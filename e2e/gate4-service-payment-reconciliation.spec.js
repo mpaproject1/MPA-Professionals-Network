@@ -1,7 +1,7 @@
 import { test, expect, request as playwrightRequest } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { getPool } from "../src/platform/db.js";
-import { register as registerMember } from "../src/membership/service.js";
+import { login as loginMember, register as registerMember } from "../src/membership/service.js";
 
 const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:3000";
 const ADMIN_EMAIL = process.env.BOOTSTRAP_ADMIN_EMAIL;
@@ -18,6 +18,7 @@ async function seedActiveMember(api, label) {
     lastName: label + suffix.slice(0, 6)
   }, randomUUID());
   const db = getPool();
+  await db.query("update app_user set email_verified_at=coalesce(email_verified_at,now()) where id=$1", [registered.user.id]);
   const product = (await db.query(
     "select id from membership_product where product_code='BASIC'"
   )).rows[0];
@@ -26,7 +27,8 @@ async function seedActiveMember(api, label) {
     "insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'admin')",
     [registered.user.id, product.id, `G4-SVC-${label}-${registered.user.id.slice(0, 8)}`]
   );
-  return { token: registered.token, userId: registered.user.id, email, password };
+  const session = await loginMember(email, password, randomUUID());
+  return { token: session.token, userId: registered.user.id, email, password };
 }
 
 test("service lifecycle is participant-scoped and manual payment reconciliation is idempotent", async () => {
@@ -63,11 +65,23 @@ test("service lifecycle is participant-scoped and manual payment reconciliation 
     expect(listingResponse.status(), "active member can create a service listing").toBe(201);
     const listing = (await listingResponse.json()).data;
 
+    const submitted = await api.post("/api/v1/services/" + listing.id + "/status", {
+      headers: providerHeaders,
+      data: { status: "published" }
+    });
+    expect(submitted.status(), "provider can submit their own listing for moderation").toBe(200);
+
+    const moderation = await api.post("/api/v1/admin/marketplace-listings/service/" + listing.id + "/moderate", {
+      headers: adminHeaders,
+      data: { decision: "approved", note: "Approved by the isolated service E2E fixture." }
+    });
+    expect(moderation.status(), "service listing must be approved before publication").toBe(200);
+
     const published = await api.post("/api/v1/services/" + listing.id + "/status", {
       headers: providerHeaders,
       data: { status: "published" }
     });
-    expect(published.status(), "provider can publish their own listing").toBe(200);
+    expect(published.status(), "approved provider can publish their own listing").toBe(200);
 
     const selfRequest = await api.post("/api/v1/services/" + listing.id + "/requests", {
       headers: providerHeaders,
@@ -86,7 +100,10 @@ test("service lifecycle is participant-scoped and manual payment reconciliation 
       headers: requesterHeaders,
       data: { message: "Retry must not duplicate an active request.", proposedPrice: 100, currency: "ETB" }
     });
-    expect(duplicateRequest.status(), "active duplicate service requests are rejected").toBe(409);
+    expect(duplicateRequest.status(), "active request retries return the existing request").toBe(201);
+    const duplicate = (await duplicateRequest.json()).data;
+    expect(duplicate.id).toBe(serviceRequest.id);
+    expect(duplicate.idempotent).toBe(true);
 
     const outsiderList = await api.get("/api/v1/me/service-requests", { headers: outsiderHeaders });
     expect(outsiderList.status()).toBe(200);

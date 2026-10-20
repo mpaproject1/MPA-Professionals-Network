@@ -13,8 +13,10 @@ async function createActor(roleCode){
  const email="security-e2e-"+roleCode+"-"+suffix+"-"+actorSuffix+"@example.test";
  const registered=await membership.register({email,password:"Security-e2e-password-12345",firstName:"Security",lastName:roleCode+actorSuffix,phone:"09"+String(Math.floor(Math.random()*100000000)).padStart(8,"0")},"security-e2e-register");
  createdUsers.push(registered.user.id);
+ await getPool().query("update app_user set email_verified_at=coalesce(email_verified_at,now()) where id=$1",[registered.user.id]);
  await getPool().query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code=$2 on conflict do nothing",[registered.user.id,roleCode]);
- return {email,userId:registered.user.id,token:registered.token};
+ const session=await membership.login(email,"Security-e2e-password-12345","security-e2e-login");
+ return {email,userId:registered.user.id,token:session.token};
 }
 
 test("non-admins cannot enroll passkeys and malformed WebAuthn responses are rejected",async()=>{
@@ -68,8 +70,15 @@ test("administrator passkey enrollment, authentication, revocation and recovery 
  const context=await browser.newContext({baseURL:"http://localhost:3001"});
  const page=await context.newPage();
  const cdp=await context.newCDPSession(page);
+ let assertionPayload;
+ page.on("request",request=>{
+  if(request.url().endsWith("/api/v1/auth/passkeys/verify")) assertionPayload=request.postDataJSON();
+ });
+ let authenticatorId;
+ const addAuthenticator=async()=>{const result=await cdp.send("WebAuthn.addVirtualAuthenticator",{options:{protocol:"ctap2",transport:"internal",hasResidentKey:true,hasUserVerification:true,isUserVerified:true,automaticPresenceSimulation:true}});authenticatorId=result.authenticatorId;};
+ const removeAuthenticator=async()=>{if(authenticatorId){await cdp.send("WebAuthn.removeVirtualAuthenticator",{authenticatorId});authenticatorId=undefined;}};
  await cdp.send("WebAuthn.enable");
- await cdp.send("WebAuthn.addVirtualAuthenticator",{options:{protocol:"ctap2",transport:"internal",hasResidentKey:true,hasUserVerification:true,isUserVerified:true,automaticPresenceSimulation:true}});
+ await addAuthenticator();
  try{
   await page.goto("/login");
   await page.getByLabel("Email").fill(admin.email);
@@ -87,6 +96,8 @@ test("administrator passkey enrollment, authentication, revocation and recovery 
   const replayApi=await playwrightRequest.newContext({baseURL:API_BASE});
   try{const replayedAssertion=await replayApi.post("/api/v1/auth/passkeys/verify",{data:assertionPayload});expect(replayedAssertion.status()).toBe(401);}finally{await replayApi.dispose();}
   await page.goto("/admin/security");
+  await removeAuthenticator();
+  await addAuthenticator();
   await page.getByRole("button",{name:"Add passkey"}).click();
   await expect(page.getByRole("heading",{name:"Save your recovery codes now"})).toBeVisible({timeout:15000});
   const recoveryCodes=await page.locator("code").allTextContents();
@@ -117,6 +128,8 @@ test("administrator passkey enrollment, authentication, revocation and recovery 
   await page.getByLabel("One-time recovery code").fill(uiRecoveryCode);
   await page.getByRole("button",{name:"Recover passkey access"}).click();
   await expect(page).toHaveURL(/\/admin\/security\?recovery=1$/,{timeout:15000});
+  await removeAuthenticator();
+  await addAuthenticator();
   await page.getByRole("button",{name:"Register replacement passkey"}).click();
   await expect(page.getByRole("heading",{name:"Save your recovery codes now"})).toBeVisible({timeout:15000});
   await page.goto("/login");
@@ -138,6 +151,6 @@ async function apiRecoveryReplay(email,code){
 
 test.afterAll(async()=>{
  const db=getPool();
- for(const userId of createdUsers){await db.query("delete from audit_log where actor_user_id=$1",[userId]);await db.query("delete from app_user where id=$1",[userId]);}
+ for(const userId of createdUsers){await db.query("delete from audit_log where actor_user_id=$1",[userId]);await db.query("delete from app_user_role where user_id=$1",[userId]);await db.query("update app_user set status='suspended',admin_passkey_enforced_at=null where id=$1",[userId]);}
  await closePool();
 });

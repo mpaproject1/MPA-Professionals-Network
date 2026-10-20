@@ -63,20 +63,25 @@ async function auth(req){
     const identity=verifyToken(header.slice(7),config.jwtSecret);
     if(!identity.sid) throw Object.assign(new Error("Session-bound authentication required."),{statusCode:401});
     const db=getPool();
-    const r=await db.query(`select s.user_id,u.status,u.email_verified_at,s.credential_setup_required,
+    const r=await db.query(`select s.user_id,u.status,u.email_verified_at,s.credential_setup_required,s.auth_method,u.admin_passkey_enforced_at,
       coalesce(json_agg(distinct role.role_code) filter(where role.role_code is not null),'[]'::json) as roles
       from auth_session s join app_user u on u.id=s.user_id
       left join app_user_role ur on ur.user_id=u.id left join app_role role on role.id=ur.role_id
       where s.id=$1 and s.revoked_at is null and s.expires_at>now()
-      group by s.id,u.id,u.status`,[identity.sid]);
+      group by s.id,u.id,u.status,s.credential_setup_required,s.auth_method,u.admin_passkey_enforced_at`,[identity.sid]);
     if(!r.rows[0]||r.rows[0].status!=="active"||r.rows[0].user_id!==identity.sub) throw Object.assign(new Error("Session expired or revoked."),{statusCode:401});
     if(!r.rows[0].email_verified_at) throw Object.assign(new Error("Verify your email before continuing."),{statusCode:403,code:"EMAIL_VERIFICATION_REQUIRED"});
     // Authorization must use current database roles, never stale role claims from a signed token.
     identity.roles=withCurrentRoles(identity,Array.isArray(r.rows[0].roles)?r.rows[0].roles:JSON.parse(r.rows[0].roles||"[]")).roles;
     identity.permissions=(await db.query("select permission_code from app_user_permission where user_id=$1",[identity.sub])).rows.map(row=>row.permission_code);
+    const path=new URL(req.url,"http://localhost").pathname.replace(/^\/+/, "");
+    const passkeySetupRoute=req.method==="POST"&&["api/v1/admin/passkeys/registration/options","api/v1/admin/passkeys/registration/verify"].includes(path);
+    const logoutRoute=req.method==="POST"&&path==="api/v1/auth/logout";
+    const isAdministrator=identity.roles.some(role=>["system_admin","admin"].includes(role));
+    if(r.rows[0].auth_method==="recovery"&&!passkeySetupRoute&&!logoutRoute) throw Object.assign(new Error("Recovery sessions may only register a replacement passkey or sign out."),{statusCode:401,code:"UNAUTHENTICATED"});
+    if(r.rows[0].admin_passkey_enforced_at&&isAdministrator&&r.rows[0].auth_method!=="passkey"&&!passkeySetupRoute&&!logoutRoute) throw Object.assign(new Error("Administrator passkey authentication is required."),{statusCode:401,code:"UNAUTHENTICATED"});
     identity.credential_setup_required=Boolean(r.rows[0].credential_setup_required);
     if(identity.credential_setup_required){
-      const path=new URL(req.url,"http://localhost").pathname.replace(/^\/+/, "");
       const allowedRecoveryRoute=(req.method==="GET"&&path==="api/v1/me")||(req.method==="PATCH"&&path==="api/v1/me/account")||(req.method==="POST"&&path==="api/v1/auth/logout");
       if(!allowedRecoveryRoute)throw Object.assign(new Error("Please set a new password before continuing to the rest of your account."),{statusCode:403,code:"PASSWORD_RESET_REQUIRED"});
     }

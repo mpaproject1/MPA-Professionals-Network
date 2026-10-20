@@ -1,0 +1,131 @@
+export class ApiError extends Error {
+  readonly code?: string;
+  readonly status: number;
+  readonly requestId?: string;
+  constructor(message: string, status: number, code?: string, requestId?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.requestId = requestId;
+  }
+}
+
+const FRIENDLY_ERRORS: Record<string,string> = {
+  IDENTITY_CONFLICT: "An account with these details may already exist. Please sign in with your existing account. If you cannot access it, contact membership support. We have not created a duplicate account.",
+  PASSWORD_TOO_SHORT: "Choose a password with at least 10 characters.",
+  EMAIL_NOT_VERIFIED: "Verify your email before signing in. You can request a new verification link below.",
+  EMAIL_VERIFICATION_REQUIRED: "Verify your email before signing in. Use the resend verification option if needed.",
+  EMAIL_DELIVERY_NOT_CONFIGURED: "Email verification delivery is not configured for this deployment. Contact the platform operator.",
+  PASSKEY_REQUIRED: "This administrator account requires a passkey or a one-time recovery code.",
+  PASSKEY_ENROLLMENT_REQUIRED: "Register an administrator passkey before continuing.",
+  PASSKEY_NOT_CONFIGURED: "Administrator passkeys are not configured for this deployment. Contact the platform operator.",
+  INVALID_CREDENTIALS: "Email/username or password is incorrect. Check your sign-in details and try again.",
+  CHALLENGE_REQUIRED: "Complete the human check before registering.",
+  CHALLENGE_INVALID: "The human-check token is invalid, expired, or already used. Complete a new check.",
+  CHALLENGE_INCORRECT: "That answer was not correct. Please try a new human check.",
+  PASSWORD_CONFIRMATION_MISMATCH: "Password confirmation does not match.",
+  USERNAME_INVALID: "Choose a username with 3–40 letters, numbers, dots, underscores or hyphens.",
+  USERNAME_TAKEN: "That username is already in use. Try another one.",
+  CURRENT_PASSWORD_REQUIRED: "Enter your current password to confirm these account changes.",
+  CURRENT_PASSWORD_INCORRECT: "That current password does not match. Please try again.",
+  PASSWORD_RESET_REQUIRED: "Set a new password to finish securing your account.",
+  ONE_TIME_LINK_INVALID: "This sign-in link is incomplete or invalid. Ask the MPA team to send a fresh one.",
+  ONE_TIME_LINK_EXPIRED: "This sign-in link has expired or has already been used. Ask the MPA team to send a new one.",
+  ACCOUNT_NOT_ACTIVE: "This account is not active. Contact MPA support for help.",
+  ACCOUNT_EMAIL_MISSING: "This account has no email address for a secure sign-in link. Contact MPA support.",
+  PUBLIC_ORIGIN_REQUIRED: "The secure sign-in link could not be prepared. Please contact the platform administrator.",
+  SELF_RECOVERY_LINK: "Use Account & Security for your own account, or ask another authorized administrator to help.",
+  UNAUTHENTICATED: "Your session has expired or you need to sign in. Please log in and try again.",
+  AUTH_RATE_LIMIT: "There have been too many unsuccessful sign-in attempts. Please wait a while and try again.",
+  RATE_LIMITED: "Too many requests were made in a short time. Please wait a moment and try again.",
+  FORBIDDEN: "Your account does not have permission to perform this action. If you believe this is incorrect, contact support.",
+  APPLICATION_EXISTS: "You already have an application in progress. Open application tracking to continue it.",
+  ACTIVE_MEMBERSHIP: "You already have an active membership. Choose the renewal option instead.",
+  MEMBERSHIP_REQUIRED: "A current active membership is required for this action. You can still browse public opportunities, request public services, and submit a job-interest request without a membership.",
+  PROFESSIONAL_PROFILE_FORBIDDEN: "This account uses an organization profile. Open the organization workspace instead of the professional profile.",
+  APPLICATION_NOT_APPROVED: "The membership application must be approved before its payment can be verified. No activation has occurred.",
+  CONSENT_REQUIRED: "The applicant has not granted current employer-sharing consent. No employer sharing was completed.",
+  CONSENT_FIELD_MISMATCH: "The selected fields exceed the applicant's sharing consent. No data was shared.",
+  ORGANIZATION_NOT_ELIGIBLE: "Only verified, visible organizations can receive job-seeker demand through this workflow.",
+  OTHER_VALUE_REQUIRED: "You selected Other. Enter the value in the custom field that appeared below the selection.",
+  UNEXPECTED_CUSTOM_VALUE: "Choose Other before entering a custom value, or select a listed option.",
+  INVALID_REFERENCE: "That reference option is no longer available. Refresh the list and choose an active option.",
+  EVIDENCE_FILE_NOT_OWNED: "Attach evidence that was uploaded and confirmed by your own account.",
+  CSV_INVALID: "The CSV has a formatting problem. Check the quoted fields and try again.",
+  CSV_COLUMNS_REQUIRED: "The CSV must include code and label columns. Download an export to use as a template.",
+  RENEWAL_NOT_ELIGIBLE: "Renewal is not available because there is no active membership to renew.",
+  RENEWAL_NOT_SUPPORTED: "This membership option does not support renewal.",
+  INVALID_PRODUCT: "That membership option is no longer available. Refresh the page and choose another option.",
+  INVALID_STATE: "This item has changed and can no longer be updated in its current state. Refresh the page to see the latest status.",
+  PAYMENT_AMOUNT_MISMATCH: "The amount does not match the approved application fee. Check the amount and try again.",
+  NOT_FOUND: "We could not find that item. It may have been removed or is no longer available.",
+  INVALID_JSON: "Some submitted information could not be read. Review the form and try again.",
+  PAYLOAD_TOO_LARGE: "The submitted information is too large. Reduce the size and try again.",
+  AUTH_NOT_CONFIGURED: "Sign-in is temporarily unavailable. Please contact support.",
+  MISSING_COLUMNS: "The CSV is missing one or more required columns. Download the latest MPA member template and use its exact headings.",
+  DUPLICATE_COLUMNS: "The CSV contains duplicate column headings. Keep one column for each field.",
+  INVALID_CSV: "The CSV has invalid quoting or formatting. Open it in a spreadsheet app and save it as CSV UTF-8.",
+  EMPTY_IMPORT: "Choose a non-empty CSV file before previewing the import.",
+  IMPORT_TOO_LARGE: "The member import is too large. Split the register into smaller CSV batches.",
+  AUDIT_REASON_REQUIRED: "Enter a clear audit reason before applying this import.",
+  SENSITIVE_REPORT_FORBIDDEN: "This report contains restricted member or financial data. Request the appropriate report permission.",
+  INVALID_EXPORT_FORMAT: "Choose one of the available export formats.",
+  INVALID_INVITATION: "This member invitation link is incomplete. Open the full link from the invitation email.",
+  INVITATION_EXPIRED: "This invitation has expired or was already used. Contact MPA membership support for a new invitation.",
+  PUBLIC_CONTACT_DETAILS: "Remove phone numbers and email addresses from the public report summary before publishing it."
+};
+
+function safeServerMessage(value: unknown): string | undefined {
+  if (typeof value !== "string") return;
+  const message = value.trim();
+  if (!message || message.length > 240 || /[{}<>]/.test(message) ||
+      /\b(sql|query|constraint|relation|column|database|stack trace|TypeError|ReferenceError|ECONN|ENOTFOUND)\b/i.test(message)) return;
+  return message;
+}
+
+function statusMessage(status: number): string {
+  if (status === 400 || status === 422) return "Please review the information and correct the form before trying again.";
+  if (status === 401) return FRIENDLY_ERRORS.UNAUTHENTICATED;
+  if (status === 403) return FRIENDLY_ERRORS.FORBIDDEN;
+  if (status === 404) return FRIENDLY_ERRORS.NOT_FOUND;
+  if (status === 409) return "This action conflicts with the current account or application state. Review the information and try again.";
+  if (status === 413) return FRIENDLY_ERRORS.PAYLOAD_TOO_LARGE;
+  if (status === 429) return FRIENDLY_ERRORS.RATE_LIMITED;
+  if (status >= 500) return "We could not complete that request because of a server problem. Please try again later. If it continues, contact support.";
+  return "We could not complete that request. Please try again.";
+}
+
+export async function api<T>(path:string,init:RequestInit={},token?:string):Promise<T>{
+  const headers=new Headers(init.headers);
+  if(!(typeof FormData !== "undefined" && init.body instanceof FormData)) headers.set("Content-Type","application/json");
+  if(token) headers.set("Authorization","Bearer "+token);
+  let response: Response;
+  try {
+    response = await fetch(path,{...init,headers,cache:"no-store"});
+  } catch {
+    throw new ApiError("We could not reach the service. Check your connection and try again.",0,"NETWORK_ERROR");
+  }
+
+  const requestId = response.headers.get("x-request-id") || undefined;
+  let body: any = null;
+  const raw = await response.text();
+  if (raw) {
+    try { body = JSON.parse(raw); }
+    catch { body = null; }
+  }
+
+  if(!response.ok) {
+    const error = body?.error ?? body?.data?.error ?? body;
+    const code = typeof error?.code === "string" ? error.code : undefined;
+    const message = FRIENDLY_ERRORS[code || ""] ||
+      (code === "VALIDATION_ERROR" || code === "BUSINESS_RULE" ? safeServerMessage(error?.message) : undefined) ||
+      statusMessage(response.status);
+    throw new ApiError(requestId ? `${message} Reference: ${requestId}` : message,response.status,code,requestId);
+  }
+
+  if (body === null) {
+    throw new ApiError("The service returned an unexpected response. Please try again.",response.status,"INVALID_RESPONSE",requestId);
+  }
+  return (body?.data??body) as T;
+}

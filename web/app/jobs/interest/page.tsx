@@ -1,9 +1,9 @@
 "use client";
+import { type FormEvent, useEffect, useState } from "react";
 import { FormFeedback } from "../../../components/form-feedback";
-import { FormEvent, useEffect, useState } from "react";
 import { TagInput } from "../../../components/tag-input";
-import { api, ApiError } from "../../../lib/api";
-import { Card, Badge } from "../../../components/ui";
+import { Badge, Card } from "../../../components/ui";
+import { ApiError, api } from "../../../lib/api";
 
 type Inquiry = { id: string; public_reference: string; continuationToken: string; nextStep?: string };
 function getPublicReference(value: Inquiry | null): string | null { return value?.public_reference ?? null; }
@@ -35,7 +35,7 @@ export default function JobInterestPage() {
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
   const [sharingOrganizationsLoading, setSharingOrganizationsLoading] = useState(false);
   const [sharingOrganizationsError, setSharingOrganizationsError] = useState("");
-  const [sharingOrganizationsReload, setSharingOrganizationsReload] = useState(0);
+  const [_sharingOrganizationsReload, setSharingOrganizationsReload] = useState(0);
   const [consentToProcess, setConsentToProcess] = useState(false);
   const [shareWithEmployers, setShareWithEmployers] = useState(false);
   const [inquiry, setInquiry] = useState<Inquiry | null>(null);
@@ -57,14 +57,14 @@ export default function JobInterestPage() {
       .catch(e => { if (active) setSharingOrganizationsError(e instanceof ApiError ? e.message : "Verified organizations could not be loaded. Retry before saving consent."); })
       .finally(() => { if (active) setSharingOrganizationsLoading(false); });
     return () => { active = false; };
-  }, [shareWithEmployers, sharingOrganizationsReload]);
+  }, [shareWithEmployers]);
   function toggleField(field: string, checked: boolean) {
     setShareFields(current => checked ? [...new Set([...current, field])] : current.filter(item => item !== field));
   }
   async function refreshSharingHistory(item: Inquiry) {
     setSharingHistoryError("");
     try {
-      const rows = await api<ShareHistory[]>("/api/v1/public/opportunity-inquiries/" + encodeURIComponent(item.public_reference) + "/sharing-history", { method: "POST", body: JSON.stringify({ token: item.continuationToken }) });
+      const rows = await api<ShareHistory[]>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(item.public_reference)}/sharing-history`, { method: "POST", body: JSON.stringify({ token: item.continuationToken }) });
       setSharingHistory(Array.isArray(rows) ? rows : []);
     } catch (e) {
       setSharingHistoryError(e instanceof ApiError ? e.message : "Sharing history could not be loaded. Retry without resubmitting your request.");
@@ -74,7 +74,7 @@ export default function JobInterestPage() {
   async function loadExistingRequest(event: FormEvent) {
     event.preventDefault(); setLookupBusy(true); setError(""); setNotice("");
     try {
-      const record = await api<any>("/api/v1/public/opportunity-inquiries/" + encodeURIComponent(lookupReference.trim()) + "/access", { method: "POST", body: JSON.stringify({ token: lookupToken.trim() }) });
+      const record = await api<any>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(lookupReference.trim())}/access`, { method: "POST", body: JSON.stringify({ token: lookupToken.trim() }) });
       if (record.inquiryType !== "job" || record.jobTitle) throw new Error("This reference is not a no-vacancy job-interest request.");
       const recovered: Inquiry = { id: "", public_reference: record.reference, continuationToken: lookupToken.trim(), nextStep: record.nextStep };
       setInquiry(recovered);
@@ -121,7 +121,7 @@ export default function JobInterestPage() {
         }
         setProcessingConsent(true);
         try {
-          await api<ConsentResult>("/api/v1/public/opportunity-inquiries/" + encodeURIComponent(created.public_reference) + "/sharing-consent", {
+          await api<ConsentResult>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(created.public_reference)}/sharing-consent`, {
             method: "POST",
             body: JSON.stringify({ token: created.continuationToken, employerSharingConsent: true, scope: "named_employer", organizationId: selectedOrganizationId, fields: shareFields })
           });
@@ -145,7 +145,7 @@ export default function JobInterestPage() {
     if (!sharingOrganizations.some(org => org.id === selectedOrganizationId)) { setError("Choose an organization from the current verified-organization list, then retry."); return; }
     setProcessingConsent(true); setError(""); setNotice("");
     try {
-      await api<ConsentResult>("/api/v1/public/opportunity-inquiries/" + encodeURIComponent(inquiry.public_reference) + "/sharing-consent", {
+      await api<ConsentResult>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(inquiry.public_reference)}/sharing-consent`, {
         method: "POST",
         body: JSON.stringify({ token: inquiry.continuationToken, employerSharingConsent: true, scope: "named_employer", organizationId: selectedOrganizationId, fields: shareFields })
       });
@@ -159,7 +159,7 @@ export default function JobInterestPage() {
     if (!inquiry) return;
     setProcessingConsent(true); setError(""); setNotice("");
     try {
-      await api<ConsentResult>("/api/v1/public/opportunity-inquiries/" + encodeURIComponent(inquiry.public_reference) + "/sharing-consent", {
+      await api<ConsentResult>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(inquiry.public_reference)}/sharing-consent`, {
         method: "POST",
         body: JSON.stringify({ token: inquiry.continuationToken, employerSharingConsent: false })
       });

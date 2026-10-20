@@ -1,7 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { generateMembershipNumber } from "../../src/membership/service.js";
+import test from "node:test";
 import { getMembershipCardStatus } from "../../src/membership/card.js";
+import { generateMembershipNumber } from "../../src/membership/service.js";
 
 test("canonical membership IDs use MPA-year-eight-uppercase-hex and remain distinct from tracking references",()=>{
   const date=new Date("2026-10-15T12:00:00.000Z");

@@ -8,7 +8,7 @@ export function membershipEndDate(startDate, feeTerms = {}) {
   if (feeTerms.durationDays === null || feeTerms.durationDays === undefined || feeTerms.durationDays === "") return null;
   const days = Number(feeTerms.durationDays);
   if (!Number.isInteger(days) || days < 1) throw new RangeError("Membership duration must be a positive whole number of days.");
-  const start = startDate instanceof Date ? new Date(startDate) : new Date(String(startDate) + "T00:00:00.000Z");
+  const start = startDate instanceof Date ? new Date(startDate) : new Date(`${String(startDate)}T00:00:00.000Z`);
   if (Number.isNaN(start.getTime())) throw new RangeError("Membership start date is invalid.");
   start.setUTCHours(0, 0, 0, 0);
   if (feeTerms.durationPolicy === "calendar_year_inclusive") {
@@ -23,8 +23,8 @@ export function membershipEndDate(startDate, feeTerms = {}) {
 export function isMembershipCurrent({ status, startDate, endDate }, today = new Date()) {
   if (status !== "active" || !startDate) return false;
   const date = today instanceof Date ? new Date(today) : new Date(today);
-  const start = new Date(String(startDate).slice(0, 10) + "T00:00:00.000Z");
-  const end = endDate ? new Date(String(endDate).slice(0, 10) + "T00:00:00.000Z") : null;
+  const start = new Date(`${String(startDate).slice(0, 10)}T00:00:00.000Z`);
+  const end = endDate ? new Date(`${String(endDate).slice(0, 10)}T00:00:00.000Z`) : null;
   const current = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
   return !Number.isNaN(start.getTime()) && start.getTime() <= current && (!end || end.getTime() >= current);
 }

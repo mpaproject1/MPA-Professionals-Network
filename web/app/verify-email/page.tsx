@@ -26,7 +26,7 @@ export default function VerifyEmail(){
   setToken(value);
   if(value)void verify(value);
   else setStatus("Enter the verification token from your email link.");
- },[]);
+ },[verify]);
  async function verify(value:string){
   setBusy(true);setError("");
   try{

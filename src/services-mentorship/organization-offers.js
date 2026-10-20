@@ -64,13 +64,13 @@ export async function listMyOrganizationMentorshipOffers(userId){
 }
 export async function listOrganizationMentorshipOffers(viewerId=null){
  const db=getPool();
- return (await db.query("select x.id,x.organization_id,o.display_name organization_name,x.title,x.description,x.expertise,x.languages,x.delivery_mode,x.visibility,x.created_at from organization_mentorship_offer x join organization o on o.id=x.organization_id where x.status='published' and x.moderation_status='approved' and o.verification_status='verified' and (x.visibility='public' or ($1::uuid is not null and x.visibility='members' and "+ACTIVE_MEMBER_SQL.replaceAll("$1","$2")+")) order by x.created_at desc limit 100",[viewerId||null,viewerId||null])).rows;
+ return (await db.query(`select x.id,x.organization_id,o.display_name organization_name,x.title,x.description,x.expertise,x.languages,x.delivery_mode,x.visibility,x.created_at from organization_mentorship_offer x join organization o on o.id=x.organization_id where x.status='published' and x.moderation_status='approved' and o.verification_status='verified' and (x.visibility='public' or ($1::uuid is not null and x.visibility='members' and ${ACTIVE_MEMBER_SQL.replaceAll("$1","$2")})) order by x.created_at desc limit 100`,[viewerId||null,viewerId||null])).rows;
 }
 export async function requestOrganizationMentorship(offerId,requesterId,input,requestId){
  return withTransaction(async db=>{
   const offer=(await db.query("select x.*,o.verification_status from organization_mentorship_offer x join organization o on o.id=x.organization_id where x.id=$1 for update of x",[offerId])).rows[0];
   if(!offer||offer.status!=="published"||offer.moderation_status!=="approved"||offer.verification_status!=="verified")throw fail(404,"This organization mentorship offer is not available.","NOT_FOUND");
-  if(offer.visibility==="members"&&!(await db.query("select 1 where "+ACTIVE_MEMBER_SQL,[requesterId])).rowCount)throw fail(403,"An active membership is required to request this member-only mentorship program.","MEMBERSHIP_REQUIRED");
+  if(offer.visibility==="members"&&!(await db.query(`select 1 where ${ACTIVE_MEMBER_SQL}`,[requesterId])).rowCount)throw fail(403,"An active membership is required to request this member-only mentorship program.","MEMBERSHIP_REQUIRED");
   if((await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[offer.organization_id,requesterId])).rowCount)throw fail(409,"Your organization team already manages this offer.","SELF_REQUEST");
   const message=clean(input.message,3000);
   if(message.length<10)throw fail(400,"Tell the organization what mentorship support you need (at least 10 characters).","VALIDATION_ERROR");

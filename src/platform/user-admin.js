@@ -1,5 +1,5 @@
-import {getPool,withTransaction} from "./db.js";
 import {hashPassword} from "../membership/identity.js";
+import {getPool,withTransaction} from "./db.js";
 import {createInAppNotification} from "./notifications.js";
 
 function err(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e}
@@ -76,7 +76,7 @@ export async function listRoles(actor){
 }
 
 export async function updateUser(actor,userId,input,requestId){
- const db=getPool();
+ const _db=getPool();
  const actorId=typeof actor==="string"?actor:actor?.sub;
  const actorPermissions=Array.isArray(actor?.permissions)?actor.permissions:[];
  return withTransaction(async tx=>{

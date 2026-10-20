@@ -1,10 +1,10 @@
 "use client";
-import {FormEvent,useState} from "react";
-import {useRouter} from "next/navigation";
 import {Fingerprint,KeyRound,LogIn,ShieldCheck} from "lucide-react";
-import {Card} from "../../components/ui";
+import {useRouter} from "next/navigation";
+import {type FormEvent,useState} from "react";
 import {EmailVerificationGate} from "../../components/email-verification-gate";
-import {api,ApiError} from "../../lib/api";
+import {Card} from "../../components/ui";
+import {ApiError, api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
 
 function fromB64url(value:string):Uint8Array{
@@ -41,7 +41,7 @@ export default function Login(){
    setToken(token);
    if(passkeyEnrollmentRequired){router.replace("/admin/security?enroll=1");return;}
    const requested=new URLSearchParams(window.location.search).get("next");
-   const destination=requested&&requested.startsWith("/")&&!requested.startsWith("//")?requested:"/dashboard";
+   const destination=requested?.startsWith("/")&&!requested.startsWith("//")?requested:"/dashboard";
    router.replace(destination);
  }
  async function submit(e:FormEvent){
@@ -73,7 +73,7 @@ export default function Login(){
  }
  async function resendVerification(){
    setBusy(true);setError("");
-   try{const result=await api<{developmentVerificationUrl?:string}>("/api/v1/auth/email-verification/resend",{method:"POST",body:JSON.stringify({email})});setError(result.developmentVerificationUrl?"Development verification link: "+result.developmentVerificationUrl:"If this address needs verification, a new link has been requested. Check your inbox and spam folder.");}
+   try{const result=await api<{developmentVerificationUrl?:string}>("/api/v1/auth/email-verification/resend",{method:"POST",body:JSON.stringify({email})});setError(result.developmentVerificationUrl?`Development verification link: ${result.developmentVerificationUrl}`:"If this address needs verification, a new link has been requested. Check your inbox and spam folder.");}
    catch(err){setError(err instanceof Error?err.message:"Could not request a verification link.");}
    finally{setBusy(false);}
  }

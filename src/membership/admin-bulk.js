@@ -1,7 +1,7 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
-import { hashPassword, normalizeEmail, normalizePhone } from "./identity.js";
 import { makeXlsx } from "../platform/reports.js";
+import { hashPassword, normalizeEmail, normalizePhone } from "./identity.js";
 
 function problem(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e}
 const IMPORT_ROLES=["system_admin","admin","membership_reviewer","finance_officer"];
@@ -19,10 +19,10 @@ function csvRows(csv){
  const headers=rows.shift().map(h=>h.trim().toLowerCase().replace(/[\s-]+/g,"_"));
  if(new Set(headers).size!==headers.length)throw problem(400,"The CSV has duplicate column headings.","DUPLICATE_COLUMNS");
  const required=["email","full_name","membership_number","product_code","status","start_date","end_date","approved_membership","approval_reference"];
- const missing=required.filter(h=>!headers.includes(h));if(missing.length)throw problem(400,"Missing required columns: "+missing.join(", "),"MISSING_COLUMNS");
+ const missing=required.filter(h=>!headers.includes(h));if(missing.length)throw problem(400,`Missing required columns: ${missing.join(", ")}`,"MISSING_COLUMNS");
  return rows.map((values,index)=>({rowNumber:index+2,raw:Object.fromEntries(headers.map((h,i)=>[h,String(values[i]??"").trim()]))}));
 }
-function parseDate(v){if(!v)return null;if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;const d=new Date(v+"T00:00:00Z");return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v?v:null;}
+function parseDate(v){if(!v)return null;if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;const d=new Date(`${v}T00:00:00Z`);return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v?v:null;}
 function cleanRow(row){
  const x=row.raw,errors=[];
  const email=normalizeEmail(x.email),fullName=String(x.full_name||"").trim().replace(/\s+/g," "),membershipNumber=String(x.membership_number||"").trim(),productCode=String(x.product_code||"").trim().toUpperCase(),status=String(x.status||"").trim().toLowerCase();
@@ -94,11 +94,11 @@ export async function applyMemberImport(identity,importId,{reason=""}={},request
    if(row.match_status==="conflict"||row.match_status==="ignored"||row.match_status==="applied"){if(row.match_status==="conflict")conflictCount++;continue;}
    const product=productMap.get(row.product_code);
    if(!product){conflictCount++;await tx.query("update membership_import_row set match_status='conflict',diagnostics=$2 where id=$1",[row.id,JSON.stringify(["Membership product is no longer active or does not exist."])]);continue;}
-   await tx.query("select pg_advisory_xact_lock(hashtext($1))",["membership:"+String(row.membership_number).toLowerCase()]);
+   await tx.query("select pg_advisory_xact_lock(hashtext($1))",[`membership:${String(row.membership_number).toLowerCase()}`]);
    const dup=(await tx.query("select id from membership_record where lower(membership_number)=lower($1) and status<>'merged' for update",[row.membership_number])).rows[0];
    if(dup){conflictCount++;await tx.query("update membership_import_row set match_status='conflict',diagnostics=$2 where id=$1",[row.id,JSON.stringify(["Membership number already exists; no membership record was changed."])]);continue;}
    if(row.legacy_member_id){
-    await tx.query("select pg_advisory_xact_lock(hashtext($1))",["legacy-member:"+String(row.legacy_member_id).toLowerCase()]);
+    await tx.query("select pg_advisory_xact_lock(hashtext($1))",[`legacy-member:${String(row.legacy_member_id).toLowerCase()}`]);
     const legacy=(await tx.query("select id from membership_record where source='legacy_import' and legacy_member_id=$1 for update",[row.legacy_member_id])).rows[0];
     if(legacy){conflictCount++;await tx.query("update membership_import_row set match_status='conflict',diagnostics=$2 where id=$1",[row.id,JSON.stringify(["Legacy member ID already exists in an earlier import."])]);continue;}
    }
@@ -114,7 +114,7 @@ export async function applyMemberImport(identity,importId,{reason=""}={},request
     await tx.query("insert into notification_preference(user_id) values($1) on conflict do nothing",[userId]);
     const token=randomBytes(32).toString("base64url"),tokenHash=createHash("sha256").update(token).digest("hex");
     await tx.query("insert into member_invitation(user_id,token_hash,expires_at,created_by,import_id) values($1,$2,now()+interval '7 days',$3,$4)",[userId,tokenHash,identity.sub,importId]);
-    await tx.query("insert into notification_outbox(channel,recipient,template_code,payload) values('email',$1,'mpa_member_invitation',$2)",[row.email,JSON.stringify({displayName:row.full_name,invitationToken:token,claimPath:"/member-invitation/claim?token="+token,expiresInDays:7,importBatchId:importId})]);
+    await tx.query("insert into notification_outbox(channel,recipient,template_code,payload) values('email',$1,'mpa_member_invitation',$2)",[row.email,JSON.stringify({displayName:row.full_name,invitationToken:token,claimPath:`/member-invitation/claim?token=${token}`,expiresInDays:7,importBatchId:importId})]);
    }
    const member=(await tx.query("insert into membership_record(user_id,legacy_member_id,membership_product_id,membership_number,status,start_date,end_date,source,source_import_id,legacy_payload) values($1,$2,$3,$4,$5,$6,$7,'legacy_import',$8,$9) returning id",[userId,row.legacy_member_id,product.id,row.membership_number,row.status,row.start_date,row.end_date,importId,row.raw_payload])).rows[0];
    await tx.query("insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'legacy_member_imported',now(),$2,'legacy_import',$3)",[member.id,identity.sub,JSON.stringify({importId,rowNumber:row.row_number,approvalConfirmed:row.raw_payload?.approved_membership==="yes",approvalReference:row.raw_payload?.approval_reference||null,reason:why,paymentImported:false})]);
@@ -136,9 +136,9 @@ export async function exportMembers(identity,{q="",status="",format="csv"}={},re
  where ($1='' or lower(coalesce(p.display_name,'')) like lower('%'||$1||'%') or lower(coalesce(u.email,'')) like lower('%'||$1||'%') or lower(mr.membership_number) like lower('%'||$1||'%'))
  and ($2='' or mr.status=$2) order by mr.created_at desc limit 10000`,[String(q).slice(0,120),String(status).slice(0,30)])).rows;
  const headers=["legacy_member_id","email","phone","full_name","membership_number","product_code","product_name","status","start_date","end_date","source","created_at"];
- const esc=v=>{let s=v==null?"":v instanceof Date?v.toISOString().slice(0,10):String(v);if(typeof v==="string"&&/^[\s]*[=+\-@]/.test(s))s="'"+s;return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
- const csv=[headers.join(","),...rows.map(row=>headers.map(h=>esc(row[h])).join(","))].join("\r\n")+"\r\n";
- const filename="mpa-members-"+new Date().toISOString().slice(0,10)+(format==="xlsx"?".xlsx":".csv");
+ const esc=v=>{let s=v==null?"":v instanceof Date?v.toISOString().slice(0,10):String(v);if(typeof v==="string"&&/^[\s]*[=+\-@]/.test(s))s=`'${s}`;return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;};
+ const csv=`${[headers.join(","),...rows.map(row=>headers.map(h=>esc(row[h])).join(","))].join("\r\n")}\r\n`;
+ const filename=`mpa-members-${new Date().toISOString().slice(0,10)}${format==="xlsx"?".xlsx":".csv"}`;
  const buffer=format==="xlsx"?makeXlsx({report:{title:"MPA member directory",scope:"Restricted platform PII",definition:"Member contact and membership details. Treat this export as confidential.",columns:headers},filters:{q,status},generatedAt:new Date().toISOString(),rows:rows.map(row=>Object.fromEntries(headers.map(h=>[h,row[h] instanceof Date?row[h].toISOString():row[h]??""]))) ,totals:{rows:rows.length}}):Buffer.from(csv,"utf8");
  await getPool().query("insert into audit_log(actor_user_id,action,resource_type,request_id,outcome,metadata) values($1,'membership.exported','membership_record',$2,'success',$3)",[identity.sub,requestId,JSON.stringify({format,rowCount:rows.length,filters:{q,status}})]);
  return {buffer,rowCount:rows.length,filename,contentType:format==="xlsx"?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"text/csv; charset=utf-8"};

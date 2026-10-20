@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
-import { getPool, withTransaction } from "./db.js";
+import { hashSessionToken, newSessionToken, sessionTokenPayload, signToken } from "./auth.js";
 import { loadConfig } from "./config.js";
-import { signToken, newSessionToken, hashSessionToken, sessionTokenPayload } from "./auth.js";
+import { getPool, withTransaction } from "./db.js";
 
 const b64url = value => Buffer.from(value).toString("base64url");
 const fromB64url = value => {
@@ -23,7 +23,7 @@ function relyingParty() {
   if (production && parsed.protocol !== "https:") fail(503,"Production passkeys require an HTTPS origin.","PASSKEY_NOT_CONFIGURED");
   if (parsed.pathname !== "/" || parsed.search || parsed.hash) fail(503,"WEBAUTHN_ORIGIN must be an origin without a path, query, or fragment.","PASSKEY_NOT_CONFIGURED");
   const rpId = configuredRpId || parsed.hostname;
-  if (parsed.hostname !== rpId && !parsed.hostname.endsWith("." + rpId)) fail(503,"WEBAUTHN_RP_ID does not match WEBAUTHN_ORIGIN.","PASSKEY_NOT_CONFIGURED");
+  if (parsed.hostname !== rpId && !parsed.hostname.endsWith(`.${rpId}`)) fail(503,"WEBAUTHN_RP_ID does not match WEBAUTHN_ORIGIN.","PASSKEY_NOT_CONFIGURED");
   return { origin: parsed.origin, rpId, rpName: "MPA Professionals Network" };
 }
 
@@ -216,7 +216,7 @@ export async function finishAdminPasskeyAuthentication(emailInput,payload,reques
 }
 
 export async function recoverAdminPasskey(emailInput,codeInput,requestMeta={},requestId) {
-  const email=String(emailInput||"").trim().toLowerCase(),code=String(codeInput||"").trim().toUpperCase(),db=getPool();
+  const email=String(emailInput||"").trim().toLowerCase(),code=String(codeInput||"").trim().toUpperCase(),_db=getPool();
   if(!email||!code||code.length>64)fail(401,"Recovery could not be completed.","RECOVERY_INVALID");
   return withTransaction(async tx=>{
     const user=(await tx.query("select id,email,username,status,email_verified_at,admin_passkey_enforced_at from app_user where lower(email)=lower($1) for update",[email])).rows[0];

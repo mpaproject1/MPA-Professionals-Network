@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { hashPassword, validatePassword, verifyPassword } from "../src/membership/identity.js";
 
 test("registration passwords must contain at least 10 characters", () => {

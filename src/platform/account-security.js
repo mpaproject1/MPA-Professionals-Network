@@ -1,9 +1,10 @@
 import crypto from "node:crypto";
-import {getPool,withTransaction} from "./db.js";
-import {hashPassword,verifyPassword,validatePassword} from "../membership/identity.js";
-import {newSessionToken,hashSessionToken,sessionTokenPayload,signToken} from "./auth.js";
-import {createInAppNotification} from "./notifications.js";
+import {hashPassword,validatePassword, verifyPassword} from "../membership/identity.js";
+import {hashSessionToken,newSessionToken,sessionTokenPayload,signToken} from "./auth.js";
 import {loadConfig} from "./config.js";
+import {withTransaction} from "./db.js";
+import {createInAppNotification} from "./notifications.js";
+
 function err(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e}
 const PRIVILEGED=new Set(["system_admin","super_admin","admin","reviewer","verification_reviewer","ethics_reviewer","appeal_reviewer","finance_officer"]);
 async function roles(db,id){return (await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[id])).rows.map(x=>x.role_code)}
@@ -20,7 +21,7 @@ export async function updateOwnCredentials(identity,input,requestId){
   const user=(await tx.query("select id,username,password_hash,status from app_user where id=$1 for update",[userId])).rows[0];
   if(!user||user.status!=="active")throw err(401,"This account cannot be changed right now. Please contact support if you need help.","ACCOUNT_UNAVAILABLE");
   const usernameChanged=usernameInput!==undefined&&usernameInput!==String(user.username).toLowerCase();
-  if(usernameChanged){await tx.query("select pg_advisory_xact_lock(hashtext($1))",["account_username:"+usernameInput]);if(!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(usernameInput))throw err(400,"Choose a username with 3–40 letters, numbers, dots, underscores or hyphens. It must start with a letter or number.","USERNAME_INVALID");}
+  if(usernameChanged){await tx.query("select pg_advisory_xact_lock(hashtext($1))",[`account_username:${usernameInput}`]);if(!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(usernameInput))throw err(400,"Choose a username with 3–40 letters, numbers, dots, underscores or hyphens. It must start with a letter or number.","USERNAME_INVALID");}
   if(!recovery&&!verifyPassword(currentPassword,user.password_hash))throw err(400,"That current password does not match. Please try again.","CURRENT_PASSWORD_INCORRECT");
   if(usernameChanged){const duplicate=await tx.query("select id from app_user where id<>$2 and (lower(username)=lower($1) or lower(email)=lower($1)) limit 1",[usernameInput,userId]);if(duplicate.rowCount)throw err(409,"That username is already in use. Try another one.","USERNAME_TAKEN")}
   const nextUsername=usernameChanged?usernameInput:user.username;
@@ -37,7 +38,7 @@ export async function createOneTimeSessionLink(actor,userId,requestId,reasonInpu
  if(!reason)throw err(400,"Add a short reason so the account recovery is recorded properly.","AUDIT_REASON_REQUIRED");
  if(!origin||!/^https?:\/\/[^/]+$/i.test(origin))throw err(400,"The secure sign-in link could not be prepared for this website. Please contact the platform administrator.","PUBLIC_ORIGIN_REQUIRED");
  if(userId===actorId)throw err(400,"For your own account, use Account & Security or ask another authorized administrator to help.","SELF_RECOVERY_LINK");
- const raw=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(raw).digest("hex"),url=origin+"/account/one-time-access?token="+encodeURIComponent(raw);
+ const raw=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(raw).digest("hex"),url=`${origin}/account/one-time-access?token=${encodeURIComponent(raw)}`;
  return withTransaction(async tx=>{
   const target=(await tx.query("select id,email,status from app_user where id=$1 for update",[userId])).rows[0];
   if(!target)throw err(404,"That account could not be found.","NOT_FOUND");

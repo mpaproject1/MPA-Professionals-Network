@@ -1,16 +1,17 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {ArrowLeft,Bookmark,Briefcase,MapPin,RefreshCw,ShieldCheck} from "lucide-react";
 import Link from "next/link";
 import {useParams} from "next/navigation";
-import {ArrowLeft,Bookmark,Briefcase,MapPin,RefreshCw,ShieldCheck} from "lucide-react";
-import {Card,Badge} from "../../../components/ui";
-import {api,ApiError} from "../../../lib/api";
+import {useCallback,useEffect,useState} from "react";
+import {Badge, Card} from "../../../components/ui";
+import {ApiError, api} from "../../../lib/api";
 import {useSavedDiscoveryItems} from "../../../lib/use-saved-discovery-items";
+
 type Profile={user_id:string;display_name:string;professional_title?:string|null;headline?:string|null;bio?:string|null;directory_summary?:string|null;years_experience?:number|null;location_label?:string|null;availability_status?:string|null;verifiedClaims?:{claim_code:string}[];experience?:{id:string;role_title:string;employer_name?:string|null;description?:string|null;start_date?:string|null;end_date?:string|null;is_current:boolean}[]};
 export default function PublicProfessionalProfile(){
  const params=useParams<{id:string}>();const id=String(params.id||"");const saved=useSavedDiscoveryItems();
  const [item,setItem]=useState<Profile|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
- const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Profile>("/api/v1/talent/"+encodeURIComponent(id)));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This professional profile is unavailable to your account.");}finally{setLoading(false);}},[id]);
+ const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Profile>(`/api/v1/talent/${encodeURIComponent(id)}`));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This professional profile is unavailable to your account.");}finally{setLoading(false);}},[id]);
  useEffect(()=>{void load();},[load]);
  return <main className="grid" style={{gap:18}}><Link href="/network" className="btn btn-ghost"><ArrowLeft size={16}/> Back to professionals</Link>
  {loading?<Card><div className="row"><RefreshCw size={18}/><p className="muted">Loading professional profile…</p></div></Card>

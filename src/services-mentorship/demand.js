@@ -21,7 +21,7 @@ async function notify(db,userId,eventCode,type,id,payload={}){
  return {channel:"in_app",status:"recorded",eventId:row.id,externalDelivery:"not_configured"};
 }
 function clean(value,max){return String(value??"").trim().slice(0,max);}
-function required(value,label,max){const v=clean(value,max);if(!v)throw fail(400,label+" is required.","VALIDATION_ERROR");return v;}
+function required(value,label,max){const v=clean(value,max);if(!v)throw fail(400,`${label} is required.`,"VALIDATION_ERROR");return v;}
 function allowedType(type){if(!["service","mentorship"].includes(type))throw fail(400,"Demand type must be service or mentorship.","VALIDATION_ERROR");return type;}
 function assertPublicCopy(...values){
  const text=values.map(v=>String(v??"")).join(" ");
@@ -50,11 +50,11 @@ export async function listMyDemand(userId){
 }
 export async function listPublishedTopics(filters={}){
  const args=[],where=["t.status='published'","(t.closes_at is null or t.closes_at>now())"];
- if(filters.type){args.push(allowedType(filters.type));where.push("t.demand_type=$"+args.length);}
- if(filters.q){args.push("%"+clean(filters.q,120)+"%");where.push("(t.title ilike $"+args.length+" or t.summary ilike $"+args.length+" or t.category ilike $"+args.length+")");}
+ if(filters.type){args.push(allowedType(filters.type));where.push(`t.demand_type=$${args.length}`);}
+ if(filters.q){args.push(`%${clean(filters.q,120)}%`);where.push(`(t.title ilike $${args.length} or t.summary ilike $${args.length} or t.category ilike $${args.length})`);}
  const limit=Math.min(Math.max(Number(filters.limit)||24,1),60);
  const db=getPool();
- const rows=(await db.query("select t.id,t.demand_type,t.title,t.summary,t.category,t.delivery_mode,t.location_label,t.interest_goal,t.published_at,coalesce(i.total,0)::int interest_count,coalesce(i.ready,0)::int ready_count from marketplace_demand_topic t left join lateral (select count(*) filter(where status='active') total,count(*) filter(where status='active' and interest_level in ('interested','ready_to_engage','can_provide')) ready from marketplace_demand_interest where topic_id=t.id) i on true where "+where.join(" and ")+" order by t.published_at desc limit "+limit,args)).rows;
+ const rows=(await db.query(`select t.id,t.demand_type,t.title,t.summary,t.category,t.delivery_mode,t.location_label,t.interest_goal,t.published_at,coalesce(i.total,0)::int interest_count,coalesce(i.ready,0)::int ready_count from marketplace_demand_topic t left join lateral (select count(*) filter(where status='active') total,count(*) filter(where status='active' and interest_level in ('interested','ready_to_engage','can_provide')) ready from marketplace_demand_interest where topic_id=t.id) i on true where ${where.join(" and ")} order by t.published_at desc limit ${limit}`,args)).rows;
  return {items:rows,limit};
 }
 export async function joinDemandTopic(topicId,userId,input,requestId){
@@ -106,9 +106,9 @@ export async function getDemandInterestAssessment(userId,filters={}){
  const type=filters.type?allowedType(filters.type):null;
  const args=[];
  const where=["i.status='active'","t.status='published'"];
- if(type){args.push(type);where.push("t.demand_type=$"+args.length);}
- if(filters.from){args.push(filters.from);where.push("t.published_at >= $"+args.length+"::date");}
- if(filters.to){args.push(filters.to);where.push("t.published_at < ($"+args.length+"::date + interval '1 day')");}
+ if(type){args.push(type);where.push(`t.demand_type=$${args.length}`);}
+ if(filters.from){args.push(filters.from);where.push(`t.published_at >= $${args.length}::date`);}
+ if(filters.to){args.push(filters.to);where.push(`t.published_at < ($${args.length}::date + interval '1 day')`);}
  const rows=(await db.query(`
   select t.demand_type, t.category,
          coalesce(nullif(trim(t.location_label),''),'Not specified') location,
@@ -132,7 +132,7 @@ export async function listReviewQueue(userId,filters={}){
  if(!["submitted","under_review","clarification_needed","matched","topic_published","converted","closed","declined","all"].includes(status))throw fail(400,"Unsupported demand queue status.","VALIDATION_ERROR");
  const where=status==="all"?"true":"d.status=$1";
  const args=status==="all"?[]:[status];
- return (await db.query("select d.*,o.display_name organization_name,p.display_name requester_name,(select count(*)::int from marketplace_demand_topic t where t.source_demand_id=d.id) topic_count from marketplace_demand d join person p on p.user_id=d.requester_user_id left join organization o on o.id=d.organization_id where "+where+" order by d.created_at asc limit 200",args)).rows;
+ return (await db.query(`select d.*,o.display_name organization_name,p.display_name requester_name,(select count(*)::int from marketplace_demand_topic t where t.source_demand_id=d.id) topic_count from marketplace_demand d join person p on p.user_id=d.requester_user_id left join organization o on o.id=d.organization_id where ${where} order by d.created_at asc limit 200`,args)).rows;
 }
 export async function mergeDemand(duplicateDemandId,targetDemandId,actorId,requestId){
  if(!targetDemandId||duplicateDemandId===targetDemandId)throw fail(400,"Choose a different existing request as the merge target.","MERGE_TARGET_INVALID");
@@ -148,7 +148,7 @@ export async function mergeDemand(duplicateDemandId,targetDemandId,actorId,reque
   if(["converted","closed","declined"].includes(target.status)||target.merged_into_demand_id)throw fail(409,"Choose an unresolved canonical request that has not itself been merged.","MERGE_TARGET_INVALID");
   if(duplicate.demand_type!==target.demand_type)throw fail(409,"Only requests of the same type can be merged.","MERGE_TYPE_MISMATCH");
   if(duplicate.id===target.id)throw fail(400,"A request cannot be merged into itself.","MERGE_TARGET_INVALID");
-  const note=clean("Duplicate of retained request "+target.id,3000);
+  const note=clean(`Duplicate of retained request ${target.id}`,3000);
   const updated=(await db.query("update marketplace_demand set status='closed',outcome_code='duplicate_merged',outcome_note=$1,merged_into_demand_id=$2,reviewed_by=$3,reviewed_at=now(),resolved_at=now(),updated_at=now() where id=$4 returning id,status,outcome_code,outcome_note,merged_into_demand_id,reviewed_by,reviewed_at,resolved_at,updated_at",[note,target.id,actorId,duplicate.id])).rows[0];
   await db.query("insert into marketplace_demand_event(demand_id,actor_user_id,action,from_status,to_status,note,metadata) values($1,$2,'demand.duplicate_merged',$3,'closed',$4,$5)",[duplicate.id,actorId,duplicate.status,note,{mergedIntoDemandId:target.id,duplicateDemandId:duplicate.id,targetDemandId:target.id}]);
   await db.query("insert into marketplace_demand_event(demand_id,actor_user_id,action,from_status,to_status,note,metadata) values($1,$2,'demand.duplicate_received',$3,$3,$4,$5)",[target.id,actorId,target.status,"A duplicate request was linked; original request history remains separate.",{duplicateDemandId:duplicate.id}]);
@@ -230,11 +230,11 @@ export async function moderateListing(listingType,listingId,actorId,input,reques
   const table=listingType==="service"?"service_listing":listingType==="mentorship"?"mentor_profile":listingType==="organization_mentorship"?"organization_mentorship_offer":null;
   if(!table)throw fail(400,"Unsupported listing type.","VALIDATION_ERROR");
   const idColumn=listingType==="service"?"id":"id";
-  const row=(await db.query("select id,status,moderation_status from "+table+" where "+idColumn+"=$1 for update",[listingId])).rows[0];
+  const row=(await db.query(`select id,status,moderation_status from ${table} where ${idColumn}=$1 for update`,[listingId])).rows[0];
   if(!row)throw fail(404,"Listing not found.","NOT_FOUND");
   if(row.status==="closed"||row.status==="closed")throw fail(409,"Closed listings cannot be moderated back into circulation.","INVALID_STATE");
   const publicStatus=decision==="approved"?(listingType==="mentorship"?"active":"published"):decision==="rejected"?"closed":"draft";
-  const updated=(await db.query("update "+table+" set moderation_status=$1,moderation_note=$2,moderated_by=$3,moderated_at=now(),status=case when $1='approved' then $4 when $1='rejected' then 'closed' else $5 end,updated_at=now() where id=$6 returning id,status,moderation_status,moderation_note,moderated_at",[decision,note,actorId,publicStatus,"draft",listingId])).rows[0];
+  const updated=(await db.query(`update ${table} set moderation_status=$1,moderation_note=$2,moderated_by=$3,moderated_at=now(),status=case when $1='approved' then $4 when $1='rejected' then 'closed' else $5 end,updated_at=now() where id=$6 returning id,status,moderation_status,moderation_note,moderated_at`,[decision,note,actorId,publicStatus,"draft",listingId])).rows[0];
   await audit(db,actorId,"marketplace.listing_moderated",listingType==="service"?"service_listing":listingType==="organization_mentorship"?"organization_mentorship_offer":"mentor_profile",listingId,requestId,{decision,note});
   return updated;
  });
@@ -321,6 +321,6 @@ export async function getDemandSummary(userId,topicId){
  const topic=(await db.query("select id,title,demand_type,category,status,interest_goal from marketplace_demand_topic where id=$1",[topicId])).rows[0];
  if(!topic)throw fail(404,"Demand topic not found.","NOT_FOUND");
  const counts=(await db.query("select interest_level,count(*)::int count from marketplace_demand_interest where topic_id=$1 and status='active' group by interest_level",[topicId])).rows;
- const participants=(await db.query("select i.interest_level,count(*)::int count from marketplace_demand_interest i join marketplace_demand_topic t on t.id=i.topic_id where i.topic_id=$1 and i.status='active' group by i.interest_level",[topicId])).rows;
+ const _participants=(await db.query("select i.interest_level,count(*)::int count from marketplace_demand_interest i join marketplace_demand_topic t on t.id=i.topic_id where i.topic_id=$1 and i.status='active' group by i.interest_level",[topicId])).rows;
  return {topic,counts,uniqueInterests:counts.reduce((n,r)=>n+Number(r.count),0),readyCount:counts.filter(r=>["ready_to_engage","can_provide"].includes(r.interest_level)).reduce((n,r)=>n+Number(r.count),0)};
 }

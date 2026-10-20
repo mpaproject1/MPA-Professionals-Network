@@ -47,9 +47,9 @@ if(!apiKey||!from){
      "If you did not request this, do not use or forward the link. Contact MPA through a known support channel."
     ].join("\n");
     const htmlBody=`<p>You asked for help signing in to your MPA account.</p><p><a href="${link}">Continue securely and choose a new password</a></p><p>This link can be used once and expires in 20 minutes. Using it signs out other active sessions.</p><p>If you did not request this, do not use or forward the link. Contact MPA through a known support channel.</p>`;
-    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":"Bearer "+apiKey,"Content-Type":"application/json"},body:JSON.stringify({from,to:[row.recipient],subject:"Your one-time MPA sign-in link",text:textBody,html:htmlBody})});
+    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":`Bearer ${apiKey}`,"Content-Type":"application/json"},body:JSON.stringify({from,to:[row.recipient],subject:"Your one-time MPA sign-in link",text:textBody,html:htmlBody})});
     const body=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error("Email provider returned HTTP "+response.status);
+    if(!response.ok)throw new Error(`Email provider returned HTTP ${response.status}`);
     await pool.query("update notification_outbox set status='sent',sent_at=now(),provider_message_id=$2,last_error=null,next_attempt_at=null,payload=payload-'url' where id=$1",[row.id,body.id||null]);
     sent++;
    }catch(error){

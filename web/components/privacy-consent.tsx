@@ -1,7 +1,8 @@
 "use client";
+import {Cookie,Settings2,ShieldCheck,X} from "lucide-react";
 import Link from "next/link";
 import {useEffect,useId,useState} from "react";
-import {Cookie,Settings2,ShieldCheck,X} from "lucide-react";
+
 const KEY="mpa-privacy-preferences-v1";
 const VERSION="2026-10-16-v1";
 type Preferences={version:string;necessary:true;analytics:boolean;personalization:boolean;updatedAt:string};

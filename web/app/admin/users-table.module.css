@@ -91,9 +91,9 @@
 }
 
 .empty {
-  padding: 24px !important;
+  padding: 24px;
   color: var(--muted);
-  text-align: center !important;
+  text-align: center;
 }
 
 .catalog {

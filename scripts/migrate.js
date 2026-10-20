@@ -1,9 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { resolveMigrationBaseline, assertMigrationChecksum } from "../src/platform/migration-ledger.js";
 import { fileURLToPath } from "node:url";
+import { assertMigrationChecksum, resolveMigrationBaseline } from "../src/platform/migration-ledger.js";
 
 const url=process.env.DATABASE_URL;
 if(!url){console.error("DATABASE_URL is required.");process.exit(1);}
@@ -22,7 +22,7 @@ function query(sql){
 function execute(sql){
   execFileSync("psql",[url,"-X","-v","ON_ERROR_STOP=1","-1","-c",sql],{stdio:"inherit"});
 }
-function quote(value){return "'"+String(value).replace(/'/g,"''")+"'";}
+function quote(value){return `'${String(value).replace(/'/g,"''")}'`;}
 
 execute(`create table if not exists ${ledger} (
   filename text primary key,

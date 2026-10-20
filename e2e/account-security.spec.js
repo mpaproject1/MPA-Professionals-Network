@@ -1,4 +1,4 @@
-import {test,expect} from "@playwright/test";
+import {expect, test} from "@playwright/test";
 
 const account={username:"legacy.member@example.org",email:"legacy.member@example.org",status:"active",credential_setup_required:false};
 async function signedIn(page){

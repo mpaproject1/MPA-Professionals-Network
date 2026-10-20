@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getPool, withTransaction } from "./db.js";
-import { parseXlsxRows, createXlsx } from "./xlsx.js";
+import { createXlsx, parseXlsxRows } from "./xlsx.js";
 
 function fail(status,message,code="BUSINESS_RULE"){return Object.assign(new Error(message),{statusCode:status,code});}
 const ADMIN_ROLES=["system_admin","admin","platform_admin"];
@@ -10,8 +10,8 @@ export function assertReferenceAdmin(identity){
  if(!ADMIN_ROLES.some(role=>roles.includes(role))&&!permissions.includes("reference:update")&&!permissions.includes("reference:import")) throw fail(403,"Reference portfolio administration permission is required.","FORBIDDEN");
 }
 const clean=(v,max=180)=>String(v??"").trim().slice(0,max);
-function isIsoDate(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||"")))return false;const date=new Date(String(value)+"T00:00:00.000Z");return !Number.isNaN(date.getTime())&&date.toISOString().slice(0,10)===String(value);}
-function csvEscape(value){const s=String(value??"");return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function isIsoDate(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||"")))return false;const date=new Date(`${String(value)}T00:00:00.000Z`);return !Number.isNaN(date.getTime())&&date.toISOString().slice(0,10)===String(value);}
+function csvEscape(value){const s=String(value??"");return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}
 function parseCsv(source,mapping={},allowUnmapped=false){
  const rows=[];let row=[],cell="",quoted=false;
  const text=String(source||"").replace(/^\uFEFF/,"");
@@ -34,7 +34,7 @@ async function datasetContext(db,key,{edit=false,actorId=null}={}){
  const published=(await db.query("select * from reference_dataset_version where dataset_id=$1 and status='published' order by published_at desc nulls last,created_at desc limit 1",[dataset.id])).rows[0]||null;
  let draft=(await db.query("select * from reference_dataset_version where dataset_id=$1 and status in ('draft','validated','submitted','approved') order by created_at desc limit 1",[dataset.id])).rows[0]||null;
  if(edit&&!draft){
-  const label="draft-"+new Date().toISOString().slice(0,10)+"-"+randomUUID().slice(0,8);
+  const label=`draft-${new Date().toISOString().slice(0,10)}-${randomUUID().slice(0,8)}`;
   draft=(await db.query("insert into reference_dataset_version(dataset_id,version_label,status,import_method,notes,created_by) values($1,$2,'draft','manual','Working copy. Public forms continue using the published version until this draft is published.',$3) returning *",[dataset.id,label,actorId])).rows[0];
   if(published) await db.query("with source as (select * from reference_item where dataset_version_id=$3), mapped as (select id,gen_random_uuid() new_id from source) insert into reference_item(id,dataset_version_id,code,parent_item_id,label,short_label,description,aliases,metadata,sort_order,active,effective_from,effective_to,created_by,updated_by) select child.new_id,$1,s.code,parent.new_id,s.label,s.short_label,s.description,s.aliases,s.metadata,s.sort_order,s.active,s.effective_from,s.effective_to,$2,$2 from source s join mapped child on child.id=s.id left join mapped parent on parent.id=s.parent_item_id",[draft.id,actorId,published.id]);
  }
@@ -101,32 +101,32 @@ export async function previewReferenceCsv(identity,key,filename,csv,providedMapp
   const code=clean(row.code,80).toUpperCase(),parent=clean(row.parent_code,80).toUpperCase();
   if(!/^[A-Z0-9][A-Z0-9._-]{0,79}$/.test(code)||!clean(row.label,180))errors.push({row:row.__row,message:"Code and Label are required; Code must use letters, numbers, dot, underscore or hyphen."});
   if(seen.has(code))errors.push({row:row.__row,message:"Duplicate code in this file."});seen.add(code);
-  if(parent){if(parent===code)errors.push({row:row.__row,message:"An item cannot be its own parent."});else if(!existing.has(parent)&&!incomingCodes.has(parent))errors.push({row:row.__row,message:"Parent code "+parent+" is not in the file or current working copy."});parents.set(code,parent);}else if(row.parent_code!==undefined)parents.delete(code);
+  if(parent){if(parent===code)errors.push({row:row.__row,message:"An item cannot be its own parent."});else if(!existing.has(parent)&&!incomingCodes.has(parent))errors.push({row:row.__row,message:`Parent code ${parent} is not in the file or current working copy.`});parents.set(code,parent);}else if(row.parent_code!==undefined)parents.delete(code);
   if(row.metadata){try{const metadata=typeof row.metadata==="string"?JSON.parse(row.metadata):row.metadata;if(!metadata||typeof metadata!=="object"||Array.isArray(metadata))throw new Error();}catch{errors.push({row:row.__row,message:"Metadata must be a valid JSON object."});}}
-  for(const field of ["effective_from","effective_to"]){const value=clean(row[field],10);if(value&&!isIsoDate(value))errors.push({row:row.__row,message:field+" must be a valid YYYY-MM-DD calendar date."});}
+  for(const field of ["effective_from","effective_to"]){const value=clean(row[field],10);if(value&&!isIsoDate(value))errors.push({row:row.__row,message:`${field} must be a valid YYYY-MM-DD calendar date.`});}
   if(row.effective_from&&row.effective_to&&String(row.effective_from)>String(row.effective_to))errors.push({row:row.__row,message:"Effective-from date must not be after effective-to date."});
  }
  const allCodes=new Set([...existing,...incomingCodes]);
  for(const [code,parent] of parents){
-  if(!allCodes.has(parent)){errors.push({row:rows.find(x=>clean(x.code,80).toUpperCase()===code)?.__row||0,message:"Parent code "+parent+" is not in the working copy or import."});continue;}
+  if(!allCodes.has(parent)){errors.push({row:rows.find(x=>clean(x.code,80).toUpperCase()===code)?.__row||0,message:`Parent code ${parent} is not in the working copy or import.`});continue;}
   const visited=new Set([code]);let cursor=parent;
-  while(cursor&&parents.has(cursor)){if(visited.has(cursor)){errors.push({row:rows.find(x=>clean(x.code,80).toUpperCase()===code)?.__row||0,message:"Parent relationships contain a cycle involving "+code+"."});break;}visited.add(cursor);cursor=parents.get(cursor);}
+  while(cursor&&parents.has(cursor)){if(visited.has(cursor)){errors.push({row:rows.find(x=>clean(x.code,80).toUpperCase()===code)?.__row||0,message:`Parent relationships contain a cycle involving ${code}.`});break;}visited.add(cursor);cursor=parents.get(cursor);}
  }
  return {filename:clean(filename,180),headers,mapping,rowCount:rows.length,sample:rows.slice(0,5).map(({__row,...row})=>row),errors,canImport:errors.length===0};
 }
 export async function importReferenceCsv(identity,key,filename,csv,mapping={},format="csv"){
  assertReferenceAdmin(identity);
  const rows=parseCsv(csv,mapping);const seen=new Set();const errors=[],parents=new Map();
- rows.forEach(row=>{const code=clean(row.code,80).toUpperCase(),parent=clean(row.parent_code,80).toUpperCase();if(!/^[A-Z0-9][A-Z0-9._-]{0,79}$/.test(code)||!clean(row.label,180))errors.push({row:row.__row,message:"Code and label are required and Code must use letters, numbers, dot, underscore or hyphen."});if(seen.has(code))errors.push({row:row.__row,message:"Duplicate code within this import."});seen.add(code);if(parent){if(parent===code)errors.push({row:row.__row,message:"An item cannot be its own parent."});parents.set(code,parent);}if(row.metadata){try{const metadata=typeof row.metadata==="string"?JSON.parse(row.metadata):row.metadata;if(!metadata||typeof metadata!=="object"||Array.isArray(metadata))throw new Error();}catch{errors.push({row:row.__row,message:"Metadata must be a valid JSON object."});}}for(const field of ["effective_from","effective_to"]){const value=clean(row[field],10);if(value&&!isIsoDate(value))errors.push({row:row.__row,message:field+" must be a valid YYYY-MM-DD calendar date."});}if(row.effective_from&&row.effective_to&&String(row.effective_from)>String(row.effective_to))errors.push({row:row.__row,message:"Effective-from date must not be after effective-to date."});});
- for(const [code,parent] of parents){const visited=new Set([code]);let cursor=parent;while(cursor&&parents.has(cursor)){if(visited.has(cursor)){errors.push({row:rows.find(x=>clean(x.code,80).toUpperCase()===code)?.__row||0,message:"Parent relationships contain a cycle involving "+code+"."});break;}visited.add(cursor);cursor=parents.get(cursor);}}
+ rows.forEach(row=>{const code=clean(row.code,80).toUpperCase(),parent=clean(row.parent_code,80).toUpperCase();if(!/^[A-Z0-9][A-Z0-9._-]{0,79}$/.test(code)||!clean(row.label,180))errors.push({row:row.__row,message:"Code and label are required and Code must use letters, numbers, dot, underscore or hyphen."});if(seen.has(code))errors.push({row:row.__row,message:"Duplicate code within this import."});seen.add(code);if(parent){if(parent===code)errors.push({row:row.__row,message:"An item cannot be its own parent."});parents.set(code,parent);}if(row.metadata){try{const metadata=typeof row.metadata==="string"?JSON.parse(row.metadata):row.metadata;if(!metadata||typeof metadata!=="object"||Array.isArray(metadata))throw new Error();}catch{errors.push({row:row.__row,message:"Metadata must be a valid JSON object."});}}for(const field of ["effective_from","effective_to"]){const value=clean(row[field],10);if(value&&!isIsoDate(value))errors.push({row:row.__row,message:`${field} must be a valid YYYY-MM-DD calendar date.`});}if(row.effective_from&&row.effective_to&&String(row.effective_from)>String(row.effective_to))errors.push({row:row.__row,message:"Effective-from date must not be after effective-to date."});});
+ for(const [code,parent] of parents){const visited=new Set([code]);let cursor=parent;while(cursor&&parents.has(cursor)){if(visited.has(cursor)){errors.push({row:rows.find(x=>clean(x.code,80).toUpperCase()===code)?.__row||0,message:`Parent relationships contain a cycle involving ${code}.`});break;}visited.add(cursor);cursor=parents.get(cursor);}}
  if(errors.length) return {status:"rejected",imported:0,errors};
  return withTransaction(async db=>{
   const {dataset,version}=await datasetContext(db,key,{edit:true,actorId:identity.sub});
    const hierarchyRows=(await db.query("select child.code,parent.code parent_code from reference_item child left join reference_item parent on parent.id=child.parent_item_id and parent.dataset_version_id=child.dataset_version_id where child.dataset_version_id=$1",[version.id])).rows;
    const allCodes=new Set([...hierarchyRows.map(item=>item.code),...rows.map(item=>clean(item.code,80).toUpperCase())]);
    const parentByCode=new Map(hierarchyRows.filter(item=>item.parent_code).map(item=>[item.code,item.parent_code]));
-   for(const row of rows){const code=clean(row.code,80).toUpperCase();if(row.parent_code!==undefined){const parent=clean(row.parent_code,80).toUpperCase();if(parent){if(parent===code||!allCodes.has(parent))throw fail(400,"Parent code "+parent+" is invalid for "+code+".","REFERENCE_PARENT_INVALID");parentByCode.set(code,parent);}else parentByCode.delete(code);}}
-   for(const [code,parent] of parentByCode){const visited=new Set([code]);let cursor=parent;while(cursor&&parentByCode.has(cursor)){if(visited.has(cursor))throw fail(400,"Parent relationships contain a cycle involving "+code+".","REFERENCE_HIERARCHY_CYCLE");visited.add(cursor);cursor=parentByCode.get(cursor);}}
+   for(const row of rows){const code=clean(row.code,80).toUpperCase();if(row.parent_code!==undefined){const parent=clean(row.parent_code,80).toUpperCase();if(parent){if(parent===code||!allCodes.has(parent))throw fail(400,`Parent code ${parent} is invalid for ${code}.`,"REFERENCE_PARENT_INVALID");parentByCode.set(code,parent);}else parentByCode.delete(code);}}
+   for(const [code,parent] of parentByCode){const visited=new Set([code]);let cursor=parent;while(cursor&&parentByCode.has(cursor)){if(visited.has(cursor))throw fail(400,`Parent relationships contain a cycle involving ${code}.`,"REFERENCE_HIERARCHY_CYCLE");visited.add(cursor);cursor=parentByCode.get(cursor);}}
    await db.query("update reference_dataset_version set status='draft',approved_by=null where id=$1 and status<>'draft'",[version.id]);
    let inserted=0,updated=0;
   for(const row of rows){
@@ -138,9 +138,9 @@ export async function importReferenceCsv(identity,key,filename,csv,mapping={},fo
    if(existing){await db.query("update reference_item set label=$1,description=case when $12 then $2 else description end,short_label=case when $13 then $3 else short_label end,aliases=case when $14 then $4::jsonb else aliases end,metadata=case when $15 then $5::jsonb else metadata end,active=case when $16 then $6 else active end,sort_order=case when $17 then $7 else sort_order end,effective_from=case when $18 then $8 else effective_from end,effective_to=case when $19 then $9 else effective_to end,updated_by=$10,updated_at=now() where id=$11",[label,description,shortLabel,JSON.stringify(aliases),JSON.stringify(metadata),active,sortOrder,effectiveFrom,effectiveTo,identity.sub,existing.id,hasDescription,hasShortLabel,hasAliases,hasMetadata,hasActive,hasSortOrder,hasEffectiveFrom,hasEffectiveTo]);updated++;}
    else{await db.query("insert into reference_item(dataset_version_id,code,label,description,short_label,aliases,metadata,active,sort_order,effective_from,effective_to,created_by,updated_by) values($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$12)",[version.id,code,label,description,shortLabel,JSON.stringify(aliases),JSON.stringify(metadata),active,sortOrder,effectiveFrom,effectiveTo,identity.sub]);inserted++;}
   }
-  for(const row of rows){const code=clean(row.code,80).toUpperCase(),parent=clean(row.parent_code,80).toUpperCase();if(parent){const parentRow=(await db.query("select id from reference_item where dataset_version_id=$1 and code=$2",[version.id,parent])).rows[0];if(!parentRow)throw fail(400,"Parent code "+parent+" was not found in the working copy.","REFERENCE_PARENT_INVALID");await db.query("update reference_item set parent_item_id=$1 where dataset_version_id=$2 and code=$3",[parentRow.id,version.id,code]);}else if(row.parent_code!==undefined)await db.query("update reference_item set parent_item_id=null where dataset_version_id=$1 and code=$2",[version.id,code]);}
-  await db.query("insert into reference_import(dataset_id,target_version_id,filename,format,status,uploaded_by,completed_at) values($1,$2,$3,$4,'drafted',$5,now())",[dataset.id,version.id,clean(filename,180)||("reference-import."+format),format,identity.sub]);
-  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,'reference_dataset',$3,'success',$4)",[identity.sub,"reference."+format+"_imported",dataset.id,JSON.stringify({datasetKey:key,rowCount:rows.length,inserted,updated,format})]);
+  for(const row of rows){const code=clean(row.code,80).toUpperCase(),parent=clean(row.parent_code,80).toUpperCase();if(parent){const parentRow=(await db.query("select id from reference_item where dataset_version_id=$1 and code=$2",[version.id,parent])).rows[0];if(!parentRow)throw fail(400,`Parent code ${parent} was not found in the working copy.`,"REFERENCE_PARENT_INVALID");await db.query("update reference_item set parent_item_id=$1 where dataset_version_id=$2 and code=$3",[parentRow.id,version.id,code]);}else if(row.parent_code!==undefined)await db.query("update reference_item set parent_item_id=null where dataset_version_id=$1 and code=$2",[version.id,code]);}
+  await db.query("insert into reference_import(dataset_id,target_version_id,filename,format,status,uploaded_by,completed_at) values($1,$2,$3,$4,'drafted',$5,now())",[dataset.id,version.id,clean(filename,180)||(`reference-import.${format}`),format,identity.sub]);
+  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,'reference_dataset',$3,'success',$4)",[identity.sub,`reference.${format}_imported`,dataset.id,JSON.stringify({datasetKey:key,rowCount:rows.length,inserted,updated,format})]);
   return {status:"imported",datasetKey:key,rowCount:rows.length,inserted,updated,errors:[]};
  });
 }
@@ -155,14 +155,14 @@ export async function publishReferenceDataset(identity,key,reason=""){
     const duplicate=(await db.query("select code from reference_item where dataset_version_id=$1 group by code having count(*)>1 limit 1",[version.id])).rows[0];
     if(duplicate) throw fail(409,"This working copy contains duplicate codes. Correct them before publishing.","REFERENCE_DUPLICATE_CODE");
     const ambiguousAlias=(await db.query("with tokens as (select id,lower(regexp_replace(trim(label),'\\s+',' ','g')) token from reference_item where dataset_version_id=$1 union all select id,lower(trim(code)) token from reference_item where dataset_version_id=$1 union all select ri.id,lower(regexp_replace(trim(alias.value),'\\s+',' ','g')) token from reference_item ri cross join lateral jsonb_array_elements_text(ri.aliases) alias(value) where ri.dataset_version_id=$1) select token from tokens where token<>'' group by token having count(distinct id)>1 limit 1",[version.id])).rows[0];
-    if(ambiguousAlias)throw fail(409,"Reference alias or label \""+ambiguousAlias.token+"\" is assigned to more than one item. Resolve the duplicate before publication.","REFERENCE_ALIAS_AMBIGUOUS");
+    if(ambiguousAlias)throw fail(409,`Reference alias or label "${ambiguousAlias.token}" is assigned to more than one item. Resolve the duplicate before publication.`,"REFERENCE_ALIAS_AMBIGUOUS");
     const invalidParent=(await db.query("select child.code from reference_item child join reference_item parent on parent.id=child.parent_item_id where child.dataset_version_id=$1 and parent.dataset_version_id<>$1 limit 1",[version.id])).rows[0];
-    if(invalidParent)throw fail(409,"Reference item "+invalidParent.code+" points to a parent outside this dataset version. Rebuild the parent relationship before publishing.","REFERENCE_PARENT_INVALID");
+    if(invalidParent)throw fail(409,`Reference item ${invalidParent.code} points to a parent outside this dataset version. Rebuild the parent relationship before publishing.`,"REFERENCE_PARENT_INVALID");
     const hierarchyCycle=(await db.query("with recursive tree(start_id,node_id,parent_item_id,path,cycle) as (select id,id,parent_item_id,array[id],false from reference_item where dataset_version_id=$1 union all select t.start_id,p.id,p.parent_item_id,t.path||p.id,p.id=any(t.path) from tree t join reference_item p on p.id=t.parent_item_id where not t.cycle) select 1 from tree where cycle limit 1",[version.id])).rows[0];
     if(hierarchyCycle)throw fail(409,"Reference hierarchy contains a parent cycle. Correct it before publication.","REFERENCE_HIERARCHY_CYCLE");
     const previous=(await db.query("select id from reference_dataset_version where dataset_id=$1 and status='published' for update",[dataset.id])).rows[0];
     if(previous) await db.query("update reference_dataset_version set status='archived',effective_to=coalesce(effective_to,current_date) where id=$1",[previous.id]);
-    const published=(await db.query("update reference_dataset_version set status='published',published_at=now(),approved_by=$1,effective_from=coalesce(effective_from,current_date),notes=coalesce(notes,'')||$2 where id=$3 returning id,version_label,status,published_at",[identity.sub,reason.trim()?"\nPublication note: "+clean(reason,1000):"",version.id])).rows[0];
+    const published=(await db.query("update reference_dataset_version set status='published',published_at=now(),approved_by=$1,effective_from=coalesce(effective_from,current_date),notes=coalesce(notes,'')||$2 where id=$3 returning id,version_label,status,published_at",[identity.sub,reason.trim()?`\nPublication note: ${clean(reason,1000)}`:"",version.id])).rows[0];
     await db.query("insert into reference_publication(dataset_version_id,action,performed_by,reason) values($1,'publish',$2,$3)",[version.id,identity.sub,clean(reason,1000)||null]);
     await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,'reference.dataset_published','reference_dataset',$2,'success',$3)",[identity.sub,dataset.id,{versionId:version.id,versionLabel:version.version_label,previousVersionId:previous?.id||null}]);
     return {datasetKey:key,version:published,previousVersionId:previous?.id||null,activeItemCount:Number(summary.active)};
@@ -196,7 +196,7 @@ export async function exportReferenceJson(identity,key){
  assertReferenceAdmin(identity);const db=getPool();const {dataset,version}=await datasetContext(db,key);
  const rows=(await db.query("select id,code,label,description,sort_order,active,parent_item_id,aliases,metadata,effective_from,effective_to from reference_item where dataset_version_id=$1 order by sort_order,label",[version.id])).rows;
  const byId=new Map(rows.map(row=>[row.id,row.code]));
- return {filename:key+".json",json:JSON.stringify({datasetKey:key,version:version.version_label,items:rows.map(({parent_item_id,...row})=>({...row,parent_code:byId.get(parent_item_id)||null}))},null,2)};
+ return {filename:`${key}.json`,json:JSON.stringify({datasetKey:key,version:version.version_label,items:rows.map(({parent_item_id,...row})=>({...row,parent_code:byId.get(parent_item_id)||null}))},null,2)};
 }
 
 
@@ -228,12 +228,12 @@ export async function exportReferenceXlsx(identity,key){
  const rows=(await db.query("select child.code,child.label,coalesce(child.description,'') description,child.sort_order,child.active,parent.code parent_code,child.aliases,child.short_label,child.metadata,child.effective_from,child.effective_to from reference_item child left join reference_item parent on parent.id=child.parent_item_id and parent.dataset_version_id=child.dataset_version_id where child.dataset_version_id=$1 order by child.sort_order,child.label",[version.id])).rows;
  const headers=["code","label","description","sort_order","active","parent_code","aliases","metadata","effective_from","effective_to"];
  const workbookRows=rows.map(row=>({...row,aliases:Array.isArray(row.aliases)?row.aliases.join(";"):row.aliases,metadata:row.metadata&&typeof row.metadata==="object"?JSON.stringify(row.metadata):row.metadata}));
- return {filename:key+".xlsx",xlsxBase64:createXlsx(workbookRows,headers).toString("base64")};
+ return {filename:`${key}.xlsx`,xlsxBase64:createXlsx(workbookRows,headers).toString("base64")};
 }
 
 export async function exportReferenceCsv(identity,key){
  assertReferenceAdmin(identity);const db=getPool();const {version}=await datasetContext(db,key);
  const rows=(await db.query("select child.code,child.label,coalesce(child.description,'') description,child.sort_order,child.active,parent.code parent_code,child.aliases,child.short_label,child.metadata,child.effective_from,child.effective_to from reference_item child left join reference_item parent on parent.id=child.parent_item_id and parent.dataset_version_id=child.dataset_version_id where child.dataset_version_id=$1 order by child.sort_order,child.label",[version.id])).rows;
  const headers=["code","label","description","sort_order","active","parent_code","aliases","short_label","metadata","effective_from","effective_to"];
- return {filename:key+".csv",csv:[headers.join(","),...rows.map(row=>headers.map(header=>{const value=row[header];return csvEscape(Array.isArray(value)?value.join(";"):value&&typeof value==="object"?JSON.stringify(value):value??"");}).join(","))].join("\r\n")};
+ return {filename:`${key}.csv`,csv:[headers.join(","),...rows.map(row=>headers.map(header=>{const value=row[header];return csvEscape(Array.isArray(value)?value.join(";"):value&&typeof value==="object"?JSON.stringify(value):value??"");}).join(","))].join("\r\n")};
 }

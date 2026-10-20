@@ -1,13 +1,13 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
   allowedApplicationTransition,
   allowedCandidateResponse,
+  canCandidateAcceptOffer,
   ELIGIBILITY_RULES,
-  isEligibleVerifiedClaimForJobs,
-  JOB_POSTING_SCOPES,
   isAllowedJobPostingScope,
-  canCandidateAcceptOffer
+  isEligibleVerifiedClaimForJobs,
+  JOB_POSTING_SCOPES
 } from "../../src/organization-jobs/service.js";
 
 test("phase 3 eligibility engine exposes controlled rule vocabulary",()=>{

@@ -32,7 +32,7 @@ export function validateReferenceRows(rows) {
     if (!parent || parentByCode.has(parent)) continue;
     const d = diagnostics.find((item) => item.code === code);
     if (d) {
-      d.errors.push("Parent code '" + parent + "' does not exist in this import.");
+      d.errors.push(`Parent code '${parent}' does not exist in this import.`);
       if (d.classification === "new") d.classification = "invalid_parent";
     }
   }

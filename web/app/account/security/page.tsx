@@ -1,10 +1,11 @@
 "use client";
-import { FormEvent,useEffect,useId,useState } from "react";
-import { KeyRound,ShieldCheck,UserRound,Eye,EyeOff } from "lucide-react";
-import { Card } from "../../../components/ui";
+import { Eye,EyeOff, KeyRound,ShieldCheck,UserRound} from "lucide-react";
+import { type FormEvent,useEffect,useId,useState } from "react";
 import { FormFeedback } from "../../../components/form-feedback";
+import { Card } from "../../../components/ui";
 import { api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
+
 type Account={username:string;email:string;status:string;credential_setup_required?:boolean};
 export default function AccountSecurityPage(){
  const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated),hydrateToken=useUiStore(s=>s.hydrateToken);

@@ -1,7 +1,7 @@
 "use client";
-import {useEffect,useState} from "react";
+import {Fingerprint,KeyRound,RefreshCw,Trash2} from "lucide-react";
 import {useRouter} from "next/navigation";
-import {Fingerprint,KeyRound,RefreshCw,ShieldCheck,Trash2} from "lucide-react";
+import {useEffect,useState} from "react";
 import {Card} from "../../../components/ui";
 import {api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
@@ -41,7 +41,7 @@ export default function AdminSecurity(){
    if(typeof window!=="undefined"){const query=new URLSearchParams(window.location.search);if(query.get("recovery")==="1")setRecoveryMode(true);if(query.get("enroll")==="1")setEnrollmentMode(true);}
  },[]);
  useEffect(()=>{if(hydrated&&!token)router.replace("/login?next=/admin/security");},[hydrated,token,router]);
- useEffect(()=>{const query=typeof window!=="undefined"?new URLSearchParams(window.location.search):null;const restrictedSetup=query?.get("recovery")==="1"||query?.get("enroll")==="1";if(token&&!recoveryMode&&!enrollmentMode&&!restrictedSetup)void load();},[token,recoveryMode,enrollmentMode]);
+ useEffect(()=>{const query=typeof window!=="undefined"?new URLSearchParams(window.location.search):null;const restrictedSetup=query?.get("recovery")==="1"||query?.get("enroll")==="1";if(token&&!recoveryMode&&!enrollmentMode&&!restrictedSetup)void load();},[token, recoveryMode, enrollmentMode, load]);
  async function registerPasskey(){
    setBusy(true);setError("");setMessage("");setRecoveryCodes([]);
    try{
@@ -60,7 +60,7 @@ export default function AdminSecurity(){
  async function revoke(id:string){
    if(!window.confirm("Revoke this passkey? It will no longer be accepted for administrator sign-in."))return;
    setBusy(true);setError("");setMessage("");
-   try{await api("/api/v1/admin/passkeys/"+encodeURIComponent(id),{method:"DELETE"},token);await load();setMessage("Passkey revoked.");}
+   try{await api(`/api/v1/admin/passkeys/${encodeURIComponent(id)}`,{method:"DELETE"},token);await load();setMessage("Passkey revoked.");}
    catch(e){setError(e instanceof Error?e.message:"Could not revoke passkey.");}
    finally{setBusy(false);}
  }

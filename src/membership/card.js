@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { getPool, withTransaction } from "../platform/db.js";
 import { loadConfig } from "../platform/config.js";
+import { getPool, withTransaction } from "../platform/db.js";
 
 const fail=(status,message,code)=>Object.assign(new Error(message),{statusCode:status,code});
 const DEFAULT_SETTINGS={
@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS={
 function tokenFor(recordId,version){
   const secret=process.env.MEMBERSHIP_CARD_SECRET||loadConfig().jwtSecret;
   if(!secret) throw fail(503,"Membership verification is not configured.","VERIFICATION_NOT_CONFIGURED");
-  return createHmac("sha256",secret).update("mpa-membership-card:"+recordId+":"+version).digest("base64url");
+  return createHmac("sha256",secret).update(`mpa-membership-card:${recordId}:${version}`).digest("base64url");
 }
 function tokenMatches(expected,supplied){
   if(typeof supplied!=="string"||supplied.length<32||supplied.length>128) return false;
@@ -65,7 +65,7 @@ export async function getMyMembershipCard(userId){
     startDate:row.start_date,
     endDate:row.end_date,
     profilePictureFileId:row.profile_picture_file_id,
-    verificationPath:"/membership/verify?record="+encodeURIComponent(row.membership_record_id)+"&token="+encodeURIComponent(token),
+    verificationPath:`/membership/verify?record=${encodeURIComponent(row.membership_record_id)}&token=${encodeURIComponent(token)}`,
     settings:cardSettings
   };
 }
@@ -91,7 +91,7 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
     memberName:row.member_name||"MPA Member",membershipType:row.membership_type,productCode:row.product_code,
     status:getMembershipCardStatus(row),startDate:row.start_date,endDate:row.end_date,
     profilePictureFileId:row.profile_picture_file_id,
-    verificationPath:"/membership/verify?record="+encodeURIComponent(row.membership_record_id)+"&token="+encodeURIComponent(tokenFor(row.membership_record_id,row.card_token_version)),
+    verificationPath:`/membership/verify?record=${encodeURIComponent(row.membership_record_id)}&token=${encodeURIComponent(tokenFor(row.membership_record_id,row.card_token_version))}`,
     settings:await settings(db)
   };
 }
@@ -131,14 +131,14 @@ export async function updateMembershipCardSettings(actorId,input,requestId){
     if(input[key]!==undefined){
       const value=String(input[key]??"").trim();
       const max=column==="header_text"?120:column==="subtitle_text"?80:180;
-      if(!value||value.length>max) throw fail(400,key+" is required and must be "+max+" characters or fewer.","INVALID_CARD_SETTINGS");
+      if(!value||value.length>max) throw fail(400,`${key} is required and must be ${max} characters or fewer.`,"INVALID_CARD_SETTINGS");
       values[column]=value;
     }
   }
   for(const [column,key] of [["background_start","backgroundStart"],["background_end","backgroundEnd"],["accent_color","accentColor"],["text_color","textColor"]]){
     if(input[key]!==undefined){
       const value=String(input[key]||"");
-      if(!/^#[0-9a-fA-F]{6}$/.test(value)) throw fail(400,key+" must be a six-digit hex color.","INVALID_CARD_SETTINGS");
+      if(!/^#[0-9a-fA-F]{6}$/.test(value)) throw fail(400,`${key} must be a six-digit hex color.`,"INVALID_CARD_SETTINGS");
       values[column]=value.toUpperCase();
     }
   }
@@ -191,6 +191,6 @@ export async function verifyMembershipCard(recordId,token){
     startDate:row.start_date,
     endDate:row.end_date,
     verifiedAt:new Date().toISOString(),
-    message:status==="active"?"This membership is currently active.":status==="expired"?"This membership is not currently active.":"This membership is "+status+"."
+    message:status==="active"?"This membership is currently active.":status==="expired"?"This membership is not currently active.":`This membership is ${status}.`
   };
 }

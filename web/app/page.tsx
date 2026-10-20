@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
-import { useId } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
-  ArrowRight, UserCheck, BriefcaseBusiness, GraduationCap, Building2,
-  ShieldCheck, CheckCircle2, LogIn, FileText, Search,
-  HeartHandshake, Network, ClipboardCheck, LockKeyhole, UsersRound
+  ArrowRight, BriefcaseBusiness, Building2,CheckCircle2, ClipboardCheck, FileText, GraduationCap,
+  HeartHandshake, LockKeyhole, LogIn, Network, Search,
+  ShieldCheck, UserCheck, UsersRound
 } from "lucide-react";
+import Link from "next/link";
+import { useId } from "react";
 import styles from "./landing-redesign.module.css";
 import LiveNetworkFeeds from "./live-network-feeds";
 
@@ -198,7 +198,7 @@ export default function Home() {
         </Reveal>
       </section>
 
-      <section className={styles.section + " " + styles.lastSection}>
+      <section className={`${styles.section} ${styles.lastSection}`}>
         <Reveal className={styles.finalCta}>
           <div className={styles.finalArch} aria-hidden="true"><svg viewBox="0 0 800 600" fill="none"><path d="M400 600V100C400 50 500 10 600 10C700 10 800 50 800 100V600" stroke="#97C024" strokeWidth="4" /></svg></div>
           <div className={styles.finalContent}>

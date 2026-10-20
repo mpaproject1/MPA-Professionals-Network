@@ -1,7 +1,7 @@
 import { getPool, withTransaction } from "../platform/db.js";
-import { nextTrackingReference } from "../platform/tracking-reference.js";
-import { assertOrganizationCapability } from "../platform/identity-policy.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
+import { assertOrganizationCapability } from "../platform/identity-policy.js";
+import { nextTrackingReference } from "../platform/tracking-reference.js";
 
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
 const ORG_WRITE_ROLES=["owner","administrator","recruiter"];
@@ -47,13 +47,13 @@ export async function registerOrganization(userId,input,requestId){
 
 export async function listPublicOrganizations(filters={}) {
  const db=getPool();const args=[];const where=["o.public_visible=true","o.verification_status='verified'"];
- if(filters.q){args.push("%"+String(filters.q).trim()+"%");where.push("(o.display_name ilike $"+args.length+" or o.legal_name ilike $"+args.length+" or coalesce(o.description,'') ilike $"+args.length+")");}
- if(filters.organizationType){args.push(String(filters.organizationType));where.push("o.organization_type=$"+args.length);}
- if(filters.location){args.push("%"+String(filters.location).trim()+"%");where.push("(coalesce(ri.label,'') ilike $"+args.length+" or coalesce(o.address_text,'') ilike $"+args.length+")");}
+ if(filters.q){args.push(`%${String(filters.q).trim()}%`);where.push(`(o.display_name ilike $${args.length} or o.legal_name ilike $${args.length} or coalesce(o.description,'') ilike $${args.length})`);}
+ if(filters.organizationType){args.push(String(filters.organizationType));where.push(`o.organization_type=$${args.length}`);}
+ if(filters.location){args.push(`%${String(filters.location).trim()}%`);where.push(`(coalesce(ri.label,'') ilike $${args.length} or coalesce(o.address_text,'') ilike $${args.length})`);}
  const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
- const base=" from organization o left join reference_item ri on ri.id=o.geography_reference_item_id where "+where.join(" and ");
- const total=Number((await db.query("select count(*)::int count"+base,args)).rows[0]?.count||0);
- const rows=(await db.query("select o.id,o.display_name,o.organization_type,o.description,o.website,ri.label location_label,o.created_at"+base+" order by o.display_name limit "+(limit+1)+" offset "+offset,args)).rows;
+ const base=` from organization o left join reference_item ri on ri.id=o.geography_reference_item_id where ${where.join(" and ")}`;
+ const total=Number((await db.query(`select count(*)::int count${base}`,args)).rows[0]?.count||0);
+ const rows=(await db.query(`select o.id,o.display_name,o.organization_type,o.description,o.website,ri.label location_label,o.created_at${base} order by o.display_name limit ${limit+1} offset ${offset}`,args)).rows;
  return {items:rows.slice(0,limit),limit,offset,total,hasMore:offset+limit<total};
 }
 
@@ -231,7 +231,7 @@ export async function createJob(orgId,userId,input,requestId){
   if(salaryMin!==null&&(!Number.isFinite(salaryMin)||salaryMin<0)) throw error(400,"salaryMin must be non-negative.","VALIDATION_ERROR");
   if(salaryMax!==null&&(!Number.isFinite(salaryMax)||salaryMax<0)) throw error(400,"salaryMax must be non-negative.","VALIDATION_ERROR");
   if(salaryMin!==null&&salaryMax!==null&&salaryMax<salaryMin) throw error(400,"salaryMax cannot be below salaryMin.","VALIDATION_ERROR");
-  let requisitionId=input.requisitionId||null;
+  const requisitionId=input.requisitionId||null;
   if(requisitionId){
     const req=(await db.query("select id,status,organization_id from job_requisition where id=$1",[requisitionId])).rows[0];
     if(!req||req.organization_id!==orgId) throw error(400,"Requisition does not belong to this organization.","INVALID_REQUISITION");
@@ -254,7 +254,7 @@ async function ensureExclusiveDefaults(db,jobId){
 async function replaceRules(db,jobId,rules){
  await db.query("delete from job_eligibility_rule where job_id=$1",[jobId]);
  for(let i=0;i<rules.length;i++){
-  const rule=rules[i]; if(!ELIGIBILITY_RULES.includes(String(rule.ruleCode).toLowerCase())) throw error(400,"Unsupported eligibility rule: "+rule.ruleCode,"INVALID_ELIGIBILITY_RULE");
+  const rule=rules[i]; if(!ELIGIBILITY_RULES.includes(String(rule.ruleCode).toLowerCase())) throw error(400,`Unsupported eligibility rule: ${rule.ruleCode}`,"INVALID_ELIGIBILITY_RULE");
   if(!["equals","in","gte","lte","contains"].includes(rule.operator||"equals")) throw error(400,"Unsupported eligibility operator.","INVALID_ELIGIBILITY_OPERATOR");
   await db.query("insert into job_eligibility_rule(job_id,rule_code,operator,value,required,reason_label,sort_order) values($1,$2,$3,$4,$5,$6,$7)",[jobId,String(rule.ruleCode).toLowerCase(),rule.operator||"equals",rule.value,rule.required!==false,rule.reasonLabel||null,i]);
  }
@@ -321,22 +321,22 @@ async function jobScopeAllowed(db,job,viewerId){
 
 export async function listJobs(filters={},viewerId=null){
  const db=getPool(); const args=[]; const where=["j.status='published'","(j.application_deadline is null or j.application_deadline>now())","o.verification_status='verified'","o.public_visible=true"];
- if(filters.visibility){args.push(filters.visibility);where.push("j.visibility=$"+args.length);}
- if(filters.postingScope){args.push(filters.postingScope);where.push("j.posting_scope=$"+args.length);}
- if(filters.q){args.push("%"+String(filters.q).trim()+"%");where.push("(j.title ilike $"+args.length+" or j.description ilike $"+args.length+" or coalesce(j.department,'') ilike $"+args.length+")");}
+ if(filters.visibility){args.push(filters.visibility);where.push(`j.visibility=$${args.length}`);}
+ if(filters.postingScope){args.push(filters.postingScope);where.push(`j.posting_scope=$${args.length}`);}
+ if(filters.q){args.push(`%${String(filters.q).trim()}%`);where.push(`(j.title ilike $${args.length} or j.description ilike $${args.length} or coalesce(j.department,'') ilike $${args.length})`);}
  for(const [key,col] of [["employmentType","j.employment_type"],["workMode","j.work_mode"],["seniority","j.seniority_level"],["department","j.department"],["location","j.location_label"]]){
-   if(filters[key]){args.push("%"+String(filters[key]).trim()+"%");where.push(col+" ilike $"+args.length);}
+   if(filters[key]){args.push(`%${String(filters[key]).trim()}%`);where.push(`${col} ilike $${args.length}`);}
  }
- if(filters.industryReferenceItemId){args.push(filters.industryReferenceItemId);where.push("j.industry_reference_item_id=$"+args.length);}
- if(filters.occupationReferenceItemId){args.push(filters.occupationReferenceItemId);where.push("j.occupation_reference_item_id=$"+args.length);}
+ if(filters.industryReferenceItemId){args.push(filters.industryReferenceItemId);where.push(`j.industry_reference_item_id=$${args.length}`);}
+ if(filters.occupationReferenceItemId){args.push(filters.occupationReferenceItemId);where.push(`j.occupation_reference_item_id=$${args.length}`);}
  // Keep the existing jobScopeAllowed policy equivalent, but apply it inside SQL
  // before count/limit/offset. This avoids loading all jobs and per-row membership queries.
- args.push(viewerId||null);const viewerParam="$"+args.length;
- where.push("(j.posting_scope='public' or (j.posting_scope in ('mpa_members','partner_network') and "+viewerParam+"::uuid is not null and exists(select 1 from membership_record m where m.user_id="+viewerParam+"::uuid and m.status='active')) or (j.posting_scope='organization_internal' and "+viewerParam+"::uuid is not null and exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id="+viewerParam+"::uuid and om.status='active')))");
+ args.push(viewerId||null);const viewerParam=`$${args.length}`;
+ where.push(`(j.posting_scope='public' or (j.posting_scope in ('mpa_members','partner_network') and ${viewerParam}::uuid is not null and exists(select 1 from membership_record m where m.user_id=${viewerParam}::uuid and m.status='active')) or (j.posting_scope='organization_internal' and ${viewerParam}::uuid is not null and exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id=${viewerParam}::uuid and om.status='active')))`);
  const predicate=where.join(" and ");
- const total=Number((await db.query("select count(*)::int count from job j join organization o on o.id=j.organization_id where "+predicate,args)).rows[0]?.count||0);
+ const total=Number((await db.query(`select count(*)::int count from job j join organization o on o.id=j.organization_id where ${predicate}`,args)).rows[0]?.count||0);
  const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
- const rows=(await db.query("select j.id,j.title,j.description,j.employment_type,j.work_mode,j.location_label,j.visibility,j.posting_scope,j.department,j.seniority_level,j.positions_count,j.salary_min,j.salary_max,j.salary_currency,j.application_deadline,j.published_at,o.id organization_id,o.display_name organization_name from job j join organization o on o.id=j.organization_id where "+predicate+" order by j.published_at desc,j.id desc limit $"+(args.length+1)+" offset $"+(args.length+2),[...args,limit,offset])).rows;
+ const rows=(await db.query(`select j.id,j.title,j.description,j.employment_type,j.work_mode,j.location_label,j.visibility,j.posting_scope,j.department,j.seniority_level,j.positions_count,j.salary_min,j.salary_max,j.salary_currency,j.application_deadline,j.published_at,o.id organization_id,o.display_name organization_name from job j join organization o on o.id=j.organization_id where ${predicate} order by j.published_at desc,j.id desc limit $${args.length+1} offset $${args.length+2}`,[...args,limit,offset])).rows;
  return {items:rows,limit,offset,total,hasMore:offset+rows.length<total};
 }
 
@@ -395,7 +395,7 @@ export async function submitApplication(applicationId,userId,input={},requestId)
   const updated=(await db.query("update job_application set status='submitted',cover_letter=coalesce($1,cover_letter),profile_snapshot=$2,eligibility_snapshot=$3,submitted_at=now(),updated_at=now() where id=$4 returning *",[input.coverLetter??null,snapshot,eligibility,applicationId])).rows[0];
   await db.query("insert into job_application_event(application_id,actor_user_id,from_status,to_status,note) values($1,$2,'draft','submitted',$3)",[applicationId,userId,input.note||null]);
   await audit(db,userId,"job.application_submitted","job_application",applicationId,requestId,{jobId:a.job_id});
-  await queueWorkflowEmail(db,userId,"professional.workflow_update",{notificationEventCode:"job.application_submitted",category:"recruitment",title:"Application submitted",message:"Your application for "+(a.job_title||"the role")+" was submitted.",status:"submitted",jobTitle:a.job_title||"job application",nextAction:"Monitor the application timeline for employer updates.",actionUrl:"/jobs",registrationReference:updated.tracking_reference||""},"job_application",applicationId);
+  await queueWorkflowEmail(db,userId,"professional.workflow_update",{notificationEventCode:"job.application_submitted",category:"recruitment",title:"Application submitted",message:`Your application for ${a.job_title||"the role"} was submitted.`,status:"submitted",jobTitle:a.job_title||"job application",nextAction:"Monitor the application timeline for employer updates.",actionUrl:"/jobs",registrationReference:updated.tracking_reference||""},"job_application",applicationId);
   const employers=(await db.query("select om.user_id from organization_membership om join app_user u on u.id=om.user_id where om.organization_id=$1 and om.status='active' and u.status='active' and om.role_code=any($2::text[])",[a.organization_id,["owner","administrator","recruiter","project_manager"]])).rows;
   for(const employer of employers) await queueWorkflowEmail(db,employer.user_id,"employer.candidate_update",{notificationEventCode:"job.application_received",category:"recruitment",title:"New candidate application",audience:"employer",jobTitle:a.job_title||"job",status:"submitted",message:"A candidate submitted an application for your job.",nextAction:"Review the candidate in the recruitment workspace.",actionUrl:"/recruitment",reviewerQueue:true,actionRequired:true,priority:"high"},"job_application",applicationId);
   return updated;
@@ -541,7 +541,7 @@ export async function addOrganizationUser(orgId,actorUserId,input,requestId){
   const target=(await db.query("select id from app_user where id=$1",[input.userId])).rows[0]; if(!target) throw error(404,"User account not found.","NOT_FOUND");
   const row=(await db.query("insert into organization_membership(organization_id,user_id,role_code,status,invited_by,joined_at) values($1,$2,$3,'active',$4,now()) on conflict(organization_id,user_id) do update set role_code=excluded.role_code,status='active',updated_at=now() returning *",[orgId,input.userId,input.roleCode,actorUserId])).rows[0];
   await audit(db,actorUserId,"organization.user_added","organization_membership",row.id,requestId,{roleCode:input.roleCode});
-  await queueWorkflowEmail(db,input.userId,"organization.membership_added",{category:"organizations",title:"Organization workspace access granted",message:"You were added to an organization workspace with the "+String(input.roleCode).replace(/_/g," ")+" role.",nextAction:"Open the organization workspace to review your access and assigned responsibilities.",actionUrl:"/organizations",eventVersion:row.id},"organization_membership",row.id);
+  await queueWorkflowEmail(db,input.userId,"organization.membership_added",{category:"organizations",title:"Organization workspace access granted",message:`You were added to an organization workspace with the ${String(input.roleCode).replace(/_/g," ")} role.`,nextAction:"Open the organization workspace to review your access and assigned responsibilities.",actionUrl:"/organizations",eventVersion:row.id},"organization_membership",row.id);
   return row;
  });
 }
@@ -554,7 +554,7 @@ export async function updateOrganizationUser(orgId,actorUserId,userId,input,requ
   const status=input.status||row.status; if(!["active","suspended","removed"].includes(status)) throw error(400,"Invalid organization user status.","VALIDATION_ERROR");
   const updated=(await db.query("update organization_membership set role_code=$1,status=$2,updated_at=now() where id=$3 returning *",[role,status,row.id])).rows[0];
   await audit(db,actorUserId,"organization.user_updated","organization_membership",row.id,requestId,{roleCode:role,status});
-  await queueWorkflowEmail(db,row.user_id,"organization.membership_updated",{category:"organizations",title:"Organization workspace access updated",message:"Your organization workspace role or access status was updated.",nextAction:status==="active"?"Review your organization workspace access and responsibilities.":"Contact an organization owner if you believe your access was changed in error.",actionUrl:"/organizations",actionRequired:status!=="active",priority:status==="active"?"normal":"high",eventVersion:row.id+":"+status+":"+role},"organization_membership",row.id);
+  await queueWorkflowEmail(db,row.user_id,"organization.membership_updated",{category:"organizations",title:"Organization workspace access updated",message:"Your organization workspace role or access status was updated.",nextAction:status==="active"?"Review your organization workspace access and responsibilities.":"Contact an organization owner if you believe your access was changed in error.",actionUrl:"/organizations",actionRequired:status!=="active",priority:status==="active"?"normal":"high",eventVersion:`${row.id}:${status}:${role}`},"organization_membership",row.id);
   return updated;
  });
 }
@@ -737,7 +737,7 @@ export async function respondInterview(interviewId,userId,status,requestId){
   const row=(await db.query("update job_interview_participant set response_status=$1 where interview_id=$2 and user_id=$3 returning *",[status,interviewId,userId])).rows[0];
   await audit(db,userId,"job.interview_response","job_interview",interviewId,requestId,{status});
   const otherParticipants=(await db.query("select user_id,role_code from job_interview_participant where interview_id=$1 and user_id<>$2",[interviewId,userId])).rows;
-  for(const participant of otherParticipants){const candidate=participant.role_code==="candidate";await queueWorkflowEmail(db,participant.user_id,candidate?"professional.workflow_update":"employer.interview_response",{notificationEventCode:"job.interview_response",category:"recruitment",title:"Interview response received",audience:candidate?undefined:"employer",status,message:"An interview participant "+status+" the scheduled interview.",nextAction:candidate?"Review the interview details and prepare for the meeting.":"Review the interview schedule and coordinate any needed changes.",actionUrl:candidate?"/jobs":"/recruitment",actionRequired:status==="declined",priority:status==="declined"?"high":"normal"},"job_interview",interviewId);}
+  for(const participant of otherParticipants){const candidate=participant.role_code==="candidate";await queueWorkflowEmail(db,participant.user_id,candidate?"professional.workflow_update":"employer.interview_response",{notificationEventCode:"job.interview_response",category:"recruitment",title:"Interview response received",audience:candidate?undefined:"employer",status,message:`An interview participant ${status} the scheduled interview.`,nextAction:candidate?"Review the interview details and prepare for the meeting.":"Review the interview schedule and coordinate any needed changes.",actionUrl:candidate?"/jobs":"/recruitment",actionRequired:status==="declined",priority:status==="declined"?"high":"normal"},"job_interview",interviewId);}
   return row;
  });
 }
@@ -808,7 +808,7 @@ export async function organizationRecruitingDashboard(orgId,userId){
 }
 export async function recordJobOutcome(jobId,userId,input,requestId){
  return withTransaction(async db=>{
-  const j=(await jobRole(db,jobId,userId,["hiring_manager","recruiter"])).job;
+  const _j=(await jobRole(db,jobId,userId,["hiring_manager","recruiter"])).job;
   if(!["filled","partially_filled","cancelled","expired","reopened","quality_issue"].includes(input.outcomeCode)) throw error(400,"Invalid job outcome.","VALIDATION_ERROR");
   const row=(await db.query("insert into job_outcome(job_id,recorded_by,outcome_code,positions_filled,outcome_note) values($1,$2,$3,$4,$5) returning *",[jobId,userId,input.outcomeCode,Number(input.positionsFilled||0),input.note||null])).rows[0];
   await audit(db,userId,"job.outcome_recorded","job_outcome",row.id,requestId,{});

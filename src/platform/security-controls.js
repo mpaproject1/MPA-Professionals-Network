@@ -55,7 +55,7 @@ export async function issueHumanChallenge() {
   const question = `Confirm you are human: ${a} ${operation} ${b} = ?`;
   const row = (await getPool().query(
     "insert into security_human_challenge(purpose,question,answer_hash,expires_at) values('registration',$1,$2,now()+interval '5 minutes') returning id,question,expires_at",
-    [question, sha256("registration:" + question + ":" + answer)]
+    [question, sha256(`registration:${question}:${answer}`)]
   )).rows[0];
   if (randomInt(0, 100) === 0) await getPool().query("delete from security_human_challenge where id in (select id from security_human_challenge where expires_at < now() or consumed_at is not null order by expires_at limit 500)");
   return { id: row.id, question: row.question, expiresAt: row.expires_at };
@@ -69,7 +69,7 @@ export async function verifyHumanChallenge(id, answer) {
       return { ok: false, code: "CHALLENGE_INVALID" };
     }
     const suppliedAnswer = normalizeAnswer(answer);
-    const actual = sha256("registration:" + row.question + ":" + suppliedAnswer);
+    const actual = sha256(`registration:${row.question}:${suppliedAnswer}`);
     const expectedBytes = Buffer.from(row.answer_hash, "hex");
     const actualBytes = Buffer.from(actual, "hex");
     const match = /^-?\d{1,3}$/.test(suppliedAnswer) && expectedBytes.length === actualBytes.length && timingSafeEqual(expectedBytes, actualBytes);

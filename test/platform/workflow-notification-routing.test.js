@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { createInAppNotification, notificationCategoryFor } from "../../src/platform/notifications.js";
 
 function fakeDb(preference={in_app_enabled:true,in_app_categories:{}}){
@@ -8,7 +8,7 @@ function fakeDb(preference={in_app_enabled:true,in_app_categories:{}}){
   calls.push({sql,params});
   if(sql.startsWith("select coalesce(in_app_enabled"))return {rows:[preference]};
   if(sql.includes("insert into notification_event"))return {rows:[{id:"notification-1"}]};
-  throw new Error("Unexpected query in notification unit test: "+sql);
+  throw new Error(`Unexpected query in notification unit test: ${sql}`);
  }};
 }
 
@@ -48,7 +48,7 @@ test("critical security notifications bypass ordinary notification preference to
 test("legacy notification backfill covers underscore event codes without deleting history",async()=>{
  const {readFile}=await import("node:fs/promises");
  const migration=await readFile(new URL("../../db/migrations/20261015210000_notification_category_legacy_backfill.sql",import.meta.url),"utf8");
- for(const category of ["membership","verification","opportunities","recruitment","organizations","mentorship","services","security"])assert.match(migration,new RegExp("THEN '"+category+"'"));
+ for(const category of ["membership","verification","opportunities","recruitment","organizations","mentorship","services","security"])assert.match(migration,new RegExp(`THEN '${category}'`));
  assert.match(migration,/UPDATE notification_event/);
  assert.doesNotMatch(migration,/DROP TABLE|TRUNCATE|DELETE FROM notification_event/i);
 });

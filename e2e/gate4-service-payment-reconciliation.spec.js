@@ -1,13 +1,13 @@
-import { test, expect, request as playwrightRequest } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { getPool } from "../src/platform/db.js";
+import { expect, request as playwrightRequest, test } from "@playwright/test";
 import { login as loginMember, register as registerMember } from "../src/membership/service.js";
+import { getPool } from "../src/platform/db.js";
 
 const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:3000";
 const ADMIN_EMAIL = process.env.BOOTSTRAP_ADMIN_EMAIL;
 const ADMIN_PASSWORD = process.env.BOOTSTRAP_ADMIN_PASSWORD;
 
-async function seedActiveMember(api, label) {
+async function seedActiveMember(_api, label) {
   const suffix = randomUUID();
   const email = `gate4-service-${label}-${suffix}@example.test`;
   const password = "gate4-service-password-12345";
@@ -39,14 +39,14 @@ test("service lifecycle is participant-scoped and manual payment reconciliation 
     });
     expect(login.status(), "CI finance/reviewer fixture login").toBe(200);
     const adminToken = (await login.json()).data.token;
-    const adminHeaders = { authorization: "Bearer " + adminToken };
+    const adminHeaders = { authorization: `Bearer ${adminToken}` };
 
     const provider = await seedActiveMember(api, "provider");
     const requester = await seedActiveMember(api, "requester");
     const outsider = await seedActiveMember(api, "outsider");
-    const providerHeaders = { authorization: "Bearer " + provider.token };
-    const requesterHeaders = { authorization: "Bearer " + requester.token };
-    const outsiderHeaders = { authorization: "Bearer " + outsider.token };
+    const providerHeaders = { authorization: `Bearer ${provider.token}` };
+    const requesterHeaders = { authorization: `Bearer ${requester.token}` };
+    const outsiderHeaders = { authorization: `Bearer ${outsider.token}` };
 
     const listingResponse = await api.post("/api/v1/services", {
       headers: providerHeaders,
@@ -65,38 +65,38 @@ test("service lifecycle is participant-scoped and manual payment reconciliation 
     expect(listingResponse.status(), "active member can create a service listing").toBe(201);
     const listing = (await listingResponse.json()).data;
 
-    const submitted = await api.post("/api/v1/services/" + listing.id + "/status", {
+    const submitted = await api.post(`/api/v1/services/${listing.id}/status`, {
       headers: providerHeaders,
       data: { status: "published" }
     });
     expect(submitted.status(), "provider can submit their own listing for moderation").toBe(200);
 
-    const moderation = await api.post("/api/v1/admin/marketplace-listings/service/" + listing.id + "/moderate", {
+    const moderation = await api.post(`/api/v1/admin/marketplace-listings/service/${listing.id}/moderate`, {
       headers: adminHeaders,
       data: { decision: "approved", note: "Approved by the isolated service E2E fixture." }
     });
     expect(moderation.status(), "service listing must be approved before publication").toBe(200);
 
-    const published = await api.post("/api/v1/services/" + listing.id + "/status", {
+    const published = await api.post(`/api/v1/services/${listing.id}/status`, {
       headers: providerHeaders,
       data: { status: "published" }
     });
     expect(published.status(), "approved provider can publish their own listing").toBe(200);
 
-    const selfRequest = await api.post("/api/v1/services/" + listing.id + "/requests", {
+    const selfRequest = await api.post(`/api/v1/services/${listing.id}/requests`, {
       headers: providerHeaders,
       data: { message: "This must be rejected." }
     });
     expect(selfRequest.status(), "providers cannot request their own service").toBe(409);
 
-    const createdRequest = await api.post("/api/v1/services/" + listing.id + "/requests", {
+    const createdRequest = await api.post(`/api/v1/services/${listing.id}/requests`, {
       headers: requesterHeaders,
       data: { message: "Please provide the agreed professional support.", proposedPrice: 100, currency: "ETB" }
     });
     expect(createdRequest.status(), "another active member can request the published service").toBe(201);
     const serviceRequest = (await createdRequest.json()).data;
 
-    const duplicateRequest = await api.post("/api/v1/services/" + listing.id + "/requests", {
+    const duplicateRequest = await api.post(`/api/v1/services/${listing.id}/requests`, {
       headers: requesterHeaders,
       data: { message: "Retry must not duplicate an active request.", proposedPrice: 100, currency: "ETB" }
     });
@@ -110,41 +110,41 @@ test("service lifecycle is participant-scoped and manual payment reconciliation 
     expect((await outsiderList.json()).data.some(row => row.id === serviceRequest.id),
       "unrelated members cannot discover another request through their own request list").toBe(false);
 
-    const outsiderTransition = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/status", {
+    const outsiderTransition = await api.post(`/api/v1/service-requests/${serviceRequest.id}/status`, {
       headers: outsiderHeaders,
       data: { status: "accepted", note: "Must be denied." }
     });
     expect(outsiderTransition.status(), "non-participants cannot mutate a service request").toBe(403);
 
-    const requesterAccept = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/status", {
+    const requesterAccept = await api.post(`/api/v1/service-requests/${serviceRequest.id}/status`, {
       headers: requesterHeaders,
       data: { status: "accepted" }
     });
     expect(requesterAccept.status(), "only the provider can accept the request").toBe(403);
 
-    const accepted = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/status", {
+    const accepted = await api.post(`/api/v1/service-requests/${serviceRequest.id}/status`, {
       headers: providerHeaders,
       data: { status: "accepted", note: "Scope and fee confirmed." }
     });
     expect(accepted.status()).toBe(200);
     expect((await accepted.json()).data.status).toBe("accepted");
 
-    const requesterStart = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/status", {
+    const requesterStart = await api.post(`/api/v1/service-requests/${serviceRequest.id}/status`, {
       headers: requesterHeaders,
       data: { status: "in_progress" }
     });
     expect(requesterStart.status(), "only the provider can start delivery").toBe(403);
 
-    const started = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/status", {
+    const started = await api.post(`/api/v1/service-requests/${serviceRequest.id}/status`, {
       headers: providerHeaders,
       data: { status: "in_progress", note: "Delivery started." }
     });
     expect(started.status()).toBe(200);
     expect((await started.json()).data.status).toBe("in_progress");
 
-    const badAmount = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/payment", {
+    const badAmount = await api.post(`/api/v1/service-requests/${serviceRequest.id}/payment`, {
       headers: requesterHeaders,
-      data: { amount: 101, currency: "ETB", channel: "bank_transfer", reference: "G4-BAD-" + randomUUID(), idempotencyKey: "g4-bad-" + randomUUID() }
+      data: { amount: 101, currency: "ETB", channel: "bank_transfer", reference: `G4-BAD-${randomUUID()}`, idempotencyKey: `g4-bad-${randomUUID()}` }
     });
     expect(badAmount.status(), "manual payment must match the agreed amount").toBe(400);
 
@@ -152,10 +152,10 @@ test("service lifecycle is participant-scoped and manual payment reconciliation 
       amount: 100,
       currency: "ETB",
       channel: "bank_transfer",
-      reference: "G4-MANUAL-" + randomUUID(),
-      idempotencyKey: "g4-service-payment-" + randomUUID()
+      reference: `G4-MANUAL-${randomUUID()}`,
+      idempotencyKey: `g4-service-payment-${randomUUID()}`
     };
-    const paymentResponse = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/payment", {
+    const paymentResponse = await api.post(`/api/v1/service-requests/${serviceRequest.id}/payment`, {
       headers: requesterHeaders,
       data: paymentInput
     });
@@ -163,7 +163,7 @@ test("service lifecycle is participant-scoped and manual payment reconciliation 
     const payment = (await paymentResponse.json()).data;
     expect(payment.status).toBe("pending");
 
-    const paymentRetry = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/payment", {
+    const paymentRetry = await api.post(`/api/v1/service-requests/${serviceRequest.id}/payment`, {
       headers: requesterHeaders,
       data: paymentInput
     });
@@ -171,20 +171,20 @@ test("service lifecycle is participant-scoped and manual payment reconciliation 
     expect((await paymentRetry.json()).data.id,
       "retries with the same idempotency key must reuse the original payment record").toBe(payment.id);
 
-    const memberCannotVerify = await api.post("/api/v1/service-payments/" + payment.id + "/verify", {
+    const memberCannotVerify = await api.post(`/api/v1/service-payments/${payment.id}/verify`, {
       headers: requesterHeaders,
       data: { decision: "approved", note: "A payer cannot verify their own payment.", evidenceChecked: ["reference", "amount"] }
     });
     expect(memberCannotVerify.status(), "payment confirmation requires finance/reviewer authority").toBe(403);
 
-    const verified = await api.post("/api/v1/service-payments/" + payment.id + "/verify", {
+    const verified = await api.post(`/api/v1/service-payments/${payment.id}/verify`, {
       headers: adminHeaders,
       data: { decision: "approved", note: "Manual bank transfer evidence checked.", evidenceChecked: ["reference", "amount"] }
     });
     expect(verified.status()).toBe(200);
     expect((await verified.json()).data.status).toBe("succeeded");
 
-    const providerCompletion = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/status", {
+    const providerCompletion = await api.post(`/api/v1/service-requests/${serviceRequest.id}/status`, {
       headers: providerHeaders,
       data: { status: "completed", note: "Delivery submitted for requester acceptance." }
     });
@@ -192,13 +192,13 @@ test("service lifecycle is participant-scoped and manual payment reconciliation 
     expect((await providerCompletion.json()).data.status,
       "provider completion submission is not requester acceptance").toBe("in_progress");
 
-    const earlyRequesterAcceptance = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/accept-completion", {
+    const earlyRequesterAcceptance = await api.post(`/api/v1/service-requests/${serviceRequest.id}/accept-completion`, {
       headers: outsiderHeaders,
       data: { note: "Non-participant cannot accept." }
     });
     expect(earlyRequesterAcceptance.status()).toBe(403);
 
-    const acceptedCompletion = await api.post("/api/v1/service-requests/" + serviceRequest.id + "/accept-completion", {
+    const acceptedCompletion = await api.post(`/api/v1/service-requests/${serviceRequest.id}/accept-completion`, {
       headers: requesterHeaders,
       data: { note: "Delivery accepted after manual payment reconciliation." }
     });

@@ -1,8 +1,8 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { getPool, closePool } from "../../src/platform/db.js";
+import test from "node:test";
 import * as membership from "../../src/membership/service.js";
+import { closePool, getPool } from "../../src/platform/db.js";
 
 const suffix=randomUUID().slice(0,8);
 const email=`phase1-${suffix}@example.test`;

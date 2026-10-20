@@ -1,8 +1,8 @@
 "use client";
+import { type FormEvent, useCallback, useEffect, useId, useMemo, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
-import { FormEvent, useCallback, useEffect, useId, useMemo, useState } from "react";
-import { Card, Badge } from "../../components/ui";
-import { api, ApiError } from "../../lib/api";
+import { Badge, Card } from "../../components/ui";
+import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
 
 type RefItem={id:string;dataset_key:string;name:string;domain:string;code:string;label:string;aliases?:string[]|null;description?:string|null;sort_order:number};
@@ -22,7 +22,7 @@ function asDraft(e:Education):EducationDraft{return {draftKey:crypto.randomUUID(
 export default function GuidedProfessionalProfile({onNationalitySaved}:{onNationalitySaved:(value:string)=>void}){
  const profileFormId=useId();
  const token=useUiStore(s=>s.token);
- const [refs,setRefs]=useState<RefItem[]>([]),[profile,setProfile]=useState<Profile>({}),[education,setEducation]=useState<EducationDraft[]>([]),[portfolio,setPortfolio]=useState<Portfolio[]>([]),[account,setAccount]=useState<AccountProfile>({});
+ const [refs,setRefs]=useState<RefItem[]>([]),[_profile,setProfile]=useState<Profile>({}),[_education,setEducation]=useState<EducationDraft[]>([]),[portfolio,setPortfolio]=useState<Portfolio[]>([]),[account,setAccount]=useState<AccountProfile>({});
  const [selectedRefs,setSelectedRefs]=useState<Record<string,string>>({}),[customRefs,setCustomRefs]=useState<Record<string,string>>({}),[languageIds,setLanguageIds]=useState<string[]>([]),[otherLanguage,setOtherLanguage]=useState(""),[skillIds,setSkillIds]=useState<string[]>([]),[otherSkills,setOtherSkills]=useState(""),[referenceSearch,setReferenceSearch]=useState<Record<string,string>>({}),[languageSearch,setLanguageSearch]=useState(""),[educationSearch,setEducationSearch]=useState<Record<string,string>>({});
  const [educationDrafts,setEducationDrafts]=useState<EducationDraft[]>([]),[portfolioDraft,setPortfolioDraft]=useState<PortfolioDraft>(blankPortfolio()),[portfolioSkillIds,setPortfolioSkillIds]=useState<string[]>([]),[portfolioOccupationIds,setPortfolioOccupationIds]=useState<string[]>([]),[portfolioSearch,setPortfolioSearch]=useState<Record<string,string>>({});
  const [loading,setLoading]=useState(false),[saving,setSaving]=useState(false),[uploading,setUploading]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
@@ -105,9 +105,9 @@ export default function GuidedProfessionalProfile({onNationalitySaved}:{onNation
   setUploading(true);setError("");setNotice("");
   try{
    const auth=await api<UploadAuthorization>("/api/v1/files/uploads",{method:"POST",body:JSON.stringify({fileName:file.name,contentType:mime,byteSize:file.size})},token);
-   const response=await fetch(auth.uploadUrl,{method:"PUT",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/octet-stream","X-Upload-Token":auth.uploadToken},body:await file.arrayBuffer(),cache:"no-store"});
+   const response=await fetch(auth.uploadUrl,{method:"PUT",headers:{"Authorization":`Bearer ${token}`,"Content-Type":"application/octet-stream","X-Upload-Token":auth.uploadToken},body:await file.arrayBuffer(),cache:"no-store"});
    if(!response.ok)throw new Error("The file transfer was not accepted. Request a fresh upload and try again.");
-   const confirmed=await api<{id:string;original_name:string}>("/api/v1/files/uploads/"+auth.uploadId+"/confirm",{method:"POST"},token);
+   const confirmed=await api<{id:string;original_name:string}>(`/api/v1/files/uploads/${auth.uploadId}/confirm`,{method:"POST"},token);
    setPortfolioDraft(d=>({...d,evidenceFileId:confirmed.id,evidenceLabel:d.evidenceLabel||file.name}));
    setNotice("Evidence uploaded and confirmed privately. It is not public; save the portfolio item to attach it.");
   }catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Evidence upload failed. Your portfolio item has not been saved.");}
@@ -124,31 +124,31 @@ export default function GuidedProfessionalProfile({onNationalitySaved}:{onNation
  }
  async function downloadEvidence(item:Portfolio){
   if(!token||!item.evidence_file_id)return;setError("");setNotice("");
-  try{const response=await fetch("/api/v1/files/"+encodeURIComponent(item.evidence_file_id),{headers:{Authorization:"Bearer "+token},cache:"no-store"});if(!response.ok)throw new Error("Private evidence could not be downloaded. Your session may have expired or access may have changed.");const blob=await response.blob();const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=item.evidence_original_name||item.evidence_label||"private-evidence";a.click();URL.revokeObjectURL(url);setNotice("Private evidence download started.");}
+  try{const response=await fetch(`/api/v1/files/${encodeURIComponent(item.evidence_file_id)}`,{headers:{Authorization:`Bearer ${token}`},cache:"no-store"});if(!response.ok)throw new Error("Private evidence could not be downloaded. Your session may have expired or access may have changed.");const blob=await response.blob();const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=item.evidence_original_name||item.evidence_label||"private-evidence";a.click();URL.revokeObjectURL(url);setNotice("Private evidence download started.");}
   catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Private evidence download failed.");}
  }
  async function removePortfolio(id:string){
   if(!token||!confirm("Remove this portfolio item from your profile? The private evidence file remains stored but will no longer be linked to this item."))return;
   setError("");setNotice("");
-  try{await api("/api/v1/me/portfolio/"+id,{method:"DELETE"},token);setPortfolio(rows=>rows.filter(row=>row.id!==id));setNotice("Portfolio item removed.");}
+  try{await api(`/api/v1/me/portfolio/${id}`,{method:"DELETE"},token);setPortfolio(rows=>rows.filter(row=>row.id!==id));setNotice("Portfolio item removed.");}
   catch(e){setError(e instanceof ApiError?e.message:"Portfolio item could not be removed.");}
  }
  function renderReferenceField(type:string,label:string,group:string){
   const value=selectedRefs[type]||"",other=byId.get(value)?.code==="OTHER";
   return <div className="grid" style={{gap:6}} key={type}>
-   <label htmlFor={"p1-search-"+type}>{label}</label>
-   <input id={"p1-search-"+type} value={referenceSearch[type]||""} onChange={e=>setReferenceSearch(v=>({...v,[type]:e.target.value}))} placeholder={"Search "+label.toLowerCase()+" or alias"}/>
-   <select id={"p1-ref-"+type} value={value} onChange={e=>setRef(type,e.target.value)}>
-    <option value="">Choose {label.toLowerCase()}</option>{(value&&!searchOptions(group,referenceSearch[type]||"").some(item=>item.id===value)?[byId.get(value)!,...searchOptions(group,referenceSearch[type]||"")]:searchOptions(group,referenceSearch[type]||"")).filter(Boolean).map(item=><option key={item.id} value={item.id}>{item.label}{item.aliases?.length?" · "+item.aliases.slice(0,2).join(", "):""}</option>)}
+   <label htmlFor={`p1-search-${type}`}>{label}</label>
+   <input id={`p1-search-${type}`} value={referenceSearch[type]||""} onChange={e=>setReferenceSearch(v=>({...v,[type]:e.target.value}))} placeholder={`Search ${label.toLowerCase()} or alias`}/>
+   <select id={`p1-ref-${type}`} value={value} onChange={e=>setRef(type,e.target.value)}>
+    <option value="">Choose {label.toLowerCase()}</option>{(value&&!searchOptions(group,referenceSearch[type]||"").some(item=>item.id===value)?[byId.get(value)!,...searchOptions(group,referenceSearch[type]||"")]:searchOptions(group,referenceSearch[type]||"")).filter(Boolean).map(item=><option key={item.id} value={item.id}>{item.label}{item.aliases?.length?` · ${item.aliases.slice(0,2).join(", ")}`:""}</option>)}
    </select>
-   {other?<label>Enter your {label.toLowerCase()}<input required value={customRefs[type]||""} onChange={e=>setCustomRefs(v=>({...v,[type]:e.target.value}))} maxLength={180} placeholder={"Type your "+label.toLowerCase()}/></label>:null}
+   {other?<label>Enter your {label.toLowerCase()}<input required value={customRefs[type]||""} onChange={e=>setCustomRefs(v=>({...v,[type]:e.target.value}))} maxLength={180} placeholder={`Type your ${label.toLowerCase()}`}/></label>:null}
   </div>;
  }
  function renderEducationSelect(draft:EducationDraft,index:number,key:keyof EducationDraft,label:string,group:string,customKey:keyof EducationDraft,customLabel:string){
-  const value=String(draft[key]||""),other=byId.get(value)?.code==="OTHER",searchKey=String(index)+":"+String(key),query=educationSearch[searchKey]||"";
+  const value=String(draft[key]||""),other=byId.get(value)?.code==="OTHER",searchKey=`${String(index)}:${String(key)}`,query=educationSearch[searchKey]||"";
   const matches=searchOptions(group,query);const visible=value&&!matches.some(item=>item.id===value)?[byId.get(value)!,...matches]:matches;
   return <div className="grid" style={{gap:6}}>
-   <label>{label}<input value={query} onChange={e=>setEducationSearch(v=>({...v,[searchKey]:e.target.value}))} placeholder={"Search "+label.toLowerCase()+" or alias"}/><select required={key!=="qualificationItemId"} value={value} onChange={e=>setEducationDrafts(rows=>rows.map((row,i)=>i===index?{...row,[key]:e.target.value,...(byId.get(e.target.value)?.code==="OTHER"?{}:{[customKey]:""})}:row))}>
+   <label>{label}<input value={query} onChange={e=>setEducationSearch(v=>({...v,[searchKey]:e.target.value}))} placeholder={`Search ${label.toLowerCase()} or alias`}/><select required={key!=="qualificationItemId"} value={value} onChange={e=>setEducationDrafts(rows=>rows.map((row,i)=>i===index?{...row,[key]:e.target.value,...(byId.get(e.target.value)?.code==="OTHER"?{}:{[customKey]:""})}:row))}>
     <option value="">Choose {label.toLowerCase()}</option>{visible.filter(Boolean).map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
    </select></label>
    {other?<label>{customLabel}<input required value={String(draft[customKey]||"")} onChange={e=>setEducationDrafts(rows=>rows.map((row,i)=>i===index?{...row,[customKey]:e.target.value}:row))} maxLength={240}/></label>:null}
@@ -169,13 +169,13 @@ export default function GuidedProfessionalProfile({onNationalitySaved}:{onNation
     <div className="grid" style={{gap:8}}><label htmlFor={`${profileFormId}-language-search`}>Languages</label>
      <input id={`${profileFormId}-language-search`} value={languageSearch} onChange={e=>setLanguageSearch(e.target.value)} placeholder="Search languages or known aliases"/>
      <div className="grid grid-2" style={{gap:6}}>{searchOptions(groups.language,languageSearch).slice(0,80).map(item=><label key={item.id} className="row" style={{alignItems:"center",gap:8,padding:"6px 8px",border:"1px solid var(--border)",borderRadius:8}}><input type="checkbox" checked={languageIds.includes(item.id)} onChange={e=>setLanguageIds(ids=>e.target.checked?[...new Set([...ids,item.id])]:ids.filter(id=>id!==item.id))}/><span>{item.label}</span></label>)}</div>
-     <p className="muted">Selected languages</p><div className="row" style={{gap:6,flexWrap:"wrap"}}>{languageIds.map(id=>{const item=byId.get(id);return item?<span key={id} className="row" style={{gap:6,alignItems:"center",border:"1px solid var(--border)",borderRadius:999,padding:"4px 10px"}}>{item.label}<button type="button" className="btn btn-ghost" onClick={()=>setLanguageIds(ids=>ids.filter(value=>value!==id))} aria-label={"Remove "+item.label}>×</button></span>:null;})}</div>
+     <p className="muted">Selected languages</p><div className="row" style={{gap:6,flexWrap:"wrap"}}>{languageIds.map(id=>{const item=byId.get(id);return item?<span key={id} className="row" style={{gap:6,alignItems:"center",border:"1px solid var(--border)",borderRadius:999,padding:"4px 10px"}}>{item.label}<button type="button" className="btn btn-ghost" onClick={()=>setLanguageIds(ids=>ids.filter(value=>value!==id))} aria-label={`Remove ${item.label}`}>×</button></span>:null;})}</div>
      {languageIds.some(id=>byId.get(id)?.code==="OTHER")?<label>Other language(s), separated by commas<input required value={otherLanguage} onChange={e=>setOtherLanguage(e.target.value)} maxLength={500} placeholder="For example, Somali, Tigrinya"/></label>:null}
     </div>
     <div className="grid" style={{gap:8}}><label htmlFor={`${profileFormId}-skill-search`}>Professional skills</label>
      <input id={`${profileFormId}-skill-search`} value={referenceSearch.skill||""} onChange={e=>setReferenceSearch(v=>({...v,skill:e.target.value}))} placeholder="Search skills or aliases"/>
      <div className="grid grid-2" style={{gap:6}}>{searchOptions(groups.skill,referenceSearch.skill||"").slice(0,100).map(item=><label key={item.id} className="row" style={{alignItems:"center",gap:8,padding:"6px 8px",border:"1px solid var(--border)",borderRadius:8}}><input type="checkbox" checked={skillIds.includes(item.id)} onChange={e=>setSkillIds(ids=>e.target.checked?[...new Set([...ids,item.id])]:ids.filter(id=>id!==item.id))}/><span>{item.label}</span></label>)}</div>
-     <p className="muted">Selected skills</p><div className="row" style={{gap:6,flexWrap:"wrap"}}>{skillIds.map(id=>{const item=byId.get(id);return item?<span key={id} className="row" style={{gap:6,alignItems:"center",border:"1px solid var(--border)",borderRadius:999,padding:"4px 10px"}}>{item.label}<button type="button" className="btn btn-ghost" onClick={()=>setSkillIds(ids=>ids.filter(value=>value!==id))} aria-label={"Remove "+item.label}>×</button></span>:null;})}</div>
+     <p className="muted">Selected skills</p><div className="row" style={{gap:6,flexWrap:"wrap"}}>{skillIds.map(id=>{const item=byId.get(id);return item?<span key={id} className="row" style={{gap:6,alignItems:"center",border:"1px solid var(--border)",borderRadius:999,padding:"4px 10px"}}>{item.label}<button type="button" className="btn btn-ghost" onClick={()=>setSkillIds(ids=>ids.filter(value=>value!==id))} aria-label={`Remove ${item.label}`}>×</button></span>:null;})}</div>
      {skillIds.some(id=>byId.get(id)?.code==="OTHER")?<label>Other skill(s), separated by commas<input required value={otherSkills} onChange={e=>setOtherSkills(e.target.value)} maxLength={1000} placeholder="For example, a specialist skill not listed"/></label>:null}
     </div>
     <button type="submit" className="btn btn-primary" disabled={saving||loading}>{saving?"Saving…":"Save classifications, skills and languages"}</button>
@@ -207,7 +207,7 @@ export default function GuidedProfessionalProfile({onNationalitySaved}:{onNation
    <p className="muted">Add multiple portfolio items. Each item should have a clear title, context and optionally a link or private evidence. Private evidence is not published in your directory profile.</p>
    {portfolio.length?<div className="grid" style={{gap:10,marginBottom:16}}>{portfolio.map(item=><div key={item.id} className="grid" style={{gap:6,padding:12,border:"1px solid var(--border)",borderRadius:12}}>
     <div className="row" style={{justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><strong>{item.title}</strong><Badge>{item.visibility}</Badge></div>
-    <p className="muted">{item.item_type.replaceAll("_"," ")}{item.description?" · "+item.description:""}{item.started_on?" · Started "+String(item.started_on).slice(0,10):""}{item.completed_on?" · Completed "+String(item.completed_on).slice(0,10):""}</p>{item.references?.length?<div className="row" style={{gap:6,flexWrap:"wrap"}}>{item.references.map(ref=><Badge key={ref.relationType+ref.referenceItemId}>{ref.relationType==="skill"?"Skill: ":"Occupation: "}{ref.label}</Badge>)}</div>:null}<p className="muted">Added {item.created_at?new Date(item.created_at).toLocaleDateString():"date unavailable"} · Review status: {item.review_status==="reviewed"?"Reviewed":item.review_status==="under_review"?"Under review":item.review_status==="needs_correction"?"Needs correction":"User supplied — not independently verified"}</p>
+    <p className="muted">{item.item_type.replaceAll("_"," ")}{item.description?` · ${item.description}`:""}{item.started_on?` · Started ${String(item.started_on).slice(0,10)}`:""}{item.completed_on?` · Completed ${String(item.completed_on).slice(0,10)}`:""}</p>{item.references?.length?<div className="row" style={{gap:6,flexWrap:"wrap"}}>{item.references.map(ref=><Badge key={ref.relationType+ref.referenceItemId}>{ref.relationType==="skill"?"Skill: ":"Occupation: "}{ref.label}</Badge>)}</div>:null}<p className="muted">Added {item.created_at?new Date(item.created_at).toLocaleDateString():"date unavailable"} · Review status: {item.review_status==="reviewed"?"Reviewed":item.review_status==="under_review"?"Under review":item.review_status==="needs_correction"?"Needs correction":"User supplied — not independently verified"}</p>
     {item.external_url?<a href={item.external_url} target="_blank" rel="noreferrer">Open portfolio link</a>:null}
     {item.evidence_file_id?<div className="row" style={{gap:8,flexWrap:"wrap"}}><p aria-live="polite" aria-atomic="true"><Badge>Private evidence attached</Badge> {item.evidence_label||item.evidence_original_name||"Evidence file"}</p><button type="button" className="btn btn-ghost" onClick={()=>void downloadEvidence(item)}>Download private evidence</button></div>:<p className="muted">No evidence attached.</p>}
     <button type="button" className="btn btn-ghost" onClick={()=>void removePortfolio(item.id)}>Remove item</button>

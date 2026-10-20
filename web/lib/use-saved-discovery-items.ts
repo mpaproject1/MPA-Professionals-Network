@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError } from "./api";
+import { ApiError, api } from "./api";
 import { useUiStore } from "./store";
 
 export type SavedDiscoveryType = "professional" | "organization" | "service" | "mentor";
 type SavedItem = { item_type: SavedDiscoveryType; item_id: string };
-const keyOf = (type: SavedDiscoveryType, id: string) => type + ":" + id;
+const keyOf = (type: SavedDiscoveryType, id: string) => `${type}:${id}`;
 
 export function useSavedDiscoveryItems() {
   const token = useUiStore(state => state.token);
@@ -38,7 +38,7 @@ export function useSavedDiscoveryItems() {
     const wasSaved = savedKeys.includes(key);
     try {
       if (wasSaved) {
-        await api("/api/v1/me/saved-items/" + encodeURIComponent(type) + "/" + encodeURIComponent(id), { method: "DELETE" }, token);
+        await api(`/api/v1/me/saved-items/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, { method: "DELETE" }, token);
         setSavedKeys(current => current.filter(item => item !== key));
       } else {
         await api("/api/v1/me/saved-items", { method: "POST", body: JSON.stringify({ itemType: type, itemId: id }) }, token);

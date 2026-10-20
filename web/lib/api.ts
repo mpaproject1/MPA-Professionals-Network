@@ -99,7 +99,7 @@ function statusMessage(status: number): string {
 export async function api<T>(path:string,init:RequestInit={},token?:string):Promise<T>{
   const headers=new Headers(init.headers);
   if(!(typeof FormData !== "undefined" && init.body instanceof FormData)) headers.set("Content-Type","application/json");
-  if(token) headers.set("Authorization","Bearer "+token);
+  if(token) headers.set("Authorization",`Bearer ${token}`);
   let response: Response;
   try {
     response = await fetch(path,{...init,headers,cache:"no-store"});

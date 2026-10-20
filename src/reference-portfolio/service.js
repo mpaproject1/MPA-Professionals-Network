@@ -12,7 +12,7 @@ function requireStatus(version, expected) {
   if (version.status !== expected) {
     throw new ReferencePortfolioError(
       "INVALID_STATE",
-      "Version " + version.id + " must be " + expected + "; current state is " + version.status + "."
+      `Version ${version.id} must be ${expected}; current state is ${version.status}.`
     );
   }
 }
@@ -31,7 +31,7 @@ export class ReferencePortfolioService {
 
   createDraftVersion(datasetKey, actorId, reason = null) {
     const dataset = this.repository.getDataset(datasetKey);
-    if (!dataset) throw new ReferencePortfolioError("NOT_FOUND", "Dataset '" + datasetKey + "' not found.");
+    if (!dataset) throw new ReferencePortfolioError("NOT_FOUND", `Dataset '${datasetKey}' not found.`);
     return this.repository.createDraftVersion({
       datasetId: dataset.id, datasetKey, actorId, reason, createdAt: this.clock()
     });
@@ -120,7 +120,7 @@ export class InMemoryReferencePortfolioRepository {
 
   createDraftVersion(input) {
     const version = {
-      id: "version-" + this.nextVersion++, datasetId: input.datasetId, datasetKey: input.datasetKey,
+      id: `version-${this.nextVersion++}`, datasetId: input.datasetId, datasetKey: input.datasetKey,
       status: "draft", reason: input.reason, createdBy: input.actorId, createdAt: input.createdAt, items: []
     };
     this.versions.push(version);

@@ -1,17 +1,18 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {ArrowLeft,Bookmark,HeartHandshake,Languages,RefreshCw} from "lucide-react";
 import Link from "next/link";
 import {useParams} from "next/navigation";
-import {ArrowLeft,Bookmark,HeartHandshake,Languages,RefreshCw} from "lucide-react";
-import {Card,Badge} from "../../../../components/ui";
-import {api,ApiError} from "../../../../lib/api";
+import {useCallback,useEffect,useState} from "react";
+import {Badge, Card} from "../../../../components/ui";
+import {ApiError, api} from "../../../../lib/api";
 import {useSavedDiscoveryItems} from "../../../../lib/use-saved-discovery-items";
+
 type Mentor={id:string;user_id:string;display_name:string;headline?:string|null;bio?:string|null;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number};
 function values(v:unknown):string[]{if(Array.isArray(v))return v.map(String);if(typeof v==="string"){try{const x=JSON.parse(v);if(Array.isArray(x))return x.map(String)}catch{}return v?[v]:[]}return []}
 export default function PublicMentorProfile(){
  const params=useParams<{id:string}>();const id=String(params.id||"");const saved=useSavedDiscoveryItems();
  const [item,setItem]=useState<Mentor|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
- const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Mentor>("/api/v1/mentors/"+encodeURIComponent(id)));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This mentor profile is unavailable to your account.");}finally{setLoading(false);}},[id]);
+ const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Mentor>(`/api/v1/mentors/${encodeURIComponent(id)}`));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This mentor profile is unavailable to your account.");}finally{setLoading(false);}},[id]);
  useEffect(()=>{void load();},[load]);
  return <main className="grid" style={{gap:18}}><Link href="/mentorship" className="btn btn-ghost"><ArrowLeft size={16}/> Back to mentorship</Link>
  {loading?<Card><div className="row"><RefreshCw size={18}/><p className="muted">Loading mentor profile…</p></div></Card>

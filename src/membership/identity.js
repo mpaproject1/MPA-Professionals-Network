@@ -9,9 +9,9 @@ export function normalizePhone(value){
   let digits=String(value).replace(/[^0-9+]/g,"");
   if(digits.startsWith("+")) digits=digits.slice(1);
   if(digits.startsWith("00251")) digits=digits.slice(2);
-  if(digits.startsWith("251")) return "+"+digits;
-  if(/^0[79][0-9]{8}$/.test(digits)) return "+251"+digits.slice(1);
-  return digits ? "+"+digits : null;
+  if(digits.startsWith("251")) return `+${digits}`;
+  if(/^0[79][0-9]{8}$/.test(digits)) return `+251${digits.slice(1)}`;
+  return digits ? `+${digits}` : null;
 }
 
 export function normalizeName(value){
@@ -45,7 +45,7 @@ export function verifyPassword(password,encoded){
 }
 
 export function validatePersonInput(input={}){
-  if(Object.prototype.hasOwnProperty.call(input,"password")) validatePassword(input.password);
+  if(Object.hasOwn(input,"password")) validatePassword(input.password);
   const firstName=String(input.firstName||"").trim();
   const middleName=String(input.middleName||"").trim()||null;
   const lastName=String(input.lastName||"").trim();

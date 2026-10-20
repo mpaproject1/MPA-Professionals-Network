@@ -1,9 +1,9 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
-  allowedServiceRequestTransition,
-  allowedMentorshipTransition,
   allowedMatchTransition,
+  allowedMentorshipTransition,
+  allowedServiceRequestTransition,
   allowedSessionTransition,
   canAcceptServiceCompletion
 } from "../../src/services-mentorship/service.js";

@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { parseNotificationFilters, safeInternalUrl } from "../../src/platform/notifications.js";
 
 test("notification filters enforce the supported category vocabulary and bounded pagination",()=>{
@@ -23,7 +23,7 @@ test("notification deep links accept only safe same-origin relative paths",()=>{
 test("action-center migration is additive and preserves notification history",async()=>{
   const {readFile}=await import("node:fs/promises");
   const migration=await readFile(new URL("../../db/migrations/20261015200000_in_app_action_center.sql",import.meta.url),"utf8");
-  for(const field of ["category","title","body","priority","action_required","action_url","read_at","archived_at","dedupe_key"])assert.match(migration,new RegExp("ADD COLUMN IF NOT EXISTS "+field));
+  for(const field of ["category","title","body","priority","action_required","action_url","read_at","archived_at","dedupe_key"])assert.match(migration,new RegExp(`ADD COLUMN IF NOT EXISTS ${field}`));
   assert.match(migration,/CREATE INDEX IF NOT EXISTS ix_notification_event_unread/);
   assert.match(migration,/CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_event_dedupe/);
   assert.doesNotMatch(migration,/DROP TABLE|TRUNCATE|DELETE FROM notification_event/i);

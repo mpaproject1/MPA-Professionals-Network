@@ -1,9 +1,10 @@
 "use client";
-import { useEffect,useState,type FormEvent } from "react";
-import { api,ApiError } from "../../../lib/api";
+import { type FormEvent, useEffect,useState} from "react";
+import { ApiError, api} from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";
 import styles from "./settings.module.css";
+
 type Settings={header_text:string;subtitle_text:string;footer_text:string;background_style:"geometric"|"gradient"|"midnight";background_start:string;background_end:string;accent_color:string;text_color:string;show_membership_type:boolean};
 const defaults:Settings={header_text:"Muslim Professionals Association",subtitle_text:"Membership ID",footer_text:"Verify membership using the QR code",background_style:"geometric",background_start:"#0A3258",background_end:"#174A78",accent_color:"#E5F044",text_color:"#FFFFFF",show_membership_type:true};
 export default function MembershipCardSettingsPage(){
@@ -17,7 +18,7 @@ export default function MembershipCardSettingsPage(){
  useEffect(()=>{hydrateToken();},[hydrateToken]);
  useEffect(()=>{let cancelled=false;if(!token){setLoading(false);return;}void api<Settings>("/api/v1/admin/membership-card-settings",{},token).then(v=>{if(!cancelled)setForm({...defaults,...v});}).catch(e=>{if(!cancelled)setError(e instanceof ApiError?e.message:"Could not load membership card settings.");}).finally(()=>{if(!cancelled)setLoading(false);});return()=>{cancelled=true;};},[token]);
  function setSetting<K extends keyof Settings>(key:K,value:Settings[K]){setForm(old=>({...old,[key]:value}));}
- function openMemberCard(e:FormEvent){e.preventDefault();const value=memberNumber.trim().toUpperCase();if(!value||value.length>100||/\p{Cc}/u.test(value)){setError("Enter an existing membership ID.");return;}window.location.href="/membership/card?membershipNumber="+encodeURIComponent(value);}
+ function openMemberCard(e:FormEvent){e.preventDefault();const value=memberNumber.trim().toUpperCase();if(!value||value.length>100||/\p{Cc}/u.test(value)){setError("Enter an existing membership ID.");return;}window.location.href=`/membership/card?membershipNumber=${encodeURIComponent(value)}`;}
  async function save(e:FormEvent){e.preventDefault();if(!token)return;setSaving(true);setError("");setNotice("");try{const updated=await api<Settings>("/api/v1/admin/membership-card-settings",{method:"PATCH",body:JSON.stringify({headerText:form.header_text,subtitleText:form.subtitle_text,footerText:form.footer_text,backgroundStyle:form.background_style,backgroundStart:form.background_start,backgroundEnd:form.background_end,accentColor:form.accent_color,textColor:form.text_color,showMembershipType:form.show_membership_type})},token);setForm({...defaults,...updated});setNotice("Membership card branding saved. New and refreshed cards will use these settings.");}catch(e){setError(e instanceof ApiError?e.message:"Could not save card branding.");}finally{setSaving(false);}}
  if(!token)return <main className={styles.page}><h1>Membership card branding</h1><p>Sign in with an authorized administrator account.</p><a href="/login?next=%2Fadmin%2Fmembership-card">Sign in</a></main>;
  return <main className={styles.page}><AdminPageHeader eyebrow="Administration · Brand control" title="Membership ID design" description="Configure the default ATM-size MPA card. Existing membership IDs and tracking references are not editable here." actions={<a className="btn btn-ghost" href="/membership/card">Open member card</a>}/>

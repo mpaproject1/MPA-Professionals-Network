@@ -1,5 +1,6 @@
 "use client";
 import {create} from "zustand";
+
 type Mode="light"|"dark";
 type State={mode:Mode;token:string;hydrated:boolean;language:string;queue:number;setMode:(mode:Mode)=>void;setToken:(token:string)=>void;clearToken:()=>void;clearSession:()=>void;hydrateToken:()=>void;setLanguage:(language:string)=>void;addQueue:()=>void;setQueue:(count:number)=>void};
 const TOKEN_KEY="mpa-session-token";

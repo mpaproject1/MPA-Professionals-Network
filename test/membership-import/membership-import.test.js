@@ -1,7 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import {normalizeLegacyMember,classifyMatch} from "../../src/membership-import/contract.js";
-import {createManualPayment,verifyManualPayment,assertPaymentTransition} from "../../src/platform/payment-workflow.js";
+import test from "node:test";
+import {classifyMatch, normalizeLegacyMember} from "../../src/membership-import/contract.js";
+import {assertPaymentTransition, createManualPayment,verifyManualPayment} from "../../src/platform/payment-workflow.js";
 
 test("legacy membership rows normalize into a stable contract",()=>{
   const row=normalizeLegacyMember({legacy_member_id:" OLD-1 ",email:" A@EXAMPLE.COM ",paid_amount:"1200",paid_currency:"etb"});

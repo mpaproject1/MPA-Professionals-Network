@@ -5,6 +5,6 @@ module.exports={
 	reactStrictMode:true,
 	poweredByHeader:false,
 	async rewrites(){
-		return [{source:"/api/:path*",destination:apiServerBase+"/api/:path*"}];
+		return [{source:"/api/:path*",destination:`${apiServerBase}/api/:path*`}];
 	}
 };

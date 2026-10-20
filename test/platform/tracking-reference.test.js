@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { formatTrackingReference } from "../../src/platform/tracking-reference.js";
 
 test("tracking references are short, typed and readable while serials grow",()=>{

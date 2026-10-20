@@ -1,7 +1,7 @@
 import { getPool, withTransaction } from "../platform/db.js";
-import { createInAppNotification } from "../platform/notifications.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
-import { hasCurrentActiveMembership, hasProfessionalIdentity, assertProfessionalIdentity, assertCurrentActiveMembership, assertOrganizationCapability } from "../platform/identity-policy.js";
+import { assertCurrentActiveMembership, assertOrganizationCapability, assertProfessionalIdentity, hasCurrentActiveMembership, hasProfessionalIdentity } from "../platform/identity-policy.js";
+import { createInAppNotification } from "../platform/notifications.js";
 
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
 const PROFESSIONAL_CLAIMS=["professional_certification","education","employment","experience","service_capability"];
@@ -163,10 +163,10 @@ export async function changeServiceListingStatus(listingId,userId,status,request
 
 export async function listServices(viewerId=null,filters={}){
   const db=getPool(); const args=[viewerId||null]; const where=["s.status='published'","s.moderation_status='approved'","((s.organization_id is not null and exists (select 1 from organization o where o.id=s.organization_id and o.verification_status='verified')) or (s.organization_id is null and exists (select 1 from membership_record m where m.user_id=s.provider_user_id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date))))","(s.visibility='public' or ($1::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$1 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date))))"];
-  if(filters.category){ args.push(String(filters.category)); where.push("s.service_category=$"+args.length); }
-  if(filters.q){ args.push("%"+String(filters.q).trim()+"%"); where.push("(s.title ilike $"+args.length+" or s.description ilike $"+args.length+" or s.service_category ilike $"+args.length+")"); }
+  if(filters.category){ args.push(String(filters.category)); where.push(`s.service_category=$${args.length}`); }
+  if(filters.q){ args.push(`%${String(filters.q).trim()}%`); where.push(`(s.title ilike $${args.length} or s.description ilike $${args.length} or s.service_category ilike $${args.length})`); }
   const limit=Math.min(Math.max(Number(filters.limit)||25,1),100),offset=Math.max(Number(filters.offset)||0,0);
-  const rows=(await db.query("select s.id,s.provider_user_id,s.organization_id,s.title,s.description,s.service_category,s.delivery_mode,s.location_label,s.pricing_model,s.price_amount,s.currency,s.visibility,s.created_at,coalesce(o.display_name,p.display_name) display_name from service_listing s left join person p on p.user_id=s.provider_user_id left join organization o on o.id=s.organization_id where "+where.join(" and ")+" order by s.created_at desc limit "+limit+" offset "+offset,args)).rows;
+  const rows=(await db.query(`select s.id,s.provider_user_id,s.organization_id,s.title,s.description,s.service_category,s.delivery_mode,s.location_label,s.pricing_model,s.price_amount,s.currency,s.visibility,s.created_at,coalesce(o.display_name,p.display_name) display_name from service_listing s left join person p on p.user_id=s.provider_user_id left join organization o on o.id=s.organization_id where ${where.join(" and ")} order by s.created_at desc limit ${limit} offset ${offset}`,args)).rows;
   return {items:rows,limit,offset};
 }
 
@@ -539,10 +539,10 @@ export async function listMentors(viewerId,filters={}){
   // always bound so the query is valid with or without optional filters.
   const args=[viewerId||null];
   const where=["mp.status='active'","mp.moderation_status='approved'","m.status='active'","m.start_date<=current_date","(m.end_date is null or m.end_date>=current_date)","(mp.visibility='public' or (mp.visibility='members' and $1::uuid is not null and exists(select 1 from membership_record vm where vm.user_id=$1::uuid and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date))))"];
-  if(filters.q){ args.push("%"+String(filters.q).trim()+"%"); where.push("(mp.headline ilike $"+args.length+" or mp.bio ilike $"+args.length+")"); }
-  if(filters.topic){ args.push("%"+String(filters.topic).trim().toLowerCase()+"%"); where.push("mp.expertise::text ilike $"+args.length); }
+  if(filters.q){ args.push(`%${String(filters.q).trim()}%`); where.push(`(mp.headline ilike $${args.length} or mp.bio ilike $${args.length})`); }
+  if(filters.topic){ args.push(`%${String(filters.topic).trim().toLowerCase()}%`); where.push(`mp.expertise::text ilike $${args.length}`); }
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
-  const rows=(await db.query("select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees from mentor_profile mp join app_user u on u.id=mp.user_id join person p on p.user_id=u.id join membership_record m on m.user_id=u.id where "+where.join(" and ")+" order by p.display_name limit "+(limit+1)+" offset "+offset,args)).rows;
+  const rows=(await db.query(`select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees from mentor_profile mp join app_user u on u.id=mp.user_id join person p on p.user_id=u.id join membership_record m on m.user_id=u.id where ${where.join(" and ")} order by p.display_name limit ${limit+1} offset ${offset}`,args)).rows;
   return rows;
 }
 

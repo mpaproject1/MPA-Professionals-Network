@@ -1,25 +1,25 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { getPool, closePool } from "../../src/platform/db.js";
+import test from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
+import { closePool, getPool } from "../../src/platform/db.js";
 import * as marketplace from "../../src/services-mentorship/demand.js";
 import * as organizationOffers from "../../src/services-mentorship/organization-offers.js";
 import * as journeys from "../../src/services-mentorship/service.js";
 
 function identity(suffix){
  const digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
- return {email:"journey-"+suffix+"@example.test",password:"JourneyGate2Password!2026",firstName:"Journey",lastName:"Gate"+suffix.slice(0,8),phone:"06"+digits};
+ return {email:`journey-${suffix}@example.test`,password:"JourneyGate2Password!2026",firstName:"Journey",lastName:`Gate${suffix.slice(0,8)}`,phone:`06${digits}`};
 }
 async function account(suffix=randomUUID()){
- const created=await membership.register(identity(suffix),"gate2-journey-"+suffix);
+ const created=await membership.register(identity(suffix),`gate2-journey-${suffix}`);
  return created.user.id;
 }
 async function activeMember(userId){
  const db=getPool(),product=(await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
  assert.ok(product,"BASIC membership product must exist");
- await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')",[userId,product.id,"MPA-G2-"+randomUUID().slice(0,8).toUpperCase()]);
+ await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')",[userId,product.id,`MPA-G2-${randomUUID().slice(0,8).toUpperCase()}`]);
  const role=(await db.query("select id from app_role where role_code='member'")).rows[0];
  if(role) await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing",[userId,role.id]);
 }
@@ -39,14 +39,14 @@ async function supportStaff(){
 }
 async function verifiedProfessionalClaim(userId){
  const db=getPool(),suffix=randomUUID().replaceAll("-","").slice(0,10);
- const program=(await db.query("insert into verification_program(program_code,name,purpose,subject_type) values($1,$2,$3,'person') returning id",["gate2-journey-"+suffix,"Gate 2 test verification","Test-only verified professional claim for a complete mentorship journey."])).rows[0];
+ const program=(await db.query("insert into verification_program(program_code,name,purpose,subject_type) values($1,$2,$3,'person') returning id",[`gate2-journey-${suffix}`,"Gate 2 test verification","Test-only verified professional claim for a complete mentorship journey."])).rows[0];
  const verificationCase=(await db.query("insert into verification_case(program_id,subject_user_id,status,purpose_snapshot,opened_by) values($1,$2,'approved',$3,$2) returning id",[program.id,userId,"Gate 2 mentorship test"])).rows[0];
  const claimType=(await db.query("insert into verification_claim_type(claim_code,name,active) values('professional_certification','Professional certification',true) on conflict(claim_code) do update set active=true returning id")).rows[0];
  await db.query("insert into verification_claim(case_id,claim_type_id,claim_code_snapshot,claimed_value,status,verified_at) values($1,$2,'professional_certification',$3,'verified',now())",[verificationCase.id,claimType.id,{source:"Gate 2 integration test"}]);
 }
 async function approvedOrg(ownerId){
  const db=getPool();
- const org=await organizationJobs.registerOrganization(ownerId,{legalName:"Gate 2 Org "+randomUUID(),displayName:"Gate 2 Verified Organization"},"gate2-org-create");
+ const org=await organizationJobs.registerOrganization(ownerId,{legalName:`Gate 2 Org ${randomUUID()}`,displayName:"Gate 2 Verified Organization"},"gate2-org-create");
  await db.query("update organization set verification_status='verified',verified_at=now(),verified_by=$2,public_visible=true where id=$1",[org.id,ownerId]);
  return org;
 }
@@ -89,7 +89,7 @@ test("Gate 2: paid service completion cannot be accepted before finance verifies
  await journeys.changeServiceRequestStatus(request.id,provider,"in_progress","Work started.","gate2-paid-service-start");
  await journeys.changeServiceRequestStatus(request.id,provider,"completed","Deliverables are ready for requester review.","gate2-paid-service-submit-completion");
  await assert.rejects(journeys.acceptServiceCompletion(request.id,requester,"The work looks complete.","gate2-paid-service-premature-accept"),error=>error.code==="PAYMENT_NOT_SETTLED");
- const payment=await journeys.submitServicePayment(request.id,requester,{amount:500,currency:"ETB",channel:"bank_transfer",reference:"GATE2-"+randomUUID(),idempotencyKey:"gate2-paid-service-"+randomUUID()},"gate2-paid-service-payment");
+ const payment=await journeys.submitServicePayment(request.id,requester,{amount:500,currency:"ETB",channel:"bank_transfer",reference:`GATE2-${randomUUID()}`,idempotencyKey:`gate2-paid-service-${randomUUID()}`},"gate2-paid-service-payment");
  assert.equal(payment.status,"pending");
  assert.equal((await journeys.verifyServicePayment(payment.id,finance,{decision:"approved",note:"Bank transfer evidence and amount checked.",evidenceChecked:["amount","currency","reference"]},"gate2-paid-service-verify")).status,"succeeded");
  assert.equal((await journeys.acceptServiceCompletion(request.id,requester,"Finance-confirmed payment and agreed deliverables are accepted.","gate2-paid-service-final-accept")).status,"completed");
@@ -209,7 +209,7 @@ test("Gate 2: Support Desk proposes a suitable provider and the provider respond
 
 test("Gate 2: organization workspace exposes required evidence and current verification blockers",async()=>{
  const owner=await account();
- const org=await organizationJobs.registerOrganization(owner,{legalName:"Gate 2 Trust Checklist "+randomUUID(),displayName:"Gate 2 Trust Checklist Organization",organizationType:"company"},"gate2-org-checklist-create");
+ const org=await organizationJobs.registerOrganization(owner,{legalName:`Gate 2 Trust Checklist ${randomUUID()}`,displayName:"Gate 2 Trust Checklist Organization",organizationType:"company"},"gate2-org-checklist-create");
  const workspace=(await organizationJobs.listMyOrganizations(owner)).find(row=>row.id===org.id);
  assert.ok(workspace,"the registered organization should appear in its owner's workspace");
  assert.ok(["draft","submitted","pending","correction_required","verified","rejected"].includes(workspace.verification_case_status));

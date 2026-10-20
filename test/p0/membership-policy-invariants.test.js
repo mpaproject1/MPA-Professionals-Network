@@ -1,7 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { membershipEndDate, isMembershipCurrent } from "../../src/platform/membership-duration.js";
-import { assertProfessionalIdentity, hasCurrentActiveMembership, assertOrganizationCapability } from "../../src/platform/identity-policy.js";
+import test from "node:test";
+import { assertOrganizationCapability, assertProfessionalIdentity, hasCurrentActiveMembership } from "../../src/platform/identity-policy.js";
+import { isMembershipCurrent, membershipEndDate } from "../../src/platform/membership-duration.js";
 
 test("annual recurring membership ends the day before its calendar anniversary", () => {
   assert.equal(membershipEndDate("2023-03-01", { durationDays: 365, durationPolicy: "calendar_year_inclusive" }).toISOString().slice(0, 10), "2024-02-29");

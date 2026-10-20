@@ -1,7 +1,7 @@
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getPool, withTransaction } from "./db.js";
-import { createInAppNotification } from "./notifications.js";
-import { createHmac, timingSafeEqual, randomUUID } from "node:crypto";
 import { resendEmailVerification } from "./email-verification.js";
+import { createInAppNotification } from "./notifications.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 async function requireAdmin(db,actorId){
@@ -92,16 +92,16 @@ async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,pay
  const cfg=providerConfig();
  if(!cfg.ready)fail(503,"Email provider is not configured. Set PUBLIC_APP_URL and Resend or signed-webhook credentials in the server environment.","EMAIL_DELIVERY_NOT_CONFIGURED");
  if(cfg.provider==="resend"){
-  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+clean(process.env.RESEND_API_KEY)},body:JSON.stringify({from:clean(process.env.EMAIL_FROM),to:[recipient],subject,text:textBody||"",html:htmlBody||undefined}),signal:AbortSignal.timeout(10000)});
+  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${clean(process.env.RESEND_API_KEY)}`},body:JSON.stringify({from:clean(process.env.EMAIL_FROM),to:[recipient],subject,text:textBody||"",html:htmlBody||undefined}),signal:AbortSignal.timeout(10000)});
   const result=await response.json().catch(()=>({}));
-  if(!response.ok)throw Object.assign(new Error("Resend rejected the message (HTTP "+response.status+")."),{code:"RESEND_HTTP_"+response.status});
+  if(!response.ok)throw Object.assign(new Error(`Resend rejected the message (HTTP ${response.status}).`),{code:`RESEND_HTTP_${response.status}`});
   return {providerMessageId:result.id||null};
  }
  const endpoint=clean(process.env.EMAIL_DELIVERY_WEBHOOK_URL),secret=clean(process.env.EMAIL_DELIVERY_WEBHOOK_SECRET);
  const body=JSON.stringify({to:recipient,subject,text:textBody||"",html:htmlBody||"",template:templateCode||"manual",payload:payload||{}});
  const signature=createHmac("sha256",secret).update(body).digest("hex");
- const response=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+secret,"x-mpa-payload-signature":signature},body,signal:AbortSignal.timeout(10000)});
- if(!response.ok)throw Object.assign(new Error("Email delivery webhook rejected the message (HTTP "+response.status+")."),{code:"DELIVERY_HTTP_"+response.status});
+ const response=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${secret}`,"x-mpa-payload-signature":signature},body,signal:AbortSignal.timeout(10000)});
+ if(!response.ok)throw Object.assign(new Error(`Email delivery webhook rejected the message (HTTP ${response.status}).`),{code:`DELIVERY_HTTP_${response.status}`});
  const result=await response.json().catch(()=>({}));
  return {providerMessageId:result.messageId||result.id||null};
 }
@@ -137,15 +137,15 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
    if(template&&!template.enabled){await db.query("update notification_outbox set status='cancelled',last_error='Notification template disabled by administrator',locked_at=null,updated_at=now() where id=$1",[row.id]);results.push({id:row.id,status:"cancelled"});continue;}
    if(template?.enabled){const vars={...(row.payload||{}),...(row.payload?.variables||{})};subject=render(template.subject_template,vars);textBody=render(template.text_template,vars);htmlBody=render(template.html_template,vars,{html:true});}
    const humanEvent=String(row.template_code||"account update").replace(/[._-]+/g," ").replace(/\b\w/g,ch=>ch.toUpperCase());
-   if(!subject)subject=humanEvent+" · MPA Professionals Network";
-   if(!textBody)textBody="There is a new update to your MPA Professionals Network account.\n\n"+(row.payload?.status?"Status: "+row.payload.status+"\n":"")+(row.payload?.nextAction?"Next action: "+row.payload.nextAction+"\n":"")+(row.payload?.registrationReference?"Reference: "+row.payload.registrationReference+"\n":"")+"Sign in to the platform to review the latest details. If you need help, contact platform support.";
-   if(!htmlBody)htmlBody="<p>There is a new update to your MPA Professionals Network account.</p>"+(row.payload?.status?"<p>Status: "+String(row.payload.status).replace(/[&<>]/g,"")+" </p>":"")+(row.payload?.nextAction?"<p>Next action: "+String(row.payload.nextAction).replace(/[&<>]/g,"")+"</p>":"")+(row.payload?.registrationReference?"<p>Reference: <strong>"+String(row.payload.registrationReference).replace(/[&<>]/g,"")+"</strong></p>":"")+"<p>Sign in to the platform to review the latest details.</p>";
+   if(!subject)subject=`${humanEvent} · MPA Professionals Network`;
+   if(!textBody)textBody=`There is a new update to your MPA Professionals Network account.\n\n${row.payload?.status?`Status: ${row.payload.status}\n`:""}${row.payload?.nextAction?`Next action: ${row.payload.nextAction}\n`:""}${row.payload?.registrationReference?`Reference: ${row.payload.registrationReference}\n`:""}Sign in to the platform to review the latest details. If you need help, contact platform support.`;
+   if(!htmlBody)htmlBody=`<p>There is a new update to your MPA Professionals Network account.</p>${row.payload?.status?`<p>Status: ${String(row.payload.status).replace(/[&<>]/g,"")} </p>`:""}${row.payload?.nextAction?`<p>Next action: ${String(row.payload.nextAction).replace(/[&<>]/g,"")}</p>`:""}${row.payload?.registrationReference?`<p>Reference: <strong>${String(row.payload.registrationReference).replace(/[&<>]/g,"")}</strong></p>`:""}<p>Sign in to the platform to review the latest details.</p>`;
    if(!subject)subject="Notification from MPA Professionals Network";
    const sent=await sendMessage({recipient:row.recipient,subject,textBody,htmlBody,templateCode:row.template_code,payload:row.payload});
    await db.query("update notification_outbox set status='sent',sent_at=now(),provider_message_id=$1,last_error=null,delivery_error_code=null,next_attempt_at=null,locked_at=null,updated_at=now() where id=$2",[sent.providerMessageId,row.id]);
    results.push({id:row.id,status:"sent"});
   }catch(e){
-   const attempt=Number(row.attempts||0)+1,delay=Math.min(3600,30*Math.pow(2,Math.min(attempt,7)));
+   const attempt=Number(row.attempts||0)+1,delay=Math.min(3600,30*2 ** Math.min(attempt,7));
    const failed=attempt>=8;
    await db.query("update notification_outbox set status=$1,last_error=$2,delivery_error_code=$3,next_attempt_at=$4,locked_at=null,updated_at=now() where id=$5",[failed?"failed":"pending",clean(e.message,500),clean(e.code||"DELIVERY_FAILED",80),failed?null:new Date(Date.now()+delay*1000),row.id]);
    results.push({id:row.id,status:failed?"failed":"pending",error:clean(e.message,250)});

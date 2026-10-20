@@ -2,6 +2,7 @@
 import { useEffect,useState } from "react";
 import { api } from "../../../lib/api";
 import styles from "./verify.module.css";
+
 type Verification={valid:boolean;status:string;message:string;membershipNumber?:string;memberName?:string;membershipType?:string;startDate?:string|null;endDate?:string|null;verifiedAt?:string};
 export default function MembershipVerificationPage(){
   const [record,setRecord]=useState("");
@@ -15,7 +16,7 @@ export default function MembershipVerificationPage(){
     if(!paramsReady)return;
     setLoading(true);
     if(!record||!token){setResult({valid:false,status:"invalid",message:"This verification link is incomplete."});setLoading(false);return;}
-    void api<Verification>("/api/v1/public/membership-verification?record="+encodeURIComponent(record)+"&token="+encodeURIComponent(token))
+    void api<Verification>(`/api/v1/public/membership-verification?record=${encodeURIComponent(record)}&token=${encodeURIComponent(token)}`)
       .then(data=>{if(!cancelled)setResult(data);})
       .catch(()=>{if(!cancelled)setResult({valid:false,status:"invalid",message:"We could not verify this membership. Check the QR code or contact MPA."});})
       .finally(()=>{if(!cancelled)setLoading(false);});

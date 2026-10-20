@@ -1,9 +1,9 @@
 "use client";
 
+import { Activity, BookOpenCheck, Building2, ClipboardList, FileBarChart, Fingerprint, Mail, MessageSquareText, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Activity, BookOpenCheck, Building2, ClipboardList, FileBarChart, Fingerprint, Mail, MessageSquareText, ShieldCheck, Users } from "lucide-react";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
 import styles from "./admin-workspace.module.css";
@@ -41,7 +41,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const current = useMemo(() => {
     const exact = destinations.find((item) => item.href === pathname);
     if (exact) return exact;
-    return [...destinations].sort((a, b) => b.href.length - a.href.length).find((item) => pathname.startsWith(item.href + "/"));
+    return [...destinations].sort((a, b) => b.href.length - a.href.length).find((item) => pathname.startsWith(`${item.href}/`));
   }, [pathname]);
   const roleSummary = roles === null ? "Resolving account access…" : roles.length ? roles.map((role) => role.replaceAll("_", " ")).join(" · ") : "No administrator role confirmed";
   const navDestinations = useMemo(() => {
@@ -56,7 +56,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
       <div className={styles.brand}><span className={styles.brandMark}><Building2 size={19} /></span><div><strong>MPA operations</strong><span>Administration workspace</span></div></div>
       <nav className={styles.nav} aria-label="Admin workspaces">
         {navDestinations.map(({ href, label, description, icon: Icon, exact = false }) => {
-          const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+          const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
           return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? styles.active : styles.link}>
             <Icon size={18} aria-hidden="true" /><span className={styles.linkText}><strong>{label}</strong><small>{description}</small></span>
           </Link>;

@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { parseAllowedOrigins, resolveAllowedOrigin } from "../src/platform/config.js";
 
 test("allowed origins support multiple browser origins for local development", () => {

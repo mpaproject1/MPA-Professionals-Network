@@ -1,16 +1,17 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {Bookmark, Building2,ExternalLink,MapPin,RefreshCw,ShieldCheck} from "lucide-react";
 import Link from "next/link";
 import {useParams} from "next/navigation";
-import {Building2,ExternalLink,MapPin,RefreshCw,ShieldCheck,Bookmark} from "lucide-react";
-import {Card,Badge} from "../../../../components/ui";
-import {api,ApiError} from "../../../../lib/api";
+import {useCallback,useEffect,useState} from "react";
+import {Badge, Card} from "../../../../components/ui";
+import {ApiError, api} from "../../../../lib/api";
 import {useSavedDiscoveryItems} from "../../../../lib/use-saved-discovery-items";
+
 type Organization={id:string;display_name:string;organization_type?:string|null;description?:string|null;website?:string|null;location_label?:string|null};
 export default function PublicOrganizationProfile(){
  const params=useParams<{id:string}>();const id=String(params.id||"");const saved=useSavedDiscoveryItems();
  const [item,setItem]=useState<Organization|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
- const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Organization>("/api/v1/public/organizations/"+encodeURIComponent(id)));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This public organization profile is unavailable.");}finally{setLoading(false);}},[id]);
+ const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Organization>(`/api/v1/public/organizations/${encodeURIComponent(id)}`));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This public organization profile is unavailable.");}finally{setLoading(false);}},[id]);
  useEffect(()=>{void load();},[load]);
  return <main className="grid" style={{gap:18}}><Link href="/organizations/directory" className="btn btn-ghost">← Back to organizations</Link>
  {loading?<Card><div className="row"><RefreshCw size={18}/><p className="muted">Loading verified organization profile…</p></div></Card>

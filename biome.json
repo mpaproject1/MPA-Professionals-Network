@@ -1,0 +1,38 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
+  "css": {
+    "parser": {
+      "cssModules": true
+    }
+  },
+  "linter": {
+    "rules": {
+      "a11y": {
+        "noSvgWithoutTitle": "warn",
+        "useAriaPropsSupportedByRole": "warn",
+        "useKeyWithClickEvents": "warn",
+        "useSemanticElements": "warn",
+        "noStaticElementInteractions": "warn"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": "warn",
+        "useUniqueElementIds": "warn"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "warn"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["web/app/globals.css"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noUnknownAtRules": "off"
+          }
+        }
+      }
+    }
+  ]
+}

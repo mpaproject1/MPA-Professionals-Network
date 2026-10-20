@@ -1,9 +1,10 @@
 "use client";
-import { FormEvent, useEffect, useState } from "react";
 import { Building2, CheckCircle2, UserRound } from "lucide-react";
-import { Card, Badge } from "../../components/ui";
+import { type FormEvent, useEffect, useState } from "react";
+import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
+
 type Product = {
   product_code: string;
   name: string;

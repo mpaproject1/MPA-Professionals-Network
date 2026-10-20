@@ -1,26 +1,26 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { getPool, closePool } from "../../src/platform/db.js";
+import test from "node:test";
 import * as membership from "../../src/membership/service.js";
-import * as talent from "../../src/talent/service.js";
+import { closePool, getPool } from "../../src/platform/db.js";
 import * as referencePortfolio from "../../src/platform/reference-portfolio.js";
+import * as talent from "../../src/talent/service.js";
 
 function identity(suffix) {
  const digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
- return {email:"p1-"+suffix+"@example.test",password:"P1GuidedProfilePassword!2026",firstName:"P1",lastName:"Guided"+suffix.slice(0,8),phone:"08"+digits};
+ return {email:`p1-${suffix}@example.test`,password:"P1GuidedProfilePassword!2026",firstName:"P1",lastName:`Guided${suffix.slice(0,8)}`,phone:`08${digits}`};
 }
 async function activeMember(suffix){
- const account=await membership.register(identity(suffix),"p1-guided-"+suffix);
+ const account=await membership.register(identity(suffix),`p1-guided-${suffix}`);
  const db=getPool(),product=(await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
  assert.ok(product,"BASIC membership product must exist");
- await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')",[account.user.id,product.id,"MPA-P1-"+randomUUID().slice(0,8).toUpperCase()]);
+ await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')",[account.user.id,product.id,`MPA-P1-${randomUUID().slice(0,8).toUpperCase()}`]);
  return account.user.id;
 }
 async function otherReference(datasetKey){
  const db=getPool();
  const row=(await db.query("select ri.id from reference_dataset d join reference_dataset_version v on v.dataset_id=d.id and v.status='published' join reference_item ri on ri.dataset_version_id=v.id and ri.code='OTHER' and ri.active=true where d.dataset_key=$1",[datasetKey])).rows[0];
- assert.ok(row,"Expected published OTHER reference for "+datasetKey);
+ assert.ok(row,`Expected published OTHER reference for ${datasetKey}`);
  return row.id;
 }
 test("P1: education records are structured, repeatable and require custom values after Other",async()=>{
@@ -56,7 +56,7 @@ test("P1: portfolio supports multiple traceable items and keeps evidence optiona
  assert.equal((await talent.getProfessionalPortfolio(userId)).length,1);
 });
 test("P1: reference CSV import is staged, exportable and only changes public forms after publication",async()=>{
- const userId=await activeMember(randomUUID()),identity={sub:userId,roles:["system_admin"],permissions:[]},key="professional_occupations",suffix=randomUUID().replaceAll("-","").slice(0,8).toUpperCase(),analystCode="P1_ANALYST_"+suffix,otherCode="P1_OTHER_"+suffix;
+ const userId=await activeMember(randomUUID()),identity={sub:userId,roles:["system_admin"],permissions:[]},key="professional_occupations",suffix=randomUUID().replaceAll("-","").slice(0,8).toUpperCase(),analystCode=`P1_ANALYST_${suffix}`,otherCode=`P1_OTHER_${suffix}`;
  const invalid=await referencePortfolio.importReferenceCsv(identity,key,"duplicate.csv","code,label\nTEST,Test\nTEST,Duplicate");
  assert.equal(invalid.status,"rejected");assert.ok(invalid.errors.length);
  const before=await referencePortfolio.listPublicReferenceSets();
@@ -66,11 +66,11 @@ test("P1: reference CSV import is staged, exportable and only changes public for
   assert.ok(originalItem,"a published reference item should be available to edit");
   const edited=await referencePortfolio.saveReferenceItem(identity,key,{code:originalItem.code,label:originalItem.label,description:originalItem.description||"",sortOrder:originalItem.sort_order,active:originalItem.active},originalItem.id);
   assert.equal(edited.code,originalItem.code);
- const csv='code,label,description,sort_order,active\n'+analystCode+',"P1 Analyst, '+suffix+'","Business analysis",5,true\n'+otherCode+',"Additional occupation '+suffix+'","Custom value",999,true';
+ const csv=`code,label,description,sort_order,active\n${analystCode},"P1 Analyst, ${suffix}","Business analysis",5,true\n${otherCode},"Additional occupation ${suffix}","Custom value",999,true`;
  const imported=await referencePortfolio.importReferenceCsv(identity,key,"valid.csv",csv);
  assert.equal(imported.status,"imported");assert.equal(imported.inserted+imported.updated,2);
  const exported=await referencePortfolio.exportReferenceCsv(identity,key);
- assert.match(exported.csv,new RegExp(analystCode));assert.match(exported.csv,new RegExp('"P1 Analyst, '+suffix+'"'));
+ assert.match(exported.csv,new RegExp(analystCode));assert.match(exported.csv,new RegExp(`"P1 Analyst, ${suffix}"`));
  const working=await referencePortfolio.listReferenceItems(identity,key);
  assert.equal(working.version.status,"draft");assert.equal(working.version.hasDraft,true);
  assert.equal((await referencePortfolio.listPublicReferenceSets()).some(row=>row.code===analystCode),false);

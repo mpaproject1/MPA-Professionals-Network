@@ -1,6 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveMigrationBaseline, assertMigrationChecksum } from "../../src/platform/migration-ledger.js";
+import test from "node:test";
+import { assertMigrationChecksum, resolveMigrationBaseline } from "../../src/platform/migration-ledger.js";
 
 const files = [
   "001_initial.sql",

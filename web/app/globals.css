@@ -23,7 +23,7 @@
 :where(button,a){touch-action:manipulation}
 :where(p,li,dd,dt,td,th){overflow-wrap:anywhere}
 :where(img,svg,video,canvas){max-width:100%}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto;animation-duration:.01ms;animation-iteration-count:1;transition-duration:.01ms}}
 @media(max-width:600px){.card{padding:16px;border-radius:16px}.h2{font-size:21px}.btn{min-height:42px}.top-actions{gap:5px}.top-actions .icon-btn{width:34px;height:34px}.mobile-more-panel{max-height:calc(100dvh - 90px);overflow-y:auto}}
 :root{--focus-ring:#0A3258;--control-border:#64748B}
 .dark{--focus-ring:#E5F044;--control-border:#8B9CAF}

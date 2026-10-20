@@ -39,7 +39,7 @@ export async function authorizePrivateUpload(userId,input){
   const id=randomUUID(),token=randomBytes(32).toString("base64url"),objectKey=path.posix.join(userId,randomUUID());
   const expiresAt=new Date(Date.now()+10*60*1000);
   await getPool().query("insert into private_upload_session(id,user_id,object_key,original_name,content_type,expected_byte_size,expected_checksum_sha256,upload_token_sha256,expires_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9)",[id,userId,objectKey,originalName,contentType,byteSize,expected,sha256(token),expiresAt]);
-  return {uploadId:id,uploadToken:token,uploadUrl:"/api/v1/files/uploads/"+id+"/content",expiresAt:expiresAt.toISOString(),maxBytes:MAX_PRIVATE_UPLOAD_BYTES};
+  return {uploadId:id,uploadToken:token,uploadUrl:`/api/v1/files/uploads/${id}/content`,expiresAt:expiresAt.toISOString(),maxBytes:MAX_PRIVATE_UPLOAD_BYTES};
 }
 export async function receivePrivateUpload(userId,id,token,bytes){
   if(!Buffer.isBuffer(bytes)) bytes=Buffer.from(bytes||[]);
@@ -53,10 +53,10 @@ export async function receivePrivateUpload(userId,id,token,bytes){
   const checksum=sha256(bytes);
   if(s.expected_checksum_sha256&&checksum!==s.expected_checksum_sha256) throw fail(400,"Uploaded checksum does not match the authorized checksum.","UPLOAD_CHECKSUM_MISMATCH");
   validatePrivateUploadBytes(s.content_type,bytes);
-  const target=filePath(s.object_key),temp=target+".uploading";
+  const target=filePath(s.object_key),temp=`${target}.uploading`;
   await mkdir(path.dirname(target),{recursive:true,mode:0o700});
   try { await writeFile(temp,bytes,{flag:"wx",mode:0o600}); await rename(temp,target); }
-  catch(e){await rm(temp,{force:true}).catch(()=>{});throw fail(500,"Private file storage could not accept the upload.","PRIVATE_STORAGE_ERROR");}
+  catch(_e){await rm(temp,{force:true}).catch(()=>{});throw fail(500,"Private file storage could not accept the upload.","PRIVATE_STORAGE_ERROR");}
   try {
     const updated=await db.query("update private_upload_session set status='uploaded',actual_byte_size=$2,actual_checksum_sha256=$3,uploaded_at=now() where id=$1 and status='authorized' returning id",[id,bytes.length,checksum]);
     if(!updated.rows[0]) {await rm(target,{force:true});throw fail(409,"Upload authorization was already consumed.","INVALID_STATE");}

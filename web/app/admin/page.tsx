@@ -11,12 +11,12 @@ import {
   ShieldCheck,
   UserCog,
 } from "lucide-react";
-import { useEffect, useState, type CSSProperties } from "react";
-import { Card, Badge } from "../../components/ui";
+import { type CSSProperties, useEffect, useState } from "react";
+import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
-import { UsersTable, type ManagedRole, type ManagedUser } from "./users-table";
 import { AdminPageHeader } from "./admin-page-header";
+import { type ManagedRole, type ManagedUser, UsersTable } from "./users-table";
 
 type Demo = {
   id: string;
@@ -87,7 +87,7 @@ export default function AdminPage() {
     const getList = async <T,>(path: string, key?: string): Promise<T[]> => {
       const payload = await api<any>(path, {}, token);
       const rows = Array.isArray(payload) ? payload : (key && Array.isArray(payload?.[key]) ? payload[key] : Array.isArray(payload?.items) ? payload.items : null);
-      if (!rows) throw new Error("The service returned an unexpected list response for " + path + ".");
+      if (!rows) throw new Error(`The service returned an unexpected list response for ${path}.`);
       return rows as T[];
     };
     const settle = async <T,>(name: string, request: Promise<T>, apply: (value: T) => void) => {
@@ -106,7 +106,7 @@ export default function AdminPage() {
       if (userQuery.trim()) params.set("q", userQuery.trim());
       if (userStatus) params.set("status", userStatus);
       params.set("limit", "200");
-      tasks.push(settle("users", getList<ManagedUser>("/api/v1/admin/users?" + params.toString(), "users"), setUsers));
+      tasks.push(settle("users", getList<ManagedUser>(`/api/v1/admin/users?${params.toString()}`, "users"), setUsers));
     } else {
       tasks.push(settle("users", getList<ManagedUser>("/api/v1/admin/users?limit=200", "users"), setUsers));
     }
@@ -136,23 +136,23 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (hydrated && token) void load();
-  }, [hydrated, token]);
+  }, [hydrated, token, load]);
 
   async function patchCase(item: Demo, active: boolean) {
     try {
-      await api("/api/v1/admin/experience/demo-cases/" + item.id, { method: "PATCH", body: JSON.stringify({ active }) }, token);
+      await api(`/api/v1/admin/experience/demo-cases/${item.id}`, { method: "PATCH", body: JSON.stringify({ active }) }, token);
       await load();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the demo case."); }
   }
   async function patchGuide(item: Guide, active: boolean) {
     try {
-      await api("/api/v1/admin/experience/guides/" + item.id, { method: "PATCH", body: JSON.stringify({ active }) }, token);
+      await api(`/api/v1/admin/experience/guides/${item.id}`, { method: "PATCH", body: JSON.stringify({ active }) }, token);
       await load();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the guide."); }
   }
   async function decideInquiry(item: Inquiry, status: string, considerNonMember: boolean) {
     try {
-      await api("/api/v1/opportunity-inquiries/" + item.id, { method: "PATCH", body: JSON.stringify({ status, consider_non_member: considerNonMember }) }, token);
+      await api(`/api/v1/opportunity-inquiries/${item.id}`, { method: "PATCH", body: JSON.stringify({ status, consider_non_member: considerNonMember }) }, token);
       await load();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the inquiry."); }
   }
@@ -245,7 +245,7 @@ export default function AdminPage() {
           <button type="button"
             key={key}
             className={
-              "btn admin-tab " + (tab === key ? "btn-primary" : "btn-ghost")
+              `btn admin-tab ${tab === key ? "btn-primary" : "btn-ghost"}`
             }
             onClick={() => setTab(key)}
           >
@@ -498,7 +498,7 @@ function CaseEditor({
     setSaving(true);
     try {
       await api(
-        "/api/v1/admin/experience/demo-cases/" + demo.id,
+        `/api/v1/admin/experience/demo-cases/${demo.id}`,
         {
           method: "PATCH",
           body: JSON.stringify({ title, description, persona }),

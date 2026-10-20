@@ -1,8 +1,8 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {AlertCircle,Archive,CheckCircle2,ChevronRight,Inbox,LayoutTemplate, Mail,MailCheck,MailPlus,RefreshCw,Send,Settings,ShieldCheck} from "lucide-react";
 import {useRouter} from "next/navigation";
-import {AlertCircle,Archive,CheckCircle2,ChevronRight,Inbox,Mail,MailCheck,MailPlus,RefreshCw,Send,Settings,ShieldCheck,LayoutTemplate} from "lucide-react";
-import {Card,Badge} from "../../../components/ui";
+import {useCallback,useEffect,useState} from "react";
+import {Badge, Card} from "../../../components/ui";
 import {api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";
@@ -15,7 +15,7 @@ const folders:{id:Folder;label:string;icon:any}[]=[{id:"inbox",label:"Inbox",ico
 export default function AdminEmailCenter(){
  const router=useRouter(),token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated);
  const [folder,setFolder]=useState<Folder>("outbox"),[operations,setOperations]=useState<Operations|null>(null),[messages,setMessages]=useState<Message[]>([]),[templates,setTemplates]=useState<TemplateRow[]>([]);
- const [selected,setSelected]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState(""),[loading,setLoading]=useState(false),[busy,setBusy]=useState("");
+ const [_selected,setSelected]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState(""),[loading,setLoading]=useState(false),[busy,setBusy]=useState("");
  const [draft,setDraft]=useState({recipient:"",subject:"",textBody:"",htmlBody:""});
  const [templateDraft,setTemplateDraft]=useState<TemplateRow|null>(null);
  const [showCompose,setShowCompose]=useState(false);
@@ -24,7 +24,7 @@ export default function AdminEmailCenter(){
   try{
    const ops=await api<Operations>("/api/v1/admin/email/operations",{},token);setOperations(ops);
    if(folder==="templates"){setTemplates(await api<TemplateRow[]>("/api/v1/admin/email/templates",{},token));setMessages([]);}
-   else {setMessages(await api<Message[]>("/api/v1/admin/email/messages?folder="+encodeURIComponent(folder==="outbox"?"queued":folder),{},token));}
+   else {setMessages(await api<Message[]>(`/api/v1/admin/email/messages?folder=${encodeURIComponent(folder==="outbox"?"queued":folder)}`,{},token));}
   }catch(e){setError(e instanceof Error?e.message:"Could not load email operations.");}
   finally{setLoading(false);}
  },[token,folder]);
@@ -32,7 +32,7 @@ export default function AdminEmailCenter(){
  useEffect(()=>{void load();},[load]);
  async function act(label:string,fn:()=>Promise<unknown>){
   setBusy(label);setError("");setNotice("");
-  try{const result=await fn();setNotice(typeof result==="object"&&result&&"processed" in result?("Delivery processed: "+String((result as any).processed)+" message(s)."):label+" completed.");await load();}
+  try{const result=await fn();setNotice(typeof result==="object"&&result&&"processed" in result?(`Delivery processed: ${String((result as any).processed)} message(s).`):`${label} completed.`);await load();}
   catch(e){setError(e instanceof Error?e.message:"Action failed.");}
   finally{setBusy("");}
  }
@@ -41,13 +41,13 @@ export default function AdminEmailCenter(){
  }
  async function saveTemplate(){
   if(!templateDraft)return;
-  await act("Template saved",async()=>api("/api/v1/admin/email/templates/"+encodeURIComponent(templateDraft.template_code),{method:"PUT",body:JSON.stringify(templateDraft)},token));
+  await act("Template saved",async()=>api(`/api/v1/admin/email/templates/${encodeURIComponent(templateDraft.template_code)}`,{method:"PUT",body:JSON.stringify(templateDraft)},token));
   setTemplateDraft(null);
  }
- async function queueDraft(id:string){await act("Draft queued",()=>api("/api/v1/admin/email/drafts/"+encodeURIComponent(id)+"/queue",{method:"POST"},token));}
- async function retry(id:string){await act("Retry",()=>api(folder==="verification-failed"?"/api/v1/admin/email/verification-failures/"+encodeURIComponent(id)+"/retry":"/api/v1/admin/email/messages/"+encodeURIComponent(id)+"/retry",{method:"POST"},token));}
+ async function queueDraft(id:string){await act("Draft queued",()=>api(`/api/v1/admin/email/drafts/${encodeURIComponent(id)}/queue`,{method:"POST"},token));}
+ async function retry(id:string){await act("Retry",()=>api(folder==="verification-failed"?`/api/v1/admin/email/verification-failures/${encodeURIComponent(id)}/retry`:`/api/v1/admin/email/messages/${encodeURIComponent(id)}/retry`,{method:"POST"},token));}
  async function dispatch(){await act("Queue dispatch",()=>api("/api/v1/admin/email/dispatch",{method:"POST",body:JSON.stringify({limit:20})},token));}
- async function inboxAction(id:string,action:"read"|"unread"|"archive"){await act("Inbox updated",()=>api("/api/v1/admin/email/inbox/"+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({action})},token));}
+ async function inboxAction(id:string,action:"read"|"unread"|"archive"){await act("Inbox updated",()=>api(`/api/v1/admin/email/inbox/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({action})},token));}
  if(!hydrated||!token)return <div className="auth-page"><Card><h1 className="h1">Administrator access required</h1><p className="muted">Sign in with an authorized system administrator account to manage email.</p></Card></div>;
  return <div className="grid" style={{gap:18}}>
   <AdminPageHeader eyebrow="Platform administration / communications" title="Email operations center" description="Manage platform notification delivery, editable templates, drafts, inbound messages and failures. This is the platform email operations console, not a personal Gmail/Outlook mailbox." actions={<button type="button" className="btn btn-ghost" onClick={()=>void load()} disabled={loading}><RefreshCw size={16}/>{loading?"Refreshing…":"Refresh"}</button>}/>
@@ -61,7 +61,7 @@ export default function AdminEmailCenter(){
     {folder!=="settings"&&folder!=="templates"&&<Card><div className="row"><div><h2 className="h2">{folders.find(x=>x.id===folder)?.label}</h2><p className="muted">{folder==="inbox"?"Inbound mail delivered to the configured inbound webhook.":folder==="drafts"?"Saved messages that have not been queued.":folder==="failed"||folder==="verification-failed"?"Messages requiring review or retry.":"Delivery records and current queue status."}</p></div>{folder==="outbox"&&<button type="button" className="btn btn-primary" onClick={()=>void dispatch()} disabled={busy!==""||!operations?.connection.ready}><Send size={16}/>Process queue</button>}</div>
     {showCompose&&<form className="form-stack" onSubmit={e=>{e.preventDefault();void saveDraft();}} style={{border:"1px solid var(--border)",padding:16,borderRadius:12,marginBottom:16}}><h3 className="h2">Compose message</h3><label>Recipient email<input type="email" required value={draft.recipient} onChange={e=>setDraft({...draft,recipient:e.target.value})}/></label><label>Subject<input required value={draft.subject} onChange={e=>setDraft({...draft,subject:e.target.value})}/></label><label>Plain-text message<textarea rows={6} value={draft.textBody} onChange={e=>setDraft({...draft,textBody:e.target.value})}/></label><label>HTML message (optional)<textarea rows={4} value={draft.htmlBody} onChange={e=>setDraft({...draft,htmlBody:e.target.value})}/></label><div className="row"><button className="btn btn-primary" type="submit" disabled={busy!==""}>Save draft</button><button className="btn btn-ghost" type="button" onClick={()=>setShowCompose(false)}>Cancel</button></div><p className="muted">Save first, then queue the draft for delivery. Delivery only runs when the provider connection is ready.</p></form>}
     {loading&&<p className="muted">Loading messages…</p>}{!loading&&!error&&messages.length===0&&<div className="case-row"><p className="muted">No messages in this folder.</p></div>}
-    {messages.map(m=><div key={m.id} className="case-row"><div className="row" style={{alignItems:"flex-start"}}><div style={{flex:1,minWidth:0}}><b>{m.subject||"(no subject)"}</b><div className="muted">{folder==="inbox"?"From: "+m.sender:"To: "+m.recipient}{m.template_code?" · "+m.template_code:""}</div><p style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{m.text_body||m.last_error||"No text body available."}</p><div className="muted">{m.created_at?new Date(m.created_at).toLocaleString():m.received_at?new Date(m.received_at).toLocaleString():""}{m.sent_at?" · Sent "+new Date(m.sent_at).toLocaleString():""}{m.attempts!==undefined?" · Attempts: "+m.attempts:""}</div>{m.last_error&&<p className="form-error">{m.last_error}</p>}</div><Badge>{m.status|| (m.read_at?"Read":"Received")}</Badge></div><div className="row" style={{justifyContent:"flex-end",marginTop:10}}>{folder==="drafts"&&<button type="button" className="btn btn-primary" disabled={busy!==""} onClick={()=>void queueDraft(m.id)}><Send size={15}/>Queue for sending</button>}{(folder==="failed"||folder==="verification-failed")&&<button type="button" className="btn btn-primary" disabled={busy!==""||!operations?.connection.ready} onClick={()=>void retry(m.id)}><RefreshCw size={15}/>Retry delivery</button>}{folder==="inbox"&&<><button type="button" className="btn btn-ghost" onClick={()=>void inboxAction(m.id,m.read_at?"unread":"read")}>{m.read_at?"Mark unread":"Mark read"}</button><button type="button" className="btn btn-ghost" onClick={()=>void inboxAction(m.id,"archive")}><Archive size={15}/>Archive</button></>}</div></div>)}</Card>}
+    {messages.map(m=><div key={m.id} className="case-row"><div className="row" style={{alignItems:"flex-start"}}><div style={{flex:1,minWidth:0}}><b>{m.subject||"(no subject)"}</b><div className="muted">{folder==="inbox"?`From: ${m.sender}`:`To: ${m.recipient}`}{m.template_code?` · ${m.template_code}`:""}</div><p style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{m.text_body||m.last_error||"No text body available."}</p><div className="muted">{m.created_at?new Date(m.created_at).toLocaleString():m.received_at?new Date(m.received_at).toLocaleString():""}{m.sent_at?` · Sent ${new Date(m.sent_at).toLocaleString()}`:""}{m.attempts!==undefined?` · Attempts: ${m.attempts}`:""}</div>{m.last_error&&<p className="form-error">{m.last_error}</p>}</div><Badge>{m.status|| (m.read_at?"Read":"Received")}</Badge></div><div className="row" style={{justifyContent:"flex-end",marginTop:10}}>{folder==="drafts"&&<button type="button" className="btn btn-primary" disabled={busy!==""} onClick={()=>void queueDraft(m.id)}><Send size={15}/>Queue for sending</button>}{(folder==="failed"||folder==="verification-failed")&&<button type="button" className="btn btn-primary" disabled={busy!==""||!operations?.connection.ready} onClick={()=>void retry(m.id)}><RefreshCw size={15}/>Retry delivery</button>}{folder==="inbox"&&<><button type="button" className="btn btn-ghost" onClick={()=>void inboxAction(m.id,m.read_at?"unread":"read")}>{m.read_at?"Mark unread":"Mark read"}</button><button type="button" className="btn btn-ghost" onClick={()=>void inboxAction(m.id,"archive")}><Archive size={15}/>Archive</button></>}</div></div>)}</Card>}
    </div>
   </div>
   <div className="footer-note"><ShieldCheck size={15}/> Only system administrators can access email operations. Provider secrets are server-only; delivery attempts and template edits are auditable.</div>

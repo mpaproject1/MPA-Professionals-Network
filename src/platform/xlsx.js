@@ -48,7 +48,7 @@ export function parseXlsxRows(input) {
   const firstSheet = workbook.match(/<sheet\b[^>]*\br:id="([^"]+)"/);
   const relationship = [...relationships.matchAll(/<Relationship\b([^>]*)\/>/g)].map(match => ({ id: match[1].match(/\bId="([^"]+)"/)?.[1], target: match[1].match(/\bTarget="([^"]+)"/)?.[1] })).find(item => item.id === firstSheet?.[1]);
   const sheetTarget = relationship?.target || "worksheets/sheet1.xml";
-  const sheetPath = sheetTarget.startsWith("/") ? sheetTarget.slice(1) : "xl/" + sheetTarget.replace(/^\.\//, "");
+  const sheetPath = sheetTarget.startsWith("/") ? sheetTarget.slice(1) : `xl/${sheetTarget.replace(/^\.\//, "")}`;
   const sheet = entryText(files, sheetPath);
   if (!sheet) throw new Error("The XLSX workbook has no readable first worksheet.");
   const sharedXml = entryText(files, "xl/sharedStrings.xml");
@@ -122,16 +122,16 @@ export function createXlsx(rows, headers) {
   const sheetRows = allRows.map((row, rowIndex) => {
     const cells = row.map((value, columnIndex) => {
       const ref = columnName(columnIndex) + (rowIndex + 1);
-      return '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(value) + '</t></is></c>';
+      return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xmlEscape(value)}</t></is></c>`;
     }).join("");
-    return '<row r="' + (rowIndex + 1) + '">' + cells + '</row>';
+    return `<row r="${rowIndex + 1}">${cells}</row>`;
   }).join("");
   const files = {
     "[Content_Types].xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
     "_rels/.rels": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
     "xl/workbook.xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Reference data" sheetId="1" r:id="rId1"/></sheets></workbook>',
     "xl/_rels/workbook.xml.rels": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
-    "xl/worksheets/sheet1.xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + sheetRows + '</sheetData></worksheet>'
+    "xl/worksheets/sheet1.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${sheetRows}</sheetData></worksheet>`
   };
   return zip(files);
 }

@@ -1,10 +1,10 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
-  allowedServiceRequestTransition,
-  canAcceptServiceCompletion,
   allowedMentorshipTransition,
+  allowedServiceRequestTransition,
   allowedSessionTransition,
+  canAcceptServiceCompletion,
 } from "../../src/services-mentorship/service.js";
 
 test("service request lifecycle requires explicit acceptance and delivery before closure", () => {

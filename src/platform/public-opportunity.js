@@ -107,9 +107,9 @@ async function visibleInquiries(db,userId,filters={}){
  else {
    clauses.push("(i.inquiry_type='job' and exists (select 1 from job j join organization_membership om on om.organization_id=j.organization_id where j.id=i.job_id and om.user_id=$1 and om.status='active' and om.role_code in ('owner','administrator','recruiter','project_manager','read_only')) or i.inquiry_type='mentorship' and (i.preferred_mentor_user_id=$1))");
  }
- if(filters.type){ params.push(filters.type); clauses.push("i.inquiry_type=$"+params.length); }
- if(filters.status){ params.push(filters.status); clauses.push("i.status=$"+params.length); }
- const sql="select i.id,i.job_id,i.public_reference,i.inquiry_type,i.status,i.consider_non_member,i.contact_name,i.contact_email,i.contact_phone,i.intent,i.details,i.employer_sharing_consent,i.employer_sharing_scope,i.employer_sharing_fields,i.employer_sharing_consented_at,i.employer_sharing_revoked_at,i.created_at,i.updated_at,j.title job_title,j.organization_id,p.display_name preferred_mentor_name from public_opportunity_inquiry i left join job j on j.id=i.job_id left join person p on p.user_id=i.preferred_mentor_user_id where "+clauses.join(" and ")+" order by i.created_at desc limit 200";
+ if(filters.type){ params.push(filters.type); clauses.push(`i.inquiry_type=$${params.length}`); }
+ if(filters.status){ params.push(filters.status); clauses.push(`i.status=$${params.length}`); }
+ const sql=`select i.id,i.job_id,i.public_reference,i.inquiry_type,i.status,i.consider_non_member,i.contact_name,i.contact_email,i.contact_phone,i.intent,i.details,i.employer_sharing_consent,i.employer_sharing_scope,i.employer_sharing_fields,i.employer_sharing_consented_at,i.employer_sharing_revoked_at,i.created_at,i.updated_at,j.title job_title,j.organization_id,p.display_name preferred_mentor_name from public_opportunity_inquiry i left join job j on j.id=i.job_id left join person p on p.user_id=i.preferred_mentor_user_id where ${clauses.join(" and ")} order by i.created_at desc limit 200`;
  return (await db.query(sql,params)).rows;
 }
 

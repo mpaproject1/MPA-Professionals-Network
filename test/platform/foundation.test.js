@@ -1,8 +1,8 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig } from "../../src/platform/config.js";
-import { signToken, verifyToken, requireRole, withCurrentRoles } from "../../src/platform/auth.js";
+import test from "node:test";
 import { createAuditEvent } from "../../src/platform/audit.js";
+import { requireRole, signToken, verifyToken, withCurrentRoles } from "../../src/platform/auth.js";
+import { loadConfig } from "../../src/platform/config.js";
 
 test("production config rejects missing or weak JWT secret",()=>{assert.throws(()=>loadConfig({NODE_ENV:"production",JWT_SECRET:"short",PORT:"3000"}),/JWT_SECRET/);});
 test("HS256 token authenticates and preserves roles",()=>{const token=signToken({sub:"u1",roles:["member"]},"secret");assert.deepEqual(verifyToken(token,"secret").roles,["member"]);});

@@ -1,7 +1,7 @@
 "use client";
 
+import { LogOut, MailCheck, Power } from "lucide-react";
 import { useState } from "react";
-import { LogOut, Power, MailCheck } from "lucide-react";
 import { FormFeedback } from "../../components/form-feedback";
 import { Badge } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
@@ -126,13 +126,13 @@ export function UsersTable({
                       {permissionCatalog.map(permission => {
                         const selected = permissionDrafts[user.id] ?? user.permissions ?? [];
                         return <label key={permission.permission_code} style={{ display: "flex", gap: 7, alignItems: "flex-start", whiteSpace: "normal", fontWeight: 400 }}>
-                          <input type="checkbox" checked={selected.includes(permission.permission_code)} disabled={!manageable || permission.system_only || busy === "permissions:" + user.id}
+                          <input type="checkbox" checked={selected.includes(permission.permission_code)} disabled={!manageable || permission.system_only || busy === `permissions:${user.id}`}
                             onChange={event => setPermissionDrafts(current => ({ ...current, [user.id]: event.target.checked ? [...selected, permission.permission_code] : selected.filter(code => code !== permission.permission_code) }))} />
                           <span><b>{permission.area} · {permission.label}{permission.system_only ? " · System-only" : ""}</b><small>{permission.description}{permission.sensitive ? " Sensitive capability; changes are audited." : ""}</small></span>
                         </label>;
                       })}
-                      <button className="btn btn-primary" type="button" disabled={!manageable || !reason.trim() || busy === "permissions:" + user.id}
-                        onClick={() => void updateUser(user, "permissions:" + user.id, () => api("/api/v1/admin/users/" + user.id + "/permissions", { method: "PATCH", body: JSON.stringify({ permissionCodes: permissionDrafts[user.id] ?? user.permissions ?? [], reason }) }, token))}>Save permission matrix</button>
+                      <button className="btn btn-primary" type="button" disabled={!manageable || !reason.trim() || busy === `permissions:${user.id}`}
+                        onClick={() => void updateUser(user, `permissions:${user.id}`, () => api(`/api/v1/admin/users/${user.id}/permissions`, { method: "PATCH", body: JSON.stringify({ permissionCodes: permissionDrafts[user.id] ?? user.permissions ?? [], reason }) }, token))}>Save permission matrix</button>
                       <small className={styles.muted}>Changing direct permissions revokes the user's active sessions. Organization and job scope, ownership, privacy, reviewer independence, and workflow validation still apply.</small>
                     </div>
                   </details>}
@@ -161,7 +161,7 @@ export function UsersTable({
                               onClick={() =>
                                 void updateUser(user, user.id, () =>
                                   api(
-                                    "/api/v1/admin/users/" + user.id,
+                                    `/api/v1/admin/users/${user.id}`,
                                     {
                                       method: "PATCH",
                                       body: JSON.stringify({
@@ -187,7 +187,7 @@ export function UsersTable({
                 <td>
                   <div className={styles.roleAction}>
                     <select
-                      aria-label={"Platform role for " + user.email}
+                      aria-label={`Platform role for ${user.email}`}
                       value={selection}
                       disabled={!manageable}
                       onChange={(event) =>
@@ -217,7 +217,7 @@ export function UsersTable({
                       onClick={() =>
                         void updateUser(user, user.id, () =>
                           api(
-                            "/api/v1/admin/users/" + user.id,
+                            `/api/v1/admin/users/${user.id}`,
                             {
                               method: "PATCH",
                               body: JSON.stringify({
@@ -262,7 +262,7 @@ export function UsersTable({
                         onClick={() =>
                           void updateUser(user, user.id, () =>
                             api(
-                              "/api/v1/admin/users/" + user.id,
+                              `/api/v1/admin/users/${user.id}`,
                               {
                                 method: "PATCH",
                                 body: JSON.stringify({
@@ -285,7 +285,7 @@ export function UsersTable({
                         onClick={() =>
                           void updateUser(user, user.id, () =>
                             api(
-                              "/api/v1/admin/users/" + user.id,
+                              `/api/v1/admin/users/${user.id}`,
                               {
                                 method: "PATCH",
                                 body: JSON.stringify({ status: "active", reason }),
@@ -301,14 +301,14 @@ export function UsersTable({
                     <button
                       className="btn btn-ghost"
                       type="button"
-                      disabled={!manageable || !reason.trim() || busy === "one-time-link:" + user.id}
-                      onClick={() => void updateUser(user, "one-time-link:" + user.id, async () => {
+                      disabled={!manageable || !reason.trim() || busy === `one-time-link:${user.id}`}
+                      onClick={() => void updateUser(user, `one-time-link:${user.id}`, async () => {
                         const result = await api<{queued:boolean;email:string;expiresInMinutes:number;message:string}>(
-                          "/api/v1/admin/users/" + user.id + "/one-time-session-link",
+                          `/api/v1/admin/users/${user.id}/one-time-session-link`,
                           { method: "POST", body: JSON.stringify({ reason }) },
                           token,
                         );
-                        setNotice(result.message + " Recipient: " + result.email + ". Confirm the person’s identity through a known channel before asking them to use the link.");
+                        setNotice(`${result.message} Recipient: ${result.email}. Confirm the person’s identity through a known channel before asking them to use the link.`);
                       })}
                     >
                       <MailCheck size={15} /> Send one-time sign-in link
@@ -320,7 +320,7 @@ export function UsersTable({
                       onClick={() =>
                         void updateUser(user, user.id, () =>
                           api(
-                            "/api/v1/admin/users/" + user.id + "/revoke-sessions",
+                            `/api/v1/admin/users/${user.id}/revoke-sessions`,
                             {
                               method: "POST",
                               body: JSON.stringify({ reason }),

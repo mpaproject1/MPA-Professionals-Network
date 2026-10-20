@@ -1,7 +1,7 @@
-import {test,expect,request as playwrightRequest} from "@playwright/test";
 import {randomUUID} from "node:crypto";
-import {getPool,closePool} from "../src/platform/db.js";
+import {expect,request as playwrightRequest, test} from "@playwright/test";
 import * as membership from "../src/membership/service.js";
+import {closePool, getPool} from "../src/platform/db.js";
 import {hashSecurityToken} from "../src/platform/security-controls.js";
 import {recoverAdminPasskey} from "../src/platform/webauthn.js";
 
@@ -10,8 +10,8 @@ const suffix=randomUUID().replace(/-/g,"").slice(0,12);
 const createdUsers=[];
 async function createActor(roleCode){
  const actorSuffix=randomUUID().replace(/-/g,"").slice(0,8);
- const email="security-e2e-"+roleCode+"-"+suffix+"-"+actorSuffix+"@example.test";
- const registered=await membership.register({email,password:"Security-e2e-password-12345",firstName:"Security",lastName:roleCode+actorSuffix,phone:"09"+String(Math.floor(Math.random()*100000000)).padStart(8,"0")},"security-e2e-register");
+ const email=`security-e2e-${roleCode}-${suffix}-${actorSuffix}@example.test`;
+ const registered=await membership.register({email,password:"Security-e2e-password-12345",firstName:"Security",lastName:roleCode+actorSuffix,phone:`09${String(Math.floor(Math.random()*100000000)).padStart(8,"0")}`},"security-e2e-register");
  createdUsers.push(registered.user.id);
  await getPool().query("update app_user set email_verified_at=coalesce(email_verified_at,now()) where id=$1",[registered.user.id]);
  await getPool().query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code=$2 on conflict do nothing",[registered.user.id,roleCode]);
@@ -24,9 +24,9 @@ test("non-admins cannot enroll passkeys and malformed WebAuthn responses are rej
  const member=await createActor("member");
  const admin=await createActor("system_admin");
  try{
-  const denied=await api.post("/api/v1/admin/passkeys/registration/options",{headers:{authorization:"Bearer "+member.token}});
+  const denied=await api.post("/api/v1/admin/passkeys/registration/options",{headers:{authorization:`Bearer ${member.token}`}});
   expect(denied.status()).toBe(403);
-  const malformed=await api.post("/api/v1/admin/passkeys/registration/verify",{headers:{authorization:"Bearer "+admin.token},data:{id:"not-a-credential",rawId:"not-a-credential",response:{}}});
+  const malformed=await api.post("/api/v1/admin/passkeys/registration/verify",{headers:{authorization:`Bearer ${admin.token}`},data:{id:"not-a-credential",rawId:"not-a-credential",response:{}}});
   expect(malformed.status()).toBe(400);
  }finally{await api.dispose();}
 });
@@ -37,7 +37,7 @@ test("revoked credentials are excluded from passkey login",async()=>{
  const db=getPool();
  try{
   await db.query("update app_user set admin_passkey_enforced_at=now() where id=$1",[admin.userId]);
-  await db.query("insert into admin_passkey_credential(user_id,credential_id,public_key_jwk,revoked_at) values($1,$2,$3,now())",[admin.userId,"revoked-"+suffix,{kty:"EC",crv:"P-256",x:"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",y:"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}]);
+  await db.query("insert into admin_passkey_credential(user_id,credential_id,public_key_jwk,revoked_at) values($1,$2,$3,now())",[admin.userId,`revoked-${suffix}`,{kty:"EC",crv:"P-256",x:"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",y:"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}]);
   const result=await api.post("/api/v1/auth/passkeys/options",{data:{email:admin.email}});
   expect(result.status()).toBe(401);
   const payload=await result.json();
@@ -49,16 +49,16 @@ test("password sessions cannot bypass passkey enforcement; recovery sessions sta
  const api=await playwrightRequest.newContext({baseURL:API_BASE});
  const admin=await createActor("system_admin");
  const db=getPool();
- const code="RECOVERY-"+suffix.toUpperCase();
+ const code=`RECOVERY-${suffix.toUpperCase()}`;
  try{
   await db.query("update app_user set admin_passkey_enforced_at=now() where id=$1",[admin.userId]);
   await db.query("insert into admin_passkey_recovery_code(user_id,code_hash) values($1,$2)",[admin.userId,hashSecurityToken(code)]);
-  const passwordBypass=await api.get("/api/v1/me",{headers:{authorization:"Bearer "+admin.token}});
+  const passwordBypass=await api.get("/api/v1/me",{headers:{authorization:`Bearer ${admin.token}`}});
   expect(passwordBypass.status()).toBe(401);
   const recovery=await api.post("/api/v1/auth/passkeys/recovery",{data:{email:admin.email,code}});
   expect(recovery.status()).toBe(200);
   const recoveryToken=(await recovery.json()).data.token;
-  const restricted=await api.get("/api/v1/me",{headers:{authorization:"Bearer "+recoveryToken}});
+  const restricted=await api.get("/api/v1/me",{headers:{authorization:`Bearer ${recoveryToken}`}});
   expect(restricted.status()).toBe(401);
   const replay=await api.post("/api/v1/auth/passkeys/recovery",{data:{email:admin.email,code}});
   expect(replay.status()).toBe(401);
@@ -110,16 +110,16 @@ test("administrator passkey enrollment, authentication, revocation and recovery 
   const adminSessionToken=await page.evaluate(()=>window.sessionStorage.getItem("mpa-session-token"));
   const revokeApi=await playwrightRequest.newContext({baseURL:API_BASE});
   try{
-   const revoked=await revokeApi.delete("/api/v1/admin/passkeys/"+activeCredentials[0].id,{headers:{authorization:"Bearer "+adminSessionToken}});
+   const revoked=await revokeApi.delete(`/api/v1/admin/passkeys/${activeCredentials[0].id}`,{headers:{authorization:`Bearer ${adminSessionToken}`}});
    expect(revoked.status()).toBe(200);
-   const lastPasskey=await revokeApi.delete("/api/v1/admin/passkeys/"+activeCredentials[1].id,{headers:{authorization:"Bearer "+adminSessionToken}});
+   const lastPasskey=await revokeApi.delete(`/api/v1/admin/passkeys/${activeCredentials[1].id}`,{headers:{authorization:`Bearer ${adminSessionToken}`}});
    expect(lastPasskey.status()).toBe(409);
   }finally{await revokeApi.dispose();}
   await db.query("update admin_passkey_credential set revoked_at=now() where user_id=$1 and revoked_at is null",[admin.userId]);
   const recovery=await recoverAdminPasskey(admin.email,recoveryCode,{ip:"198.51.100.40",userAgent:"playwright-security"},"security-e2e-recovery");
   const api=await playwrightRequest.newContext({baseURL:API_BASE});
   try{
-   const bypass=await api.get("/api/v1/me",{headers:{authorization:"Bearer "+recovery.token}});
+   const bypass=await api.get("/api/v1/me",{headers:{authorization:`Bearer ${recovery.token}`}});
    expect(bypass.status()).toBe(401);
   }finally{await api.dispose();}
   await page.goto("/login");

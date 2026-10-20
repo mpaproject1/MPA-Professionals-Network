@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
 
 test("XLSX reference workbook round-trips stable codes, hierarchy, metadata, dates and Unicode", () => {

@@ -1,12 +1,12 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { getPool, closePool } from "../../src/platform/db.js";
+import test from "node:test";
 import * as membership from "../../src/membership/service.js";
-import * as talent from "../../src/talent/service.js";
-import * as serviceMentorship from "../../src/services-mentorship/service.js";
-import * as publicOpportunity from "../../src/platform/public-opportunity.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
+import { closePool, getPool } from "../../src/platform/db.js";
+import * as publicOpportunity from "../../src/platform/public-opportunity.js";
+import * as serviceMentorship from "../../src/services-mentorship/service.js";
+import * as talent from "../../src/talent/service.js";
 
 function identity(suffix) {
   const digits = suffix.replace(/[^0-9]/g, "").slice(0, 8).padEnd(8, "7");
@@ -15,11 +15,11 @@ function identity(suffix) {
     password: "P0BusinessInvariantPassword!2026",
     firstName: "P0",
     lastName: `Invariant${suffix.slice(0, 8)}`,
-    phone: "09" + digits
+    phone: `09${digits}`
   };
 }
 async function register(suffix) {
-  return membership.register(identity(suffix), "p0-test-" + suffix);
+  return membership.register(identity(suffix), `p0-test-${suffix}`);
 }
 
 test("P0: non-members cannot edit account or professional profile or publish provider offers", async () => {
@@ -46,7 +46,7 @@ test("P0: non-members cannot edit account or professional profile or publish pro
   const db = getPool();
   const product = (await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
   assert.ok(product, "BASIC membership product must exist for the provider fixture");
-  await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')", [provider.user.id, product.id, "MPA-P0-" + randomUUID().slice(0,8).toUpperCase()]);
+  await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')", [provider.user.id, product.id, `MPA-P0-${randomUUID().slice(0,8).toUpperCase()}`]);
   const listing = await serviceMentorship.createServiceListing(provider.user.id, { title: "Public P0 test service", description: "A public service listing for non-member request coverage.", serviceCategory: "p0-test", visibility: "public" }, "p0-public-service-create");
   await db.query("update service_listing set moderation_status='approved' where id=$1", [listing.id]);
   await serviceMentorship.changeServiceListingStatus(listing.id, provider.user.id, "published", "p0-public-service-publish");
@@ -59,7 +59,7 @@ test("P0: provider cannot bypass Support Desk moderation to publish a service or
   const db = getPool();
   const product = (await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
   assert.ok(product, "BASIC membership product must exist");
-  await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')", [provider.user.id, product.id, "MPA-P0-MOD-" + randomUUID().slice(0,8).toUpperCase()]);
+  await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')", [provider.user.id, product.id, `MPA-P0-MOD-${randomUUID().slice(0,8).toUpperCase()}`]);
   const listing = await serviceMentorship.createServiceListing(provider.user.id, { title: "Moderation gate test", description: "A listing that must remain private until Support Desk approval.", serviceCategory: "p0-test", visibility: "public" }, "p0-moderation-create");
   const submitted = await serviceMentorship.changeServiceListingStatus(listing.id, provider.user.id, "published", "p0-moderation-bypass");
   assert.equal(submitted.status, "draft");
@@ -128,7 +128,7 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
   );
 
   const organization = await organizationJobs.registerOrganization(support.user.id, {
-    legalName: "P0 Consent Test Organization " + randomUUID(),
+    legalName: `P0 Consent Test Organization ${randomUUID()}`,
     displayName: "P0 Consent Test Organization"
   }, "p0-consent-test-organization");
   await db.query("update organization set verification_status='verified',public_visible=true,verified_at=now() where id=$1", [organization.id]);
@@ -204,9 +204,9 @@ test("P0: membership activation requires approval and confirmed payment; reversa
   }, "p0-membership-ordering-approve");
   const pending = await membership.createManualPayment(application.id, applicant.user.id, {
     amount: Number(application.fee_snapshot.amount),
-    idempotencyKey: "p0-membership-payment-" + randomUUID(),
+    idempotencyKey: `p0-membership-payment-${randomUUID()}`,
     channel: "bank_transfer",
-    reference: "P0-MANUAL-" + randomUUID()
+    reference: `P0-MANUAL-${randomUUID()}`
   }, "p0-membership-ordering-payment");
   await assert.rejects(
     membership.activateApplication(application.id, reviewer.user.id, "p0-membership-activate-unverified-payment"),
@@ -242,7 +242,7 @@ test("P0: expired membership loses direct profile and provider privileges", asyn
   const db = getPool();
   const product = (await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
   assert.ok(product, "BASIC membership product must exist");
-  await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date-400,current_date-1,'online')", [account.user.id, product.id, "MPA-P0-EXP-" + randomUUID().slice(0,8).toUpperCase()]);
+  await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date-400,current_date-1,'online')", [account.user.id, product.id, `MPA-P0-EXP-${randomUUID().slice(0,8).toUpperCase()}`]);
   await assert.rejects(
     membership.updateProfile(account.user.id, {}, "p0-expired-profile-edit"),
     error => error.code === "MEMBERSHIP_REQUIRED",
@@ -259,7 +259,7 @@ test("P0: applications retain their original fee-rule version after a future pla
   const applicant = await register(randomUUID());
   const administrator = await register(randomUUID());
   const db = getPool();
-  const productCode = "P0VER" + randomUUID().replace(/-/g, "").slice(0,8).toUpperCase();
+  const productCode = `P0VER${randomUUID().replace(/-/g, "").slice(0,8).toUpperCase()}`;
   const today = new Date().toISOString().slice(0,10);
   const future = new Date(Date.now() + 10 * 86400000).toISOString().slice(0,10);
   await membership.saveMembershipProduct(administrator.user.id, null, {

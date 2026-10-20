@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { withTransaction, getPool } from "../platform/db.js";
-import { createInAppNotification } from "../platform/notifications.js";
-import { signToken, newSessionToken, hashSessionToken, sessionTokenPayload } from "../platform/auth.js";
+import { hashSessionToken, newSessionToken, sessionTokenPayload, signToken } from "../platform/auth.js";
 import { loadConfig } from "../platform/config.js";
-import { nextTrackingReference } from "../platform/tracking-reference.js";
-import { hashPassword, verifyPassword, normalizeEmail, normalizePhone, normalizeName, validatePersonInput } from "./identity.js";
+import { getPool, withTransaction } from "../platform/db.js";
+import { assertEmailDeliveryConfigured, createEmailVerification, deliverEmailVerification } from "../platform/email-verification.js";
 import { assertProfessionalProfileCapability } from "../platform/identity-policy.js";
 import { membershipEndDate } from "../platform/membership-duration.js";
+import { createInAppNotification } from "../platform/notifications.js";
 import { consumeHumanChallenge } from "../platform/security-controls.js";
-import { assertEmailDeliveryConfigured, createEmailVerification, deliverEmailVerification } from "../platform/email-verification.js";
+import { nextTrackingReference } from "../platform/tracking-reference.js";
+import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
 
 export function generateMembershipNumber(date=new Date()) { return `MPA-${date.getUTCFullYear()}-${randomUUID().slice(0,8).toUpperCase()}`; }
 
@@ -375,7 +375,7 @@ export async function reviewApplication(applicationId,reviewerId,input,requestId
     const decision=input.decision;
     if(!["approved","rejected","correction_required"].includes(decision)) throw httpError(400,"Invalid review decision.","VALIDATION_ERROR");
     const review=(await db.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,$3,$4,$5) returning *",[applicationId,reviewerId,decision,input.note||null,JSON.stringify(input.checklist||[])])).rows[0];
-    let next=decision==="approved"?"payment_pending":decision==="rejected"?"rejected":"correction_required";
+    const next=decision==="approved"?"payment_pending":decision==="rejected"?"rejected":"correction_required";
     await db.query("update membership_application set status=$1,approved_at=case when $1='payment_pending' then now() else approved_at end,updated_at=now() where id=$2",[next,applicationId]);
     if(decision==="correction_required") await db.query("insert into membership_correction(application_id,requested_by,requested_fields,reviewer_note) values($1,$2,$3,$4)",[applicationId,reviewerId,JSON.stringify(input.requestedFields||[]),input.note||"Correction required."]);
     await audit(db,reviewerId,"membership.application_reviewed","membership_application",applicationId,requestId,{decision});
@@ -462,7 +462,7 @@ export async function verifyPayment(paymentId,verifierId,input,requestId){
     await db.query("update payment_transaction set status=$1,verified_by=$2,verified_at=now(),verification_note=$3,completed_at=case when $1 in ('succeeded','failed') then now() else completed_at end,updated_at=now() where id=$4",[next,verifierId,input.note||null,paymentId]);
     const appStatus=decision==="approved"?"paid":"payment_pending";
     await db.query("update membership_application set status=$1,updated_at=now() where id=$2",[appStatus,p.application_id]);
-    if(decision==="approved") await db.query("insert into payment_reconciliation(payment_transaction_id,membership_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,null,'matched',$2,now(),$3)",[paymentId,verifierId,"Matched to membership application "+p.application_id]);
+    if(decision==="approved") await db.query("insert into payment_reconciliation(payment_transaction_id,membership_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,null,'matched',$2,now(),$3)",[paymentId,verifierId,`Matched to membership application ${p.application_id}`]);
     await audit(db,verifierId,"membership.payment_verified","payment_transaction",paymentId,requestId,{decision,applicationId:p.application_id});
     await notify(db,p.user_id,`membership_payment_${decision}`,"payment_transaction",paymentId,{applicationId:p.application_id,eventVersion:requestId||paymentId});
     return (await db.query("select * from payment_transaction where id=$1",[paymentId])).rows[0];
@@ -495,7 +495,7 @@ export async function activateApplication(applicationId,actorId,requestId){
     if(previous?.status==="active" && previous.end_date && new Date(previous.end_date)>=start) start.setTime(new Date(previous.end_date).getTime()+86400000);
     const todayUtc=new Date();todayUtc.setUTCHours(0,0,0,0);
     if(app.application_type==="renewal"&&start.getTime()>todayUtc.getTime()){
-      throw httpError(409,"Your current membership remains active through "+(previous?.end_date?new Date(previous.end_date).toISOString().slice(0,10):"its recorded end date")+". Activate the paid renewal on or after "+start.toISOString().slice(0,10)+"; your current access has not been changed.","RENEWAL_NOT_DUE");
+      throw httpError(409,`Your current membership remains active through ${previous?.end_date?new Date(previous.end_date).toISOString().slice(0,10):"its recorded end date"}. Activate the paid renewal on or after ${start.toISOString().slice(0,10)}; your current access has not been changed.`,"RENEWAL_NOT_DUE");
     }
     // Retire stale active rows before inserting a replacement. Authorization
     // already checks dates, but the database's one-active-row constraint also
@@ -541,7 +541,7 @@ export async function reverseMembershipPayment(paymentId,actorId,input,requestId
       JSON.stringify({requestId:requestId||null,previousStatus:row.status,applicationStatus:row.application_status})
     ])).rows[0];
     await db.query("update payment_transaction set status='refunded',updated_at=now(),completed_at=coalesce(completed_at,now()),verification_note=$1 where id=$2",[reason,paymentId]);
-    await db.query("update payment_reconciliation set reconciliation_status='disputed',reconciled_by=$1,reconciled_at=now(),note=concat_ws(' | ',note,$2::text) where payment_transaction_id=$3",[actorId,"Refund/reversal recorded: "+reason,paymentId]);
+    await db.query("update payment_reconciliation set reconciliation_status='disputed',reconciled_by=$1,reconciled_at=now(),note=concat_ws(' | ',note,$2::text) where payment_transaction_id=$3",[actorId,`Refund/reversal recorded: ${reason}`,paymentId]);
     const suspended=(await db.query("update membership_record set status='suspended',updated_at=now() where application_id=$1 and status='active' returning id,user_id",[row.application_id])).rows;
     if(row.application_status==="paid"){
       await db.query("update membership_application set status='payment_pending',updated_at=now() where id=$1",[row.application_id]);

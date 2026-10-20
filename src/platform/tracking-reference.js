@@ -7,7 +7,7 @@ export function formatTrackingReference(type,year,serial){
   if(!prefix)throw new TypeError("Unsupported tracking-reference type.");
   if(!/^\d{2}$/.test(normalizedYear))throw new TypeError("Tracking-reference year must contain two digits.");
   if(!/^\d+$/.test(normalizedSerial)||BigInt(normalizedSerial)<1n)throw new TypeError("Tracking-reference serial must be a positive integer.");
-  return "MPA-"+prefix+"-"+normalizedYear+"-"+normalizedSerial.padStart(6,"0");
+  return `MPA-${prefix}-${normalizedYear}-${normalizedSerial.padStart(6,"0")}`;
 }
 
 export async function nextTrackingReference(db,type){

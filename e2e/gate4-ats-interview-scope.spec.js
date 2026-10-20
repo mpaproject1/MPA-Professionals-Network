@@ -1,7 +1,7 @@
-import { test, expect, request as playwrightRequest } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { getPool } from "../src/platform/db.js";
+import { expect, request as playwrightRequest, test } from "@playwright/test";
 import { register as registerMember } from "../src/membership/service.js";
+import { getPool } from "../src/platform/db.js";
 
 const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:3000";
 const ADMIN_EMAIL = process.env.BOOTSTRAP_ADMIN_EMAIL;
@@ -35,7 +35,7 @@ test("ATS interview feedback is assigned-interviewer-only and the candidate time
     });
     expect(adminLogin.status()).toBe(200);
     const adminToken = (await adminLogin.json()).data.token;
-    const adminHeaders = { authorization: "Bearer " + adminToken };
+    const adminHeaders = { authorization: `Bearer ${adminToken}` };
     const adminMe = await api.get("/api/v1/me", { headers: adminHeaders });
     expect(adminMe.status()).toBe(200);
     const adminId = (await adminMe.json()).data.user_id;
@@ -49,16 +49,16 @@ test("ATS interview feedback is assigned-interviewer-only and the candidate time
       data: { email: reviewer.user.email, password: "gate4-ats-password-12345" }
     });
     expect(reviewerLogin.status()).toBe(200);
-    const reviewerHeaders = { authorization: "Bearer " + (await reviewerLogin.json()).data.token };
+    const reviewerHeaders = { authorization: `Bearer ${(await reviewerLogin.json()).data.token}` };
 
-    const organizationName = "Gate 4 ATS Organization " + randomUUID();
+    const organizationName = `Gate 4 ATS Organization ${randomUUID()}`;
     const organizationResponse = await api.post("/api/v1/organizations", {
       headers: adminHeaders,
       data: { legalName: organizationName, displayName: organizationName, organizationType: "company" }
     });
     expect(organizationResponse.status()).toBe(201);
     const organization = (await organizationResponse.json()).data;
-    const verificationSubmission = await api.post("/api/v1/organizations/" + organization.id + "/submit-verification", {
+    const verificationSubmission = await api.post(`/api/v1/organizations/${organization.id}/submit-verification`, {
       headers: adminHeaders
     });
     expect(verificationSubmission.status()).toBe(200);
@@ -69,7 +69,7 @@ test("ATS interview feedback is assigned-interviewer-only and the candidate time
     expect(verificationDecision.status()).toBe(200);
 
     const interviewer = await registerActor("interviewer");
-    const interviewerOrgMembership = await api.post("/api/v1/organizations/" + organization.id + "/users", {
+    const interviewerOrgMembership = await api.post(`/api/v1/organizations/${organization.id}/users`, {
       headers: adminHeaders,
       data: { userId: interviewer.user.id, roleCode: "read_only" }
     });
@@ -77,7 +77,7 @@ test("ATS interview feedback is assigned-interviewer-only and the candidate time
     const candidate = await registerActor("candidate");
     await activateMember(candidate.user.id, "CANDIDATE");
 
-    const title = "Gate 4 Interview Feedback Role Test " + randomUUID();
+    const title = `Gate 4 Interview Feedback Role Test ${randomUUID()}`;
     const jobResponse = await api.post("/api/v1/jobs", {
       headers: adminHeaders,
       data: {
@@ -90,30 +90,30 @@ test("ATS interview feedback is assigned-interviewer-only and the candidate time
     });
     expect(jobResponse.status()).toBe(201);
     const job = (await jobResponse.json()).data;
-    const published = await api.post("/api/v1/jobs/" + job.id + "/publish", { headers: adminHeaders });
+    const published = await api.post(`/api/v1/jobs/${job.id}/publish`, { headers: adminHeaders });
     expect(published.status()).toBe(200);
 
-    const team = await api.post("/api/v1/jobs/" + job.id + "/team", {
+    const team = await api.post(`/api/v1/jobs/${job.id}/team`, {
       headers: adminHeaders,
       data: { userId: interviewer.user.id, roleCode: "interviewer" }
     });
     expect(team.status()).toBe(201);
 
-    const draft = await api.post("/api/v1/jobs/" + job.id + "/application-drafts", {
-      headers: { authorization: "Bearer " + candidate.token },
+    const draft = await api.post(`/api/v1/jobs/${job.id}/application-drafts`, {
+      headers: { authorization: `Bearer ${candidate.token}` },
       data: { coverLetter: "I would like to be considered for this opportunity." }
     });
     expect(draft.status()).toBe(201);
     const applicationId = (await draft.json()).data.id;
-    const submitted = await api.post("/api/v1/job-applications/" + applicationId + "/submit", {
-      headers: { authorization: "Bearer " + candidate.token },
+    const submitted = await api.post(`/api/v1/job-applications/${applicationId}/submit`, {
+      headers: { authorization: `Bearer ${candidate.token}` },
       data: {}
     });
     expect(submitted.status()).toBe(200);
 
     const start = new Date(Date.now() + 48 * 60 * 60 * 1000);
     const end = new Date(start.getTime() + 30 * 60 * 1000);
-    const interviewResponse = await api.post("/api/v1/job-applications/" + applicationId + "/interviews", {
+    const interviewResponse = await api.post(`/api/v1/job-applications/${applicationId}/interviews`, {
       headers: adminHeaders,
       data: {
         scheduledStart: start.toISOString(),
@@ -127,26 +127,26 @@ test("ATS interview feedback is assigned-interviewer-only and the candidate time
     expect(interviewResponse.status()).toBe(201);
     const interview = (await interviewResponse.json()).data;
 
-    const candidateFeedback = await api.post("/api/v1/job-interviews/" + interview.id + "/feedback", {
-      headers: { authorization: "Bearer " + candidate.token },
+    const candidateFeedback = await api.post(`/api/v1/job-interviews/${interview.id}/feedback`, {
+      headers: { authorization: `Bearer ${candidate.token}` },
       data: { ratings: { roleFit: 4 }, recommendation: "advance", comments: "Must be denied." }
     });
     expect(candidateFeedback.status(), "candidates cannot submit interviewer feedback").toBe(403);
 
-    const outsiderFeedback = await api.post("/api/v1/job-interviews/" + interview.id + "/feedback", {
-      headers: { authorization: "Bearer " + reviewerHeaders.authorization.replace("Bearer ", "") },
+    const outsiderFeedback = await api.post(`/api/v1/job-interviews/${interview.id}/feedback`, {
+      headers: { authorization: `Bearer ${reviewerHeaders.authorization.replace("Bearer ", "")}` },
       data: { ratings: { roleFit: 4 }, recommendation: "advance", comments: "Not assigned to this interview." }
     });
     expect(outsiderFeedback.status(), "a platform reviewer who is not assigned as interviewer cannot rate this interview").toBe(403);
 
-    const candidateResponse = await api.post("/api/v1/job-interviews/" + interview.id + "/response", {
-      headers: { authorization: "Bearer " + candidate.token },
+    const candidateResponse = await api.post(`/api/v1/job-interviews/${interview.id}/response`, {
+      headers: { authorization: `Bearer ${candidate.token}` },
       data: { status: "accepted" }
     });
     expect(candidateResponse.status()).toBe(200);
 
-    const feedbackResponse = await api.post("/api/v1/job-interviews/" + interview.id + "/feedback", {
-      headers: { authorization: "Bearer " + interviewer.token },
+    const feedbackResponse = await api.post(`/api/v1/job-interviews/${interview.id}/feedback`, {
+      headers: { authorization: `Bearer ${interviewer.token}` },
       data: {
         ratings: { roleFit: 4, communication: 5 },
         recommendation: "advance",
@@ -157,20 +157,20 @@ test("ATS interview feedback is assigned-interviewer-only and the candidate time
     const feedback = (await feedbackResponse.json()).data;
     expect(feedback.recommendation).toBe("advance");
 
-    const note = await api.post("/api/v1/job-applications/" + applicationId + "/notes", {
+    const note = await api.post(`/api/v1/job-applications/${applicationId}/notes`, {
       headers: adminHeaders,
       data: { note: "Interview completed; hiring team review pending.", visibility: "team" }
     });
     expect(note.status()).toBe(201);
     const noteData = (await note.json()).data;
-    const notes = await api.get("/api/v1/job-applications/" + applicationId + "/notes", {
-      headers: { authorization: "Bearer " + interviewer.token }
+    const notes = await api.get(`/api/v1/job-applications/${applicationId}/notes`, {
+      headers: { authorization: `Bearer ${interviewer.token}` }
     });
     expect(notes.status()).toBe(200);
     expect((await notes.json()).data.some(row => row.id === noteData.id),
       "the authorized interview team can read the persisted candidate timeline note").toBe(true);
 
-    const outsiderNotes = await api.get("/api/v1/job-applications/" + applicationId + "/notes", {
+    const outsiderNotes = await api.get(`/api/v1/job-applications/${applicationId}/notes`, {
       headers: reviewerHeaders
     });
     expect(outsiderNotes.status(), "a reviewer without job-team scope cannot read candidate timeline notes").toBe(403);

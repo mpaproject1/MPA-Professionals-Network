@@ -1,6 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { validatePrivateUploadName, validatePrivateUploadBytes, MAX_PRIVATE_UPLOAD_BYTES } from "../../src/platform/private-file-storage.js";
+import test from "node:test";
+import { MAX_PRIVATE_UPLOAD_BYTES, validatePrivateUploadBytes, validatePrivateUploadName } from "../../src/platform/private-file-storage.js";
 
 test("private upload names are reduced to a safe basename",()=>{
   assert.equal(validatePrivateUploadName("../../evidence.pdf"),"evidence.pdf");

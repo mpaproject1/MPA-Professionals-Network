@@ -1,13 +1,13 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { randomUUID, createHash } from "node:crypto";
-import { getPool, closePool, withTransaction } from "../../src/platform/db.js";
+import { createHash, randomUUID } from "node:crypto";
+import test from "node:test";
 import * as membership from "../../src/membership/service.js";
 import { verifyToken } from "../../src/platform/auth.js";
 import { loadConfig } from "../../src/platform/config.js";
-import { issueHumanChallenge, verifyHumanChallenge, consumeHumanChallenge, enforcePersistentRateLimit, hashSecurityToken } from "../../src/platform/security-controls.js";
-import { recoverAdminPasskey, beginAdminPasskeyAuthentication, finishAdminPasskeyAuthentication } from "../../src/platform/webauthn.js";
-import { createEmailVerification, verifyEmailToken, assertEmailDeliveryConfigured } from "../../src/platform/email-verification.js";
+import { closePool, getPool, withTransaction } from "../../src/platform/db.js";
+import { assertEmailDeliveryConfigured, createEmailVerification, verifyEmailToken } from "../../src/platform/email-verification.js";
+import { consumeHumanChallenge, enforcePersistentRateLimit, hashSecurityToken, issueHumanChallenge, verifyHumanChallenge } from "../../src/platform/security-controls.js";
+import { beginAdminPasskeyAuthentication, finishAdminPasskeyAuthentication, recoverAdminPasskey } from "../../src/platform/webauthn.js";
 
 const suffix=randomUUID().replace(/-/g,"").slice(0,12);
 const createdUsers=[];
@@ -39,7 +39,7 @@ test("first-party human challenge rejects wrong answers and verified tokens are 
 });
 
 test("persistent rate limits are shared by independent request objects",async()=>{
-  const action="security-test-"+suffix;
+  const action=`security-test-${suffix}`;
   const requestA={headers:{},socket:{remoteAddress:"198.51.100.23"}};
   const requestB={headers:{},socket:{remoteAddress:"198.51.100.23"}};
   await enforcePersistentRateLimit(requestA,action,2,60000);
@@ -48,13 +48,13 @@ test("persistent rate limits are shared by independent request objects",async()=
 });
 
 test("WebAuthn assertion with a mismatched challenge is rejected",async()=>{
-  const email="security-webauthn-"+suffix+"@example.test";
-  const registered=await membership.register({email,password:"Security-webauthn-password-12345",firstName:"Security",lastName:"WebAuthn"+suffix,phone:"09"+randomUUID().replace(/\D/g,"").slice(0,8)},"security-webauthn-register");
+  const email=`security-webauthn-${suffix}@example.test`;
+  const registered=await membership.register({email,password:"Security-webauthn-password-12345",firstName:"Security",lastName:`WebAuthn${suffix}`,phone:`09${randomUUID().replace(/\D/g,"").slice(0,8)}`},"security-webauthn-register");
   const userId=registered.user.id;createdUsers.push(userId);
   const db=getPool();
   await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='system_admin' on conflict do nothing",[userId]);
   await db.query("update app_user set email_verified_at=now(),admin_passkey_enforced_at=now() where id=$1",[userId]);
-  const credentialId=Buffer.from("credential-"+suffix).toString("base64url");
+  const credentialId=Buffer.from(`credential-${suffix}`).toString("base64url");
   await db.query("insert into admin_passkey_credential(user_id,credential_id,public_key_jwk) values($1,$2,$3)",[userId,credentialId,{kty:"EC",crv:"P-256",x:Buffer.alloc(32,1).toString("base64url"),y:Buffer.alloc(32,2).toString("base64url"),ext:true}]);
   await beginAdminPasskeyAuthentication(email);
   const clientData=Buffer.from(JSON.stringify({type:"webauthn.get",challenge:"deliberately-wrong-challenge",origin:"http://localhost:3001"})).toString("base64url");
@@ -64,8 +64,8 @@ test("WebAuthn assertion with a mismatched challenge is rejected",async()=>{
 });
 
 test("email verification is one-time and blocks unverified login",async()=>{
-  const email="security-email-"+suffix+"@example.test";
-  const registered=await membership.register({email,password:"Security-email-password-12345",firstName:"Security",lastName:"Email"+suffix,phone:"09"+randomUUID().replace(/\D/g,"").slice(0,8)},"security-email-register");
+  const email=`security-email-${suffix}@example.test`;
+  const registered=await membership.register({email,password:"Security-email-password-12345",firstName:"Security",lastName:`Email${suffix}`,phone:`09${randomUUID().replace(/\D/g,"").slice(0,8)}`},"security-email-register");
   const userId=registered.user.id;createdUsers.push(userId);
   const db=getPool();
   assert.match(registered.registrationReference,/^MPA-MEM-\d{2}-\d{6,}$/);
@@ -91,13 +91,13 @@ test("email verification is one-time and blocks unverified login",async()=>{
 });
 
 test("administrator recovery codes are single-use and create a restricted recovery session",async()=>{
-  const email="security-admin-"+suffix+"@example.test";
-  const registered=await membership.register({email,password:"Security-test-password-12345",firstName:"Security",lastName:"Admin"+suffix,phone:"09"+String(Date.now()).slice(-8)},"security-auth-test-register");
+  const email=`security-admin-${suffix}@example.test`;
+  const registered=await membership.register({email,password:"Security-test-password-12345",firstName:"Security",lastName:`Admin${suffix}`,phone:`09${String(Date.now()).slice(-8)}`},"security-auth-test-register");
   const userId=registered.user.id;createdUsers.push(userId);
   const db=getPool();
   await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='system_admin' on conflict do nothing",[userId]);
   await db.query("update app_user set email_verified_at=now(),admin_passkey_enforced_at=now() where id=$1",[userId]);
-  const code="RECOVERY-"+suffix.toUpperCase();
+  const code=`RECOVERY-${suffix.toUpperCase()}`;
   await db.query("insert into admin_passkey_recovery_code(user_id,code_hash) values($1,$2)",[userId,hashSecurityToken(code)]);
   const previousJwtSecret=process.env.JWT_SECRET;
   process.env.JWT_SECRET=previousJwtSecret||"security-recovery-test-secret-with-more-than-32-characters";
@@ -124,9 +124,9 @@ test("production registration rejects a missing human-check token before creatin
   process.env.NODE_ENV="production";
   process.env.JWT_SECRET="security-test-production-secret-with-more-than-32-characters";
   process.env.HUMAN_CHALLENGE_REQUIRED="false";
-  const email="security-bypass-"+suffix+"@example.test";
+  const email=`security-bypass-${suffix}@example.test`;
   try {
-    await assert.rejects(membership.register({email,password:"Security-bypass-password-12345",firstName:"Security",lastName:"Bypass"+suffix,phone:"09"+randomUUID().replace(/\D/g,"").slice(0,8)},"security-no-human-token"),error=>error.code==="CHALLENGE_REQUIRED");
+    await assert.rejects(membership.register({email,password:"Security-bypass-password-12345",firstName:"Security",lastName:`Bypass${suffix}`,phone:`09${randomUUID().replace(/\D/g,"").slice(0,8)}`},"security-no-human-token"),error=>error.code==="CHALLENGE_REQUIRED");
     assert.equal((await getPool().query("select id from app_user where lower(email)=lower($1)",[email])).rows.length,0,"registration must not persist before challenge consumption");
   } finally {
     for(const key of keys){if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}
@@ -134,31 +134,31 @@ test("production registration rejects a missing human-check token before creatin
 });
 
 test("non-administrators cannot enroll administrator passkeys",async()=>{
-  const email="security-nonadmin-"+suffix+"@example.test";
-  const registered=await membership.register({email,password:"Security-nonadmin-password-12345",firstName:"Security",lastName:"Nonadmin"+suffix,phone:"09"+randomUUID().replace(/\D/g,"").slice(0,8)},"security-nonadmin-register");
+  const email=`security-nonadmin-${suffix}@example.test`;
+  const registered=await membership.register({email,password:"Security-nonadmin-password-12345",firstName:"Security",lastName:`Nonadmin${suffix}`,phone:`09${randomUUID().replace(/\D/g,"").slice(0,8)}`},"security-nonadmin-register");
   createdUsers.push(registered.user.id);
   const {beginAdminPasskeyRegistration}=await import("../../src/platform/webauthn.js");
   await assert.rejects(beginAdminPasskeyRegistration({sub:registered.user.id,sid:"not-a-session"}),error=>error.statusCode===403&&error.code==="FORBIDDEN");
 });
 
 test("revoked administrator passkeys cannot be used for authentication",async()=>{
-  const email="security-revoked-"+suffix+"@example.test";
-  const registered=await membership.register({email,password:"Security-revoked-password-12345",firstName:"Security",lastName:"Revoked"+suffix,phone:"09"+randomUUID().replace(/\D/g,"").slice(0,8)},"security-revoked-register");
+  const email=`security-revoked-${suffix}@example.test`;
+  const registered=await membership.register({email,password:"Security-revoked-password-12345",firstName:"Security",lastName:`Revoked${suffix}`,phone:`09${randomUUID().replace(/\D/g,"").slice(0,8)}`},"security-revoked-register");
   const userId=registered.user.id;createdUsers.push(userId);
   const db=getPool();
   await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='system_admin' on conflict do nothing",[userId]);
   await db.query("update app_user set admin_passkey_enforced_at=now() where id=$1",[userId]);
-  await db.query("insert into admin_passkey_credential(user_id,credential_id,public_key_jwk,revoked_at) values($1,$2,$3,now())",[userId,Buffer.from("revoked-"+suffix).toString("base64url"),{kty:"EC",crv:"P-256",x:Buffer.alloc(32,3).toString("base64url"),y:Buffer.alloc(32,4).toString("base64url")}]);
+  await db.query("insert into admin_passkey_credential(user_id,credential_id,public_key_jwk,revoked_at) values($1,$2,$3,now())",[userId,Buffer.from(`revoked-${suffix}`).toString("base64url"),{kty:"EC",crv:"P-256",x:Buffer.alloc(32,3).toString("base64url"),y:Buffer.alloc(32,4).toString("base64url")}]);
   await assert.rejects(beginAdminPasskeyAuthentication(email),error=>error.code==="PASSKEY_NOT_AVAILABLE");
 });
 
 
 test("persistent identity limits cannot be bypassed by changing source IP",async()=>{
-  const action="security-identity-test-"+suffix;
+  const action=`security-identity-test-${suffix}`;
   const requestA={headers:{},socket:{remoteAddress:"198.51.100.31"}};
   const requestB={headers:{},socket:{remoteAddress:"198.51.100.32"}};
-  await enforcePersistentRateLimit(requestA,action,1,60000,"target-"+suffix+"@example.test");
-  await assert.rejects(enforcePersistentRateLimit(requestB,action,1,60000,"TARGET-"+suffix+"@EXAMPLE.TEST"),error=>error.code==="RATE_LIMITED"&&error.statusCode===429);
+  await enforcePersistentRateLimit(requestA,action,1,60000,`target-${suffix}@example.test`);
+  await assert.rejects(enforcePersistentRateLimit(requestB,action,1,60000,`TARGET-${suffix}@EXAMPLE.TEST`),error=>error.code==="RATE_LIMITED"&&error.statusCode===429);
 });
 
 test("human subtraction challenges remain answerable on numeric-only keyboards",async()=>{
@@ -171,9 +171,9 @@ test("human subtraction challenges remain answerable on numeric-only keyboards",
 });
 
 test("organization registration creates an organization-only account without a professional profile",async()=>{
-  const email="security-org-"+suffix+"@example.test";
-  const phone="08"+randomUUID().replace(/\D/g,"").slice(0,8);
-  const registered=await membership.register({accountType:"organization",email,password:"Security-org-password-12345",passwordConfirmation:"Security-org-password-12345",firstName:"Organization",middleName:"Representative",lastName:"Test"+suffix,displayName:"Organization Representative Test "+suffix,phone},"security-org-register");
+  const email=`security-org-${suffix}@example.test`;
+  const phone=`08${randomUUID().replace(/\D/g,"").slice(0,8)}`;
+  const registered=await membership.register({accountType:"organization",email,password:"Security-org-password-12345",passwordConfirmation:"Security-org-password-12345",firstName:"Organization",middleName:"Representative",lastName:`Test${suffix}`,displayName:`Organization Representative Test ${suffix}`,phone},"security-org-register");
   const userId=registered.user.id;createdUsers.push(userId);
   assert.equal(registered.accountType,"organization_representative");
   assert.deepEqual(registered.roles,["organization_representative"]);

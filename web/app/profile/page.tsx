@@ -1,6 +1,4 @@
 "use client";
-import { FormEvent, useCallback, useEffect, useId, useState } from "react";
-import { FormFeedback } from "../../components/form-feedback";
 import {
   CreditCard,
   Eye,
@@ -12,12 +10,15 @@ import {
   Users,
   WifiOff,
 } from "lucide-react";
-import { Card, Badge } from "../../components/ui";
-import { api, ApiError } from "../../lib/api";
-import { useUiStore } from "../../lib/store";
+import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
+import { FormFeedback } from "../../components/form-feedback";
+import { Badge, Card } from "../../components/ui";
+import { ApiError, api } from "../../lib/api";
 import { hasProfessionalIdentity } from "../../lib/identity-capabilities";
-import styles from "./profile.module.css";
+import { useUiStore } from "../../lib/store";
 import GuidedProfessionalProfile from "./guided-professional-profile";
+import styles from "./profile.module.css";
+
 type Profile = {
   user_id: string;
   email: string;
@@ -232,8 +233,8 @@ export default function Profile() {
     }
     let objectUrl = "";
     let cancelled = false;
-    void fetch("/api/v1/files/" + encodeURIComponent(profile.profile_picture_file_id), {
-      headers: { Authorization: "Bearer " + token }, cache: "no-store",
+    void fetch(`/api/v1/files/${encodeURIComponent(profile.profile_picture_file_id)}`, {
+      headers: { Authorization: `Bearer ${token}` }, cache: "no-store",
     }).then(async (response) => {
       if (!response.ok) throw new Error("Picture unavailable");
       const blob = await response.blob();
@@ -259,10 +260,10 @@ export default function Profile() {
         { method: "POST", body: JSON.stringify({ fileName: file.name, contentType: file.type, byteSize: file.size }) }, token,
       );
       const bytes = await fetch(upload.uploadUrl, {
-        method: "PUT", headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream", "X-Upload-Token": upload.uploadToken }, body: file,
+        method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/octet-stream", "X-Upload-Token": upload.uploadToken }, body: file,
       });
       if (!bytes.ok) throw new Error("The image upload could not be completed.");
-      const stored = await api<{id:string}>("/api/v1/files/uploads/" + encodeURIComponent(upload.uploadId) + "/confirm", { method: "POST", body: "{}" }, token);
+      const stored = await api<{id:string}>(`/api/v1/files/uploads/${encodeURIComponent(upload.uploadId)}/confirm`, { method: "POST", body: "{}" }, token);
       await api("/api/v1/me/profile-picture", { method: "PATCH", body: JSON.stringify({ fileObjectId: stored.id }) }, token);
       await load();
       setNotice("Profile picture updated. You can now print your membership card.");
@@ -546,10 +547,10 @@ export default function Profile() {
                   ] as const
                 ).map(([key, label]) => (
                   <div key={key}>
-                    <label htmlFor={"profile-" + key}>{label}</label>
+                    <label htmlFor={`profile-${key}`}>{label}</label>
                     {key === "sex" ? (
                       <select
-                        id={"profile-" + key}
+                        id={`profile-${key}`}
                         value={form[key]}
                         onChange={(e) => update(key, e.target.value)}
                       >
@@ -559,7 +560,7 @@ export default function Profile() {
                       </select>
                     ) : (
                       <input
-                        id={"profile-" + key}
+                        id={`profile-${key}`}
                         required={key === "firstName" || key === "lastName"}
                         type={key === "dateOfBirth" ? "date" : "text"}
                         autoComplete={key === "phone" ? "tel" : undefined}

@@ -1,35 +1,34 @@
-import http from "node:http";
-import { authorizePrivateUpload, receivePrivateUpload, confirmPrivateUpload, readAuthorizedPrivateFile, MAX_PRIVATE_UPLOAD_BYTES } from "./src/platform/private-file-storage.js";
 import { randomUUID } from "node:crypto";
-import { loadConfig } from "./src/platform/config.js";
-import { createLogger } from "./src/platform/logger.js";
-import { verifyToken, requireRole, hashSessionToken, withCurrentRoles } from "./src/platform/auth.js";
-import { getPool } from "./src/platform/db.js";
-import * as membership from "./src/membership/service.js";
-import * as membershipCard from "./src/membership/card.js";
+import http from "node:http";
 import * as membershipAdminBulk from "./src/membership/admin-bulk.js";
-import * as reports from "./src/platform/reports.js";
-import * as verification from "./src/verification/service.js";
-import * as talent from "./src/talent/service.js";
+import * as membershipCard from "./src/membership/card.js";
+import * as membership from "./src/membership/service.js";
 import * as organizationJobs from "./src/organization-jobs/service.js";
-import * as servicesMentorship from "./src/services-mentorship/service.js";
+import * as accountSecurity from "./src/platform/account-security.js";
+import * as applicationTracking from "./src/platform/application-tracking.js";
+import { requireRole, verifyToken, withCurrentRoles } from "./src/platform/auth.js";
+import { loadConfig, resolveAllowedOrigin } from "./src/platform/config.js";
+import { getPool } from "./src/platform/db.js";
+import * as emailOperations from "./src/platform/email-operations.js";
+import { resendEmailVerification, verifyEmailToken } from "./src/platform/email-verification.js";
+import * as experience from "./src/platform/experience.js";
+import { createLogger } from "./src/platform/logger.js";
+import * as notifications from "./src/platform/notifications.js";
+import { authorizePrivateUpload, confirmPrivateUpload, MAX_PRIVATE_UPLOAD_BYTES, readAuthorizedPrivateFile, receivePrivateUpload } from "./src/platform/private-file-storage.js";
+import * as publicOpportunity from "./src/platform/public-opportunity.js";
+import * as referencePortfolio from "./src/platform/reference-portfolio.js";
+import * as reports from "./src/platform/reports.js";
+import * as savedDiscoveryItems from "./src/platform/saved-discovery-items.js";
+import { enforcePersistentRateLimit, issueHumanChallenge, verifyHumanChallenge } from "./src/platform/security-controls.js";
+import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
+import * as supportBot from "./src/platform/support-bot.js";
+import * as userAdmin from "./src/platform/user-admin.js";
+import { beginAdminPasskeyAuthentication, beginAdminPasskeyRegistration, finishAdminPasskeyAuthentication, finishAdminPasskeyRegistration, listAdminPasskeys, recoverAdminPasskey, revokeAdminPasskey } from "./src/platform/webauthn.js";
 import * as marketplaceDemand from "./src/services-mentorship/demand.js";
 import * as organizationMentorshipOffers from "./src/services-mentorship/organization-offers.js";
-import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
-import * as experience from "./src/platform/experience.js";
-import * as applicationTracking from "./src/platform/application-tracking.js";
-import * as publicOpportunity from "./src/platform/public-opportunity.js";
-import * as userAdmin from "./src/platform/user-admin.js";
-import * as emailOperations from "./src/platform/email-operations.js";
-import * as notifications from "./src/platform/notifications.js";
-import * as savedDiscoveryItems from "./src/platform/saved-discovery-items.js";
-import { verifyEmailToken, resendEmailVerification } from "./src/platform/email-verification.js";
-import { enforcePersistentRateLimit, issueHumanChallenge, verifyHumanChallenge } from "./src/platform/security-controls.js";
-import { beginAdminPasskeyRegistration, finishAdminPasskeyRegistration, beginAdminPasskeyAuthentication, finishAdminPasskeyAuthentication, recoverAdminPasskey, listAdminPasskeys, revokeAdminPasskey } from "./src/platform/webauthn.js";
-import * as accountSecurity from "./src/platform/account-security.js";
-import * as referencePortfolio from "./src/platform/reference-portfolio.js";
-import * as supportBot from "./src/platform/support-bot.js";
-import { resolveAllowedOrigin } from "./src/platform/config.js";
+import * as servicesMentorship from "./src/services-mentorship/service.js";
+import * as talent from "./src/talent/service.js";
+import * as verification from "./src/verification/service.js";
 
 const config=loadConfig();
 const logger=createLogger({level:config.logLevel});
@@ -108,7 +107,7 @@ function anyRoleOrPermission(identity,allowed,permissionCodes=[]){
 }
 function ok(res,data,requestId,status=200){ return json(res,status,{data},requestId); }
 const rateBuckets=new Map();
-function publicRateLimit(req,key,limit=30,windowMs=60000){ const now=Date.now(), k=key+":"+clientIp(req); const b=rateBuckets.get(k)||{start:now,count:0}; if(now-b.start>=windowMs){b.start=now;b.count=0} b.count++; rateBuckets.set(k,b); if(b.count>limit) throw Object.assign(new Error("Too many requests. Please try again later."),{statusCode:429,code:"RATE_LIMITED"}); }
+function publicRateLimit(req,key,limit=30,windowMs=60000){ const now=Date.now(), k=`${key}:${clientIp(req)}`; const b=rateBuckets.get(k)||{start:now,count:0}; if(now-b.start>=windowMs){b.start=now;b.count=0} b.count++; rateBuckets.set(k,b); if(b.count>limit) throw Object.assign(new Error("Too many requests. Please try again later."),{statusCode:429,code:"RATE_LIMITED"}); }
 async function bootstrapAdmin(){ if(!config.bootstrapAdminEmail||!config.bootstrapAdminPassword) return; const m=await import("./src/membership/service.js"); return m.bootstrapAdmin({email:config.bootstrapAdminEmail,password:config.bootstrapAdminPassword,name:config.bootstrapAdminName}); }
 
 const server=http.createServer(async (req,res)=>{
@@ -175,7 +174,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && p==="api/v1/files/uploads") { const identity=await auth(req); return ok(res,await authorizePrivateUpload(identity.sub,await body(req)),requestId,201); }
     if(req.method==="PUT" && parts.length===6 && p.startsWith("api/v1/files/uploads/") && parts[5]==="content") { const identity=await auth(req); if(!String(req.headers["content-type"]||"").startsWith("application/octet-stream")) throw Object.assign(new Error("Upload content must use application/octet-stream."),{statusCode:415,code:"UNSUPPORTED_MEDIA_TYPE"}); const result=await receivePrivateUpload(identity.sub,parts[4],String(req.headers["x-upload-token"]||""),await rawBody(req)); return ok(res,result,requestId,201); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/files/uploads/") && parts[5]==="confirm") { const identity=await auth(req); return ok(res,await confirmPrivateUpload(identity.sub,parts[4]),requestId,201); }
-    if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/files/")) { const identity=await auth(req); const result=await readAuthorizedPrivateFile(identity.sub,parts[3],identity.roles||[],requestId,identity.permissions||[]); res.writeHead(200,{"content-type":result.file.content_type,"content-length":String(result.bytes.length),"content-disposition":"attachment; filename*=UTF-8''"+encodeURIComponent(result.file.original_name),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId}); return res.end(result.bytes); }
+    if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/files/")) { const identity=await auth(req); const result=await readAuthorizedPrivateFile(identity.sub,parts[3],identity.roles||[],requestId,identity.permissions||[]); res.writeHead(200,{"content-type":result.file.content_type,"content-length":String(result.bytes.length),"content-disposition":`attachment; filename*=UTF-8''${encodeURIComponent(result.file.original_name)}`,"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId}); return res.end(result.bytes); }
     if(req.method==="POST" && p==="api/v1/auth/member-invitation/claim") return ok(res,await membershipAdminBulk.claimMemberInvitation(await body(req)),requestId);
     if(req.method==="POST" && p==="api/v1/auth/register") { const b=await body(req); await enforcePersistentRateLimit(req,"register",5,60000,String(b.email||"").trim().toLowerCase()); return ok(res,await membership.register(b,requestId),requestId,201); }
     if(req.method==="GET" && p==="api/v1/membership/products") return ok(res,await membership.listMembershipProducts(),requestId);
@@ -217,13 +216,13 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/admin/members/import-template") { const identity=await auth(req); const csv=membershipAdminBulk.memberImportTemplate(identity); res.writeHead(200,{"content-type":"text/csv; charset=utf-8","content-disposition":"attachment; filename=mpa-approved-members-template.csv","cache-control":"no-store","x-request-id":requestId}); return res.end(csv); }
     if(req.method==="POST" && p==="api/v1/admin/members/import/preview") { const identity=await auth(req); return ok(res,await membershipAdminBulk.previewMemberImport(identity,await body(req,6*1024*1024),requestId),requestId,201); }
     if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/members/import/") && parts[6]==="apply") { const identity=await auth(req); return ok(res,await membershipAdminBulk.applyMemberImport(identity,parts[5],await body(req),requestId),requestId); }
-    if(req.method==="GET" && p==="api/v1/admin/members/export") { const identity=await auth(req),q=query(req.url),out=await membershipAdminBulk.exportMembers(identity,{q:q.get("q"),status:q.get("status"),format:q.get("format")||"csv"},requestId); res.writeHead(200,{"content-type":out.contentType,"content-disposition":"attachment; filename="+out.filename,"content-length":String(out.buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId}); return res.end(out.buffer); }
+    if(req.method==="GET" && p==="api/v1/admin/members/export") { const identity=await auth(req),q=query(req.url),out=await membershipAdminBulk.exportMembers(identity,{q:q.get("q"),status:q.get("status"),format:q.get("format")||"csv"},requestId); res.writeHead(200,{"content-type":out.contentType,"content-disposition":`attachment; filename=${out.filename}`,"content-length":String(out.buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId}); return res.end(out.buffer); }
     if(req.method==="GET" && p==="api/v1/me/report-saved-views") { const identity=await auth(req); return ok(res,await reports.listSavedViews(identity),requestId); }
     if(req.method==="POST" && p==="api/v1/me/report-saved-views") { const identity=await auth(req); return ok(res,await reports.saveSavedView(identity,await body(req),requestId),requestId,201); }
     if(req.method==="DELETE" && parts.length===5 && p.startsWith("api/v1/me/report-saved-views/")) { const identity=await auth(req); return ok(res,await reports.deleteSavedView(identity,parts[4],requestId),requestId); }
     if(req.method==="GET" && p==="api/v1/admin/reports") { const identity=await auth(req); return ok(res,reports.listReportCatalogue(identity),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/admin/reports/") && parts[5]==="run") { const identity=await auth(req); return ok(res,await reports.runReport(identity,parts[4],await body(req),requestId),requestId); }
-    if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/admin/reports/") && parts[5]==="export") { const identity=await auth(req),q=query(req.url),out=await reports.exportReport(identity,parts[4],{from:q.get("from"),to:q.get("to"),status:q.get("status"),q:q.get("q"),groupBy:q.get("groupBy")},q.get("format")||"pdf",requestId); res.writeHead(200,{"content-type":out.contentType,"content-disposition":"attachment; filename="+out.filename,"content-length":String(out.buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId}); return res.end(out.buffer); }
+    if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/admin/reports/") && parts[5]==="export") { const identity=await auth(req),q=query(req.url),out=await reports.exportReport(identity,parts[4],{from:q.get("from"),to:q.get("to"),status:q.get("status"),q:q.get("q"),groupBy:q.get("groupBy")},q.get("format")||"pdf",requestId); res.writeHead(200,{"content-type":out.contentType,"content-disposition":`attachment; filename=${out.filename}`,"content-length":String(out.buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId}); return res.end(out.buffer); }
     if(req.method==="GET" && p==="api/v1/admin/users") { const identity=await auth(req); return ok(res,await userAdmin.listUsers(identity,{q:query(req.url).get("q"),status:query(req.url).get("status")}),requestId); }
     if(req.method==="GET" && p==="api/v1/admin/roles") { const identity=await auth(req); return ok(res,await userAdmin.listRoles(identity.sub),requestId); }
     if(req.method==="GET" && p==="api/v1/admin/permissions") { const identity=await auth(req); return ok(res,await userAdmin.listPermissions(identity.sub),requestId); }

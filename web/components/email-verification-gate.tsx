@@ -1,10 +1,10 @@
 "use client";
 
-import {FormEvent,useState} from "react";
-import Link from "next/link";
 import {CheckCircle2,MailCheck,RefreshCw,ShieldCheck} from "lucide-react";
+import Link from "next/link";
+import {type FormEvent,useState} from "react";
+import {ApiError, api} from "../lib/api";
 import {Card} from "./ui";
-import {api,ApiError} from "../lib/api";
 
 type Props={email:string;message:string;developmentVerificationUrl?:string};
 type ResendResult={accepted:boolean;developmentVerificationUrl?:string};

@@ -1,6 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_THEME,resolveTheme,assertThemeContrast } from "../../src/platform/ui-theme.js";
+import test from "node:test";
+import { assertThemeContrast, DEFAULT_THEME,resolveTheme} from "../../src/platform/ui-theme.js";
 
 test("global theme provides strict light and dark semantic tokens",()=>{
   const light=resolveTheme({mode:"light"});

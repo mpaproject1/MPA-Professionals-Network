@@ -5,7 +5,7 @@ const clean = (value, max=2000) => String(value ?? "").replace(/\p{Cc}/gu, chara
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const sha = value => createHash("sha256").update(String(value)).digest("hex");
 const slugify = value => clean(value,80).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,80) || "category";
-function publicRef(){return "MPA-SUP-"+randomUUID().replace(/-/g,"").slice(0,10).toUpperCase();}
+function publicRef(){return `MPA-SUP-${randomUUID().replace(/-/g,"").slice(0,10).toUpperCase()}`;}
 function httpError(message,statusCode=400,code="INVALID_REQUEST"){return Object.assign(new Error(message),{statusCode,code});}
 function rowArticle(row){return {id:row.id,categoryId:row.category_id,categoryName:row.category_name,title:row.title,questionExamples:row.question_examples||[],keywords:row.keywords||[],answer:row.answer,sourceNote:row.source_note,sortOrder:row.sort_order,isPublished:row.is_published,updatedAt:row.updated_at};}
 function matchScore(question,article){
@@ -16,7 +16,7 @@ function matchScore(question,article){
  let score=0;
  for(const token of qTokens){if(entries.some(entry=>entry.split(" ").includes(token)))score+=token.length>5?2:1;}
  if(entries.some(entry=>entry===q))score+=5;
- if(entries.some(entry=>entry.startsWith(q+" ")||entry.endsWith(" "+q)||entry.includes(" "+q+" ")))score+=4;
+ if(entries.some(entry=>entry.startsWith(`${q} `)||entry.endsWith(` ${q}`)||entry.includes(` ${q} `)))score+=4;
  return score;
 }
 async function logAudit(db,actorId,action,resourceId,requestId){

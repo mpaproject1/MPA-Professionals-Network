@@ -1,12 +1,12 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { getPool, closePool } from "../../src/platform/db.js";
-import { listSavedViews, saveSavedView, deleteSavedView } from "../../src/platform/reports.js";
+import test from "node:test";
+import { closePool, getPool } from "../../src/platform/db.js";
+import { deleteSavedView, listSavedViews, saveSavedView } from "../../src/platform/reports.js";
 
 async function createUser(){
  const suffix=randomUUID();
- return (await getPool().query("insert into app_user(username,email,status) values($1,$2,'active') returning id",["report-view-"+suffix,"report-view-"+suffix+"@example.invalid"])).rows[0].id;
+ return (await getPool().query("insert into app_user(username,email,status) values($1,$2,'active') returning id",[`report-view-${suffix}`,`report-view-${suffix}@example.invalid`])).rows[0].id;
 }
 test("saved report views are private to their owner, role-authorized, and auditable",async()=>{
  const ownerId=await createUser(),outsiderId=await createUser();

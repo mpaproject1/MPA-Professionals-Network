@@ -1,6 +1,4 @@
 "use client";
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { FormFeedback } from "../../components/form-feedback";
 import {
   Building2,
   FileCheck2,
@@ -8,8 +6,10 @@ import {
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
-import { Card, Badge } from "../../components/ui";
-import { api, ApiError } from "../../lib/api";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { FormFeedback } from "../../components/form-feedback";
+import { Badge, Card } from "../../components/ui";
+import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
 
 type Inquiry = {
@@ -267,7 +267,7 @@ export default function Organizations() {
     setNotice("");
     try {
       const updated = await api<Inquiry>(
-        "/api/v1/opportunity-inquiries/" + encodeURIComponent(inquiry.id),
+        `/api/v1/opportunity-inquiries/${encodeURIComponent(inquiry.id)}`,
         {
           method: "PATCH",
           body: JSON.stringify({
@@ -352,7 +352,7 @@ export default function Organizations() {
       const uploaded = await fetch(base + authorization.uploadUrl, {
         method: "PUT",
         headers: {
-          Authorization: "Bearer " + token,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/octet-stream",
           "X-Upload-Token": authorization.uploadToken,
         },
@@ -410,8 +410,8 @@ export default function Organizations() {
     try {
       const base = "";
       const response = await fetch(
-        base + "/api/v1/files/" + encodeURIComponent(fileObjectId),
-        { headers: { Authorization: "Bearer " + token }, cache: "no-store" },
+        `${base}/api/v1/files/${encodeURIComponent(fileObjectId)}`,
+        { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
       );
       if (!response.ok)
         throw new Error(
@@ -711,7 +711,7 @@ export default function Organizations() {
                       <b>{org.display_name}</b>
                       <div className="muted">
                         {org.legal_name}
-                        {org.role_code ? " · " + org.role_code : ""}
+                        {org.role_code ? ` · ${org.role_code}` : ""}
                         <div className="muted">Application reference: {org.tracking_reference || "Pending"} · Last updated: {org.updated_at ? new Date(org.updated_at).toLocaleString() : "Not yet recorded"}</div>
                         <div className="muted">Current status: {org.verification_case_status === "submitted" || org.verification_case_status === "pending" || org.verification_status === "pending" ? "Awaiting review" : org.verification_case_status === "correction_required" ? "Correction required" : org.verification_status === "verified" ? "Completed — organization verified" : (org.verification_case_status || org.verification_status || "draft").replaceAll("_", " ")}</div><div className="muted">Next action: {org.verification_case_status === "correction_required" ? "Provide the requested corrections" : org.verification_case_status === "submitted" || org.verification_case_status === "pending" || org.verification_status === "pending" ? "Wait for organization review; resubmission is unavailable while awaiting review" : org.verification_status === "verified" ? "Manage approved organization activities" : "Complete required evidence and submit for verification"}</div>
                       </div>
@@ -883,7 +883,7 @@ export default function Organizations() {
                           <div className="row" key={ev.id}>
                             <span>
                               {ev.evidenceType}
-                              {ev.note ? " · " + ev.note : ""}
+                              {ev.note ? ` · ${ev.note}` : ""}
                             </span>
                             <button
                               className="btn btn-ghost"
@@ -1007,7 +1007,7 @@ export default function Organizations() {
                           <label>
                             Decision
                             <select
-                              aria-label={"Decision for " + i.public_reference}
+                              aria-label={`Decision for ${i.public_reference}`}
                               value={draft.status}
                               onChange={(e) =>
                                 setInquiryDrafts((current) => ({
@@ -1028,7 +1028,7 @@ export default function Organizations() {
                           <label className="checkbox-row">
                             <input
                               aria-label={
-                                "Consider non-member for " + i.public_reference
+                                `Consider non-member for ${i.public_reference}`
                               }
                               type="checkbox"
                               checked={draft.considerNonMember}
@@ -1048,7 +1048,7 @@ export default function Organizations() {
                             Decision note
                             <textarea
                               aria-label={
-                                "Decision note for " + i.public_reference
+                                `Decision note for ${i.public_reference}`
                               }
                               rows={2}
                               maxLength={4000}

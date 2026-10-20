@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError } from "../../../lib/api";
-import { Card, Badge } from "../../../components/ui";
+import { Badge, Card } from "../../../components/ui";
+import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 
 type Demand = {
@@ -60,10 +60,10 @@ export default function JobSeekerDemandSupportPage() {
     if (!choice?.organizationId || !choice.fields.length) { setError("Select a verified organization and at least one consented field."); return; }
     setBusyId(item.id); setError(""); setNotice("");
     try {
-      const result = await api<{reference:string;organizationId:string;sharedFields:string[];sharedAt:string}>("/api/v1/support/job-seeker-demands/" + encodeURIComponent(item.id) + "/share", {
+      const result = await api<{reference:string;organizationId:string;sharedFields:string[];sharedAt:string}>(`/api/v1/support/job-seeker-demands/${encodeURIComponent(item.id)}/share`, {
         method: "POST", body: JSON.stringify({ organizationId: choice.organizationId, fields: choice.fields })
       }, token || undefined);
-      setNotice("Demand " + result.reference + " was shared with the selected organization using only the consented fields.");
+      setNotice(`Demand ${result.reference} was shared with the selected organization using only the consented fields.`);
       await load();
     } catch (e) { setError(e instanceof ApiError ? e.message : "Sharing was not confirmed. The request remains private; please retry."); }
     finally { setBusyId(""); }
@@ -94,7 +94,7 @@ export default function JobSeekerDemandSupportPage() {
         </div>
         <p><b>Applicant:</b> {item.contact_name} · <b>Status:</b> {item.status}</p>
         <p>{item.intent || "No introduction supplied."}</p>
-        <p className="muted">Received {item.employer_sharing_consented_at ? "with sharing consent on " + new Date(item.employer_sharing_consented_at).toLocaleString() : "without employer-sharing consent"}.</p>
+        <p className="muted">Received {item.employer_sharing_consented_at ? `with sharing consent on ${new Date(item.employer_sharing_consented_at).toLocaleString()}` : "without employer-sharing consent"}.</p>
         {canShare ? <div style={{ display: "grid", gap: 12 }}>
           <label>Verified organization
             <select value={choice.organizationId} onChange={e => updateChoice(item.id,{organizationId:e.target.value})} required>

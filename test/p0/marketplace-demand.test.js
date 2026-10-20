@@ -1,21 +1,21 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { getPool, closePool } from "../../src/platform/db.js";
+import test from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
+import { closePool, getPool } from "../../src/platform/db.js";
 import * as marketplaceDemand from "../../src/services-mentorship/demand.js";
 import * as services from "../../src/services-mentorship/service.js";
 
 async function account(suffix){
  const digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
- const created=await membership.register({email:"marketplace-"+suffix+"@example.test",password:"MarketplaceP1Password!2026",firstName:"Market",lastName:"Test"+suffix.slice(0,8),phone:"07"+digits},"marketplace-test-"+suffix);
+ const created=await membership.register({email:`marketplace-${suffix}@example.test`,password:"MarketplaceP1Password!2026",firstName:"Market",lastName:`Test${suffix.slice(0,8)}`,phone:`07${digits}`},`marketplace-test-${suffix}`);
  return created.user.id;
 }
 async function activeMember(userId){
  const db=getPool(),product=(await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
  assert.ok(product,"BASIC membership product must exist");
- await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')",[userId,product.id,"MPA-MKT-"+randomUUID().slice(0,8).toUpperCase()]);
+ await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')",[userId,product.id,`MPA-MKT-${randomUUID().slice(0,8).toUpperCase()}`]);
 }
 async function supportStaff(){
  const db=getPool(),userId=await account(randomUUID());
@@ -50,7 +50,7 @@ test("P1 marketplace: private demand is reviewed before a privacy-safe public to
  assert.ok(summary.counts.some(row=>row.interest_level==="ready_to_engage"&&Number(row.count)===1));
 });
 test("P1 marketplace: demand assessment is Support Desk-only and returns aggregate-only rows",async()=>{
- const requester=await account(randomUUID()),staff=await supportStaff(),outsider=await account(randomUUID()),category="Finance "+randomUUID().replaceAll("-","").slice(0,8);
+ const requester=await account(randomUUID()),staff=await supportStaff(),outsider=await account(randomUUID()),category=`Finance ${randomUUID().replaceAll("-","").slice(0,8)}`;
  const demand=await marketplaceDemand.createDemand(requester,{demandType:"service",title:"Need bookkeeping support",description:"Our small team needs monthly bookkeeping and financial reporting support.",category,deliveryMode:"remote",locationLabel:"Addis Ababa"}, "marketplace-assessment-submit");
  const reviewed=await marketplaceDemand.reviewDemand(demand.id,staff,{status:"topic_published",publishTopic:true,publicTitle:"Bookkeeping support for small teams",publicSummary:"Small teams are seeking qualified help with monthly bookkeeping and clear financial reporting.",publicCategory:category,publicLocationLabel:"Addis Ababa",interestGoal:3},"marketplace-assessment-review");
  await marketplaceDemand.joinDemandTopic(reviewed.topic.id,outsider,{interestLevel:"ready_to_engage"},"marketplace-assessment-interest");
@@ -67,7 +67,7 @@ test("P1 marketplace: demand assessment is Support Desk-only and returns aggrega
 });
 test("P1 marketplace: organization demand is visible to its owner but not an unrelated account",async()=>{
  const owner=await account(randomUUID()),unrelated=await account(randomUUID());
- const org=await organizationJobs.registerOrganization(owner,{legalName:"Marketplace Test "+randomUUID(),displayName:"Marketplace Test Organization"},"marketplace-org-create");
+ const org=await organizationJobs.registerOrganization(owner,{legalName:`Marketplace Test ${randomUUID()}`,displayName:"Marketplace Test Organization"},"marketplace-org-create");
  const demand=await marketplaceDemand.createDemand(owner,{demandType:"mentorship",title:"Mentorship for early-career staff",description:"Our organization seeks a structured mentoring program for early-career team members.",category:"Career development",organizationId:org.id},"marketplace-org-demand");
  assert.ok((await marketplaceDemand.listMyDemand(owner)).some(row=>row.id===demand.id));
  assert.equal((await marketplaceDemand.listMyDemand(unrelated)).some(row=>row.id===demand.id),false);

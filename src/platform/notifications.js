@@ -11,7 +11,7 @@ function eventTitle(code){return String(code||"Update").split(/[._-]+/).filter(B
 function present(row){
   const payload=row.payload&&typeof row.payload==="object"?row.payload:{};
   const title=row.title||payload.title||eventTitle(row.event_code);
-  const body=row.body||payload.message||payload.summary||payload.nextAction||payload.next_action||(payload.status?("Status updated: "+String(payload.status).replace(/[_-]+/g," ").toLowerCase()):"There is an update to review in your MPA Network account.");
+  const body=row.body||payload.message||payload.summary||payload.nextAction||payload.next_action||(payload.status?(`Status updated: ${String(payload.status).replace(/[_-]+/g," ").toLowerCase()}`):"There is an update to review in your MPA Network account.");
   return {id:row.id,category:row.category,title,body,priority:row.priority,actionRequired:row.action_required,
     actionUrl:safeInternalUrl(row.action_url),resourceType:row.resource_type,resourceId:row.resource_id,
     eventCode:row.event_code,createdAt:row.created_at,readAt:row.read_at,archivedAt:row.archived_at};
@@ -49,7 +49,7 @@ export async function createInAppNotification(db,userId,eventCode,resourceType,r
  const category=notificationCategoryFor(eventCode,resourceType,payload),critical=category==="security"&&(payload.critical===true||payload.critical==="true");
  if(!critical&&(!user.in_app_enabled||user.in_app_categories?.[category]===false))return null;
  const title=String(payload.title||eventCode||"Update").split(/[._-]+/).filter(Boolean).map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join(" ").slice(0,180);
- const body=String(payload.message||payload.summary||payload.nextAction||payload.next_action||(payload.status?("Status updated: "+String(payload.status).replace(/[_-]+/g," ").toLowerCase()):"There is an update to review in your MPA Network account.")).slice(0,1000);
+ const body=String(payload.message||payload.summary||payload.nextAction||payload.next_action||(payload.status?(`Status updated: ${String(payload.status).replace(/[_-]+/g," ").toLowerCase()}`):"There is an update to review in your MPA Network account.")).slice(0,1000);
  const priority=["low","normal","high","urgent"].includes(payload.priority)?payload.priority:(critical?"high":"normal");
  const actionRequired=payload.actionRequired===true||payload.action_required===true||Boolean(payload.nextAction||payload.next_action);
  const actionUrl=defaultActionUrl(category,resourceType,payload);

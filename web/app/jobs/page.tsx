@@ -1,10 +1,10 @@
 "use client";
 
-import {FormEvent,useCallback,useEffect,useId,useState} from "react";
-import {Bookmark,Building2,Clock3,MapPin,SlidersHorizontal,Users,RefreshCw} from "lucide-react";
-import {Card,Badge} from "../../components/ui";
-import {api,ApiError} from "../../lib/api";
+import {Bookmark,Building2,Clock3,MapPin,RefreshCw, SlidersHorizontal,Users} from "lucide-react";
+import {type FormEvent,useCallback,useEffect,useId,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
+import {Badge, Card} from "../../components/ui";
+import {ApiError, api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
 
 type Job={
@@ -18,7 +18,7 @@ type EligibilityResult=Eligibility|{error:string};
 type Filters={q:string;location:string;employmentType:string;workMode:string;seniority:string;postingScope:string};
 const initialFilters:Filters={q:"",location:"",employmentType:"",workMode:"",seniority:"",postingScope:""};
 
-function EligibilityDetails({result}:{result?:EligibilityResult}){if(!result)return <p className="muted">Eligibility has not been checked yet.</p>;if("error" in result)return <p className="form-error" role="alert">{result.error}</p>;return <>{<p>{result.summary}</p>}{result.results.length>0&&<ul>{result.results.map((rule,index)=><li key={rule.code}>{rule.eligible?"Meets requirement: ":"Still needed: "}{rule.reason}</li>)}</ul>}</>;}
+function EligibilityDetails({result}:{result?:EligibilityResult}){if(!result)return <p className="muted">Eligibility has not been checked yet.</p>;if("error" in result)return <p className="form-error" role="alert">{result.error}</p>;return <>{<p>{result.summary}</p>}{result.results.length>0&&<ul>{result.results.map((rule,_index)=><li key={rule.code}>{rule.eligible?"Meets requirement: ":"Still needed: "}{rule.reason}</li>)}</ul>}</>;}
 function queryString(filters:Filters){
  const p=new URLSearchParams();
  for(const [key,value] of Object.entries(filters)) if(value.trim()) p.set(key,value.trim());
@@ -117,11 +117,11 @@ export default function Jobs(){
    if(isOpen){setExpanded(current=>({...current,[job.id]:false}));return;}
    setExpanded(current=>({...current,[job.id]:true}));
    const tasks:Promise<unknown>[]=[];
-   if(job.description===undefined)tasks.push(api<Job>("/api/v1/jobs/"+encodeURIComponent(job.id),{},token||undefined).then(detail=>setJobs(current=>current.map(item=>item.id===job.id?{...item,...detail}:item))).catch(e=>setError(e instanceof ApiError?e.message:"We couldn't load the opportunity details.")));
+   if(job.description===undefined)tasks.push(api<Job>(`/api/v1/jobs/${encodeURIComponent(job.id)}`,{},token||undefined).then(detail=>setJobs(current=>current.map(item=>item.id===job.id?{...item,...detail}:item))).catch(e=>setError(e instanceof ApiError?e.message:"We couldn't load the opportunity details.")));
    if(token&&!eligibilityByJob[job.id]){
      setEligibilityLoading(current=>({...current,[job.id]:true}));
      tasks.push(
-       api<Eligibility>("/api/v1/jobs/" + encodeURIComponent(job.id) + "/eligibility", {}, token)
+       api<Eligibility>(`/api/v1/jobs/${encodeURIComponent(job.id)}/eligibility`, {}, token)
          .then((result) => setEligibilityByJob((current) => ({ ...current, [job.id]: result })))
          .catch((e) => setEligibilityByJob((current) => ({
            ...current,
@@ -136,7 +136,7 @@ export default function Jobs(){
    if(!token)return;
    setEligibilityLoading(current=>({...current,[job.id]:true}));
    setEligibilityByJob(current=>{const next={...current};delete next[job.id];return next;});
-   try{const result=await api<Eligibility>("/api/v1/jobs/"+encodeURIComponent(job.id)+"/eligibility",{},token);setEligibilityByJob(current=>({...current,[job.id]:result}));}
+   try{const result=await api<Eligibility>(`/api/v1/jobs/${encodeURIComponent(job.id)}/eligibility`,{},token);setEligibilityByJob(current=>({...current,[job.id]:result}));}
    catch(e){setEligibilityByJob(current=>({...current,[job.id]:{error:e instanceof ApiError?e.message:"Eligibility could not be checked. Retry to refresh."}}));}
    finally{setEligibilityLoading(current=>({...current,[job.id]:false}));}
  }
@@ -178,7 +178,7 @@ export default function Jobs(){
            {salary(job)&&<span className="tagline">{salary(job)}</span>}
          </div>
          {job.application_deadline&&<p className="muted">Application deadline: {new Date(job.application_deadline).toLocaleDateString()}</p>}
-         {expanded[job.id]&&<div style={{marginTop:14}}><p>{job.description||"No further description has been published."}</p>{token?<div className="case-row" style={{margin:"12px 0"}}><div style={{flex:1,minWidth:0}}><b>Are you eligible for this opportunity?</b>{eligibilityLoading[job.id]?<p className="muted">Checking the published requirements for your account…</p>:<EligibilityDetails result={eligibilityByJob[job.id]}/>}</div><div className="row" style={{gap:8,flexWrap:"wrap"}}>{eligibilityByJob[job.id]&&"error" in eligibilityByJob[job.id]&&<button className="btn btn-ghost" type="button" onClick={()=>void retryEligibility(job)} disabled={eligibilityLoading[job.id]}>Retry eligibility check</button>}</div></div>:<p className="muted">Sign in to check your eligibility against this vacancy's actual requirements.</p>}<p className="muted">A public inquiry is not a formal application. Formal submission is authenticated and checks eligibility, required screening answers and duplicate applications.</p>{token?<div className="grid" style={{gap:8,marginTop:10}}><label htmlFor={"cover-"+job.id}>Cover letter (optional)<textarea id={"cover-"+job.id} rows={3} value={coverLetters[job.id]||""} onChange={e=>setCoverLetters(current=>({...current,[job.id]:e.target.value}))} placeholder="Explain your interest and relevant experience."/></label><button className="btn btn-primary" type="button" disabled={applyingId===job.id} onClick={()=>void submitFormalApplication(job)}>{applyingId===job.id?"Submitting…":draftIds[job.id]?"Retry formal submission":"Submit formal application"}</button></div>:<p className="muted"><a href="/login?next=/jobs">Sign in to submit a formal application</a>; use public inquiry only if you want to ask questions first.</p>}</div>}
+         {expanded[job.id]&&<div style={{marginTop:14}}><p>{job.description||"No further description has been published."}</p>{token?<div className="case-row" style={{margin:"12px 0"}}><div style={{flex:1,minWidth:0}}><b>Are you eligible for this opportunity?</b>{eligibilityLoading[job.id]?<p className="muted">Checking the published requirements for your account…</p>:<EligibilityDetails result={eligibilityByJob[job.id]}/>}</div><div className="row" style={{gap:8,flexWrap:"wrap"}}>{eligibilityByJob[job.id]&&"error" in eligibilityByJob[job.id]&&<button className="btn btn-ghost" type="button" onClick={()=>void retryEligibility(job)} disabled={eligibilityLoading[job.id]}>Retry eligibility check</button>}</div></div>:<p className="muted">Sign in to check your eligibility against this vacancy's actual requirements.</p>}<p className="muted">A public inquiry is not a formal application. Formal submission is authenticated and checks eligibility, required screening answers and duplicate applications.</p>{token?<div className="grid" style={{gap:8,marginTop:10}}><label htmlFor={`cover-${job.id}`}>Cover letter (optional)<textarea id={`cover-${job.id}`} rows={3} value={coverLetters[job.id]||""} onChange={e=>setCoverLetters(current=>({...current,[job.id]:e.target.value}))} placeholder="Explain your interest and relevant experience."/></label><button className="btn btn-primary" type="button" disabled={applyingId===job.id} onClick={()=>void submitFormalApplication(job)}>{applyingId===job.id?"Submitting…":draftIds[job.id]?"Retry formal submission":"Submit formal application"}</button></div>:<p className="muted"><a href="/login?next=/jobs">Sign in to submit a formal application</a>; use public inquiry only if you want to ask questions first.</p>}</div>}
          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
            <button className="btn btn-ghost" type="button" onClick={()=>void toggleDetails(job)}>{expanded[job.id]?"Hide details":"View details"}</button>
            <a className="btn btn-primary" href={"/apply/job"}>Start public inquiry</a>

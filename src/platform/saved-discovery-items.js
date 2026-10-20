@@ -1,6 +1,6 @@
-import { getPool } from "./db.js";
-import * as talent from "../talent/service.js";
 import * as servicesMentorship from "../services-mentorship/service.js";
+import * as talent from "../talent/service.js";
+import { getPool } from "./db.js";
 
 function error(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e;}
 const TYPES=new Set(["professional","organization","service","mentor"]);

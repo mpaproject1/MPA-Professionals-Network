@@ -126,7 +126,9 @@ export async function login(email,password,requestId,requestMeta={}){
   const user=r.rows.length===1?r.rows[0]:null;
   if(!user || user.status!=="active" || !verifyPassword(password,user.password_hash)){
     await db.query("insert into auth_login_attempt(identity_key,ip_address,succeeded) values($1,$2,false)",[identityKey,requestMeta.ip||null]);
-    throw httpError(401,"Invalid credentials.","UNAUTHENTICATED");
+    // Keep credential failures distinct from expired/revoked bearer sessions.
+    // Both remain 401s, but the client can give a useful sign-in message.
+    throw httpError(401,"Email/username or password is incorrect.","INVALID_CREDENTIALS");
   }
   if(!user.email_verified_at) throw httpError(403,"Verify your email before signing in. Request a new verification link if needed.","EMAIL_VERIFICATION_REQUIRED");
   const rs=await roles(db,user.id);

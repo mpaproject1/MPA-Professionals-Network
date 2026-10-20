@@ -20,6 +20,7 @@ const FRIENDLY_ERRORS: Record<string,string> = {
   PASSKEY_REQUIRED: "This administrator account requires a passkey or a one-time recovery code.",
   PASSKEY_ENROLLMENT_REQUIRED: "Register an administrator passkey before continuing.",
   PASSKEY_NOT_CONFIGURED: "Administrator passkeys are not configured for this deployment. Contact the platform operator.",
+  INVALID_CREDENTIALS: "Email/username or password is incorrect. Check your sign-in details and try again.",
   CHALLENGE_REQUIRED: "Complete the human check before registering.",
   CHALLENGE_INVALID: "The human-check token is invalid, expired, or already used. Complete a new check.",
   CHALLENGE_INCORRECT: "That answer was not correct. Please try a new human check.",

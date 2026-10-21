@@ -219,7 +219,7 @@ export default function AdminPage() {
           <p className="muted">Start with a real queue or a decision that needs attention. Each workspace retains its own status, permissions and audit trail.</p>
           <div className="row" style={{gap:8,flexWrap:"wrap"}}>
             {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-primary" href="/admin/marketplace">Marketplace review</a>}
-            {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/organizations">Organization verification</a>}
+            {roles.some((role) => ["system_admin", "reviewer"].includes(role)) && <a className="btn btn-ghost" href="/organizations">Organization verification</a>}
             {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/recruitment">Recruitment workflow</a>}
             {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/admin/support">Support desk</a>}
             {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/support/job-seeker-demands">Job-seeker demand and consent</a>}

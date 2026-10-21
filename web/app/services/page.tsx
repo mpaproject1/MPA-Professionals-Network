@@ -1,7 +1,7 @@
 "use client";
 import {Bookmark,Handshake,MessageSquareText,RefreshCw,Star} from "lucide-react";
 import Link from "next/link";
-import {type FormEvent,useCallback,useEffect,useState} from "react";
+import {type FormEvent,useCallback,useEffect,useRef,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
 import { FormFeedback } from "../../components/form-feedback";
 import {Badge, Card} from "../../components/ui";
@@ -11,7 +11,7 @@ import {useUiStore} from "../../lib/store";
 import {useSavedDiscoveryItems} from "../../lib/use-saved-discovery-items";
 
 type Service={id:string;title:string;description:string;service_category:string;delivery_mode?:string;location_label?:string;pricing_model:string;price_amount?:number|string|null;currency?:string|null;display_name?:string;provider_name?:string};
-type ServiceRequest={id:string;status:string;service_title?:string;created_at?:string;message?:string;provider_user_id?:string;requester_user_id?:string;is_provider?:boolean;provider_completed_at?:string|null;requester_accepted_at?:string|null;outcome_summary?:string|null;nextAction?:string;status_history?:{fromStatus?:string|null;toStatus?:string|null;note?:string|null;createdAt?:string}[]};
+type ServiceRequest={id:string;idempotent?:boolean;tracking_reference?:string;status:string;service_title?:string;created_at?:string;message?:string;provider_user_id?:string;requester_user_id?:string;is_provider?:boolean;provider_completed_at?:string|null;requester_accepted_at?:string|null;outcome_summary?:string|null;nextAction?:string;status_history?:{fromStatus?:string|null;toStatus?:string|null;note?:string|null;createdAt?:string}[]};
 type ServiceDelivery={id:string;request_id:string;description:string;status:string;reviewer_note?:string|null;created_at?:string;submitted_by:string};
 type ProviderListing={id:string;title:string;description:string;service_category:string;delivery_mode:string;location_label?:string|null;pricing_model:string;price_amount?:number|string|null;currency?:string|null;visibility:string;status:string;moderation_status:string;moderation_note?:string|null;organization_id?:string|null;provider_name?:string|null};
 type Org={id:string;display_name:string;verification_status?:string;role_code?:string};
@@ -38,6 +38,10 @@ export default function Services(){
  const [selected,setSelected]=useState<Service|null>(null);
  const [message,setMessage]=useState("");
  const [submitting,setSubmitting]=useState(false);
+ const [noticeReference,setNoticeReference]=useState("");
+ const inFlightActions=useRef(new Set<string>());
+ const claimAction=(key:string)=>{if(inFlightActions.current.has(key))return false;inFlightActions.current.add(key);return true;};
+ const releaseAction=(key:string)=>{inFlightActions.current.delete(key);};
 
  const load=useCallback(async(q="",pageIndex=0)=>{
    setLoading(true);setError("");
@@ -63,7 +67,7 @@ export default function Services(){
  useEffect(()=>{void loadProviderWorkspace();},[loadProviderWorkspace]);
 
  async function submitProviderListing(e:FormEvent){
-   e.preventDefault();if(!token)return;setProviderSaving(true);setError("");setNotice("");
+   e.preventDefault();if(!token)return;if(!claimAction("provider:save"))return;setProviderSaving(true);setError("");setNotice("");setNoticeReference("");
    try{
      const body={title:providerForm.title.trim(),description:providerForm.description.trim(),serviceCategory:providerForm.serviceCategory.trim(),deliveryMode:providerForm.deliveryMode,locationLabel:providerForm.locationLabel.trim()||null,pricingModel:providerForm.pricingModel,priceAmount:providerForm.pricingModel==="free"?0:providerForm.priceAmount?Number(providerForm.priceAmount):null,currency:providerForm.currency||"ETB",visibility:providerForm.visibility,organizationId:providerForm.organizationId||undefined};
      await api(editingListingId?`/api/v1/services/${encodeURIComponent(editingListingId)}`:"/api/v1/services",{method:editingListingId?"PATCH":"POST",body:JSON.stringify(body)},token);
@@ -71,7 +75,7 @@ export default function Services(){
      setEditingListingId("");setServiceCategoryChoice("");setProviderForm({title:"",description:"",serviceCategory:"",deliveryMode:"remote",locationLabel:"",pricingModel:"quote",priceAmount:"",currency:"ETB",visibility:"public",organizationId:""});
      await loadProviderWorkspace();
    }catch(e){setError(e instanceof ApiError?e.message:"Your listing could not be saved. Your entered details remain in the form.");}
-   finally{setProviderSaving(false);}
+   finally{releaseAction("provider:save");setProviderSaving(false);}
  }
  async function changeListingStatus(item:ProviderListing,status:"published"|"paused"|"closed"){
    if(!token)return;setTransitioningId(item.id);setError("");setNotice("");
@@ -96,16 +100,16 @@ export default function Services(){
  async function submitDelivery(r:ServiceRequest){if(!token)return;const description=(deliveryDrafts[r.id]||"").trim();if(description.length<8){setError("Describe the work delivered in at least 8 characters.");return;}setTransitioningId(r.id);setError("");setNotice("");try{const result=await api<any>(`/api/v1/service-requests/${encodeURIComponent(r.id)}/deliveries`,{method:"POST",body:JSON.stringify({description})},token);setNotice(result?.nextAction||"Delivery recorded. The requester can review it and accept or ask for a revision.");setDeliveryDrafts(v=>({...v,[r.id]:""}));await loadRequests();}catch(e){setError(e instanceof ApiError?e.message:"Delivery could not be submitted. Please retry.");}finally{setTransitioningId("");}}
  async function reviewDelivery(d:ServiceDelivery,status:"accepted"|"revision_requested"){if(!token)return;const note=(deliveryNotes[d.id]||"").trim();if(status==="revision_requested"&&note.length<4){setError("Explain what needs to change before requesting a revision.");return;}setTransitioningId(d.id);setError("");setNotice("");try{const result=await api<any>(`/api/v1/service-deliveries/${encodeURIComponent(d.id)}/review`,{method:"POST",body:JSON.stringify({status,note:note||undefined})},token);setNotice(result?.nextAction||(status==="accepted"?"Delivery accepted.":"Revision requested."));await loadRequests();}catch(e){setError(e instanceof ApiError?e.message:"Delivery review could not be saved. Please retry.");}finally{setTransitioningId("");}}
  async function submitRequest(e:FormEvent){
-   e.preventDefault();if(!selected)return;
+   e.preventDefault();if(!selected)return;const lock="service-request:"+selected.id;if(!claimAction(lock))return;
    if(!token){setNotice("Sign in to request this service. Member-only offers require an active membership.");return;}
-   setSubmitting(true);setError("");setNotice("");
+   setSubmitting(true);setError("");setNotice("");setNoticeReference("");
    try{
      const created=await api<ServiceRequest>(`/api/v1/services/${encodeURIComponent(selected.id)}/requests`,{method:"POST",body:JSON.stringify({message:message.trim()||undefined})},token);
-     setNotice("Your service request was submitted. It is awaiting the provider's response.");
+     setNotice(created.idempotent?"You already have an active request for this service. No duplicate was created; check request history below.":"Your service request was recorded and is waiting for the provider to respond. Work starts only after acceptance.");setNoticeReference(created.tracking_reference||created.id||"");
      setSelected(null);setMessage("");
-     setRequests(current=>[created,...current]);
-   }catch(e){setError(e instanceof ApiError?e.message:"We couldn't submit this service request.");}
-   finally{setSubmitting(false);}
+     await loadRequests();
+   }catch(e){setError(e instanceof ApiError?e.message:"We could not confirm the service request. Check request history before trying again.");}
+   finally{releaseAction(lock);setSubmitting(false);}
  }
 
  return <div className="grid">
@@ -136,7 +140,7 @@ export default function Services(){
      </form>
    </Card>
    {error&&<FormFeedback kind="error" message={error} onRetry={()=>{void load(query,page);void loadRequests();}} retryLabel="Reload workspace" membershipReturnTo="/services"/>}
-   {notice&&<FormFeedback kind="success" message={notice} actionHref={!token?"/login?next=/services":undefined} actionLabel={!token?"Sign in":undefined}/>}
+   {notice&&<FormFeedback kind="success" message={notice} reference={noticeReference||undefined} actionHref={!token?"/login?next=/services":undefined} actionLabel={!token?"Sign in":undefined}/>}
    {loading?<Card><div className="row"><RefreshCw size={18}/><p className="muted">Loading published services…</p></div></Card>:items.length===0&&!error?<Card><h2 className="h2">No published services found</h2><p className="muted">Try another keyword or check again later. Only live published listings are shown.</p></Card>:<div className="grid grid-2">{items.map(service=><Card key={service.id}>
      <div className="row"><Badge>{service.service_category}</Badge><span className="tagline">{(service.delivery_mode||"remote").replaceAll("_"," ")}</span></div>
      <h2 className="h2" style={{marginTop:12}}>{service.title}</h2>

@@ -109,6 +109,7 @@ export default function Services(){
  }
 
  return <div className="grid">
+   <p className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm"><span>Looking for help that is not listed yet?</span> <a className="btn btn-secondary" href="/service-demand">Explore service requests and unmet needs →</a></p>
    <div><div className="eyebrow">Professional services</div><h1 className="h1">Find help, then deliver it well.</h1><p className="muted">Browse published service offers. Public offers can be requested by signed-in users; member-only offers require an active membership. Providers must accept before work begins.</p></div>
    <Card id="provider-workspace"><div className="row" style={{justifyContent:"space-between",flexWrap:"wrap"}}><div><div className="eyebrow">Provider workspace</div><h2 className="h2">Offer a professional service</h2><p className="muted">Create a draft, submit it for review, and track moderation status here. Public discovery begins only after approval.</p></div><Badge>Moderated publication</Badge></div>
     {!token?<p className="muted">Sign in to create or manage a service listing. Individual provider listings require an active membership; verified organizations can publish through an authorized organization role.</p>:<form className="grid" style={{gap:12,marginTop:14}} onSubmit={submitProviderListing}>

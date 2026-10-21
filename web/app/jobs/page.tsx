@@ -154,9 +154,11 @@ export default function Jobs(){
      primaryHref="#job-search"
      steps={[
        { title: "Join", description: "Create an account and complete the minimum profile information.", href: "/register", action: "Create account" },
-       { title: "Prepare", description: "Review your professional profile and choose what information is visible.", href: "/profile", action: "Prepare profile" },
-       { title: "Apply", description: "Check eligibility, save suitable roles and submit only the information requested.", href: "#job-search", action: "Find opportunities" },
-       { title: "Progress", description: "Return to your dashboard for account activity and follow up on employer requests.", href: "/dashboard", action: "Open dashboard" },
+       { title: "Prepare", description: "Review your professional profile, choose visibility and add relevant experience or portfolio information.", href: "/profile", action: "Prepare profile" },
+       { title: "Discover and save", description: "Search verified opportunities, check eligibility and keep suitable roles in Saved.", href: "#job-search", action: "Find opportunities" },
+       { title: "Apply", description: "Submit the formal application with only the information requested for that opportunity.", href: "#job-search", action: "Apply to a role" },
+       { title: "Track progress", description: "See current application status, the last update and the next action in one timeline.", href: "/track", action: "Track applications" },
+       { title: "Build skills", description: "Explore mentoring opportunities while applications progress.", href: "/mentorship", action: "Explore mentorship" },
      ]}
    />
    <p><a className="btn btn-ghost" href="/jobs/interest">No matching vacancy? Register your job interest</a> <a className="btn btn-ghost" href="/saved">Review saved items</a></p>

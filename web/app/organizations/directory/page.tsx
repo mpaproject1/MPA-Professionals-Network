@@ -1,5 +1,3 @@
-"use client";
-
 import { redirect } from "next/navigation";
 
 /** Public organization discovery is intentionally disabled. Organization details

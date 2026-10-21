@@ -39,56 +39,62 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git rev-parse HEAD > "$RUNNER_TEMP/source-commit.txt"
           git ls-files -z | python3 -c '
           import os, sys
-          paths = sys.stdin.buffer.read().split(b"\\0")
+          paths = sys.stdin.buffer.read().split(b"\0")
           selected = []
           allowed_roots = (b"src/", b"scripts/", b"db/migrations/", b"tests/", b"test/", b"config/")
           allowed_files = {b"server.js", b"package.json", b"package-lock.json", b"npm-shrinkwrap.json"}
           for raw in paths:
               if not raw:
                   continue
-              path = raw.replace(b"\\\\", b"/")
+              path = raw
               base = os.path.basename(path).lower()
               if path in allowed_files or any(path.startswith(root) for root in allowed_roots):
                   if any(token in base for token in (b".env", b"secret", b"credential", b"private_key", b"id_rsa")):
-                      continue
-                  if b"/node_modules/" in b"/" + path + b"/" or path.startswith((b"web/", b".github/")):
                       continue
                   selected.append(raw)
           if b"server.js" not in selected or b"package.json" not in selected:
               raise SystemExit("Required backend entrypoint/package manifest not found in selected source revision")
           if not any(p.startswith(b"db/migrations/") and p.endswith(b".sql") for p in selected):
               raise SystemExit("No tracked SQL migrations selected; refusing to create incomplete backend package")
-          sys.stdout.buffer.write(b"\\0".join(selected) + b"\\0")
+          sys.stdout.buffer.write(b"\0".join(selected) + b"\0")
           ' > "$RUNNER_TEMP/backend-files.list"
 
-          FILE_COUNT=$(python3 -c 'print(len([p for p in open("'"$RUNNER_TEMP/backend-files.list"'", "rb").read().split(b"\\0") if p]))')
-          MIGRATION_COUNT=$(python3 -c 'print(sum(1 for p in open("'"$RUNNER_TEMP/backend-files.list"'", "rb").read().split(b"\\0") if p.startswith(b"db/migrations/") and p.endswith(b".sql")))')
-          echo "Selected tracked backend files: $FILE_COUNT"
-          echo "Selected tracked SQL migrations: $MIGRATION_COUNT"
+          python3 - "$RUNNER_TEMP/backend-files.list" <<'PY'
+          import sys
+          paths = [p for p in open(sys.argv[1], "rb").read().split(b"\0") if p]
+          migrations = [p for p in paths if p.startswith(b"db/migrations/") and p.endswith(b".sql")]
+          print(f"Selected tracked backend files: {len(paths)}")
+          print(f"Selected tracked SQL migrations: {len(migrations)}")
+          PY
           grep -zqx 'server.js' "$RUNNER_TEMP/backend-files.list"
           grep -zqx 'package.json' "$RUNNER_TEMP/backend-files.list"
 
       - name: Package source and record revision
         id: package
         shell: bash
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
         run: |
           set -euo pipefail
-          archive="$RUNNER_TEMP/mpa-backend-source-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
-          manifest="$RUNNER_TEMP/mpa-backend-source-${GITHUB_SHA}-${GITHUB_RUN_ID}.manifest.txt"
+          SOURCE_COMMIT="$(cat "$RUNNER_TEMP/source-commit.txt")"
+          archive="$RUNNER_TEMP/mpa-backend-source-${SOURCE_COMMIT}-${GITHUB_RUN_ID}.tar.gz"
+          manifest="$RUNNER_TEMP/mpa-backend-source-${SOURCE_COMMIT}-${GITHUB_RUN_ID}.manifest.txt"
           checksum="$archive.sha256"
 
           tar --null -T "$RUNNER_TEMP/backend-files.list" -czf "$archive"
-          {
-            echo "repository=${GITHUB_REPOSITORY}"
-            echo "source_commit=${GITHUB_SHA}"
-            echo "source_ref=${{ inputs.source_ref }}"
-            echo "workflow_run_id=${GITHUB_RUN_ID}"
-            echo "tracked_backend_file_count=$(python3 -c 'print(len([p for p in open("'"$RUNNER_TEMP/backend-files.list"'", "rb").read().split(b"\\0") if p]))')"
-            echo "sql_migration_count=$(python3 -c 'print(sum(1 for p in open("'"$RUNNER_TEMP/backend-files.list"'", "rb").read().split(b"\\0") if p.startswith(b"db/migrations/") and p.endswith(b".sql"))')"
-            echo "archive_sha256=$(sha256sum "$archive" | cut -d " " -f1)"
-          } > "$manifest"
+          python3 - "$RUNNER_TEMP/backend-files.list" "$manifest" "$SOURCE_COMMIT" "$SOURCE_REF" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$archive" <<'PY'
+          import hashlib, sys
+          files_path, manifest_path, commit, ref, repo, run_id, archive = sys.argv[1:]
+          paths = [p for p in open(files_path, "rb").read().split(b"\0") if p]
+          migrations = [p for p in paths if p.startswith(b"db/migrations/") and p.endswith(b".sql")]
+          digest = hashlib.sha256(open(archive, "rb").read()).hexdigest()
+          with open(manifest_path, "w", encoding="utf-8") as out:
+              out.write(f"repository={repo}\nsource_commit={commit}\nsource_ref={ref}\nworkflow_run_id={run_id}\n")
+              out.write(f"tracked_backend_file_count={len(paths)}\nsql_migration_count={len(migrations)}\narchive_sha256={digest}\n")
+          PY
           (cd "$(dirname "$archive")" && sha256sum "$(basename "$archive")" > "$(basename "$checksum")")
 
           if tar -tzf "$archive" | grep -E '(^|/)(\.env([^/]*)?|node_modules)(/|$)|(^|/)web/|(^|/)\.git/' ; then
@@ -105,7 +111,7 @@ jobs:
       - name: Store source package as private Actions artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mpa-backend-source-${{ github.sha }}-${{ github.run_id }}
+          name: mpa-backend-source-${{ github.run_id }}
           path: |
             ${{ steps.package.outputs.archive }}
             ${{ steps.package.outputs.checksum }}
@@ -121,9 +127,9 @@ jobs:
           test -n "$CPANEL_SSH_KEY"
           test -n "$CPANEL_KNOWN_HOSTS"
           install -d -m 700 "$HOME/.ssh"
-          printf '%s\\n' "$CPANEL_SSH_KEY" > "$HOME/.ssh/cpanel_deploy_key"
+          printf '%s\n' "$CPANEL_SSH_KEY" > "$HOME/.ssh/cpanel_deploy_key"
           chmod 600 "$HOME/.ssh/cpanel_deploy_key"
-          printf '%s\\n' "$CPANEL_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
           ssh-keygen -y -f "$HOME/.ssh/cpanel_deploy_key" > /dev/null
           ssh-keygen -F "$CPANEL_HOST" -f "$HOME/.ssh/known_hosts" > /dev/null
@@ -133,11 +139,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ssh -i "$HOME/.ssh/cpanel_deploy_key" \\
-            -p "$CPANEL_PORT" -o IdentitiesOnly=yes -o BatchMode=yes \\
-            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \\
-            "$CPANEL_USER@$CPANEL_HOST" \\
-            'set -eu; test -d /home/muslimjq/mpa-deploy-staging; test -w /home/muslimjq/mpa-deploy-staging; printf "STAGING_ACCESS_OK\\n"; whoami'
+          ssh -i "$HOME/.ssh/cpanel_deploy_key" \
+            -p "$CPANEL_PORT" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$CPANEL_USER@$CPANEL_HOST" \
+            'set -eu; test -d /home/muslimjq/mpa-deploy-staging; test -w /home/muslimjq/mpa-deploy-staging; printf "STAGING_ACCESS_OK\n"; whoami'
 
       - name: Upload backend archive to staging directory only
         shell: bash
@@ -149,15 +155,15 @@ jobs:
           MANIFEST_NAME: ${{ steps.package.outputs.manifest_name }}
         run: |
           set -euo pipefail
-          scp -i "$HOME/.ssh/cpanel_deploy_key" \\
-            -P "$CPANEL_PORT" -o IdentitiesOnly=yes -o BatchMode=yes \\
-            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \\
-            "$ARCHIVE" "$CHECKSUM" "$MANIFEST" \\
+          scp -i "$HOME/.ssh/cpanel_deploy_key" \
+            -P "$CPANEL_PORT" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$ARCHIVE" "$CHECKSUM" "$MANIFEST" \
             "$CPANEL_USER@$CPANEL_HOST:$REMOTE_DIR/"
-          ssh -i "$HOME/.ssh/cpanel_deploy_key" \\
-            -p "$CPANEL_PORT" -o IdentitiesOnly=yes -o BatchMode=yes \\
-            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \\
-            "$CPANEL_USER@$CPANEL_HOST" \\
+          ssh -i "$HOME/.ssh/cpanel_deploy_key" \
+            -p "$CPANEL_PORT" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$CPANEL_USER@$CPANEL_HOST" \
             "set -eu; cd '$REMOTE_DIR'; sha256sum -c '$(basename "$CHECKSUM")'; test -s '$ARCHIVE_NAME'; test -s '$MANIFEST_NAME'; echo BACKEND_SOURCE_STAGING_UPLOAD_VERIFIED; cat '$MANIFEST_NAME'"
 
       - name: State deployment boundary

@@ -55,7 +55,7 @@ export default function Home() {
             className={styles.networkTag}
             initial={reduceMotion ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.45 }}
           >
             <span className={styles.liveDot} aria-hidden="true" />
             MPA Professionals Network
@@ -65,7 +65,7 @@ export default function Home() {
             className={styles.heroTitle}
             initial={reduceMotion ? false : { opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.06 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.55, delay: 0.06 }}
           >
             Your expertise can open <span>meaningful doors.</span>
           </motion.h1>
@@ -73,7 +73,7 @@ export default function Home() {
             className={styles.heroSubtitle}
             initial={reduceMotion ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.13 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.5, delay: 0.13 }}
           >
             Discover professional services, explore opportunities, learn from mentors and build purposeful professional connections.
           </motion.p>
@@ -81,7 +81,7 @@ export default function Home() {
             className={styles.heroActions}
             initial={reduceMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.5, delay: 0.2 }}
           >
             <Link href="/services" className={styles.primaryCta}>Browse professional services <ArrowRight size={17} aria-hidden="true" /></Link>
             <Link href="/jobs" className={styles.secondaryCta}>Explore opportunities</Link>
@@ -109,7 +109,7 @@ export default function Home() {
                 key={href}
                 initial={reduceMotion ? false : { opacity: 0, x: 12 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.38, delay: 0.12 + index * 0.08 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.38, delay: 0.12 + index * 0.08 }}
               >
                 <Link href={href} className={styles.quickStart}>
                   <span className={styles.quickIcon}><Icon size={19} aria-hidden="true" /></span>

@@ -42,15 +42,15 @@ test("public professional, service and mentor details remain while organization 
   const professionalPage = await read("../../web/app/network/[id]/page.tsx");
   const servicePage = await read("../../web/app/services/[id]/page.tsx");
   const mentorPage = await read("../../web/app/mentorship/mentors/[id]/page.tsx");
-  assert.doesNotMatch(server, /getPublicOrganizationProfile\\(parts\\[4\\]\\)/);
-  assert.doesNotMatch(server, /api\\/v1\\/public\\/organizations/);
-  assert.match(orgPage, /redirect\\("\\/services"\\)/);
-  assert.match(orgProfilePage, /redirect\\("\\/services"\\)/);
+  assert.doesNotMatch(server, /getPublicOrganizationProfile\(parts\[4\]\)/);
+  assert.doesNotMatch(server, /api\/v1\/public\/organizations/);
+  assert.match(orgPage, /redirect\("\/services"\)/);
+  assert.match(orgProfilePage, /redirect\("\/services"\)/);
   assert.match(services, /export async function getMentorProfile/);
-  assert.match(server, /getMentorProfile\\(parts\\[3\\]/);
-  assert.match(professionalPage, /api\\/v1\\/talent/);
-  assert.match(servicePage, /api\\/v1\\/services/);
-  assert.match(mentorPage, /api\\/v1\\/mentors/);
+  assert.match(server, /getMentorProfile\(parts\[3\]/);
+  assert.match(professionalPage, /api\/v1\/talent/);
+  assert.match(servicePage, /api\/v1\/services/);
+  assert.match(mentorPage, /api\/v1\/mentors/);
 });
 
 test("the unified saved-items page and discovery surfaces are wired to account persistence", async () => {
@@ -64,5 +64,5 @@ test("the unified saved-items page and discovery surfaces are wired to account p
   assert.match(hook, /method: "POST"/);
   assert.match(hook, /method: "DELETE"/);
   for (const page of [network, services, mentors]) assert.match(page, /useSavedDiscoveryItems/);
-  assert.match(orgs, /redirect\\("\\/services"\\)/);
+  assert.match(orgs, /redirect\("\/services"\)/);
 });

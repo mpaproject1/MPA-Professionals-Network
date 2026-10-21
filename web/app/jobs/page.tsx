@@ -6,6 +6,7 @@ import {DiscoveryPagination} from "../../components/discovery-pagination";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
+import { JourneyGuide } from "../../components/journey-guide";
 
 type Job={
  id:string;title:string;description?:string;organization_id:string;organization_name?:string;
@@ -145,9 +146,22 @@ export default function Jobs(){
    <div className="eyebrow">Employment & opportunity hub</div>
    <h1 className="h1">Opportunities, without the maze.</h1>
    <p className="muted">Browse current opportunities published by verified organizations. Eligibility and formal application steps are checked by the platform; sample or invented vacancies are not shown.</p>
-   <p><a className="btn btn-ghost" href="/jobs/interest">No matching vacancy? Register your job interest</a></p>
+   <JourneyGuide
+     eyebrow="Professional member / job seeker"
+     title="Join → Prepare → Apply → Progress"
+     description="Follow the path from a useful profile to a considered application. Your saved opportunities and application records remain available as you move forward."
+     primaryLabel="Search verified opportunities"
+     primaryHref="#job-search"
+     steps={[
+       { title: "Join", description: "Create an account and complete the minimum profile information.", href: "/register", action: "Create account" },
+       { title: "Prepare", description: "Review your professional profile and choose what information is visible.", href: "/profile", action: "Prepare profile" },
+       { title: "Apply", description: "Check eligibility, save suitable roles and submit only the information requested.", href: "#job-search", action: "Find opportunities" },
+       { title: "Progress", description: "Return to your dashboard for account activity and follow up on employer requests.", href: "/dashboard", action: "Open dashboard" },
+     ]}
+   />
+   <p><a className="btn btn-ghost" href="/jobs/interest">No matching vacancy? Register your job interest</a> <a className="btn btn-ghost" href="/saved">Review saved items</a></p>
    <div className="split" style={{marginTop:20}}>
-     <Card id={`${jobsId}-filters`} className="filter">
+     <Card id="job-search" className="filter">
        <form onSubmit={submitFilters}>
          <div className="row"><b>Search opportunities</b><SlidersHorizontal size={17}/></div>
          <label style={{display:"grid",gap:6,marginTop:14,fontSize:13,fontWeight:700}}>Role, skill or sector<input value={filters.q} onChange={e=>setFilters({...filters,q:e.target.value})} placeholder="Search job title or description"/></label>

@@ -65,4 +65,72 @@ test.describe("P2 real-browser role journeys (environment-backed; no API mocks)"
       }
     });
   }
+
+  test("active member double-submit creates only one private demand request", async ({ page }) => {
+    test.skip(process.env.MPA_E2E_ALLOW_MUTATIONS !== "1", "Requires explicit opt-in to mutate a dedicated non-production test environment.");
+    const email = process.env.MPA_E2E_ACTIVE_MEMBER_EMAIL;
+    const password = process.env.MPA_E2E_ACTIVE_MEMBER_PASSWORD;
+    test.skip(!email || !password, "Configure the dedicated active-member test account.");
+    await signIn(page, email, password);
+    await page.goto("/service-demand");
+    const title = "E2E private demand " + Date.now();
+    await page.getByLabel("Category or field").fill("E2E test category");
+    await page.getByLabel("Short title").fill(title);
+    await page.getByLabel("Details").fill("This is an isolated browser acceptance request for duplicate-submit protection.");
+    const posts = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname === "/api/v1/marketplace-demand") posts.push(request.url());
+    });
+    await page.locator("#private-demand-intake form").evaluate((form) => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await expect(page.locator('[data-feedback-state="success"]')).toContainText("was received as a private request", { timeout: 20000 });
+    expect(posts).toHaveLength(1);
+    await expect(page.getByText(title, { exact: true })).toHaveCount(1);
+  });
+
+  test("active member double-submit creates only one service request", async ({ page }) => {
+    test.skip(process.env.MPA_E2E_ALLOW_MUTATIONS !== "1", "Requires explicit opt-in to mutate a dedicated non-production test environment.");
+    const email = process.env.MPA_E2E_ACTIVE_MEMBER_EMAIL;
+    const password = process.env.MPA_E2E_ACTIVE_MEMBER_PASSWORD;
+    test.skip(!email || !password, "Configure the dedicated active-member test account.");
+    await signIn(page, email, password);
+    await page.goto("/services");
+    const requestButton = page.getByRole("button", { name: /request this service/i }).first();
+    await expect(requestButton, "A published, approved test service must be seeded in the non-production environment.").toBeVisible();
+    await requestButton.click();
+    await page.getByLabel("Message to the provider").fill("Please contact me about the scope and expected outcomes for this service.");
+    const posts = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST" && /\/api\/v1\/services\/[^/]+\/requests$/.test(new URL(request.url()).pathname)) posts.push(request.url());
+    });
+    await page.locator("#service-request form").evaluate((form) => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await expect(page.locator('[data-feedback-state="success"]')).toContainText(/service request was recorded|already have an active request/i, { timeout: 20000 });
+    expect(posts).toHaveLength(1);
+  });
+
+  test("active member double-submit creates only one mentorship request", async ({ page }) => {
+    test.skip(process.env.MPA_E2E_ALLOW_MUTATIONS !== "1", "Requires explicit opt-in to mutate a dedicated non-production test environment.");
+    const email = process.env.MPA_E2E_ACTIVE_MEMBER_EMAIL;
+    const password = process.env.MPA_E2E_ACTIVE_MEMBER_PASSWORD;
+    test.skip(!email || !password, "Configure the dedicated active-member test account.");
+    await signIn(page, email, password);
+    await page.goto("/mentorship");
+    await page.getByRole("button", { name: /request mentorship without a preferred mentor/i }).click();
+    await page.getByLabel("Your mentorship goal").fill("E2E goal: improve project leadership and communication.");
+    const posts = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname === "/api/v1/mentorship/requests") posts.push(request.url());
+    });
+    await page.locator("#mentor-goal form").evaluate((form) => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await expect(page.getByText("Your request is in the system")).toBeVisible({ timeout: 20000 });
+    expect(posts).toHaveLength(1);
+  });
 });

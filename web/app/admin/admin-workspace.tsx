@@ -16,6 +16,7 @@ const destinations: Destination[] = [
   { href: "/admin/membership-card", label: "Membership card", description: "Credential appearance", icon: ShieldCheck },
   { href: "/admin/reference-portfolio", label: "Reference data", description: "Governed profile options", icon: BookOpenCheck },
   { href: "/admin/marketplace", label: "Marketplace", description: "Demand and listing review", icon: ClipboardList },
+  { href: "/organizations", label: "Organizations", description: "Verification, evidence and partner workspace", icon: Building2 },
   { href: "/admin/reports", label: "Reports", description: "Reporting and exports", icon: FileBarChart },
   { href: "/admin/email", label: "Email operations", description: "Queues, templates and delivery", icon: Mail },
   { href: "/admin/security", label: "Admin security", description: "Passkeys and recovery", icon: Fingerprint },
@@ -47,9 +48,11 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const roleSummary = roles === null ? "Resolving account access…" : roles.length ? roles.map((role) => role.replaceAll("_", " ")).join(" · ") : "No administrator role confirmed";
   const navDestinations = useMemo(() => {
     const platformAdmin = Boolean(roles?.some((role) => ["system_admin", "admin", "platform_admin"].includes(role)));
-    if (platformAdmin || !roles?.includes("supporting_staff")) return destinations;
-    const priority: Record<string, number> = { "/admin": 0, "/admin/marketplace": 1, "/admin/support": 2 };
-    return [...destinations].sort((a, b) => (priority[a.href] ?? 10) - (priority[b.href] ?? 10));
+    const organizationWorkspaceAllowed = platformAdmin || Boolean(roles?.includes("supporting_staff"));
+    const available = destinations.filter((item) => item.href !== "/organizations" || organizationWorkspaceAllowed);
+    if (platformAdmin || !roles?.includes("supporting_staff")) return available;
+    const priority: Record<string, number> = { "/admin": 0, "/admin/marketplace": 1, "/organizations": 2, "/admin/support": 3 };
+    return [...available].sort((a, b) => (priority[a.href] ?? 10) - (priority[b.href] ?? 10));
   }, [roles]);
 
   return <div className={styles.workspace}>

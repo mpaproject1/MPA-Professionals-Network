@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "../../../components/ui";
 import { api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
-import Membership from "../../membership/page";
+import MembershipWorkspace from "../../membership/workspace";
 
 type MembershipAccess = { roles?: string[]; permissions?: string[] };
 type AccessState = "loading" | "allowed" | "denied" | "signin";
@@ -51,5 +51,5 @@ export default function MembershipAdministrationPage() {
     return <Card><h1 className="h1">You do not have access to this workspace</h1><p className="muted">Membership administration is available only to authorized reviewers, finance staff and administrators. Your account and membership records have not been changed.</p><a className="btn btn-ghost" href="/membership">Return to my membership</a></Card>;
   }
 
-  return <Membership adminWorkspace />;
+  return <MembershipWorkspace adminWorkspace />;
 }

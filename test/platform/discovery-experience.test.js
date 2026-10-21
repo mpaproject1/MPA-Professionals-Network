@@ -19,11 +19,11 @@ test("public organization directory and profile API routes are disabled", async 
   const server = await read("../../server.js");
   const page = await read("../../web/app/organizations/directory/page.tsx");
   const profilePage = await read("../../web/app/organizations/directory/[id]/page.tsx");
-  assert.doesNotMatch(server, /api\\/v1\\/public\\/organizations/);
-  assert.doesNotMatch(server, /getPublicOrganizationProfile\\(parts\\[4\\]\\)/);
-  assert.doesNotMatch(server, /api\\/v1\\/public\\/opportunity-sharing-organizations/);
-  assert.match(page, /redirect\\("\\/services"\\)/);
-  assert.match(profilePage, /redirect\\("\\/services"\\)/);
+  assert.doesNotMatch(server, /api\/v1\/public\/organizations/);
+  assert.doesNotMatch(server, /getPublicOrganizationProfile\(parts\[4\]\)/);
+  assert.doesNotMatch(server, /api\/v1\/public\/opportunity-sharing-organizations/);
+  assert.match(page, /redirect\("\/services"\)/);
+  assert.match(profilePage, /redirect\("\/services"\)/);
 });
 
 test("discovery clients request bounded pages while retaining existing visibility-aware APIs", async () => {

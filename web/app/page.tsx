@@ -3,8 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowDown, ArrowRight, BriefcaseBusiness, Building2, Compass, GraduationCap,
-  HeartHandshake, LockKeyhole, Network, Search, ShieldCheck, Sparkles, UsersRound,
-  UserRoundCheck, Wrench
+  LockKeyhole, Network, Search, ShieldCheck, Sparkles, UserRoundCheck, Wrench
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";

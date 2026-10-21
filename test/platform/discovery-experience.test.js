@@ -15,21 +15,15 @@ test("first-visit install nudge is delayed and remembered without forcing instal
   assert.doesNotMatch(shell, /prompt\(\);\s*[^}]*setInstalled\(true\)/);
 });
 
-test("public organization directory is bounded and filters private or unverified organizations at query time", async () => {
-  const service = await read("../../src/organization-jobs/service.js");
+test("public organization directory and profile API routes are disabled", async () => {
   const server = await read("../../server.js");
   const page = await read("../../web/app/organizations/directory/page.tsx");
-  const start = service.indexOf("export async function listPublicOrganizations");
-  const end = service.indexOf("export async function getOrganization", start);
-  assert.ok(start >= 0 && end > start);
-  const query = service.slice(start, end);
-  assert.match(query, /o\.public_visible=true/);
-  assert.match(query, /o\.verification_status='verified'/);
-  assert.match(query, /limit\s*\+\s*1/);
-  assert.match(query, /offset/);
-  assert.match(server, /api\/v1\/public\/organizations/);
-  assert.match(page, /organizationType/);
-  assert.match(page, /DiscoveryPagination/);
+  const profilePage = await read("../../web/app/organizations/directory/[id]/page.tsx");
+  assert.doesNotMatch(server, /api\\/v1\\/public\\/organizations/);
+  assert.doesNotMatch(server, /getPublicOrganizationProfile\\(parts\\[4\\]\\)/);
+  assert.doesNotMatch(server, /api\\/v1\\/public\\/opportunity-sharing-organizations/);
+  assert.match(page, /redirect\\("\\/services"\\)/);
+  assert.match(profilePage, /redirect\\("\\/services"\\)/);
 });
 
 test("discovery clients request bounded pages while retaining existing visibility-aware APIs", async () => {

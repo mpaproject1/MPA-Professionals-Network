@@ -41,3 +41,12 @@ test("role journey browser suite uses real routes and is deferred until final-st
   assert.match(suite, /api\/v1\/review\/membership\/applications/);
   assert.doesNotMatch(suite, /page\.route\(/);
 });
+
+test("failed service delivery history and membership-plan loads remain retryable instead of looking empty", async () => {
+  const services = await read("../../web/app/services/page.tsx");
+  const membership = await read("../../web/app/membership/workspace.tsx");
+  assert.match(services, /deliveryErrors/);
+  assert.match(services, /Retry delivery history/);
+  assert.match(membership, /adminPlansError/);
+  assert.match(membership, /Retry plan loading/);
+});

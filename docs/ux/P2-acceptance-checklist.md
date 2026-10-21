@@ -23,6 +23,7 @@ This change is intentionally separate from the CORS documentation/test PR. It bu
 - [ ] Exercise role accounts: public visitor, non-member, active member, service provider, mentor, organization owner, organization staff, reviewer, finance officer and system administrator.
 - [ ] For each role, test direct route URLs and direct API calls, including access to unrelated organizations and private application evidence.
 - [ ] Run the environment-backed Playwright suite in e2e/p2-role-journeys.spec.js only when MPA_E2E_ROLE_JOURNEYS=1 and dedicated non-production role accounts are configured.
+- [ ] For the three rapid-submit mutation journeys (private demand, service request, mentorship request), also set MPA_E2E_ALLOW_MUTATIONS=1, use a dedicated active-member test account, and seed at least one published/approved service listing. These tests create records and must never run against production.
 - [ ] Only after manual acceptance, run the full final test/CI stage. No tests or CI have been run for this change.
 
 ## Test-account environment variables

@@ -63,6 +63,17 @@ test.describe("P2 real-browser role journeys (environment-backed; no API mocks)"
       } else {
         expect([200, 403]).toContain(response.status());
       }
+
+      const privateOrganizationId = process.env.MPA_E2E_UNRELATED_PRIVATE_ORG_ID;
+      if (privateOrganizationId && ["NON_MEMBER", "ORG_OWNER", "ORG_STAFF"].includes(persona.key)) {
+        const organizationResponse = await request.get("/api/v1/organizations/" + encodeURIComponent(privateOrganizationId), { headers: { Authorization: "Bearer " + token } });
+        expect(organizationResponse.status(), "An unrelated private organization profile must not be readable by this account.").toBe(403);
+      }
+      const privateFileId = process.env.MPA_E2E_UNRELATED_PRIVATE_FILE_ID;
+      if (privateFileId && ["NON_MEMBER", "ACTIVE_MEMBER", "SERVICE_PROVIDER", "MENTOR", "ORG_OWNER", "ORG_STAFF"].includes(persona.key)) {
+        const fileResponse = await request.get("/api/v1/files/" + encodeURIComponent(privateFileId), { headers: { Authorization: "Bearer " + token } });
+        expect(fileResponse.status(), "Private evidence belonging to another account must not be readable without a specific authorization relationship.").toBe(403);
+      }
     });
   }
 

@@ -9,6 +9,7 @@ const directoryPage = await readFile(
 );
 const membershipPage = await readFile(new URL("../../web/app/membership/workspace.tsx", import.meta.url), "utf8");
 const adminMembershipPage = await readFile(new URL("../../web/app/admin/membership/page.tsx", import.meta.url), "utf8");
+const shell = await readFile(new URL("../../web/components/shell.tsx", import.meta.url), "utf8");
 
 test("public organization listing and profile API routes are not registered", () => {
   assert.doesNotMatch(serverSource, /p==="api\/v1\/public\/organizations"/);
@@ -20,6 +21,13 @@ test("public organization listing and profile API routes are not registered", ()
     serverSource,
     /p==="api\/v1\/public\/opportunity-sharing-organizations"/,
   );
+});
+
+test("Services is primary and organization workspace links require a signed-in organization account", () => {
+  assert.match(shell, /\["\/services","Services",BriefcaseBusiness\]/);
+  assert.match(shell, /\["\/","\/services","\/network","\/jobs","\/membership"\]/);
+  assert.doesNotMatch(shell, /\/organizations\/directory/);
+  assert.match(shell, /if\(token&&hasOrganizations\)[\s\S]*mobileMore\.push\(orgLink\)/);
 });
 
 test("direct visits to the public organization directory redirect to Services", () => {

@@ -1,0 +1,158 @@
+name: cPanel staging upload (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Git branch, tag, or commit to build"
+        required: true
+        default: "fix/production-api-proxy-default"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mpa-cpanel-staging-upload
+  cancel-in-progress: false
+
+jobs:
+  build-and-upload-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+      CPANEL_SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}
+      CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+      CPANEL_USER: muslimjq
+      CPANEL_PORT: "22"
+      REMOTE_DIR: /home/muslimjq/mpa-deploy-staging
+
+    steps:
+      - name: Check out selected source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --include=dev --include-workspace-root
+
+      - name: Build portal outside cPanel
+        run: npm run web:build
+
+      - name: Validate production build and API rewrite
+        working-directory: web
+        run: |
+          set -euo pipefail
+          test -s .next/BUILD_ID
+          test -s .next/routes-manifest.json
+          test -s .next/build-manifest.json
+          node <<'NODE'
+          const fs = require("node:fs");
+          const routes = JSON.parse(fs.readFileSync(".next/routes-manifest.json", "utf8"));
+          const rewrites = Array.isArray(routes.rewrites)
+            ? routes.rewrites
+            : [
+                ...(routes.rewrites?.beforeFiles ?? []),
+                ...(routes.rewrites?.afterFiles ?? []),
+                ...(routes.rewrites?.fallback ?? []),
+              ];
+          const expected = rewrites.some((r) =>
+            r.source === "/api/:path*" &&
+            r.destination === "https://api.muslimprofession.org/api/:path*"
+          );
+          if (!expected) {
+            console.error("Expected production /api rewrite was not found.");
+            process.exit(1);
+          }
+          console.log("BUILD_ID, route manifest, build manifest, and production API rewrite verified.");
+          NODE
+
+      - name: Package only the portal build and Next.js config
+        id: package
+        working-directory: web
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/mpa-web-staging-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
+          tar -czf "$archive" .next next.config.js
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "archive_name=$(basename "$archive")" >> "$GITHUB_OUTPUT"
+          (cd "$(dirname "$archive")" && sha256sum "$(basename "$archive")" > "$archive.sha256")
+          echo "checksum=$archive.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Save build artifact in GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpa-web-staging-${{ github.sha }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Configure verified SSH connection
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CPANEL_HOST"
+          test -n "$CPANEL_SSH_KEY"
+          test -n "$CPANEL_KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$CPANEL_SSH_KEY" > "$HOME/.ssh/cpanel_deploy_key"
+          chmod 600 "$HOME/.ssh/cpanel_deploy_key"
+          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/cpanel_deploy_key" > /dev/null
+          ssh-keygen -F "$CPANEL_HOST" -f "$HOME/.ssh/known_hosts" > /dev/null
+          echo "SSH key format and known-host entry are present; strict host verification remains enabled."
+
+      - name: Verify cPanel SSH and staging write access
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/cpanel_deploy_key" \
+            -p "$CPANEL_PORT" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$CPANEL_USER@$CPANEL_HOST" \
+            'set -eu; test -d /home/muslimjq/mpa-deploy-staging; test -w /home/muslimjq/mpa-deploy-staging; printf "STAGING_ACCESS_OK\\n"; whoami'
+
+      - name: Upload archive to staging only
+        shell: bash
+        env:
+          ARCHIVE: ${{ steps.package.outputs.archive }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+          ARCHIVE_NAME: ${{ steps.package.outputs.archive_name }}
+        run: |
+          set -euo pipefail
+          scp -i "$HOME/.ssh/cpanel_deploy_key" \
+            -P "$CPANEL_PORT" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$ARCHIVE" "$CHECKSUM" \
+            "$CPANEL_USER@$CPANEL_HOST:$REMOTE_DIR/"
+          ssh -i "$HOME/.ssh/cpanel_deploy_key" \
+            -p "$CPANEL_PORT" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$CPANEL_USER@$CPANEL_HOST" \
+            "set -eu; cd '$REMOTE_DIR'; sha256sum -c '$ARCHIVE_NAME.sha256'; chmod 600 '$ARCHIVE_NAME' '$ARCHIVE_NAME.sha256'; echo STAGING_UPLOAD_VERIFIED"
+
+      - name: Summarize staging-only result
+        if: success()
+        run: |
+          echo "Build commit: $GITHUB_SHA"
+          echo "Uploaded to: $REMOTE_DIR"
+          echo "No live portal files were changed and no application restart was performed."

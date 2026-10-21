@@ -49,3 +49,11 @@ form input[type="checkbox"],form input[type="radio"]{accent-color:var(--primary)
 .membership-plan__fee strong{font-size:20px}
 .membership-step{display:flex;align-items:flex-start;gap:12px;padding:13px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
 .membership-step .muted{margin:3px 0 0;line-height:1.5}
+
+/* P2 UX resilience: prevent long user content and form controls from widening narrow viewports. */
+.card,.grid,.case-row{min-width:0}
+.case-row{grid-template-columns:minmax(0,1fr) auto}
+.case-row>:first-child{min-width:0;overflow-wrap:anywhere}
+.form-stack :is(input,select,textarea),form.grid>label :is(input,select,textarea){min-width:0;max-width:100%}
+.btn{min-height:44px}
+@media(max-width:600px){.case-row{grid-template-columns:minmax(0,1fr);gap:8px}.case-row .row{flex-wrap:wrap}.form-stack>.btn{width:100%}}

@@ -7,7 +7,7 @@ const directoryPage = await readFile(
   new URL("../../web/app/organizations/directory/page.tsx", import.meta.url),
   "utf8",
 );
-const membershipPage = await readFile(new URL("../../web/app/membership/page.tsx", import.meta.url), "utf8");
+const membershipPage = await readFile(new URL("../../web/app/membership/workspace.tsx", import.meta.url), "utf8");
 const adminMembershipPage = await readFile(new URL("../../web/app/admin/membership/page.tsx", import.meta.url), "utf8");
 
 test("public organization listing and profile API routes are not registered", () => {

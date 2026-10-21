@@ -89,7 +89,7 @@ export default function AboutPage() {
           className={styles.heroCopy}
           initial={reduceMotion ? false : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.5 }}
         >
           <p className={styles.eyebrow}><span className={styles.eyebrowDot} /> About MPA</p>
           <h1 id="about-title">A professional network should help you turn <span>connections into contribution.</span></h1>
@@ -170,7 +170,7 @@ export default function AboutPage() {
           key={selectedAudience.id}
           initial={reduceMotion ? false : { opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.22 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.22 }}
           aria-live="polite"
         >
           <span className={styles.audiencePanelIcon}><CircleHelp size={22} aria-hidden="true" /></span>

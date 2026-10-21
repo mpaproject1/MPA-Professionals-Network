@@ -53,6 +53,61 @@ jobs:
       - name: Type-check web application
         run: npx --no-install tsc --noEmit --pretty false -p web/tsconfig.json
 
+  backend-tests:
+    name: Backend tests (isolated PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: mpa_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mpa_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/mpa_test
+      JWT_SECRET: mpa-ci-only-jwt-secret-at-least-32-characters-long
+      DB_POOL_MAX: 5
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Verify test database connection
+        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'select current_database(), current_user;'
+      - name: Apply migrations to disposable CI database only
+        run: npm run migrate
+      - name: Run every backend test file
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t TEST_FILES < <(find test tests -type f -name '*.test.js' -print 2>/dev/null | sort || true)
+          if (( ${#TEST_FILES[@]} == 0 )); then
+            echo "No backend .test.js files found; refusing a false-green result."
+            exit 1
+          fi
+          printf 'Discovered %s backend test files.\n' "${#TEST_FILES[@]}"
+          printf '%s\n' "${TEST_FILES[@]}"
+          node --test "${TEST_FILES[@]}"
+
   production-build:
     name: Next.js production build
     runs-on: ubuntu-latest

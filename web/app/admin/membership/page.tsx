@@ -32,7 +32,7 @@ export default function MembershipAdministrationPage() {
         const roles = Array.isArray(me.roles) ? me.roles : [];
         const permissions = Array.isArray(me.permissions) ? me.permissions : [];
         const allowed =
-          roles.some((role) => ["system_admin", "admin", "platform_admin", "reviewer", "finance_officer"].includes(role)) ||
+          roles.some((role) => ["system_admin", "reviewer", "finance_officer"].includes(role)) ||
           permissions.some((permission) => ["members.view", "members.manage", "finance.view", "finance.manage"].includes(permission));
         setAccess(allowed ? "allowed" : "denied");
       })

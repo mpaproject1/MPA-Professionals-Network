@@ -11,6 +11,7 @@ test("private demand draft persistence is opt-in, tab-scoped, expiring and clear
   assert.match(source, /expiresAt>Date\.now\(\)/);
   assert.match(source, /24\*60\*60\*1000/);
   assert.match(source, /setKeepDraft\(false\)/);
+  assert.match(source, /created\.tracking_reference\|\|created\.id/);
   assert.match(source, /do not enable this on a shared device/);
 });
 

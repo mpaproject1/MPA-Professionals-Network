@@ -212,6 +212,33 @@ export default function AdminPage() {
   return (
     <div className="grid">
       <AdminPageHeader eyebrow="Platform administration" title="Operate the platform." description="Global account controls are separate from organization roles and business review decisions. Your authority comes from the current account roles shown below." actions={<div className="grid" style={{gap:8}}><div className="row" style={{flexWrap:"wrap"}}>{roles.map((role) => <Badge key={role} tone="slate">{role}</Badge>)}</div><div className="row" style={{flexWrap:"wrap"}}>{(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/support/job-seeker-demands">Review job-seeker demand and consent</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/reference-portfolio">Manage professional reference lists and CSV imports</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/reports">Reports and PDF/XLSX exports</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/members">Bulk approved-member import/export</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/email"><Mail size={16} /> Email operations</a>}{(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-primary" href="/admin/marketplace">Review marketplace listings and service/mentorship demand</a>}</div></div>}/>
+      <section className="grid grid-2" aria-label="Administration overview" style={{gap:12}}>
+        <Card>
+          <div className="eyebrow">Operational work</div>
+          <h2 className="h2">Review and resolve</h2>
+          <p className="muted">Start with a real queue or a decision that needs attention. Each workspace retains its own status, permissions and audit trail.</p>
+          <div className="row" style={{gap:8,flexWrap:"wrap"}}>
+            {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-primary" href="/admin/marketplace">Marketplace review</a>}
+            {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/organizations">Organization verification</a>}
+            {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/recruitment">Recruitment workflow</a>}
+            {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/admin/support">Support desk</a>}
+            {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/support/job-seeker-demands">Job-seeker demand and consent</a>}
+          </div>
+        </Card>
+        <Card>
+          <div className="eyebrow">Governance and reporting</div>
+          <h2 className="h2">Manage the platform</h2>
+          <p className="muted">Use separate workspaces for reporting, member records, membership decisions and platform configuration.</p>
+          <div className="row" style={{gap:8,flexWrap:"wrap"}}>
+            {isPlatformAdmin && <a className="btn btn-primary" href="/admin/reports">Reports and exports</a>}
+            {isPlatformAdmin && <a className="btn btn-ghost" href="/admin/members">Members</a>}
+            {isPlatformAdmin && <a className="btn btn-ghost" href="/admin/membership">Membership administration</a>}
+            {isPlatformAdmin && <a className="btn btn-ghost" href="/admin/reference-portfolio">Reference data</a>}
+            {isPlatformAdmin && <a className="btn btn-ghost" href="/admin/email">Email operations</a>}
+            {isPlatformAdmin && <a className="btn btn-ghost" href="/admin/security">Admin security</a>}
+          </div>
+        </Card>
+      </section>
       {error && (
         <div className="field-banner">
           <ShieldCheck size={18} />

@@ -11,6 +11,7 @@ import { FormFeedback } from "../../components/form-feedback";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
+import { JourneyGuide } from "../../components/journey-guide";
 
 type Inquiry = {
   id: string;
@@ -516,6 +517,19 @@ export default function Organizations() {
           never assumed by the interface.
         </p>
       </div>
+      <JourneyGuide
+        eyebrow="Employer / recruiter"
+        title="Verify → Publish → Review → Report"
+        description="Use the organization identity you are authorized to represent. Verification, moderation and hiring decisions remain explicit recorded steps."
+        primaryLabel={token ? "Continue organization setup" : "Sign in to begin"}
+        primaryHref={token ? "#org-registration" : "/login?next=/organizations"}
+        steps={[
+          { title: "Verify", description: "Register the legal identity, nominate an authorized representative and provide required evidence.", href: token ? "#org-registration" : "/login?next=/organizations", action: "Register organization" },
+          { title: "Publish", description: "After verification, prepare a vacancy or paid project with clear eligibility and terms.", href: "/recruitment", action: "Open recruitment" },
+          { title: "Review", description: "Review applicants for your own opportunities and respond to moderation or correction requests.", href: "/recruitment", action: "Review applicants" },
+          { title: "Report", description: "Record interview decisions, hiring outcomes and follow-up feedback through the authorized workflow.", href: "/recruitment", action: "Track hiring" },
+        ]}
+      />
       {!token ? (
         <Card>
           <h2 className="h2">Sign in to manage an organization</h2>
@@ -529,23 +543,7 @@ export default function Organizations() {
         </Card>
       ) : (
         <>
-          <Card>
-            <div className="h2">Your organization journey</div>
-            <p className="muted">You do not need to learn platform terminology. Follow these steps in order; publishing controls unlock only when the server confirms your organization is verified.</p>
-            <ol className="form-stack" style={{paddingLeft:22}}>
-              <li><b>Establish trust:</b> register the legal identity and authorized contact, then upload the required private documents.</li>
-              <li><b>Resolve blockers:</b> review the missing-evidence checklist and the latest reviewer note shown on each organization below.</li>
-              <li><b>Wait for a decision:</b> submitted organizations remain private for publishing until approval. If corrections are requested, provide them and submit again.</li>
-              <li><b>Publish and hire:</b> after verification, use the organization’s own identity to manage jobs, approved services and mentorship offers.</li>
-              <li><b>Find relevant people:</b> use the professional directory and job-specific eligibility information; only view or contact people within their sharing permissions.</li>
-              <li><b>Manage hiring:</b> open Recruitment to review applicants, move candidates through the hiring stages, schedule interviews, record decisions and track outcomes.</li>
-            </ol>
-            <div className="row" style={{flexWrap:"wrap",gap:8}}>
-              <a className="btn btn-ghost" href="/recruitment">Open recruitment</a>
-              <a className="btn btn-ghost" href="/network">Search professional network</a>
-              <a className="btn btn-ghost" href="/jobs">View job opportunities</a>
-            </div>
-          </Card>
+          
           <Card id="org-registration">
             <div className="row">
               <div>

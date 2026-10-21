@@ -48,7 +48,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const roleSummary = roles === null ? "Resolving account access…" : roles.length ? roles.map((role) => role.replaceAll("_", " ")).join(" · ") : "No administrator role confirmed";
   const navDestinations = useMemo(() => {
     const platformAdmin = Boolean(roles?.some((role) => ["system_admin", "admin", "platform_admin"].includes(role)));
-    const organizationWorkspaceAllowed = platformAdmin || Boolean(roles?.includes("supporting_staff"));
+    const organizationWorkspaceAllowed = Boolean(roles?.some((role) => ["system_admin", "reviewer"].includes(role)));
     const available = destinations.filter((item) => item.href !== "/organizations" || organizationWorkspaceAllowed);
     if (platformAdmin || !roles?.includes("supporting_staff")) return available;
     const priority: Record<string, number> = { "/admin": 0, "/admin/marketplace": 1, "/organizations": 2, "/admin/support": 3 };

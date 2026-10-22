@@ -89,18 +89,18 @@ export async function saveEmailDraft(actorId,input){
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)||!subject||(!textBody&&!htmlBody))fail(400,"A valid recipient, subject and message body are required.","VALIDATION_ERROR");
  return (await db.query("insert into email_outbox_draft(created_by,recipient,subject,text_body,html_body) values($1,$2,$3,$4,$5) returning id,recipient,subject,text_body,html_body,status,created_at,updated_at",[actorId,recipient,subject,textBody,htmlBody])).rows[0];
 }
-async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,payload,providerMessageId=null}){
+async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,payload,providerMessageId=null,idempotencyKey=null}){
  htmlBody=renderBrandedEmail({subject,htmlBody,textBody,preheader:subject});
  const cfg=providerConfig();
  if(!cfg.ready)fail(503,"Email provider is not configured. Set PUBLIC_APP_URL and Resend or signed-webhook credentials in the server environment.","EMAIL_DELIVERY_NOT_CONFIGURED");
  if(cfg.provider==="resend"){
-  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${clean(process.env.RESEND_API_KEY)}`},body:JSON.stringify({from:clean(process.env.EMAIL_FROM),to:[recipient],subject,text:textBody||"",html:htmlBody||undefined}),signal:AbortSignal.timeout(10000)});
+  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${clean(process.env.RESEND_API_KEY)}`,...(idempotencyKey?{"Idempotency-Key":`mpa-email-${clean(idempotencyKey,120)}`}:{})},body:JSON.stringify({from:clean(process.env.EMAIL_FROM),to:[recipient],subject,text:textBody||"",html:htmlBody||undefined}),signal:AbortSignal.timeout(10000)});
   const result=await response.json().catch(()=>({}));
   if(!response.ok)throw Object.assign(new Error(`Resend rejected the message (HTTP ${response.status}).`),{code:`RESEND_HTTP_${response.status}`});
   return {providerMessageId:result.id||null};
  }
  const endpoint=clean(process.env.EMAIL_DELIVERY_WEBHOOK_URL),secret=clean(process.env.EMAIL_DELIVERY_WEBHOOK_SECRET);
- const body=JSON.stringify({to:recipient,subject,text:textBody||"",html:htmlBody||"",template:templateCode||"manual",payload:payload||{}});
+ const body=JSON.stringify({to:recipient,subject,text:textBody||"",html:htmlBody||"",template:templateCode||"manual",idempotencyKey:idempotencyKey?`mpa-email-${clean(idempotencyKey,120)}`:undefined,payload:payload||{}});
  const signature=createHmac("sha256",secret).update(body).digest("hex");
  const response=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${secret}`,"x-mpa-payload-signature":signature},body,signal:AbortSignal.timeout(10000)});
  if(!response.ok)throw Object.assign(new Error(`Email delivery webhook rejected the message (HTTP ${response.status}).`),{code:`DELIVERY_HTTP_${response.status}`});
@@ -143,7 +143,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
    if(!textBody)textBody=`There is a new update to your MPA Professionals Network account.\n\n${row.payload?.status?`Status: ${row.payload.status}\n`:""}${row.payload?.nextAction?`Next action: ${row.payload.nextAction}\n`:""}${row.payload?.registrationReference?`Reference: ${row.payload.registrationReference}\n`:""}Sign in to the platform to review the latest details. If you need help, contact platform support.`;
    if(!htmlBody)htmlBody=`<p>There is a new update to your MPA Professionals Network account.</p>${row.payload?.status?`<p>Status: ${String(row.payload.status).replace(/[&<>]/g,"")} </p>`:""}${row.payload?.nextAction?`<p>Next action: ${String(row.payload.nextAction).replace(/[&<>]/g,"")}</p>`:""}${row.payload?.registrationReference?`<p>Reference: <strong>${String(row.payload.registrationReference).replace(/[&<>]/g,"")}</strong></p>`:""}<p>Sign in to the platform to review the latest details.</p>`;
    if(!subject)subject="Notification from MPA Professionals Network";
-   const sent=await sendMessage({recipient:row.recipient,subject,textBody,htmlBody,templateCode:row.template_code,payload:row.payload});
+   const sent=await sendMessage({recipient:row.recipient,subject,textBody,htmlBody,templateCode:row.template_code,payload:row.payload,idempotencyKey:row.id});
    await db.query("update notification_outbox set status='sent',sent_at=now(),provider_message_id=$1,last_error=null,delivery_error_code=null,next_attempt_at=null,locked_at=null,updated_at=now() where id=$2",[sent.providerMessageId,row.id]);
    results.push({id:row.id,status:"sent"});
   }catch(e){

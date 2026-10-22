@@ -101,8 +101,9 @@ test("Phase 1 manual payment verification controls activation",async()=>{
   assert.equal(activated.status,"active");
   assert.ok(activated.membership_number);
   assert.equal((await membership.getMe(userId)).has_active_membership,true);
-  const updated=await membership.updateProfile(userId,{firstName:"Phase",lastName:`Member${suffix}`,headline:"Updated Professional"},"phase1-test-profile-after-membership");
+  const updated=await membership.updateProfile(userId,{firstName:"Phase",lastName:`Member${suffix}`,headline:"Updated Professional",visibility:"members"},"phase1-test-profile-after-membership");
   assert.equal(updated.headline,"Updated Professional");
+  assert.equal(updated.visibility,"members","active members may choose a permitted directory visibility setting");
 
   const history=await membership.history(userId);
   assert.equal(history.memberships.length,1);

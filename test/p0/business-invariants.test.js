@@ -283,6 +283,11 @@ test("P0: expired membership loses direct profile and provider privileges", asyn
     "an expired row with status=active must not grant member-only professional profile editing"
   );
   await assert.rejects(
+    membership.updateProfile(account.user.id, { firstName: "Expired", lastName: "Applicant", visibility: "public" }, "p0-expired-directory-visibility-edit"),
+    error => error.code === "MEMBERSHIP_REQUIRED",
+    "an expired member cannot republish a directory profile through the basic profile endpoint"
+  );
+  await assert.rejects(
     serviceMentorship.createServiceListing(account.user.id, { title: "Expired member offer", description: "Must remain denied.", serviceCategory: "p0-test" }, "p0-expired-service-create"),
     error => error.code === "MEMBERSHIP_REQUIRED",
     "an expired row with status=active must not grant provider publishing"

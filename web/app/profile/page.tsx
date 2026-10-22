@@ -428,13 +428,14 @@ export default function Profile() {
   const update = (key: keyof typeof blank, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
   const latestMembershipApplication=membershipApplications[0];
+  const isOrganizationAccount=Boolean(profile?.roles?.some(role=>["organization_representative","organization_owner","organization_admin","organization_member","organization"].includes(role)));
   if (organizationOnly) return (
     <div className={`grid ${styles.page}`} style={{ gap: 18, minWidth: 0, width: "100%" }}>
       <Card>
         <div className="eyebrow">Organization workspace</div>
-        <h1 className="h1">This account uses an organization profile.</h1>
-        <p className="muted">Professional directory profiles are separate from organization profiles. This account cannot access or edit a professional profile. Open the organization workspace to manage organizations you are authorized to access.</p>
-        <p><a className="btn btn-primary" href="/organizations">Open organization workspace</a></p>
+        <h1 className="h1">{isOrganizationAccount ? "This account uses an organization profile." : "A professional profile isn't available for this account."}</h1>
+        <p className="muted">{isOrganizationAccount ? "Professional directory profiles are separate from organization profiles. This account cannot access or edit a professional profile. Open the organization workspace to manage organizations you are authorized to access." : "Your current account role does not include professional-profile access. No profile information was changed. If you need a professional profile, sign in with a member/professional account or contact MPA Support Desk."}</p>
+        <p>{isOrganizationAccount ? <a className="btn btn-primary" href="/organizations">Open organization workspace</a> : <a className="btn btn-ghost" href="/dashboard">Return to dashboard</a>}</p>
       </Card>
     </div>
   );

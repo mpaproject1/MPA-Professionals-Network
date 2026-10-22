@@ -137,14 +137,16 @@ export default function Mentorship(){
    finally{releaseAction("mentorship:request");setSubmitting(false);}
  }
 
- return <div>
-   <div className="eyebrow">Mentorship match</div><h1 className="h1">One goal. One good match.</h1>
-   <p className="muted">Discover current mentor profiles and submit a goal-based request. We show only details returned by the platform; availability and matching are not guessed or guaranteed.</p>
-   <div className="row" style={{gap:8,flexWrap:"wrap"}}>
-     <a className="btn btn-primary" href="#mentor-discovery">Find a mentor</a>
-     {token&&<a className="btn btn-ghost" href="#offer-mentorship">Offer your expertise</a>}
-     {token&&<a className="btn btn-ghost" href="#mentorship-requests">Track requests and matches</a>}
-   </div>
+ return <div className="mpa-mentorship-page">
+   <section className="mpa-signature-intro" aria-labelledby="mentorship-page-title">
+     <div className="eyebrow">Mentorship match</div><h1 id="mentorship-page-title" className="h1">One goal. One good match.</h1>
+     <p>Discover current mentor profiles and submit a goal-based request. We show only details returned by the platform; availability and matching are not guessed or guaranteed.</p>
+     <div className="row" style={{gap:8,flexWrap:"wrap"}}>
+       <a className="btn btn-primary" href="#mentor-discovery">Find a mentor</a>
+       {token&&<a className="btn btn-ghost" href="#offer-mentorship">Offer your expertise</a>}
+       {token&&<a className="btn btn-ghost" href="#mentorship-requests">Track requests and matches</a>}
+     </div>
+   </section>
    {token&&<JourneyGuide
      eyebrow="Mentor journey"
      title="Offer expertise → Match → Guide → Close"

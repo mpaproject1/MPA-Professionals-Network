@@ -39,7 +39,6 @@ type Profile = {
   has_active_membership?: boolean;
   profile_picture_file_id?: string | null;
 };
-type MembershipApplication={id:string;tracking_reference?:string|null;application_type:string;status:string;created_at:string;updated_at:string;fee_snapshot?:{productName?:string;productCode?:string;amount?:number|string;currency?:string}|null};
 type Preferences = {
   email_enabled: boolean;
   sms_enabled: boolean;
@@ -105,7 +104,6 @@ export default function Profile() {
     clearToken = useUiStore((s) => s.clearToken),
     language = useUiStore((s) => s.language);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [membershipApplications,setMembershipApplications]=useState<MembershipApplication[]>([]);
   const [form, setForm] = useState(blank);
   const [organizationOnly, setOrganizationOnly] = useState(false);
   const [profilePictureUrl, setProfilePictureUrl] = useState("");
@@ -147,7 +145,6 @@ export default function Profile() {
   const load = useCallback(async () => {
     if (!token) {
       setProfile(null);
-      setMembershipApplications([]);
       setOrganizationOnly(false);
       setError("");
       return;
@@ -181,12 +178,8 @@ export default function Profile() {
         bio: me.bio || "",
         visibility: me.visibility || "public",
       });
-      const [prefs, membershipApps] = await Promise.all([
-        api<Preferences>("/api/v1/notifications/preferences", {}, token),
-        api<MembershipApplication[]>("/api/v1/membership/applications/me", {}, token),
-      ]);
+      const prefs = await api<Preferences>("/api/v1/notifications/preferences", {}, token);
       setPreferences(prefs);
-      setMembershipApplications(Array.isArray(membershipApps) ? membershipApps : []);
       if (!me.has_active_membership) {
         setTalentProfile(null);
         setTalentVisibility({ ...emptyTalentVisibility, user_id: me.user_id });
@@ -436,7 +429,6 @@ export default function Profile() {
   }
   const update = (key: keyof typeof blank, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
-  const latestMembershipApplication=membershipApplications[0];
   const isOrganizationAccount=Boolean(profile?.roles?.some(role=>["organization_representative","organization_owner","organization_admin","organization_member","organization"].includes(role)));
   if (organizationOnly) return (
     <div className={`grid ${styles.page}`} style={{ gap: 18, minWidth: 0, width: "100%" }}>

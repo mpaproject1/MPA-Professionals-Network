@@ -517,6 +517,18 @@ export default function Organizations() {
           never assumed by the interface.
         </p>
       </div>
+      <Card>
+        <div className="eyebrow">Why partner with MPA</div>
+        <h2 className="h2">A more trusted way to connect with professionals</h2>
+        <p className="muted">MPA is a nonprofit professional network. Organization participation helps connect employers, institutions and professionals through clearer identity checks, permission-based information sharing and accountable opportunity workflows—not a promise of hiring results.</p>
+        <div className="grid grid-2" style={{gap:14,marginTop:14}}>
+          <section className="membership-plan"><h3 className="h2">A verified organization presence</h3><p className="muted">Submit legal identity and supporting evidence for review. Where verification is approved, your organization can present a more credible profile; approval is recorded and is never automatic.</p></section>
+          <section className="membership-plan"><h3 className="h2">Publish and manage opportunities</h3><p className="muted">Eligible organization roles can manage supported job and opportunity workflows, with publication and access governed by organization verification, permissions and posting scope.</p></section>
+          <section className="membership-plan"><h3 className="h2">Reach professionals responsibly</h3><p className="muted">Use the talent and inquiry workflows available to your role. Candidate details are limited by profile visibility and consent; private contact information is not a general directory download.</p></section>
+          <section className="membership-plan"><h3 className="h2">Keep decisions and next steps clear</h3><p className="muted">Review incoming inquiries, record supported decisions and follow the available status history. A public inquiry is not treated as a formal job application unless the relevant workflow records that transition.</p></section>
+          <section className="membership-plan"><h3 className="h2">Support a shared professional ecosystem</h3><p className="muted">Participate in a nonprofit network that supports professional development, mentorship and clearer connections between institutions and talent, while retaining responsibility for fair recruitment and selection.</p></section>
+        </div>
+      </Card>
       <JourneyGuide
         eyebrow="Employer / recruiter"
         title="Verify → Publish → Review → Report"

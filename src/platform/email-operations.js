@@ -151,7 +151,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
    const code=clean(e.code||"DELIVERY_FAILED",80);
    // Retry network/timeout, rate-limit and provider-server errors; fail fast on
    // permanent recipient, authentication, or template/configuration rejections.
-   const statusMatch=code.match(/(?:RESEND|DELIVERY)_HTTP_(\\d{3})/);
+   const statusMatch=code.match(/(?:RESEND|DELIVERY)_HTTP_(\d{3})/);
    const httpStatus=statusMatch?Number(statusMatch[1]):null;
    const retryable=!httpStatus||httpStatus===408||httpStatus===429||httpStatus>=500;
    const exhausted=attempt>=8;

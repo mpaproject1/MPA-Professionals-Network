@@ -14,3 +14,7 @@
  .launcher{padding:12px 14px}
  .launcherText{font-size:13px}
 }
+
+.quickQuestions{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}
+.quickQuestions button{flex:0 0 auto;max-width:210px;padding:7px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg);color:var(--text);font:inherit;font-size:10px;line-height:1.35;cursor:pointer}
+.quickQuestions button:hover,.quickQuestions button:focus-visible{border-color:#97C024;outline:2px solid color-mix(in srgb,#97C024 35%,transparent);outline-offset:1px}

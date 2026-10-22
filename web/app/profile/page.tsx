@@ -167,23 +167,47 @@ export default function Profile() {
         return;
       }
       setOrganizationOnly(false);
-      const [prefs, tp, tv, membershipApps] = await Promise.all([
+      setProfile(me);
+      setForm({
+        firstName: me.first_name || "",
+        middleName: me.middle_name || "",
+        lastName: me.last_name || "",
+        displayName: me.display_name || "",
+        phone: me.phone || "",
+        dateOfBirth: me.date_of_birth ? String(me.date_of_birth).slice(0, 10) : "",
+        sex: me.sex || "",
+        nationality: me.nationality || "",
+        headline: me.headline || "",
+        bio: me.bio || "",
+        visibility: me.visibility || "public",
+      });
+      const [prefs, membershipApps] = await Promise.all([
         api<Preferences>("/api/v1/notifications/preferences", {}, token),
-        api<TalentProfile>("/api/v1/me/talent-profile", {}, token),
-        api<TalentVisibility>("/api/v1/me/talent-visibility", {}, token),
         api<MembershipApplication[]>("/api/v1/membership/applications/me", {}, token),
       ]);
-      setProfile(me);
-      setMembershipApplications(Array.isArray(membershipApps)?membershipApps:[]);
       setPreferences(prefs);
+      setMembershipApplications(Array.isArray(membershipApps) ? membershipApps : []);
+      if (!me.has_active_membership) {
+        setTalentProfile(null);
+        setTalentVisibility({ ...emptyTalentVisibility, user_id: me.user_id });
+        setExperienceDrafts([]);
+        setTalentForm({
+          professionalTitle: "", yearsExperience: "", availabilityStatus: "",
+          locationLabel: "", directorySummary: "", headline: "", bio: "",
+          visibility: "members", educationSummary: "", qualifications: "",
+          skills: "", languages: "", certifications: "", portfolioUrl: "",
+        });
+        return;
+      }
+      const [tp, tv] = await Promise.all([
+        api<TalentProfile>("/api/v1/me/talent-profile", {}, token),
+        api<TalentVisibility>("/api/v1/me/talent-visibility", {}, token),
+      ]);
       setTalentProfile(tp);
       setTalentVisibility({ ...emptyTalentVisibility, ...tv });
       setTalentForm({
         professionalTitle: tp.professional_title || "",
-        yearsExperience:
-          tp.years_experience === null || tp.years_experience === undefined
-            ? ""
-            : String(tp.years_experience),
+        yearsExperience: tp.years_experience === null || tp.years_experience === undefined ? "" : String(tp.years_experience),
         availabilityStatus: tp.availability_status || "",
         locationLabel: tp.location_label || "",
         directorySummary: tp.directory_summary || "",
@@ -198,21 +222,6 @@ export default function Profile() {
         portfolioUrl: tp.portfolio_url || "",
       });
       setExperienceDrafts((tp.experience || []).map((item) => ({ draftKey: crypto.randomUUID(), employerName: item.employer_name || "", roleTitle: item.role_title || "", startDate: item.start_date ? String(item.start_date).slice(0,10) : "", endDate: item.end_date ? String(item.end_date).slice(0,10) : "", currentRole: Boolean(item.is_current), description: item.description || "", visibility: item.visibility || "members" })));
-      setForm({
-        firstName: me.first_name || "",
-        middleName: me.middle_name || "",
-        lastName: me.last_name || "",
-        displayName: me.display_name || "",
-        phone: me.phone || "",
-        dateOfBirth: me.date_of_birth
-          ? String(me.date_of_birth).slice(0, 10)
-          : "",
-        sex: me.sex || "",
-        nationality: me.nationality || "",
-        headline: me.headline || "",
-        bio: me.bio || "",
-        visibility: me.visibility || "public",
-      });
     } catch (e) {
       setError(
         e instanceof ApiError
@@ -439,38 +448,6 @@ export default function Profile() {
       </Card>
     </div>
   );
-  if(profile&&profile.has_active_membership===false&&latestMembershipApplication)return (
-    <div className={`grid ${styles.page}`} style={{gap:18,minWidth:0,width:"100%"}}>
-      <Card>
-        <div className="eyebrow">Membership application</div>
-        <div className="row" style={{justifyContent:"space-between",flexWrap:"wrap"}}>
-          <h1 className="h1">Your application is already on file.</h1>
-          <Badge tone={["rejected","withdrawn"].includes(latestMembershipApplication.status)?"gold":"slate"}>{latestMembershipApplication.status.replaceAll("_"," ")}</Badge>
-        </div>
-        <p className="muted">Your professional profile stays read-only until membership review, payment verification and activation are complete. Continue the existing application instead of starting a duplicate.</p>
-        <div className="grid grid-2" style={{gap:12,padding:14,border:"1px solid var(--border)",borderRadius:10}}>
-          <div><span className="muted">Application reference</span><p><strong>{latestMembershipApplication.tracking_reference||latestMembershipApplication.id}</strong></p></div>
-          <div><span className="muted">Plan at submission</span><p><strong>{latestMembershipApplication.fee_snapshot?.productName||latestMembershipApplication.fee_snapshot?.productCode||"Membership plan"}</strong>{latestMembershipApplication.fee_snapshot?.amount!=null?` · ${latestMembershipApplication.fee_snapshot.currency||""} ${latestMembershipApplication.fee_snapshot.amount}`:""}</p></div>
-          <div><span className="muted">Last updated</span><p><strong>{new Date(latestMembershipApplication.updated_at||latestMembershipApplication.created_at).toLocaleString()}</strong></p></div>
-          <div><span className="muted">Next step</span><p><strong>{latestMembershipApplication.status==="correction_required"?"Respond to the requested correction":latestMembershipApplication.status==="payment_pending"?"Review payment instructions and submit evidence":latestMembershipApplication.status==="paid"?"Wait for activation after payment verification":"Track the existing application"}</strong></p></div>
-        </div>
-        <div className="row" style={{flexWrap:"wrap",marginTop:16}}>
-          <a className="btn btn-primary" href="/membership#my-applications">Continue application</a>
-          <a className="btn btn-ghost" href="/track">View application timeline</a>
-        </div>
-      </Card>
-    </div>
-  );
-  if (profile && profile.has_active_membership === false) return (
-    <div className={`grid ${styles.page}`} style={{ gap: 18, minWidth: 0, width: "100%" }}>
-      <Card>
-        <div className="eyebrow">Professional profile</div>
-        <h1 className="h1">Membership is required to edit your profile.</h1>
-        <p className="muted">Your current profile remains read-only until your membership fee is verified and your membership is activated. You can still browse public opportunities, request public services, and submit a job-interest request.</p>
-        <p><a className="btn btn-primary" href="/membership?next=%2Fprofile">Apply for or renew membership</a> <a className="btn btn-ghost" href="/dashboard">Return to dashboard</a></p>
-      </Card>
-    </div>
-  );
   return (
     <div className={`grid ${styles.page}`} style={{ gap: 18, minWidth: 0, width: "100%" }}>
       <div>
@@ -623,6 +600,7 @@ export default function Profile() {
               </div>
             </form>
           </Card>
+          {profile?.has_active_membership ? <>
           <Card>
             <div className="row">
               <div>
@@ -829,6 +807,15 @@ export default function Profile() {
               {savingVisibility ? "Saving…" : "Save directory privacy settings"}
             </button>
           </Card>
+          </> : <Card>
+            <div className="eyebrow">Membership unlocks professional review</div>
+            <h2 className="h2">Your profile can be prepared now</h2>
+            <p className="muted">You can save your basic identity and professional summary before membership. Member-only directory publication, credential review and verification requests become available after membership approval, payment verification where required, and confirmed activation. Saving profile details does not mark them as verified.</p>
+            <div className="row" style={{flexWrap:"wrap"}}>
+              <a className="btn btn-primary" href="/membership">Review membership options</a>
+              <a className="btn btn-ghost" href="/membership#my-applications">Track an existing application</a>
+            </div>
+          </Card>}
           <Card>
             <div className="row">
               <div>

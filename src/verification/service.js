@@ -1,6 +1,6 @@
 import { getPool, withTransaction } from "../platform/db.js";
-import { createInAppNotification } from "../platform/notifications.js";
 import { assertProfessionalProfileCapability } from "../platform/identity-policy.js";
+import { createInAppNotification } from "../platform/notifications.js";
 
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
 async function assertMemberVerificationAccess(db,userId){

@@ -4,13 +4,13 @@ import Link from "next/link";
 import {type FormEvent,useCallback,useEffect,useRef,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
 import { FormFeedback } from "../../components/form-feedback";
+import { JourneyGuide } from "../../components/journey-guide";
 import { TagInput } from "../../components/tag-input";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
 import { humanStatus } from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 import {useSavedDiscoveryItems} from "../../lib/use-saved-discovery-items";
-import { JourneyGuide } from "../../components/journey-guide";
 
 type Mentor={id:string;user_id:string;display_name:string;headline?:string;bio?:string;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number};
 type OrganizationOffer={id:string;organization_id:string;organization_name:string;title:string;description:string;expertise?:string[]|string;languages?:string[]|string;delivery_mode:string;visibility:string;status:string;moderation_status:string;moderation_note?:string|null};

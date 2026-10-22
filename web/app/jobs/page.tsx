@@ -3,10 +3,10 @@
 import {Bookmark,Building2,Clock3,MapPin,RefreshCw, SlidersHorizontal,Users} from "lucide-react";
 import {type FormEvent,useCallback,useEffect,useId,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
+import { JourneyGuide } from "../../components/journey-guide";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
-import { JourneyGuide } from "../../components/journey-guide";
 
 type Job={
  id:string;title:string;description?:string;organization_id:string;organization_name?:string;

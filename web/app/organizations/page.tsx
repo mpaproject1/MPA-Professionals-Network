@@ -8,10 +8,10 @@ import {
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
+import { JourneyGuide } from "../../components/journey-guide";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
-import { JourneyGuide } from "../../components/journey-guide";
 
 type Inquiry = {
   id: string;

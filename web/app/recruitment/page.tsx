@@ -2,11 +2,11 @@
 import {BriefcaseBusiness,CalendarClock,RefreshCw,Users} from "lucide-react";
 import {type FormEvent,useCallback,useEffect,useState} from "react";
 import { FormFeedback } from "../../components/form-feedback";
+import { JourneyGuide } from "../../components/journey-guide";
 import { TagInput } from "../../components/tag-input";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
-import { JourneyGuide } from "../../components/journey-guide";
 
 type Organization={id:string;legal_name:string;display_name:string;verification_status?:string;role_code?:string};
 type Job={id:string;title:string;description?:string;status:string;posting_scope?:string;application_deadline?:string;organization_id:string};

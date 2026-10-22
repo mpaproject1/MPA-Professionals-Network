@@ -21,7 +21,8 @@ test("public organization directory and profile API routes are disabled", async 
   const profilePage = await read("../../web/app/organizations/directory/[id]/page.tsx");
   assert.doesNotMatch(server, /api\/v1\/public\/organizations/);
   assert.doesNotMatch(server, /getPublicOrganizationProfile\(parts\[4\]\)/);
-  assert.doesNotMatch(server, /api\/v1\/public\/opportunity-sharing-organizations/);
+  assert.match(server, /api\/v1\/public\/opportunity-sharing-organizations/);
+  assert.match(server, /searchPublicSharingOrganizations\(searchTerm\)/);
   assert.match(page, /redirect\("\/services"\)/);
   assert.match(profilePage, /redirect\("\/services"\)/);
 });

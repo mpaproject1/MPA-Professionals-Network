@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getPool, withTransaction } from "./db.js";
 import { resendEmailVerification } from "./email-verification.js";
 import { createInAppNotification } from "./notifications.js";
+import { renderBrandedEmail } from "./email-template.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 async function requireAdmin(db,actorId){
@@ -89,6 +90,7 @@ export async function saveEmailDraft(actorId,input){
  return (await db.query("insert into email_outbox_draft(created_by,recipient,subject,text_body,html_body) values($1,$2,$3,$4,$5) returning id,recipient,subject,text_body,html_body,status,created_at,updated_at",[actorId,recipient,subject,textBody,htmlBody])).rows[0];
 }
 async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,payload,providerMessageId=null}){
+ htmlBody=renderBrandedEmail({subject,htmlBody,textBody,preheader:subject});
  const cfg=providerConfig();
  if(!cfg.ready)fail(503,"Email provider is not configured. Set PUBLIC_APP_URL and Resend or signed-webhook credentials in the server environment.","EMAIL_DELIVERY_NOT_CONFIGURED");
  if(cfg.provider==="resend"){
@@ -145,10 +147,25 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
    await db.query("update notification_outbox set status='sent',sent_at=now(),provider_message_id=$1,last_error=null,delivery_error_code=null,next_attempt_at=null,locked_at=null,updated_at=now() where id=$2",[sent.providerMessageId,row.id]);
    results.push({id:row.id,status:"sent"});
   }catch(e){
-   const attempt=Number(row.attempts||0)+1,delay=Math.min(3600,30*2 ** Math.min(attempt,7));
-   const failed=attempt>=8;
-   await db.query("update notification_outbox set status=$1,last_error=$2,delivery_error_code=$3,next_attempt_at=$4,locked_at=null,updated_at=now() where id=$5",[failed?"failed":"pending",clean(e.message,500),clean(e.code||"DELIVERY_FAILED",80),failed?null:new Date(Date.now()+delay*1000),row.id]);
-   results.push({id:row.id,status:failed?"failed":"pending",error:clean(e.message,250)});
+   const attempt=Number(row.attempts||0)+1;
+   const code=clean(e.code||"DELIVERY_FAILED",80);
+   // Retry network/timeout, rate-limit and provider-server errors; fail fast on
+   // permanent recipient, authentication, or template/configuration rejections.
+   const statusMatch=code.match(/(?:RESEND|DELIVERY)_HTTP_(\\d{3})/);
+   const httpStatus=statusMatch?Number(statusMatch[1]):null;
+   const retryable=!httpStatus||httpStatus===408||httpStatus===429||httpStatus>=500;
+   const exhausted=attempt>=8;
+   const failed=!retryable||exhausted;
+   const delay=Math.min(3600,30*2 ** Math.min(attempt,7));
+   try{
+    await db.query("update notification_outbox set status=$1,last_error=$2,delivery_error_code=$3,next_attempt_at=$4,locked_at=null,updated_at=now() where id=$5",[failed?"failed":"pending",clean(e.message,500),code,failed?null:new Date(Date.now()+delay*1000),row.id]);
+    results.push({id:row.id,status:failed?"failed":"pending",error:clean(e.message,250),retryable});
+   }catch(persistError){
+    // Keep processing the rest of the batch if a single failure record cannot
+    // be persisted; an operator can recover stale processing locks afterwards.
+    console.error("[email-outbox] failed to persist delivery failure", {outboxId:row.id,code,reason:clean(persistError?.message||"database error",180)});
+    results.push({id:row.id,status:"persistence_error",error:"Delivery failed and the failure status could not be saved. Check database connectivity and the outbox record."});
+   }
   }
  }
  return {processed:results.length,results};

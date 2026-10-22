@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const serverSource = await readFile(new URL("../../server.js", import.meta.url), "utf8");
+const publicOpportunitySource = await readFile(new URL("../../src/platform/public-opportunity.js", import.meta.url), "utf8");
 const directoryPage = await readFile(
   new URL("../../web/app/organizations/directory/page.tsx", import.meta.url),
   "utf8",
@@ -17,10 +18,13 @@ test("public organization listing and profile API routes are not registered", ()
     serverSource,
     /p\.startsWith\("api\/v1\/public\/organizations\/"\)/,
   );
-  assert.doesNotMatch(
+  assert.match(
     serverSource,
-    /p==="api\/v1\/public\/opportunity-sharing-organizations"/,
+    /p==="api\\/v1\\/public\\/opportunity-sharing-organizations"[\\s\\S]*?const searchTerm=query\\(req.url\\)\\.get\\("q"\\)\\|\\|""[\\s\\S]*?searchPublicSharingOrganizations\\(searchTerm\\)/,
   );
+  assert.match(publicOpportunitySource, /export async function searchPublicSharingOrganizations\\(searchTerm\\)/);
+  assert.match(publicOpportunitySource, /if\\(term\\.length<3\\) throw error\\(400,[^;]*SEARCH_TERM_REQUIRED/);
+  assert.match(publicOpportunitySource, /verification_status='verified' and public_visible=true and \\(display_name ilike \\$1 or legal_name ilike \\$1\\)[\\s\\S]*limit 10/);
 });
 
 test("Services is primary and organization workspace links require a signed-in organization account", () => {

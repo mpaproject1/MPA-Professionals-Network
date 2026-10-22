@@ -37,6 +37,11 @@ test("P0: applicants can update basic profile while member-only capabilities rem
   assert.equal(updated.first_name, "Updated", "non-members may update permitted personal identity details");
   assert.equal(updated.headline, "Applicant profile headline", "non-members may save the permitted basic profile headline");
   assert.equal(updated.has_active_membership, false, "basic profile editing must not activate membership");
+  await assert.rejects(
+    membership.updateProfile(userId, { firstName: "Updated", lastName: "Applicant", visibility: "public" }, "p0-directory-visibility-before-membership"),
+    error => error.code === "MEMBERSHIP_REQUIRED",
+    "non-members cannot publish or change directory visibility through the basic profile endpoint"
+  );
 
   await assert.rejects(
     talent.updateProfessionalProfile(userId, { professionalTitle: "Member-only title" }, "p0-talent-edit-before-membership"),

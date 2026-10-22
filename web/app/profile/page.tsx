@@ -289,9 +289,23 @@ export default function Profile() {
     setError("");
     setNotice("");
     try {
+      const profilePayload = profile?.has_active_membership
+        ? form
+        : {
+            firstName: form.firstName,
+            middleName: form.middleName,
+            lastName: form.lastName,
+            displayName: form.displayName,
+            phone: form.phone,
+            dateOfBirth: form.dateOfBirth,
+            sex: form.sex,
+            nationality: form.nationality,
+            headline: form.headline,
+            bio: form.bio,
+          };
       const updated = await api<Profile>(
         "/api/v1/me/profile",
-        { method: "PATCH", body: JSON.stringify(form) },
+        { method: "PATCH", body: JSON.stringify(profilePayload) },
         token,
       );
       setProfile(updated);
@@ -560,24 +574,34 @@ export default function Profile() {
                   maxLength={4000}
                 />
               </div>
-              <div>
-                <label htmlFor={`${profileId}-visibility`}>
-                  Professional directory visibility
-                </label>
-                <select
-                  id={`${profileId}-visibility`}
-                  value={form.visibility}
-                  onChange={(e) => update("visibility", e.target.value)}
-                >
-                  <option value="public">Public-safe profile</option>
-                  <option value="members">Members only</option>
-                  <option value="private">Private / hidden</option>
-                </select>
-                <p className="muted">
-                  This controls directory visibility, not access to private
-                  evidence or account records.
-                </p>
-              </div>
+              {profile?.has_active_membership ? (
+                <div>
+                  <label htmlFor={`${profileId}-visibility`}>
+                    Professional directory visibility
+                  </label>
+                  <select
+                    id={`${profileId}-visibility`}
+                    value={form.visibility}
+                    onChange={(e) => update("visibility", e.target.value)}
+                  >
+                    <option value="public">Public-safe profile</option>
+                    <option value="members">Members only</option>
+                    <option value="private">Private / hidden</option>
+                  </select>
+                  <p className="muted">
+                    This controls directory visibility, not access to private
+                    evidence or account records.
+                  </p>
+                </div>
+              ) : (
+                <div className="membership-progress" aria-label="Directory visibility eligibility">
+                  <b>Professional directory visibility</b>
+                  <p className="muted">
+                    You can prepare your basic profile now. Directory visibility controls become available after your membership is active. Publication also depends on the required verification and eligibility checks; saving this page does not publish your profile.
+                  </p>
+                  <a className="btn btn-ghost" href="/membership">Review membership options</a>
+                </div>
+              )}
               <div className="row" style={{ justifyContent: "space-between" }}>
                 <span className="muted">
                   Profile completion: {profile?.completion_percent ?? 0}%

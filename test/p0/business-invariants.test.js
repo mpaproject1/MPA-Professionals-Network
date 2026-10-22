@@ -26,6 +26,7 @@ async function register(suffix) {
 test("P0: applicants can update basic profile while member-only capabilities remain protected", async () => {
   const account = await register(randomUUID());
   const userId = account.user.id;
+  const db = getPool();
   const updated = await membership.updateProfile(userId, {
     firstName: "Updated",
     lastName: "Applicant",
@@ -47,6 +48,16 @@ test("P0: applicants can update basic profile while member-only capabilities rem
   await assert.rejects(talent.saveProfessionalPortfolioItem(userId, { title: "Applicant portfolio item" }, "p0-portfolio-before-membership"), error => error.code === "MEMBERSHIP_REQUIRED", "portfolio writes remain member-only");
   await assert.rejects(talent.updateVisibility(userId, { directoryVisible: true }, "p0-visibility-before-membership"), error => error.code === "MEMBERSHIP_REQUIRED", "directory visibility remains member-only");
   await assert.rejects(verification.createCase(userId, "BASIC", userId, "p0-verification-before-membership"), error => error.code === "MEMBERSHIP_REQUIRED", "non-members cannot open their own professional verification case");
+  const reviewer = await register(randomUUID());
+  const reviewerRole = (await db.query("select id from app_role where role_code='verification_reviewer'")).rows[0];
+  assert.ok(reviewerRole, "verification_reviewer role must exist");
+  await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing", [reviewer.user.id, reviewerRole.id]);
+  const program = (await db.query("select program_code from verification_program where active=true order by program_code limit 1")).rows[0];
+  assert.ok(program, "an active verification program must exist for the authorization fixture");
+  const reviewerOpenedCase = await verification.createCase(userId, program.program_code, reviewer.user.id, "p0-reviewer-opened-applicant-case");
+  await assert.rejects(verification.giveConsent(reviewerOpenedCase.id, userId, "p0-test", "p0-nonmember-verification-consent"), error => error.code === "MEMBERSHIP_REQUIRED", "non-members cannot consent to a member-only verification case");
+  await assert.rejects(verification.addClaim(reviewerOpenedCase.id, "EDUCATION", {}, userId, "p0-nonmember-verification-claim"), error => error.code === "MEMBERSHIP_REQUIRED", "non-members cannot add verification claims even when a case already exists");
+  await assert.rejects(verification.addEvidence(reviewerOpenedCase.id, {}, userId, "p0-nonmember-verification-evidence"), error => error.code === "MEMBERSHIP_REQUIRED", "non-members cannot add verification evidence even when a case already exists");
   await assert.rejects(
     serviceMentorship.createServiceListing(userId, { title: "P0 test", description: "Not published", serviceCategory: "test" }, "p0-service-before-membership"),
     error => error.code === "MEMBERSHIP_REQUIRED"
@@ -57,7 +68,6 @@ test("P0: applicants can update basic profile while member-only capabilities rem
   );
 
   const provider = await register(randomUUID());
-  const db = getPool();
   const product = (await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
   assert.ok(product, "BASIC membership product must exist for the provider fixture");
   await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')", [provider.user.id, product.id, `MPA-P0-${randomUUID().slice(0,8).toUpperCase()}`]);

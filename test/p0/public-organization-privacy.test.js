@@ -12,7 +12,7 @@ const membershipPage = await readFile(new URL("../../web/app/membership/workspac
 const adminMembershipPage = await readFile(new URL("../../web/app/admin/membership/page.tsx", import.meta.url), "utf8");
 const shell = await readFile(new URL("../../web/components/shell.tsx", import.meta.url), "utf8");
 
-test("public organization listing and profile API routes are not registered", () => {
+test("public organization directory is private and named sharing uses bounded search", () => {
   assert.doesNotMatch(serverSource, /p==="api\/v1\/public\/organizations"/);
   assert.doesNotMatch(
     serverSource,
@@ -20,13 +20,12 @@ test("public organization listing and profile API routes are not registered", ()
   );
   assert.match(
     serverSource,
-    /p==="api\\/v1\\/public\\/opportunity-sharing-organizations"[\\s\\S]*?const searchTerm=query\\(req.url\\)\\.get\\("q"\\)\\|\\|""[\\s\\S]*?searchPublicSharingOrganizations\\(searchTerm\\)/,
+    /p==="api\/v1\/public\/opportunity-sharing-organizations"[\s\S]*?const searchTerm=query\(req.url\)\.get\("q"\)\|\|""[\s\S]*?searchPublicSharingOrganizations\(searchTerm\)/,
   );
-  assert.match(publicOpportunitySource, /export async function searchPublicSharingOrganizations\\(searchTerm\\)/);
-  assert.match(publicOpportunitySource, /if\\(term\\.length<3\\) throw error\\(400,[^;]*SEARCH_TERM_REQUIRED/);
-  assert.match(publicOpportunitySource, /verification_status='verified' and public_visible=true and \\(display_name ilike \\$1 or legal_name ilike \\$1\\)[\\s\\S]*limit 10/);
+  assert.match(publicOpportunitySource, /export async function searchPublicSharingOrganizations\(searchTerm\)/);
+  assert.match(publicOpportunitySource, /if\(term\.length<3\) throw error\(400,[^;]*SEARCH_TERM_REQUIRED/);
+  assert.match(publicOpportunitySource, /verification_status='verified' and public_visible=true and \(display_name ilike \$1 or legal_name ilike \$1\)[\s\S]*limit 10/);
 });
-
 test("Services is primary and organization workspace links require a signed-in organization account", () => {
   assert.match(shell, /\["\/services","Services",BriefcaseBusiness\]/);
   assert.match(shell, /\["\/","\/services","\/network","\/jobs","\/membership"\]/);

@@ -142,10 +142,12 @@ export default function Jobs(){
    finally{setEligibilityLoading(current=>({...current,[job.id]:false}));}
  }
 
- return <div>
-   <div className="eyebrow">Employment & opportunity hub</div>
-   <h1 className="h1">Opportunities, without the maze.</h1>
-   <p className="muted">Browse current opportunities published by verified organizations. Eligibility and formal application steps are checked by the platform; sample or invented vacancies are not shown.</p>
+ return <div className="mpa-jobs-page">
+   <section className="mpa-signature-intro" aria-labelledby="jobs-page-title">
+     <div className="eyebrow">Employment & opportunity hub</div>
+     <h1 id="jobs-page-title" className="h1">Opportunities, without the maze.</h1>
+     <p>Browse current opportunities published by verified organizations. Eligibility and formal application steps are checked by the platform; sample or invented vacancies are not shown.</p>
+   </section>
    <JourneyGuide
      eyebrow="Professional member / job seeker"
      title="Join → Prepare → Apply → Progress"

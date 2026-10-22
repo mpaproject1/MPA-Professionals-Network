@@ -1,5 +1,5 @@
 "use client";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { FormFeedback } from "../../../components/form-feedback";
 import { TagInput } from "../../../components/tag-input";
 import { Badge, Card } from "../../../components/ui";
@@ -35,7 +35,7 @@ export default function JobInterestPage() {
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
   const [sharingOrganizationsLoading, setSharingOrganizationsLoading] = useState(false);
   const [sharingOrganizationsError, setSharingOrganizationsError] = useState("");
-  const [_sharingOrganizationsReload, setSharingOrganizationsReload] = useState(0);
+  const [organizationSearch, setOrganizationSearch] = useState("");
   const [consentToProcess, setConsentToProcess] = useState(false);
   const [shareWithEmployers, setShareWithEmployers] = useState(false);
   const [inquiry, setInquiry] = useState<Inquiry | null>(null);
@@ -47,17 +47,28 @@ export default function JobInterestPage() {
   const [notice, setNotice] = useState("");
 
   function update(key: keyof typeof form, value: string) { setForm(current => ({ ...current, [key]: value })); }
-  useEffect(() => {
-    if (!shareWithEmployers) return;
-    let active = true;
+  async function searchSharingOrganizations() {
+    const term = organizationSearch.trim();
+    if (term.length < 3) {
+      setSharingOrganizations([]);
+      setSelectedOrganizationId("");
+      setSharingOrganizationsError("Enter at least 3 characters of an organization name to search.");
+      return;
+    }
     setSharingOrganizationsLoading(true);
     setSharingOrganizationsError("");
-    api<SharingOrganization[]>("/api/v1/public/opportunity-sharing-organizations")
-      .then(rows => { if (active) setSharingOrganizations(Array.isArray(rows) ? rows : []); })
-      .catch(e => { if (active) setSharingOrganizationsError(e instanceof ApiError ? e.message : "Verified organizations could not be loaded. Retry before saving consent."); })
-      .finally(() => { if (active) setSharingOrganizationsLoading(false); });
-    return () => { active = false; };
-  }, [shareWithEmployers]);
+    setSharingOrganizations([]);
+    setSelectedOrganizationId("");
+    try {
+      const rows = await api<SharingOrganization[]>(`/api/v1/public/opportunity-sharing-organizations?q=${encodeURIComponent(term)}`);
+      if (!Array.isArray(rows)) throw new Error("The organization search returned an unexpected response.");
+      setSharingOrganizations(rows);
+    } catch (e) {
+      setSharingOrganizationsError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Verified organizations could not be searched. Retry before saving consent.");
+    } finally {
+      setSharingOrganizationsLoading(false);
+    }
+  }
   function toggleField(field: string, checked: boolean) {
     setShareFields(current => checked ? [...new Set([...current, field])] : current.filter(item => item !== field));
   }
@@ -197,7 +208,7 @@ export default function JobInterestPage() {
       {error ? <FormFeedback kind="error" message={error}/> : null}
       {!consentSaved ? <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
         <label style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><input type="checkbox" checked={shareWithEmployers} onChange={e => setShareWithEmployers(e.target.checked)} />I explicitly opt in to named-employer sharing now. This is optional and separate from submitting my request.</label>
-        {shareWithEmployers ? <div style={{ display: "grid", gap: 8 }}><label>Specific verified organization authorized to receive selected fields<select required value={selectedOrganizationId} onChange={e => setSelectedOrganizationId(e.target.value)} disabled={sharingOrganizationsLoading || processingConsent}><option value="">Choose a verified organization</option>{organizationOptions.map(org => <option key={org.id} value={org.id}>{org.label}</option>)}</select></label>{sharingOrganizationsLoading ? <p aria-live="polite" aria-atomic="true" className="muted">Loading verified organizations…</p> : null}{sharingOrganizationsError ? <FormFeedback kind="error" message={sharingOrganizationsError} onRetry={() => setSharingOrganizationsReload(value => value + 1)} /> : null}{!sharingOrganizationsLoading && !sharingOrganizationsError && !sharingOrganizations.length ? <p role="alert" className="muted">No public verified organizations are currently available. Your request remains private; consent cannot be saved until an eligible organization is available.</p> : null}{shareable.map(([field,label]) => <label key={field} style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={shareFields.includes(field)} onChange={e => toggleField(field,e.target.checked)} />{label}</label>)}<button className="btn btn-primary" type="button" disabled={processingConsent || sharingOrganizationsLoading || Boolean(sharingOrganizationsError) || !organizationOptions.some(org => org.id === selectedOrganizationId) || !shareFields.length} onClick={() => void retryConsent()}>{processingConsent ? "Saving consent…" : "Save explicit sharing consent"}</button></div> : <p className="muted">Your request remains private. No employer can access it.</p>}
+        {shareWithEmployers ? <div style={{ display: "grid", gap: 8 }}><label>Search for the specific verified organization<input maxLength={120} value={organizationSearch} onChange={e => setOrganizationSearch(e.target.value)} placeholder="Enter at least 3 characters of the organization name" /></label><button className="btn btn-ghost" type="button" disabled={sharingOrganizationsLoading || processingConsent} onClick={() => void searchSharingOrganizations()}>{sharingOrganizationsLoading ? "Searching…" : "Search verified organizations"}</button>{organizationOptions.length > 0 ? <label>Choose the organization authorized to receive selected fields<select required value={selectedOrganizationId} onChange={e => setSelectedOrganizationId(e.target.value)} disabled={sharingOrganizationsLoading || processingConsent}><option value="">Choose a verified organization</option>{organizationOptions.map(org => <option key={org.id} value={org.id}>{org.label}</option>)}</select></label> : null}{sharingOrganizationsLoading ? <p aria-live="polite" aria-atomic="true" className="muted">Loading verified organizations…</p> : null}{sharingOrganizationsError ? <FormFeedback kind="error" message={sharingOrganizationsError} onRetry={() => void searchSharingOrganizations()} /> : null}{!sharingOrganizationsLoading && !sharingOrganizationsError && !sharingOrganizations.length ? <p className="muted">{organizationSearch.trim().length >= 3 ? "No verified organizations matched that search. Your request remains private; try another name or leave sharing off." : "Search for a verified organization by name. The full organization directory is not exposed."}</p> : null}{shareable.map(([field,label]) => <label key={field} style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={shareFields.includes(field)} onChange={e => toggleField(field,e.target.checked)} />{label}</label>)}<button className="btn btn-primary" type="button" disabled={processingConsent || sharingOrganizationsLoading || Boolean(sharingOrganizationsError) || !organizationOptions.some(org => org.id === selectedOrganizationId) || !shareFields.length} onClick={() => void retryConsent()}>{processingConsent ? "Saving consent…" : "Save explicit sharing consent"}</button></div> : <p className="muted">Your request remains private. No employer can access it.</p>}
       </div> : <button className="btn btn-ghost" type="button" disabled={processingConsent} onClick={() => void revokeConsent()}>{processingConsent ? "Updating…" : "Revoke employer-sharing consent"}</button>}
       <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><h3 className="h2">Employer sharing history</h3><button className="btn btn-ghost" type="button" onClick={() => void refreshSharingHistory(inquiry)}>Refresh history</button></div>
@@ -225,7 +236,7 @@ export default function JobInterestPage() {
           <h3 className="h2">Optional: consent to named-employer sharing</h3>
           <p className="muted">Off by default. If selected, MPA Support Desk may share only the fields you choose with a specific verified organization after review. Contact details are not selected by default.</p>
           <label style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><input type="checkbox" checked={shareWithEmployers} onChange={e => setShareWithEmployers(e.target.checked)} />I explicitly opt in to sharing selected information with a named, verified employer after MPA Support Desk review.</label>
-          {shareWithEmployers ? <div style={{ display: "grid", gap: 8, marginTop: 10 }}><label>Specific verified organization authorized to receive selected fields<select required value={selectedOrganizationId} onChange={e => setSelectedOrganizationId(e.target.value)} disabled={sharingOrganizationsLoading || busy || processingConsent}><option value="">Choose a verified organization</option>{organizationOptions.map(org => <option key={org.id} value={org.id}>{org.label}</option>)}</select></label>{sharingOrganizationsLoading ? <p aria-live="polite" aria-atomic="true" className="muted">Loading verified organizations…</p> : null}{sharingOrganizationsError ? <FormFeedback kind="error" message={sharingOrganizationsError} onRetry={() => setSharingOrganizationsReload(value => value + 1)} /> : null}{!sharingOrganizationsLoading && !sharingOrganizationsError && !sharingOrganizations.length ? <p role="alert" className="muted">No public verified organizations are currently available. You can still submit your request privately; employer-sharing consent will remain off.</p> : null}{shareable.map(([field,label]) => <label key={field} style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={shareFields.includes(field)} onChange={e => toggleField(field,e.target.checked)} />{label}</label>)}</div> : null}
+          {shareWithEmployers ? <div style={{ display: "grid", gap: 8, marginTop: 10 }}><label>Search for the specific verified organization<input maxLength={120} value={organizationSearch} onChange={e => setOrganizationSearch(e.target.value)} placeholder="Enter at least 3 characters of the organization name" /></label><button className="btn btn-ghost" type="button" disabled={sharingOrganizationsLoading || processingConsent} onClick={() => void searchSharingOrganizations()}>{sharingOrganizationsLoading ? "Searching…" : "Search verified organizations"}</button>{organizationOptions.length > 0 ? <label>Choose the organization authorized to receive selected fields<select required value={selectedOrganizationId} onChange={e => setSelectedOrganizationId(e.target.value)} disabled={sharingOrganizationsLoading || processingConsent}><option value="">Choose a verified organization</option>{organizationOptions.map(org => <option key={org.id} value={org.id}>{org.label}</option>)}</select></label> : null}{sharingOrganizationsLoading ? <p aria-live="polite" aria-atomic="true" className="muted">Loading verified organizations…</p> : null}{sharingOrganizationsError ? <FormFeedback kind="error" message={sharingOrganizationsError} onRetry={() => setSharingOrganizationsReload(value => value + 1)} /> : null}{!sharingOrganizationsLoading && !sharingOrganizationsError && !sharingOrganizations.length ? <p role="alert" className="muted">No public verified organizations are currently available. You can still submit your request privately; employer-sharing consent will remain off.</p> : null}{shareable.map(([field,label]) => <label key={field} style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={shareFields.includes(field)} onChange={e => toggleField(field,e.target.checked)} />{label}</label>)}</div> : null}
         </Card>
         {error ? <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>{error}</p> : null}
         {notice ? <FormFeedback kind="success" message={notice}>{getPublicReference(inquiry) ? <p>Keep this reference to check your request later: <strong>{getPublicReference(inquiry)}</strong></p> : null}</FormFeedback> : null}

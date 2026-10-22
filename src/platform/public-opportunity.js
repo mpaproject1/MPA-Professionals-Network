@@ -121,7 +121,7 @@ export async function listShareableOrganizations(userId){
  return (await db.query("select id,display_name,legal_name from organization where verification_status='verified' and public_visible=true order by coalesce(display_name,legal_name),id")).rows;
 }
 export async function searchPublicSharingOrganizations(searchTerm){
- const term=String(searchTerm||"").trim().replace(/[^\\p{L}\\p{N}\\s.'-]/gu," ").replace(/\\s+/g," ").trim();
+ const term=String(searchTerm||"").trim().replace(/[^\p{L}\p{N}\s.'-]/gu," ").replace(/\s+/g," ").trim();
  if(term.length<3) throw error(400,"Enter at least 3 characters to search verified organizations.","SEARCH_TERM_REQUIRED");
  return (await getPool().query("select id,display_name,legal_name from organization where verification_status='verified' and public_visible=true and (display_name ilike $1 or legal_name ilike $1) order by coalesce(display_name,legal_name),id limit 10",[`%${term}%`])).rows;
 }

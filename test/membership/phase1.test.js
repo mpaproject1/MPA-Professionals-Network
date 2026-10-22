@@ -12,9 +12,10 @@ let paymentId;
 let membershipId;
 
 test("Phase 1 completes registration, profile and application identity flow",async()=>{
+  const phone=`09${String(Date.now()).slice(-8)}`;
   const registered=await membership.register({
     email,password:"Phase1SecurePassword!",
-    firstName:"Phase",lastName:`Member${suffix}`,phone:`09${String(Date.now()).slice(-8)}`,
+    firstName:"Phase",lastName:`Member${suffix}`,phone,
     headline:"Professional",bio:"Phase 1 test profile"
   },"phase1-test-register");
   userId=registered.user.id;
@@ -26,10 +27,13 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   const me=await membership.getMe(userId);
   assert.equal(me.email,email);
   assert.equal(me.has_active_membership,false);
-  await assert.rejects(
-    membership.updateProfile(userId,{firstName:"Phase",lastName:`Member${suffix}`,headline:"Updated Professional"},"phase1-test-profile-before-membership"),
-    error=>error.code==="MEMBERSHIP_REQUIRED"
-  );
+  const beforeMembership=await membership.updateProfile(userId,{
+    firstName:"Phase",lastName:`Member${suffix}`,phone,
+    headline:"Updated Professional",bio:"Applicant can prepare a basic profile before membership."
+  },"phase1-test-profile-before-membership");
+  assert.equal(beforeMembership.first_name,"Phase");
+  assert.equal(beforeMembership.headline,"Updated Professional");
+  assert.equal(beforeMembership.has_active_membership,false,"editing a basic profile must not activate membership");
 
   const app=await membership.createApplication(userId,{productCode:"BASIC"},"phase1-test-application");
   applicationId=app.id;

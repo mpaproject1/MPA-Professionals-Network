@@ -7,6 +7,7 @@ import { closePool, getPool } from "../../src/platform/db.js";
 import * as publicOpportunity from "../../src/platform/public-opportunity.js";
 import * as serviceMentorship from "../../src/services-mentorship/service.js";
 import * as talent from "../../src/talent/service.js";
+import * as verification from "../../src/verification/service.js";
 
 function identity(suffix) {
   const digits = suffix.replace(/[^0-9]/g, "").slice(0, 8).padEnd(8, "7");
@@ -22,17 +23,30 @@ async function register(suffix) {
   return membership.register(identity(suffix), `p0-test-${suffix}`);
 }
 
-test("P0: non-members cannot edit account or professional profile or publish provider offers", async () => {
+test("P0: applicants can update basic profile while member-only capabilities remain protected", async () => {
   const account = await register(randomUUID());
   const userId = account.user.id;
+  const updated = await membership.updateProfile(userId, {
+    firstName: "Updated",
+    lastName: "Applicant",
+    phone: identity(randomUUID()).phone,
+    headline: "Applicant profile headline",
+    bio: "A personal profile prepared before membership activation."
+  }, "p0-profile-edit-before-membership");
+  assert.equal(updated.first_name, "Updated", "non-members may update permitted personal identity details");
+  assert.equal(updated.headline, "Applicant profile headline", "non-members may save the permitted basic profile headline");
+  assert.equal(updated.has_active_membership, false, "basic profile editing must not activate membership");
+
   await assert.rejects(
-    membership.updateProfile(userId, {}, "p0-profile-edit-before-membership"),
+    talent.updateProfessionalProfile(userId, { professionalTitle: "Member-only title" }, "p0-talent-edit-before-membership"),
     error => error.code === "MEMBERSHIP_REQUIRED"
   );
-  await assert.rejects(
-    talent.updateProfessionalProfile(userId, {}, "p0-talent-edit-before-membership"),
-    error => error.code === "MEMBERSHIP_REQUIRED"
-  );
+  await assert.rejects(talent.getProfessionalEducation(userId), error => error.code === "MEMBERSHIP_REQUIRED", "education reads remain member-only");
+  await assert.rejects(talent.saveProfessionalEducation(userId, { education: [] }, "p0-education-before-membership"), error => error.code === "MEMBERSHIP_REQUIRED", "education writes remain member-only");
+  await assert.rejects(talent.getProfessionalPortfolio(userId), error => error.code === "MEMBERSHIP_REQUIRED", "portfolio reads remain member-only");
+  await assert.rejects(talent.saveProfessionalPortfolioItem(userId, { title: "Applicant portfolio item" }, "p0-portfolio-before-membership"), error => error.code === "MEMBERSHIP_REQUIRED", "portfolio writes remain member-only");
+  await assert.rejects(talent.updateVisibility(userId, { directoryVisible: true }, "p0-visibility-before-membership"), error => error.code === "MEMBERSHIP_REQUIRED", "directory visibility remains member-only");
+  await assert.rejects(verification.createCase(userId, "BASIC", userId, "p0-verification-before-membership"), error => error.code === "MEMBERSHIP_REQUIRED", "non-members cannot open their own professional verification case");
   await assert.rejects(
     serviceMentorship.createServiceListing(userId, { title: "P0 test", description: "Not published", serviceCategory: "test" }, "p0-service-before-membership"),
     error => error.code === "MEMBERSHIP_REQUIRED"
@@ -243,10 +257,15 @@ test("P0: expired membership loses direct profile and provider privileges", asyn
   const product = (await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
   assert.ok(product, "BASIC membership product must exist");
   await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date-400,current_date-1,'online')", [account.user.id, product.id, `MPA-P0-EXP-${randomUUID().slice(0,8).toUpperCase()}`]);
+  const basicProfile = await membership.updateProfile(account.user.id, {
+    firstName: "Expired",
+    lastName: "Applicant"
+  }, "p0-expired-basic-profile-edit");
+  assert.equal(basicProfile.first_name, "Expired", "expired members retain basic personal profile editing");
   await assert.rejects(
-    membership.updateProfile(account.user.id, {}, "p0-expired-profile-edit"),
+    talent.updateProfessionalProfile(account.user.id, { professionalTitle: "Expired member" }, "p0-expired-talent-profile-edit"),
     error => error.code === "MEMBERSHIP_REQUIRED",
-    "an expired row with status=active must not grant profile editing"
+    "an expired row with status=active must not grant member-only professional profile editing"
   );
   await assert.rejects(
     serviceMentorship.createServiceListing(account.user.id, { title: "Expired member offer", description: "Must remain denied.", serviceCategory: "p0-test" }, "p0-expired-service-create"),

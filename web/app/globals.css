@@ -65,4 +65,4 @@ button:disabled,[role=button][aria-disabled=true]{cursor:not-allowed!important;o
 button:disabled svg{animation:none!important}
 button:not(:disabled),a.btn{transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease}
 button:not(:disabled):active,a.btn:active{transform:translateY(1px)}
-@media(prefers-reduced-motion:reduce){.operation-status__icon--moving svg{animation:none;opacity:.8}button:not(:disabled),a.btn{transition:none}button:not(:disabled):active,a.btn:active{transform:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:0.01ms!important}.operation-status__icon--moving svg{animation:none;opacity:.8}button:not(:disabled),a.btn{transition:none}button:not(:disabled):active,a.btn:active{transform:none}}

@@ -39,7 +39,9 @@
 - The existing reviewer UI already includes reasoned decisions and displays decision history.
 
 **Not yet addressed / needs verification**
-- Added source-level guards for cross-case claim/evidence references, checklist evidence IDs and independent appeal-decision authority. Database/browser validation is still required for assigned/unassigned access, assignment history, appeals, reference operations and private file retrieval.
+- Added source-level guards for cross-case claim/evidence references and checklist/appeal evidence IDs; appeal decisions now enforce independent reviewer authority and a required reason. Independent appeal reviewers can open an appealed case only when they are not the subject or original decision maker.
+- Private-file authorization no longer grants every verification reviewer access to every professional evidence file; it checks assigned-case/manager access, with a separate independent-appeal exception.
+- **Still missing:** reference-request create/respond/consent endpoints are not present in the reviewed service/router, and assignment-history UI is not complete. Database/browser validation is still required for all routes and private file downloads.
 - Audit every remaining verification write and evidence-download route against the complete permission matrix.
 - Complete browser/API acceptance for assignment changes, race conditions, private evidence and appeal independence.
 
@@ -58,7 +60,7 @@
 - **Transfer/reassignment:** manager-only API and UI controls, active eligible colleague list, required handoff reason, row locking and audit event are in source.
 - **Escalation:** added a persisted workflow table migration, high/urgent priority, waiting-on-member/organization/provider/internal states, manager notification queue, a dedicated escalated-inquiry filter and UI controls.
 - Source-structure tests cover the migration, API, queue filter and controls; database integration and browser tests have not been run. The migration has not been applied to any database.
-- Still incomplete: notification delivery/receipt confirmation and runtime negative tests for cross-staff access, missing/revoked consent, private attachments and escalation recovery.
+- Still incomplete: notification delivery/receipt confirmation, policy-defined escalation deadlines/automatic escalation, and runtime negative tests for cross-staff access, missing/revoked consent, private attachments and escalation recovery.
 - A full support ticket lifecycle is not yet proven; the existing support conversation workflow is not automatically equivalent to a complete ticketing system.
 
 ### 4. Finance

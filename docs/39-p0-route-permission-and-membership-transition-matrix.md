@@ -68,7 +68,7 @@ The service separates application review, payment verification, activation, and 
 | Submit payment evidence | payment_pending → payment pending review | Manual payment is linked to the application; verification is a separate action. | Present; confirm payment submission constraints and idempotency in acceptance |
 | Verify payment | pending payment + approved application → succeeded/paid, failed/payment_pending, or needs-correction/pending | Locks application/payment; requires approved application; checks amount/currency against saved fee snapshot; rejects already-reversed payment and invalid manual channel; records verification. | Present |
 | Activate membership | paid application + successful unreversed payment → activated + membership record | Requires approval and payment confirmation; checks saved fee terms; uses saved duration; locks application/payment; checks current/previous membership and renewal start date. | Present |
-| Expire membership | active record after end date → no longer eligible | Capability checks use start/end date bounds, so expired membership does not satisfy active-membership checks. A persisted `status='expired'` update is performed during activation processing, not by a dedicated expiry worker shown in the inspected paths. | **Follow-up gap:** access expires by date; persisted status may remain stale until another activation runs |
+| Expire membership | active record after end date → no longer eligible | Added `expireDueMemberships()` batch, `npm run memberships:expire`, and API startup/hourly invocation; updates due rows to `expired` and records an audit event. | Runtime verification and worker failure/recovery behavior remain open |
 | Reverse/refund payment | succeeded payment → refunded + reversal record; active membership for that application → suspended | Requires reason, only allows successful payments, writes reversal and reconciliation state, suspends active records for that application, records audit and notifies member. Duplicate reversal returns the prior reversal. | Present; verify role separation and edge cases |
 | Retry after reversal | reversed payment cannot be verified/activated again | Verification checks for a reversal; activation requires successful unreversed payment. | Present |
 
@@ -89,7 +89,7 @@ The service separates application review, payment verification, activation, and 
 ## Remaining follow-up items
 
 - Add/adjust regression tests for organization-detail access and reviewer list/detail scoping. CI is intentionally deferred until Phase 3 is complete.
-- Decide whether to add a dedicated expiry worker or a safe, auditable lazy-expiry service so persisted status agrees with date-based access checks.
+- Verify the startup/hourly expiry worker, its audit events, batch limits and failure/recovery behavior in a safe test environment.
 - Confirm separation of duties: whether reviewers may verify finance evidence, whether finance may approve membership applications, and who may activate.
 - Support inquiry queue and reply/status routes now scope work to unassigned/self-assigned conversations unless explicit broader authority is present; verify this with direct-request tests.
 - A read-only administrator audit endpoint and UI tab were added; verify schema compatibility, route authorization, and completeness of event history.

@@ -4,7 +4,7 @@ import {useRouter} from "next/navigation";
 import {useEffect, useId, useState} from "react";
 import {OperationStatus} from "../../components/operation-status";
 import {Badge} from "../../components/ui";
-import {api, ApiError} from "../../lib/api";
+import {ApiError, api} from "../../lib/api";
 import {humanStatus} from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 import styles from "./dashboard.module.css";

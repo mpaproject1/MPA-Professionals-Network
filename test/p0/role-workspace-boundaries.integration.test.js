@@ -186,7 +186,7 @@ test("support inquiry transfer requires manager authority and records the handof
   assert.equal(result.assignedTo, staffB);
   assert.equal(result.transferred, true);
   const audit = (await db.query(
-    "select action,metadata from audit_log where actor_user_id=$1 and resource_type='support_bot' and resource_id=$2 and action='support.inquiry_transferred' order by created_at desc limit 1",
+    "select action,metadata from audit_log where actor_user_id=$1 and resource_type='support_bot' and resource_id=$2 and action='support.inquiry_transferred' order by occurred_at desc limit 1",
     [manager, row.id],
   )).rows[0];
   assert.ok(audit, "successful transfer must be audited");

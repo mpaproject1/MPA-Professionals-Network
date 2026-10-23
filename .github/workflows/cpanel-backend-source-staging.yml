@@ -25,7 +25,7 @@ jobs:
       - name: Check out requested source revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_ref }}
+          ref: \${{ inputs.source_ref }}
           persist-credentials: false
 
       - name: Select backend source files only
@@ -35,7 +35,7 @@ jobs:
           git rev-parse HEAD > "$RUNNER_TEMP/source-commit.txt"
           git ls-files -z | python3 -c '
           import os, sys
-          paths = sys.stdin.buffer.read().split(b"\\0")
+          paths = sys.stdin.buffer.read().split(b"\0")
           selected = []
           allowed_roots = (b"src/", b"scripts/", b"db/migrations/", b"tests/", b"test/", b"config/")
           allowed_files = {b"server.js", b"package.json", b"package-lock.json", b"npm-shrinkwrap.json"}
@@ -51,7 +51,7 @@ jobs:
               raise SystemExit("Required backend entrypoint/package manifest not found")
           if not any(p.startswith(b"db/migrations/") and p.endswith(b".sql") for p in selected):
               raise SystemExit("No tracked SQL migrations found; refusing incomplete package")
-          sys.stdout.buffer.write(b"\\0".join(selected) + b"\\0")
+          sys.stdout.buffer.write(b"\0".join(selected) + b"\0")
           ' > "$RUNNER_TEMP/backend-files.list"
 
           grep -zqx 'server.js' "$RUNNER_TEMP/backend-files.list"
@@ -61,23 +61,23 @@ jobs:
         id: package
         shell: bash
         env:
-          SOURCE_REF: ${{ inputs.source_ref }}
+          SOURCE_REF: \${{ inputs.source_ref }}
         run: |
           set -euo pipefail
           SOURCE_COMMIT="$(cat "$RUNNER_TEMP/source-commit.txt")"
-          archive="$RUNNER_TEMP/mpa-backend-predeployment-${SOURCE_COMMIT}-${GITHUB_RUN_ID}.tar.gz"
-          manifest="$RUNNER_TEMP/mpa-backend-predeployment-${SOURCE_COMMIT}-${GITHUB_RUN_ID}.manifest.txt"
+          archive="$RUNNER_TEMP/mpa-backend-predeployment-\${SOURCE_COMMIT}-\${GITHUB_RUN_ID}.tar.gz"
+          manifest="$RUNNER_TEMP/mpa-backend-predeployment-\${SOURCE_COMMIT}-\${GITHUB_RUN_ID}.manifest.txt"
           checksum="$archive.sha256"
           tar --null -T "$RUNNER_TEMP/backend-files.list" -czf "$archive"
           python3 - "$RUNNER_TEMP/backend-files.list" "$manifest" "$SOURCE_COMMIT" "$SOURCE_REF" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$archive" <<'PY'
           import hashlib, sys
           files_path, manifest_path, commit, ref, repo, run_id, archive = sys.argv[1:]
-          paths = [p for p in open(files_path, "rb").read().split(b"\\0") if p]
+          paths = [p for p in open(files_path, "rb").read().split(b"\0") if p]
           migrations = [p for p in paths if p.startswith(b"db/migrations/") and p.endswith(b".sql")]
           digest = hashlib.sha256(open(archive, "rb").read()).hexdigest()
           with open(manifest_path, "w", encoding="utf-8") as out:
-              out.write(f"repository={repo}\\nsource_commit={commit}\\nsource_ref={ref}\\nworkflow_run_id={run_id}\\n")
-              out.write(f"tracked_backend_file_count={len(paths)}\\nsql_migration_count={len(migrations)}\\narchive_sha256={digest}\\n")
+              out.write(f"repository={repo}\nsource_commit={commit}\nsource_ref={ref}\nworkflow_run_id={run_id}\n")
+              out.write(f"tracked_backend_file_count={len(paths)}\nsql_migration_count={len(migrations)}\narchive_sha256={digest}\n")
           PY
           (cd "$(dirname "$archive")" && sha256sum "$(basename "$archive")" > "$(basename "$checksum")")
           if tar -tzf "$archive" | grep -E '(^|/)(\.env([^/]*)?|node_modules)(/|$)|(^|/)web/|(^|/)\.git/' ; then
@@ -91,11 +91,11 @@ jobs:
       - name: Store package as GitHub Actions artifact only
         uses: actions/upload-artifact@v4
         with:
-          name: mpa-backend-predeployment-${{ github.run_id }}
+          name: mpa-backend-predeployment-\${{ github.run_id }}
           path: |
-            ${{ steps.package.outputs.archive }}
-            ${{ steps.package.outputs.checksum }}
-            ${{ steps.package.outputs.manifest }}
+            \${{ steps.package.outputs.archive }}
+            \${{ steps.package.outputs.checksum }}
+            \${{ steps.package.outputs.manifest }}
           retention-days: 7
           if-no-files-found: error
 

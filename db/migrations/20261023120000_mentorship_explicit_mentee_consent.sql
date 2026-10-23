@@ -20,6 +20,7 @@ where m.request_id=mm.request_id
   and m.mentor_user_id=mm.mentor_user_id
   and m.mentee_user_id=mm.mentee_user_id
   and m.status='active'
+  and mm.status='accepted'
   and mm.mentee_consent_status='pending';
 
 -- Keep declined proposals as history while allowing a fresh proposal for the same request.

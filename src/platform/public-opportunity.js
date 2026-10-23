@@ -3,6 +3,7 @@ import { getPool, withTransaction } from "./db.js";
 
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
 function hashToken(token){ return createHash("sha256").update(token).digest("hex"); }
+function hashPayload(payload){ return createHash("sha256").update(JSON.stringify(payload)).digest("hex"); }
 function refCode(type){ return `MPA-${type==="job"?"JOB":"MEN"}-${randomBytes(5).toString("hex").toUpperCase()}`; }
 function clean(v,max=4000){ return v===undefined||v===null?null:String(v).trim().slice(0,max); }
 async function audit(db,actor,action,type,id,requestId,metadata={}){ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,metadata]); }
@@ -17,39 +18,64 @@ async function mentorAuthorized(db,mentorUserId,userId){
  return mentorUserId===userId;
 }
 
-export async function createPublicInquiry(input,requestId,identity=null){
+export async function createPublicInquiry(input,requestId,identity=null,idempotencyKey=null){
  return withTransaction(async db=>{
   const type=input.inquiryType==="mentorship"?"mentorship":"job";
-  if(!input.contactName) throw error(400,"contactName is required.","VALIDATION_ERROR");
-  if(!input.contactEmail&&!input.contactPhone) throw error(400,"Provide an email address or phone number.","VALIDATION_ERROR");
-  if(input.consent!==true) throw error(400,"Consent is required before submitting an inquiry.","CONSENT_REQUIRED");
+  if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
+   throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
+  const normalized={
+   type,
+   jobId:clean(input.jobId,100)||null,
+   preferredMentorUserId:clean(input.preferredMentorUserId,100)||null,
+   contactName:clean(input.contactName,200),
+   contactEmail:clean(input.contactEmail,320),
+   contactPhone:clean(input.contactPhone,80),
+   intent:clean(input.intent,2000)||"I would like to explore this opportunity.",
+   consent:input.consent===true,
+   identityId:identity?.sub||null,
+   details:{
+    targetRole:clean(input.targetRole,500),
+    skills:Array.isArray(input.skills)?input.skills.map(x=>clean(x,120)).filter(Boolean).slice(0,30):[],
+    experience:clean(input.experience,3000),
+    location:clean(input.location,300),
+    workMode:clean(input.workMode,100),
+    availability:clean(input.availability,500),
+    professionalSummary:clean(input.professionalSummary,3000)
+   }
+  };
+  const requestFingerprint=hashPayload(normalized);
+  const continuationHash=hashToken(idempotencyKey);
+  const existing=(await db.query("select id,public_reference,inquiry_type,status,created_at,app_user_id,idempotency_request_hash from public_opportunity_inquiry where continuation_token_hash=$1 for update",[continuationHash])).rows[0];
+  if(existing){
+   if(existing.idempotency_request_hash!==requestFingerprint)
+    throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,continuationToken:idempotencyKey,replayed:true,nextStep:"This inquiry was already received. Continue using the secure link below; you do not need to submit it again."};
+  }
+  if(!normalized.contactName) throw error(400,"Enter your name before submitting the inquiry.","VALIDATION_ERROR");
+  if(!normalized.contactEmail&&!normalized.contactPhone) throw error(400,"Provide an email address or phone number.","VALIDATION_ERROR");
+  if(!normalized.consent) throw error(400,"Consent is required before submitting an inquiry.","CONSENT_REQUIRED");
   let job=null;
-  if(type==="job" && input.jobId){
-    job=(await db.query("select id,title,status,posting_scope,organization_id from job where id=$1",[input.jobId])).rows[0];
-    if(!job) throw error(404,"Job not found.","NOT_FOUND");
-    if(job.status!=="published" || job.posting_scope!=="public") throw error(409,"This vacancy is not accepting public inquiries.","JOB_NOT_PUBLIC");
+  if(type==="job" && normalized.jobId){
+   job=(await db.query("select id,title,status,posting_scope,organization_id from job where id=$1",[normalized.jobId])).rows[0];
+   if(!job) throw error(404,"Job not found.","NOT_FOUND");
+   if(job.status!=="published" || job.posting_scope!=="public") throw error(409,"This vacancy is not accepting public inquiries.","JOB_NOT_PUBLIC");
   }
   let mentor=null;
-  if(type==="mentorship" && input.preferredMentorUserId){
-    mentor=(await db.query("select mp.user_id from mentor_profile mp where mp.user_id=$1 and mp.status='active' and mp.visibility='public'",[input.preferredMentorUserId])).rows[0];
-    if(!mentor) throw error(404,"The selected mentor is not available for public requests.","MENTOR_NOT_PUBLIC");
+  if(type==="mentorship" && normalized.preferredMentorUserId){
+   mentor=(await db.query("select mp.user_id from mentor_profile mp where mp.user_id=$1 and mp.status='active' and mp.visibility='public'",[normalized.preferredMentorUserId])).rows[0];
+   if(!mentor) throw error(404,"The selected mentor is not available for public requests.","MENTOR_NOT_PUBLIC");
   }
-  const token=randomBytes(24).toString("base64url");
-  const initialDetails={
-   targetRole:clean(input.targetRole,500),
-   skills:Array.isArray(input.skills)?input.skills.map(x=>clean(x,120)).filter(Boolean).slice(0,30):[],
-   experience:clean(input.experience,3000),
-   location:clean(input.location,300),
-   workMode:clean(input.workMode,100),
-   availability:clean(input.availability,500),
-   professionalSummary:clean(input.professionalSummary,3000)
-  };
-  const row=(await db.query("insert into public_opportunity_inquiry(inquiry_type,job_id,preferred_mentor_user_id,public_reference,continuation_token_hash,contact_name,contact_email,contact_phone,intent,consent,app_user_id,details) values($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11) returning id,public_reference,inquiry_type,status,created_at",[type,job?.id||null,mentor?.user_id||null,refCode(type),hashToken(token),clean(input.contactName,200),clean(input.contactEmail,320),clean(input.contactPhone,80),clean(input.intent,2000)||"I would like to explore this opportunity.",identity?.sub||null,JSON.stringify(initialDetails)])).rows[0];
-  await audit(db,identity?.sub||null,"public_opportunity.inquiry_received","public_opportunity_inquiry",row.id,requestId,{inquiryType:type,jobId:job?.id||null});
-  return {...row,continuationToken:token,nextStep:"Use the secure continuation link to provide detailed information, or create/sign in to an MPA account for the formal application workflow."};
+  const inserted=(await db.query("insert into public_opportunity_inquiry(inquiry_type,job_id,preferred_mentor_user_id,public_reference,continuation_token_hash,idempotency_request_hash,contact_name,contact_email,contact_phone,intent,consent,app_user_id,details) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,$11,$12) on conflict (continuation_token_hash) do nothing returning id,public_reference,inquiry_type,status,created_at",[type,job?.id||null,mentor?.user_id||null,refCode(type),continuationHash,requestFingerprint,normalized.contactName,normalized.contactEmail,normalized.contactPhone,normalized.intent,identity?.sub||null,JSON.stringify(normalized.details)])).rows[0];
+  if(!inserted){
+   const raced=(await db.query("select id,public_reference,inquiry_type,status,created_at,idempotency_request_hash from public_opportunity_inquiry where continuation_token_hash=$1 for update",[continuationHash])).rows[0];
+   if(!raced || raced.idempotency_request_hash!==requestFingerprint)
+    throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...raced,continuationToken:idempotencyKey,replayed:true,nextStep:"This inquiry was already received. Continue using the secure link below; you do not need to submit it again."};
+  }
+  await audit(db,identity?.sub||null,"public_opportunity.inquiry_received","public_opportunity_inquiry",inserted.id,requestId,{inquiryType:type,jobId:job?.id||null});
+  return {...inserted,continuationToken:idempotencyKey,replayed:false,nextStep:"Use the secure continuation link to provide detailed information, or create/sign in to an MPA account for the formal application workflow."};
  });
 }
-
 async function getByToken(db,reference,token){
  const r=(await db.query("select i.*,j.title job_title,j.organization_id,mp.user_id mentor_user_id from public_opportunity_inquiry i left join job j on j.id=i.job_id left join mentor_profile mp on mp.user_id=i.preferred_mentor_user_id where i.public_reference=$1 and i.continuation_token_hash=$2",[reference,hashToken(token)])).rows[0];
  if(!r) throw error(404,"Inquiry reference or continuation token is invalid.","NOT_FOUND");

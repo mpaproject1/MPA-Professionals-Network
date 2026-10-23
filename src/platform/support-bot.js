@@ -132,7 +132,7 @@ export async function adminUpdateConversation(actorId,id,input,requestId,canMana
    const eligible=await db.query(`select u.id from app_user u where u.id=$1 and u.status='active' and (
     exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($2::text[]))
     or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code=any($3::text[]))
-   )`,[requestedAssignee,["supporting_staff","system_admin","admin"],["support.manage","support.queue.manage"]]);
+   )`,[requestedAssignee,["supporting_staff","system_admin","admin"],["support.manage","support.queue.manage","support.inquiries.manage"]]);
    if(!eligible.rowCount)throw httpError("Choose an active Support Desk colleague with support permissions.",400,"INVALID_ASSIGNEE");
   }
   const nextStatus=status||current.status;

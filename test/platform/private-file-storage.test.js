@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import * as membership from "../../src/membership/service.js";
-import { getPool } from "../../src/platform/db.js";
+import { closePool, getPool } from "../../src/platform/db.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import { MAX_PRIVATE_UPLOAD_BYTES, readAuthorizedPrivateFile, validatePrivateUploadBytes, validatePrivateUploadName } from "../../src/platform/private-file-storage.js";
 
@@ -63,3 +63,5 @@ test("private file authorization denies an owner from another organization",asyn
     "even the correct organization owner must not read a CV attached to an unsubmitted draft application"
   );
 });
+
+test.after(async()=>{ await closePool(); });

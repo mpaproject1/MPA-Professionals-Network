@@ -31,55 +31,56 @@
 ### 2. Reviewer
 
 **Addressed in source**
-- Review queue filtering is derived from the authenticated viewer; a caller-provided `reviewerId` cannot broaden an ordinary reviewer's queue.
-- Case detail is limited to the assigned reviewer unless system administrator or explicit `verification.manage` authority applies.
-- Case assignment is restricted to system administrators or explicit `verification.manage` permission.
-- Direct claim/evidence routes now pass the authenticated viewer into case access checks.
-- Claim creation, evidence creation, and claim-status changes now enforce assigned-reviewer scope in the service layer as well as the route layer.
+- Review queue scope derives from the authenticated viewer, not a caller-supplied reviewer ID.
+- Case detail and claim/evidence actions check assigned-reviewer scope.
+- System administrators and users with explicit `verification.manage` permission are recognized by the service-level assignment helper.
+- Review-case assignment has an explicit manager permission gate.
+- The existing reviewer UI already includes reasoned decisions and displays decision history.
 
 **Not yet addressed / needs verification**
-- Add database-backed tests for assigned reviewer success, unassigned reviewer denial, reviewer-ID tampering, own-case conflict, and manager access.
-- Review all verification write actions (transition, decision, checklist, appeal, references, evidence downloads) as one complete authorization matrix; do not assume the routes are safe because list/detail are scoped.
-- Improve reviewer UX: assigned-only queue, filters and actionable empty states, conflict-of-interest warnings, reasoned decisions, prior-decision history, and clear next steps.
-- Verify that a reviewer cannot see another reviewer's private evidence through any alternate endpoint.
+- Runtime tests still need to prove assigned reviewer success, unassigned reviewer denial, reviewer-ID tampering, own-case conflict and manager access.
+- Audit every remaining verification write and evidence-download route against the complete permission matrix.
+- Complete browser/API acceptance for assignment changes, race conditions, private evidence and appeal independence.
 
 ### 3. Support Desk
 
-**Addressed in source / documented**
-- Existing demand-sharing service has checks for Support Desk access, active applicant consent, named-employer audience, allowed fields, and authorized organization membership before shared demand is visible.
-- The P0 matrix records the required privacy and authorization checks.
+**Addressed in source**
+- Inquiry queue queries now require an authenticated support identity and return only unassigned or self-assigned work unless the user has broader queue authority.
+- Status-change and reply actions check assignment, and assignment checks are performed under a row lock inside a transaction.
+- Starting work on an unassigned inquiry assigns it to the current staff member.
+- Status changes and replies record status/assignment context in audit metadata.
+- Existing demand-sharing checks cover consent, named-employer audience, allowed fields and organization membership.
 
 **Not yet addressed / needs verification**
-- Verify assigned-ticket queues, ownership/transfer, escalation, resolution outcomes, status history, and notifications are complete and persisted.
-- Verify all alternate routes preserve consent and employer scoping, including attachment/evidence access.
-- Improve task UX for ticket priority, waiting-on-member vs waiting-on-organization, escalation, and retryable failures.
-- Add negative API tests for missing/revoked consent, wrong employer, extra fields, and unassigned tickets.
+- Confirm the new queue behavior against the existing admin/support UI and database schema using runtime tests.
+- Complete explicit transfer/reassignment, escalation policy, priority, waiting-on-member versus waiting-on-organization, and notification behavior.
+- Add negative tests for another staff member's assigned conversation, manager override, missing/revoked consent, wrong employer and private attachments.
+- A full support ticket lifecycle is not yet proven; the existing support conversation workflow is not automatically equivalent to a complete ticketing system.
 
 ### 4. Finance
 
 **Addressed in source / documented**
-- Payment verification and reversal are separate service actions with distinct role/permission checks.
-- Membership activation requires the approval/payment conditions in the service; reversal records a reason and affects the associated membership.
-- The P0 matrix documents the transition sequence and acceptance scenarios.
+- Payment verification and reversal are separate operations.
+- Activation requires an approved application and successful unreversed payment with matching saved fee terms.
+- The finance route and membership lifecycle matrix identify amount/currency, reversal and reconciliation boundaries.
 
-**Not yet addressed / needs verification**
-- Product owner must confirm separation of duties: current routes allow reviewers to verify payments and finance users to review/activate memberships. Do not silently change this policy without confirmation.
-- Build/verify a finance-first queue for pending evidence, exceptions, duplicate submissions, reversals, reconciliation, receipts and audit history.
-- Add integration tests for wrong amount/currency, unapproved application, pending/reversed payment, duplicate verification/reversal, and unrelated-membership protection.
-- A dedicated expiry worker or auditable lazy-expiry process remains undecided. Date-based access may expire while persisted `status='expired'` remains stale.
+**Blocked pending policy confirmation / not yet addressed**
+- The separation-of-duties policy is still unconfirmed: current route gates allow reviewers to verify payments and finance users to review/activate memberships. I have not silently changed this authority model.
+- Finance-first queue UX for pending evidence, exceptions, duplicates, receipts, reversals and reconciliation remains incomplete.
+- Runtime tests are needed for wrong amount/currency, unapproved application, duplicate verification/reversal, and isolation from unrelated membership records.
 
 ### 5. Administrator
 
-**Addressed in source / documented**
-- Key membership product and membership-card settings routes have role/permission gates.
-- Review-case assignment has an explicit manager gate.
-- The matrix identifies administrative route families and requires actor, timestamp, reason, and before/after history for consequential changes.
+**Addressed in source**
+- Added a read-only audit history API, restricted to system administrators or an explicitly authorized `audit.view` permission.
+- Added an Audit history tab to the existing administrator workspace for system administrators, with action, time, resource, actor, request ID and metadata.
+- Key membership settings routes and review assignment have explicit permission gates.
 
 **Not yet addressed / needs verification**
-- Finish route-by-route review of every admin mutation, including role/permission changes, organization verification requirements, membership products/settings, reference data, and card verification.
-- Confirm every consequential admin action is auditable and scoped; authentication alone is not sufficient.
-- Ensure admin UI distinguishes safe viewing from consequential actions and shows confirmation, reason capture, result, and audit history.
-- Add forbidden direct-request tests for ordinary members, organization users, reviewers, and finance users.
+- Runtime-check the audit query against the actual schema and verify authorization for every user/role combination.
+- Finish the route-by-route audit of all admin mutations, including roles/permissions, organization verification, membership products, reference data and card verification.
+- Verify that all consequential changes capture sufficient before/after data and a reason where required; an audit viewer does not guarantee every mutation records complete history.
+- Add forbidden direct-request tests for ordinary members, organization users, reviewers and finance users.
 
 ## Membership lifecycle status
 
@@ -90,7 +91,7 @@
 | Submit payment evidence | Separate from payment verification | Test ownership, allowed channels, duplicate evidence, and idempotency |
 | Verify payment | Separate action with amount/currency and application-state checks | Test repeat/competing decisions, wrong amount/currency, reversal state, and role separation |
 | Activate membership | Requires approval and verified unreversed payment | Test repeated activation, correct start/end dates, and no overlapping renewal |
-| Expire membership | Date-based capability checks stop treating the membership as active | Persisted expiry status may remain stale; expiry worker/lazy-expiry design is open |
+| Expire membership | Added `expireDueMemberships()` and `npm run memberships:expire`; batch updates expired rows and writes an audit event | A scheduler/cron invocation is not configured or tested; runtime batch and downstream expiry behavior remain to verify |
 | Reverse/refund | Separate reasoned reversal and associated membership suspension exist | Test duplicate reversal, audit, reconciliation, and isolation from unrelated membership records |
 
 ## Regression coverage added in this continuation
@@ -98,19 +99,22 @@
 Added `test/p0/role-workspace-authorization.test.js` with structural regression checks for:
 - organization detail requiring an authenticated active organization membership;
 - reviewer list scope being derived from the authenticated viewer;
-- reviewer case-detail assignment enforcement;
+- reviewer case-detail assignment enforcement and explicit manager permission;
 - manager-only review assignment;
-- separate payment verification and membership activation paths.
+- support inquiry queue and action scoping;
+- separate payment verification and membership activation paths;
+- auditable membership-expiry batch and command;
+- applicant profile editing remaining available before membership while verification stays membership-gated.
 
 These are **source-structure regression guards**. They do not prove runtime authorization, HTTP status codes, database isolation, or complete role UX. Database-backed service/API tests and browser acceptance are still required. CI remains deferred until Phase 3 is complete, as requested.
 
 ## Recommended implementation order
 
-1. Finish reviewer and organization authorization regression coverage before expanding workspace UI.
-2. Complete Organization/Recruiter workspace and its cross-organization negative tests.
-3. Complete Reviewer workspace and assigned-case decision history.
-4. Complete Support Desk queue, consent visibility, and escalation.
-5. Complete Finance exception/reconciliation queue after separation-of-duties policy is confirmed.
-6. Complete Administrator action/audit matrix.
-7. Resolve membership expiry persistence and separation-of-duties decisions.
-8. Run the full CI and browser/API acceptance suite only after Phase 3 is complete; review results before any merge or deployment.
+1. Add database-backed reviewer, organization and support-assignment tests; source-structure checks alone are insufficient.
+2. Verify the existing Organization/Recruiter journey and test cross-organization resource IDs.
+3. Finish reviewer route coverage, including remaining write actions and evidence downloads.
+4. Verify Support Desk queue, escalation, consent and notification behavior in runtime tests.
+5. Obtain the separation-of-duties decision before implementing the final Finance permission model and finance-first UI.
+6. Finish the administrator mutation audit and validate the new audit view against the deployed schema in a safe test environment.
+7. Configure and verify the membership expiry batch schedule; confirm all profile editing works for non-members and member-only verification remains gated.
+8. Run CI and browser/API acceptance after Phase 3 is complete; review failures without removing tests or masking errors, and do not merge/deploy before review.

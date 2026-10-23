@@ -151,3 +151,50 @@ test("shared loading states and report controls explain pending work without blo
   assert.match(status, /aria-busy/);
   assert.match(styles, /prefers-reduced-motion:reduce/);
 });
+
+
+test("service and mentorship request retries use database-backed idempotency", async () => {
+  const [service, demand, server, demandMigration, mentorshipMigration, serviceMigration, servicesPage, demandPage, mentorshipPage] = await Promise.all([
+    source("../../src/services-mentorship/service.js"),
+    source("../../src/services-mentorship/demand.js"),
+    source("../../server.js"),
+    source("../../db/migrations/20261023101000_marketplace_demand_idempotency.sql"),
+    source("../../db/migrations/20261023102000_mentorship_request_idempotency.sql"),
+    source("../../db/migrations/20261023103000_service_request_idempotency.sql"),
+    source("../../web/app/services/page.tsx"),
+    source("../../web/app/service-demand/page.tsx"),
+    source("../../web/app/mentorship/page.tsx"),
+  ]);
+  assert.ok(server.includes('marketplaceDemand.createDemand(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"])'));
+  assert.ok(server.includes('servicesMentorship.createMentorshipRequest(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"])'));
+  assert.ok(server.includes('servicesMentorship.requestService(parts[3],identity.sub,await body(req),requestId,req.headers["x-idempotency-key"])'));
+  assert.ok(demand.includes("createDemand(userId,input,requestId,idempotencyKey=null)"));
+  assert.ok(service.includes("createMentorshipRequest(menteeId,input,requestId,idempotencyKey=null)"));
+  assert.ok(service.includes("requestService(listingId,requesterId,input,requestId,idempotencyKey=null)"));
+  for (const migration of [demandMigration, mentorshipMigration, serviceMigration]) {
+    assert.ok(migration.includes("request_idempotency_hash"));
+    assert.ok(migration.includes("request_fingerprint"));
+  }
+  for (const page of [servicesPage, demandPage, mentorshipPage]) {
+    assert.ok(page.includes("X-Idempotency-Key"));
+    assert.ok(page.includes("submissionUncertain"));
+    assert.ok(page.includes("Check submission again"));
+  }
+});
+
+test("recruitment and verification isolate pending actions and report recorded status", async () => {
+  const [recruitment, verification, jobs, services] = await Promise.all([
+    source("../../web/app/recruitment/page.tsx"),
+    source("../../web/app/verification/page.tsx"),
+    source("../../web/app/jobs/page.tsx"),
+    source("../../web/app/services/page.tsx"),
+  ]);
+  assert.ok(recruitment.includes("busyActions"));
+  assert.ok(recruitment.includes("humanStatus(updated.status||status)"));
+  assert.ok(verification.includes("busyActions"));
+  assert.ok(verification.includes("Loading verification cases and review queues"));
+  assert.ok(jobs.includes("Formal application status:"));
+  assert.ok(jobs.includes("This application is no longer a draft"));
+  assert.ok(services.includes("Service request reference"));
+  assert.ok(services.includes("transitioningIds"));
+});

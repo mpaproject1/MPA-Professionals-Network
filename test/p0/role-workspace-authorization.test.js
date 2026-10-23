@@ -84,13 +84,14 @@ test("membership expiry is persisted through an auditable batch runner", () => {
 test("professional profile edits are available before membership while verification remains membership-gated", () => {
   const policy = read("src/platform/identity-policy.js");
   const membership = read("src/membership/service.js");
+  const verification = read("src/verification/service.js");
   assert.match(policy, /export async function assertProfessionalProfileCapability\(db,userId,\{ requireActiveMembership = false \} = \{\}\)/);
   assert.match(membership, /await assertProfessionalProfileAccess\(db,userId\);/);
   const updateStart = membership.indexOf("export async function updateProfile(");
   const updateEnd = membership.indexOf("export async function listMyApplications(", updateStart);
   assert.ok(updateStart >= 0 && updateEnd > updateStart);
   assert.doesNotMatch(membership.slice(updateStart, updateEnd), /requireActiveMembership:true/);
-  assert.match(membership, /await assertProfessionalProfileAccess\(db,userId,\{requireActiveMembership:true\}\)/);
+  assert.match(verification, /assertProfessionalProfileCapability\(db,userId,\{requireActiveMembership:true\}\)/);
 });
 test("organization roster and ownership changes remain restricted to the dedicated owner/admin workflow", () => {
   const service = read("src/organization-jobs/service.js");

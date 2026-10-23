@@ -1,13 +1,12 @@
 "use client";
-import { ChartNoAxesCombined,FileSpreadsheet,FileText,RefreshCw,ShieldCheck } from "lucide-react";
-import { OperationStatus } from "../../../components/operation-status";
-import { useCallback,useEffect,useState } from "react";
-import { FormFeedback } from "../../../components/form-feedback";
-import { Badge, Card} from "../../../components/ui";
-import { ApiError, api} from "../../../lib/api";
-import { useUiStore } from "../../../lib/store";
-import { AdminPageHeader } from "../admin-page-header";
-
+import {ChartNoAxesCombined, FileSpreadsheet, FileText, RefreshCw, ShieldCheck} from "lucide-react";
+import {useCallback, useEffect, useState} from "react";
+import {FormFeedback} from "../../../components/form-feedback";
+import {OperationStatus} from "../../../components/operation-status";
+import {Badge, Card} from "../../../components/ui";
+import {api, ApiError} from "../../../lib/api";
+import {useUiStore} from "../../../lib/store";
+import {AdminPageHeader} from "../admin-page-header";
 type Report={id:string;title:string;description:string;category:string;scope:string;sensitive:boolean;columns:string[];definition:string;formats:string[]};
 type Result={report:Report;filters:{from:string;to:string;status:string;q:string;groupBy?:string};generatedAt:string;rows:Record<string,unknown>[];totals:Record<string,number|string>};
 type SavedView={id:string;report_id:string;reportTitle:string;name:string;filters:{from:string;to:string;status:string;q:string;groupBy?:string};updated_at:string};

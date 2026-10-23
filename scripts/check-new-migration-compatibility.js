@@ -3,6 +3,7 @@ import {readdir, readFile} from "node:fs/promises";
 import {join} from "node:path";
 import {fileURLToPath} from "node:url";
 import pg from "pg";
+
 const { Client } = pg;
 
 const expectedDatabase = process.env.MIGRATION_CHECK_EXPECTED_DATABASE;

@@ -279,3 +279,16 @@ test("CV storage remains private by default and sharing is limited to the applic
   assert.match(cvPage, /Revoke CV access/);
   assert.match(employerPage, /Documents the applicant shared with this application/);
 });
+
+test("Reviewer checklist and claim assessment actions are case-scoped and evidence-linked", () => {
+  const service = read("src/verification/service.js");
+  const server = read("server.js");
+  const ui = read("web/app/verification/page.tsx");
+  assert.match(service, /checklistItems:checklistItems\.rows/);
+  assert.match(service, /expectedCaseId&&row\.case_id!==expectedCaseId/);
+  assert.match(server, /verification\.setClaimStatus\(b\.claimId,b\.status,identity\.sub,requestId,parts\[4\]\)/);
+  assert.match(ui, /Reviewer checklist/);
+  assert.match(ui, /Save checklist result/);
+  assert.match(ui, /Save assessment/);
+  assert.match(ui, /Evidence linked to this checklist item/);
+});

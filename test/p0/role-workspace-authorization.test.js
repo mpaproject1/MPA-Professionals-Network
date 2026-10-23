@@ -24,6 +24,12 @@ test("reviewer queue derives scope from the authenticated viewer, not a caller-s
   assert.match(server, /verification\.listCases\(\{viewerId:identity\.sub/);
 });
 
+test("verification case reads fail closed when no viewer identity is supplied", () => {
+  const service = read("src/verification/service.js");
+  assert.match(service, /getCase\(caseId,viewerId=null\)\{ if\(!viewerId\) throw error\(403/);
+  assert.match(service, /if\(existing\.rows\[0\]\) return getCase\(existing\.rows\[0\]\.id,actorId\)/);
+});
+
 test("reviewer case details enforce assignment unless the viewer has elevated authority", () => {
   const service = read("src/verification/service.js");
   assert.match(service, /Only the assigned reviewer or an explicitly authorized verification manager may view this case/);

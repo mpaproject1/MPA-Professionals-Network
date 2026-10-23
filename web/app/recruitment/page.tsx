@@ -1,15 +1,14 @@
 "use client";
-import {BriefcaseBusiness,Building2,CalendarClock,Download,FileText,RefreshCw,Users} from "lucide-react";
-import {type FormEvent,useCallback,useEffect,useState} from "react";
-import { FormFeedback } from "../../components/form-feedback";
-import { OperationStatus } from "../../components/operation-status";
-import { JourneyGuide } from "../../components/journey-guide";
-import { TagInput } from "../../components/tag-input";
+import {BriefcaseBusiness, Building2, CalendarClock, Download, FileText, RefreshCw, Users} from "lucide-react";
+import {type FormEvent, useCallback, useEffect, useState} from "react";
+import {FormFeedback} from "../../components/form-feedback";
+import {JourneyGuide} from "../../components/journey-guide";
+import {OperationStatus} from "../../components/operation-status";
+import {TagInput} from "../../components/tag-input";
 import {Badge, Card} from "../../components/ui";
-import {ApiError, api} from "../../lib/api";
-import { humanStatus } from "../../lib/status-labels";
+import {api, ApiError} from "../../lib/api";
+import {humanStatus} from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
-
 type Organization={id:string;legal_name:string;display_name:string;verification_status?:string;role_code?:string};
 type Job={id:string;title:string;description?:string;status:string;posting_scope?:string;application_deadline?:string;organization_id:string};
 type Candidate={id:string;job_id:string;status:string;cover_letter?:string|null;submitted_at?:string|null;updated_at:string;candidate_name?:string;eligibility_snapshot?:any;attachments?:{id:string;fileObjectId:string;fileName:string;contentType:string;byteSize:number;attachmentType:string}[];offer_amount?:number|string|null;offer_currency?:string|null;offer_terms?:string|null;offer_approval_status?:string};

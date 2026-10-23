@@ -54,7 +54,7 @@ async function approvedOrg(ownerId){
 test("Gate 2: public service journey reaches accepted delivery, requester outcome acceptance and feedback",async()=>{
  const provider=await account(),requester=await account(),staff=await supportStaff();
  await activeMember(provider);
- const listing=await journeys.createServiceListing(provider,{title:"Gate 2 bookkeeping support",description:"Monthly bookkeeping, reconciliation and clear management reporting for small teams.",serviceCategory:"Finance",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-service-create");
+ const listing=await journeys.createServiceListing(provider,{title:"Gate 2 bookkeeping support",description:"Monthly bookkeeping, reconciliation and clear management reporting for small teams.",serviceCategory:"Finance",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-service-create",randomUUID());
  const submitted=await journeys.changeServiceListingStatus(listing.id,provider,"published","gate2-service-submit");
  assert.equal(submitted.moderation_status,"pending");
  assert.equal((await journeys.listServices(null,{q:"Gate 2 bookkeeping support"})).items.some(x=>x.id===listing.id),false);
@@ -62,7 +62,7 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
  const approved=await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Scope and public description reviewed."},"gate2-service-approve");
  assert.equal(approved.status,"published");
  assert.ok((await journeys.listServices(null,{q:"Gate 2 bookkeeping support"})).items.some(x=>x.id===listing.id));
- const request=await journeys.requestService(listing.id,requester,{message:"Please help us reconcile the last quarter."},"gate2-service-request");
+ const request=await journeys.requestService(listing.id,requester,{message:"Please help us reconcile the last quarter."},"gate2-service-request",randomUUID());
  await assert.rejects(journeys.changeServiceRequestStatus(request.id,await account(),"accepted","unrelated user","gate2-outsider"),e=>e.code==="FORBIDDEN");
  assert.equal((await journeys.changeServiceRequestStatus(request.id,provider,"accepted","Scope confirmed.","gate2-service-accept")).status,"accepted");
  assert.equal((await journeys.changeServiceRequestStatus(request.id,provider,"in_progress","Work started.","gate2-service-start")).status,"in_progress");
@@ -80,11 +80,11 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
 test("Gate 2: paid service completion cannot be accepted before finance verifies the agreed payment",async()=>{
  const provider=await account(),requester=await account(),finance=await financeStaff();
  await activeMember(provider);
- const listing=await journeys.createServiceListing(provider,{title:"Gate 2 paid service settlement",description:"A fixed-price engagement used to prove that completion acceptance follows finance-verified settlement.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"fixed",priceAmount:500,currency:"ETB",visibility:"public"},"gate2-paid-service-listing");
+ const listing=await journeys.createServiceListing(provider,{title:"Gate 2 paid service settlement",description:"A fixed-price engagement used to prove that completion acceptance follows finance-verified settlement.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"fixed",priceAmount:500,currency:"ETB",visibility:"public"},"gate2-paid-service-listing",randomUUID());
  await journeys.changeServiceListingStatus(listing.id,provider,"published","gate2-paid-service-publish");
  const staff=await supportStaff();
  await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Fixed-price scope and terms reviewed."},"gate2-paid-service-moderate");
- const request=await journeys.requestService(listing.id,requester,{message:"Please deliver the fixed-price operating procedure review.",proposedPrice:500,currency:"ETB"},"gate2-paid-service-request");
+ const request=await journeys.requestService(listing.id,requester,{message:"Please deliver the fixed-price operating procedure review.",proposedPrice:500,currency:"ETB"},"gate2-paid-service-request",randomUUID());
  await journeys.changeServiceRequestStatus(request.id,provider,"accepted","Agreed fixed price: ETB 500.","gate2-paid-service-accept");
  await journeys.changeServiceRequestStatus(request.id,provider,"in_progress","Work started.","gate2-paid-service-start");
  await journeys.changeServiceRequestStatus(request.id,provider,"completed","Deliverables are ready for requester review.","gate2-paid-service-submit-completion");
@@ -96,7 +96,7 @@ test("Gate 2: paid service completion cannot be accepted before finance verifies
 });
 test("Gate 2: verified organization publishes under its own identity and can fulfill a public service request",async()=>{
  const owner=await account(),requester=await account(),staff=await supportStaff(),org=await approvedOrg(owner);
- const listing=await journeys.createServiceListing(owner,{organizationId:org.id,title:"Gate 2 organization training",description:"Practical workplace training with a clear agenda, materials and measurable learning outcomes.",serviceCategory:"Training",deliveryMode:"hybrid",pricingModel:"quote",visibility:"public"},"gate2-org-service-create");
+ const listing=await journeys.createServiceListing(owner,{organizationId:org.id,title:"Gate 2 organization training",description:"Practical workplace training with a clear agenda, materials and measurable learning outcomes.",serviceCategory:"Training",deliveryMode:"hybrid",pricingModel:"quote",visibility:"public"},"gate2-org-service-create",randomUUID());
  assert.equal(listing.organization_id,org.id);
  const submitted=await journeys.changeServiceListingStatus(listing.id,owner,"published","gate2-org-service-submit");
  assert.equal(submitted.moderation_status,"pending");
@@ -104,7 +104,7 @@ test("Gate 2: verified organization publishes under its own identity and can ful
  assert.equal(approved.status,"published");
  const publicListing=(await journeys.listServices(null,{q:"Gate 2 organization training"})).items.find(x=>x.id===listing.id);
  assert.ok(publicListing);assert.equal(publicListing.organization_id,org.id);assert.equal(publicListing.display_name,org.display_name);
- const request=await journeys.requestService(listing.id,requester,{message:"Please share a training outline and available dates."},"gate2-org-service-request");
+ const request=await journeys.requestService(listing.id,requester,{message:"Please share a training outline and available dates."},"gate2-org-service-request",randomUUID());
  await assert.rejects(journeys.changeServiceRequestStatus(request.id,await account(),"accepted","Unrelated actor","gate2-org-service-outsider"),e=>e.code==="FORBIDDEN");
  assert.equal((await journeys.listMyServiceRequests(owner)).some(row=>row.id===request.id),true,"authorized organization owner can follow the request");
  assert.equal((await journeys.listMyServiceRequests(await account())).some(row=>row.id===request.id),false,"unrelated account cannot discover organization request details");
@@ -134,7 +134,7 @@ test("Gate 2: mentorship offer is reviewed, matched, accepted, scheduled, comple
  const weekdayNames={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
  const weekday=weekdayNames[new Intl.DateTimeFormat("en-US",{weekday:"short",timeZone:"Africa/Addis_Ababa"}).format(start)];
  await journeys.setMentorAvailability(profile.id,mentor,{slots:[{dayOfWeek:weekday,startTime:"09:00",endTime:"12:00",timezone:"Africa/Addis_Ababa"}]},"gate2-mentor-availability");
- const request=await journeys.createMentorshipRequest(mentee,{goals:"Build a realistic product discovery and delivery plan.",topics:["product","strategy"],preferredModes:["remote"],preferredLanguages:["english"],preferredDays:[weekday]},"gate2-mentorship-request");
+ const request=await journeys.createMentorshipRequest(mentee,{goals:"Build a realistic product discovery and delivery plan.",topics:["product","strategy"],preferredModes:["remote"],preferredLanguages:["english"],preferredDays:[weekday]},"gate2-mentorship-request",randomUUID());
  const matches=await journeys.findMentorMatches(request.id,mentee);
  assert.ok(matches.some(x=>x.mentorUserId===mentor));
  const proposed=await journeys.proposeMentorMatch(request.id,mentor,mentee,"gate2-mentorship-propose");
@@ -184,10 +184,10 @@ test("Gate 2: verified organization mentorship offer is moderated, requested, ac
 test("Gate 2: Support Desk proposes a suitable provider and the provider responds before demand is matched",async()=>{
  const provider=await account(),requester=await account(),staff=await supportStaff();
  await activeMember(provider);
- const listing=await journeys.createServiceListing(provider,{title:"Gate 2 demand-matching service",description:"Practical business operations support with a defined scope and measurable outcomes.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-match-listing-create");
+ const listing=await journeys.createServiceListing(provider,{title:"Gate 2 demand-matching service",description:"Practical business operations support with a defined scope and measurable outcomes.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-match-listing-create",randomUUID());
  await journeys.changeServiceListingStatus(listing.id,provider,"published","gate2-match-listing-submit");
  await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Public provider offer reviewed."},"gate2-match-listing-approve");
- const demand=await marketplace.createDemand(requester,{demandType:"service",title:"Need operations support",description:"Our small team needs help improving weekly workflows and documenting reliable operating procedures.",category:"Operations",deliveryMode:"remote"},"gate2-match-demand-create");
+ const demand=await marketplace.createDemand(requester,{demandType:"service",title:"Need operations support",description:"Our small team needs help improving weekly workflows and documenting reliable operating procedures.",category:"Operations",deliveryMode:"remote"},"gate2-match-demand-create",randomUUID());
  await assert.rejects(marketplace.reviewDemand(demand.id,staff,{status:"matched",internalNote:"",outcomeCode:"provider_search"},"gate2-match-premature"),e=>e.code==="PROVIDER_MATCH_REQUIRED");
  const candidates=await marketplace.listDemandMatchCandidates(staff,"service");
  assert.ok(candidates.some(x=>x.id===listing.id&&x.listing_type==="service"));

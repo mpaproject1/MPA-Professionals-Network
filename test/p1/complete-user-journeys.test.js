@@ -58,7 +58,7 @@ test("Gate 2: concurrent talent inquiries from one requester cannot create dupli
  await activeMember(professional);
  await verifiedProfessionalClaim(professional);
  const db=getPool();
- await db.query("update verification_visibility set directory_visible=true where user_id=$1",[professional]);
+ await db.query("insert into verification_visibility(user_id,directory_visible) values($1,true) on conflict(user_id) do update set directory_visible=true",[professional]);
  await db.query("update professional_profile set directory_visibility='members' where person_id=(select id from person where user_id=$1)",[professional]);
  const input={professionalUserId:professional,subject:"Professional collaboration",message:"I would like to discuss a possible professional collaboration."};
  const outcomes=await Promise.allSettled([

@@ -213,8 +213,27 @@ try {
       !consentConstraint.rows[0]?.definition?.includes("'declined'")) {
     throw new Error("Mentorship mentee-consent check constraint is missing or has unexpected values.");
   }
-  const rematchIndex = await client.query("select 1 from pg_indexes where schemaname='public' and indexname='ux_mentorship_match_one_open_request'");
-  if (!rematchIndex.rowCount) throw new Error("The partial unique index protecting active mentorship proposals is missing.");
+  const requiredUniqueIndexes = [
+    "ux_marketplace_demand_idempotency_hash",
+    "ux_mentorship_request_idempotency_hash",
+    "ux_service_request_idempotency_hash",
+    "ux_service_listing_idempotency_hash",
+    "ux_talent_inquiry_idempotency_hash",
+    "ux_mentorship_match_one_open_request"
+  ];
+  for (const name of requiredUniqueIndexes) {
+    const row = (await client.query(
+      "select indexdef from pg_indexes where schemaname='public' and indexname=$1",
+      [name]
+    )).rows[0];
+    if (!row || !row.indexdef.toUpperCase().includes("CREATE UNIQUE INDEX")) {
+      throw new Error(`Required unique index ${name} is missing or not unique.`);
+    }
+    if (name === "ux_mentorship_match_one_open_request" &&
+        (!row.indexdef.toLowerCase().includes("where") || !row.indexdef.includes("mentee_consent_status"))) {
+      throw new Error("The mentorship rematching index must remain a partial index scoped to non-declined proposals.");
+    }
+  }
 
   const requiredChecks = [
     ["support_conversation_workflow","support_conversation_workflow_priority_check",["low","normal","high","urgent"]],

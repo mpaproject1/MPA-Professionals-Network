@@ -9,7 +9,7 @@ import { humanStatus } from "../../../lib/status-labels";
 type Inquiry = { id: string; public_reference: string; continuationToken: string; status?: string; nextStep?: string; nextAction?: string };
 function createSubmissionKey(): string { if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function") throw new Error("Secure submission is unavailable in this browser. Please reload and try again."); return crypto.randomUUID()+crypto.randomUUID(); }
 function getPublicReference(value: Inquiry | null): string | null { return value?.public_reference ?? null; }
-type ConsentResult = { employer_sharing_consent: boolean; nextStep?: string };
+type ConsentResult = { employer_sharing_consent: boolean; status?: string; nextStep?: string };
 type ShareHistory = { shareId: string; organizationName: string; sharedFields: string[]; sharedAt: string; revokedAt?: string | null; status: string };
 type SharingOrganization = { id: string; display_name?: string | null; legal_name?: string | null };
 
@@ -172,7 +172,7 @@ export default function JobInterestPage() {
     if (!sharingOrganizations.some(org => org.id === selectedOrganizationId)) { setError("Choose an organization from the current verified-organization list, then retry."); return; }
     setProcessingConsent(true); setError(""); setNotice("");
     try {
-      await api<ConsentResult>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(inquiry.public_reference)}/sharing-consent`, {
+      const consent=await api<ConsentResult>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(inquiry.public_reference)}/sharing-consent`, {
         method: "POST",
         body: JSON.stringify({ token: inquiry.continuationToken, employerSharingConsent: true, scope: "named_employer", organizationId: selectedOrganizationId, fields: shareFields })
       });

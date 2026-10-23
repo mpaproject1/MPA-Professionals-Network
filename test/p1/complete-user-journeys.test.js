@@ -8,6 +8,7 @@ import * as marketplace from "../../src/services-mentorship/demand.js";
 import * as organizationOffers from "../../src/services-mentorship/organization-offers.js";
 import * as journeys from "../../src/services-mentorship/service.js";
 import * as talent from "../../src/talent/service.js";
+import * as verification from "../../src/verification/service.js";
 
 function identity(suffix){
  const digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
@@ -51,6 +52,30 @@ async function approvedOrg(ownerId){
  await db.query("update organization set verification_status='verified',verified_at=now(),verified_by=$2,public_visible=true where id=$1",[org.id,ownerId]);
  return org;
 }
+
+test("Gate 2: reference consent and reviewer assessment persist values allowed by the migration",async()=>{
+ const subject=await account(),referee=await account(),reviewer=await account();
+ await activeMember(subject);
+ const db=getPool(),code=`gate2-reference-${randomUUID().replaceAll("-","").slice(0,12)}`;
+ const program=(await db.query("insert into verification_program(program_code,name,purpose,subject_type) values($1,$2,$3,'person') returning id",[code,"Reference workflow compatibility","Test the reference consent and review states against persisted database constraints."])).rows[0];
+ const caseRow=(await db.query("insert into verification_case(program_id,subject_user_id,status,purpose_snapshot,opened_by,assigned_reviewer_id) values($1,$2,'review',$3,$2,$4) returning id",[program.id,subject,"Reference compatibility test",reviewer])).rows[0];
+ const refereeEmail=(await db.query("select email from app_user where id=$1",[referee])).rows[0].email;
+ const requested=await verification.requestReference(caseRow.id,{refereeEmail,relationship:"Former colleague"},subject,"gate2-reference-request");
+ assert.equal(requested.consent_status,"pending");
+ const responded=await verification.respondReferenceRequest(requested.id,{consent:true,responseText:"I worked with this person and can confirm their professional contribution."},referee,"gate2-reference-consent");
+ assert.equal(responded.consent_status,"consented");
+ assert.equal(responded.verification_status,"pending");
+ const reviewed=await verification.reviewReferenceRequest(requested.id,{status:"needs_clarification",reason:"Please clarify the dates and responsibilities covered by this reference."},reviewer,"gate2-reference-review");
+ assert.equal(reviewed.verification_status,"needs_clarification");
+ const persisted=(await db.query("select referee_contact,consent_status,verification_status,requester_user_id,referee_user_id,responded_by,reviewed_by from verification_reference_request where id=$1",[requested.id])).rows[0];
+ assert.equal(persisted.referee_contact,refereeEmail,"the required legacy contact column must remain populated");
+ assert.equal(persisted.consent_status,"consented");
+ assert.equal(persisted.verification_status,"needs_clarification");
+ assert.equal(persisted.requester_user_id,subject);
+ assert.equal(persisted.referee_user_id,referee);
+ assert.equal(persisted.responded_by,referee);
+ assert.equal(persisted.reviewed_by,reviewer);
+});
 
 test("Gate 2: concurrent talent inquiries from one requester cannot create duplicate pending records",async()=>{
  const requester=await account(),professional=await account();

@@ -55,7 +55,7 @@ test("reference workflow migration permits the persisted consent and assessment 
   for(const value of ["pending","received","verified","insufficient","disputed","not_verified","needs_clarification"]) {
     assert.ok(migration.includes(`'${value}'`),`reference assessment constraint must include ${value}`);
   }
-  assert.ok(service.includes('consent_status in (\'pending\',\'consented\')'));
+  assert.ok(service.includes('consent_status in (\'pending\',\'accepted\',\'consented\')'));
   assert.ok(service.includes('consent?"consented":"declined"'));
   assert.ok(service.includes('["verified","not_verified","needs_clarification"]'));
 });

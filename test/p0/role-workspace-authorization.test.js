@@ -81,10 +81,10 @@ test("membership expiry is persisted through an auditable batch runner", () => {
   assert.equal(packageJson.scripts["memberships:expire"], "node scripts/expire-memberships.js");
 });
 
-test("professional profile edits do not require active membership unless a membership-gated visibility change is requested", () => {
+test("professional profile edits are available before membership while verification remains membership-gated", () => {
   const policy = read("src/platform/identity-policy.js");
   const membership = read("src/membership/service.js");
   assert.match(policy, /export async function assertProfessionalProfileCapability\(db,userId,\{ requireActiveMembership = false \} = \{\}\)/);
   assert.match(membership, /await assertProfessionalProfileAccess\(db,userId\);/);
-  assert.match(membership, /if\(input\.visibility!==undefined&&input\.visibility!==null&&String\(input\.visibility\)\.trim\(\)!==\"\"\)\{\s*await assertProfessionalProfileAccess\(db,userId,\{requireActiveMembership:true\}\);/);
+  const updateStart = membership.indexOf("export async function updateProfile(");\n  const updateEnd = membership.indexOf("export async function listMyApplications(", updateStart);\n  assert.ok(updateStart >= 0 && updateEnd > updateStart);\n  assert.doesNotMatch(membership.slice(updateStart, updateEnd), /requireActiveMembership:true/);\n  assert.match(membership, /await assertProfessionalProfileAccess\(db,userId,\{requireActiveMembership:true\}\)/);
 });

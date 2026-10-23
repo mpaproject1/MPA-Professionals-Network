@@ -183,17 +183,17 @@ export default function JobInterestPage() {
     finally { setProcessingConsent(false); }
   }
   async function revokeConsent() {
-    if (!inquiry) return;
+    if (!inquiry||processingConsent) return;
     setProcessingConsent(true); setError(""); setNotice("");
     try {
-      await api<ConsentResult>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(inquiry.public_reference)}/sharing-consent`, {
+      const consent=await api<ConsentResult>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(inquiry.public_reference)}/sharing-consent`, {
         method: "POST",
         body: JSON.stringify({ token: inquiry.continuationToken, employerSharingConsent: false })
       });
       setConsentSaved(false);
       setShareWithEmployers(false);
       await refreshSharingHistory(inquiry);
-      setNotice("Employer-sharing consent was revoked. Existing employer access has been revoked; the request remains private to MPA Support Desk.");
+      setNotice("Employer-sharing consent status: "+(consent.employer_sharing_consent?"Still enabled":"Revoked")+". "+(consent.nextStep||"Previously shared records remain in the audit history."));
     } catch (e) { setError(e instanceof ApiError ? e.message : "We couldn't confirm consent revocation. Please retry."); }
     finally { setProcessingConsent(false); }
   }

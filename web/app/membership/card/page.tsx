@@ -1,11 +1,10 @@
 "use client";
-import { QRCodeSVG } from "qrcode.react";
-import { type CSSProperties, useEffect, useState } from "react";
-import { ApiError, api } from "../../../lib/api";
-import { OperationStatus } from "../../../components/operation-status";
-import { useUiStore } from "../../../lib/store";
+import {QRCodeSVG} from "qrcode.react";
+import {type CSSProperties, useEffect, useState} from "react";
+import {OperationStatus} from "../../../components/operation-status";
+import {api, ApiError} from "../../../lib/api";
+import {useUiStore} from "../../../lib/store";
 import styles from "./card.module.css";
-
 type CardSettings = {
   header_text:string; subtitle_text:string; footer_text:string; background_style:"geometric"|"gradient"|"midnight";
   background_start:string; background_end:string; accent_color:string; text_color:string; show_membership_type:boolean;

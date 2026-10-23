@@ -30,6 +30,23 @@ test("P1 service lifecycle: a disputed request cannot bypass provider delivery a
  assert.equal(services.allowedServiceRequestTransition("disputed","cancelled"),true,"a reasoned cancellation remains possible");
 });
 
+test("P1 marketplace demand: concurrent replay is idempotent and key reuse with changed payload conflicts",async()=>{
+ const requester=await account(randomUUID());
+ const key=randomUUID();
+ const payload={demandType:"service",title:"Concurrent bookkeeping support",description:"Need monthly bookkeeping support and transparent financial reporting.",category:"Finance",deliveryMode:"remote"};
+ const results=await Promise.all([
+  marketplaceDemand.createDemand(requester,payload,"marketplace-demand-concurrent-a",key),
+  marketplaceDemand.createDemand(requester,payload,"marketplace-demand-concurrent-b",key)
+ ]);
+ assert.equal(results[0].id,results[1].id,"concurrent retries with the same key must resolve to one persisted demand");
+ assert.equal((await getPool().query("select count(*)::int count from marketplace_demand where request_idempotency_hash=$1",[ (await import("node:crypto")).createHash("sha256").update(key).digest("hex") ])).rows[0].count,1);
+ await assert.rejects(
+  marketplaceDemand.createDemand(requester,{...payload,title:"Changed title for same key"},"marketplace-demand-conflict",key),
+  error=>error.code==="IDEMPOTENCY_KEY_CONFLICT",
+  "the same key cannot be reused for a different payload"
+ );
+});
+
 test("P1 marketplace: private demand is reviewed before a privacy-safe public topic appears; interests are unique",async()=>{
  const requester=await account(randomUUID()),staff=await supportStaff();
  const demand=await marketplaceDemand.createDemand(requester,{demandType:"service",title:"Need bookkeeping support",description:"Our small team needs monthly bookkeeping and financial reporting support.",category:"Finance",deliveryMode:"remote"},"marketplace-demand-submit",randomUUID());

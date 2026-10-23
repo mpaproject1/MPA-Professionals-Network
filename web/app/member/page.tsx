@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import {ArrowRight,Bell,Bookmark,BriefcaseBusiness,FileCheck2,GraduationCap,ShieldCheck,UserRound,Users} from "lucide-react";
+import {ArrowRight,Bell,Bookmark,BriefcaseBusiness,FileCheck2,FileText,GraduationCap,ShieldCheck,UserRound,Users} from "lucide-react";
 import {useCallback,useEffect,useState} from "react";
 import {OperationStatus} from "../../components/operation-status";
 import {Badge,Card} from "../../components/ui";
@@ -15,7 +15,8 @@ type Verification={items?:{id:string;status:string;program_name?:string;program_
 type MembershipApplication={id:string;status:string;created_at?:string;tracking_reference?:string};
 type Data={me:Me;tracking:Tracking;saved:SavedItem[];inbox:Inbox;talent:TalentProfile;verification:Verification;membership:MembershipApplication[];errors:string[]};
 const shortcuts=[
- {href:"/profile",title:"Profile, CV and portfolio",detail:"Maintain your professional record and portfolio; share documents only through a supported, authorized application or consent workflow.",icon:UserRound},
+ {href:"/profile",title:"Profile and portfolio",detail:"Keep your identity, education, experience and portfolio current.",icon:UserRound},
+ {href:"/member/cv",title:"CV and sharing permissions",detail:"Keep a private CV and choose which of your job applications receives it; revoke access later.",icon:FileText},
  {href:"/jobs",title:"Find opportunities",detail:"Explore public opportunities and save roles to revisit.",icon:BriefcaseBusiness},
  {href:"/track",title:"Applications and requests",detail:"Check the latest status, review history and next action.",icon:FileCheck2},
  {href:"/mentorship",title:"Mentoring",detail:"Explore mentorship and follow your active requests.",icon:Users},

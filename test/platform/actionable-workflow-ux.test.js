@@ -80,7 +80,7 @@ test("completed public inquiries provide a clear next task", async () => {
   ]);
   for (const page of [job, mentorship]) {
     assert.match(page, /Start another inquiry/);
-    assert.match(page, /aria-busy=\{submitting\}/);
+    assert.match(page, /aria-busy=\{submitting(?:\|\|submissionUncertain)?\}/);
     assert.match(page, /Sending your inquiry securely/);
     assert.match(page, /busy=\{submitting\}/);
   }

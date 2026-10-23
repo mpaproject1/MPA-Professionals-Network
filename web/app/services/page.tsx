@@ -62,7 +62,7 @@ export default function Services(){
    try{const [result,me]=await Promise.all([api<ServiceRequest[]>("/api/v1/me/service-requests",{},token),api<{user_id:string}>("/api/v1/me",{},token)]);const rows=Array.isArray(result)?result:[];setRequests(rows);setCurrentUserId(me.user_id);const loaded=await Promise.all(rows.map(async r=>{try{return [r.id,await api<ServiceDelivery[]>(`/api/v1/service-requests/${encodeURIComponent(r.id)}/deliveries`,{},token)] as const;}catch{return [r.id,[]] as const;}}));setDeliveries(Object.fromEntries(loaded));}
    catch(e){setError(e instanceof ApiError?e.message:"We couldn't load your service requests.");}
  },[token]);
- useEffect(()=>{void load();},[load]);
+ useEffect(()=>{const initialQuery=new URLSearchParams(window.location.search).get("q")?.trim()||"";setQuery(initialQuery);void load(initialQuery,0);},[load]);
  useEffect(()=>{void loadRequests();},[loadRequests]);
  useEffect(()=>{void loadProviderWorkspace();},[loadProviderWorkspace]);
 

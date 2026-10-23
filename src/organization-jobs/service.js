@@ -545,7 +545,7 @@ export async function addApplicationAttachment(applicationId,userId,input,reques
 export async function addOrganizationUser(orgId,actorUserId,input,requestId){
  return withTransaction(async db=>{
   await orgRole(db,orgId,actorUserId,["owner","administrator"]);
-  if(!["owner","administrator","recruiter","project_manager","event_manager","finance","read_only"].includes(input.roleCode)) throw error(400,"Invalid organization role.","VALIDATION_ERROR");
+  if(!["administrator","recruiter","project_manager","event_manager","finance","read_only"].includes(input.roleCode)) throw error(400,"Choose a supported organization role. Ownership transfer uses a separate controlled workflow.","VALIDATION_ERROR");
   const target=(await db.query("select id from app_user where id=$1",[input.userId])).rows[0]; if(!target) throw error(404,"User account not found.","NOT_FOUND");
   const row=(await db.query("insert into organization_membership(organization_id,user_id,role_code,status,invited_by,joined_at) values($1,$2,$3,'active',$4,now()) on conflict(organization_id,user_id) do update set role_code=excluded.role_code,status='active',updated_at=now() returning *",[orgId,input.userId,input.roleCode,actorUserId])).rows[0];
   await audit(db,actorUserId,"organization.user_added","organization_membership",row.id,requestId,{roleCode:input.roleCode});
@@ -557,8 +557,8 @@ export async function updateOrganizationUser(orgId,actorUserId,userId,input,requ
  return withTransaction(async db=>{
   await orgRole(db,orgId,actorUserId,["owner","administrator"]);
   const row=(await db.query("select * from organization_membership where organization_id=$1 and user_id=$2 for update",[orgId,userId])).rows[0]; if(!row) throw error(404,"Organization user not found.","NOT_FOUND");
-  if(row.role_code==="owner"&&actorUserId!==userId) throw error(403,"The owner role requires a dedicated ownership transfer workflow.","FORBIDDEN");
-  const role=input.roleCode||row.role_code; if(!["owner","administrator","recruiter","project_manager","event_manager","finance","read_only"].includes(role)) throw error(400,"Invalid organization role.","VALIDATION_ERROR");
+  if(row.role_code==="owner") throw error(403,"The owner role cannot be changed here. Use a dedicated ownership transfer workflow.","FORBIDDEN");
+  const role=input.roleCode||row.role_code; if(!["administrator","recruiter","project_manager","event_manager","finance","read_only"].includes(role)) throw error(400,"Choose a supported organization role. Ownership transfer uses a separate controlled workflow.","VALIDATION_ERROR");
   const status=input.status||row.status; if(!["active","suspended","removed"].includes(status)) throw error(400,"Invalid organization user status.","VALIDATION_ERROR");
   const updated=(await db.query("update organization_membership set role_code=$1,status=$2,updated_at=now() where id=$3 returning *",[role,status,row.id])).rows[0];
   await audit(db,actorUserId,"organization.user_updated","organization_membership",row.id,requestId,{roleCode:role,status});
@@ -567,7 +567,7 @@ export async function updateOrganizationUser(orgId,actorUserId,userId,input,requ
  });
 }
 export async function listOrganizationUsers(orgId,actorUserId){
- const db=getPool(); await orgRole(db,orgId,actorUserId,["owner","administrator","recruiter","read_only"]);
+ const db=getPool(); await orgRole(db,orgId,actorUserId,["owner","administrator"]);
  return (await db.query("select om.user_id,om.role_code,om.status,om.joined_at,p.display_name,u.email from organization_membership om join app_user u on u.id=om.user_id left join person p on p.user_id=u.id where om.organization_id=$1 order by om.created_at",[orgId])).rows;
 }
 

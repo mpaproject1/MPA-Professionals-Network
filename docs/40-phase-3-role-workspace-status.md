@@ -18,7 +18,8 @@
 
 **Addressed in source**
 - Full organization detail no longer relies on `public_visible`; the viewer must have an active allowed role in that exact organization.
-- The full membership roster is limited to owner/administrator; other authorized organization members receive no roster.
+- Both organization-detail roster data and the separate roster endpoint are limited to owner/administrator.
+- Direct assignment of the owner role through ordinary add/update-member actions is blocked; ownership transfer requires a dedicated workflow.
 - Public organization discovery continues through the separate limited public-profile projection.
 - Existing organization/job services are intended to enforce organization scope on job, candidate, applicant, and team actions; this still needs negative cross-organization API tests.
 
@@ -49,12 +50,14 @@
 - Status-change and reply actions check assignment, and assignment checks are performed under a row lock inside a transaction.
 - Starting work on an unassigned inquiry assigns it to the current staff member.
 - Status changes and replies record status/assignment context in audit metadata.
+- Contact name, email, phone and preferred contact method are suppressed from support queue results when the person has not consented to follow-up.
 - Existing demand-sharing checks cover consent, named-employer audience, allowed fields and organization membership.
 
 **Not yet addressed / needs verification**
 - Confirm the new queue behavior against the existing admin/support UI and database schema using runtime tests.
 - Complete explicit transfer/reassignment, escalation policy, priority, waiting-on-member versus waiting-on-organization, and notification behavior.
 - Add negative tests for another staff member's assigned conversation, manager override, missing/revoked consent, wrong employer and private attachments.
+- Explicit transfer/reassignment and escalation policy remain unimplemented; self-assignment of unassigned work is not a complete handoff workflow.
 - A full support ticket lifecycle is not yet proven; the existing support conversation workflow is not automatically equivalent to a complete ticketing system.
 
 ### 4. Finance

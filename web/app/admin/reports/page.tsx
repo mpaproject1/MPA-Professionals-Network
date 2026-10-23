@@ -4,7 +4,7 @@ import {useCallback, useEffect, useState} from "react";
 import {FormFeedback} from "../../../components/form-feedback";
 import {OperationStatus} from "../../../components/operation-status";
 import {Badge, Card} from "../../../components/ui";
-import {api, ApiError} from "../../../lib/api";
+import {ApiError, api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
 import {AdminPageHeader} from "../admin-page-header";
 

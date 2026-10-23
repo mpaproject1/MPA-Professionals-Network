@@ -155,6 +155,7 @@ test("Gate 2: mentorship offer is reviewed, matched, accepted, scheduled, comple
 
 test("Gate 2: mentee can consent before the mentor and relationship starts only after both accept",async()=>{
  const mentee=await account(),mentor=await account(),staff=await supportStaff();
+ await activeMember(mentee);
  await activeMember(mentor);
  await verifiedProfessionalClaim(mentor);
  const profile=await journeys.createMentorProfile(mentor,{headline:"Mentee-first product mentor",bio:"Practical product discovery and delivery coaching.",expertise:["product","strategy"],languages:["english"],mentoringModes:["remote"],visibility:"public",maxActiveMentees:3},"gate2-mentee-first-profile");
@@ -177,6 +178,7 @@ test("Gate 2: mentee can consent before the mentor and relationship starts only 
 });
 test("Gate 2: declined mentorship match remains in history when a different mentor is proposed",async()=>{
  const mentee=await account(),firstMentor=await account(),secondMentor=await account(),staff=await supportStaff();
+ await activeMember(mentee);
  for(const mentor of [firstMentor,secondMentor]){
   await activeMember(mentor);
   await verifiedProfessionalClaim(mentor);

@@ -529,6 +529,20 @@ const server=http.createServer(async (req,res)=>{
     return json(res,status,{error:{code:error.code||"INTERNAL_ERROR",message:status>=500?"Internal server error.":error.message}},requestId);
   }
 });
+// Bounded, unref'd expiry worker. The batch uses row locks so concurrent instances can safely share the work.
+let membershipExpiryRunning=false;
+async function runMembershipExpiry(){
+  if(membershipExpiryRunning)return;
+  membershipExpiryRunning=true;
+  try {
+    const result=await membership.expireDueMemberships(process.env.MEMBERSHIP_EXPIRY_BATCH_SIZE||500);
+    if(result.expiredCount)logger.info("membership.expiry.completed",{expiredCount:result.expiredCount});
+  } catch(error) {
+    logger.warn("membership.expiry.failed",{error:error.message,code:error.code||"MEMBERSHIP_EXPIRY_FAILED"});
+  } finally { membershipExpiryRunning=false; }
+}
+const membershipExpiryTimer=setInterval(()=>void runMembershipExpiry(),60*60*1000);
+membershipExpiryTimer.unref();
 // Bounded, unref'd dispatcher. Row-level locking in the outbox service coordinates multiple instances.
 let emailWorkerRunning=false;
 const emailWorkerTimer=setInterval(async()=>{
@@ -539,5 +553,5 @@ const emailWorkerTimer=setInterval(async()=>{
   finally { emailWorkerRunning=false; }
 },30000);
 emailWorkerTimer.unref();
-server.listen(config.port,config.host,async()=>{ try { await bootstrapAdmin(); logger.info("server.started",{host:config.host,port:config.port,environment:config.nodeEnv,bootstrapAdmin:Boolean(config.bootstrapAdminEmail)}); } catch(error){ logger.error("bootstrap.admin.failed",{error:error.message}); if(config.nodeEnv==="production") process.exitCode=1; } });
+server.listen(config.port,config.host,async()=>{ try { await bootstrapAdmin(); void runMembershipExpiry(); logger.info("server.started",{host:config.host,port:config.port,environment:config.nodeEnv,bootstrapAdmin:Boolean(config.bootstrapAdminEmail)}); } catch(error){ logger.error("bootstrap.admin.failed",{error:error.message}); if(config.nodeEnv==="production") process.exitCode=1; } });
 export { server };

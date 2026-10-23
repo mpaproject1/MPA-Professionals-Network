@@ -41,6 +41,7 @@ type Guide = {
 };
 type CurrentUser = { user_id: string; roles: string[] };
 type ManagedPermission = { permission_code: string; area: string; label: string; description: string; sensitive: boolean; system_only: boolean };
+type AuditEvent = { id: string; actor_user_id?: string | null; action: string; resource_type: string; resource_id?: string | null; request_id?: string | null; outcome: string; metadata?: Record<string, unknown>; created_at: string };
 type Inquiry = {
   id: string;
   public_reference: string;
@@ -61,13 +62,14 @@ export default function AdminPage() {
   const hydrated = useUiStore((s) => s.hydrated);
   const token = useUiStore((s) => s.token);
   const hydrateToken = useUiStore((s) => s.hydrateToken);
-  const [tab, setTab] = useState<"cases" | "guides" | "inquiries" | "users">("cases");
+  const [tab, setTab] = useState<"cases" | "guides" | "inquiries" | "users" | "audit">("cases");
   const [cases, setCases] = useState<Demo[]>([]);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [roleCatalog, setRoleCatalog] = useState<ManagedRole[]>([]);
   const [permissionCatalog, setPermissionCatalog] = useState<ManagedPermission[]>([]);
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [scopeResolved, setScopeResolved] = useState(false);
@@ -125,7 +127,8 @@ export default function AdminPage() {
       if (currentRoles.includes("system_admin")) {
         try { const permissions = await api<ManagedPermission[]>("/api/v1/admin/permissions", {}, token); setPermissionCatalog(Array.isArray(permissions) ? permissions : []); }
         catch { errors.push("permission catalog"); }
-      } else setPermissionCatalog([]);
+        tasks.push(settle("audit history", getList<AuditEvent>("/api/v1/admin/audit-log?limit=100", "items"), setAuditEvents));
+      } else { setPermissionCatalog([]); setAuditEvents([]); }
       setScopeResolved(true);
     } catch (cause) {
       setScopeResolved(true);
@@ -263,6 +266,7 @@ export default function AdminPage() {
                   ["cases", "Demo cases", cases.length],
                   ["guides", "User guides", guides.length],
                   ["users", "Users & roles", users.length],
+                  ...(roles.includes("system_admin") ? [["audit", "Audit history", auditEvents.length] as [typeof tab, string, number]] : []),
                 ]
               : []),
             ...(canReviewInquiries
@@ -370,6 +374,22 @@ export default function AdminPage() {
                 )}{" "}
                 {g.active ? "Disable" : "Enable"}
               </button>
+            </div>
+          ))}
+        </Card>
+      )}
+      {tab === "audit" && roles.includes("system_admin") && (
+        <Card>
+          <div className="h2">Administrative audit history</div>
+          <p className="muted">Read-only record of consequential platform actions. Use the action and resource details to investigate changes; access to this view is restricted by the server.</p>
+          {sectionErrors.includes("audit history") ? <OperationStatus state="error" title="Audit history could not be loaded" detail="Retry after confirming your administrator session and audit permissions." /> : auditEvents.length === 0 ? <p className="muted">No audit events were returned for the current page.</p> : auditEvents.map((event) => (
+            <div className="case-row" key={event.id}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="row" style={{ gap: 8, flexWrap: "wrap" }}><b>{event.action.replaceAll("_", " ")}</b><Badge>{event.outcome}</Badge></div>
+                <p className="muted">{event.created_at ? new Date(event.created_at).toLocaleString() : "Time unavailable"} · {event.resource_type || "resource"} · {event.resource_id || "No resource ID"}</p>
+                <p className="muted">Actor: {event.actor_user_id || "System"}{event.request_id ? ` · Request: ${event.request_id}` : ""}</p>
+                {event.metadata && Object.keys(event.metadata).length > 0 ? <details><summary>Change details</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(event.metadata, null, 2)}</pre></details> : null}
+              </div>
             </div>
           ))}
         </Card>

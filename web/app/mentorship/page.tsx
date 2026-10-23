@@ -134,7 +134,7 @@ export default function Mentorship(){
   }
 
  return <div>
-   <div className="eyebrow">Mentorship match</div><h1 className="h1">One goal. One good match.</h1>
+   <div><Link href="/marketplace" className="text-link">← Back to Marketplace</Link><div className="eyebrow" style={{marginTop:8}}>Mentorship match</div><h1 className="h1">One goal. One good match.</h1></div>
    <p className="muted">Discover current mentor profiles and submit a goal-based request. We show only details returned by the platform; availability and matching are not guessed or guaranteed.</p>
    <div className="row" style={{gap:8,flexWrap:"wrap"}}>
      <a className="btn btn-primary" href="#mentor-discovery">Find a mentor</a>

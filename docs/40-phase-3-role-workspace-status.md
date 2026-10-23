@@ -66,7 +66,7 @@
 
 **Still needs validation**
 - Run negative API tests with foreign organization, job, candidate, application and interview IDs; verify every employer role and consent-controlled profile field.
-- Confirm outcome history and partnership request transitions in browser/runtime tests. No employer workflow is being claimed as production-validated.
+- Confirm outcome history and organization mentorship request transitions in browser/runtime tests. The current link is to the existing mentorship-program workflow; a separate general-purpose employer partnership proposal/agreement/milestone lifecycle is still not implemented. No employer workflow is being claimed as production-validated.
 
 ### 3. Support Desk
 

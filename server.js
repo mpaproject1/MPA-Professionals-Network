@@ -434,6 +434,12 @@ const server=http.createServer(async (req,res)=>{
     }
 
     if(req.method==="GET" && p==="api/v1/professional-reference-data") return ok(res,await referencePortfolio.listPublicReferenceSets(),requestId);
+    if(req.method==="GET" && p==="api/v1/me/job-applications") return ok(res,await organizationJobs.listMyApplications(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/me/cv") return ok(res,await talent.getMyCv(identity.sub),requestId);
+    if(req.method==="PATCH" && p==="api/v1/me/cv") { const b=await body(req); return ok(res,await talent.saveMyCv(identity.sub,b.fileObjectId||null,requestId),requestId); }
+    if(req.method==="GET" && p==="api/v1/me/cv/shares") return ok(res,await talent.listMyCvShares(identity.sub),requestId);
+    if(req.method==="POST" && p==="api/v1/me/cv/share") { const b=await body(req); return ok(res,await talent.shareMyCvWithApplication(identity.sub,b.applicationId,requestId),requestId,201); }
+    if(req.method==="DELETE" && p==="api/v1/me/cv/share") { const b=await body(req); return ok(res,await talent.revokeMyCvShare(identity.sub,b.applicationId,requestId),requestId); }
     if(req.method==="GET" && p==="api/v1/me/education") return ok(res,await talent.getProfessionalEducation(identity.sub),requestId);
     if(req.method==="PUT" && p==="api/v1/me/education") return ok(res,await talent.saveProfessionalEducation(identity.sub,await body(req),requestId),requestId);
     if(req.method==="GET" && p==="api/v1/me/portfolio") return ok(res,await talent.getProfessionalPortfolio(identity.sub),requestId);

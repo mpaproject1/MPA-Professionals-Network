@@ -54,9 +54,12 @@ async function approvedOrg(ownerId){
 }
 
 test("Gate 2: reference consent and reviewer assessment persist values allowed by the migration",async()=>{
- const subject=await account(),referee=await account(),reviewer=await account();
+ const subject=await account(),referee=await account(),reviewer=await account(),unassignedReviewer=await account();
  await activeMember(subject);
- const db=getPool(),code=`gate2-reference-${randomUUID().replaceAll("-","").slice(0,12)}`;
+ const db=getPool();
+ await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='verification_reviewer' on conflict do nothing",[reviewer]);
+ await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='verification_reviewer' on conflict do nothing",[unassignedReviewer]);
+ const code=`gate2-reference-${randomUUID().replaceAll("-","").slice(0,12)}`;
  const program=(await db.query("insert into verification_program(program_code,name,purpose,subject_type) values($1,$2,$3,'person') returning id",[code,"Reference workflow compatibility","Test the reference consent and review states against persisted database constraints."])).rows[0];
  const caseRow=(await db.query("insert into verification_case(program_id,subject_user_id,status,purpose_snapshot,opened_by,assigned_reviewer_id) values($1,$2,'review',$3,$2,$4) returning id",[program.id,subject,"Reference compatibility test",reviewer])).rows[0];
  const refereeEmail=(await db.query("select email from app_user where id=$1",[referee])).rows[0].email;
@@ -65,6 +68,11 @@ test("Gate 2: reference consent and reviewer assessment persist values allowed b
  const responded=await verification.respondReferenceRequest(requested.id,{consent:true,responseText:"I worked with this person and can confirm their professional contribution."},referee,"gate2-reference-consent");
  assert.equal(responded.consent_status,"consented");
  assert.equal(responded.verification_status,"pending");
+ await assert.rejects(
+  verification.reviewReferenceRequest(requested.id,{status:"verified",reason:"Unassigned reviewer must not be able to decide this reference."},unassignedReviewer,"gate2-reference-unassigned-review"),
+  error=>error.code==="FORBIDDEN",
+  "a reviewer without assignment must not assess another reviewer's reference"
+ );
  const reviewed=await verification.reviewReferenceRequest(requested.id,{status:"needs_clarification",reason:"Please clarify the dates and responsibilities covered by this reference."},reviewer,"gate2-reference-review");
  assert.equal(reviewed.verification_status,"needs_clarification");
  const persisted=(await db.query("select referee_contact,consent_status,verification_status,requester_user_id,referee_user_id,responded_by,reviewed_by from verification_reference_request where id=$1",[requested.id])).rows[0];

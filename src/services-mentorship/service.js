@@ -206,6 +206,12 @@ export async function requestService(listingId,requesterId,input,requestId,idemp
    return {...existing,idempotent:true,replayed:true,nextAction:existing.status==="requested"?"Wait for the provider to respond.":existing.status==="accepted"?"Confirm scope, timing and milestones.":existing.status==="in_progress"?"Track delivery and review the provider's submitted outcome.":"Review the recorded request outcome; do not submit the same request again."};
   }
   const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
+  // Re-check the key after acquiring the listing lock: another request may have committed while this transaction waited.
+  const racedExisting=(await db.query("select * from service_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(racedExisting){
+   if(racedExisting.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...racedExisting,idempotent:true,replayed:true,nextAction:racedExisting.status==="requested"?"Wait for the provider to respond.":racedExisting.status==="accepted"?"Confirm scope, timing and milestones.":racedExisting.status==="in_progress"?"Track delivery and review the provider's submitted outcome.":"Review the recorded request outcome; do not submit the same request again."};
+  }
   if(!listing||listing.status!=="published"||listing.moderation_status!=="approved"||listing.visibility==="private") throw error(404,"Service listing is not available.","NOT_FOUND");
   if(listing.organization_id){const org=(await db.query("select verification_status from organization where id=$1",[listing.organization_id])).rows[0];if(!org||org.verification_status!=="verified")throw error(404,"Service listing is not available.","NOT_FOUND");}
   else if(!(await activeMember(db,listing.provider_user_id))) throw error(404,"Service listing is not available.","NOT_FOUND");

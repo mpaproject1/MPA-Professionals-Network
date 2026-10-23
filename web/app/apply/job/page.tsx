@@ -1,8 +1,8 @@
 "use client";
 import {ArrowRight,BriefcaseBusiness,CheckCircle2} from "lucide-react";
 import {type FormEvent,useEffect,useState} from "react";
-import {Badge, Card} from "../../../components/ui";
 import {FormFeedback} from "../../../components/form-feedback";
+import {Badge, Card} from "../../../components/ui";
 import {api} from "../../../lib/api";
 
 type Job={id:string;title:string;organization_name?:string;organization_display_name?:string;location_label?:string;posting_scope?:string;status?:string};

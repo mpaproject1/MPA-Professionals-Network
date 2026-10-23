@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { getPool, withTransaction } from "./db.js";
+import { queueWorkflowEmail } from "./email-operations.js";
 
 const clean = (value, max=2000) => String(value ?? "").replace(/\p{Cc}/gu, character => "\t\n\r".includes(character) ? character : "").trim().slice(0,max);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -110,12 +111,12 @@ export async function adminListConversations(filters={}){
  if(!actorId) throw httpError("A signed-in support identity is required.",403,"FORBIDDEN");
  const canViewAll=filters.canViewAll===true;
  const limit=Math.max(1,Math.min(100,Number.parseInt(filters.limit||"50",10)||50));
- const r=await db.query(`select c.id,c.public_reference,c.user_id,case when c.consent_to_contact then c.contact_name else null end as contact_name,case when c.consent_to_contact then c.contact_email else null end as contact_email,case when c.consent_to_contact then c.contact_phone else null end as contact_phone,case when c.consent_to_contact then c.preferred_contact else null end as preferred_contact,c.consent_to_contact,c.page_path,c.status,c.last_question,c.created_at,c.updated_at,c.assigned_to,c.resolved_at,cat.name as category_name,
+ const r=await db.query(`select c.id,c.public_reference,c.user_id,case when c.consent_to_contact then c.contact_name else null end as contact_name,case when c.consent_to_contact then c.contact_email else null end as contact_email,case when c.consent_to_contact then c.contact_phone else null end as contact_phone,case when c.consent_to_contact then c.preferred_contact else null end as preferred_contact,c.consent_to_contact,c.page_path,c.status,c.last_question,c.created_at,c.updated_at,c.assigned_to,c.resolved_at,coalesce((select w.priority from support_conversation_workflow w where w.conversation_id=c.id),'normal') as priority,coalesce((select w.waiting_on from support_conversation_workflow w where w.conversation_id=c.id),'none') as waiting_on,(select w.escalated_at from support_conversation_workflow w where w.conversation_id=c.id) as escalated_at,(select w.escalation_reason from support_conversation_workflow w where w.conversation_id=c.id) as escalation_reason,cat.name as category_name,
  coalesce(json_agg(json_build_object('id',m.id,'senderType',m.sender_type,'message',m.message_text,'createdAt',m.created_at,'knowledgeArticleId',m.knowledge_article_id) order by m.created_at) filter(where m.id is not null),'[]'::json) as messages
  from support_conversation c left join support_knowledge_category cat on cat.id=c.category_id left join support_message m on m.conversation_id=c.id
  where ($1::text is null or c.status=$1) and ($3::boolean=true or c.assigned_to is null or c.assigned_to=$2)
  group by c.id,cat.name order by case c.status when 'open' then 0 when 'in_progress' then 1 else 2 end,c.updated_at desc limit $4`,[status,actorId,canViewAll,limit]);
- return r.rows.map(c=>({...c,contactName:c.contact_name,contactEmail:c.contact_email,contactPhone:c.contact_phone,preferredContact:c.preferred_contact,consentToContact:c.consent_to_contact,pagePath:c.page_path,publicReference:c.public_reference,lastQuestion:c.last_question,createdAt:c.created_at,updatedAt:c.updated_at,categoryName:c.category_name,messages:c.messages||[]}));
+ return r.rows.map(c=>({...c,contactName:c.contact_name,contactEmail:c.contact_email,contactPhone:c.contact_phone,preferredContact:c.preferred_contact,consentToContact:c.consent_to_contact,pagePath:c.page_path,publicReference:c.public_reference,lastQuestion:c.last_question,createdAt:c.created_at,updatedAt:c.updated_at,categoryName:c.category_name,waitingOn:c.waiting_on,escalatedAt:c.escalated_at,escalationReason:c.escalation_reason,messages:c.messages||[]}));
 }
 export async function adminUpdateConversation(actorId,id,input,requestId,canManageAll=false){
  const status=input.status===undefined?null:clean(input.status,20);
@@ -136,6 +137,12 @@ export async function adminUpdateConversation(actorId,id,input,requestId,canMana
    if(!eligible.rowCount)throw httpError("Choose an active Support Desk colleague with support permissions.",400,"INVALID_ASSIGNEE");
   }
   const nextStatus=status||current.status;
+  const hasPriority=Object.prototype.hasOwnProperty.call(input,"priority");
+  const hasWaitingOn=Object.prototype.hasOwnProperty.call(input,"waitingOn");
+  const priority=hasPriority?clean(input.priority,20):null;
+  const waitingOn=hasWaitingOn?clean(input.waitingOn,30):null;
+  if(hasPriority&&!["low","normal","high","urgent"].includes(priority))throw httpError("Choose a valid inquiry priority.");
+  if(hasWaitingOn&&!["none","member","organization","provider","internal"].includes(waitingOn))throw httpError("Choose a valid waiting state.");
   const assignToSelf=!hasTransfer&&(input.assignToSelf===true||(!current.assigned_to&&["in_progress","resolved","closed"].includes(nextStatus)));
   const nextAssignee=hasTransfer?requestedAssignee:(assignToSelf?actorId:current.assigned_to);
   const r=await db.query("update support_conversation set status=$2,assigned_to=$3,resolved_at=case when $2='resolved' then coalesce(resolved_at,now()) when $2 in ('open','in_progress') then null else resolved_at end,updated_at=now() where id=$1 returning id,public_reference,status,assigned_to",[id,nextStatus,nextAssignee]);
@@ -146,7 +153,28 @@ export async function adminUpdateConversation(actorId,id,input,requestId,canMana
   if(status!==null&&status!==current.status){
    await logAudit(db,actorId,"support.inquiry_status_changed",id,requestId,{fromStatus:current.status,toStatus:status,assignedTo:r.rows[0].assigned_to,reason});
   }
+  if(hasPriority||hasWaitingOn){
+   const oldWorkflow=(await db.query("select priority,waiting_on from support_conversation_workflow where conversation_id=$1 for update",[id])).rows[0]||{priority:"normal",waiting_on:"none"};
+   await db.query("insert into support_conversation_workflow(conversation_id,priority,waiting_on,updated_by) values($1,$2,$3,$4) on conflict(conversation_id) do update set priority=$2,waiting_on=$3,updated_by=$4,updated_at=now()",[id,hasPriority?priority:oldWorkflow.priority,hasWaitingOn?waitingOn:oldWorkflow.waiting_on,actorId]);
+   await logAudit(db,actorId,"support.inquiry_workflow_updated",id,requestId,{fromPriority:oldWorkflow.priority,toPriority:hasPriority?priority:oldWorkflow.priority,fromWaitingOn:oldWorkflow.waiting_on,toWaitingOn:hasWaitingOn?waitingOn:oldWorkflow.waiting_on,reason});
+  }
   return {id:r.rows[0].id,publicReference:r.rows[0].public_reference,status:r.rows[0].status,assignedTo:r.rows[0].assigned_to,transferred:hasTransfer};
+ });
+}
+
+export async function escalateConversation(actorId,id,input,requestId,canManageAll=false){
+ const reason=clean(input.reason,1000);
+ if(reason.length<8)throw httpError("Add a clear escalation reason of at least 8 characters.");
+ const priority=clean(input.priority||"high",20);
+ if(!["high","urgent"].includes(priority))throw httpError("Escalations must use high or urgent priority.");
+ return withTransaction(async db=>{
+  const current=await assertConversationScope(db,actorId,id,canManageAll,true);
+  if(["resolved","closed"].includes(current.status))throw httpError("Reopen the inquiry before escalating a closed or resolved case.",409,"INVALID_STATE");
+  const row=(await db.query("insert into support_conversation_workflow(conversation_id,priority,waiting_on,escalated_at,escalated_by,escalation_reason,updated_by) values($1,$2,'internal',now(),$3,$4,$3) on conflict(conversation_id) do update set priority=$2,waiting_on='internal',escalated_at=now(),escalated_by=$3,escalation_reason=$4,updated_by=$3,updated_at=now() returning *",[id,priority,actorId,reason])).rows[0];
+  await logAudit(db,actorId,"support.inquiry_escalated",id,requestId,{fromStatus:current.status,priority,reason,assignedTo:current.assigned_to});
+  const managers=(await db.query("select distinct u.id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('system_admin','admin','platform_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='support.inquiries.manage'))")).rows;
+  for(const manager of managers)await queueWorkflowEmail(db,manager.id,"support.inquiry_escalated",{category:"support",title:"Support inquiry escalated",publicReference:current.public_reference||id,status:current.status,priority,message:"A support inquiry has been escalated for manager attention.",nextAction:"Review the inquiry, its assignment and escalation reason, then record the next decision.",actionUrl:"/admin/support",actionRequired:true,eventVersion:row.updated_at?.toISOString?.()||String(row.updated_at)},"support_bot",id);
+  return {id,publicReference:current.public_reference||null,status:current.status,priority:row.priority,waitingOn:row.waiting_on,escalatedAt:row.escalated_at,escalationReason:row.escalation_reason};
  });
 }
 

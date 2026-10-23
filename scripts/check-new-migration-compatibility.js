@@ -285,6 +285,10 @@ try {
     if (!row || !row.indexdef.toUpperCase().includes("CREATE UNIQUE INDEX")) {
       throw new Error(`Required unique index ${name} is missing or not unique.`);
     }
+    if (name !== "ux_mentorship_match_one_open_request" &&
+        (!row.indexdef.includes("request_idempotency_hash") || !row.indexdef.toLowerCase().includes("where"))) {
+      throw new Error(`Idempotency index ${name} must uniquely index the request hash and exclude null keys.`);
+    }
     if (name === "ux_mentorship_match_one_open_request" &&
         (!row.indexdef.toLowerCase().includes("where") ||
          !row.indexdef.includes("mentee_consent_status") ||
@@ -293,6 +297,12 @@ try {
          !row.indexdef.includes("'declined'"))) {
       throw new Error("The mentorship rematching index must be partial and cover only proposed/accepted matches that have not been declined by the mentee.");
     }
+  }
+  const publicInquiryTokenIndex = await client.query(
+    "select indexdef from pg_indexes where schemaname='public' and tablename='public_opportunity_inquiry' and indexdef ilike 'CREATE UNIQUE INDEX%' and indexdef ilike '%continuation_token_hash%'"
+  );
+  if (!publicInquiryTokenIndex.rowCount) {
+    throw new Error("public_opportunity_inquiry.continuation_token_hash must remain uniquely indexed for safe public-inquiry replay.");
   }
   const oldRequestUnique = await client.query(
     "select count(*)::int as count from pg_constraint where conrelid='public.mentorship_match'::regclass and contype='u' and pg_get_constraintdef(oid)='UNIQUE (request_id)'"

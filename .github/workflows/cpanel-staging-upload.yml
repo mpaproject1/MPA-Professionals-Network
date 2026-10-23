@@ -1,49 +1,46 @@
-name: cPanel staging upload (manual)
+name: Pre-deployment portal build (manual)
 
 on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: "Git branch, tag, or commit to build"
+        description: "Git branch, tag, or commit to build and validate"
         required: true
-        default: "fix/production-api-proxy-default"
+        default: "ux/p0-navigation-and-org-privacy"
         type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: mpa-cpanel-staging-upload
+  group: mpa-predeployment-portal-build
   cancel-in-progress: false
 
 jobs:
-  build-and-upload-staging:
+  build-and-validate:
+    name: Build and validate only (no deployment)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
-      CPANEL_SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}
-      CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
-      CPANEL_USER: muslimjq
-      CPANEL_PORT: "22"
-      REMOTE_DIR: /home/muslimjq/mpa-deploy-staging
-
     steps:
-      - name: Check out selected source
+      - name: Check out selected source revision
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_ref }}
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install locked dependencies
         run: npm ci --include=dev --include-workspace-root
 
-      - name: Build portal outside cPanel
+      - name: Build portal
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
         run: npm run web:build
 
       - name: Validate production build and API rewrite
@@ -71,88 +68,33 @@ jobs:
             console.error("Expected production /api rewrite was not found.");
             process.exit(1);
           }
-          console.log("BUILD_ID, route manifest, build manifest, and production API rewrite verified.");
+          console.log("Build output and production API rewrite verified.");
           NODE
 
-      - name: Package only the portal build and Next.js config
+      - name: Package a local review artifact
         id: package
         working-directory: web
         run: |
           set -euo pipefail
-          archive="$RUNNER_TEMP/mpa-web-staging-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
+          archive="$RUNNER_TEMP/mpa-web-predeployment-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
           tar -czf "$archive" .next next.config.js
-          echo "archive=$archive" >> "$GITHUB_OUTPUT"
-          echo "archive_name=$(basename "$archive")" >> "$GITHUB_OUTPUT"
           (cd "$(dirname "$archive")" && sha256sum "$(basename "$archive")" > "$archive.sha256")
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
           echo "checksum=$archive.sha256" >> "$GITHUB_OUTPUT"
 
-      - name: Save build artifact in GitHub Actions
+      - name: Store artifact in GitHub Actions only
         uses: actions/upload-artifact@v4
         with:
-          name: mpa-web-staging-${{ github.sha }}
+          name: mpa-web-predeployment-${{ github.sha }}
           path: |
             ${{ steps.package.outputs.archive }}
             ${{ steps.package.outputs.checksum }}
           retention-days: 14
           if-no-files-found: error
 
-      - name: Configure verified SSH connection
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$CPANEL_HOST"
-          test -n "$CPANEL_SSH_KEY"
-          test -n "$CPANEL_KNOWN_HOSTS"
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$CPANEL_SSH_KEY" > "$HOME/.ssh/cpanel_deploy_key"
-          chmod 600 "$HOME/.ssh/cpanel_deploy_key"
-          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/known_hosts"
-          ssh-keygen -y -f "$HOME/.ssh/cpanel_deploy_key" > /dev/null
-          ssh-keygen -F "$CPANEL_HOST" -f "$HOME/.ssh/known_hosts" > /dev/null
-          echo "SSH key format and known-host entry are present; strict host verification remains enabled."
-
-      - name: Verify cPanel SSH and staging write access
-        shell: bash
-        run: |
-          set -euo pipefail
-          ssh -i "$HOME/.ssh/cpanel_deploy_key" \
-            -p "$CPANEL_PORT" \
-            -o IdentitiesOnly=yes \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            "$CPANEL_USER@$CPANEL_HOST" \
-            'set -eu; test -d /home/muslimjq/mpa-deploy-staging; test -w /home/muslimjq/mpa-deploy-staging; printf "STAGING_ACCESS_OK\\n"; whoami'
-
-      - name: Upload archive to staging only
-        shell: bash
-        env:
-          ARCHIVE: ${{ steps.package.outputs.archive }}
-          CHECKSUM: ${{ steps.package.outputs.checksum }}
-          ARCHIVE_NAME: ${{ steps.package.outputs.archive_name }}
-        run: |
-          set -euo pipefail
-          scp -i "$HOME/.ssh/cpanel_deploy_key" \
-            -P "$CPANEL_PORT" \
-            -o IdentitiesOnly=yes \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            "$ARCHIVE" "$CHECKSUM" \
-            "$CPANEL_USER@$CPANEL_HOST:$REMOTE_DIR/"
-          ssh -i "$HOME/.ssh/cpanel_deploy_key" \
-            -p "$CPANEL_PORT" \
-            -o IdentitiesOnly=yes \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            "$CPANEL_USER@$CPANEL_HOST" \
-            "set -eu; cd '$REMOTE_DIR'; sha256sum -c '$ARCHIVE_NAME.sha256'; chmod 600 '$ARCHIVE_NAME' '$ARCHIVE_NAME.sha256'; echo STAGING_UPLOAD_VERIFIED"
-
-      - name: Summarize staging-only result
+      - name: Confirm pre-deployment boundary
         if: success()
         run: |
-          echo "Build commit: $GITHUB_SHA"
-          echo "Uploaded to: $REMOTE_DIR"
-          echo "No live portal files were changed and no application restart was performed."
+          echo "Build and route validation passed for source revision: $GITHUB_SHA"
+          echo "Artifact is stored in GitHub Actions only."
+          echo "No cPanel/SSH credentials are read; no remote upload, restart, migration, or deployment occurs."

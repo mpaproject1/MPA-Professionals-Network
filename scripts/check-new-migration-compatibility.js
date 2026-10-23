@@ -68,8 +68,8 @@ try {
   if (identity.database_name !== expectedDatabase) {
     throw new Error(`Connected to database "${identity.database_name}", not the explicitly approved "${expectedDatabase}".`);
   }
-  if (!/(test|staging|sandbox|ci|verify)/i.test(identity.database_name)) {
-    throw new Error("Database name must clearly identify a test/staging/sandbox/CI/verification database.");
+  if (!/(test|sandbox|ci|verify)/i.test(identity.database_name)) {
+    throw new Error("Database name must clearly identify a disposable test/sandbox/CI/verification database; shared staging databases are not accepted.");
   }
   if (identity.schema_name !== "public") throw new Error(`Expected public search schema; got "${identity.schema_name}".`);
 

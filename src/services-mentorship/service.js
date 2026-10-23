@@ -690,7 +690,7 @@ export async function respondToMenteeMatch(matchId,menteeUserId,status,note,requ
     if(match.status!=="accepted")throw error(409,"The proposed mentor must accept first; the relationship is not active yet.","INVALID_STATE");
     if(match.mentee_consent_status===status)return {...match,idempotent:true,nextAction:status==="accepted"?"Your match is approved. Open the mentorship to agree goals and schedule a first session.":"Your response is already recorded; the coordinator can help with another match."};
     if(match.mentee_consent_status!=="pending")throw error(409,"This match has already received your final response.","INVALID_STATE");
-    const updated=(await db.query("update mentorship_match set mentee_consent_status=$1,mentee_responded_at=now(),mentee_response_note=$2 where id=$3 returning *",[status,note?.trim()||null,matchId])).rows[0];
+    const updated=(await db.query("update mentorship_match set mentee_consent_status=$1,mentee_responded_at=now(),mentee_response_note=$2 where id=$3 returning *",[status,String(note||"").trim()||null,matchId])).rows[0];
     if(status==="accepted"){
       const existing=(await db.query("select id from mentorship where request_id=$1 for update",[match.request_id])).rows[0];
       if(!existing)await db.query("insert into mentorship(request_id,mentor_user_id,mentee_user_id,goals,status) select mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mr.goals,'active' from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id where mm.id=$1 and mm.status='accepted' and mm.mentee_consent_status='accepted'",[matchId]);

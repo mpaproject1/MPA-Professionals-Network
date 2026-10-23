@@ -1,14 +1,13 @@
 "use client";
-import {ArrowRight,ArrowUpRight,BriefcaseBusiness,Building2,CheckCircle2,ClipboardList,Clock3,FileCheck2,LayoutDashboard,LogOut,RefreshCw,ShieldCheck,UserRound,UsersRound,WalletCards} from "lucide-react";
+import {ArrowRight, ArrowUpRight, BriefcaseBusiness, Building2, CheckCircle2, ClipboardList, Clock3, FileCheck2, LayoutDashboard, LogOut, RefreshCw, ShieldCheck, UserRound, UsersRound, WalletCards} from "lucide-react";
 import {useRouter} from "next/navigation";
-import {useEffect,useId,useState} from "react";
-import { OperationStatus } from "../../components/operation-status";
+import {useEffect, useId, useState} from "react";
+import {OperationStatus} from "../../components/operation-status";
 import {Badge} from "../../components/ui";
-import {ApiError, api} from "../../lib/api";
+import {api, ApiError} from "../../lib/api";
+import {humanStatus} from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
-import { humanStatus } from "../../lib/status-labels";
 import styles from "./dashboard.module.css";
-
 type Profile={user_id:string;email:string;display_name?:string;first_name?:string;last_name?:string;completion_percent?:number;status?:string;roles?:string[];has_active_membership?:boolean;visibility?:string};
 type MembershipApplication={id:string;tracking_reference?:string;application_type?:string;status:string;updated_at?:string;fee_snapshot?:{amount?:number|string;currency?:string;productName?:string;productCode?:string};payment?:{status?:string;amount?:number|string;currency?:string;verified_at?:string}|null;latest_correction?:{status?:string;reviewer_note?:string;requested_fields?:unknown}|null};
 type VerificationSummary={id:string;status:string;program_name?:string;program_code?:string;claims?:{claim_code?:string;claim_type_name?:string;status:string}[];decisions?:{decision?:string;reason?:string;decided_at?:string;member_response_due_at?:string|null}[];checklist_version_snapshot?:{items?:{itemCode?:string;label?:string;required?:boolean}[]}[];checkResults?:{item_code?:string;label?:string;required?:boolean;outcome?:string}[]};

@@ -45,3 +45,10 @@ test("membership activation is separate from application approval and payment ve
   assert.match(membership, /payment/i);
   assert.match(membership, /activateApplication/);
 });
+test("verification claim, evidence, and claim-status writes enforce assignment at service level", () => {
+  const service = read("src/verification/service.js");
+  assert.match(service, /else await assertAssignedReviewer\(db,caseId,actorId\)/);
+  assert.match(service, /await assertAssignedReviewer\(db,row\.case_id,actorId\)/);
+  const server = read("server.js");
+  assert.match(server, /verification\.getCase\(parts\[4\],identity\.sub\)/);
+});

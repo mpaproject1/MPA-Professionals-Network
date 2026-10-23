@@ -827,9 +827,13 @@ export async function listMyMentorshipRequests(userId){
 
 export async function listMyMentorshipMatches(userId){
  const db=getPool();
- return (await db.query(`select mm.id,mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mm.score,mm.match_reasons,mm.status,mm.proposed_at,mr.goals,p.display_name mentee_name
- from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id join person p on p.user_id=mr.mentee_user_id
- where mm.mentor_user_id=$1 and mm.status='proposed' order by mm.proposed_at desc`,[userId])).rows;
+ return (await db.query(`select mm.id,mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mm.score,mm.match_reasons,mm.status,mm.mentee_consent_status,mm.mentee_response_note,mm.proposed_at,mr.goals,pm.display_name mentor_name,pe.display_name mentee_name,
+ case when mm.mentor_user_id=$1 then 'mentor' else 'mentee' end match_role
+ from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id
+ join person pm on pm.user_id=mm.mentor_user_id join person pe on pe.user_id=mm.mentee_user_id
+ where (mm.mentor_user_id=$1 and mm.status='proposed')
+    or (mm.mentee_user_id=$1 and mm.status='accepted' and mm.mentee_consent_status='pending')
+ order by mm.proposed_at desc`,[userId])).rows;
 }
 export async function listMyMentorships(userId){
  const db=getPool();

@@ -1,5 +1,5 @@
 "use client";
-import {Bookmark,Clock3,HeartHandshake,Languages,RefreshCw,Target} from "lucide-react";
+import {Bookmark,Clock3,HeartHandshake,Languages,RefreshCw,Search,Target} from "lucide-react";
 import Link from "next/link";
 import {type FormEvent,useCallback,useEffect,useRef,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
@@ -136,10 +136,10 @@ export default function Mentorship(){
   }
 
  return <div>
-   <div><Link href="/marketplace" className="text-link">← Back to Marketplace</Link><div className="eyebrow" style={{marginTop:8}}>Mentorship match</div><h1 className="h1">One goal. One good match.</h1></div>
-   <p className="muted">Discover current mentor profiles and submit a goal-based request. We show only details returned by the platform; availability and matching are not guessed or guaranteed.</p>
+   <div><Link href="/marketplace" className="text-link">← Back to Marketplace</Link><div className="eyebrow" style={{marginTop:8}}>Mentorship and professional growth</div><h1 className="h1">Empower the next generation of leaders.</h1></div>
+   <p className="muted">Explore current mentor profiles from experienced professionals, researchers and specialists. Search by expertise and topic, or submit your goals as an open mentorship request.</p>
    <div className="row" style={{gap:8,flexWrap:"wrap"}}>
-     <a className="btn btn-primary" href="#mentor-discovery">Find a mentor</a>
+     <a className="btn btn-primary" href="#mentor-discovery">Explore mentors</a>
      {token&&<a className="btn btn-ghost" href="#offer-mentorship">Offer your expertise</a>}
      {token&&<a className="btn btn-ghost" href="#mentorship-requests">Track requests and matches</a>}
    </div>
@@ -170,11 +170,11 @@ export default function Mentorship(){
      <button className="btn btn-primary" type="submit" disabled={loading}>{loading?"Finding mentor profiles…":"Search mentors"}</button>
      <button className="btn btn-ghost" type="button" onClick={()=>{setQuery("");setTopic("");void load("","",0)}}>Clear</button>
    </form></Card>
-   <div style={{marginTop:14}}><button className="btn btn-ghost" type="button" disabled={submitting||submissionUncertain} onClick={()=>{setSelected(null);setShowRequestForm(true);setCreated(null);setNotice("");setError("");}}>Request mentorship without a preferred mentor</button><p className="muted">You can submit your goal now; the platform will not invent a match or confirm a mentor until one is eligible and accepts.</p></div>
+   <div style={{marginTop:14}}><button className="btn btn-ghost" type="button" disabled={submitting||submissionUncertain} onClick={()=>{setSelected(null);setShowRequestForm(true);setCreated(null);setNotice("");setError("");}}>Submit an open mentorship request <span aria-hidden="true">→</span></button><p className="muted">Share your goals even when you have not selected a mentor. Your request and status are recorded in your account; a match requires an eligible mentor’s acceptance and your approval.</p></div>
    {error&&<FormFeedback kind="error" message={error} onRetry={()=>{if(submissionUncertain){void submit();return;}void load();void loadMyRequests();void loadOrganizationOffers();}} retryLabel={submissionUncertain?"Check submission again":"Reload workspace"} busy={submitting} nextAction={submissionUncertain?"We could not confirm whether the request was received. Your entries are locked so you can safely retry the same submission.":"Reload mentor profiles, requests and organization offers before assuming the information is current."} membershipReturnTo="/mentorship"/>}
    {notice&&<FormFeedback kind="success" message={notice} actionHref={!token?"/login?next=/mentorship":undefined} actionLabel={!token?"Sign in":undefined}/>}
    {created&&<Card><Badge tone="green">Request recorded</Badge><h2 className="h2" style={{marginTop:10}}>Your request is in the system</h2><p className="muted">Request reference: {created.id}</p><p className="muted">Status: {humanStatus(created.status)}. The platform does not create a mentorship until the matching and acceptance steps are completed.</p><p className="muted">{created.nextAction||"Review your request status and wait for an eligible mentor proposal."}</p><a className="btn btn-ghost" href="#mentorship-requests">Track request and matching</a><button className="btn btn-ghost" type="button" onClick={()=>setCreated(null)}>Dismiss</button></Card>}
-   {loading?<Card><OperationStatus state="loading" title="Loading active mentor profiles" detail="We’re checking current mentor profiles and the filters you selected. We do not create a match or change your request during this check." /></Card>:mentors.length===0&&!error?<Card><h2 className="h2">No active mentor profiles found</h2><p className="muted">Try a different topic or return later. We do not display placeholder mentors.</p></Card>:<div className="grid grid-3" style={{marginTop:18}}>{mentors.map(mentor=><Card key={mentor.user_id}>
+   {loading?<Card><OperationStatus state="loading" title="Loading mentor profiles" detail="We’re checking current mentor profiles against your selected filters. Your request records are not changed by this search." /></Card>:mentors.length===0&&!error?<Card className="mentorship-empty-state"><div className="marketplace-pathway-icon"><Search size={22}/></div><h2 className="h2">No mentors match these filters yet</h2><p className="muted">Try a broader topic or clear your filters. You can still submit your career goals as an open mentorship request and follow its status in your account. A match is confirmed only after the required participants agree.</p><div className="row" style={{gap:8,flexWrap:"wrap"}}><button className="btn btn-primary" type="button" disabled={submitting||submissionUncertain} onClick={()=>{setSelected(null);setShowRequestForm(true);setCreated(null);setNotice("");setError("");}}>Submit an open mentorship request <span aria-hidden="true">→</span></button><button className="btn btn-ghost" type="button" disabled={loading} onClick={()=>{setQuery("");setTopic("");void load("","",0)}}>Clear filters</button></div></Card>:<div className="grid grid-3" style={{marginTop:18}}>{mentors.map(mentor=><Card key={mentor.user_id}>
      <div className="row"><div className="avatar">{mentor.display_name.split(" ").map(x=>x[0]).join("").slice(0,3)}</div><Badge>Active profile</Badge></div>
      <h2 style={{fontSize:19,marginBottom:4,marginTop:14}}>{mentor.display_name}</h2><div className="tagline">{mentor.headline||"Professional mentor"}</div>
      {mentor.bio&&<p className="muted">{mentor.bio}</p>}

@@ -136,6 +136,7 @@ test("shared loading states and report controls explain pending work without blo
     source("../../web/app/admin/reports/page.tsx"),
     source("../../web/app/membership/workspace.tsx"),
     source("../../web/components/operation-status.tsx"),
+    source("../../web/app/globals.css"),
   ]);
   assert.match(dashboard, /title="Loading your dashboard"/);
   assert.match(organizations, /Check latest organizations/);
@@ -145,5 +146,6 @@ test("shared loading states and report controls explain pending work without blo
   assert.match(reports, /disabled=\{viewBusy\|\|!viewName\.trim\(\)\|\|!current\}/);
   assert.match(reports, /disabled=\{reportBusy\}/);
   assert.match(membership, /Loading your saved applications/);
-  assert.match(status, /aria-busy/);\n  assert.match(styles, /prefers-reduced-motion:reduce/);
+  assert.match(status, /aria-busy/);
+  assert.match(styles, /prefers-reduced-motion:reduce/);
 });

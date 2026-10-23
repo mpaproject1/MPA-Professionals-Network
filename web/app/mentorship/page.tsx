@@ -165,7 +165,7 @@ export default function Mentorship(){
    <Card id="mentor-discovery"><form onSubmit={e=>{e.preventDefault();void load(query,topic,0)}} className="row" style={{gap:10,flexWrap:"wrap"}}>
      <label style={{flex:"1 1 220px"}}>Search expertise<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Mentor headline or bio"/></label>
      <label style={{flex:"1 1 180px"}}>Topic<input value={topic} onChange={e=>setTopic(e.target.value)} placeholder="Expertise topic"/></label>
-     <button className="btn btn-primary" type="submit" disabled={loading}>{loading?"Searching…":"Search mentors"}</button>
+     <button className="btn btn-primary" type="submit" disabled={loading}>{loading?"Finding mentor profiles…":"Search mentors"}</button>
      <button className="btn btn-ghost" type="button" onClick={()=>{setQuery("");setTopic("");void load("","",0)}}>Clear</button>
    </form></Card>
    <div style={{marginTop:14}}><button className="btn btn-ghost" type="button" disabled={submitting||submissionUncertain} onClick={()=>{setSelected(null);setShowRequestForm(true);setCreated(null);setNotice("");setError("");}}>Request mentorship without a preferred mentor</button><p className="muted">You can submit your goal now; the platform will not invent a match or confirm a mentor until one is eligible and accepts.</p></div>

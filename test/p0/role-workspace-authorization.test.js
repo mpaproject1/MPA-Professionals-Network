@@ -242,3 +242,17 @@ test("Employer recruitment workspace keeps vacancy and applicant views organizat
   assert.match(service, /organization_id/);
   assert.match(service, /INVALID_INTERVIEWER/);
 });
+
+test("verification.manage permission is accepted consistently by reviewer routes and decision service", () => {
+  const server = read("server.js");
+  const service = read("src/verification/service.js");
+  assert.match(server, /anyRoleOrPermission\(identity,\["verification_reviewer","ethics_reviewer","system_admin"\],\["verification\.manage"\]\)/);
+  assert.match(service, /up\.permission_code='verification\.manage'\)\)\",\[caseId,actorId\]\)/);
+});
+
+test("checklist results must reference an active item attached to the case program and use a valid outcome", () => {
+  const service = read("src/verification/service.js");
+  assert.match(service, /join verification_program_checklist pc on pc\.program_id=vc\.program_id and pc\.checklist_id=i\.checklist_id where vc\.id=\$1 and i\.active=true/);
+  assert.match(service, /Choose a valid checklist outcome/);
+  assert.match(service, /Checklist response must be a structured object/);
+});

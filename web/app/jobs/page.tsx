@@ -125,7 +125,7 @@ export default function Jobs(){
   async function submitFormalApplication(job:Job){
     if(!token){setNotice("Sign in to start a formal application. Public interest intake remains available separately.");return;}
     if(applyingIds[job.id])return;
-    setApplyingId(job.id);setError("");setNotice("");
+    setApplyingIds(current=>({...current,[job.id]:true}));setError("");setNotice("");
     try{
       let draftId=draftIds[job.id];
       if(!draftId){
@@ -140,7 +140,7 @@ export default function Jobs(){
         setDraftIds(current=>{const next={...current};delete next[job.id];return next;});
         setNotice("This application is no longer a draft. It may already have been submitted. Check application tracking before trying again.");
       }else setError(e instanceof ApiError?e.message:"We couldn't confirm the formal application outcome. Check application tracking before retrying so you do not duplicate the application.");
-    }finally{setApplyingId("");}
+    }finally{setApplyingIds(current=>({...current,[job.id]:false}));}
   }
 
  async function toggleDetails(job:Job){

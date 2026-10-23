@@ -460,7 +460,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/reference-requests/") && parts[5]==="review") return ok(res,await verification.reviewReferenceRequest(parts[4],await body(req),identity.sub,requestId),requestId);
     if(req.method==="POST" && p==="api/v1/verification/cases"){
       const b=await body(req);
-      if(b.subjectUserId && b.subjectUserId!==identity.sub) anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]);
+      if(b.subjectUserId && b.subjectUserId!==identity.sub) anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]);
       else requireRole(identity,"member");
       return ok(res,await verification.createCase(b.subjectUserId||identity.sub,b.programCode,identity.sub,requestId),requestId,201);
     }
@@ -471,7 +471,7 @@ const server=http.createServer(async (req,res)=>{
     }
     if(req.method==="GET" && p==="api/v1/review/verification/appeals") return ok(res,await verification.listAppealsForReview(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/review/verification/cases"){
-      anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]);
+      anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]);
       const q=query(req.url);
       return ok(res,await verification.listCases({viewerId:identity.sub,status:q.get("status"),programCode:q.get("programCode"),reviewerId:q.get("reviewerId"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
     }
@@ -480,21 +480,21 @@ const server=http.createServer(async (req,res)=>{
       return ok(res,await verification.assignCase(parts[4],b.reviewerId,identity.sub,requestId,b.reason||"Assignment updated"),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="transition"){
-      anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]); const b=await body(req);
+      anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]); const b=await body(req);
       return ok(res,await verification.transitionCase(parts[4],b.status,identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="claims"){
       const b=await body(req); const c=await verification.getCase(parts[4],identity.sub);
-      if(c.subject_user_id!==identity.sub) anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]);
+      if(c.subject_user_id!==identity.sub) anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]);
       return ok(res,await verification.addClaim(parts[4],b.claimTypeCode,b.claimedValue,identity.sub,requestId),requestId,201);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="evidence"){
       const b=await body(req); const c=await verification.getCase(parts[4],identity.sub);
-      if(c.subject_user_id!==identity.sub) anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]);
+      if(c.subject_user_id!==identity.sub) anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]);
       return ok(res,await verification.addEvidence(parts[4],b,identity.sub,requestId),requestId,201);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="decision"){
-      anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]);
+      anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]);
       return ok(res,await verification.decide(parts[4],await body(req),identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="response") return ok(res,await verification.memberResponse(parts[4],await body(req),identity.sub,requestId),requestId);
@@ -504,11 +504,11 @@ const server=http.createServer(async (req,res)=>{
       return ok(res,await verification.decideAppeal(parts[3],await body(req),identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="claim-status"){
-      anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]); const b=await body(req);
+      anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]); const b=await body(req);
       return ok(res,await verification.setClaimStatus(parts[4],b.status,identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="check-results"){
-      anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]); const b=await body(req);
+      anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]); const b=await body(req);
       return ok(res,await verification.recordCheckResult(parts[4],b.checklistItemId,b,identity.sub,requestId),requestId);
     }
 

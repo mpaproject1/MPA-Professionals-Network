@@ -82,7 +82,7 @@ const SERVICE_TRANSITIONS={
  requested:["accepted","declined","cancelled"],
  accepted:["in_progress","cancelled"],
  in_progress:["completed","disputed","cancelled"],
- disputed:["in_progress","completed","cancelled"],
+ disputed:["in_progress","cancelled"],
  completed:[],
  declined:[],
  cancelled:[]
@@ -249,6 +249,7 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
     if(status==="completed"&&r.status==="in_progress"&&r.provider_completed_at)return {...r,idempotent:true,nextAction:"The requester must review the submitted outcome and accept completion."};
     if(r.status==="requested" && !providerActor) throw error(403,"Only the provider can accept or decline a service request.","FORBIDDEN");
     if(r.status==="accepted" && status==="in_progress" && !providerActor) throw error(403,"Only the provider can start service delivery.","FORBIDDEN");
+    if(r.status==="disputed" && status==="in_progress" && !providerActor) throw error(403,"Only the provider can resume delivery after the concern is addressed.","FORBIDDEN");
     if(r.status==="in_progress" && status==="completed" && !providerActor) throw error(403,"Only the provider can mark delivery complete; the requester must accept the outcome separately.","FORBIDDEN");
     if(r.status==="accepted" && status==="cancelled" && !providerActor) {
       // requester cancellation is allowed before delivery starts

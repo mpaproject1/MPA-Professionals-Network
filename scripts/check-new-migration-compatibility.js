@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client } from "pg";
+import pg from "pg";
+const { Client } = pg;
 
 const expectedDatabase = process.env.MIGRATION_CHECK_EXPECTED_DATABASE;
 const allowRollback = process.env.MIGRATION_CHECK_ALLOW_ROLLBACK;
@@ -90,7 +92,7 @@ try {
   const recorded = new Map(ledgerRows.map(row => [row.filename, row.checksum]));
   const migrations = [];
   for (const filename of migrationNames) {
-    const sql = await readFile(new URL(filename, `file://${migrationDirectory}/`), "utf8");
+    const sql = await readFile(join(migrationDirectory, filename), "utf8");
     const checksum = createHash("sha256").update(sql).digest("hex");
     if (recorded.has(filename) && recorded.get(filename) !== checksum) {
       throw new Error(`Migration checksum mismatch for ${filename}; do not edit an applied migration. Create a forward corrective migration instead.`);
@@ -109,6 +111,93 @@ try {
   await client.query("rollback");
   transactionOpen = false;
   console.log("PASS: all ten migrations are compatible with this existing schema in a transaction; all DDL was rolled back.");
+
+  const postMigrationColumns = [
+    ["public_opportunity_inquiry","idempotency_request_hash","text"],
+    ...["marketplace_demand","mentorship_request","service_request","service_listing","talent_inquiry"].flatMap(table=>[[table,"request_idempotency_hash","text"],[table,"request_fingerprint","text"]]),
+    ["verification_reference_request","requester_user_id","uuid"],
+    ["verification_reference_request","referee_user_id","uuid"],
+    ["verification_reference_request","response_text","text"],
+    ["verification_reference_request","responded_by","uuid"],
+    ["verification_reference_request","reviewed_by","uuid"],
+    ["verification_reference_request","review_reason","text"],
+    ["verification_reference_request","reviewed_at","timestamptz"],
+    ["verification_reference_request","updated_at","timestamptz"],
+    ["verification_case_assignment_history","id","uuid"],
+    ["verification_case_assignment_history","case_id","uuid"],
+    ["verification_case_assignment_history","previous_reviewer_id","uuid"],
+    ["verification_case_assignment_history","new_reviewer_id","uuid"],
+    ["verification_case_assignment_history","changed_by","uuid"],
+    ["professional_profile","cv_file_id","uuid"],
+    ["professional_profile","cv_updated_at","timestamptz"],
+    ["mentorship_match","mentee_consent_status","text"],
+    ["mentorship_match","mentee_responded_at","timestamptz"],
+    ["mentorship_match","mentee_response_note","text"],
+    ["support_conversation_workflow","conversation_id","uuid"],
+    ["support_conversation_workflow","priority","text"],
+    ["support_conversation_workflow","waiting_on","text"],
+    ["support_conversation_workflow","escalated_at","timestamptz"],
+    ["support_conversation_workflow","escalated_by","uuid"],
+    ["support_conversation_workflow","updated_by","uuid"]
+  ];
+  const columnErrors = [];
+  for (const [table,column,type] of postMigrationColumns) {
+    const result = await client.query(
+      "select udt_name from information_schema.columns where table_schema='public' and table_name=$1 and column_name=$2",
+      [table,column]
+    );
+    if (!result.rows[0]) columnErrors.push(`${table}.${column} missing after migration`);
+    else if (result.rows[0].udt_name !== type) columnErrors.push(`${table}.${column} expected ${type}, found ${result.rows[0].udt_name}`);
+  }
+  if (columnErrors.length) throw new Error("Post-migration column checks failed:\\n- " + columnErrors.join("\\n- "));
+
+  const requiredForeignKeys = [
+    ["verification_reference_request","requester_user_id","app_user","id"],
+    ["verification_reference_request","referee_user_id","app_user","id"],
+    ["verification_reference_request","responded_by","app_user","id"],
+    ["verification_reference_request","reviewed_by","app_user","id"],
+    ["verification_case_assignment_history","case_id","verification_case","id"],
+    ["verification_case_assignment_history","previous_reviewer_id","app_user","id"],
+    ["verification_case_assignment_history","new_reviewer_id","app_user","id"],
+    ["verification_case_assignment_history","changed_by","app_user","id"],
+    ["professional_profile","cv_file_id","file_object","id"],
+    ["support_conversation_workflow","conversation_id","support_conversation","id"],
+    ["support_conversation_workflow","escalated_by","app_user","id"],
+    ["support_conversation_workflow","updated_by","app_user","id"]
+  ];
+  const fkErrors = [];
+  for (const [table,column,targetTable,targetColumn] of requiredForeignKeys) {
+    const result = await client.query(
+      `select 1
+         from pg_constraint c
+         join pg_class src on src.oid=c.conrelid
+         join pg_namespace sn on sn.oid=src.relnamespace
+         join pg_class dst on dst.oid=c.confrelid
+         join pg_namespace dn on dn.oid=dst.relnamespace
+         join unnest(c.conkey) with ordinality sk(attnum,ord) on true
+         join unnest(c.confkey) with ordinality dk(attnum,ord) on dk.ord=sk.ord
+         join pg_attribute sa on sa.attrelid=src.oid and sa.attnum=sk.attnum
+         join pg_attribute da on da.attrelid=dst.oid and da.attnum=dk.attnum
+        where c.contype='f' and sn.nspname='public' and dn.nspname='public'
+          and src.relname=$1 and sa.attname=$2 and dst.relname=$3 and da.attname=$4
+        limit 1`,
+      [table,column,targetTable,targetColumn]
+    );
+    if (!result.rowCount) fkErrors.push(`${table}.${column} -> ${targetTable}.${targetColumn}`);
+  }
+  if (fkErrors.length) throw new Error("Foreign-key target checks failed:\\n- " + fkErrors.join("\\n- "));
+
+  const consentConstraint = await client.query(
+    "select pg_get_constraintdef(oid) as definition from pg_constraint where conrelid='public.mentorship_match'::regclass and conname='mentorship_match_mentee_consent_status_check'"
+  );
+  if (!consentConstraint.rows[0]?.definition?.includes("'pending'") ||
+      !consentConstraint.rows[0]?.definition?.includes("'accepted'") ||
+      !consentConstraint.rows[0]?.definition?.includes("'declined'")) {
+    throw new Error("Mentorship mentee-consent check constraint is missing or has unexpected values.");
+  }
+  const rematchIndex = await client.query("select 1 from pg_indexes where schemaname='public' and indexname='ux_mentorship_match_one_open_request'");
+  if (!rematchIndex.rowCount) throw new Error("The partial unique index protecting active mentorship proposals is missing.");
+
   console.log("NOTE: this validates migration execution and existing column types/FK targets; it does not replace application-level integration tests.");
 } catch (error) {
   if (transactionOpen) {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -90,15 +90,24 @@ try {
   }
   const ledgerRows = (await client.query("select filename, checksum from public.app_schema_migration")).rows;
   const recorded = new Map(ledgerRows.map(row => [row.filename, row.checksum]));
-  const migrations = [];
-  for (const filename of migrationNames) {
+  const repositoryMigrationFiles = (await readdir(migrationDirectory)).filter(name => name.endsWith(".sql")).sort();
+  const repositoryMigrations = new Map();
+  for (const filename of repositoryMigrationFiles) {
     const sql = await readFile(join(migrationDirectory, filename), "utf8");
-    const checksum = createHash("sha256").update(sql).digest("hex");
-    if (recorded.has(filename) && recorded.get(filename) !== checksum) {
+    repositoryMigrations.set(filename, { sql, checksum: createHash("sha256").update(sql).digest("hex") });
+  }
+  for (const [filename, recordedChecksum] of recorded) {
+    const current = repositoryMigrations.get(filename);
+    if (!current) throw new Error(`Migration history contains ${filename}, but that migration file is missing from this revision.`);
+    if (recordedChecksum !== current.checksum) {
       throw new Error(`Migration checksum mismatch for ${filename}; do not edit an applied migration. Create a forward corrective migration instead.`);
     }
-    migrations.push({ filename, sql });
   }
+  const migrations = migrationNames.map(filename => {
+    const migration = repositoryMigrations.get(filename);
+    if (!migration) throw new Error(`Required migration file is missing: ${filename}`);
+    return { filename, sql: migration.sql };
+  });
 
   await client.query("begin");
   transactionOpen = true;

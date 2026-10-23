@@ -3,6 +3,7 @@ import {Bookmark,Briefcase,MapPin,MessageSquareText, RefreshCw,Search,ShieldChec
 import Link from "next/link";
 import {type FormEvent,useCallback,useEffect,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
+import { FormFeedback } from "../../components/form-feedback";
 import { OperationStatus } from "../../components/operation-status";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";

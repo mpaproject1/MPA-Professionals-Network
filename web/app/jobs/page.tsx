@@ -3,7 +3,6 @@
 import {Bookmark,Building2,Clock3,MapPin,RefreshCw, SlidersHorizontal,Users} from "lucide-react";
 import {type FormEvent,useCallback,useEffect,useId,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
-import { JourneyGuide } from "../../components/journey-guide";
 import { OperationStatus } from "../../components/operation-status";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
@@ -174,24 +173,14 @@ export default function Jobs(){
  }
 
  return <div>
-   <div className="eyebrow">Employment & opportunity hub</div>
-   <h1 className="h1">Opportunities, without the maze.</h1>
-   <p className="muted">Browse current opportunities published by verified organizations. Eligibility and formal application steps are checked by the platform; sample or invented vacancies are not shown.</p>
-   <JourneyGuide
-     eyebrow="Professional member / job seeker"
-     title="Join → Prepare → Apply → Progress"
-     description="Follow the path from a useful profile to a considered application. Your saved opportunities and application records remain available as you move forward."
-     primaryLabel="Search verified opportunities"
-     primaryHref="#job-search"
-     steps={[
-       { title: "Join", description: "Create an account and complete the minimum profile information.", href: "/register", action: "Create account" },
-       { title: "Prepare", description: "Review your professional profile, choose visibility and add relevant experience or portfolio information.", href: "/profile", action: "Prepare profile" },
-       { title: "Discover and save", description: "Search verified opportunities, check eligibility and keep suitable roles in Saved.", href: "#job-search", action: "Find opportunities" },
-       { title: "Apply", description: "Submit the formal application with only the information requested for that opportunity.", href: "#job-search", action: "Apply to a role" },
-       { title: "Track progress", description: "See current application status, the last update and the next action in one timeline.", href: "/track", action: "Track applications" },
-       { title: "Build skills", description: "Explore mentoring opportunities while applications progress.", href: "/mentorship", action: "Explore mentorship" },
-     ]}
-   />
+   <div className="eyebrow">Careers and opportunities</div>
+   <h1 className="h1">Find your next professional opportunity.</h1>
+   <p className="muted">Explore published vacancies from eligible organizations. Review each role’s requirements, check your eligibility and track any formal application from your account.</p>
+   <div className="job-journey grid grid-3" aria-label="Your opportunity journey" style={{gap:10,marginTop:14}}>
+    <Card><div className="eyebrow">Step 1</div><b>Prepare your profile</b><p className="muted">Keep your experience and visibility settings up to date.</p><a className="text-link" href="/profile">Review profile →</a></Card>
+    <Card><div className="eyebrow">Step 2</div><b>Discover and apply</b><p className="muted">Check requirements and submit the information requested for each role.</p><a className="text-link" href="#job-search">Search opportunities →</a></Card>
+    <Card><div className="eyebrow">Step 3</div><b>Track your progress</b><p className="muted">Follow recorded application updates and next actions.</p><a className="text-link" href="/track">Track applications →</a></Card>
+   </div>
    <p><a className="btn btn-ghost" href="/jobs/interest">No matching vacancy? Register your job interest</a> <a className="btn btn-ghost" href="/saved">Review saved items</a></p>
    <div className="split" style={{marginTop:20}}>
      <Card id="job-search" className="filter">
@@ -212,7 +201,7 @@ export default function Jobs(){
        {error&&<div className="form-error" role="alert">{error}<button className="btn btn-ghost" onClick={()=>void loadJobs(filters,page)} type="button" disabled={loading} style={{marginLeft:8}}>{loading?"Checking opportunities…":"Retry loading opportunities"}</button></div>}
        {notice&&<p className="muted" aria-live="polite" aria-atomic="true">{notice}{(notice.includes("application tracking")||notice.includes("Check application tracking"))&&token?<a className="btn btn-ghost" href="/track" style={{marginLeft:8}}>Open application tracking</a>:null}{!token&&<a href="/login?next=/jobs"> Sign in</a>}</p>}
        {loading&&<Card><OperationStatus state="loading" title="Loading current opportunities" detail="We’re retrieving published jobs that match your search and account access. Your saved drafts and applications are not being changed." /></Card>}
-       {!loading&&!error&&jobs.length===0&&<Card><h2 className="h2">No matching opportunities</h2><p className="muted">There are no published opportunities matching these filters right now. Try clearing filters or check again later.</p><button type="button" className="btn btn-ghost" onClick={()=>{setFilters(initialFilters);void loadJobs(initialFilters)}}>Clear filters</button></Card>}
+       {!loading&&!error&&jobs.length===0&&<Card><h2 className="h2">No roles match these filters yet</h2><p className="muted">Broaden your search or register your job interest to help the team understand what roles you are looking for. You can also review saved opportunities while new listings are published.</p><div className="row" style={{gap:8,flexWrap:"wrap"}}><button type="button" className="btn btn-ghost" onClick={()=>{setFilters(initialFilters);void loadJobs(initialFilters)}}>Clear filters</button><a className="btn btn-primary" href="/jobs/interest">Register job interest <span aria-hidden="true">→</span></a><a className="btn btn-ghost" href="/saved">View saved items</a></div></Card>}
        {jobs.map(job=><Card key={job.id}>
          <div className="row"><Badge>{scopeLabel(job.posting_scope)}</Badge><button className="icon-btn" type="button" aria-label={saved.includes(job.id)?"Remove saved opportunity":"Save opportunity"} title={saved.includes(job.id)?"Remove saved opportunity":"Save opportunity"} disabled={savingId===job.id} onClick={()=>void toggleSave(job)}><Bookmark size={18} fill={saved.includes(job.id)?"currentColor":"none"}/></button></div>
          <h2 style={{fontSize:20,margin:"12px 0 5px"}}>{job.title}</h2>

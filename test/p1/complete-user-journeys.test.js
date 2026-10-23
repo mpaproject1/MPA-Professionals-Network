@@ -51,6 +51,26 @@ async function approvedOrg(ownerId){
  return org;
 }
 
+test("Gate 2: concurrent mentorship submissions cannot create duplicate requests or reuse a key for changed goals",async()=>{
+ const mentee=await account();
+ await activeMember(mentee);
+ const key=`gate2-mentorship-idempotency-${randomUUID()}`;
+ const input={goals:"Prepare a practical mentorship plan for product discovery and delivery.",topics:["product","strategy"],preferredModes:["remote"],preferredLanguages:["english"],preferredDays:[1,3]};
+ const results=await Promise.all([
+  journeys.createMentorshipRequest(mentee,input,"gate2-mentorship-idempotency-a",key),
+  journeys.createMentorshipRequest(mentee,input,"gate2-mentorship-idempotency-b",key)
+ ]);
+ assert.equal(results[0].id,results[1].id,"concurrent retries with the same key must resolve to one request");
+ const secondKeyResult=await journeys.createMentorshipRequest(mentee,input,"gate2-mentorship-distinct-key",`gate2-distinct-${randomUUID()}`);
+ assert.equal(secondKeyResult.id,results[0].id,"same pending goal must not be duplicated when a second tab uses a different key");
+ const persisted=await getPool().query("select count(*)::int count from mentorship_request where mentee_user_id=$1 and goals=$2 and status in ('requested','matching','matched')",[mentee,input.goals]);
+ assert.equal(persisted.rows[0].count,1,"only one active request for the same normalized goal should persist");
+ await assert.rejects(
+  journeys.createMentorshipRequest(mentee,{...input,goals:"Changed goal with the same key"},"gate2-mentorship-idempotency-conflict",key),
+  error=>error.code==="IDEMPOTENCY_KEY_CONFLICT"
+ );
+});
+
 test("Gate 2: public service journey reaches accepted delivery, requester outcome acceptance and feedback",async()=>{
  const provider=await account(),requester=await account(),staff=await supportStaff();
  await activeMember(provider);

@@ -16,7 +16,7 @@ The PR base must match the current `main` SHA reported by GitHub. Record both fu
 
 ## 2. Verify the ten new migrations without keeping DDL
 
-Restore a sanitized copy of the existing schema and migration ledger to a disposable database whose name contains `test`, `sandbox`, `ci`, or `verify`. The ledger must be present and its recorded checksums must match already-applied migration files.
+Restore a sanitized copy of the existing schema and migration ledger to a disposable database whose name contains `test`, `sandbox`, `ci`, or `verify`. The ledger must be present, record every migration through `20261016200000_saved_discovery_items.sql`, and have checksums matching the current repository files. If the database was created before migration tracking existed, establish the operator-confirmed baseline first; do not guess which historical migrations ran.
 
 Run this from the repository root, substituting the test connection details:
 

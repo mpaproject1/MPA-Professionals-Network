@@ -125,6 +125,24 @@ test("Gate 2: concurrent mentorship submissions cannot create duplicate requests
  );
 });
 
+test("Gate 2: concurrent service requests cannot reuse one idempotency key for different payloads",async()=>{
+ const provider=await account(),requester=await account(),staff=await supportStaff();
+ await activeMember(provider);
+ const listing=await journeys.createServiceListing(provider,{title:"Concurrent idempotency conflict test",description:"A public listing for conflicting submission-key requests.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-service-key-conflict-listing",randomUUID());
+ await journeys.changeServiceListingStatus(listing.id,provider,"published","gate2-service-key-conflict-publish");
+ await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Approved for idempotency conflict test."},"gate2-service-key-conflict-approve");
+ const key=`gate2-service-conflict-${randomUUID()}`;
+ const outcomes=await Promise.allSettled([
+  journeys.requestService(listing.id,requester,{message:"First request scope for the provider."},"gate2-service-key-conflict-a",key),
+  journeys.requestService(listing.id,requester,{message:"Different request scope using the same key."},"gate2-service-key-conflict-b",key)
+ ]);
+ assert.equal(outcomes.filter(x=>x.status==="fulfilled").length,1,"only one payload may claim an idempotency key");
+ const rejected=outcomes.find(x=>x.status==="rejected");
+ assert.equal(rejected.reason.code,"IDEMPOTENCY_KEY_CONFLICT","the conflicting concurrent payload must not silently replay another request");
+ const rows=await getPool().query("select count(*)::int count from service_request where service_listing_id=$1 and requester_user_id=$2",[listing.id,requester]);
+ assert.equal(rows.rows[0].count,1,"only one service request should persist");
+});
+
 test("Gate 2: conflicting concurrent provider responses persist only one decision",async()=>{
  const provider=await account(),requester=await account(),staff=await supportStaff();
  await activeMember(provider);

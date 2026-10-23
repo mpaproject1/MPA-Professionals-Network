@@ -654,7 +654,7 @@ export async function proposeMentorMatch(requestId,mentorUserId,actorUserId,requ
     if(["cancelled","completed"].includes(request.status)) throw error(409,"This mentorship request is closed.","INVALID_STATE");
     const existingRelationship=(await db.query("select id,status from mentorship where request_id=$1 for update",[requestId])).rows[0];
     if(existingRelationship)throw error(409,"This request already became a mentorship relationship. Manage goals, sessions and completion from the active relationship instead of proposing another match.","RELATIONSHIP_ALREADY_CREATED");
-    const existingMatch=(await db.query("select * from mentorship_match where request_id=$1 order by proposed_at desc,id desc limit 1 for update",[requestId])).rows[0];
+    const existingMatch=(await db.query("select * from mentorship_match where request_id=$1 and status in ('proposed','accepted') and mentee_consent_status<>'declined' limit 1 for update",[requestId])).rows[0];
     if(existingMatch?.status==="accepted"&&existingMatch.mentee_consent_status!=="declined")throw error(409,"The mentor already accepted this match. Wait for the mentee to approve or decline this specific match.","MATCH_ALREADY_ACCEPTED");
     if(existingMatch?.status==="proposed"&&existingMatch.mentee_consent_status!=="declined"){if(existingMatch.mentor_user_id===mentorUserId)return {...existingMatch,idempotent:true,nextAction:"The mentor has already been invited. Wait for their response."};throw error(409,"A mentor proposal is already awaiting a response. Wait for the answer before proposing another match.","MATCH_RESPONSE_PENDING");}
     const candidates=await mentorCandidates(db,request); const match=candidates.find(x=>x.mentorUserId===mentorUserId);

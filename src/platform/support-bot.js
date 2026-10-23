@@ -19,9 +19,16 @@ function matchScore(question,article){
  if(entries.some(entry=>entry.startsWith(`${q} `)||entry.endsWith(` ${q}`)||entry.includes(` ${q} `)))score+=4;
  return score;
 }
-async function logAudit(db,actorId,action,resourceId,requestId){
+async function logAudit(db,actorId,action,resourceId,requestId,metadata={}){
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'support_bot',$3,$4,'success',$5)",
- [actorId,action,resourceId,requestId||null,{source:"support-bot-admin"}]);
+ [actorId,action,resourceId,requestId||null,{source:"support-bot-admin",...metadata}]);
+}
+async function assertConversationScope(db,actorId,id,canManageAll=false){
+ if(!actorId) throw httpError("A signed-in support identity is required.",403,"FORBIDDEN");
+ const row=(await db.query("select id,assigned_to,status from support_conversation where id=$1",[id])).rows[0];
+ if(!row) throw httpError("Inquiry not found.",404,"NOT_FOUND");
+ if(!canManageAll && row.assigned_to && row.assigned_to!==actorId) throw httpError("This inquiry is assigned to another support colleague. Ask a support manager if reassignment is needed.",403,"FORBIDDEN");
+ return row;
 }
 export async function answerPublicQuestion(input,context={}){
  const question=clean(input.question,2000);
@@ -99,26 +106,32 @@ export async function adminSaveArticle(actorId,input,requestId){
 }
 export async function adminListConversations(filters={}){
  const db=getPool();const status=["open","in_progress","resolved","closed"].includes(filters.status)?filters.status:null;
+ const actorId=filters.actorId;
+ if(!actorId) throw httpError("A signed-in support identity is required.",403,"FORBIDDEN");
+ const canViewAll=filters.canViewAll===true;
  const limit=Math.max(1,Math.min(100,Number.parseInt(filters.limit||"50",10)||50));
  const r=await db.query(`select c.id,c.public_reference,c.user_id,c.contact_name,c.contact_email,c.contact_phone,c.preferred_contact,c.consent_to_contact,c.page_path,c.status,c.last_question,c.created_at,c.updated_at,c.assigned_to,c.resolved_at,cat.name as category_name,
  coalesce(json_agg(json_build_object('id',m.id,'senderType',m.sender_type,'message',m.message_text,'createdAt',m.created_at,'knowledgeArticleId',m.knowledge_article_id) order by m.created_at) filter(where m.id is not null),'[]'::json) as messages
  from support_conversation c left join support_knowledge_category cat on cat.id=c.category_id left join support_message m on m.conversation_id=c.id
- where ($1::text is null or c.status=$1) group by c.id,cat.name order by case c.status when 'open' then 0 when 'in_progress' then 1 else 2 end,c.updated_at desc limit $2`,[status,limit]);
+ where ($1::text is null or c.status=$1) and ($3::boolean=true or c.assigned_to is null or c.assigned_to=$2)
+ group by c.id,cat.name order by case c.status when 'open' then 0 when 'in_progress' then 1 else 2 end,c.updated_at desc limit $4`,[status,actorId,canViewAll,limit]);
  return r.rows.map(c=>({...c,contactName:c.contact_name,contactEmail:c.contact_email,contactPhone:c.contact_phone,preferredContact:c.preferred_contact,consentToContact:c.consent_to_contact,pagePath:c.page_path,publicReference:c.public_reference,lastQuestion:c.last_question,createdAt:c.created_at,updatedAt:c.updated_at,categoryName:c.category_name,messages:c.messages||[]}));
 }
-export async function adminUpdateConversation(actorId,id,input,requestId){
+export async function adminUpdateConversation(actorId,id,input,requestId,canManageAll=false){
  const db=getPool();const status=clean(input.status,20);if(!["open","in_progress","resolved","closed"].includes(status))throw httpError("Choose a valid inquiry status.");
- const r=await db.query("update support_conversation set status=$2,assigned_to=case when $3 then $4 else assigned_to end,resolved_at=case when $2='resolved' then now() when $2 in ('open','in_progress') then null else resolved_at end,updated_at=now() where id=$1 returning id,public_reference,status",[id,status,input.assignToSelf===true,actorId]);
+ const current=await assertConversationScope(db,actorId,id,canManageAll);
+ const assignToSelf=input.assignToSelf===true||(!current.assigned_to&&["in_progress","resolved","closed"].includes(status));
+ const r=await db.query("update support_conversation set status=$2,assigned_to=case when $3 then $4 else assigned_to end,resolved_at=case when $2='resolved' then now() when $2 in ('open','in_progress') then null else resolved_at end,updated_at=now() where id=$1 returning id,public_reference,status,assigned_to",[id,status,assignToSelf,actorId]);
  if(!r.rows[0])throw httpError("Inquiry not found.",404,"NOT_FOUND");
- await logAudit(db,actorId,"support.inquiry_status_changed",id,requestId);
- return {id:r.rows[0].id,publicReference:r.rows[0].public_reference,status:r.rows[0].status};
+ await logAudit(db,actorId,"support.inquiry_status_changed",id,requestId,{fromStatus:current.status,toStatus:status,assignedTo:r.rows[0].assigned_to,reason:clean(input.reason,1000)||null});
+ return {id:r.rows[0].id,publicReference:r.rows[0].public_reference,status:r.rows[0].status,assignedTo:r.rows[0].assigned_to};
 }
 
-export async function adminReplyToConversation(actorId,id,input,requestId){
+export async function adminReplyToConversation(actorId,id,input,requestId,canManageAll=false){
  const message=clean(input.message,5000);if(message.length<2)throw httpError("Reply must contain at least two characters.");
- const db=getPool();const found=await db.query("select id from support_conversation where id=$1",[id]);if(!found.rows[0])throw httpError("Inquiry not found.",404,"NOT_FOUND");
+ const db=getPool();const current=await assertConversationScope(db,actorId,id,canManageAll);
  await db.query("insert into support_message(conversation_id,sender_type,message_text) values($1,'staff',$2)",[id,message]);
- await db.query("update support_conversation set status=case when status='open' then 'in_progress' else status end,assigned_to=coalesce(assigned_to,$2),updated_at=now() where id=$1",[id,actorId]);
- await logAudit(db,actorId,"support.inquiry_replied",id,requestId);
- return {id,message,status:"in_progress"};
+ const updated=(await db.query("update support_conversation set status=case when status='open' then 'in_progress' else status end,assigned_to=coalesce(assigned_to,$2),updated_at=now() where id=$1 returning assigned_to,status",[id,actorId])).rows[0];
+ await logAudit(db,actorId,"support.inquiry_replied",id,requestId,{fromStatus:current.status,toStatus:updated.status,assignedTo:updated.assigned_to});
+ return {id,message,status:updated.status,assignedTo:updated.assigned_to};
 }

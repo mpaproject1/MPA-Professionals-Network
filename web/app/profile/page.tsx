@@ -586,8 +586,8 @@ export default function Profile() {
                   </label>
                   <select
                     id={`${profileId}-visibility`}
-                    value={form.visibility} disabled={saving||loading}
-                  disabled={saving||loading}
+                    value={form.visibility}
+                    disabled={saving||loading}
                     onChange={(e) => update("visibility", e.target.value)}
                   >
                     <option value="public">Public-safe profile</option>

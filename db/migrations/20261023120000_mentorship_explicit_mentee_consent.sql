@@ -12,6 +12,14 @@ alter table mentorship_match
   add constraint mentorship_match_mentee_consent_status_check
   check (mentee_consent_status in ('pending','accepted','declined'));
 
+update mentorship_match
+   set mentee_consent_status='pending'
+ where mentee_consent_status is null;
+
+alter table mentorship_match
+  alter column mentee_consent_status set default 'pending',
+  alter column mentee_consent_status set not null;
+
 update mentorship_match mm
 set mentee_consent_status='accepted',
     mentee_responded_at=coalesce(mm.mentee_responded_at,m.created_at)

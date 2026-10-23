@@ -6,6 +6,7 @@ import * as organizationJobs from "../../src/organization-jobs/service.js";
 import {closePool, getPool} from "../../src/platform/db.js";
 import * as supportBot from "../../src/platform/support-bot.js";
 import * as verification from "../../src/verification/service.js";
+
 async function account(suffix) {
   const digits = suffix.replace(/[^0-9]/g, "").slice(0, 8).padEnd(8, "7");
   const result = await membership.register({

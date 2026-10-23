@@ -25,8 +25,8 @@ async function assertAssignedReviewer(db,caseId,actorId){
  const row=(await db.query("select subject_user_id,assigned_reviewer_id from verification_case where id=$1",[caseId])).rows[0];
  if(!row) throw error(404,"Verification case not found.","NOT_FOUND");
  if(row.subject_user_id===actorId) throw error(403,"The subject cannot review their own case.","CONFLICT_OF_INTEREST");
- const admin=(await db.query("select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code='system_admin' limit 1",[actorId])).rows[0];
- if(!admin && row.assigned_reviewer_id!==actorId) throw error(403,"Only the assigned reviewer or a system administrator may perform this review action.","FORBIDDEN");
+ const authority=(await db.query("select exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code='system_admin') or exists(select 1 from app_user_permission up where up.user_id=$1 and up.permission_code='verification.manage') as can_manage",[actorId])).rows[0];
+ if(!authority?.can_manage && row.assigned_reviewer_id!==actorId) throw error(403,"Only the assigned reviewer or a user with verification management permission may perform this review action.","FORBIDDEN");
  return row;
 }
 export function allowedTransition(from,to){ return Boolean(TRANSITIONS[from]?.includes(to)); }

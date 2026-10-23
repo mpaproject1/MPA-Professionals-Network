@@ -18,8 +18,15 @@ export default function MarketplacePage(){return <main className="mx-auto grid w
   <div className="eyebrow">MPA professional network · Marketplace</div>
   <h1 className="h1">One marketplace. More ways to grow.</h1>
   <p className="muted" style={{maxWidth:760}}>Discover professional services, mentorship, career opportunities and community initiatives in one place. Start with public information; requests, applications and delivery continue through their dedicated workflows.</p>
+  <form action="/services" method="get" className="marketplace-search" role="search">
+   <label htmlFor="marketplace-service-search"><Search size={17} aria-hidden="true"/> Search professional services</label>
+   <input id="marketplace-service-search" name="q" type="search" placeholder="Try finance, design, training or consulting" />
+   <button className="btn btn-primary" type="submit">Search services <ArrowRight size={16}/></button>
+  </form>
+  <div className="row marketplace-tabs" aria-label="Explore marketplace areas" style={{gap:8,flexWrap:"wrap"}}>
+   <Link href="/marketplace" aria-current="page">All</Link><Link href="/services">Services</Link><Link href="/mentorship">Mentorship</Link><Link href="/jobs">Careers</Link><Link href="/organizations">Organizations</Link>
+  </div>
   <div className="row" style={{gap:10,flexWrap:"wrap"}}>
-   <Link className="btn btn-primary" href="/services"><Search size={17}/> Explore services</Link>
    <Link className="btn btn-ghost" href="/service-demand"><Users size={17}/> Share a need</Link>
    <Link className="btn btn-ghost" href="/member"><Workflow size={17}/> My workspace</Link>
   </div>

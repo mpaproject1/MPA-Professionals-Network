@@ -119,5 +119,5 @@ These are **source-structure regression guards**. They do not prove runtime auth
 4. Verify Support Desk queue, escalation, consent and notification behavior in runtime tests.
 5. Obtain the separation-of-duties decision before implementing the final Finance permission model and finance-first UI.
 6. Finish the administrator mutation audit and validate the new audit view against the deployed schema in a safe test environment.
-7. Configure and verify the membership expiry batch schedule; confirm all profile editing works for non-members and member-only verification remains gated.
+7. Verify the startup/hourly membership expiry worker and its failure/retry behavior; confirm all profile editing works for non-members and member-only verification remains gated.
 8. Run CI and browser/API acceptance after Phase 3 is complete; review failures without removing tests or masking errors, and do not merge/deploy before review.

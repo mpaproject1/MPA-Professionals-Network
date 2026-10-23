@@ -161,7 +161,7 @@ export default function AdminPage() {
     if (typeof window !== "undefined") window.location.assign(item.start_path || "/");
   }
 
-  if (!hydrated) return <div className="auth-page"><Card><p className="muted">Loading administrator workspace…</p></Card></div>;
+  if (!hydrated) return <div className="auth-page"><Card><OperationStatus state="loading" title="Preparing the administrator workspace" detail="We’re checking your session and access before showing administrative tools." /></Card></div>;
   if (!token)
 
     return (

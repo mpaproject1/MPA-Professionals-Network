@@ -26,7 +26,7 @@ async function supportStaff(){
 }
 test("P1 marketplace: private demand is reviewed before a privacy-safe public topic appears; interests are unique",async()=>{
  const requester=await account(randomUUID()),staff=await supportStaff();
- const demand=await marketplaceDemand.createDemand(requester,{demandType:"service",title:"Need bookkeeping support",description:"Our small team needs monthly bookkeeping and financial reporting support.",category:"Finance",deliveryMode:"remote"},"marketplace-demand-submit");
+ const demand=await marketplaceDemand.createDemand(requester,{demandType:"service",title:"Need bookkeeping support",description:"Our small team needs monthly bookkeeping and financial reporting support.",category:"Finance",deliveryMode:"remote"},"marketplace-demand-submit",randomUUID());
  assert.equal(demand.status,"submitted");
  const privateRows=await marketplaceDemand.listMyDemand(requester);
  assert.ok(privateRows.some(row=>row.id===demand.id));
@@ -51,7 +51,7 @@ test("P1 marketplace: private demand is reviewed before a privacy-safe public to
 });
 test("P1 marketplace: demand assessment is Support Desk-only and returns aggregate-only rows",async()=>{
  const requester=await account(randomUUID()),staff=await supportStaff(),outsider=await account(randomUUID()),category=`Finance ${randomUUID().replaceAll("-","").slice(0,8)}`;
- const demand=await marketplaceDemand.createDemand(requester,{demandType:"service",title:"Need bookkeeping support",description:"Our small team needs monthly bookkeeping and financial reporting support.",category,deliveryMode:"remote",locationLabel:"Addis Ababa"}, "marketplace-assessment-submit");
+ const demand=await marketplaceDemand.createDemand(requester,{demandType:"service",title:"Need bookkeeping support",description:"Our small team needs monthly bookkeeping and financial reporting support.",category,deliveryMode:"remote",locationLabel:"Addis Ababa"}, "marketplace-assessment-submit",randomUUID());
  const reviewed=await marketplaceDemand.reviewDemand(demand.id,staff,{status:"topic_published",publishTopic:true,publicTitle:"Bookkeeping support for small teams",publicSummary:"Small teams are seeking qualified help with monthly bookkeeping and clear financial reporting.",publicCategory:category,publicLocationLabel:"Addis Ababa",interestGoal:3},"marketplace-assessment-review");
  await marketplaceDemand.joinDemandTopic(reviewed.topic.id,outsider,{interestLevel:"ready_to_engage"},"marketplace-assessment-interest");
  const assessment=await marketplaceDemand.getDemandInterestAssessment(staff,{type:"service"});
@@ -68,14 +68,14 @@ test("P1 marketplace: demand assessment is Support Desk-only and returns aggrega
 test("P1 marketplace: organization demand is visible to its owner but not an unrelated account",async()=>{
  const owner=await account(randomUUID()),unrelated=await account(randomUUID());
  const org=await organizationJobs.registerOrganization(owner,{legalName:`Marketplace Test ${randomUUID()}`,displayName:"Marketplace Test Organization"},"marketplace-org-create");
- const demand=await marketplaceDemand.createDemand(owner,{demandType:"mentorship",title:"Mentorship for early-career staff",description:"Our organization seeks a structured mentoring program for early-career team members.",category:"Career development",organizationId:org.id},"marketplace-org-demand");
+ const demand=await marketplaceDemand.createDemand(owner,{demandType:"mentorship",title:"Mentorship for early-career staff",description:"Our organization seeks a structured mentoring program for early-career team members.",category:"Career development",organizationId:org.id},"marketplace-org-demand",randomUUID());
  assert.ok((await marketplaceDemand.listMyDemand(owner)).some(row=>row.id===demand.id));
  assert.equal((await marketplaceDemand.listMyDemand(unrelated)).some(row=>row.id===demand.id),false);
 });
 test("P1 marketplace: service listings stay hidden until approved by Support Desk",async()=>{
  const provider=await account(randomUUID()),staff=await supportStaff();
  await activeMember(provider);
- const listing=await services.createServiceListing(provider,{title:"Test professional service",description:"A detailed professional service for marketplace moderation testing.",serviceCategory:"Testing",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"marketplace-listing-create");
+ const listing=await services.createServiceListing(provider,{title:"Test professional service",description:"A detailed professional service for marketplace moderation testing.",serviceCategory:"Testing",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"marketplace-listing-create",randomUUID());
  const submitted=await services.changeServiceListingStatus(listing.id,provider,"published","marketplace-listing-submit");
  assert.equal(submitted.status,"draft");assert.equal(submitted.moderation_status,"pending");
  assert.equal((await services.listServices(null,{q:"Test professional service"})).items.some(item=>item.id===listing.id),false);
@@ -86,8 +86,8 @@ test("P1 marketplace: service listings stay hidden until approved by Support Des
 });
 test("P1 marketplace: Support Desk merges duplicate demand into a canonical request without losing source history",async()=>{
  const firstRequester=await account(randomUUID()),secondRequester=await account(randomUUID()),staff=await supportStaff(),outsider=await account(randomUUID());
- const target=await marketplaceDemand.createDemand(firstRequester,{demandType:"service",title:"Bookkeeping support for SMEs",description:"Small businesses need recurring bookkeeping and monthly financial reporting.",category:"Finance",deliveryMode:"remote"},"marketplace-merge-target");
- const duplicate=await marketplaceDemand.createDemand(secondRequester,{demandType:"service",title:"Monthly bookkeeping help",description:"A small company needs monthly bookkeeping and reporting assistance.",category:"Finance",deliveryMode:"remote"},"marketplace-merge-duplicate");
+ const target=await marketplaceDemand.createDemand(firstRequester,{demandType:"service",title:"Bookkeeping support for SMEs",description:"Small businesses need recurring bookkeeping and monthly financial reporting.",category:"Finance",deliveryMode:"remote"},"marketplace-merge-target",randomUUID());
+ const duplicate=await marketplaceDemand.createDemand(secondRequester,{demandType:"service",title:"Monthly bookkeeping help",description:"A small company needs monthly bookkeeping and reporting assistance.",category:"Finance",deliveryMode:"remote"},"marketplace-merge-duplicate",randomUUID());
  await assert.rejects(
   marketplaceDemand.mergeDemand(duplicate.id,target.id,outsider,"marketplace-merge-forbidden"),
   error=>error.code==="FORBIDDEN",

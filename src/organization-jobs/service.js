@@ -716,27 +716,33 @@ export async function addApplicationNote(applicationId,userId,input,requestId){
  });
 }
 export async function listApplicationNotes(applicationId,userId){
- const db=getPool(); const a=(await db.query("select job_id from job_application where id=$1",[applicationId])).rows[0]; if(!a) throw error(404,"Application not found.","NOT_FOUND");
- await jobRole(db,a.job_id,userId,["hiring_manager","recruiter","interviewer","observer"]);
- return (await db.query("select n.*,p.display_name author_name from job_application_note n left join person p on p.user_id=n.author_user_id where n.application_id=$1 order by n.created_at desc",[applicationId])).rows;
+ const db=getPool(); const a=(await db.query("select a.job_id from job_application a where a.id=$1",[applicationId])).rows[0]; if(!a) throw error(404,"Application not found.","NOT_FOUND");
+ const access=await jobRole(db,a.job_id,userId,["hiring_manager","recruiter","interviewer","observer"]);
+ const elevated=["owner","administrator","recruiter"].includes(access.role);
+ return (await db.query("select n.*,p.display_name author_name from job_application_note n left join person p on p.user_id=n.author_user_id where n.application_id=$1 and (n.visibility<>'private' or n.author_user_id=$2 or $3::boolean) order by n.created_at desc",[applicationId,userId,elevated])).rows;
 }
 export async function scheduleInterview(applicationId,userId,input,requestId){
  return withTransaction(async db=>{
-  const a=(await db.query("select a.*,j.organization_id from job_application a join job j on j.id=a.job_id where a.id=$1",[applicationId])).rows[0]; if(!a) throw error(404,"Application not found.","NOT_FOUND");
+  const a=(await db.query("select a.*,j.organization_id from job_application a join job j on j.id=a.job_id where a.id=$1 for update",[applicationId])).rows[0]; if(!a) throw error(404,"Application not found.","NOT_FOUND");
   await jobRole(db,a.job_id,userId,["hiring_manager","recruiter"]);
+  const interviewerUserId=input.interviewerUserId||userId;
+  const interviewer=(await db.query("select 1 from app_user u where u.id=$1 and u.status='active' and (exists(select 1 from organization_membership om where om.organization_id=$2 and om.user_id=u.id and om.status='active') or exists(select 1 from job_team_member jt where jt.job_id=$3 and jt.user_id=u.id and jt.active=true and jt.role_code in ('hiring_manager','recruiter','interviewer','approver')))",[interviewerUserId,a.organization_id,a.job_id])).rows[0];
+  if(!interviewer) throw error(400,"Choose an active interviewer who belongs to this organization or its authorized job team.","INVALID_INTERVIEWER");
+  if(!["submitted","screening","shortlisted","interview"].includes(a.status)) throw error(409,"Interviews can only be scheduled for an active application in the recruitment pipeline.","INVALID_STATE");
   const start=new Date(input.scheduledStart),end=new Date(input.scheduledEnd); if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())||end<=start) throw error(400,"A valid interview time range is required.","VALIDATION_ERROR");
-  const overlap=(await db.query("select 1 from job_interview ji join job_interview_participant jp on jp.interview_id=ji.id where jp.user_id=$1 and ji.status in ('scheduled','confirmed') and ji.scheduled_start < $3 and ji.scheduled_end > $2 limit 1",[input.interviewerUserId||userId,start,end])).rows[0];
+  const overlap=(await db.query("select 1 from job_interview ji join job_interview_participant jp on jp.interview_id=ji.id where jp.user_id=$1 and ji.status in ('scheduled','confirmed') and ji.scheduled_start < $3 and ji.scheduled_end > $2 limit 1",[interviewerUserId,start,end])).rows[0];
   if(overlap) throw error(409,"The interviewer already has an overlapping interview.","INTERVIEW_CONFLICT");
   const row=(await db.query("insert into job_interview(application_id,organizer_user_id,scheduled_start,scheduled_end,timezone,mode,location_text,meeting_url,agenda) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *",[applicationId,userId,start,end,input.timezone||"Africa/Addis_Ababa",input.mode||"online",input.locationText||null,input.meetingUrl||null,input.agenda||null])).rows[0];
   await db.query("insert into job_interview_participant(interview_id,user_id,role_code) values($1,$2,'candidate') on conflict do nothing",[row.id,a.applicant_user_id]);
-  if(input.interviewerUserId) await db.query("insert into job_interview_participant(interview_id,user_id,role_code) values($1,$2,'interviewer') on conflict do nothing",[row.id,input.interviewerUserId]);
-  await audit(db,userId,"job.interview_scheduled","job_interview",row.id,requestId,{applicationId});
+  await db.query("insert into job_interview_participant(interview_id,user_id,role_code) values($1,$2,'interviewer') on conflict do nothing",[row.id,interviewerUserId]);
+  await audit(db,userId,"job.interview_scheduled","job_interview",row.id,requestId,{applicationId,interviewerUserId});
   await queueWorkflowEmail(db,a.applicant_user_id,"professional.workflow_update",{notificationEventCode:"job.interview_scheduled",category:"recruitment",title:"Interview scheduled",status:"scheduled",message:"An interview has been scheduled for your application.",nextAction:"Review the interview time, timezone, format and instructions, then confirm or decline.",actionUrl:"/track",actionRequired:true,priority:"high",scheduledStart:start.toISOString(),scheduledEnd:end.toISOString(),timezone:input.timezone||"Africa/Addis_Ababa"},"job_interview",row.id);
   const interviewParticipants=(await db.query("select user_id,role_code from job_interview_participant where interview_id=$1 and user_id<>$2",[row.id,a.applicant_user_id])).rows;
   for(const participant of interviewParticipants)await queueWorkflowEmail(db,participant.user_id,"employer.interview_scheduled",{notificationEventCode:"job.interview_scheduled",category:"recruitment",title:"Interview scheduled",audience:"employer",status:"scheduled",message:"An interview was scheduled for a candidate in your recruitment workflow.",nextAction:"Review the interview details and confirm your availability.",actionUrl:"/recruitment",scheduledStart:start.toISOString(),scheduledEnd:end.toISOString(),timezone:input.timezone||"Africa/Addis_Ababa"},"job_interview",row.id);
   return row;
  });
 }
+
 export async function respondInterview(interviewId,userId,status,requestId){
  return withTransaction(async db=>{
   const p=(await db.query("select jp.*,ji.application_id,j.organization_id,a.applicant_user_id,j.title job_title from job_interview_participant jp join job_interview ji on ji.id=jp.interview_id join job_application a on a.id=ji.application_id join job j on j.id=a.job_id where jp.interview_id=$1 and jp.user_id=$2",[interviewId,userId])).rows[0];

@@ -66,3 +66,19 @@ button:disabled svg{animation:none!important}
 button:not(:disabled),a.btn{transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease}
 button:not(:disabled):active,a.btn:active{transform:translateY(1px)}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:0.01ms!important}.operation-status__icon--moving svg{animation:none;opacity:.8}button:not(:disabled),a.btn{transition:none}button:not(:disabled):active,a.btn:active{transform:none}}
+
+/* Page-level UX refinements: responsive marketplace hierarchy, readable filters and compact membership steps. */
+.marketplace-pathway{min-height:260px;border-radius:18px;transition:transform .18s ease,border-color .18s ease}
+.marketplace-pathway:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--primary) 42%,var(--border))}
+.marketplace-pathway-icon{display:grid;place-items:center;width:48px;height:48px;border:1px solid var(--border);border-radius:15px;background:color-mix(in srgb,var(--primary) 9%,var(--surface));color:var(--primary)}
+.marketplace-trust{padding:16px;border:1px solid var(--border);border-radius:18px;background:color-mix(in srgb,var(--surface) 94%,var(--bg))}
+.membership-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px}
+.membership-steps>div{min-width:0;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+.membership-steps>div>span{display:grid;place-items:center;width:28px;height:28px;margin-bottom:10px;border-radius:50%;background:var(--primary);color:var(--primary-contrast);font-weight:800}
+.membership-steps b{display:block}
+.membership-steps p{margin:6px 0 0;font-size:13px;line-height:1.5}
+.filter input,.filter select,.filter textarea{width:100%;min-width:0;padding:11px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text)}
+.filter input:focus,.filter select:focus,.filter textarea:focus{outline:2px solid color-mix(in srgb,var(--primary) 45%,transparent);outline-offset:1px}
+.mentorship-empty-state{display:grid;gap:12px;max-width:900px;padding:24px}
+@media(max-width:700px){.membership-steps{grid-template-columns:1fr}.marketplace-primary-grid,.marketplace-secondary-grid{grid-template-columns:1fr}.marketplace-pathway{min-height:0}.job-journey{grid-template-columns:1fr}.mentorship-empty-state{padding:18px}}
+@media(prefers-reduced-motion:reduce){.marketplace-pathway{transition:none}.marketplace-pathway:hover{transform:none}}

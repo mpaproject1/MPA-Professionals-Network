@@ -99,7 +99,7 @@
 
 ## Regression coverage added in this continuation
 
-Added `test/p0/role-workspace-authorization.test.js` with structural regression checks for:
+Added `test/p0/role-workspace-authorization.test.js` with source-structure regression checks and `test/p0/role-workspace-boundaries.integration.test.js` with database-backed scenarios for organization/recruiter scope, reviewer assignment, and Support Desk assignment/consent:
 - organization detail requiring an authenticated active organization membership;
 - reviewer list scope being derived from the authenticated viewer;
 - reviewer case-detail assignment enforcement and explicit manager permission;

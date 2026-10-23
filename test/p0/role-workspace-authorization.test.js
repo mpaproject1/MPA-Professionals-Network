@@ -3,6 +3,7 @@ import {readFileSync} from "node:fs";
 import {dirname, resolve} from "node:path";
 import test from "node:test";
 import {fileURLToPath} from "node:url";
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 

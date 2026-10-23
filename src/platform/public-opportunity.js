@@ -5,6 +5,13 @@ function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message);
 function hashToken(token){ return createHash("sha256").update(token).digest("hex"); }
 function hashPayload(payload){ return createHash("sha256").update(JSON.stringify(payload)).digest("hex"); }
 function refCode(type){ return `MPA-${type==="job"?"JOB":"MEN"}-${randomBytes(5).toString("hex").toUpperCase()}`; }
+function inquiryNextStep(status){
+ if(["converted","declined","closed"].includes(status)) return "This inquiry has a recorded outcome and no longer accepts additional details. Do not submit the same request again; contact MPA support if you need clarification."
+ if(status==="invited") return "You have been invited to the next step. Continue with the secure details link if more information is requested, or sign in to follow any formal application steps."
+ if(status==="contacted") return "An authorized MPA representative has contacted you. Check your messages and use the secure details link if you still need to provide information."
+ if(status==="considering") return "Your inquiry is being considered. Review or complete your detailed information; do not submit a duplicate inquiry."
+ return "Use the secure continuation link to provide detailed information, or create/sign in to an MPA account for the formal application workflow."
+}
 function clean(v,max=4000){ return v===undefined||v===null?null:String(v).trim().slice(0,max); }
 async function audit(db,actor,action,type,id,requestId,metadata={}){ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,metadata]); }
 async function notify(db,userId,eventCode,type,id,payload={}){if(!userId)return;await db.query("insert into notification_event(user_id,event_code,resource_type,resource_id,payload) values($1,$2,$3,$4,$5)",[userId,eventCode,type,id,payload]);}
@@ -49,7 +56,7 @@ export async function createPublicInquiry(input,requestId,identity=null,idempote
   if(existing){
    if(existing.idempotency_request_hash!==requestFingerprint)
     throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
-   return {...existing,publicReference:existing.public_reference,continuationToken:idempotencyKey,replayed:true,nextStep:"This inquiry was already received. Continue using the secure link below; you do not need to submit it again."};
+   return {...existing,publicReference:existing.public_reference,continuationToken:idempotencyKey,replayed:true,nextStep:inquiryNextStep(existing.status)};
   }
   if(!normalized.contactName) throw error(400,"Enter your name before submitting the inquiry.","VALIDATION_ERROR");
   if(!normalized.contactEmail&&!normalized.contactPhone) throw error(400,"Provide an email address or phone number.","VALIDATION_ERROR");
@@ -70,10 +77,10 @@ export async function createPublicInquiry(input,requestId,identity=null,idempote
    const raced=(await db.query("select id,public_reference,inquiry_type,status,created_at,idempotency_request_hash from public_opportunity_inquiry where continuation_token_hash=$1 for update",[continuationHash])).rows[0];
    if(!raced || raced.idempotency_request_hash!==requestFingerprint)
     throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
-   return {...raced,publicReference:raced.public_reference,continuationToken:idempotencyKey,replayed:true,nextStep:"This inquiry was already received. Continue using the secure link below; you do not need to submit it again."};
+   return {...raced,publicReference:raced.public_reference,continuationToken:idempotencyKey,replayed:true,nextStep:inquiryNextStep(raced.status)};
   }
   await audit(db,identity?.sub||null,"public_opportunity.inquiry_received","public_opportunity_inquiry",inserted.id,requestId,{inquiryType:type,jobId:job?.id||null});
-  return {...inserted,publicReference:inserted.public_reference,continuationToken:idempotencyKey,replayed:false,nextStep:"Use the secure continuation link to provide detailed information, or create/sign in to an MPA account for the formal application workflow."};
+  return {...inserted,publicReference:inserted.public_reference,continuationToken:idempotencyKey,replayed:false,nextStep:inquiryNextStep(inserted.status)};
  });
 }
 async function getByToken(db,reference,token){

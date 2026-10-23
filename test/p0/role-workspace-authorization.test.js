@@ -178,3 +178,14 @@ test("support escalation, priority and waiting states are persisted and routed",
   assert.match(supportUi, /Escalate to manager/);
   assert.match(supportUi, /Escalated queue/);
 });
+
+
+test("private verification files require case assignment, manager authority, or independent appeal access", () => {
+  const files = read("src/platform/private-file-storage.js");
+  const verification = read("src/verification/service.js");
+  assert.match(files, /vc\.assigned_reviewer_id=\$2 or \$3=true/);
+  assert.match(files, /a\.status in \('submitted','under_review'\) and vc\.subject_user_id<>\$2 and d\.decided_by<>\$2/);
+  assert.doesNotMatch(files, /or \$5=true/);
+  assert.match(verification, /independentAppealReviewer/);
+  assert.match(verification, /pendingIndependentAppeal/);
+});

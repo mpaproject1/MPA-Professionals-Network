@@ -268,17 +268,16 @@ try {
   }
   const missingActiveConsent = await client.query(`
     select count(*)::int as count
-      from mentorship_match mm
-      join mentorship m
+      from mentorship m
+      left join mentorship_match mm
         on m.request_id=mm.request_id
        and m.mentor_user_id=mm.mentor_user_id
        and m.mentee_user_id=mm.mentee_user_id
      where m.status='active'
-       and mm.status='accepted'
-       and mm.mentee_consent_status<>'accepted'
+       and (mm.id is null or mm.status<>'accepted' or mm.mentee_consent_status<>'accepted')
   `);
   if (missingActiveConsent.rows[0].count > 0) {
-    throw new Error(`Mentorship consent backfill left ${missingActiveConsent.rows[0].count} active accepted relationship(s) without preserved consent.`);
+    throw new Error(`Mentorship consent migration left ${missingActiveConsent.rows[0].count} active relationship(s) without a matching accepted proposal and recorded mentee consent; review these records before applying.`);
   }
 
   await client.query("rollback");

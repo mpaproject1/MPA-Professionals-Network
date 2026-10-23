@@ -10,7 +10,7 @@ import {useUiStore} from "../../lib/store";
 
 function createSubmissionKey():string{if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function")throw new Error("Secure submission is unavailable in this browser. Please reload and try again.");return crypto.randomUUID()+crypto.randomUUID();}
 type Topic={id:string;demand_type:"service"|"mentorship";title:string;summary:string;category:string;delivery_mode:string;location_label?:string|null;interest_goal?:number|null;published_at:string;interest_count:number;ready_count:number};
-type Demand={id:string;demand_type:string;title:string;category:string;status:string;outcome_code?:string|null;outcome_note?:string|null;merged_into_existing?:boolean;created_at:string;organization_name?:string|null};
+type Demand={nextAction?:string;id:string;demand_type:string;title:string;category:string;status:string;outcome_code?:string|null;outcome_note?:string|null;merged_into_existing?:boolean;created_at:string;organization_name?:string|null};
 type Org={id:string;display_name:string;verification_status?:string};
 type Interest={id:string;topic_id:string;interest_level:string;title:string;topic_status:string;status:"active"|"withdrawn";next_action?:string;withdrawn_at?:string|null};
 type ProviderMatch={id:string;demand_id:string;demand_title:string;demand_type:string;listing_type:string;listing_title:string;provider_name?:string|null;status:string;is_requester:boolean;is_provider:boolean;match_note?:string|null;response_note?:string|null};

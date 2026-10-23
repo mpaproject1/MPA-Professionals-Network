@@ -496,7 +496,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="response") return ok(res,await verification.memberResponse(parts[4],await body(req),identity.sub,requestId),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="appeal") return ok(res,await verification.submitAppeal(parts[4],await body(req),identity.sub,requestId),requestId,201);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/verification/appeals/") && parts[4]==="decision"){
-      anyRole(identity,["appeal_reviewer","system_admin"]);
+      anyRoleOrPermission(identity,["appeal_reviewer","system_admin"],["verification.manage"]);
       return ok(res,await verification.decideAppeal(parts[3],await body(req),identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="claim-status"){

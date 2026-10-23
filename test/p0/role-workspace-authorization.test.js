@@ -274,10 +274,13 @@ test("CV storage remains private by default and sharing is limited to the applic
   assert.match(files, /job_application_attachment aa join job_application a on a\.id=aa\.application_id join job j on j\.id=a\.job_id/);
   assert.match(files, /om\.role_code in \('owner','administrator','recruiter','project_manager'\)/);
   assert.match(files, /jt\.active=true/);
+  assert.match(files, /jt\.role_code in \\(\'hiring_manager\',\'recruiter\',\'interviewer\'\\)/);
   assert.match(migration, /cv_file_id uuid references file_object\(id\)/);
   assert.match(cvPage, /Your CV, your choice/);
   assert.match(cvPage, /Revoke CV access/);
   assert.match(employerPage, /Documents the applicant shared with this application/);
+  assert.match(employerPage, /Open private document/);
+  assert.match(read("src/organization-jobs/service.js"), /attachments from job_application a join job j on j\.id=a\.job_id/);
 });
 
 test("Reviewer checklist and claim assessment actions are case-scoped and evidence-linked", () => {

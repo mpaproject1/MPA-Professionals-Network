@@ -71,7 +71,7 @@ export async function getOrganization(orgId,viewerId=null){
  // Public visibility applies only to the explicitly limited public-profile projection.
  // Full organization records and membership rosters are private workspace data.
  if(!viewerId) throw error(403,"Sign in with an active organization role to view workspace details.","FORBIDDEN");
- const membership=(await db.query("select om.role_code from organization_membership om where om.organization_id=$1 and om.user_id=$2 and om.status='active'",[orgId,viewerId])).rows[0];
+ const membership=(await db.query("select om.role_code from organization_membership om where om.organization_id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator','recruiter','project_manager')",[orgId,viewerId])).rows[0];
  if(!membership) throw error(403,"An active member of this organization is required to view its workspace details.","FORBIDDEN");
  const users=membership.role_code==="owner"||membership.role_code==="administrator"
   ? (await db.query("select om.user_id,om.role_code,om.status from organization_membership om where om.organization_id=$1 and om.status='active' order by om.role_code,om.user_id",[orgId])).rows

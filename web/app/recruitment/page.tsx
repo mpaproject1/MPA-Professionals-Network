@@ -6,7 +6,7 @@ import {JourneyGuide} from "../../components/journey-guide";
 import {OperationStatus} from "../../components/operation-status";
 import {TagInput} from "../../components/tag-input";
 import {Badge, Card} from "../../components/ui";
-import {api, ApiError} from "../../lib/api";
+import {ApiError, api} from "../../lib/api";
 import {humanStatus} from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 

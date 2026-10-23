@@ -180,32 +180,41 @@ export async function getServiceListing(listingId,viewerId=null){
   return row;
 }
 
-export async function requestService(listingId,requesterId,input,requestId){
-  return withTransaction(async db=>{
-    const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
-    if(!listing||listing.status!=="published"||listing.moderation_status!=="approved"||listing.visibility==="private") throw error(404,"Service listing is not available.","NOT_FOUND");
-    if(listing.organization_id){const org=(await db.query("select verification_status from organization where id=$1",[listing.organization_id])).rows[0];if(!org||org.verification_status!=="verified")throw error(404,"Service listing is not available.","NOT_FOUND");}
-    else if(!(await activeMember(db,listing.provider_user_id))) throw error(404,"Service listing is not available.","NOT_FOUND");
-    if(listing.visibility!=="public"&&!(await activeMember(db,requesterId))) throw error(403,"An active membership is required to request a member-only service.","MEMBERSHIP_REQUIRED");
-    if(listing.provider_user_id===requesterId) throw error(409,"You cannot request your own service.","SELF_REQUEST");
-    const duplicate=(await db.query("select * from service_request where service_listing_id=$1 and requester_user_id=$2 and status in ('requested','accepted','in_progress') order by created_at desc limit 1 for update",[listingId,requesterId])).rows[0];
-    if(duplicate) return {...duplicate,idempotent:true,nextAction:duplicate.status==="requested"?"Wait for the provider to respond.":duplicate.status==="accepted"?"Confirm scope, timing and milestones.":"Track delivery and review the provider's submitted outcome."};
-    if(listing.max_active_requests){
-      const count=(await db.query("select count(*)::int count from service_request where service_listing_id=$1 and status in ('requested','accepted','in_progress')",[listingId])).rows[0].count;
-      if(count>=listing.max_active_requests) throw error(409,"This service has reached its active request limit.","CAPACITY_REACHED");
-    }
-    const proposedPrice=input.proposedPrice===undefined||input.proposedPrice===null?null:Number(input.proposedPrice);
-    if(proposedPrice!==null&&(!Number.isFinite(proposedPrice)||proposedPrice<0)) throw error(400,"proposedPrice must be a non-negative number.","VALIDATION_ERROR");
-    const row=(await db.query("insert into service_request(service_listing_id,requester_user_id,provider_user_id,status,message,scope,agreed_price,agreed_currency,completion_due_at,requested_start_at,requested_end_at) values($1,$2,$3,'requested',$4,$5,$6,$7,$8,$9,$10) returning *",[listingId,requesterId,listing.provider_user_id,input.message||null,input.scope||null,proposedPrice,input.currency?String(input.currency).toUpperCase():listing.currency,input.completionDueAt||null,input.requestedStartAt||null,input.requestedEndAt||null])).rows[0];
-    await db.query("insert into service_request_event(request_id,actor_user_id,to_status,note) values($1,$2,'requested',$3)",[row.id,requesterId,input.message||null]);
-    await audit(db,requesterId,"service.request_created","service_request",row.id,requestId,{listingId,organizationId:listing.organization_id||null});
-    const recipients=listing.organization_id?(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code=any($2::text[])",[listing.organization_id,["owner","administrator","recruiter","project_manager"]])).rows.map(x=>x.user_id):[listing.provider_user_id];
-    for(const recipient of new Set(recipients))if(recipient&&recipient!==requesterId)await queueWorkflowEmail(db,recipient,"professional.workflow_update",{notificationEventCode:"service.request_received",category:"services",title:"New service request",status:"requested",message:"A new service request needs a response.",nextAction:"Review the requested scope and accept, decline or ask for clarification.",actionUrl:"/services",actionRequired:true,priority:"high"},"service_request",row.id);
-    await queueWorkflowEmail(db,requesterId,"professional.workflow_update",{notificationEventCode:"service.request_submitted",category:"services",title:"Service request submitted",status:"requested",message:"Your service request has been recorded.",nextAction:"Track the provider response in your service requests.",actionUrl:"/services"},"service_request",row.id);
-    return {...row,nextAction:"Your request is recorded. The provider or authorized organization team must respond before delivery begins."};
-  });
+export async function requestService(listingId,requesterId,input,requestId,idempotencyKey=null){
+ if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
+  throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
+ const proposedPrice=input.proposedPrice===undefined||input.proposedPrice===null?null:Number(input.proposedPrice);
+ if(proposedPrice!==null&&(!Number.isFinite(proposedPrice)||proposedPrice<0)) throw error(400,"proposedPrice must be a non-negative number.","VALIDATION_ERROR");
+ const normalized={listingId,requesterId,message:String(input.message||"").trim()||null,scope:input.scope||null,proposedPrice,currency:input.currency?String(input.currency).toUpperCase():null,completionDueAt:input.completionDueAt||null,requestedStartAt:input.requestedStartAt||null,requestedEndAt:input.requestedEndAt||null};
+ const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
+ return withTransaction(async db=>{
+  const existing=(await db.query("select * from service_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){
+   if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,idempotent:true,replayed:true,nextAction:existing.status==="requested"?"Wait for the provider to respond.":existing.status==="accepted"?"Confirm scope, timing and milestones.":existing.status==="in_progress"?"Track delivery and review the provider's submitted outcome.":"Review the recorded request outcome; do not submit the same request again."};
+  }
+  const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
+  if(!listing||listing.status!=="published"||listing.moderation_status!=="approved"||listing.visibility==="private") throw error(404,"Service listing is not available.","NOT_FOUND");
+  if(listing.organization_id){const org=(await db.query("select verification_status from organization where id=$1",[listing.organization_id])).rows[0];if(!org||org.verification_status!=="verified")throw error(404,"Service listing is not available.","NOT_FOUND");}
+  else if(!(await activeMember(db,listing.provider_user_id))) throw error(404,"Service listing is not available.","NOT_FOUND");
+  if(listing.visibility!=="public"&&!(await activeMember(db,requesterId))) throw error(403,"An active membership is required to request a member-only service.","MEMBERSHIP_REQUIRED");
+  if(listing.provider_user_id===requesterId) throw error(409,"You cannot request your own service.","SELF_REQUEST");
+  const duplicate=(await db.query("select * from service_request where service_listing_id=$1 and requester_user_id=$2 and status in ('requested','accepted','in_progress') order by created_at desc limit 1 for update",[listingId,requesterId])).rows[0];
+  if(duplicate) return {...duplicate,idempotent:true,nextAction:duplicate.status==="requested"?"Wait for the provider to respond.":duplicate.status==="accepted"?"Confirm scope, timing and milestones.":"Track delivery and review the provider's submitted outcome."};
+  const row=(await db.query("insert into service_request(service_listing_id,requester_user_id,provider_user_id,status,message,scope,agreed_price,agreed_currency,completion_due_at,requested_start_at,requested_end_at,request_idempotency_hash,request_fingerprint) values($1,$2,$3,'requested',$4,$5,$6,$7,$8,$9,$10,$11,$12) on conflict do nothing returning *",[listingId,requesterId,listing.provider_user_id,normalized.message,normalized.scope,proposedPrice,normalized.currency||listing.currency,normalized.completionDueAt,normalized.requestedStartAt,normalized.requestedEndAt,keyHash,fingerprint])).rows[0];
+  if(!row){
+   const raced=(await db.query("select * from service_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+   if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...raced,idempotent:true,replayed:true,nextAction:"This service request was already recorded. Follow its current status; you do not need to submit it again."};
+  }
+  await db.query("insert into service_request_event(request_id,actor_user_id,to_status,note) values($1,$2,'requested',$3)",[row.id,requesterId,normalized.message]);
+  await audit(db,requesterId,"service.request_created","service_request",row.id,requestId,{listingId,organizationId:listing.organization_id||null});
+  const recipients=listing.organization_id?(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code=any($2::text[])",[listing.organization_id,["owner","administrator","recruiter","project_manager"]])).rows.map(x=>x.user_id):[listing.provider_user_id];
+  for(const recipient of new Set(recipients))if(recipient&&recipient!==requesterId)await queueWorkflowEmail(db,recipient,"professional.workflow_update",{notificationEventCode:"service.request_received",category:"services",title:"New service request",status:"requested",message:"A new service request needs a response.",nextAction:"Review the requested scope and accept, decline or ask for clarification.",actionUrl:"/services",actionRequired:true,priority:"high"},"service_request",row.id);
+  await queueWorkflowEmail(db,requesterId,"professional.workflow_update",{notificationEventCode:"service.request_submitted",category:"services",title:"Service request submitted",status:"requested",message:"Your service request has been recorded.",nextAction:"Track the provider response in your service requests.",actionUrl:"/services"},"service_request",row.id);
+  return {...row,idempotent:false,replayed:false,nextAction:"Your request is recorded. The provider or authorized organization team must respond before delivery begins."};
+ });
 }
-
 export async function listMyServiceListings(userId){
  const db=getPool();
  const roles=["owner","administrator","recruiter","project_manager"];

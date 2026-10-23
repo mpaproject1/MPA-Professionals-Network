@@ -3,6 +3,7 @@ import {ArrowLeft,Bookmark,RefreshCw} from "lucide-react";
 import Link from "next/link";
 import {useParams} from "next/navigation";
 import {useCallback,useEffect,useState} from "react";
+import { OperationStatus } from "../../../components/operation-status";
 import {Badge, Card} from "../../../components/ui";
 import {ApiError, api} from "../../../lib/api";
 import {useSavedDiscoveryItems} from "../../../lib/use-saved-discovery-items";
@@ -14,7 +15,7 @@ export default function PublicServiceProfile(){
  const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Service>(`/api/v1/services/${encodeURIComponent(id)}`));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This service listing is unavailable to your account.");}finally{setLoading(false);}},[id]);
  useEffect(()=>{void load();},[load]);
  return <main className="grid" style={{gap:18}}><Link href="/services" className="btn btn-ghost"><ArrowLeft size={16}/> Back to services</Link>
- {loading?<Card><div className="row"><RefreshCw size={18}/><p className="muted">Loading service details…</p></div></Card>
+ {loading?<Card><OperationStatus state="loading" title="Loading service details" detail="We’re retrieving the selected published service, its provider and pricing details. No request is being submitted." /></Card>
  :error?<Card><h1 className="h2">Service unavailable</h1><p role="alert" className="form-error">{error}</p><button className="btn btn-primary" type="button" onClick={()=>void load()}>Retry</button></Card>
  :item&&<Card><div className="row"><div style={{flex:1,minWidth:0}}><Badge>{item.service_category}</Badge><h1 className="h1" style={{marginTop:10}}>{item.title}</h1><p className="tagline">Provider: {item.display_name||item.provider_name||"Verified provider"}</p></div><button className="btn btn-ghost" type="button" disabled={!saved.signedIn||saved.isSaving("service",item.id)} aria-pressed={saved.isSaved("service",item.id)} onClick={()=>void saved.toggle("service",item.id)}><Bookmark size={16}/>{saved.isSaved("service",item.id)?"Saved":"Save service"}</button></div>
  <p className="muted" style={{whiteSpace:"pre-wrap",marginTop:16}}>{item.description}</p>

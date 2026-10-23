@@ -153,6 +153,28 @@ test("Gate 2: mentorship offer is reviewed, matched, accepted, scheduled, comple
  assert.equal(Number(programFeedback.rating),5);
 });
 
+test("Gate 2: mentee can consent before the mentor and relationship starts only after both accept",async()=>{
+ const mentee=await account(),mentor=await account(),staff=await supportStaff();
+ await activeMember(mentor);
+ await verifiedProfessionalClaim(mentor);
+ const profile=await journeys.createMentorProfile(mentor,{headline:"Mentee-first product mentor",bio:"Practical product discovery and delivery coaching.",expertise:["product","strategy"],languages:["english"],mentoringModes:["remote"],visibility:"public",maxActiveMentees:3},"gate2-mentee-first-profile");
+ await journeys.changeMentorStatus(profile.id,mentor,"active","gate2-mentee-first-submit");
+ await marketplace.moderateListing("mentorship",profile.id,staff,{decision:"approved",note:"Mentee-first test mentor approved."},"gate2-mentee-first-approve");
+ const start=new Date(Date.now()+14*24*60*60*1000);start.setUTCHours(7,0,0,0);
+ const weekdayNames={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+ const weekday=weekdayNames[new Intl.DateTimeFormat("en-US",{weekday:"short",timeZone:"Africa/Addis_Ababa"}).format(start)];
+ await journeys.setMentorAvailability(profile.id,mentor,{slots:[{dayOfWeek:weekday,startTime:"09:00",endTime:"12:00",timezone:"Africa/Addis_Ababa"}]},"gate2-mentee-first-availability");
+ const request=await journeys.createMentorshipRequest(mentee,{goals:"Build a practical product discovery and delivery plan.",topics:["product","strategy"],preferredModes:["remote"],preferredLanguages:["english"],preferredDays:[weekday]},"gate2-mentee-first-request",randomUUID());
+ const proposed=await journeys.proposeMentorMatch(request.id,mentor,mentee,"gate2-mentee-first-propose");
+ const menteeResponse=await journeys.respondToMenteeMatch(proposed.id,mentee,"accepted","","gate2-mentee-first-consent");
+ assert.equal(menteeResponse.mentee_consent_status,"accepted");
+ assert.equal((await getPool().query("select count(*)::int count from mentorship where request_id=$1",[request.id])).rows[0].count,0,"mentee consent alone must not activate the relationship");
+ const mentorResponse=await journeys.respondToMatch(proposed.id,mentor,"accepted","gate2-mentor-second-consent");
+ assert.equal(mentorResponse.mentee_consent_status,"accepted","mentor acceptance must preserve earlier mentee consent");
+ const active=(await journeys.listMyMentorships(mentee)).find(x=>x.mentor_user_id===mentor&&x.request_id===request.id);
+ assert.ok(active,"the relationship becomes active only after both separate acceptances");
+ assert.equal(active.status,"active");
+});
 test("Gate 2: declined mentorship match remains in history when a different mentor is proposed",async()=>{
  const mentee=await account(),firstMentor=await account(),secondMentor=await account(),staff=await supportStaff();
  for(const mentor of [firstMentor,secondMentor]){

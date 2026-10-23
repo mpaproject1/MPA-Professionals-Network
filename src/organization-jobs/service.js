@@ -68,8 +68,14 @@ export async function getOrganization(orgId,viewerId=null){
  const db=getPool();
  const org=(await db.query("select o.*,ri.code geography_code,ri.label geography_label from organization o left join reference_item ri on ri.id=o.geography_reference_item_id where o.id=$1",[orgId])).rows[0];
  if(!org) throw error(404,"Organization not found.","NOT_FOUND");
- if(!org.public_visible && (!viewerId || !(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[orgId,viewerId])).rows[0])) throw error(403,"You do not have access to this organization.","FORBIDDEN");
- const users=(await db.query("select om.user_id,om.role_code,om.status from organization_membership om where om.organization_id=$1 and om.status='active'",[orgId])).rows;
+ // Public visibility applies only to the explicitly limited public-profile projection.
+ // Full organization records and membership rosters are private workspace data.
+ if(!viewerId) throw error(403,"Sign in with an active organization role to view workspace details.","FORBIDDEN");
+ const membership=(await db.query("select om.role_code from organization_membership om where om.organization_id=$1 and om.user_id=$2 and om.status='active'",[orgId,viewerId])).rows[0];
+ if(!membership) throw error(403,"An active member of this organization is required to view its workspace details.","FORBIDDEN");
+ const users=membership.role_code==="owner"||membership.role_code==="administrator"
+  ? (await db.query("select om.user_id,om.role_code,om.status from organization_membership om where om.organization_id=$1 and om.status='active' order by om.role_code,om.user_id",[orgId])).rows
+  : [];
  return {...org,users};
 }
 

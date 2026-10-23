@@ -42,6 +42,7 @@ export default function JobInterestPage() {
   const [consentSaved, setConsentSaved] = useState(false);
   const [sharingHistory, setSharingHistory] = useState<ShareHistory[]>([]);
   const [sharingHistoryError, setSharingHistoryError] = useState("");
+  const [sharingHistoryLoading, setSharingHistoryLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -73,12 +74,16 @@ export default function JobInterestPage() {
     setShareFields(current => checked ? [...new Set([...current, field])] : current.filter(item => item !== field));
   }
   async function refreshSharingHistory(item: Inquiry) {
+    if (sharingHistoryLoading) return;
+    setSharingHistoryLoading(true);
     setSharingHistoryError("");
     try {
       const rows = await api<ShareHistory[]>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(item.public_reference)}/sharing-history`, { method: "POST", body: JSON.stringify({ token: item.continuationToken }) });
       setSharingHistory(Array.isArray(rows) ? rows : []);
     } catch (e) {
       setSharingHistoryError(e instanceof ApiError ? e.message : "Sharing history could not be loaded. Retry without resubmitting your request.");
+    } finally {
+      setSharingHistoryLoading(false);
     }
   }
 
@@ -211,7 +216,7 @@ export default function JobInterestPage() {
         {shareWithEmployers ? <div style={{ display: "grid", gap: 8 }}><label>Search for the specific verified organization<input maxLength={120} value={organizationSearch} onChange={e => setOrganizationSearch(e.target.value)} placeholder="Enter at least 3 characters of the organization name" /></label><button className="btn btn-ghost" type="button" disabled={sharingOrganizationsLoading || processingConsent} onClick={() => void searchSharingOrganizations()}>{sharingOrganizationsLoading ? "Searching…" : "Search verified organizations"}</button>{organizationOptions.length > 0 ? <label>Choose the organization authorized to receive selected fields<select required value={selectedOrganizationId} onChange={e => setSelectedOrganizationId(e.target.value)} disabled={sharingOrganizationsLoading || processingConsent}><option value="">Choose a verified organization</option>{organizationOptions.map(org => <option key={org.id} value={org.id}>{org.label}</option>)}</select></label> : null}{sharingOrganizationsLoading ? <p aria-live="polite" aria-atomic="true" className="muted">Loading verified organizations…</p> : null}{sharingOrganizationsError ? <FormFeedback kind="error" message={sharingOrganizationsError} onRetry={() => void searchSharingOrganizations()} /> : null}{!sharingOrganizationsLoading && !sharingOrganizationsError && !sharingOrganizations.length ? <p className="muted">{organizationSearch.trim().length >= 3 ? "No verified organizations matched that search. Your request remains private; try another name or leave sharing off." : "Search for a verified organization by name. The full organization directory is not exposed."}</p> : null}{shareable.map(([field,label]) => <label key={field} style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={shareFields.includes(field)} onChange={e => toggleField(field,e.target.checked)} />{label}</label>)}<button className="btn btn-primary" type="button" disabled={processingConsent || sharingOrganizationsLoading || Boolean(sharingOrganizationsError) || !organizationOptions.some(org => org.id === selectedOrganizationId) || !shareFields.length} onClick={() => void retryConsent()}>{processingConsent ? "Saving consent…" : "Save explicit sharing consent"}</button></div> : <p className="muted">Your request remains private. No employer can access it.</p>}
       </div> : <button className="btn btn-ghost" type="button" disabled={processingConsent} onClick={() => void revokeConsent()}>{processingConsent ? "Updating…" : "Revoke employer-sharing consent"}</button>}
       <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
-        <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><h3 className="h2">Employer sharing history</h3><button className="btn btn-ghost" type="button" onClick={() => void refreshSharingHistory(inquiry)}>Refresh history</button></div>
+        <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><h3 className="h2">Employer sharing history</h3><button className="btn btn-ghost" type="button" onClick={() => void refreshSharingHistory(inquiry)} disabled={sharingHistoryLoading} aria-busy={sharingHistoryLoading}>{sharingHistoryLoading ? "Checking sharing history…" : "Check sharing history"}</button></div>
         {sharingHistoryError ? <p role="alert">{sharingHistoryError}</p> : null}
         {sharingHistory.length ? sharingHistory.map(item => <div key={item.shareId} className="case-row"><b>{item.organizationName}</b><p className="muted">Fields shared: {item.sharedFields.map(field => labelsForHistory(field)).join(", ")} · {new Date(item.sharedAt).toLocaleString()}</p><Badge>{item.status}</Badge>{item.revokedAt ? <p className="muted">Access revoked {new Date(item.revokedAt).toLocaleString()}.</p> : null}</div>) : <p className="muted">No employer has received this request. If you opted in, Support Desk review is still required before any sharing.</p>}
       </div>

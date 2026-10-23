@@ -221,11 +221,16 @@ try {
   const badBackfill = await client.query(`
     select count(*)::int as count
       from mentorship_match mm
-     where mm.status in ('declined','cancelled','expired')
+      join mentorship m
+        on m.request_id=mm.request_id
+       and m.mentor_user_id=mm.mentor_user_id
+       and m.mentee_user_id=mm.mentee_user_id
+     where m.status='active'
+       and mm.status in ('declined','cancelled','expired')
        and mm.mentee_consent_status='accepted'
   `);
   if (badBackfill.rows[0].count > 0) {
-    throw new Error(`Mentorship consent backfill has ${badBackfill.rows[0].count} declined/cancelled/expired match(es) marked accepted.`);
+    throw new Error(`Mentorship history has ${badBackfill.rows[0].count} active relationship(s) linked to a declined/cancelled/expired match with accepted mentee consent.`);
   }
   const missingActiveConsent = await client.query(`
     select count(*)::int as count

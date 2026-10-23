@@ -3,6 +3,7 @@ import http from "node:http";
 import * as membershipAdminBulk from "./src/membership/admin-bulk.js";
 import * as membershipCard from "./src/membership/card.js";
 import * as membership from "./src/membership/service.js";
+import * as adminAudit from "./src/platform/admin-audit.js";
 import * as organizationJobs from "./src/organization-jobs/service.js";
 import * as accountSecurity from "./src/platform/account-security.js";
 import * as applicationTracking from "./src/platform/application-tracking.js";
@@ -381,6 +382,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/admin/membership-card") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin","reviewer"],["members.view","members.manage"]); return ok(res,await membershipCard.getMembershipCardForAdmin(query(req.url).get("membershipNumber"),identity.sub,requestId),requestId); }
     if(req.method==="PATCH" && p==="api/v1/me/profile-picture") { const identity=await auth(req); return ok(res,await membershipCard.setMyProfilePicture(identity.sub,(await body(req)).fileObjectId,requestId),requestId); }
     if(req.method==="DELETE" && p==="api/v1/me/profile-picture") { const identity=await auth(req); return ok(res,await membershipCard.removeMyProfilePicture(identity.sub,requestId),requestId); }
+    if(req.method==="GET" && p==="api/v1/admin/audit-log") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin"],["audit.view"]); const q=query(req.url); return ok(res,await adminAudit.listAdminAuditEvents({action:q.get("action"),resourceType:q.get("resourceType"),limit:q.get("limit")||"50",offset:q.get("offset")||"0"}),requestId); }
     if(req.method==="GET" && p==="api/v1/admin/membership-card-settings") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin","admin","platform_admin"],["members.manage"]); return ok(res,await membershipCard.getMembershipCardSettings(),requestId); }
     if(req.method==="PATCH" && p==="api/v1/admin/membership-card-settings") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin"],["members.manage"]); return ok(res,await membershipCard.updateMembershipCardSettings(identity.sub,await body(req),requestId),requestId); }
     if(req.method==="POST" && parts.length===6 && parts[0]==="api" && parts[1]==="v1" && parts[2]==="admin" && parts[3]==="membership-records" && parts[5]==="rotate-verification") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin"],["members.manage"]); return ok(res,await membershipCard.rotateMembershipCardVerification(parts[4],identity.sub,requestId),requestId); }

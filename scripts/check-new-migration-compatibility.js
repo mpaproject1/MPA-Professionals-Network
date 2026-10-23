@@ -156,6 +156,50 @@ try {
   }
   if (columnErrors.length) throw new Error("Post-migration column checks failed:\\n- " + columnErrors.join("\\n- "));
 
+  const requiredNotNull = [
+    ["verification_reference_request","updated_at"],
+    ["mentorship_match","mentee_consent_status"],
+    ["support_conversation_workflow","conversation_id"],
+    ["support_conversation_workflow","priority"],
+    ["support_conversation_workflow","waiting_on"],
+    ["support_conversation_workflow","created_at"],
+    ["support_conversation_workflow","updated_at"]
+  ];
+  for (const [table,column] of requiredNotNull) {
+    const result = await client.query(
+      `select a.attnotnull
+         from pg_attribute a
+         join pg_class c on c.oid=a.attrelid
+         join pg_namespace n on n.oid=c.relnamespace
+        where n.nspname='public' and c.relname=$1 and a.attname=$2 and not a.attisdropped`,
+      [table,column]
+    );
+    if (!result.rows[0]?.attnotnull) throw new Error(`Expected ${table}.${column} to be NOT NULL.`);
+  }
+
+  const requiredDefaults = [
+    ["verification_reference_request","updated_at","now"],
+    ["mentorship_match","mentee_consent_status","pending"],
+    ["support_conversation_workflow","priority","normal"],
+    ["support_conversation_workflow","waiting_on","none"],
+    ["support_conversation_workflow","created_at","now"],
+    ["support_conversation_workflow","updated_at","now"]
+  ];
+  for (const [table,column,expected] of requiredDefaults) {
+    const result = await client.query(
+      `select pg_get_expr(d.adbin,d.adrelid) as expression
+         from pg_attribute a
+         join pg_class c on c.oid=a.attrelid
+         join pg_namespace n on n.oid=c.relnamespace
+         left join pg_attrdef d on d.adrelid=c.oid and d.adnum=a.attnum
+        where n.nspname='public' and c.relname=$1 and a.attname=$2 and not a.attisdropped`,
+      [table,column]
+    );
+    if (!result.rows[0]?.expression || !result.rows[0].expression.toLowerCase().includes(expected)) {
+      throw new Error(`Expected default ${expected} for ${table}.${column}.`);
+    }
+  }
+
   const requiredForeignKeys = [
     ["public_opportunity_inquiry","app_user_id","app_user","id"],
     ["marketplace_demand","requester_user_id","app_user","id"],

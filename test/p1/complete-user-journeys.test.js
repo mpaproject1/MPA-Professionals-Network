@@ -272,6 +272,11 @@ test("Gate 2: mentorship offer is reviewed, matched, accepted, scheduled, comple
  const mentorResponse=await journeys.respondToMatch(proposed.id,mentor,"accepted","gate2-mentorship-accept");
  assert.equal(mentorResponse.status,"accepted");
  assert.equal((await getPool().query("select count(*)::int count from mentorship where request_id=$1",[request.id])).rows[0].count,0,"mentor acceptance alone must not activate the relationship");
+ await assert.rejects(
+  journeys.proposeMentorMatch(request.id,mentor,mentee,"gate2-duplicate-open-match"),
+  error=>error.code==="MATCH_ALREADY_ACCEPTED",
+  "a match accepted by the mentor must remain open for the mentee's decision rather than being replaced"
+ );
  const menteeResponse=await journeys.respondToMenteeMatch(proposed.id,mentee,"accepted","","gate2-mentorship-mentee-accept");
  assert.equal(menteeResponse.mentee_consent_status,"accepted");
  const engagement=(await journeys.listMyMentorships(mentee)).find(x=>x.mentor_user_id===mentor&&x.request_id===request.id);

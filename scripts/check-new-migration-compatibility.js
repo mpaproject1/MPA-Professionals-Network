@@ -203,6 +203,45 @@ try {
   const rematchIndex = await client.query("select 1 from pg_indexes where schemaname='public' and indexname='ux_mentorship_match_one_open_request'");
   if (!rematchIndex.rowCount) throw new Error("The partial unique index protecting active mentorship proposals is missing.");
 
+  const requiredChecks = [
+    ["support_conversation_workflow","support_conversation_workflow_priority_check",["low","normal","high","urgent"]],
+    ["support_conversation_workflow","support_conversation_workflow_waiting_on_check",["none","member","organization","provider","internal"]],
+    ["mentorship_match","mentorship_match_mentee_consent_status_check",["pending","accepted","declined"]]
+  ];
+  for (const [table,name,values] of requiredChecks) {
+    const row = (await client.query(
+      "select pg_get_constraintdef(oid) as definition from pg_constraint where conrelid=$1::regclass and conname=$2 and contype='c'",
+      [`public.${table}`,name]
+    )).rows[0];
+    if (!row || values.some(value=>!row.definition.includes(`'${value}'`))) {
+      throw new Error(`Check constraint ${table}.${name} is missing or does not contain the expected allowed values.`);
+    }
+  }
+
+  const badBackfill = await client.query(`
+    select count(*)::int as count
+      from mentorship_match mm
+     where mm.status in ('declined','cancelled','expired')
+       and mm.mentee_consent_status='accepted'
+  `);
+  if (badBackfill.rows[0].count > 0) {
+    throw new Error(`Mentorship consent backfill has ${badBackfill.rows[0].count} declined/cancelled/expired match(es) marked accepted.`);
+  }
+  const missingActiveConsent = await client.query(`
+    select count(*)::int as count
+      from mentorship_match mm
+      join mentorship m
+        on m.request_id=mm.request_id
+       and m.mentor_user_id=mm.mentor_user_id
+       and m.mentee_user_id=mm.mentee_user_id
+     where m.status='active'
+       and mm.status='accepted'
+       and mm.mentee_consent_status<>'accepted'
+  `);
+  if (missingActiveConsent.rows[0].count > 0) {
+    throw new Error(`Mentorship consent backfill left ${missingActiveConsent.rows[0].count} active accepted relationship(s) without preserved consent.`);
+  }
+
   await client.query("rollback");
   transactionOpen = false;
   console.log("PASS: all ten migrations and post-migration schema assertions succeeded; all DDL was rolled back.");

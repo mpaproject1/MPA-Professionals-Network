@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
+import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { hasProfessionalIdentity } from "../../lib/identity-capabilities";
@@ -495,7 +496,7 @@ export default function Profile() {
               </div>
               <ShieldCheck color="var(--primary)" />
             </div>
-            {loading && <p aria-live="polite" aria-atomic="true">Loading profile from your account…</p>}
+            {loading && <OperationStatus state="loading" title="Loading your account profile" detail="We’re retrieving your saved profile, membership visibility and account preferences. Your profile is not being changed." />}
             <section aria-labelledby={`${profileId}-picture-heading`} className="grid" style={{ gridTemplateColumns: "auto minmax(0,1fr)", alignItems: "center", gap: 14, padding: 14, border: "1px solid var(--border)", borderRadius: 12 }}>
               <div style={{ width: 92, height: 92, borderRadius: 12, overflow: "hidden", display: "grid", placeItems: "center", background: "linear-gradient(145deg,#0A3258,#174A78)", color: "#fff", border: "2px solid #97C024", fontSize: 28, fontWeight: 800 }}>
                 {profilePictureUrl ? <img src={profilePictureUrl} alt="Your professional profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span>{(profile?.first_name?.[0] || "M").toUpperCase()}{(profile?.last_name?.[0] || "P").toUpperCase()}</span>}

@@ -9,6 +9,7 @@ import {useUiStore} from "../lib/store";
 import {GuideLauncher} from "./guide";
 import {PrivacyConsent} from "./privacy-consent";
 import {SupportBot} from "./support-bot";
+
 type NavItem = readonly [string,string,typeof Home];
 const nav:NavItem[]=[["/","Home",Home],["/member","My workspace",LayoutDashboard],["/marketplace","Marketplace",Search],["/services","Services",BriefcaseBusiness],["/network","Network",Network],["/jobs","Jobs",BriefcaseBusiness],["/mentorship","Mentorship",UserRound],["/membership","Membership",ShieldCheck],["/saved","Saved",Bookmark],["/profile","Profile",UserRound]];
 function PwaStatus(){const [online,setOnline]=useState(true);const [installPrompt,setInstallPrompt]=useState<any>(null);const [helpOpen,setHelpOpen]=useState(false);const [installed,setInstalled]=useState(false);const [showInstallNudge,setShowInstallNudge]=useState(false);

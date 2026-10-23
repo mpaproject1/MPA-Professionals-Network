@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
 
 function fail(status,message,code="BUSINESS_RULE"){return Object.assign(new Error(message),{statusCode:status,code});}
@@ -21,6 +22,8 @@ async function notify(db,userId,eventCode,type,id,payload={}){
  return {channel:"in_app",status:"recorded",eventId:row.id,externalDelivery:"not_configured"};
 }
 function clean(value,max){return String(value??"").trim().slice(0,max);}
+function hashValue(value){return createHash("sha256").update(value).digest("hex");}
+function hashPayload(value){return hashValue(JSON.stringify(value));}
 function required(value,label,max){const v=clean(value,max);if(!v)throw fail(400,`${label} is required.`,"VALIDATION_ERROR");return v;}
 function allowedType(type){if(!["service","mentorship"].includes(type))throw fail(400,"Demand type must be service or mentorship.","VALIDATION_ERROR");return type;}
 function assertPublicCopy(...values){
@@ -29,19 +32,33 @@ function assertPublicCopy(...values){
 }
 function allowedMode(mode){const v=mode||"flexible";if(!["remote","onsite","hybrid","flexible"].includes(v))throw fail(400,"Unsupported delivery mode.","VALIDATION_ERROR");return v;}
 
-export async function createDemand(userId,input,requestId){
+export async function createDemand(userId,input,requestId,idempotencyKey=null){
  const type=allowedType(input.demandType);
  const title=required(input.title,"Title",180), description=required(input.description,"Description",5000);
  if(title.length<4||description.length<10)throw fail(400,"Use a title of at least 4 characters and a description of at least 10 characters.","VALIDATION_ERROR");
  const category=required(input.category,"Category",120), mode=allowedMode(input.deliveryMode);
+ if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
+  throw fail(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
  const organizationId=input.organizationId||null;
  const audience=organizationId?"organization":"private";
+ const normalized={userId,type,title,description,category,mode,locationLabel:clean(input.locationLabel,180)||null,desiredTiming:clean(input.desiredTiming,180)||null,organizationId};
+ const fingerprint=hashPayload(normalized), keyHash=hashValue(idempotencyKey);
  return withTransaction(async db=>{
+  const existing=(await db.query("select id,demand_type,title,category,delivery_mode,status,created_at,request_fingerprint from marketplace_demand where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){
+   if(existing.request_fingerprint!==fingerprint)throw fail(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,idempotent:true,replayed:true,nextAction:"This private request was already received. Follow its current status below; you do not need to submit it again."};
+  }
   if(organizationId) await orgAccess(db,organizationId,userId);
-  const row=(await db.query("insert into marketplace_demand(demand_type,requester_user_id,organization_id,title,description,category,delivery_mode,location_label,desired_timing,audience) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id,demand_type,title,category,delivery_mode,status,created_at",[type,userId,organizationId,title,description,category,mode,clean(input.locationLabel,180)||null,clean(input.desiredTiming,180)||null,audience])).rows[0];
-  await db.query("insert into marketplace_demand_event(demand_id,actor_user_id,action,to_status,note,metadata) values($1,$2,'demand.submitted','submitted',$3,$4)",[row.id,userId,"Private intake submitted.",{audience,organizationId:organizationId||null}]);
-  await audit(db,userId,"marketplace.demand_submitted","marketplace_demand",row.id,requestId,{demandType:type,audience});
-  return row;
+  const inserted=(await db.query("insert into marketplace_demand(demand_type,requester_user_id,organization_id,title,description,category,delivery_mode,location_label,desired_timing,audience,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) on conflict do nothing returning id,demand_type,title,category,delivery_mode,status,created_at",[type,userId,organizationId,title,description,category,mode,normalized.locationLabel,normalized.desiredTiming,audience,keyHash,fingerprint])).rows[0];
+  if(!inserted){
+   const raced=(await db.query("select id,demand_type,title,category,delivery_mode,status,created_at,request_fingerprint from marketplace_demand where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+   if(!raced||raced.request_fingerprint!==fingerprint)throw fail(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...raced,idempotent:true,replayed:true,nextAction:"This private request was already received. Follow its current status below; you do not need to submit it again."};
+  }
+  await db.query("insert into marketplace_demand_event(demand_id,actor_user_id,action,to_status,note,metadata) values($1,$2,'demand.submitted','submitted',$3,$4)",[inserted.id,userId,"Private intake submitted.",{audience,organizationId:organizationId||null}]);
+  await audit(db,userId,"marketplace.demand_submitted","marketplace_demand",inserted.id,requestId,{demandType:type,audience});
+  return {...inserted,idempotent:false,replayed:false,nextAction:"Your private request is recorded and awaits Support Desk review. Check its status in Your activity."};
  });
 }
 export async function listMyDemand(userId){

@@ -49,7 +49,7 @@ export async function createPublicInquiry(input,requestId,identity=null,idempote
   if(existing){
    if(existing.idempotency_request_hash!==requestFingerprint)
     throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
-   return {...existing,continuationToken:idempotencyKey,replayed:true,nextStep:"This inquiry was already received. Continue using the secure link below; you do not need to submit it again."};
+   return {...existing,publicReference:existing.public_reference,continuationToken:idempotencyKey,replayed:true,nextStep:"This inquiry was already received. Continue using the secure link below; you do not need to submit it again."};
   }
   if(!normalized.contactName) throw error(400,"Enter your name before submitting the inquiry.","VALIDATION_ERROR");
   if(!normalized.contactEmail&&!normalized.contactPhone) throw error(400,"Provide an email address or phone number.","VALIDATION_ERROR");
@@ -70,10 +70,10 @@ export async function createPublicInquiry(input,requestId,identity=null,idempote
    const raced=(await db.query("select id,public_reference,inquiry_type,status,created_at,idempotency_request_hash from public_opportunity_inquiry where continuation_token_hash=$1 for update",[continuationHash])).rows[0];
    if(!raced || raced.idempotency_request_hash!==requestFingerprint)
     throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
-   return {...raced,continuationToken:idempotencyKey,replayed:true,nextStep:"This inquiry was already received. Continue using the secure link below; you do not need to submit it again."};
+   return {...raced,publicReference:raced.public_reference,continuationToken:idempotencyKey,replayed:true,nextStep:"This inquiry was already received. Continue using the secure link below; you do not need to submit it again."};
   }
   await audit(db,identity?.sub||null,"public_opportunity.inquiry_received","public_opportunity_inquiry",inserted.id,requestId,{inquiryType:type,jobId:job?.id||null});
-  return {...inserted,continuationToken:idempotencyKey,replayed:false,nextStep:"Use the secure continuation link to provide detailed information, or create/sign in to an MPA account for the formal application workflow."};
+  return {...inserted,publicReference:inserted.public_reference,continuationToken:idempotencyKey,replayed:false,nextStep:"Use the secure continuation link to provide detailed information, or create/sign in to an MPA account for the formal application workflow."};
  });
 }
 async function getByToken(db,reference,token){

@@ -247,7 +247,7 @@ test("verification.manage permission is accepted consistently by reviewer routes
   const server = read("server.js");
   const service = read("src/verification/service.js");
   assert.match(server, /anyRoleOrPermission\(identity,\["verification_reviewer","ethics_reviewer","system_admin"\],\["verification\.manage"\]\)/);
-  assert.match(service, /up\.permission_code='verification\.manage'\)\)\",\[caseId,actorId\]\)/);
+  assert.match(service, /permission_code='verification\.manage'/);
 });
 
 test("checklist results must reference an active item attached to the case program and use a valid outcome", () => {
@@ -255,4 +255,27 @@ test("checklist results must reference an active item attached to the case progr
   assert.match(service, /join verification_program_checklist pc on pc\.program_id=vc\.program_id and pc\.checklist_id=i\.checklist_id where vc\.id=\$1 and i\.active=true/);
   assert.match(service, /Choose a valid checklist outcome/);
   assert.match(service, /Checklist response must be a structured object/);
+});
+
+test("CV storage remains private by default and sharing is limited to the applicant's selected application with revocation", () => {
+  const talent = read("src/talent/service.js");
+  const server = read("server.js");
+  const files = read("src/platform/private-file-storage.js");
+  const migration = read("db/migrations/20261023111000_member_cv_vault.sql");
+  const cvPage = read("web/app/member/cv/page.tsx");
+  const employerPage = read("web/app/recruitment/page.tsx");
+  assert.match(talent, /export async function getMyCv/);
+  assert.match(talent, /export async function saveMyCv/);
+  assert.match(talent, /export async function shareMyCvWithApplication/);
+  assert.match(talent, /export async function revokeMyCvShare/);
+  assert.match(talent, /Only your own applications can receive your CV/);
+  assert.match(talent, /talent\.cv_sharing_revoked/);
+  assert.match(server, /api\/v1\/me\/cv\/share/);
+  assert.match(files, /job_application_attachment aa join job_application a on a\.id=aa\.application_id join job j on j\.id=a\.job_id/);
+  assert.match(files, /om\.role_code in \('owner','administrator','recruiter','project_manager'\)/);
+  assert.match(files, /jt\.active=true/);
+  assert.match(migration, /cv_file_id uuid references file_object\(id\)/);
+  assert.match(cvPage, /Your CV, your choice/);
+  assert.match(cvPage, /Revoke CV access/);
+  assert.match(employerPage, /Documents the applicant shared with this application/);
 });

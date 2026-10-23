@@ -54,14 +54,21 @@ async function approvedOrg(ownerId){
 }
 
 test("Gate 2: reference consent and reviewer assessment persist values allowed by the migration",async()=>{
- const subject=await account(),referee=await account(),reviewer=await account(),unassignedReviewer=await account();
+ const subject=await account(),referee=await account(),reviewer=await account(),unassignedReviewer=await account(),manager=await account();
  await activeMember(subject);
  const db=getPool();
  await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='verification_reviewer' on conflict do nothing",[reviewer]);
  await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='verification_reviewer' on conflict do nothing",[unassignedReviewer]);
+ await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='system_admin' on conflict do nothing",[manager]);
  const code=`gate2-reference-${randomUUID().replaceAll("-","").slice(0,12)}`;
  const program=(await db.query("insert into verification_program(program_code,name,purpose,subject_type) values($1,$2,$3,'person') returning id",[code,"Reference workflow compatibility","Test the reference consent and review states against persisted database constraints."])).rows[0];
- const caseRow=(await db.query("insert into verification_case(program_id,subject_user_id,status,purpose_snapshot,opened_by,assigned_reviewer_id) values($1,$2,'review',$3,$2,$4) returning id",[program.id,subject,"Reference compatibility test",reviewer])).rows[0];
+ const caseRow=(await db.query("insert into verification_case(program_id,subject_user_id,status,purpose_snapshot,opened_by) values($1,$2,'review',$3,$2) returning id",[program.id,subject,"Reference compatibility test"])).rows[0];
+ await verification.assignCase(caseRow.id,reviewer,manager,"gate2-reference-assign","Assign the reference case to the designated reviewer.");
+ const assignmentHistory=(await db.query("select previous_reviewer_id,new_reviewer_id,changed_by,reason from verification_case_assignment_history where case_id=$1 order by created_at desc limit 1",[caseRow.id])).rows[0];
+ assert.equal(assignmentHistory.previous_reviewer_id,null);
+ assert.equal(assignmentHistory.new_reviewer_id,reviewer);
+ assert.equal(assignmentHistory.changed_by,manager);
+ assert.equal(assignmentHistory.reason,"Assign the reference case to the designated reviewer.");
  const refereeEmail=(await db.query("select email from app_user where id=$1",[referee])).rows[0].email;
  const requested=await verification.requestReference(caseRow.id,{refereeEmail,relationship:"Former colleague"},subject,"gate2-reference-request");
  assert.equal(requested.consent_status,"pending");

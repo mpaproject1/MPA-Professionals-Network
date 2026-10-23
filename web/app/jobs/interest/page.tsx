@@ -6,6 +6,7 @@ import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
 
 type Inquiry = { id: string; public_reference: string; continuationToken: string; nextStep?: string };
+function createSubmissionKey(): string { if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function") throw new Error("Secure submission is unavailable in this browser. Please reload and try again."); return crypto.randomUUID()+crypto.randomUUID(); }
 function getPublicReference(value: Inquiry | null): string | null { return value?.public_reference ?? null; }
 type ConsentResult = { employer_sharing_consent: boolean; nextStep?: string };
 type ShareHistory = { shareId: string; organizationName: string; sharedFields: string[]; sharedAt: string; revokedAt?: string | null; status: string };
@@ -44,6 +45,8 @@ export default function JobInterestPage() {
   const [sharingHistoryError, setSharingHistoryError] = useState("");
   const [sharingHistoryLoading, setSharingHistoryLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [submissionUncertain,setSubmissionUncertain] = useState(false);
+  const [requestIdempotencyKey,setRequestIdempotencyKey] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -105,12 +108,15 @@ export default function JobInterestPage() {
     finally { setLookupBusy(false); }
   }
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true); setError(""); setNotice("");
+  async function submit(event?: FormEvent) {
+    event?.preventDefault();
+    if(busy||inquiry)return;
+    setBusy(true);setError("");setNotice("");
     try {
+      const key=requestIdempotencyKey||createSubmissionKey();setRequestIdempotencyKey(key);
       const created = await api<Inquiry>("/api/v1/public/opportunity-inquiries", {
         method: "POST",
+        headers: {"X-Idempotency-Key":key},
         body: JSON.stringify({
           inquiryType: "job",
           contactName: form.contactName.trim(),
@@ -126,6 +132,7 @@ export default function JobInterestPage() {
           consent: consentToProcess
         })
       });
+      setSubmissionUncertain(false);setRequestIdempotencyKey("");
       setInquiry(created);
       void refreshSharingHistory(created);
       if (shareWithEmployers) {
@@ -149,10 +156,12 @@ export default function JobInterestPage() {
           setError(consentError instanceof ApiError ? consentError.message : "Consent could not be saved.");
         } finally { setProcessingConsent(false); }
       } else {
-        setNotice("Your job-interest request was submitted privately to you and MPA Support Desk. It has not been shared with employers.");
+        setNotice("Your job-interest request was submitted privately. MPA Support Desk will review it before any named-employer sharing.");
       }
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "We couldn't confirm submission. Your entries remain on this form; please retry.");
+      const uncertain=e instanceof ApiError&&(e.status===0||e.status>=500||e.code==="INVALID_RESPONSE");
+      setSubmissionUncertain(uncertain);
+      setError(uncertain?"We could not confirm whether your request was received. Your entries are locked so you can safely retry the same submission without creating a duplicate.":e instanceof ApiError?e.message:e instanceof Error?e.message:"We couldn't submit this request.");
     } finally { setBusy(false); }
   }
   async function retryConsent() {
@@ -210,7 +219,7 @@ export default function JobInterestPage() {
       <label>Private continuation token<input readOnly value={inquiry.continuationToken} aria-label="Private continuation token" /></label>
       <p className="muted">Save this token somewhere private. It lets you manage employer-sharing consent and view which organizations received your request. Anyone who obtains it may be able to access this request, so do not post or forward it.</p>
       <p>{notice || inquiry.nextStep || "MPA Support Desk will review your request and determine an appropriate next step."}</p>
-      {error ? <FormFeedback kind="error" message={error}/> : null}
+      {error ? <FormFeedback kind="error" message={error} onRetry={submissionUncertain?()=>void submit():undefined} retryLabel="Check submission again" busy={busy} nextAction={submissionUncertain?"Keep the same details and retry to retrieve the existing request safely.":"Correct any highlighted information, then submit again."}/> : null}
       {!consentSaved ? <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
         <label style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><input type="checkbox" checked={shareWithEmployers} onChange={e => setShareWithEmployers(e.target.checked)} />I explicitly opt in to named-employer sharing now. This is optional and separate from submitting my request.</label>
         {shareWithEmployers ? <div style={{ display: "grid", gap: 8 }}><label>Search for the specific verified organization<input maxLength={120} value={organizationSearch} onChange={e => setOrganizationSearch(e.target.value)} placeholder="Enter at least 3 characters of the organization name" /></label><button className="btn btn-ghost" type="button" disabled={sharingOrganizationsLoading || processingConsent} onClick={() => void searchSharingOrganizations()}>{sharingOrganizationsLoading ? "Searching…" : "Search verified organizations"}</button>{organizationOptions.length > 0 ? <label>Choose the organization authorized to receive selected fields<select required value={selectedOrganizationId} onChange={e => setSelectedOrganizationId(e.target.value)} disabled={sharingOrganizationsLoading || processingConsent}><option value="">Choose a verified organization</option>{organizationOptions.map(org => <option key={org.id} value={org.id}>{org.label}</option>)}</select></label> : null}{sharingOrganizationsLoading ? <p aria-live="polite" aria-atomic="true" className="muted">Loading verified organizations…</p> : null}{sharingOrganizationsError ? <FormFeedback kind="error" message={sharingOrganizationsError} onRetry={() => void searchSharingOrganizations()} /> : null}{!sharingOrganizationsLoading && !sharingOrganizationsError && !sharingOrganizations.length ? <p className="muted">{organizationSearch.trim().length >= 3 ? "No verified organizations matched that search. Your request remains private; try another name or leave sharing off." : "Search for a verified organization by name. The full organization directory is not exposed."}</p> : null}{shareable.map(([field,label]) => <label key={field} style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={shareFields.includes(field)} onChange={e => toggleField(field,e.target.checked)} />{label}</label>)}<button className="btn btn-primary" type="button" disabled={processingConsent || sharingOrganizationsLoading || Boolean(sharingOrganizationsError) || !organizationOptions.some(org => org.id === selectedOrganizationId) || !shareFields.length} onClick={() => void retryConsent()}>{processingConsent ? "Saving consent…" : "Save explicit sharing consent"}</button></div> : <p className="muted">Your request remains private. No employer can access it.</p>}
@@ -225,17 +234,17 @@ export default function JobInterestPage() {
       <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
         <h2 className="h2">Your job-interest request</h2>
         <div className="grid grid-2">
-          <label>Your name<input required maxLength={200} value={form.contactName} onChange={e => update("contactName", e.target.value)} /></label>
-          <label>Email (optional if phone provided)<input type="email" maxLength={320} value={form.contactEmail} onChange={e => update("contactEmail", e.target.value)} /></label>
-          <label>Phone (optional if email provided)<input maxLength={80} value={form.contactPhone} onChange={e => update("contactPhone", e.target.value)} /></label>
-          <label>Target role / occupation<input required maxLength={500} value={form.targetRole} onChange={e => update("targetRole", e.target.value)} placeholder="What kind of work are you seeking?" /></label>
-          <TagInput label="Skills" value={selectedSkills} onChange={setSelectedSkills} placeholder="Add one skill at a time" help="Add each skill separately. Duplicate entries are ignored; remove any selection before submitting."/>
-          <label>Preferred location<input maxLength={300} value={form.location} onChange={e => update("location", e.target.value)} placeholder="City or region" /></label>
+          <label>Your name<input required maxLength={200} value={form.contactName} disabled={busy||submissionUncertain||Boolean(inquiry)} onChange={e => {setRequestIdempotencyKey("");setSubmissionUncertain(false);update("contactName", e.target.value)}} /></label>
+          <label>Email (optional if phone provided)<input type="email" maxLength={320} value={form.contactEmail} disabled={busy||submissionUncertain||Boolean(inquiry)} onChange={e => {setRequestIdempotencyKey("");setSubmissionUncertain(false);update("contactEmail", e.target.value)}} /></label>
+          <label>Phone (optional if email provided)<input maxLength={80} value={form.contactPhone} disabled={busy||submissionUncertain||Boolean(inquiry)} onChange={e => {setRequestIdempotencyKey("");setSubmissionUncertain(false);update("contactPhone", e.target.value)}} /></label>
+          <label>Target role / occupation<input required maxLength={500} value={form.targetRole} disabled={busy||submissionUncertain||Boolean(inquiry)} onChange={e => {setRequestIdempotencyKey("");setSubmissionUncertain(false);update("targetRole", e.target.value)}} placeholder="What kind of work are you seeking?" /></label>
+          <TagInput label="Skills" disabled={busy||submissionUncertain||Boolean(inquiry)} value={selectedSkills} onChange={setSelectedSkills} placeholder="Add one skill at a time" help="Add each skill separately. Duplicate entries are ignored; remove any selection before submitting."/>
+          <label>Preferred location<input maxLength={300} value={form.location} disabled={busy||submissionUncertain||Boolean(inquiry)} onChange={e => {setRequestIdempotencyKey("");setSubmissionUncertain(false);update("location", e.target.value)}} placeholder="City or region" /></label>
           <label>Preferred work mode<select value={form.workMode} onChange={e=>update("workMode",e.target.value)}><option value="">No preference</option><option value="onsite">On-site</option><option value="hybrid">Hybrid</option><option value="remote">Remote</option></select></label>
           <label>Availability<select value={form.availability} onChange={e=>update("availability",e.target.value)}><option value="">Not specified</option><option value="immediately">Immediately</option><option value="within_2_weeks">Within two weeks</option><option value="within_1_month">Within one month</option><option value="within_3_months">Within three months</option><option value="flexible">Flexible / to discuss</option></select></label>
         </div>
         <label>Experience range<select value={form.experience} onChange={e=>update("experience",e.target.value)}><option value="">Not specified</option><option value="less_than_1_year">Less than 1 year</option><option value="1_to_3_years">1–3 years</option><option value="4_to_7_years">4–7 years</option><option value="8_to_10_years">8–10 years</option><option value="more_than_10_years">More than 10 years</option></select></label>
-        <label>Anything else MPA should know<textarea maxLength={2000} rows={3} value={form.intent} onChange={e => update("intent", e.target.value)} /></label>
+        <label>Anything else MPA should know<textarea maxLength={2000} rows={3} value={form.intent} disabled={busy||submissionUncertain||Boolean(inquiry)} onChange={e => {setRequestIdempotencyKey("");setSubmissionUncertain(false);update("intent", e.target.value)}} /></label>
         <label style={{ display: "flex", gap: 10, alignItems: "flex-start" }}><input type="checkbox" required checked={consentToProcess} onChange={e => setConsentToProcess(e.target.checked)} />I agree that MPA may receive and review this job-interest request to assess possible opportunities. This does not authorize employer sharing.</label>
         <Card>
           <h3 className="h2">Optional: consent to named-employer sharing</h3>
@@ -244,7 +253,7 @@ export default function JobInterestPage() {
           {shareWithEmployers ? <div style={{ display: "grid", gap: 8, marginTop: 10 }}><label>Search for the specific verified organization<input maxLength={120} value={organizationSearch} onChange={e => setOrganizationSearch(e.target.value)} placeholder="Enter at least 3 characters of the organization name" /></label><button className="btn btn-ghost" type="button" disabled={sharingOrganizationsLoading || processingConsent} onClick={() => void searchSharingOrganizations()}>{sharingOrganizationsLoading ? "Searching…" : "Search verified organizations"}</button>{organizationOptions.length > 0 ? <label>Choose the organization authorized to receive selected fields<select required value={selectedOrganizationId} onChange={e => setSelectedOrganizationId(e.target.value)} disabled={sharingOrganizationsLoading || processingConsent}><option value="">Choose a verified organization</option>{organizationOptions.map(org => <option key={org.id} value={org.id}>{org.label}</option>)}</select></label> : null}{sharingOrganizationsLoading ? <p aria-live="polite" aria-atomic="true" className="muted">Loading verified organizations…</p> : null}{sharingOrganizationsError ? <FormFeedback kind="error" message={sharingOrganizationsError} onRetry={() => void searchSharingOrganizations()} /> : null}{!sharingOrganizationsLoading && !sharingOrganizationsError && !sharingOrganizations.length ? <p role="alert" className="muted">Search for a verified organization by name. The full organization directory is not exposed.</p> : null}{shareable.map(([field,label]) => <label key={field} style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={shareFields.includes(field)} onChange={e => toggleField(field,e.target.checked)} />{label}</label>)}</div> : null}
         </Card>
         {error ? <p role="alert" style={{ color: "var(--danger, #b91c1c)" }}>{error}</p> : null}
-        {notice ? <FormFeedback kind="success" message={notice}>{getPublicReference(inquiry) ? <p>Keep this reference to check your request later: <strong>{getPublicReference(inquiry)}</strong></p> : null}</FormFeedback> : null}
+        {notice ? <FormFeedback kind="success" message={notice} actionHref={inquiry?"/track":undefined} actionLabel={inquiry?"Open application tracking":undefined}>{getPublicReference(inquiry) ? <p>Keep this reference to check your request later: <strong>{getPublicReference(inquiry)}</strong></p> : null}{inquiry&&<button type="button" className="btn btn-ghost" onClick={()=>{setInquiry(null);setForm({contactName:"",contactEmail:"",contactPhone:"",targetRole:"",experience:"",location:"",workMode:"",availability:"",intent:""});setSelectedSkills([]);setConsentToProcess(false);setShareWithEmployers(false);setShareFields(["targetRole","skills"]);setSelectedOrganizationId("");setConsentSaved(false);setNotice("");setError("");setRequestIdempotencyKey("");setSubmissionUncertain(false);}}>Start another request</button>}</FormFeedback> : null}
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
           <button className="btn btn-primary" type="submit" disabled={busy || processingConsent}>{busy ? "Submitting…" : "Submit job-interest request"}</button>
           <a className="btn btn-ghost" href="/jobs">Return to listed jobs</a>

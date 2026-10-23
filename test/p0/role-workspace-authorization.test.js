@@ -63,7 +63,7 @@ test("support inquiry lists and actions are scoped to unassigned or self-assigne
   assert.match(support, /filters\.actorId/);
   assert.match(support, /c\.assigned_to is null or c\.assigned_to=\$2/);
   assert.match(support, /async function assertConversationScope/);
-  assert.match(support, /current\.assigned_to!==actorId/);
+  assert.match(support, /row\.assigned_to!==actorId/);
   assert.match(support, /assertConversationScope\(db,actorId,id,canManageAll,true\)/);
   assert.match(server, /adminListConversations\(\{actorId:identity\.sub,canViewAll/);
   assert.match(server, /adminUpdateConversation\(identity\.sub,parts\[5\],await body\(req\),requestId,canManageAll\)/);

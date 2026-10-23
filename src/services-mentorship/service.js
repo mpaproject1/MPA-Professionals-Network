@@ -704,10 +704,13 @@ export async function respondToMenteeMatch(matchId,menteeUserId,status,note,requ
     const match=(await db.query("select * from mentorship_match where id=$1 for update",[matchId])).rows[0];
     if(!match)throw error(404,"Mentorship match not found.","NOT_FOUND");
     if(match.mentee_user_id!==menteeUserId)throw error(403,"Only the mentee who requested this match can respond.","FORBIDDEN");
+    if(match.mentee_consent_status===status){
+      const nextAction=status==="declined"?"Your decline is already recorded. The request is back in matching.":match.status==="accepted"?"Both participants have accepted. Open the active mentorship to agree goals and sessions.":match.status==="declined"?"Your consent was recorded, but the mentor declined. The request is back in matching.":"Your consent is recorded. The mentor must also accept before the relationship starts.";
+      return {...match,idempotent:true,nextAction};
+    }
     if(!["proposed","accepted"].includes(match.status))throw error(409,"This match is no longer awaiting a response.","INVALID_STATE");
-    if(match.mentee_consent_status===status)return {...match,idempotent:true,nextAction:status==="accepted"?(match.status==="accepted"?"Your match is approved. Open the active mentorship to agree goals and schedule a first session.":"Your consent is recorded. The mentor must also accept before the relationship starts."):"Your response is already recorded; the coordinator can help with another match."};
     if(match.mentee_consent_status!=="pending")throw error(409,"This match has already received your final response.","INVALID_STATE");
-    const updated=(await db.query("update mentorship_match set mentee_consent_status=$1,mentee_responded_at=now(),mentee_response_note=$2 where id=$3 returning *",[status,String(note||"").trim()||null,matchId])).rows[0];
+    const updated=(await db.query("update mentorship_match set mentee_consent_status=$1,mentee_responded_at=now(),mentee_response_note=$2,status=case when $1='declined' then 'declined' else status end,responded_at=case when $1='declined' then now() else responded_at end where id=$3 returning *",[status,String(note||"").trim()||null,matchId])).rows[0];
     if(status==="accepted"){
       if(match.status==="accepted"){
         const existing=(await db.query("select id from mentorship where request_id=$1 for update",[match.request_id])).rows[0];

@@ -465,7 +465,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/review/verification/cases"){
       anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]);
       const q=query(req.url);
-      return ok(res,await verification.listCases({status:q.get("status"),programCode:q.get("programCode"),reviewerId:q.get("reviewerId"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
+      return ok(res,await verification.listCases({viewerId:identity.sub,status:q.get("status"),programCode:q.get("programCode"),reviewerId:q.get("reviewerId"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="assign"){
       anyRole(identity,["verification_reviewer","system_admin"]); const b=await body(req);

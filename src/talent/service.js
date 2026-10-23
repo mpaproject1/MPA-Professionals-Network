@@ -345,7 +345,7 @@ export async function saveMyCv(userId,fileObjectId,requestId){
    if(!file)throw error(400,"Your CV must be an uploaded, confirmed private file owned by your account.","INVALID_CV_FILE");
   }
   if(profile.cv_file_id&&profile.cv_file_id!==nextId){
-   const revoked=(await db.query("delete from job_application_attachment aa using job_application a where aa.application_id=a.id and a.applicant_user_id=$1 and aa.file_object_id=$2 and aa.attachment_type='cv' returning aa.application_id,aa.id",[userId,profile.cv_file_id])).rows;
+   const revoked=(await db.query("delete from job_application_attachment aa using job_application a where aa.application_id=a.id and a.applicant_user_id=$1 and aa.file_object_id=$2 and aa.attachment_type='application_document' returning aa.application_id,aa.id",[userId,profile.cv_file_id])).rows;
    for(const row of revoked)await audit(db,userId,"talent.cv_sharing_revoked","job_application",row.application_id,requestId,{fileObjectId:profile.cv_file_id,attachmentId:row.id,reason:"CV replaced or removed"});
   }
   const updated=(await db.query("update professional_profile set cv_file_id=$1,cv_updated_at=case when $1 is null then null else now() end where id=$2 returning cv_file_id,cv_updated_at",[nextId,profile.id])).rows[0];
@@ -358,7 +358,7 @@ export async function listMyCvShares(userId){
  const profile=(await db.query("select pp.cv_file_id from professional_profile pp join person p on p.id=pp.person_id where p.user_id=$1",[userId])).rows[0];
  if(!profile)throw error(404,"Create your professional profile before managing CV sharing.","PROFILE_REQUIRED");
  if(!profile.cv_file_id)return [];
- return (await db.query("select a.id application_id,j.title job_title,o.display_name organization_name,a.status application_status from job_application_attachment aa join job_application a on a.id=aa.application_id join job j on j.id=a.job_id join organization o on o.id=j.organization_id where a.applicant_user_id=$1 and aa.file_object_id=$2 and aa.attachment_type='cv' order by a.created_at desc",[userId,profile.cv_file_id])).rows;
+ return (await db.query("select a.id application_id,j.title job_title,o.display_name organization_name,a.status application_status from job_application_attachment aa join job_application a on a.id=aa.application_id join job j on j.id=a.job_id join organization o on o.id=j.organization_id where a.applicant_user_id=$1 and aa.file_object_id=$2 and aa.attachment_type='application_document' order by a.created_at desc",[userId,profile.cv_file_id])).rows;
 }
 export async function shareMyCvWithApplication(userId,applicationId,requestId){
  return withTransaction(async db=>{
@@ -370,7 +370,7 @@ export async function shareMyCvWithApplication(userId,applicationId,requestId){
   if(["withdrawn","rejected"].includes(application.status))throw error(409,"A withdrawn or rejected application cannot receive a new CV attachment.","APPLICATION_CLOSED");
   const file=(await db.query("select id from file_object where id=$1 and created_by=$2 and visibility='private'",[profile.cv_file_id,userId])).rows[0];
   if(!file)throw error(409,"Your saved CV file is no longer available. Upload it again before sharing.","CV_FILE_UNAVAILABLE");
-  const existing=(await db.query("select id from job_application_attachment where application_id=$1 and file_object_id=$2 and attachment_type='cv' limit 1",[applicationId,profile.cv_file_id])).rows[0];
+  const existing=(await db.query("select id from job_application_attachment where application_id=$1 and file_object_id=$2 and attachment_type='application_document' limit 1",[applicationId,profile.cv_file_id])).rows[0];
   if(existing)return {shared:true,alreadyShared:true,applicationId,jobTitle:application.title};
   const attachment=(await db.query("insert into job_application_attachment(application_id,file_object_id,attachment_type) values($1,$2,'cv') returning id,application_id,file_object_id,attachment_type",[applicationId,profile.cv_file_id])).rows[0];
   await audit(db,userId,"talent.cv_shared_with_application","job_application",applicationId,requestId,{fileObjectId:profile.cv_file_id,attachmentId:attachment.id});
@@ -383,7 +383,7 @@ export async function revokeMyCvShare(userId,applicationId,requestId){
   if(!profile?.cv_file_id)throw error(404,"No saved CV is available to revoke.","CV_NOT_FOUND");
   const application=(await db.query("select id from job_application where id=$1 and applicant_user_id=$2 for update",[applicationId,userId])).rows[0];
   if(!application)throw error(404,"Your application was not found.","APPLICATION_NOT_FOUND");
-  const removed=await db.query("delete from job_application_attachment where application_id=$1 and file_object_id=$2 and attachment_type='cv' returning id",[applicationId,profile.cv_file_id]);
+  const removed=await db.query("delete from job_application_attachment where application_id=$1 and file_object_id=$2 and attachment_type='application_document' returning id",[applicationId,profile.cv_file_id]);
   if(!removed.rows[0])throw error(404,"This CV is not currently attached to that application.","CV_SHARE_NOT_FOUND");
   await audit(db,userId,"talent.cv_sharing_revoked","job_application",applicationId,requestId,{fileObjectId:profile.cv_file_id,attachmentId:removed.rows[0].id});
   return {shared:false,applicationId};

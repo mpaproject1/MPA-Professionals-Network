@@ -73,6 +73,13 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
  await journeys.changeServiceRequestStatus(request.id,provider,"completed","Delivery submitted for requester acceptance.","gate2-service-completion");
  const completed=await journeys.acceptServiceCompletion(request.id,requester,"The agreed outcome is accepted.","gate2-service-outcome");
  assert.equal(completed.status,"completed");
+ const persistedEvents=(await getPool().query("select from_status,to_status,note from service_request_event where request_id=$1 order by created_at",[request.id])).rows;
+ assert.ok(persistedEvents.some(event=>event.to_status==="requested"),"request submission must be recorded in status history");
+ assert.ok(persistedEvents.some(event=>event.from_status==="in_progress"&&event.to_status==="in_progress"&&String(event.note||"").includes("requester acceptance")),"provider completion submission must be distinct from requester acceptance");
+ assert.ok(persistedEvents.some(event=>event.from_status==="in_progress"&&event.to_status==="completed"),"requester outcome acceptance must be persisted as a separate transition");
+ const auditActions=(await getPool().query("select action from audit_log where resource_type='service_request' and resource_id=$1",[request.id])).rows.map(row=>row.action);
+ assert.ok(auditActions.includes("service.request_completion_submitted"));
+ assert.ok(auditActions.includes("service.request_completion_accepted"));
  const feedback=await journeys.submitServiceFeedback(request.id,requester,{targetRole:"provider",rating:5,comments:"Clear communication and useful outcome."},"gate2-service-feedback");
  assert.equal(Number(feedback.rating),5);
 });

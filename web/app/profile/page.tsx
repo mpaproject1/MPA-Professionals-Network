@@ -537,6 +537,7 @@ export default function Profile() {
                       <select
                         id={`profile-${key}`}
                         value={form[key]}
+                        disabled={saving||loading}
                         onChange={(e) => update(key, e.target.value)}
                       >
                         <option value="">Choose gender</option>
@@ -550,6 +551,7 @@ export default function Profile() {
                         type={key === "dateOfBirth" ? "date" : "text"}
                         autoComplete={key === "phone" ? "tel" : undefined}
                         value={form[key]}
+                        disabled={saving||loading}
                         onChange={(e) => update(key, e.target.value)}
                       />
                     )}
@@ -561,6 +563,7 @@ export default function Profile() {
                 <input
                   id={`${profileId}-headline`}
                   value={form.headline}
+                  disabled={saving||loading}
                   onChange={(e) => update("headline", e.target.value)}
                   maxLength={180}
                 />
@@ -570,6 +573,7 @@ export default function Profile() {
                 <textarea
                   id={`${profileId}-bio`}
                   value={form.bio}
+                  disabled={saving||loading}
                   onChange={(e) => update("bio", e.target.value)}
                   rows={4}
                   maxLength={4000}
@@ -582,7 +586,8 @@ export default function Profile() {
                   </label>
                   <select
                     id={`${profileId}-visibility`}
-                    value={form.visibility}
+                    value={form.visibility} disabled={saving||loading}
+                  disabled={saving||loading}
                     onChange={(e) => update("visibility", e.target.value)}
                   >
                     <option value="public">Public-safe profile</option>
@@ -640,7 +645,7 @@ export default function Profile() {
                 <label>
                   Professional title
                   <input
-                    value={talentForm.professionalTitle}
+                    value={talentForm.professionalTitle} disabled={savingTalent}
                     onChange={(e) =>
                       setTalentForm((f) => ({
                         ...f,
@@ -656,7 +661,7 @@ export default function Profile() {
                     type="number"
                     min="0"
                     step="1"
-                    value={talentForm.yearsExperience}
+                    value={talentForm.yearsExperience} disabled={savingTalent}
                     onChange={(e) =>
                       setTalentForm((f) => ({
                         ...f,
@@ -700,7 +705,7 @@ export default function Profile() {
                 Directory summary
                 <textarea
                   rows={3}
-                  value={talentForm.directorySummary}
+                  value={talentForm.directorySummary} disabled={savingTalent}
                   onChange={(e) =>
                     setTalentForm((f) => ({
                       ...f,
@@ -722,7 +727,7 @@ export default function Profile() {
                 Directory bio
                 <textarea
                   rows={3}
-                  value={talentForm.bio}
+                  value={talentForm.bio} disabled={savingTalent}
                   onChange={(e) =>
                     setTalentForm((f) => ({ ...f, bio: e.target.value }))
                   }

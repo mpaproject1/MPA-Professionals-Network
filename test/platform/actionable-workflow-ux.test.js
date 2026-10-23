@@ -198,3 +198,22 @@ test("recruitment and verification isolate pending actions and report recorded s
   assert.ok(services.includes("Service request reference"));
   assert.ok(services.includes("transitioningIds"));
 });
+
+
+test("service listing and no-vacancy job-interest forms recover uncertain creates safely", async () => {
+  const [service, server, migration, servicesPage, interestPage] = await Promise.all([
+    source("../../src/services-mentorship/service.js"),
+    source("../../server.js"),
+    source("../../db/migrations/20261023104000_service_listing_idempotency.sql"),
+    source("../../web/app/services/page.tsx"),
+    source("../../web/app/jobs/interest/page.tsx"),
+  ]);
+  assert.ok(service.includes("createServiceListing(userId,input,requestId,idempotencyKey=null)"));
+  assert.ok(server.includes('servicesMentorship.createServiceListing(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"])'));
+  assert.ok(migration.includes("ux_service_listing_idempotency_hash"));
+  assert.ok(servicesPage.includes("providerSaveUncertain"));
+  assert.ok(servicesPage.includes("X-Idempotency-Key"));
+  assert.ok(interestPage.includes("X-Idempotency-Key"));
+  assert.ok(interestPage.includes("Start another request"));
+  assert.ok(interestPage.includes("submissionUncertain"));
+});

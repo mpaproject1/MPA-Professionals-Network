@@ -151,7 +151,7 @@ export async function adminUpdateConversation(actorId,id,input,requestId,canMana
   if(hasWaitingOn&&!["none","member","organization","provider","internal"].includes(waitingOn))throw httpError("Choose a valid waiting state.");
   const assignToSelf=!hasTransfer&&(input.assignToSelf===true||(!current.assigned_to&&["in_progress","resolved","closed"].includes(nextStatus)));
   const nextAssignee=hasTransfer?requestedAssignee:(assignToSelf?actorId:current.assigned_to);
-  const r=await db.query("update support_conversation set status=$2,assigned_to=$3,resolved_at=case when $2::text='resolved' then coalesce(resolved_at,now()) when $2::text in ('open','in_progress') then null else resolved_at end,updated_at=now() where id=$1 returning id,public_reference,status,assigned_to",[id,nextStatus,nextAssignee]);
+  const r=await db.query("update support_conversation set status=$2,assigned_to=$3,resolved_at=case when $4='resolved' then coalesce(resolved_at,now()) when $4 in ('open','in_progress') then null else resolved_at end,updated_at=now() where id=$1 returning id,public_reference,status,assigned_to",[id,nextStatus,nextAssignee,String(nextStatus)]);
   if(!r.rows[0])throw httpError("Inquiry not found.",404,"NOT_FOUND");
   if(hasTransfer){
    await logAudit(db,actorId,"support.inquiry_transferred",id,requestId,{fromAssignee:current.assigned_to,toAssignee:r.rows[0].assigned_to,fromStatus:current.status,toStatus:r.rows[0].status,reason});

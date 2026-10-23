@@ -126,7 +126,7 @@ test("completed inquiry screens show current status and avoid reopening closed r
     assert.match(page, /!\["converted","declined","closed"\]\.includes\(result\.status\)/);
     assert.match(page, /Start another inquiry/);
   }
-  assert.match(details, /Current status: \$\{humanStatus\(r\.status\|\|data\.status\)\}/);
+  assert.match(details, /Current inquiry status: \$\{humanStatus\(r\.status\|\|data\.status\)\}/);
   assert.match(details, /if\(submitting\)return/);
 });
 

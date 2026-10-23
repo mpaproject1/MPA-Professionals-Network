@@ -8,6 +8,7 @@ import {Badge, Card} from "../../components/ui";
 import {api, ApiError} from "../../lib/api";
 import {humanStatus} from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
+
 function createSubmissionKey():string{if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function")throw new Error("Secure submission is unavailable in this browser. Please reload and try again.");return crypto.randomUUID()+crypto.randomUUID();}
 type Topic={id:string;demand_type:"service"|"mentorship";title:string;summary:string;category:string;delivery_mode:string;location_label?:string|null;interest_goal?:number|null;published_at:string;interest_count:number;ready_count:number};
 type Demand={nextAction?:string;id:string;demand_type:string;title:string;category:string;status:string;outcome_code?:string|null;outcome_note?:string|null;merged_into_existing?:boolean;created_at:string;organization_name?:string|null};

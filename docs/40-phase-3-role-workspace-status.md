@@ -56,7 +56,7 @@
 **Not yet addressed / needs verification**
 - Confirm the new queue behavior against the existing admin/support UI and database schema using runtime tests.
 - **Manager-controlled transfer/reassignment is now implemented in source:** only users with broader queue-management authority may transfer, the target must be an active eligible support colleague, a handoff reason is required, the row is locked in a transaction, and the transfer is audited.
-- A source-structure regression test was added for transfer authorization, recipient validation and audit metadata; it has not been run.
+- Source-structure and database-backed integration tests were added for transfer authorization, recipient validation and audit metadata; neither has been run.
 - Still incomplete: escalation policy, priority, waiting-on-member versus waiting-on-organization states, delivery/receipt confirmation for notifications, and negative runtime tests for another staff member's assignment, manager override, missing/revoked consent, wrong employer and private attachments.
 - A full support ticket lifecycle is not yet proven; the existing support conversation workflow is not automatically equivalent to a complete ticketing system.
 

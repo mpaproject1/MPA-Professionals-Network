@@ -4,6 +4,7 @@ import test, { after } from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import * as supportBot from "../../src/platform/support-bot.js";
+import * as verification from "../../src/verification/service.js";
 import { closePool, getPool } from "../../src/platform/db.js";
 
 async function account(suffix) {
@@ -23,6 +24,15 @@ async function assignRole(userId, roleCode) {
   const role = (await db.query("select id from app_role where role_code=$1", [roleCode])).rows[0];
   assert.ok(role, `Expected role ${roleCode} to exist`);
   await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing", [userId, role.id]);
+}
+
+async function activeMember(suffix) {
+  const userId = await account(suffix);
+  const db = getPool();
+  const product = (await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
+  assert.ok(product, "BASIC membership product must exist");
+  await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')", [userId, product.id, `MPA-RBAC-${randomUUID().slice(0, 8).toUpperCase()}`]);
+  return userId;
 }
 
 function hasStatus(status) {
@@ -54,6 +64,37 @@ test("organization full detail and roster are scoped to the correct organization
     organizationJobs.updateOrganizationUser(org.id, owner, owner, { roleCode: "administrator" }, `org-owner-change-${suffix}`),
     hasStatus(403),
   );
+});
+
+test("reviewer queue, case detail and write actions enforce assigned-case boundaries in the database", async () => {
+  const suffix = randomUUID().replace(/-/g, "");
+  const subjectA = await activeMember(suffix + "f");
+  const subjectB = await activeMember(suffix + "g");
+  const reviewerA = await account(suffix + "h");
+  const reviewerB = await account(suffix + "i");
+  const manager = await account(suffix + "j");
+  await assignRole(reviewerA, "verification_reviewer");
+  await assignRole(reviewerB, "verification_reviewer");
+  await assignRole(manager, "system_admin");
+
+  const programs = await verification.listPrograms();
+  assert.ok(programs.length, "At least one active verification program must exist");
+  const caseA = await verification.createCase(subjectA, programs[0].program_code, subjectA, `case-a-${suffix}`);
+  const caseB = await verification.createCase(subjectB, programs[0].program_code, subjectB, `case-b-${suffix}`);
+  await verification.assignCase(caseA.id, reviewerA, manager, `assign-a-${suffix}`);
+  await verification.assignCase(caseB.id, reviewerB, manager, `assign-b-${suffix}`);
+
+  const queue = await verification.listCases({ viewerId: reviewerA, reviewerId: reviewerB, limit: 100 });
+  const queueIds = queue.items.map((item) => item.id);
+  assert.ok(queueIds.includes(caseA.id), "reviewer should receive their assigned case");
+  assert.ok(!queueIds.includes(caseB.id), "caller-supplied reviewerId must not expose another reviewer's case");
+
+  const assigned = await verification.getCase(caseA.id, reviewerA);
+  assert.equal(assigned.id, caseA.id);
+  await assert.rejects(verification.getCase(caseB.id, reviewerA), hasStatus(403));
+  await assert.rejects(verification.addClaim(caseB.id, "NOT_A_REAL_CLAIM", { name: "Unauthorized claim" }, reviewerA, `claim-cross-${suffix}`), hasStatus(403));
+  await assert.rejects(verification.addEvidence(caseB.id, { evidenceType: "supporting_document" }, reviewerA, `evidence-cross-${suffix}`), hasStatus(403));
+  await assert.rejects(verification.getCase(caseA.id), hasStatus(403), "case reads without a viewer identity must fail closed");
 });
 
 test("support queue hides another colleague's assigned conversation and contact details without consent", async () => {

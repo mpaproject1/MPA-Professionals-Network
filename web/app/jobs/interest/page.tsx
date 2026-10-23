@@ -5,7 +5,7 @@ import { TagInput } from "../../../components/tag-input";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
 
-type Inquiry = { id: string; public_reference: string; continuationToken: string; nextStep?: string };
+type Inquiry = { id: string; public_reference: string; continuationToken: string; status?: string; nextStep?: string; nextAction?: string };
 function createSubmissionKey(): string { if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function") throw new Error("Secure submission is unavailable in this browser. Please reload and try again."); return crypto.randomUUID()+crypto.randomUUID(); }
 function getPublicReference(value: Inquiry | null): string | null { return value?.public_reference ?? null; }
 type ConsentResult = { employer_sharing_consent: boolean; nextStep?: string };
@@ -134,10 +134,11 @@ export default function JobInterestPage() {
       });
       setSubmissionUncertain(false);setRequestIdempotencyKey("");
       setInquiry(created);
+      const statusMessage="Job-interest request status: "+humanStatus(created.status||"received")+". "+(created.nextStep||created.nextAction||"Your request is recorded and awaits Support Desk review.");
       void refreshSharingHistory(created);
       if (shareWithEmployers) {
         if (!selectedOrganizationId) {
-          setNotice("Your job-interest request was submitted privately. Select a verified organization before saving named-employer consent.");
+          setNotice(statusMessage+" Select a verified organization before saving named-employer consent.");
           setError("Choose the specific verified organization you authorize. No employer sharing is enabled yet.");
           setBusy(false);
           return;
@@ -150,13 +151,13 @@ export default function JobInterestPage() {
           });
           setConsentSaved(true);
           await refreshSharingHistory(created);
-          setNotice("Your job-interest request was submitted. MPA Support Desk will review it. You opted in to sharing only the fields selected above with a named, verified employer after review; no employer has been given access yet.");
+          setNotice(statusMessage+" You opted in to sharing only the fields selected above with a named, verified employer after review; no employer has been given access yet.");
         } catch (consentError) {
-          setNotice("Your job-interest request was submitted privately. Employer-sharing consent was not saved, so no employer sharing is enabled. Keep this page open and retry the consent step below.");
+          setNotice(statusMessage+" Employer-sharing consent was not saved, so no employer sharing is enabled. Keep this page open and retry the consent step below.");
           setError(consentError instanceof ApiError ? consentError.message : "Consent could not be saved.");
         } finally { setProcessingConsent(false); }
       } else {
-        setNotice("Your job-interest request was submitted privately. MPA Support Desk will review it before any named-employer sharing.");
+        setNotice(statusMessage+" MPA Support Desk will review it before any named-employer sharing.");
       }
     } catch (e) {
       const uncertain=e instanceof ApiError&&(e.status===0||e.status>=500||e.code==="INVALID_RESPONSE");

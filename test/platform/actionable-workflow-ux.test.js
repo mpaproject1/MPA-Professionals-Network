@@ -85,3 +85,65 @@ test("completed public inquiries provide a clear next task", async () => {
     assert.match(page, /busy=\{submitting\}/);
   }
 });
+
+
+test("public inquiry retries reuse a stable key and cannot create a second record", async () => {
+  const [service, server, migration, job, mentorship] = await Promise.all([
+    source("../../src/platform/public-opportunity.js"),
+    source("../../server.js"),
+    source("../../db/migrations/20261023100000_public_inquiry_idempotency.sql"),
+    source("../../web/app/apply/job/page.tsx"),
+    source("../../web/app/apply/mentorship/page.tsx"),
+  ]);
+  assert.match(server, /X-Idempotency-Key/);
+  assert.match(server, /req\.headers\["x-idempotency-key"\]/);
+  assert.match(service, /idempotency_request_hash/);
+  assert.match(service, /on conflict \(continuation_token_hash\) do nothing returning/);
+  assert.match(service, /IDEMPOTENCY_KEY_CONFLICT/);
+  assert.match(service, /replayed:true/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS idempotency_request_hash/);
+  for (const page of [job, mentorship]) {
+    assert.match(page, /createSubmissionKey/);
+    assert.match(page, /X-Idempotency-Key/);
+    assert.match(page, /const key=idempotencyKey\|\|createSubmissionKey\(\)/);
+    assert.match(page, /setIdempotencyKey\("\);setForm/);
+  }
+});
+
+test("completed inquiry screens show current status and avoid reopening closed records", async () => {
+  const [service, job, mentorship, details] = await Promise.all([
+    source("../../src/platform/public-opportunity.js"),
+    source("../../web/app/apply/job/page.tsx"),
+    source("../../web/app/apply/mentorship/page.tsx"),
+    source("../../web/app/apply/opportunity/page.tsx"),
+  ]);
+  assert.match(service, /function inquiryNextStep\(status\)/);
+  assert.match(service, /inquiryNextStep\(inserted\.status\)/);
+  for (const page of [job, mentorship]) {
+    assert.match(page, /humanStatus\(result\.status\|\|"received"\)/);
+    assert.match(page, /!\["converted","declined","closed"\]\.includes\(result\.status\)/);
+    assert.match(page, /Start another inquiry/);
+  }
+  assert.match(details, /Current status: \$\{humanStatus\(r\.status\|\|data\.status\)\}/);
+  assert.match(details, /if\(submitting\)return/);
+});
+
+test("shared loading states and report controls explain pending work without blocking unrelated tasks", async () => {
+  const [dashboard, organizations, admin, reports, membership, status] = await Promise.all([
+    source("../../web/app/dashboard/page.tsx"),
+    source("../../web/app/organizations/page.tsx"),
+    source("../../web/app/admin/page.tsx"),
+    source("../../web/app/admin/reports/page.tsx"),
+    source("../../web/app/membership/workspace.tsx"),
+    source("../../web/components/operation-status.tsx"),
+  ]);
+  assert.match(dashboard, /title="Loading your dashboard"/);
+  assert.match(organizations, /Check latest organizations/);
+  assert.match(admin, /Preparing the administrator workspace/);
+  assert.match(reports, /setViewBusy/);
+  assert.match(reports, /setReportBusy/);
+  assert.match(reports, /disabled=\{viewBusy\|\|!viewName\.trim\(\)\|\|!current\}/);
+  assert.match(reports, /disabled=\{reportBusy\}/);
+  assert.match(membership, /Loading your saved applications/);
+  assert.match(status, /prefers-reduced-motion/);
+});

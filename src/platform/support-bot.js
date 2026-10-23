@@ -105,6 +105,12 @@ export async function adminSaveArticle(actorId,input,requestId){
  else{r=await db.query("insert into support_knowledge_article(category_id,title,question_examples,keywords,answer,source_note,sort_order,is_published,created_by,updated_by) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$9) returning id",[categoryId,title,examples,keywords,answer,sourceNote,sortOrder,input.isPublished===true,actorId]);}
  if(!r.rows[0])throw httpError("Article was not found.",404,"NOT_FOUND");await logAudit(db,actorId,"support.knowledge_article_saved",r.rows[0].id,requestId);return (await adminGetKnowledge()).articles.find(a=>a.id===r.rows[0].id);
 }
+export async function adminListSupportColleagues(actorId){
+ const db=getPool();
+ const manager=(await db.query("select exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code in ('system_admin','admin','platform_admin')) is_admin,exists(select 1 from app_user_permission up where up.user_id=$1 and up.permission_code='support.inquiries.manage') can_manage",[actorId])).rows[0]||{};
+ if(!manager.is_admin&&!manager.can_manage)throw httpError("Only a support manager may view the colleague transfer list.",403,"FORBIDDEN");
+ return (await db.query("select distinct u.id,p.display_name,u.email from app_user u left join person p on p.user_id=u.id where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('supporting_staff','system_admin','admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code=any(array['support.manage','support.queue.manage','support.inquiries.manage']))) order by p.display_name nulls last,u.email")).rows;
+}
 export async function adminListConversations(filters={}){
  const db=getPool();const status=["open","in_progress","resolved","closed"].includes(filters.status)?filters.status:null;
  const actorId=filters.actorId;

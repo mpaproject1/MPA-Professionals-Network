@@ -16,6 +16,7 @@ type Job={
 };
 type Eligibility={eligible:boolean;summary:string;results:{code:string;eligible:boolean;reason:string}[]};
 type EligibilityResult=Eligibility|{error:string};
+type ExistingApplication={id:string;job_id:string;status:string;cover_letter?:string|null};
 type Filters={q:string;location:string;employmentType:string;workMode:string;seniority:string;postingScope:string};
 const initialFilters:Filters={q:"",location:"",employmentType:"",workMode:"",seniority:"",postingScope:""};
 
@@ -69,9 +70,15 @@ export default function Jobs(){
 
  useEffect(()=>{void loadJobs(initialFilters)},[loadJobs]);
  useEffect(()=>{
-   if(!token){setSaved([]);return;}
+   if(!token){setSaved([]);setDraftIds({});setCoverLetters({});return;}
    let active=true;
    api<Job[]>("/api/v1/me/saved-jobs",{},token).then(rows=>{if(active)setSaved(Array.isArray(rows)?rows.map(row=>row.id):[])}).catch(e=>{if(active)setError(e instanceof ApiError?e.message:"We couldn't load saved opportunities.")});
+   api<ExistingApplication[]>("/api/v1/me/job-applications",{},token).then(rows=>{
+     if(!active)return;
+     const drafts=Array.isArray(rows)?rows.filter(row=>row.status==="draft"&&typeof row.job_id==="string"):[];
+     setDraftIds(Object.fromEntries(drafts.map(row=>[row.job_id,row.id])));
+     setCoverLetters(Object.fromEntries(drafts.map(row=>[row.job_id,row.cover_letter||""])));
+   }).catch(e=>{if(active)setError(e instanceof ApiError?e.message:"Saved application drafts could not be restored. Retry loading your applications before submitting.")});
    return ()=>{active=false};
  },[token]);
 
@@ -98,6 +105,22 @@ export default function Jobs(){
    }catch(e){setError(e instanceof ApiError?e.message:"We couldn't update your saved jobs.");}
    finally{setSavingId("");}
  }
+ async function saveFormalApplicationDraft(job:Job){
+   if(!token){setNotice("Sign in to save an application draft to your account.");return;}
+   setApplyingId(job.id);setError("");setNotice("");
+   try{
+     let draftId=draftIds[job.id];
+     if(!draftId){
+       const draft=await api<{id:string}>("/api/v1/jobs/"+encodeURIComponent(job.id)+"/application-drafts",{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+       draftId=draft.id;setDraftIds(current=>({...current,[job.id]:draftId!}));
+     }else{
+       await api("/api/v1/job-applications/"+encodeURIComponent(draftId),{method:"PATCH",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+     }
+     setNotice("Your application draft is saved to your account. You can return to it before submitting.");
+   }catch(e){setError(e instanceof ApiError?e.message:"We couldn't save this draft. Your text is still on this page; retry before leaving.");}
+   finally{setApplyingId("");}
+ }
+
  async function submitFormalApplication(job:Job){
    if(!token){setNotice("Sign in to start a formal application. Public interest intake remains available separately.");return;}
    setApplyingId(job.id);setError("");setNotice("");
@@ -194,7 +217,7 @@ export default function Jobs(){
            {salary(job)&&<span className="tagline">{salary(job)}</span>}
          </div>
          {job.application_deadline&&<p className="muted">Application deadline: {new Date(job.application_deadline).toLocaleDateString()}</p>}
-         {expanded[job.id]&&<div style={{marginTop:14}}><p>{job.description||"No further description has been published."}</p>{token?<div className="case-row" style={{margin:"12px 0"}}><div style={{flex:1,minWidth:0}}><b>Are you eligible for this opportunity?</b>{eligibilityLoading[job.id]?<p className="muted">Checking the published requirements for your account…</p>:<EligibilityDetails result={eligibilityByJob[job.id]}/>}</div><div className="row" style={{gap:8,flexWrap:"wrap"}}>{eligibilityByJob[job.id]&&"error" in eligibilityByJob[job.id]&&<button className="btn btn-ghost" type="button" onClick={()=>void retryEligibility(job)} disabled={eligibilityLoading[job.id]}>Retry eligibility check</button>}</div></div>:<p className="muted">Sign in to check your eligibility against this vacancy's actual requirements.</p>}<p className="muted">A public inquiry is not a formal application. Formal submission is authenticated and checks eligibility, required screening answers and duplicate applications.</p>{token?<div className="grid" style={{gap:8,marginTop:10}}><label htmlFor={`cover-${job.id}`}>Cover letter (optional)<textarea id={`cover-${job.id}`} rows={3} value={coverLetters[job.id]||""} onChange={e=>setCoverLetters(current=>({...current,[job.id]:e.target.value}))} placeholder="Explain your interest and relevant experience."/></label><button className="btn btn-primary" type="button" disabled={applyingId===job.id} onClick={()=>void submitFormalApplication(job)}>{applyingId===job.id?"Submitting…":draftIds[job.id]?"Retry formal submission":"Submit formal application"}</button></div>:<p className="muted"><a href="/login?next=/jobs">Sign in to submit a formal application</a>; use public inquiry only if you want to ask questions first.</p>}</div>}
+         {expanded[job.id]&&<div style={{marginTop:14}}><p>{job.description||"No further description has been published."}</p>{token?<div className="case-row" style={{margin:"12px 0"}}><div style={{flex:1,minWidth:0}}><b>Are you eligible for this opportunity?</b>{eligibilityLoading[job.id]?<p className="muted">Checking the published requirements for your account…</p>:<EligibilityDetails result={eligibilityByJob[job.id]}/>}</div><div className="row" style={{gap:8,flexWrap:"wrap"}}>{eligibilityByJob[job.id]&&"error" in eligibilityByJob[job.id]&&<button className="btn btn-ghost" type="button" onClick={()=>void retryEligibility(job)} disabled={eligibilityLoading[job.id]}>Retry eligibility check</button>}</div></div>:<p className="muted">Sign in to check your eligibility against this vacancy's actual requirements.</p>}<p className="muted">A public inquiry is not a formal application. Formal submission is authenticated and checks eligibility, required screening answers and duplicate applications.</p>{token?<div className="grid" style={{gap:8,marginTop:10}}><label htmlFor={`cover-${job.id}`}>Cover letter (optional)<textarea id={`cover-${job.id}`} rows={3} value={coverLetters[job.id]||""} onChange={e=>setCoverLetters(current=>({...current,[job.id]:e.target.value}))} placeholder="Explain your interest and relevant experience."/></label><div className="row" style={{gap:8,flexWrap:"wrap"}}><button className="btn btn-ghost" type="button" disabled={applyingId===job.id} onClick={()=>void saveFormalApplicationDraft(job)}>{applyingId===job.id?"Saving…":draftIds[job.id]?"Save draft changes":"Save draft"}</button><button className="btn btn-primary" type="button" disabled={applyingId===job.id} onClick={()=>void submitFormalApplication(job)}>{applyingId===job.id?"Please wait…":draftIds[job.id]?"Submit saved draft":"Submit formal application"}</button></div></div>:<p className="muted"><a href="/login?next=/jobs">Sign in to submit a formal application</a>; use public inquiry only if you want to ask questions first.</p>}</div>}
          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
            <button className="btn btn-ghost" type="button" onClick={()=>void toggleDetails(job)}>{expanded[job.id]?"Hide details":"View details"}</button>
            <a className="btn btn-primary" href={"/apply/job"}>Start public inquiry</a>

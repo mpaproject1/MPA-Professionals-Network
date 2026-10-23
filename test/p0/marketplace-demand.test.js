@@ -24,6 +24,12 @@ async function supportStaff(){
  await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing",[userId,role.id]);
  return userId;
 }
+test("P1 service lifecycle: a disputed request cannot bypass provider delivery and requester confirmation",()=>{
+ assert.equal(services.allowedServiceRequestTransition("disputed","completed"),false,"a disputed engagement cannot jump directly to completed");
+ assert.equal(services.allowedServiceRequestTransition("disputed","in_progress"),true,"delivery can resume after the concern is addressed");
+ assert.equal(services.allowedServiceRequestTransition("disputed","cancelled"),true,"a reasoned cancellation remains possible");
+});
+
 test("P1 marketplace: private demand is reviewed before a privacy-safe public topic appears; interests are unique",async()=>{
  const requester=await account(randomUUID()),staff=await supportStaff();
  const demand=await marketplaceDemand.createDemand(requester,{demandType:"service",title:"Need bookkeeping support",description:"Our small team needs monthly bookkeeping and financial reporting support.",category:"Finance",deliveryMode:"remote"},"marketplace-demand-submit",randomUUID());

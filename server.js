@@ -454,6 +454,10 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/verification/programs") return ok(res,await verification.listPrograms(),requestId);
     if(req.method==="GET" && p==="api/v1/verification/claim-types") return ok(res,await verification.listClaimTypes(),requestId);
     if(req.method==="GET" && p==="api/v1/me/verification/cases") return ok(res,await verification.listCases({viewerId:identity.sub,subjectUserId:identity.sub}),requestId);
+    if(req.method==="GET" && p==="api/v1/me/verification/reference-requests") return ok(res,await verification.listMyReferenceRequests(identity.sub),requestId);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="references") return ok(res,await verification.requestReference(parts[4],await body(req),identity.sub,requestId),requestId,201);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/reference-requests/") && parts[5]==="respond") return ok(res,await verification.respondReferenceRequest(parts[4],await body(req),identity.sub,requestId),requestId);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/reference-requests/") && parts[5]==="review") return ok(res,await verification.reviewReferenceRequest(parts[4],await body(req),identity.sub,requestId),requestId);
     if(req.method==="POST" && p==="api/v1/verification/cases"){
       const b=await body(req);
       if(b.subjectUserId && b.subjectUserId!==identity.sub) anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]);
@@ -473,7 +477,7 @@ const server=http.createServer(async (req,res)=>{
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="assign"){
       anyRoleOrPermission(identity,["system_admin"],["verification.manage"]); const b=await body(req);
-      return ok(res,await verification.assignCase(parts[4],b.reviewerId,identity.sub,requestId),requestId);
+      return ok(res,await verification.assignCase(parts[4],b.reviewerId,identity.sub,requestId,b.reason||"Assignment updated"),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="transition"){
       anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]); const b=await body(req);

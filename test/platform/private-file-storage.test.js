@@ -34,7 +34,7 @@ test("private upload validates signatures for PDF and images",()=>{
   assert.doesNotThrow(()=>validatePrivateUploadBytes("image/jpeg",Buffer.from([255,216,255,0])));
 });
 
-test("private file authorization denies a recruiter from another organization",async()=>{
+test("private file authorization denies an owner from another organization",async()=>{
   const owner=await account(),applicant=await account(),otherOrganizationOwner=await account();
   const organization=await organizationJobs.registerOrganization(owner,{legalName:`Private file owner ${randomUUID()}`,displayName:"Private File Owner Organization"},"private-file-owner-org");
   const otherOrganization=await organizationJobs.registerOrganization(otherOrganizationOwner,{legalName:`Unrelated organization ${randomUUID()}`,displayName:"Unrelated Organization"},"private-file-unrelated-org");
@@ -48,7 +48,7 @@ test("private file authorization denies a recruiter from another organization",a
   await assert.rejects(
     readAuthorizedPrivateFile(otherOrganizationOwner,file.id,[], "private-file-cross-org-test", []),
     error=>error.code==="FORBIDDEN"&&error.statusCode===403,
-    "an owner/recruiter in a different organization must not read another organization's applicant attachment"
+    "an owner in a different organization must not read another organization's applicant attachment"
   );
 
   const draftJob=(await db.query("insert into job(organization_id,title,description,status,created_by,updated_by) values($1,$2,$3,'published',$4,$4) returning id",[organization.id,"Draft attachment privacy test","A published test vacancy with an unsubmitted application.",owner])).rows[0];

@@ -146,13 +146,13 @@ export default function JobInterestPage() {
         }
         setProcessingConsent(true);
         try {
-          await api<ConsentResult>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(created.public_reference)}/sharing-consent`, {
+          const consent=await api<ConsentResult>(`/api/v1/public/opportunity-inquiries/${encodeURIComponent(created.public_reference)}/sharing-consent`, {
             method: "POST",
             body: JSON.stringify({ token: created.continuationToken, employerSharingConsent: true, scope: "named_employer", organizationId: selectedOrganizationId, fields: shareFields })
           });
           setConsentSaved(true);
           await refreshSharingHistory(created);
-          setNotice(statusMessage+" You opted in to sharing only the fields selected above with a named, verified employer after review; no employer has been given access yet.");
+          setNotice(statusMessage+" Employer-sharing consent status: "+(consent.employer_sharing_consent?"Saved for review":"Not enabled")+". "+(consent.nextStep||"Support Desk review is required before any employer access."));
         } catch (consentError) {
           setNotice(statusMessage+" Employer-sharing consent was not saved, so no employer sharing is enabled. Keep this page open and retry the consent step below.");
           setError(consentError instanceof ApiError ? consentError.message : "Consent could not be saved.");
@@ -178,7 +178,7 @@ export default function JobInterestPage() {
       });
       setConsentSaved(true);
       await refreshSharingHistory(inquiry);
-      setNotice("Your sharing preference is saved. MPA Support Desk must still review the request and select a named, verified employer before anything is shared.");
+      setNotice("Employer-sharing consent status: "+(consent.employer_sharing_consent?"Saved for review":"Not enabled")+". "+(consent.nextStep||"Support Desk review is required before any employer access."));
     } catch (e) { setError(e instanceof ApiError ? e.message : "Consent could not be saved. No employer sharing is enabled."); }
     finally { setProcessingConsent(false); }
   }

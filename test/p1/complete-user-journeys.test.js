@@ -153,6 +153,40 @@ test("Gate 2: mentorship offer is reviewed, matched, accepted, scheduled, comple
  assert.equal(Number(programFeedback.rating),5);
 });
 
+test("Gate 2: declined mentorship match remains in history when a different mentor is proposed",async()=>{
+ const mentee=await account(),firstMentor=await account(),secondMentor=await account(),staff=await supportStaff();
+ for(const mentor of [firstMentor,secondMentor]){
+  await activeMember(mentor);
+  await verifiedProfessionalClaim(mentor);
+ }
+ const firstProfile=await journeys.createMentorProfile(firstMentor,{headline:"Rematching product mentor A",bio:"Practical product discovery and delivery coaching.",expertise:["product","strategy"],languages:["english"],mentoringModes:["remote"],visibility:"public",maxActiveMentees:3},"gate2-rematch-profile-a");
+ const secondProfile=await journeys.createMentorProfile(secondMentor,{headline:"Rematching product mentor B",bio:"Practical product discovery and delivery coaching.",expertise:["product","strategy"],languages:["english"],mentoringModes:["remote"],visibility:"public",maxActiveMentees:3},"gate2-rematch-profile-b");
+ await journeys.changeMentorStatus(firstProfile.id,firstMentor,"active","gate2-rematch-submit-a");
+ await journeys.changeMentorStatus(secondProfile.id,secondMentor,"active","gate2-rematch-submit-b");
+ await marketplace.moderateListing("mentorship",firstProfile.id,staff,{decision:"approved",note:"Rematching test mentor A approved."},"gate2-rematch-approve-a");
+ await marketplace.moderateListing("mentorship",secondProfile.id,staff,{decision:"approved",note:"Rematching test mentor B approved."},"gate2-rematch-approve-b");
+ const start=new Date(Date.now()+14*24*60*60*1000);start.setUTCHours(7,0,0,0);
+ const weekdayNames={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+ const weekday=weekdayNames[new Intl.DateTimeFormat("en-US",{weekday:"short",timeZone:"Africa/Addis_Ababa"}).format(start)];
+ for(const mentor of [firstMentor,secondMentor]){
+  const profile=mentor===firstMentor?firstProfile:secondProfile;
+  await journeys.setMentorAvailability(profile.id,mentor,{slots:[{dayOfWeek:weekday,startTime:"09:00",endTime:"12:00",timezone:"Africa/Addis_Ababa"}]},"gate2-rematch-availability");
+ }
+ const request=await journeys.createMentorshipRequest(mentee,{goals:"Build a practical product discovery and delivery plan.",topics:["product","strategy"],preferredModes:["remote"],preferredLanguages:["english"],preferredDays:[weekday]},"gate2-rematch-request",randomUUID());
+ const candidates=await journeys.findMentorMatches(request.id,mentee);
+ assert.ok(candidates.some(x=>x.mentorUserId===firstMentor));
+ assert.ok(candidates.some(x=>x.mentorUserId===secondMentor));
+ const firstMatch=await journeys.proposeMentorMatch(request.id,firstMentor,mentee,"gate2-rematch-propose-a");
+ assert.equal(firstMatch.status,"proposed");
+ assert.equal((await journeys.respondToMatch(firstMatch.id,firstMentor,"declined","gate2-rematch-decline-a")).status,"declined");
+ const secondMatch=await journeys.proposeMentorMatch(request.id,secondMentor,mentee,"gate2-rematch-propose-b");
+ assert.notEqual(secondMatch.id,firstMatch.id,"rematching creates a new proposal rather than overwriting the declined match");
+ assert.equal(secondMatch.status,"proposed");
+ const history=(await getPool().query("select id,mentor_user_id,status from mentorship_match where request_id=$1 order by proposed_at,id",[request.id])).rows;
+ assert.equal(history.length,2,"both the declined proposal and the new proposal remain persisted");
+ assert.equal(history.find(x=>x.id===firstMatch.id).status,"declined");
+ assert.equal(history.find(x=>x.id===secondMatch.id).status,"proposed");
+});
 test("Gate 2: verified organization mentorship offer is moderated, requested, accepted and completed",async()=>{
  const owner=await account(),requester=await account(),staff=await supportStaff(),org=await approvedOrg(owner);
  const offer=await organizationOffers.createOrganizationMentorshipOffer(owner,{organizationId:org.id,title:"Gate 2 leadership mentorship program",description:"A structured program for early-career professionals with guided goals, mentor check-ins and a clear completion outcome.",expertise:["leadership","career development"],languages:["English","Amharic"],deliveryMode:"hybrid",visibility:"public"},"gate2-org-mentorship-create");

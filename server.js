@@ -481,7 +481,7 @@ const server=http.createServer(async (req,res)=>{
       return ok(res,await verification.addClaim(parts[4],b.claimTypeCode,b.claimedValue,identity.sub,requestId),requestId,201);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="evidence"){
-      const b=await body(req); const c=await verification.getCase(parts[4]);
+      const b=await body(req); const c=await verification.getCase(parts[4],identity.sub);
       if(c.subject_user_id!==identity.sub) anyRole(identity,["verification_reviewer","ethics_reviewer","system_admin"]);
       return ok(res,await verification.addEvidence(parts[4],b,identity.sub,requestId),requestId,201);
     }

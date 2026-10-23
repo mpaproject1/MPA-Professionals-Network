@@ -111,6 +111,43 @@
 - Verify that all consequential changes capture sufficient before/after data and a reason where required; an audit viewer does not guarantee every mutation records complete history.
 - Add forbidden direct-request tests for ordinary members, organization users, reviewers and finance users.
 
+### 6. Mentorship workspace
+
+**Existing source workflow**
+- Mentor discovery, member mentorship requests, coordinator/support matching, mentor accept/decline, goals, sessions, feedback and relationship status already exist.
+- Requests and proposed matches are persisted; a declined mentor returns the request to matching.
+- Relationship and session actions use participant checks and audit events.
+
+**Important gap to close before describing the journey as end-to-end**
+- A coordinator-proposed match currently becomes an active mentorship as soon as the mentor accepts. The mentee has requested mentorship generally, but does not explicitly accept that specific coordinator-selected mentor before activation.
+- A dedicated private concern/safeguarding workflow and reasoned rematch action are not implemented as a complete participant journey. Do not represent generic Support Desk contact as a complete mentorship concern process.
+- Next source phase should add explicit mentee approval for the exact proposed match, then activate only after both responses; provide private concern reporting, assigned coordinator handling, safety-sensitive visibility, pause/restrict contact where policy allows, and auditable rematch history. Validate database constraints before choosing status values or migrations.
+
+### 7. Service workspace
+
+**Existing source workflow**
+- Service requests record scope and commercial terms; provider acceptance/decline and participant status changes are recorded with event history.
+- Authorized participants can define milestones, submit delivery evidence, request revisions with an explanation, review deliveries, raise a dispute, accept completion and provide feedback.
+- Service completion is gated on milestone outcomes; private delivery files are checked for ownership and request scope.
+
+**Still incomplete / needs validation**
+- Improve the participant-facing agreement summary before acceptance: scope, exclusions, deliverables, milestones, dates, amount/currency, cancellation terms and how to raise a dispute should be visible together. Do not silently change accepted terms.
+- Confirm every material scope/price/date amendment requires an explicit response from the other participant and leaves an immutable before/after history. This has not been proven from the current end-to-end workflow.
+- A dispute is a request status today; a complete resolution workflow with neutral case ownership, evidence exchange, decisions, reasons, appeals/escalation and closure needs separate review.
+- Validate private attachment downloads, milestone transitions, repeated submissions, cancellation rules, dispute transitions and completion acceptance using negative API tests.
+
+### 8. Marketplace discovery and routing
+
+**Added in source**
+- Added `/marketplace` as a discovery hub linking to the existing Services, Mentorship, Service Demand, Jobs, Organizations and Saved workflows.
+- Added Marketplace to desktop and mobile navigation and return links from Services, Mentorship and Service Demand.
+- The hub states that public discovery does not create a private agreement, application or mentoring relationship.
+
+**Still incomplete / needs validation**
+- This is a connected entry point, not a new cross-category search index. Search, filters, listing moderation and request forms continue to live in their existing feature workflows.
+- Verify that public listings and demand topics remain limited to approved/public-safe fields, that private requests never appear in public feeds, and that all private actions use server-side authorization.
+- End-to-end acceptance must confirm that a public discovery action routes to the correct protected request/application flow, with clear sign-in or membership requirements at the action—not a blanket block on browsing.
+
 ## Membership lifecycle status
 
 | Transition | Current assessment | Remaining work |

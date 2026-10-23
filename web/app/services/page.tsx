@@ -70,8 +70,8 @@ export default function Services(){
    e.preventDefault();if(!token)return;setProviderSaving(true);setError("");setNotice("");
    try{
      const body={title:providerForm.title.trim(),description:providerForm.description.trim(),serviceCategory:providerForm.serviceCategory.trim(),deliveryMode:providerForm.deliveryMode,locationLabel:providerForm.locationLabel.trim()||null,pricingModel:providerForm.pricingModel,priceAmount:providerForm.pricingModel==="free"?0:providerForm.priceAmount?Number(providerForm.priceAmount):null,currency:providerForm.currency||"ETB",visibility:providerForm.visibility,organizationId:providerForm.organizationId||undefined};
-     await api(editingListingId?`/api/v1/services/${encodeURIComponent(editingListingId)}`:"/api/v1/services",{method:editingListingId?"PATCH":"POST",body:JSON.stringify(body)},token);
-     setNotice(editingListingId?"Listing saved as a draft and returned to moderation review.":"Listing created as a draft. Review the details, then submit it for moderation.");
+     const saved=await api<ProviderListing>(editingListingId?`/api/v1/services/${encodeURIComponent(editingListingId)}`:"/api/v1/services",{method:editingListingId?"PATCH":"POST",body:JSON.stringify(body)},token);
+     setNotice(`Listing status: ${humanStatus(saved.status||"draft")}. Moderation: ${humanStatus(saved.moderation_status||"pending")}. ${saved.status==="published"?"Check the moderation decision before sharing the listing.":"Review the saved draft, then submit it for moderation."}`);
      setEditingListingId("");setServiceCategoryChoice("");setProviderForm({title:"",description:"",serviceCategory:"",deliveryMode:"remote",locationLabel:"",pricingModel:"quote",priceAmount:"",currency:"ETB",visibility:"public",organizationId:""});
      await loadProviderWorkspace();
    }catch(e){setError(e instanceof ApiError?e.message:"Your listing could not be saved. Your entered details remain in the form.");}
@@ -79,7 +79,7 @@ export default function Services(){
  }
  async function changeListingStatus(item:ProviderListing,status:"published"|"paused"|"closed"){
    if(!token)return;setTransitioning(item.id,true);setError("");setNotice("");
-   try{await api(`/api/v1/services/${encodeURIComponent(item.id)}/status`,{method:"POST",body:JSON.stringify({status})},token);setNotice(status==="published"?"Listing submitted for moderation. It is not public until approved.":"Listing status updated.");await loadProviderWorkspace();}
+   try{const updated=await api<ProviderListing>(`/api/v1/services/${encodeURIComponent(item.id)}/status`,{method:"POST",body:JSON.stringify({status})},token);setNotice(`Listing status: ${humanStatus(updated.status||status)}. Moderation status: ${humanStatus(updated.moderation_status||item.moderation_status)}. ${status==="published"?"It remains hidden until approved.":"Review the updated listing state before taking another action."}`);await loadProviderWorkspace();}
    catch(e){setError(e instanceof ApiError?e.message:"Listing status could not be updated.");}
    finally{setTransitioning(item.id,false);}
  }

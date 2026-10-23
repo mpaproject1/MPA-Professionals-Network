@@ -50,5 +50,5 @@ test("verification claim, evidence, and claim-status writes enforce assignment a
   assert.match(service, /else await assertAssignedReviewer\(db,caseId,actorId\)/);
   assert.match(service, /await assertAssignedReviewer\(db,row\.case_id,actorId\)/);
   const server = read("server.js");
-  assert.match(server, /verification\.getCase\(parts\[4\],identity\.sub\)/);
+  assert.equal((server.match(/verification\.getCase\(parts\[4\],identity\.sub\)/g) || []).length, 3, "case detail, claim, and evidence routes must pass the authenticated viewer");
 });

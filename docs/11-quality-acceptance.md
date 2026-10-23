@@ -71,3 +71,10 @@ Optimize measured bottlenecks.
 ## 8. Production readiness
 
 Before release: security review, verified backups, monitoring, error reporting, payment reconciliation tests, admin recovery account, rollback process and runbooks.
+
+
+## 9. Browser CORS acceptance
+
+For the production portal origin, the API must return the exact `Access-Control-Allow-Origin` header on normal responses and preflight responses, and normal responses must include `Vary: Origin`. Untrusted origins must not receive an allow-origin header. See [the production CORS regression and release checklist](13-cors-release-checklist.md) and tracking issue [#3](https://github.com/jtestcoder/MPA-Professionals-Network/issues/3).
+
+Before release, run the opt-in deployed HTTP smoke test with `CORS_SMOKE_BASE_URL` set. A skipped smoke test is not production evidence.

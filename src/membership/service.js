@@ -559,6 +559,32 @@ export async function reverseMembershipPayment(paymentId,actorId,input,requestId
   });
 }
 
+export async function expireDueMemberships(batchSize=500){
+ const size=Math.max(1,Math.min(5000,Number.parseInt(batchSize,10)||500));
+ return withTransaction(async db=>{
+  const result=await db.query(`with due as (
+    select id,user_id,end_date from membership_record
+    where status='active' and end_date is not null and end_date<current_date
+    order by end_date asc,id asc
+    limit $1
+    for update skip locked
+  ), expired as (
+    update membership_record mr set status='expired',updated_at=now()
+    from due where mr.id=due.id
+    returning mr.id,mr.user_id,mr.end_date
+  ), logged as (
+    insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata)
+    select null,'membership.expired','membership_record',e.id,null,'success',
+      jsonb_build_object('reason','end_date_elapsed','endDate',e.end_date,'source','expiry_batch')
+    from expired e
+    returning resource_id
+  )
+  select e.id,e.user_id,e.end_date from expired e join logged l on l.resource_id=e.id
+  order by e.end_date asc`,[size]);
+  return {expiredCount:result.rowCount,items:result.rows};
+ });
+}
+
 export async function renew(userId,productCode,requestId){
   return createApplication(userId,{productCode,applicationType:"renewal"},requestId);
 }

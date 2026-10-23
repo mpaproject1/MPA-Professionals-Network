@@ -89,3 +89,14 @@ test("reviewer routing excludes inactive accounts and organization drafts do not
  assert.doesNotMatch(registration,/reviewer\.review_queue_update|organization\.review_queue_item/);
  assert.match(organizations,/organization verification queue and review the submitted evidence/);
 });
+test("job application notifications take applicants to tracking and employers to recruitment",async()=>{
+ const applicantDb=fakeDb();
+ await createInAppNotification(applicantDb,"applicant-1","job.application_status_changed","job_application","application-1",{status:"interview",nextAction:"Review your interview details."});
+ const applicantInsert=applicantDb.calls.find(call=>call.sql.includes("insert into notification_event"));
+ assert.equal(applicantInsert.params[10],"/track");
+
+ const employerDb=fakeDb();
+ await createInAppNotification(employerDb,"employer-1","job.application_received","job_application","application-1",{audience:"employer",nextAction:"Review the candidate."});
+ const employerInsert=employerDb.calls.find(call=>call.sql.includes("insert into notification_event"));
+ assert.equal(employerInsert.params[10],"/recruitment");
+});

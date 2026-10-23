@@ -139,7 +139,7 @@ export default function Services(){
    <Card id="service-discovery">
      <form onSubmit={e=>{e.preventDefault();void load(query,0)}} className="row" style={{gap:10,flexWrap:"wrap"}}>
        <label style={{flex:"1 1 240px"}}>Search services<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Category, capability or keyword" style={{width:"100%"}}/></label>
-       <button className="btn btn-primary" type="submit" disabled={loading}>{loading?"Searching…":"Search"}</button>
+       <button className="btn btn-primary" type="submit" disabled={loading}>{loading?"Finding services…":"Search services"}</button>
        <button className="btn btn-ghost" type="button" disabled={loading} onClick={()=>{setQuery("");void load("",0)}}>Clear</button>
      </form>
    </Card>

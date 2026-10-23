@@ -125,6 +125,26 @@ test("Gate 2: concurrent mentorship submissions cannot create duplicate requests
  );
 });
 
+test("Gate 2: conflicting concurrent provider responses persist only one decision",async()=>{
+ const provider=await account(),requester=await account(),staff=await supportStaff();
+ await activeMember(provider);
+ const listing=await journeys.createServiceListing(provider,{title:"Concurrent provider decision test",description:"A public listing for testing mutually exclusive provider decisions.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-service-conflict-listing",randomUUID());
+ await journeys.changeServiceListingStatus(listing.id,provider,"published","gate2-service-conflict-publish");
+ await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Approved for concurrency test."},"gate2-service-conflict-approve");
+ const request=await journeys.requestService(listing.id,requester,{message:"Please review this request."},"gate2-service-conflict-request",randomUUID());
+ const outcomes=await Promise.allSettled([
+  journeys.changeServiceRequestStatus(request.id,provider,"accepted","The provider accepts the request.","gate2-service-conflict-accept"),
+  journeys.changeServiceRequestStatus(request.id,provider,"declined","The provider declines the request.","gate2-service-conflict-decline")
+ ]);
+ assert.equal(outcomes.filter(x=>x.status==="fulfilled").length,1,"row locking must permit only one conflicting decision to win");
+ const rejected=outcomes.find(x=>x.status==="rejected");
+ assert.equal(rejected.reason.code,"INVALID_STATE","the losing concurrent action must receive a stale-state conflict");
+ const persisted=(await getPool().query("select status from service_request where id=$1",[request.id])).rows[0];
+ assert.ok(["accepted","declined"].includes(persisted.status));
+ const decisions=await getPool().query("select count(*)::int count from service_request_event where request_id=$1 and from_status='requested' and to_status in ('accepted','declined')",[request.id]);
+ assert.equal(decisions.rows[0].count,1,"only the winning response may appear in persisted status history");
+});
+
 test("Gate 2: public service journey reaches accepted delivery, requester outcome acceptance and feedback",async()=>{
  const provider=await account(),requester=await account(),staff=await supportStaff();
  await activeMember(provider);

@@ -113,7 +113,7 @@ jobs:
           fi
           printf 'Discovered %s backend test files.\n' "${#TEST_FILES[@]}"
           printf '%s\n' "${TEST_FILES[@]}"
-          node --test "${TEST_FILES[@]}"
+          node --test --test-concurrency=1 "${TEST_FILES[@]}"
 
   production-build:
     name: Next.js production build (no deployment)

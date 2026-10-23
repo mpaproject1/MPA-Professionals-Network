@@ -831,7 +831,7 @@ export async function listMyMentorshipMatches(userId){
  case when mm.mentor_user_id=$1 then 'mentor' else 'mentee' end match_role
  from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id
  join person pm on pm.user_id=mm.mentor_user_id join person pe on pe.user_id=mm.mentee_user_id
- where (mm.mentor_user_id=$1 and mm.status='proposed')
+ where (mm.mentor_user_id=$1 and (mm.status='proposed' or (mm.status='accepted' and mm.mentee_consent_status='pending')))
     or (mm.mentee_user_id=$1 and mm.status='accepted' and mm.mentee_consent_status='pending')
  order by mm.proposed_at desc`,[userId])).rows;
 }

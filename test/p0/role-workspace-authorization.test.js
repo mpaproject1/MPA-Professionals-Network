@@ -78,6 +78,16 @@ test("support inquiry lists and actions are scoped to unassigned or self-assigne
   assert.match(server, /adminReplyToConversation\(identity\.sub,parts\[5\],await body\(req\),requestId,canManageAll\)/);
 });
 
+test("support inquiry transfer is manager-only, validates active support recipients, and records handoff reason", () => {
+  const support = read("src/platform/support-bot.js");
+  assert.match(support, /hasTransfer&&!canManageAll/);
+  assert.match(support, /support\.inquiry_transferred/);
+  assert.match(support, /fromAssignee:current\.assigned_to,toAssignee:r\.rows\[0\]\.assigned_to/);
+  assert.match(support, /Choose an active Support Desk colleague with support permissions/);
+  assert.match(support, /Add a short handoff reason/);
+  assert.match(support, /for update/);
+});
+
 test("membership expiry is persisted through an auditable batch runner", () => {
   const service = read("src/membership/service.js");
   const runner = read("scripts/expire-memberships.js");

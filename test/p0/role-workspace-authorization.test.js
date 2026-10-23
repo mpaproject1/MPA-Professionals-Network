@@ -86,5 +86,8 @@ test("professional profile edits are available before membership while verificat
   const membership = read("src/membership/service.js");
   assert.match(policy, /export async function assertProfessionalProfileCapability\(db,userId,\{ requireActiveMembership = false \} = \{\}\)/);
   assert.match(membership, /await assertProfessionalProfileAccess\(db,userId\);/);
-  const updateStart = membership.indexOf("export async function updateProfile(");\n  const updateEnd = membership.indexOf("export async function listMyApplications(", updateStart);\n  assert.ok(updateStart >= 0 && updateEnd > updateStart);\n  assert.doesNotMatch(membership.slice(updateStart, updateEnd), /requireActiveMembership:true/);\n  assert.match(membership, /await assertProfessionalProfileAccess\(db,userId,\{requireActiveMembership:true\}\)/);
+  const updateStart = membership.indexOf("export async function updateProfile(");
+  const updateEnd = membership.indexOf("export async function listMyApplications(", updateStart);
+  assert.ok(updateStart >= 0 && updateEnd > updateStart);
+  assert.doesNotMatch(membership.slice(updateStart, updateEnd), /requireActiveMembership:true/);\n  assert.match(membership, /await assertProfessionalProfileAccess\(db,userId,\{requireActiveMembership:true\}\)/);
 });

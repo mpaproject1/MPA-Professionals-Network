@@ -54,8 +54,8 @@
 - Links to mentoring, saved items, account security, notifications and application tracking without inventing completion states.
 
 **Still incomplete**
-- A dedicated CV vault and recipient-by-recipient CV approval/revocation screen are not implemented. Existing profile visibility and application-document workflows must not be represented as a complete CV-sharing feature. Add this before claiming the entire requested Member workspace is complete.
-- Validate all loading/empty/error states, role combinations, privacy toggles, and the actual server response contracts in browser/API tests.
+- Added a private CV vault at `/member/cv`, with validated private upload, save/download/remove, a list of the member’s own applications, application-specific CV sharing, sharing history and revocation. Replacing/removing the saved CV withdraws its existing CV attachments. Employer access to a CV is allowed only through an attachment to an application for a job the viewer is authorized to manage; the recruitment pipeline now lists those applicant-shared files with audited download actions.
+- **Still needs validation:** confirm the CV migration and existing attachment-table schema on a safe test database; verify application-specific access and revocation with cross-organization negative tests, and run browser/API acceptance. The CV is not automatically shared and this source work has not been runtime-validated.
 
 ### Employment / employer workspace
 

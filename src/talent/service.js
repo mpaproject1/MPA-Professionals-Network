@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
 import { assertProfessionalProfileCapability } from "../platform/identity-policy.js";
 
+function hashValue(value){return createHash("sha256").update(value).digest("hex");}
+function hashPayload(value){return hashValue(JSON.stringify(value));}
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
 
 async function assertProfessionalProfileAccess(db,userId,options={}){
@@ -154,40 +157,48 @@ export async function saveSearch(userId,input,requestId){
 export async function listSavedSearches(userId){ return (await getPool().query("select * from talent_saved_search where user_id=$1 and active=true order by created_at desc",[userId])).rows; }
 
 
-export async function createTalentInquiry(requesterId,input,requestId){
-  return withTransaction(async db=>{
-    if(!input.professionalUserId||!input.subject||!input.message) throw error(400,"professionalUserId, subject and message are required.","VALIDATION_ERROR");
-    if(requesterId===input.professionalUserId) throw error(400,"You cannot inquire about your own professional profile.","SELF_INQUIRY");
-    const member=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[requesterId])).rows[0];
-    if(!member) throw error(403,"An active membership is required to contact a professional.","MEMBERSHIP_REQUIRED");
-    const target=(await db.query(`
-      select u.id
-      from app_user u
-      join membership_record m on m.user_id=u.id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)
-      join verification_visibility vv on vv.user_id=u.id and vv.directory_visible=true
-      join person p on p.user_id=u.id
-      join professional_profile pp on pp.person_id=p.id and pp.directory_visibility in ('members','public')
-      where u.id=$1
-        and exists (
-          select 1 from verification_claim vc
-          join verification_case c on c.id=vc.case_id
-          where c.subject_user_id=u.id and vc.status='verified'
-            and lower(vc.claim_code_snapshot) in ('professional_certification','education','employment','experience','service_capability')
-        )
-    `,[input.professionalUserId])).rows[0];
-    if(!target) throw error(404,"Verified professional not found or not accepting directory contact.","NOT_FOUND");
-    if(input.organizationId){
-      const orgMember=(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[input.organizationId,requesterId])).rows[0];
-      if(!orgMember) throw error(403,"You must be an active member of the supplied organization to send an organization inquiry.","ORGANIZATION_SCOPE");
-    }
-    const duplicate=(await db.query("select id from talent_inquiry where requester_user_id=$1 and professional_user_id=$2 and status='requested'",[requesterId,input.professionalUserId])).rows[0];
-    if(duplicate) throw error(409,"You already have a pending inquiry for this professional.","DUPLICATE_INQUIRY");
-    const row=(await db.query("insert into talent_inquiry(requester_user_id,professional_user_id,organization_id,subject,message) values($1,$2,$3,$4,$5) returning *",[requesterId,input.professionalUserId,input.organizationId||null,input.subject,input.message])).rows[0];
-    await audit(db,requesterId,"talent.inquiry_created","talent_inquiry",row.id,requestId,{professionalUserId:input.professionalUserId});
-    return row;
-  });
+export async function createTalentInquiry(requesterId,input,requestId,idempotencyKey=null){
+ if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
+  throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
+ const normalized={requesterId,professionalUserId:input.professionalUserId||null,organizationId:input.organizationId||null,subject:String(input.subject||"").trim(),message:String(input.message||"").trim()};
+ if(!normalized.professionalUserId||!normalized.subject||!normalized.message)throw error(400,"Choose a professional and enter a subject and message.","VALIDATION_ERROR");
+ if(requesterId===normalized.professionalUserId)throw error(400,"You cannot inquire about your own professional profile.","SELF_INQUIRY");
+ const keyHash=hashValue(idempotencyKey),fingerprint=hashPayload(normalized);
+ return withTransaction(async db=>{
+  const existing=(await db.query("select * from talent_inquiry where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){
+   if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,idempotent:true,replayed:true,nextAction:existing.status==="requested"?"Your inquiry is awaiting a response. Check your inquiries for updates.":"Review the recorded inquiry status; do not submit the same request again."};
+  }
+  const member=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[requesterId])).rows[0];
+  if(!member)throw error(403,"An active membership is required to contact a professional.","MEMBERSHIP_REQUIRED");
+  const target=(await db.query(`
+    select u.id
+    from app_user u
+    join membership_record m on m.user_id=u.id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)
+    join verification_visibility vv on vv.user_id=u.id and vv.directory_visible=true
+    join person p on p.user_id=u.id
+    join professional_profile pp on pp.person_id=p.id and pp.directory_visibility in ('members','public')
+    where u.id=$1
+      and exists (select 1 from verification_claim vc join verification_case c on c.id=vc.case_id where c.subject_user_id=u.id and vc.status='verified' and lower(vc.claim_code_snapshot)=any($2::text[]))
+  `,[normalized.professionalUserId,ELIGIBLE_VERIFICATION_CLAIMS])).rows[0];
+  if(!target)throw error(404,"Verified professional not found or not accepting directory contact.","NOT_FOUND");
+  if(normalized.organizationId){
+   const orgMember=(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[normalized.organizationId,requesterId])).rows[0];
+   if(!orgMember)throw error(403,"You must be an active member of the supplied organization to send an organization inquiry.","ORGANIZATION_SCOPE");
+  }
+  const duplicate=(await db.query("select id from talent_inquiry where requester_user_id=$1 and professional_user_id=$2 and status='requested'",[requesterId,normalized.professionalUserId])).rows[0];
+  if(duplicate)throw error(409,"You already have a pending inquiry for this professional. Open your existing inquiry instead of sending another.","DUPLICATE_INQUIRY");
+  const row=(await db.query("insert into talent_inquiry(requester_user_id,professional_user_id,organization_id,subject,message,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7) on conflict do nothing returning *",[requesterId,normalized.professionalUserId,normalized.organizationId,normalized.subject,normalized.message,keyHash,fingerprint])).rows[0];
+  if(!row){
+   const raced=(await db.query("select * from talent_inquiry where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+   if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...raced,idempotent:true,replayed:true,nextAction:"Your inquiry was already recorded. Check your inquiries for updates."};
+  }
+  await audit(db,requesterId,"talent.inquiry_created","talent_inquiry",row.id,requestId,{professionalUserId:normalized.professionalUserId});
+  return {...row,idempotent:false,replayed:false,nextAction:"Your inquiry is recorded and awaits a response. Check your inquiries for updates."};
+ });
 }
-
 export async function listTalentInquiries(userId){
   const db=getPool();
   return (await db.query(`

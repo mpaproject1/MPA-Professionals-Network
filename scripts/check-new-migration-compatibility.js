@@ -108,10 +108,6 @@ try {
     await client.query(migration.sql);
     console.log(`PASS: ${migration.filename} applied inside rollback-only transaction`);
   }
-  await client.query("rollback");
-  transactionOpen = false;
-  console.log("PASS: all ten migrations are compatible with this existing schema in a transaction; all DDL was rolled back.");
-
   const postMigrationColumns = [
     ["public_opportunity_inquiry","idempotency_request_hash","text"],
     ...["marketplace_demand","mentorship_request","service_request","service_listing","talent_inquiry"].flatMap(table=>[[table,"request_idempotency_hash","text"],[table,"request_fingerprint","text"]]),
@@ -198,6 +194,9 @@ try {
   const rematchIndex = await client.query("select 1 from pg_indexes where schemaname='public' and indexname='ux_mentorship_match_one_open_request'");
   if (!rematchIndex.rowCount) throw new Error("The partial unique index protecting active mentorship proposals is missing.");
 
+  await client.query("rollback");
+  transactionOpen = false;
+  console.log("PASS: all ten migrations and post-migration schema assertions succeeded; all DDL was rolled back.");
   console.log("NOTE: this validates migration execution and existing column types/FK targets; it does not replace application-level integration tests.");
 } catch (error) {
   if (transactionOpen) {

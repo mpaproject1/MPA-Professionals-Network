@@ -7,6 +7,7 @@ import { closePool, getPool } from "../../src/platform/db.js";
 import * as marketplace from "../../src/services-mentorship/demand.js";
 import * as organizationOffers from "../../src/services-mentorship/organization-offers.js";
 import * as journeys from "../../src/services-mentorship/service.js";
+import * as talent from "../../src/talent/service.js";
 
 function identity(suffix){
  const digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
@@ -50,6 +51,26 @@ async function approvedOrg(ownerId){
  await db.query("update organization set verification_status='verified',verified_at=now(),verified_by=$2,public_visible=true where id=$1",[org.id,ownerId]);
  return org;
 }
+
+test("Gate 2: concurrent talent inquiries from one requester cannot create duplicate pending records",async()=>{
+ const requester=await account(),professional=await account();
+ await activeMember(requester);
+ await activeMember(professional);
+ await verifiedProfessionalClaim(professional);
+ const db=getPool();
+ await db.query("update verification_visibility set directory_visible=true where user_id=$1",[professional]);
+ await db.query("update professional_profile set directory_visibility='members' where person_id=(select id from person where user_id=$1)",[professional]);
+ const input={professionalUserId:professional,subject:"Professional collaboration",message:"I would like to discuss a possible professional collaboration."};
+ const outcomes=await Promise.allSettled([
+  talent.createTalentInquiry(requester,input,"gate2-talent-concurrent-a",`gate2-talent-a-${randomUUID()}`),
+  talent.createTalentInquiry(requester,input,"gate2-talent-concurrent-b",`gate2-talent-b-${randomUUID()}`)
+ ]);
+ assert.equal(outcomes.filter(x=>x.status==="fulfilled").length,1,"only one concurrent pending inquiry should be created");
+ const rejected=outcomes.find(x=>x.status==="rejected");
+ assert.equal(rejected.reason.code,"DUPLICATE_INQUIRY","the second concurrent request must return the existing-request conflict");
+ const count=await db.query("select count(*)::int count from talent_inquiry where requester_user_id=$1 and professional_user_id=$2 and status='requested'",[requester,professional]);
+ assert.equal(count.rows[0].count,1,"duplicate concurrent inquiries must not both persist");
+});
 
 test("Gate 2: concurrent mentorship submissions cannot create duplicate requests or reuse a key for changed goals",async()=>{
  const mentee=await account();

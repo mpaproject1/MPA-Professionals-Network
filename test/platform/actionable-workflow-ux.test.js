@@ -217,3 +217,20 @@ test("service listing and no-vacancy job-interest forms recover uncertain create
   assert.ok(interestPage.includes("Start another request"));
   assert.ok(interestPage.includes("submissionUncertain"));
 });
+
+
+test("professional directory inquiries use server-backed idempotency and clear recovery feedback", async () => {
+  const [service, server, migration, page] = await Promise.all([
+    source("../../src/talent/service.js"),
+    source("../../server.js"),
+    source("../../db/migrations/20261023105000_talent_inquiry_idempotency.sql"),
+    source("../../web/app/network/page.tsx"),
+  ]);
+  assert.ok(service.includes("createTalentInquiry(requesterId,input,requestId,idempotencyKey=null)"));
+  assert.ok(server.includes('talent.createTalentInquiry(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"])'));
+  assert.ok(migration.includes("ux_talent_inquiry_idempotency_hash"));
+  assert.ok(page.includes('headers:{"X-Idempotency-Key":key}'));
+  assert.ok(page.includes("submissionUncertain"));
+  assert.ok(page.includes("Check submission again"));
+  assert.ok(page.includes("Inquiry status:"));
+});

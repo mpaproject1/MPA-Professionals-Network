@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
@@ -39,7 +39,7 @@ test("P1 marketplace demand: concurrent replay is idempotent and key reuse with 
   marketplaceDemand.createDemand(requester,payload,"marketplace-demand-concurrent-b",key)
  ]);
  assert.equal(results[0].id,results[1].id,"concurrent retries with the same key must resolve to one persisted demand");
- assert.equal((await getPool().query("select count(*)::int count from marketplace_demand where request_idempotency_hash=$1",[ (await import("node:crypto")).createHash("sha256").update(key).digest("hex") ])).rows[0].count,1);
+ assert.equal((await getPool().query("select count(*)::int count from marketplace_demand where request_idempotency_hash=$1",[ createHash("sha256").update(key).digest("hex") ])).rows[0].count,1);
  await assert.rejects(
   marketplaceDemand.createDemand(requester,{...payload,title:"Changed title for same key"},"marketplace-demand-conflict",key),
   error=>error.code==="IDEMPOTENCY_KEY_CONFLICT",

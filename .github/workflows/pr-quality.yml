@@ -1,4 +1,4 @@
-name: PR Quality — pre-deployment checks
+name: PR Quality - pre-deployment checks
 
 on:
   pull_request:
@@ -77,7 +77,7 @@ jobs:
       JWT_SECRET: mpa-ci-only-jwt-secret-at-least-32-characters-long
       DB_POOL_MAX: 5
       MIGRATION_CHECK_EXPECTED_DATABASE: mpa_test
-      MIGRATION_CHECK_ALLOW_ROLLBACK: YES
+      MIGRATION_CHECK_ALLOW_ROLLBACK: "YES"
     steps:
       - name: Check out exact revision
         uses: actions/checkout@v4

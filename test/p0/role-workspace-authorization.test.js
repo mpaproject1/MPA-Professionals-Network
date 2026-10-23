@@ -86,6 +86,9 @@ test("membership expiry is persisted through an auditable batch runner", () => {
   assert.match(service, /status='active' and end_date is not null and end_date<current_date/);
   assert.match(service, /'membership\.expired','membership_record'/);
   assert.match(runner, /expireDueMemberships/);
+  const server = read("server.js");
+  assert.match(server, /setInterval\(\(\)=>void runMembershipExpiry\(\),60\*60\*1000\)/);
+  assert.match(server, /void runMembershipExpiry\(\)/);
   assert.equal(packageJson.scripts["memberships:expire"], "node scripts/expire-memberships.js");
 });
 

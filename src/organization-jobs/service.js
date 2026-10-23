@@ -759,6 +759,10 @@ export async function submitInterviewFeedback(interviewId,userId,input,requestId
  return withTransaction(async db=>{
   const p=(await db.query("select jp.*,ji.application_id,a.job_id from job_interview_participant jp join job_interview ji on ji.id=jp.interview_id join job_application a on a.id=ji.application_id where ji.id=$1 and jp.user_id=$2 and jp.role_code='interviewer'",[interviewId,userId])).rows[0];
   if(!p) throw error(403,"Only assigned interviewers can submit feedback.","FORBIDDEN");
+  if(input.scorecardId){
+   const scorecard=(await db.query("select id from job_interview_scorecard where id=$1 and job_id=$2 and active=true",[input.scorecardId,p.job_id])).rows[0];
+   if(!scorecard)throw error(400,"The selected scorecard is not active for this interview's job.","SCORECARD_SCOPE");
+  }
   const recommendation=String(input.recommendation ?? "no_decision");
   const allowedRecommendations=["strong_yes","yes","mixed","no","strong_no","no_decision","advance"];
   if(!allowedRecommendations.includes(recommendation)) throw error(400,"Unsupported interview recommendation.","VALIDATION_ERROR");

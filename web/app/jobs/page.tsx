@@ -122,21 +122,27 @@ export default function Jobs(){
    finally{setApplyingId("");}
  }
 
- async function submitFormalApplication(job:Job){
-   if(!token){setNotice("Sign in to start a formal application. Public interest intake remains available separately.");return;}
-   setApplyingId(job.id);setError("");setNotice("");
-   try{
-     let draftId=draftIds[job.id];
-     if(!draftId){
-       const draft=await api<{id:string}>(`/api/v1/jobs/${encodeURIComponent(job.id)}/application-drafts`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
-       draftId=draft.id;setDraftIds(current=>({...current,[job.id]:draftId!}));
-     }
-     await api(`/api/v1/job-applications/${encodeURIComponent(draftId)}/submit`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
-     setNotice("Formal application submitted. Its status is available in application tracking.");
-     setDraftIds(current=>{const next={...current};delete next[job.id];return next;});
-   }catch(e){setError(e instanceof ApiError?e.message:"We couldn't submit the formal application. If eligibility needs review, the draft remains available in this session.");}
-   finally{setApplyingId("");}
- }
+  async function submitFormalApplication(job:Job){
+    if(!token){setNotice("Sign in to start a formal application. Public interest intake remains available separately.");return;}
+    if(applyingId)return;
+    setApplyingId(job.id);setError("");setNotice("");
+    try{
+      let draftId=draftIds[job.id];
+      if(!draftId){
+        const draft=await api<{id:string}>(`/api/v1/jobs/${encodeURIComponent(job.id)}/application-drafts`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+        draftId=draft.id;setDraftIds(current=>({...current,[job.id]:draftId!}));
+      }
+      const submitted=await api<{status?:string;tracking_reference?:string|null}>(`/api/v1/job-applications/${encodeURIComponent(draftId)}/submit`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+      setNotice(`Formal application status: ${humanStatus(submitted.status||"submitted")}.${submitted.tracking_reference?` Reference ${submitted.tracking_reference}.`:""} Open application tracking for the next steps.`);
+      setDraftIds(current=>{const next={...current};delete next[job.id];return next;});
+    }catch(e){
+      if(e instanceof ApiError&&e.code==="INVALID_STATE"){
+        setDraftIds(current=>{const next={...current};delete next[job.id];return next;});
+        setNotice("This application is no longer a draft. It may already have been submitted. Check application tracking before trying again.");
+      }else setError(e instanceof ApiError?e.message:"We couldn't confirm the formal application outcome. Check application tracking before retrying so you do not duplicate the application.");
+    }finally{setApplyingId("");}
+  }
+
  async function toggleDetails(job:Job){
    const isOpen=Boolean(expanded[job.id]);
    if(isOpen){setExpanded(current=>({...current,[job.id]:false}));return;}
@@ -203,7 +209,7 @@ export default function Jobs(){
      </Card>
      <div id={`${jobsId}-cards`} className="grid">
        {error&&<div className="form-error" role="alert">{error}<button className="btn btn-ghost" onClick={()=>void loadJobs(filters,page)} type="button" disabled={loading} style={{marginLeft:8}}>{loading?"Checking opportunities…":"Retry loading opportunities"}</button></div>}
-       {notice&&<p className="muted" aria-live="polite" aria-atomic="true">{notice}{!token&&<a href="/login?next=/jobs"> Sign in</a>}</p>}
+       {notice&&<p className="muted" aria-live="polite" aria-atomic="true">{notice}{(notice.includes("application tracking")||notice.includes("Check application tracking"))&&token?<a className="btn btn-ghost" href="/track" style={{marginLeft:8}}>Open application tracking</a>:null}{!token&&<a href="/login?next=/jobs"> Sign in</a>}</p>}
        {loading&&<Card><OperationStatus state="loading" title="Loading current opportunities" detail="We’re retrieving published jobs that match your search and account access. Your saved drafts and applications are not being changed." /></Card>}
        {!loading&&!error&&jobs.length===0&&<Card><h2 className="h2">No matching opportunities</h2><p className="muted">There are no published opportunities matching these filters right now. Try clearing filters or check again later.</p><button type="button" className="btn btn-ghost" onClick={()=>{setFilters(initialFilters);void loadJobs(initialFilters)}}>Clear filters</button></Card>}
        {jobs.map(job=><Card key={job.id}>

@@ -1,4 +1,4 @@
-name: PR Quality — parallel diagnostics
+name: PR Quality — pre-deployment checks
 
 on:
   pull_request:
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout exact PR head
+      - name: Check out exact revision
         uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -32,7 +32,7 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install locked dependencies
         run: npm ci
-      - name: Lint all JS/TS application and test sources
+      - name: Lint application and test sources
         run: npx --yes @biomejs/biome@2.2.4 check --max-diagnostics=5000 --formatter-enabled=false web/app web/components web/lib web/server.js web/next.config.js web/tailwind.config.ts src test e2e scripts server.js
 
   typecheck:
@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout exact PR head
+      - name: Check out exact revision
         uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -54,9 +54,9 @@ jobs:
         run: npx --no-install tsc --noEmit --pretty false -p web/tsconfig.json
 
   backend-tests:
-    name: Backend tests (isolated PostgreSQL)
+    name: Backend tests (disposable PostgreSQL)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:16
@@ -76,8 +76,10 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/mpa_test
       JWT_SECRET: mpa-ci-only-jwt-secret-at-least-32-characters-long
       DB_POOL_MAX: 5
+      MIGRATION_CHECK_EXPECTED_DATABASE: mpa_test
+      MIGRATION_CHECK_ALLOW_ROLLBACK: YES
     steps:
-      - name: Check out exact PR head
+      - name: Check out exact revision
         uses: actions/checkout@v4
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
@@ -91,10 +93,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
-      - name: Verify test database connection
-        run: psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'select current_database(), current_user;'
-      - name: Apply migrations to disposable CI database only
+      - name: Verify disposable database identity
+        run: |
+          set -euo pipefail
+          test "$(psql "$DATABASE_URL" -X -A -t -v ON_ERROR_STOP=1 -c 'select current_database()')" = "mpa_test"
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'select current_database(), current_user;'
+      - name: Apply repository migrations to disposable CI database
         run: npm run migrate
+      - name: Verify migration compatibility in rollback-only transaction
+        run: npm run check:migrations:rollback
       - name: Run every backend test file
         shell: bash
         run: |
@@ -109,11 +116,11 @@ jobs:
           node --test "${TEST_FILES[@]}"
 
   production-build:
-    name: Next.js production build
+    name: Next.js production build (no deployment)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Checkout exact PR head
+      - name: Check out exact revision
         uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -128,3 +135,11 @@ jobs:
           NEXT_TELEMETRY_DISABLED: "1"
           API_SERVER_BASE_URL: http://127.0.0.1:3000
         run: npm run web:build
+      - name: Verify build output exists
+        working-directory: web
+        run: |
+          set -euo pipefail
+          test -s .next/BUILD_ID
+          test -s .next/routes-manifest.json
+          test -s .next/build-manifest.json
+          echo "Production build artifacts exist. No deployment or upload is performed."

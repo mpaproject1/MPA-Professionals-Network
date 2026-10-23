@@ -18,7 +18,7 @@ type OrganizationOffer={id:string;organization_id:string;organization_name:strin
 type Organization={id:string;display_name:string;verification_status:string};
 type OrganizationRequest={id:string;offer_id:string;offer_title:string;organization_name:string;requester_user_id:string;requester_name?:string;message:string;status:string;is_requester:boolean;response_note?:string|null};
 function createSubmissionKey():string{if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function")throw new Error("Secure submission is unavailable in this browser. Please reload and try again.");return crypto.randomUUID()+crypto.randomUUID();}
-type RequestResult={id:string;status:string;goals?:string;created_at?:string;preferred_mentor_user_id?:string|null};
+type RequestResult={id:string;status:string;goals?:string;created_at?:string;preferred_mentor_user_id?:string|null;nextAction?:string};
 type MatchOffer={id:string;request_id:string;goals:string;mentee_name:string;status:string};
 type MentorshipRecord={id:string;mentor_user_id:string;mentee_user_id:string;mentor_name:string;mentee_name:string;goals:string;status:string;outcome_summary?:string|null};
 type MentorCandidate={mentorUserId:string;displayName:string;score:number;reasons:string[]};

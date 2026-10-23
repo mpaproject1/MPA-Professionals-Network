@@ -6,6 +6,10 @@ import {Badge, Card} from "../../../components/ui";
 import {ApiError,api} from "../../../lib/api";
 
 type Mentor={user_id:string;display_name:string;headline:string};
+function createSubmissionKey(): string {
+ if (typeof crypto === "undefined" || typeof crypto.randomUUID !== "function") throw new Error("Secure submission is unavailable in this browser. Please reload the page and try again.");
+ return crypto.randomUUID() + crypto.randomUUID();
+}
 export default function PublicMentorshipApply(){
  const [mentors,setMentors]=useState<Mentor[]>([]); const [mentorId,setMentorId]=useState(""); const [form,setForm]=useState({contactName:"",contactEmail:"",contactPhone:"",intent:"",consent:false}); const [result,setResult]=useState<any>(null); const [error,setError]=useState(""); const [errorReference,setErrorReference]=useState(""); const [submitting,setSubmitting]=useState(false); const [idempotencyKey,setIdempotencyKey]=useState(""); const [mentorsError,setMentorsError]=useState("");
  async function loadMentors(){setMentorsError("");try{const x=await api<Mentor[]>("/api/v1/mentors");setMentors(Array.isArray(x)?x:[])}catch{setMentorsError("Mentor options could not be loaded. You can retry, or continue without choosing a specific mentor.");setMentors([])}}

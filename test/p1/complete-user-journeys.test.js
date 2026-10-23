@@ -212,8 +212,12 @@ test("Gate 2: mentorship offer is reviewed, matched, accepted, scheduled, comple
  assert.ok(matches.some(x=>x.mentorUserId===mentor));
  const proposed=await journeys.proposeMentorMatch(request.id,mentor,mentee,"gate2-mentorship-propose");
  assert.equal(proposed.status,"proposed");
- assert.equal((await journeys.respondToMatch(proposed.id,mentor,"accepted","gate2-mentorship-accept")).status,"accepted");
- const engagement=(await journeys.listMyMentorships(mentee)).find(x=>x.mentor_user_id===mentor);
+ const mentorResponse=await journeys.respondToMatch(proposed.id,mentor,"accepted","gate2-mentorship-accept");
+ assert.equal(mentorResponse.status,"accepted");
+ assert.equal((await getPool().query("select count(*)::int count from mentorship where request_id=$1",[request.id])).rows[0].count,0,"mentor acceptance alone must not activate the relationship");
+ const menteeResponse=await journeys.respondToMenteeMatch(proposed.id,mentee,"accepted","","gate2-mentorship-mentee-accept");
+ assert.equal(menteeResponse.mentee_consent_status,"accepted");
+ const engagement=(await journeys.listMyMentorships(mentee)).find(x=>x.mentor_user_id===mentor&&x.request_id===request.id);
  assert.ok(engagement);assert.equal(engagement.status,"active");
  const sessionStart=start.toISOString(),sessionEnd=new Date(start.getTime()+60*60*1000).toISOString();
  const session=await journeys.createMentorshipSession(engagement.id,mentor,{scheduledStartAt:sessionStart,scheduledEndAt:sessionEnd,mode:"remote",agenda:"Review the discovery plan"},"gate2-mentorship-session");

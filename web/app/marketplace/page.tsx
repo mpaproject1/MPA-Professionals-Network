@@ -10,7 +10,7 @@ const primaryPathways=[
 ];
 const otherPathways=[
  {href:"/jobs",title:"Careers and opportunities",description:"Browse published opportunities and continue through the relevant application workflow.",action:"Browse opportunities"},
- {href:"/organizations",title:"Organizations",description:"Explore public information from participating organizations.",action:"Discover organizations"},
+ {href:"/organizations",title:"Organization workspace",description:"If you manage an organization, open its workspace to manage approved profile details and recruitment tasks.",action:"Open workspace"},
  {href:"/saved",title:"Saved items",description:"Return to services, mentors and opportunities you have saved.",action:"View saved items"}
 ];
 export default function MarketplacePage(){return <main className="mx-auto grid w-full max-w-7xl px-4 py-6 sm:px-6" style={{gap:28}}>

@@ -26,7 +26,7 @@ async function logAudit(db,actorId,action,resourceId,requestId,metadata={}){
 }
 async function assertConversationScope(db,actorId,id,canManageAll=false,lock=false){
  if(!actorId) throw httpError("A signed-in support identity is required.",403,"FORBIDDEN");
- const row=(await db.query(`select id,assigned_to,status from support_conversation where id=$1${lock?" for update":""}`,[id])).rows[0];
+ const row=(await db.query(`select id,public_reference,assigned_to,status from support_conversation where id=$1${lock?" for update":""}`,[id])).rows[0];
  if(!row) throw httpError("Inquiry not found.",404,"NOT_FOUND");
  if(!canManageAll && row.assigned_to && row.assigned_to!==actorId) throw httpError("This inquiry is assigned to another support colleague. Ask a support manager if reassignment is needed.",403,"FORBIDDEN");
  return row;

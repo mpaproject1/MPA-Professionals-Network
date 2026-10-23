@@ -110,7 +110,7 @@ export async function adminListConversations(filters={}){
  if(!actorId) throw httpError("A signed-in support identity is required.",403,"FORBIDDEN");
  const canViewAll=filters.canViewAll===true;
  const limit=Math.max(1,Math.min(100,Number.parseInt(filters.limit||"50",10)||50));
- const r=await db.query(`select c.id,c.public_reference,c.user_id,c.contact_name,c.contact_email,c.contact_phone,c.preferred_contact,c.consent_to_contact,c.page_path,c.status,c.last_question,c.created_at,c.updated_at,c.assigned_to,c.resolved_at,cat.name as category_name,
+ const r=await db.query(`select c.id,c.public_reference,c.user_id,case when c.consent_to_contact then c.contact_name else null end as contact_name,case when c.consent_to_contact then c.contact_email else null end as contact_email,case when c.consent_to_contact then c.contact_phone else null end as contact_phone,case when c.consent_to_contact then c.preferred_contact else null end as preferred_contact,c.consent_to_contact,c.page_path,c.status,c.last_question,c.created_at,c.updated_at,c.assigned_to,c.resolved_at,cat.name as category_name,
  coalesce(json_agg(json_build_object('id',m.id,'senderType',m.sender_type,'message',m.message_text,'createdAt',m.created_at,'knowledgeArticleId',m.knowledge_article_id) order by m.created_at) filter(where m.id is not null),'[]'::json) as messages
  from support_conversation c left join support_knowledge_category cat on cat.id=c.category_id left join support_message m on m.conversation_id=c.id
  where ($1::text is null or c.status=$1) and ($3::boolean=true or c.assigned_to is null or c.assigned_to=$2)

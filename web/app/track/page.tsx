@@ -6,8 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
 import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
-import { useUiStore } from "../../lib/store";
 import { humanStatus } from "../../lib/status-labels";
+import { useUiStore } from "../../lib/store";
 
 type Item = {
   id: string;

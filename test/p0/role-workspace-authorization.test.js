@@ -162,6 +162,7 @@ test("support escalation, priority and waiting states are persisted and routed",
   const support = read("src/platform/support-bot.js");
   const server = read("server.js");
   const migration = read("db/migrations/20261023_support_inquiry_workflow.sql");
+  const supportUi = read("web/app/admin/support/page.tsx");
   assert.match(support, /export async function escalateConversation/);
   assert.match(support, /support\.inquiry_escalated/);
   assert.match(support, /support_conversation_workflow/);
@@ -171,4 +172,9 @@ test("support escalation, priority and waiting states are persisted and routed",
   assert.match(migration, /priority text not null default 'normal'/);
   assert.match(migration, /waiting_on text not null default 'none'/);
   assert.match(migration, /escalated_at timestamptz/);
+  assert.match(support, /escalatedOnly/);
+  assert.match(support, /support.inquiry_escalated/);
+  assert.match(supportUi, /Transfer inquiry/);
+  assert.match(supportUi, /Escalate to manager/);
+  assert.match(supportUi, /Escalated queue/);
 });

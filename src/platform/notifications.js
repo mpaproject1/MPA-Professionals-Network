@@ -40,6 +40,7 @@ function defaultActionUrl(category,resourceType,payload={}){
  }
  const routes={membership:"/membership",verification:"/verification",opportunities:"/jobs",recruitment:"/jobs",organizations:"/organizations",mentorship:"/mentorship",services:"/services",security:"/profile",system:"/dashboard"};
  if(resourceType==="job_application"&&payload.audience==="employer")return "/recruitment";
+ if(resourceType==="job_application")return "/track";
  if(resourceType==="organization_verification_case")return "/organizations";
  return routes[category]||null;
 }

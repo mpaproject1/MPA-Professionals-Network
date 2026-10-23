@@ -5,8 +5,8 @@ import {useEffect,useId,useState} from "react";
 import {Badge} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
-import styles from "./dashboard.module.css";
 import { humanStatus } from "../../lib/status-labels";
+import styles from "./dashboard.module.css";
 
 type Profile={user_id:string;email:string;display_name?:string;first_name?:string;last_name?:string;completion_percent?:number;status?:string;roles?:string[];has_active_membership?:boolean;visibility?:string};
 type MembershipApplication={id:string;tracking_reference?:string;application_type?:string;status:string;updated_at?:string;fee_snapshot?:{amount?:number|string;currency?:string;productName?:string;productCode?:string};payment?:{status?:string;amount?:number|string;currency?:string;verified_at?:string}|null;latest_correction?:{status?:string;reviewer_note?:string;requested_fields?:unknown}|null};

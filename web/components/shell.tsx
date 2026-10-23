@@ -1,5 +1,5 @@
 "use client";
-import {Bell,Bookmark, BriefcaseBusiness,Building2,CheckCircle2,Home,KeyRound,LayoutDashboard,LogOut,MessageSquareText,Moon,MoreHorizontal,Network,ShieldCheck,Sun,UserRound,WifiOff,X} from "lucide-react";
+import {Bell,Bookmark, BriefcaseBusiness,Building2,CheckCircle2,Home,KeyRound,LayoutDashboard,LogOut,MessageSquareText,Search,Moon,MoreHorizontal,Network,ShieldCheck,Sun,UserRound,WifiOff,X} from "lucide-react";
 import Link from "next/link";
 import {usePathname,useRouter} from "next/navigation";
 import {useEffect,useId,useState} from "react";

@@ -52,3 +52,39 @@ test("verification claim, evidence, and claim-status writes enforce assignment a
   const server = read("server.js");
   assert.equal((server.match(/verification\.getCase\(parts\[4\],identity\.sub\)/g) || []).length, 3, "case detail, claim, and evidence routes must pass the authenticated viewer");
 });
+test("verification manager permission is honored by service-level assigned-reviewer checks", () => {
+  const service = read("src/verification/service.js");
+  assert.match(service, /r\.role_code='system_admin'\) or exists\(select 1 from app_user_permission up where up\.user_id=\$1 and up\.permission_code='verification\.manage'/);
+});
+
+test("support inquiry lists and actions are scoped to unassigned or self-assigned work unless explicitly authorized for all", () => {
+  const support = read("src/platform/support-bot.js");
+  const server = read("server.js");
+  assert.match(support, /filters\.actorId/);
+  assert.match(support, /c\.assigned_to is null or c\.assigned_to=\$2/);
+  assert.match(support, /async function assertConversationScope/);
+  assert.match(support, /current\.assigned_to!==actorId/);
+  assert.match(support, /assertConversationScope\(db,actorId,id,canManageAll,true\)/);
+  assert.match(server, /adminListConversations\(\{actorId:identity\.sub,canViewAll/);
+  assert.match(server, /adminUpdateConversation\(identity\.sub,parts\[5\],await body\(req\),requestId,canManageAll\)/);
+  assert.match(server, /adminReplyToConversation\(identity\.sub,parts\[5\],await body\(req\),requestId,canManageAll\)/);
+});
+
+test("membership expiry is persisted through an auditable batch runner", () => {
+  const service = read("src/membership/service.js");
+  const runner = read("scripts/expire-memberships.js");
+  const packageJson = JSON.parse(read("package.json"));
+  assert.match(service, /export async function expireDueMemberships\(batchSize=500\)/);
+  assert.match(service, /status='active' and end_date is not null and end_date<current_date/);
+  assert.match(service, /'membership\.expired','membership_record'/);
+  assert.match(runner, /expireDueMemberships/);
+  assert.equal(packageJson.scripts["memberships:expire"], "node scripts/expire-memberships.js");
+});
+
+test("professional profile edits do not require active membership unless a membership-gated visibility change is requested", () => {
+  const policy = read("src/platform/identity-policy.js");
+  const membership = read("src/membership/service.js");
+  assert.match(policy, /export async function assertProfessionalProfileCapability\(db,userId,\{ requireActiveMembership = false \} = \{\}\)/);
+  assert.match(membership, /await assertProfessionalProfileAccess\(db,userId\);/);
+  assert.match(membership, /if\(input\.visibility!==undefined&&input\.visibility!==null&&String\(input\.visibility\)\.trim\(\)!==\"\"\)\{\s*await assertProfessionalProfileAccess\(db,userId,\{requireActiveMembership:true\}\);/);
+});

@@ -4,6 +4,7 @@ import { ArrowRight, RefreshCw, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
+import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
 import { humanStatus } from "../../lib/status-labels";
@@ -161,11 +162,12 @@ export default function Track() {
           <p className="muted">See the latest status, last update and next step for your own applications.</p>
         </div>
         <button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={loading}>
-          <RefreshCw size={16} /> {loading ? "Refreshing…" : "Refresh"}
+          <RefreshCw size={16} /> {loading ? "Checking status…" : "Check latest status"}
         </button>
       </header>
 
-      {error && <FormFeedback kind="error" message={error} onRetry={() => void load()} retryLabel="Reload tracking" />}
+      {error && <FormFeedback kind="error" message={error} onRetry={() => void load()} retryLabel="Check status again" />}
+      {loading && data && <OperationStatus state="loading" title="Checking for the latest updates" detail="We’re retrieving your current application statuses and next steps. You can keep this page open; actions that depend on this refresh are temporarily paused." />}
 
       <div className="grid grid-3">
         {([
@@ -181,7 +183,7 @@ export default function Track() {
       </div>
 
       <section className="grid" aria-label="Application progress" style={{ gap: 12 }}>
-        {loading && !data && <Card><p className="muted">Loading your application progress…</p></Card>}
+        {loading && !data && <Card><OperationStatus state="loading" title="Loading your application progress" detail="We’re gathering your membership, organization and job application updates. Your saved applications are not being changed." /></Card>}
         {(data?.items || []).map((item) => {
           const action = actionFor(item);
           return (
@@ -220,7 +222,7 @@ export default function Track() {
         {data?.hasMore && (
           <div className="row" style={{ justifyContent: "center", flexWrap: "wrap" }}>
             <button className="btn btn-ghost" type="button" onClick={() => void load(true)} disabled={loading}>
-              {loading ? "Loading…" : "Load more applications"}
+              {loading ? "Loading applications…" : "Load more applications"}
             </button>
             <span className="muted">Showing {data.items.length} of {data.summary.total}</span>
           </div>

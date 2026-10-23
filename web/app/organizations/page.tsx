@@ -9,6 +9,7 @@ import {
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
 import { JourneyGuide } from "../../components/journey-guide";
+import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
@@ -703,10 +704,10 @@ export default function Organizations() {
                 disabled={loading}
               >
                 <RefreshCw size={16} />
-                {loading ? "Loading…" : "Refresh"}
+                {loading ? "Checking organizations…" : "Check latest organizations"}
               </button>
             </div>
-            {loading && <p className="muted">Loading your organizations…</p>}
+            {loading && <OperationStatus state="loading" title="Checking your organizations" detail="We’re retrieving organizations linked to your signed-in account. This does not change your organization records." /> }
             {!loading && organizations.length === 0 && (
               <p className="muted">
                 No organization is linked to this account yet. Use registration

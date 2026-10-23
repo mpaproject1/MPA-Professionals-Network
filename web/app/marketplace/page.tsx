@@ -1,5 +1,5 @@
 "use client";
-import {ArrowRight,BriefcaseBusiness,Building2,Compass,HeartHandshake,LockKeyhole,Search,Users,Workflow} from "lucide-react";
+import {ArrowRight,LockKeyhole,Search,Users,Workflow} from "lucide-react";
 import Link from "next/link";
 import {Card} from "../../components/ui";
 

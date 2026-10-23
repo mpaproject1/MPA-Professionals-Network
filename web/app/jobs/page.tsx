@@ -203,7 +203,7 @@ export default function Jobs(){
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Work mode<input value={filters.workMode} onChange={e=>setFilters({...filters,workMode:e.target.value})} placeholder="e.g. remote"/></label>
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Seniority<input value={filters.seniority} onChange={e=>setFilters({...filters,seniority:e.target.value})} placeholder="Seniority level"/></label>
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Scope<select value={filters.postingScope} onChange={e=>setFilters({...filters,postingScope:e.target.value})}><option value="">All opportunities visible to me</option><option value="public">Public</option><option value="partner_network">Member network</option><option value="organization_internal">Organization internal</option></select></label>
-         <button className="btn btn-primary" type="submit" disabled={loading} style={{width:"100%",marginTop:18}}>{loading?"Searching…":"Apply filters"}</button>
+         <button className="btn btn-primary" type="submit" disabled={loading} style={{width:"100%",marginTop:18}}>{loading?"Finding matching jobs…":"Apply filters"}</button>
          <button className="btn btn-ghost" type="button" onClick={()=>{setFilters(initialFilters);void loadJobs(initialFilters,0)}} disabled={loading} style={{width:"100%",marginTop:8}}>Clear filters</button>
          <button className="btn btn-ghost" type="button" onClick={()=>void createAlert()} disabled={creatingAlert||loading} style={{width:"100%",marginTop:8}}>{creatingAlert?"Saving alert…":"Save job alert"}</button>
        </form>

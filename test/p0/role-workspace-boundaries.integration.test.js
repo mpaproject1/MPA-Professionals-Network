@@ -66,6 +66,26 @@ test("organization full detail and roster are scoped to the correct organization
   );
 });
 
+test("recruiter and employer resources reject cross-organization job and application IDs", async () => {
+  const suffix = randomUUID().replace(/-/g, "");
+  const ownerA = await account(suffix + "ra");
+  const ownerB = await account(suffix + "rb");
+  const applicant = await account(suffix + "rc");
+  const orgA = await organizationJobs.registerOrganization(ownerA, { legalName: `Cross Org A ${suffix}`, displayName: `Cross Org A ${suffix.slice(0, 8)}` }, `cross-org-a-${suffix}`);
+  const orgB = await organizationJobs.registerOrganization(ownerB, { legalName: `Cross Org B ${suffix}`, displayName: `Cross Org B ${suffix.slice(0, 8)}` }, `cross-org-b-${suffix}`);
+  const jobA = await organizationJobs.createJob(orgA.id, ownerA, { title: "Boundary test A", description: "Test-only vacancy A" }, `job-a-${suffix}`);
+  const jobB = await organizationJobs.createJob(orgB.id, ownerB, { title: "Boundary test B", description: "Test-only vacancy B" }, `job-b-${suffix}`);
+  const applicationA = await organizationJobs.saveApplicationDraft(jobA.id, applicant, { coverLetter: "Test-only draft" }, `application-a-${suffix}`);
+
+  await assert.rejects(organizationJobs.listOrganizationJobs(orgA.id, ownerB), hasStatus(403));
+  await assert.rejects(organizationJobs.listCandidates(jobA.id, ownerB), hasStatus(403));
+  await assert.rejects(organizationJobs.listJobApplications(jobA.id, ownerB), hasStatus(403));
+  await assert.rejects(organizationJobs.listApplicationNotes(applicationA.id, ownerB), hasStatus(403));
+  await assert.rejects(organizationJobs.updateCandidate(jobB.id, applicationA.id, ownerB, { status: "screening" }, `cross-application-${suffix}`), hasStatus(404));
+  await assert.rejects(organizationJobs.addJobTeamMember(jobA.id, ownerB, { userId: ownerB, roleCode: "recruiter" }, `cross-team-${suffix}`), hasStatus(403));
+  await assert.rejects(organizationJobs.scheduleInterview(applicationA.id, ownerB, { scheduledStart: "2026-11-01T10:00:00Z", scheduledEnd: "2026-11-01T10:30:00Z" }, `cross-interview-${suffix}`), hasStatus(403));
+});
+
 test("reviewer queue, case detail and write actions enforce assigned-case boundaries in the database", async () => {
   const suffix = randomUUID().replace(/-/g, "");
   const subjectA = await activeMember(suffix + "f");

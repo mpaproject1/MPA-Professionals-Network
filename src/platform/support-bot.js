@@ -176,11 +176,12 @@ export async function escalateConversation(actorId,id,input,requestId,canManageA
  return withTransaction(async db=>{
   const current=await assertConversationScope(db,actorId,id,canManageAll,true);
   if(["resolved","closed"].includes(current.status))throw httpError("Reopen the inquiry before escalating a closed or resolved case.",409,"INVALID_STATE");
+  const assigned=(await db.query("update support_conversation set assigned_to=coalesce(assigned_to,$2),updated_at=now() where id=$1 returning assigned_to",[id,actorId])).rows[0];
   const row=(await db.query("insert into support_conversation_workflow(conversation_id,priority,waiting_on,escalated_at,escalated_by,escalation_reason,updated_by) values($1,$2,'internal',now(),$3,$4,$3) on conflict(conversation_id) do update set priority=$2,waiting_on='internal',escalated_at=now(),escalated_by=$3,escalation_reason=$4,updated_by=$3,updated_at=now() returning *",[id,priority,actorId,reason])).rows[0];
   await logAudit(db,actorId,"support.inquiry_escalated",id,requestId,{fromStatus:current.status,priority,reason,assignedTo:current.assigned_to});
   const managers=(await db.query("select distinct u.id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('system_admin','admin','platform_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='support.inquiries.manage'))")).rows;
   for(const manager of managers)await queueWorkflowEmail(db,manager.id,"support.inquiry_escalated",{category:"support",title:"Support inquiry escalated",publicReference:current.public_reference||id,status:current.status,priority,message:"A support inquiry has been escalated for manager attention.",nextAction:"Review the inquiry, its assignment and escalation reason, then record the next decision.",actionUrl:"/admin/support",actionRequired:true,eventVersion:row.updated_at?.toISOString?.()||String(row.updated_at)},"support_bot",id);
-  return {id,publicReference:current.public_reference||null,status:current.status,priority:row.priority,waitingOn:row.waiting_on,escalatedAt:row.escalated_at,escalationReason:row.escalation_reason};
+  return {id,publicReference:current.public_reference||null,status:current.status,priority:row.priority,waitingOn:row.waiting_on,escalatedAt:row.escalated_at,escalationReason:row.escalation_reason,assignedTo:assigned.assigned_to};
  });
 }
 

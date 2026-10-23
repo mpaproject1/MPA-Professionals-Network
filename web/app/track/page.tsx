@@ -7,6 +7,7 @@ import { FormFeedback } from "../../components/form-feedback";
 import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
+import { humanStatus } from "../../lib/status-labels";
 
 type Item = {
   id: string;
@@ -120,7 +121,7 @@ export default function Track() {
       <div className="auth-page">
         <Card>
           <div className="eyebrow">Private inquiry tracking</div>
-          <h1 className="h1">{publicInquiry.jobTitle || "Mentorship"} · {publicInquiry.status}</h1>
+          <h1 className="h1">{publicInquiry.jobTitle || "Mentorship"} · {humanStatus(publicInquiry.status)}</h1>
           <p className="muted">Reference <b>{publicInquiry.reference}</b>. {publicInquiry.nextStep}</p>
           <div className="tracker-line">
             <span className="timeline-dot" />
@@ -192,7 +193,7 @@ export default function Track() {
                   <p className="muted" style={{ margin: 0 }}>{item.subtitle}</p>
                   <p className="muted" style={{ margin: "4px 0 0" }}>Reference: {item.trackingReference || "Not assigned yet"}</p>
                 </div>
-                <span className="badge">{item.statusLabel || item.status.replaceAll("_", " ")}</span>
+                <span className="badge">{item.statusLabel || humanStatus(item.status)}</span>
               </div>
               <div className="track-card-grid">
                 <div><span>Last updated</span><b>{dateLabel(item.updatedAt, true)}</b></div>
@@ -200,7 +201,7 @@ export default function Track() {
               </div>
               <div className="tracker-line">
                 <span className="timeline-dot" />
-                <div><b>{item.statusLabel || item.status}</b><p className="muted">Submitted {dateLabel(item.submittedAt)}</p></div>
+                <div><b>{item.statusLabel || humanStatus(item.status)}</b><p className="muted">Submitted {dateLabel(item.submittedAt)}</p></div>
               </div>
               {action && <div className="row" style={{ marginTop: 12 }}><Link className="btn btn-ghost" href={action.href}>{action.label} <ArrowRight size={15} /></Link></div>}
             </Card>

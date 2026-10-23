@@ -1,5 +1,6 @@
 -- Explicit two-party consent for coordinator-proposed mentorship matches.
--- Existing active relationships are preserved as already consented.
+-- Preserve consent only where an existing active relationship proves the match was accepted.
+-- Pending, declined, cancelled, or otherwise historical matches must not be silently consented.
 alter table mentorship_match
   add column if not exists mentee_consent_status text not null default 'pending',
   add column if not exists mentee_responded_at timestamptz,
@@ -18,6 +19,7 @@ from mentorship m
 where m.request_id=mm.request_id
   and m.mentor_user_id=mm.mentor_user_id
   and m.mentee_user_id=mm.mentee_user_id
+  and m.status='active'
   and mm.mentee_consent_status='pending';
 
 create index if not exists ix_mentorship_match_mentee_consent

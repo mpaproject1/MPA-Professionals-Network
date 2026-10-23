@@ -106,26 +106,38 @@ export function allowedMatchTransition(from,to){ return (MATCH_TRANSITIONS[from]
 const SESSION_TRANSITIONS={scheduled:["completed","cancelled","no_show"],completed:[],cancelled:[],no_show:[]};
 export function allowedSessionTransition(from,to){ return (SESSION_TRANSITIONS[from]||[]).includes(to); }
 
-export async function createServiceListing(userId,input,requestId){
-  return withTransaction(async db=>{
-    const organizationId=input.organizationId||null;
-    if(organizationId){
-      let membership;
-      try { membership=await assertOrganizationCapability(db,organizationId,userId); }
-      catch(cause) { throw error(cause.statusCode||403,cause.message||"An active organization owner or authorized manager is required to create this listing.",cause.code||"ORGANIZATION_FORBIDDEN"); }
-      if(membership.verification_status!=="verified") throw error(409,"The organization must be verified before it can publish a service listing.","ORGANIZATION_NOT_VERIFIED");
-    } else {
-      await requirePersonalProfessionalCapability(db,userId);
-    }
-    if(!input.title||!input.description||!input.serviceCategory) throw error(400,"title, description and serviceCategory are required.","VALIDATION_ERROR");
-    const pricing=input.pricingModel||"quote";
-    if(!["free","fixed","hourly","quote"].includes(pricing)) throw error(400,"Unsupported pricing model.","VALIDATION_ERROR");
-    const row=(await db.query("insert into service_listing(provider_user_id,organization_id,title,description,service_category,delivery_mode,location_label,pricing_model,price_amount,currency,visibility,max_active_requests) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *",[userId,organizationId,input.title,input.description,input.serviceCategory,input.deliveryMode||"remote",input.locationLabel||null,pricing,input.priceAmount??null,input.currency||null,input.visibility||"members",input.maxActiveRequests??null])).rows[0];
-    await audit(db,userId,"service.listing_created","service_listing",row.id,requestId);
-    return row;
-  });
+export async function createServiceListing(userId,input,requestId,idempotencyKey=null){
+ if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
+  throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
+ const organizationId=input.organizationId||null;
+ const normalized={userId,organizationId,title:String(input.title||"").trim(),description:String(input.description||"").trim(),serviceCategory:String(input.serviceCategory||"").trim(),deliveryMode:input.deliveryMode||"remote",locationLabel:input.locationLabel||null,pricingModel:input.pricingModel||"quote",priceAmount:input.priceAmount??null,currency:input.currency||null,visibility:input.visibility||"members",maxActiveRequests:input.maxActiveRequests??null};
+ if(!normalized.title||!normalized.description||!normalized.serviceCategory) throw error(400,"title, description and serviceCategory are required.","VALIDATION_ERROR");
+ if(!["free","fixed","hourly","quote"].includes(normalized.pricingModel)) throw error(400,"Unsupported pricing model.","VALIDATION_ERROR");
+ const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
+ return withTransaction(async db=>{
+  const existing=(await db.query("select * from service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){
+   if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different listing details. Start a new listing before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,idempotent:true,replayed:true,nextAction:existing.status==="published"?"Review the moderation decision before sharing this listing.":"Review the saved draft, then submit it for moderation."};
+  }
+  if(organizationId){
+   let membership;
+   try { membership=await assertOrganizationCapability(db,organizationId,userId); }
+   catch(cause) { throw error(cause.statusCode||403,cause.message||"An active organization owner or authorized manager is required to create this listing.",cause.code||"ORGANIZATION_FORBIDDEN"); }
+   if(membership.verification_status!=="verified") throw error(409,"The organization must be verified before it can publish a service listing.","ORGANIZATION_NOT_VERIFIED");
+  } else {
+   await requirePersonalProfessionalCapability(db,userId);
+  }
+  const row=(await db.query("insert into service_listing(provider_user_id,organization_id,title,description,service_category,delivery_mode,location_label,pricing_model,price_amount,currency,visibility,max_active_requests,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) on conflict do nothing returning *",[userId,organizationId,normalized.title,normalized.description,normalized.serviceCategory,normalized.deliveryMode,normalized.locationLabel,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.visibility,normalized.maxActiveRequests,keyHash,fingerprint])).rows[0];
+  if(!row){
+   const raced=(await db.query("select * from service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+   if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different listing details. Start a new listing before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...raced,idempotent:true,replayed:true,nextAction:"Review the saved draft, then submit it for moderation."};
+  }
+  await audit(db,userId,"service.listing_created","service_listing",row.id,requestId);
+  return {...row,idempotent:false,replayed:false,nextAction:"Review the saved draft, then submit it for moderation."};
+ });
 }
-
 export async function updateServiceListing(listingId,userId,input,requestId){
   return withTransaction(async db=>{
     const row=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];

@@ -41,9 +41,32 @@
 **Not yet addressed / needs verification**
 - Added source-level guards for cross-case claim/evidence references and checklist/appeal evidence IDs; appeal decisions now enforce independent reviewer authority and a required reason. Independent appeal reviewers can open an appealed case only when they are not the subject or original decision maker.
 - Private-file authorization no longer grants every verification reviewer access to every professional evidence file; it checks assigned-case/manager access, with a separate independent-appeal exception.
-- **Still missing:** reference-request create/respond/consent endpoints are not present in the reviewed service/router, and assignment-history UI is not complete. Database/browser validation is still required for all routes and private file downloads.
-- Audit every remaining verification write and evidence-download route against the complete permission matrix.
-- Complete browser/API acceptance for assignment changes, race conditions, private evidence and appeal independence.
+- Added source-level reference workflow: a member can request a reference from an active MPA account; the named referee alone can consent/respond or decline; the assigned reviewer/verification manager can assess a consented response with a required reason. Duplicate open requests are blocked, notifications and audit events are written, and the UI exposes the request, response and assessment steps. External referees without an active MPA account still need an approved invitation path.
+- Added a dedicated assignment-history table and UI showing previous/new reviewer, actor, reason and timestamp. Assignment changes now write a history record.
+- Tightened private portfolio evidence reads so reviewer access requires the file to be attached to evidence for the case the reviewer is assigned to; the independent appeal exception is also limited to evidence attached to the appealed case. Explicit verification-management permission now passes consistently through reviewer API gates and the final decision check. Checklist items must belong to the case program and outcomes are validated.
+- **Still needs validation:** all migration assumptions and existing reference-table constraints must be checked on a safe test database; no migration has been applied and no CI/API/browser tests have run. Verify all verification writes, assignment races, reference consent/revocation, private-file downloads, and appeal independence end to end.
+
+### Member workspace
+
+**Added in source**
+- Added a signed-in `/member` workspace and navigation entry focused on “What should I do next?” with resilient partial loading for the account, own application tracker, saved items, notifications, profile, verification and membership applications.
+- Shows non-members that they can still edit their own profile and use public opportunities; member-only verification is explained at the point of action instead of blocking ordinary profile editing.
+- Links to mentoring, saved items, account security, notifications and application tracking without inventing completion states.
+
+**Still incomplete**
+- A dedicated CV vault and recipient-by-recipient CV approval/revocation screen are not implemented. Existing profile visibility and application-document workflows must not be represented as a complete CV-sharing feature. Add this before claiming the entire requested Member workspace is complete.
+- Validate all loading/empty/error states, role combinations, privacy toggles, and the actual server response contracts in browser/API tests.
+
+### Employment / employer workspace
+
+**Addressed in source**
+- Preserved the existing organization-scoped recruitment page and its verified organization setup, vacancy draft/publish, scoped applicant pipeline, interviews, offers and recruiting summary.
+- Added an entry point to the existing organization mentorship/partnership-program workflow, including requests and persisted accepted/declined/cancelled/completed states.
+- Existing service-level interviewer checks require active organization/team membership and an eligible active application; private application notes remain restricted.
+
+**Still needs validation**
+- Run negative API tests with foreign organization, job, candidate, application and interview IDs; verify every employer role and consent-controlled profile field.
+- Confirm outcome history and partnership request transitions in browser/runtime tests. No employer workflow is being claimed as production-validated.
 
 ### 3. Support Desk
 

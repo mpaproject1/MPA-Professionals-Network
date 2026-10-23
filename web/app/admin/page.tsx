@@ -381,8 +381,8 @@ export default function AdminPage() {
       {tab === "audit" && roles.includes("system_admin") && (
         <Card>
           <div className="h2">Administrative audit history</div>
-          <p className="muted">Read-only record of consequential platform actions. Use the action and resource details to investigate changes; access to this view is restricted by the server.</p>
-          {sectionErrors.includes("audit history") ? <OperationStatus state="error" title="Audit history could not be loaded" detail="Retry after confirming your administrator session and audit permissions." /> : auditEvents.length === 0 ? <p className="muted">No audit events were returned for the current page.</p> : auditEvents.map((event) => (
+          <p className="muted">Read-only view of the latest 100 consequential platform events. Use the action, actor, time and resource details to investigate changes; access is restricted by the server.</p>
+          {sectionErrors.includes("audit history") ? <OperationStatus state="error" title="Audit history could not be loaded" detail="Retry after confirming your administrator session and audit permissions." /> : auditEvents.length === 0 ? <p className="muted">No audit events were returned in the latest 100 records.</p> : auditEvents.map((event) => (
             <div className="case-row" key={event.id}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="row" style={{ gap: 8, flexWrap: "wrap" }}><b>{event.action.replaceAll("_", " ")}</b><Badge>{event.outcome}</Badge></div>

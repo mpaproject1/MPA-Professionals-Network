@@ -10,6 +10,14 @@ alter table verification_reference_request
   add column if not exists reviewed_at timestamptz,
   add column if not exists updated_at timestamptz not null default now();
 
+update verification_reference_request
+   set updated_at=now()
+ where updated_at is null;
+
+alter table verification_reference_request
+  alter column updated_at set default now(),
+  alter column updated_at set not null;
+
 -- Align persisted reference states with the service contract while preserving legacy values.
 alter table verification_reference_request
   drop constraint if exists verification_reference_request_consent_status_check;

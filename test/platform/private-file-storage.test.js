@@ -5,6 +5,7 @@ import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import {closePool, getPool} from "../../src/platform/db.js";
 import {MAX_PRIVATE_UPLOAD_BYTES, readAuthorizedPrivateFile, validatePrivateUploadBytes, validatePrivateUploadName} from "../../src/platform/private-file-storage.js";
+
 async function account(suffix=randomUUID()){
   const digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
   const created=await membership.register({email:`private-file-${suffix}@example.test`,password:"PrivateFileGatePassword!2026",firstName:"Private",lastName:`File${suffix.slice(0,8)}`,phone:`08${digits}`},`private-file-test-${suffix}`);

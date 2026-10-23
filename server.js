@@ -30,6 +30,7 @@ import * as organizationMentorshipOffers from "./src/services-mentorship/organiz
 import * as servicesMentorship from "./src/services-mentorship/service.js";
 import * as talent from "./src/talent/service.js";
 import * as verification from "./src/verification/service.js";
+
 const config=loadConfig();
 const logger=createLogger({level:config.logLevel});
 

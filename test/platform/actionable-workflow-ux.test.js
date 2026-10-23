@@ -21,8 +21,8 @@ test("dashboard and tracker use the shared human-readable status vocabulary", as
     source("../../web/app/track/page.tsx"),
     source("../../web/lib/status-labels.ts"),
   ]);
-  assert.match(dashboard, /import \{ humanStatus \} from "\.\.\/\.\.\/lib\/status-labels"/);
-  assert.match(tracker, /import \{ humanStatus \} from "\.\.\/\.\.\/lib\/status-labels"/);
+  assert.match(dashboard, /import\s*\{\s*humanStatus\s*\}\s*from "\.\.\/\.\.\/lib\/status-labels"/);
+  assert.match(tracker, /import\s*\{\s*humanStatus\s*\}\s*from "\.\.\/\.\.\/lib\/status-labels"/);
   assert.match(dashboard, /humanStatus\(item\.status\)/);
   assert.match(tracker, /humanStatus\(item\.status\)/);
   assert.match(labels, /Awaiting review/);

@@ -2,6 +2,7 @@
 import { AlertTriangle, ArrowDownToLine,CheckCircle2,FileSpreadsheet,ShieldCheck,UploadCloud,} from "lucide-react";
 import { type ChangeEvent, useEffect,useState} from "react";
 import { FormFeedback } from "../../../components/form-feedback";
+import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card} from "../../../components/ui";
 import { ApiError, api} from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
@@ -18,7 +19,7 @@ export default function AdminMembersPage(){
  async function applyImport(){if(!token||!preview)return;setBusy(true);setError("");setNotice("");try{const result=await api<{status:string;appliedCount:number;createdAccounts:number;conflictCount:number;notice:string}>(`/api/v1/admin/members/import/${encodeURIComponent(preview.importId)}/apply`,{method:"POST",body:JSON.stringify({reason})},token);setNotice(`Import processed: ${result.appliedCount} membership record(s) added, ${result.createdAccounts} new account(s) created, ${result.conflictCount} conflict(s) left for review. ${result.notice}`);setPreview(null);setFile(null);}catch(e){setError(e instanceof ApiError||e instanceof Error?e.message:"Import was not confirmed. Refresh the batch before retrying.");}finally{setBusy(false);}}
  async function exportMembers(){if(!token)return;setBusy(true);setError("");try{const p=new URLSearchParams({format:exportFormat,q:query,status});await download(`/api/v1/admin/members/export?${p.toString()}`,token,`mpa-members.${exportFormat==="xlsx"?"xlsx":"csv"}`);setNotice("Member export requested. Handle the downloaded file as confidential personal data.");}catch(e){setError(e instanceof Error?e.message:"Member export failed.");}finally{setBusy(false);}}
  const conflicts=preview?.rows.filter(r=>!r.ready)||[];
- if(!hydrated)return <div className="grid" style={{gap:16}}><h1 className="h1">Member administration</h1><Card>Loading secure member tools…</Card></div>;
+ if(!hydrated)return <div className="grid" style={{gap:16}}><h1 className="h1">Member administration</h1><Card><OperationStatus state="loading" title="Preparing secure member administration" detail="We’re restoring your session before enabling member export and import tools." /></Card></div>;
  if(!token)return <div className="grid" style={{gap:16}}><h1 className="h1">Member administration</h1><Card><p>Sign in with an authorized MPA administrator account to import or export membership records.</p><a className="btn btn-primary" href="/login?next=/admin/members">Sign in</a></Card></div>;
  return <div className="grid" style={{gap:18,minWidth:0}}>
   <AdminPageHeader eyebrow="Administration · Membership" title="Bulk member administration" description="Bring the approved MPA register into one auditable workflow. Download the template, validate and resolve conflicts, then explicitly apply the batch. Existing accounts are matched instead of duplicated." actions={<><a className="btn btn-ghost" href="/admin">Admin home</a><a className="btn btn-ghost" href="/admin/reports">Reports catalogue</a><a className="btn btn-primary" href="/admin/membership-card">Membership card design</a></>}/>

@@ -13,7 +13,7 @@ async function account(suffix) {
     email: `role-boundary-${suffix}@example.test`,
     password: "RoleBoundaryP1Password!2026",
     firstName: "Boundary",
-    lastName: `Test${suffix.slice(0, 8)}`,
+    lastName: `Test${suffix.slice(-8)}`,
     phone: `09${digits}`,
   }, `role-boundary-${suffix}`);
   return result.user.id;

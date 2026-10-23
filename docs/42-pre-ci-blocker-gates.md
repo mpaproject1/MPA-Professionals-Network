@@ -58,6 +58,7 @@ Required evidence includes:
 - cross-organization users cannot download applicant attachments;
 - attachments on draft applications remain inaccessible to hiring teams;
 - assigned-reviewer and organization-scoped access is enforced at the service/API boundary, not only hidden in the UI;
+- reference consent and assessment states satisfy the database check constraints, required referee contact remains populated, assignment history records the actor/reason, and an unassigned reviewer is denied;
 - service completion requires a provider submission followed by requester acceptance, and the audit/status history is persisted.
 
 ## 4. Combined-diff review checklist

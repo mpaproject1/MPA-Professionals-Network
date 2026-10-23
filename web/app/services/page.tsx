@@ -1,5 +1,5 @@
 "use client";
-import {Bookmark,Handshake,MessageSquareText,RefreshCw,Star} from "lucide-react";
+import {Bookmark,Handshake,MessageSquareText,RefreshCw,ShieldCheck,Star} from "lucide-react";
 import Link from "next/link";
 import {type FormEvent,useCallback,useEffect,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";

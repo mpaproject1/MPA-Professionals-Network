@@ -189,3 +189,56 @@ test("private verification files require case assignment, manager authority, or 
   assert.match(verification, /independentAppealReviewer/);
   assert.match(verification, /pendingIndependentAppeal/);
 });
+
+test("reference workflow requires active membership for requesters, referee consent, assigned reviewer assessment, and assignment history", () => {
+  const service = read("src/verification/service.js");
+  const server = read("server.js");
+  const migration = read("db/migrations/20261023110000_verification_reference_and_assignment_history.sql");
+  const ui = read("web/app/verification/page.tsx");
+  assert.match(service, /export async function requestReference/);
+  assert.match(service, /export async function listMyReferenceRequests/);
+  assert.match(service, /export async function respondReferenceRequest/);
+  assert.match(service, /export async function reviewReferenceRequest/);
+  assert.match(service, /await assertMemberVerificationAccess\(db,actorId\)/);
+  assert.match(service, /Only the named referee can respond to this request/);
+  assert.match(service, /A referee must consent and respond before the reviewer can assess this reference/);
+  assert.match(service, /verification_case_assignment_history/);
+  assert.match(server, /verification\.requestReference/);
+  assert.match(server, /verification\.respondReferenceRequest/);
+  assert.match(server, /verification\.reviewReferenceRequest/);
+  assert.match(server, /verification\.listMyReferenceRequests/);
+  assert.match(migration, /verification_reference_request/);
+  assert.match(migration, /create table if not exists verification_case_assignment_history/);
+  assert.match(ui, /Reference requests sent to you/);
+  assert.match(ui, /Send reference request/);
+  assert.match(ui, /Assignment history/);
+});
+
+test("reviewer private portfolio evidence must be attached to the authorized case, not merely belong to its subject", () => {
+  const files = read("src/platform/private-file-storage.js");
+  assert.match(files, /join verification_evidence ve on ve\.file_object_id=pi\.evidence_file_id and ve\.case_id=vc\.id/);
+  assert.match(files, /appealPortfolioEvidence/);
+  assert.match(files, /a\.status in \('submitted','under_review'\) and vc\.subject_user_id<>\$2 and d\.decided_by<>\$2/);
+});
+
+test("Member workspace preserves non-member profile and public-feature access and uses only self-scoped APIs", () => {
+  const page = read("web/app/member/page.tsx");
+  const shell = read("web/components/shell.tsx");
+  assert.match(page, /What should I do next/);
+  assert.match(page, /You do not need active membership to update your own profile or explore public opportunities/);
+  assert.match(page, /\/api\/v1\/me\/application-tracking/);
+  assert.match(page, /\/api\/v1\/me\/saved-items/);
+  assert.match(page, /\/api\/v1\/notifications/);
+  assert.match(page, /\/api\/v1\/me\/verification\/cases/);
+  assert.match(shell, /\["\/member","My workspace",LayoutDashboard\]/);
+});
+
+test("Employer recruitment workspace keeps vacancy and applicant views organization/job scoped", () => {
+  const page = read("web/app/recruitment/page.tsx");
+  const service = read("src/organization-jobs/service.js");
+  assert.match(page, /Employer ATS · organization-scoped/);
+  assert.match(page, /Candidate information is shown only after the server authorizes your role for this job/);
+  assert.match(service, /orgRole\(db,orgId,actorUserId/);
+  assert.match(service, /organization_id/);
+  assert.match(service, /INVALID_INTERVIEWER/);
+});

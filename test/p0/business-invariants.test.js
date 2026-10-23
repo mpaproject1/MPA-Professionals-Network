@@ -64,7 +64,7 @@ test("P0: applicants can update basic profile while member-only capabilities rem
   await assert.rejects(verification.addClaim(reviewerOpenedCase.id, "EDUCATION", {}, userId, "p0-nonmember-verification-claim"), error => error.code === "MEMBERSHIP_REQUIRED", "non-members cannot add verification claims even when a case already exists");
   await assert.rejects(verification.addEvidence(reviewerOpenedCase.id, {}, userId, "p0-nonmember-verification-evidence"), error => error.code === "MEMBERSHIP_REQUIRED", "non-members cannot add verification evidence even when a case already exists");
   await assert.rejects(
-    serviceMentorship.createServiceListing(userId, { title: "P0 test", description: "Not published", serviceCategory: "test" }, "p0-service-before-membership"),
+    serviceMentorship.createServiceListing(userId, { title: "P0 test", description: "Not published", serviceCategory: "test" }, "p0-service-before-membership",randomUUID()),
     error => error.code === "MEMBERSHIP_REQUIRED"
   );
   await assert.rejects(
@@ -76,10 +76,10 @@ test("P0: applicants can update basic profile while member-only capabilities rem
   const product = (await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
   assert.ok(product, "BASIC membership product must exist for the provider fixture");
   await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')", [provider.user.id, product.id, `MPA-P0-${randomUUID().slice(0,8).toUpperCase()}`]);
-  const listing = await serviceMentorship.createServiceListing(provider.user.id, { title: "Public P0 test service", description: "A public service listing for non-member request coverage.", serviceCategory: "p0-test", visibility: "public" }, "p0-public-service-create");
+  const listing = await serviceMentorship.createServiceListing(provider.user.id, { title: "Public P0 test service", description: "A public service listing for non-member request coverage.", serviceCategory: "p0-test", visibility: "public" }, "p0-public-service-create",randomUUID());
   await db.query("update service_listing set moderation_status='approved' where id=$1", [listing.id]);
   await serviceMentorship.changeServiceListingStatus(listing.id, provider.user.id, "published", "p0-public-service-publish");
-  const request = await serviceMentorship.requestService(listing.id, userId, { message: "I would like to request this public service." }, "p0-non-member-service-request");
+  const request = await serviceMentorship.requestService(listing.id, userId, { message: "I would like to request this public service." }, "p0-non-member-service-request",randomUUID());
   assert.equal(request.status, "requested", "non-members may request public services without publishing provider offers");
 });
 
@@ -89,7 +89,7 @@ test("P0: provider cannot bypass Support Desk moderation to publish a service or
   const product = (await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
   assert.ok(product, "BASIC membership product must exist");
   await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')", [provider.user.id, product.id, `MPA-P0-MOD-${randomUUID().slice(0,8).toUpperCase()}`]);
-  const listing = await serviceMentorship.createServiceListing(provider.user.id, { title: "Moderation gate test", description: "A listing that must remain private until Support Desk approval.", serviceCategory: "p0-test", visibility: "public" }, "p0-moderation-create");
+  const listing = await serviceMentorship.createServiceListing(provider.user.id, { title: "Moderation gate test", description: "A listing that must remain private until Support Desk approval.", serviceCategory: "p0-test", visibility: "public" }, "p0-moderation-create",randomUUID());
   const submitted = await serviceMentorship.changeServiceListingStatus(listing.id, provider.user.id, "published", "p0-moderation-bypass");
   assert.equal(submitted.status, "draft");
   assert.equal(submitted.moderation_status, "pending");
@@ -120,7 +120,7 @@ test("P0: organization-only role cannot access a professional profile", async ()
     error => error.code === "PROFESSIONAL_PROFILE_FORBIDDEN"
   );
   await assert.rejects(
-    serviceMentorship.createServiceListing(userId, { title: "Forbidden personal offer", description: "Organization-only accounts must use organization-owned listings.", serviceCategory: "p0-test" }, "p0-org-personal-service"),
+    serviceMentorship.createServiceListing(userId, { title: "Forbidden personal offer", description: "Organization-only accounts must use organization-owned listings.", serviceCategory: "p0-test" }, "p0-org-personal-service",randomUUID()),
     error => error.code === "PROFESSIONAL_PROFILE_FORBIDDEN"
   );
   await assert.rejects(
@@ -145,7 +145,7 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
     skills: ["bookkeeping", "Excel"],
     intent: "Please consider me for relevant work even when no vacancy is listed.",
     consent: true
-  }, "p0-job-demand-create", null);
+  }, "p0-job-demand-create", null, randomUUID());
   const initial = (await db.query("select job_id,employer_sharing_consent,employer_sharing_scope from public_opportunity_inquiry where id=$1", [inquiry.id])).rows[0];
   assert.equal(initial.job_id, null, "job-interest demand must not require a vacancy");
   assert.equal(initial.employer_sharing_consent, false, "employer-sharing consent is separate from intake consent");
@@ -288,7 +288,7 @@ test("P0: expired membership loses direct profile and provider privileges", asyn
     "an expired member cannot republish a directory profile through the basic profile endpoint"
   );
   await assert.rejects(
-    serviceMentorship.createServiceListing(account.user.id, { title: "Expired member offer", description: "Must remain denied.", serviceCategory: "p0-test" }, "p0-expired-service-create"),
+    serviceMentorship.createServiceListing(account.user.id, { title: "Expired member offer", description: "Must remain denied.", serviceCategory: "p0-test" }, "p0-expired-service-create",randomUUID()),
     error => error.code === "MEMBERSHIP_REQUIRED",
     "an expired row with status=active must not grant provider publishing"
   );

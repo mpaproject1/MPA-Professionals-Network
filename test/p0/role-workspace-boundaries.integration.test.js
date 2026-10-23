@@ -140,4 +140,38 @@ test("support queue hides another colleague's assigned conversation and contact 
   );
 });
 
+test("support inquiry transfer requires manager authority and records the handoff reason", async () => {
+  const suffix = randomUUID().replace(/-/g, "");
+  const staffA = await account(suffix + "m");
+  const staffB = await account(suffix + "n");
+  const manager = await account(suffix + "o");
+  await assignRole(staffA, "supporting_staff");
+  await assignRole(staffB, "supporting_staff");
+  await assignRole(manager, "system_admin");
+  const db = getPool();
+  const ref = `MPA-SUP-${randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`;
+  const row = (await db.query(`
+    insert into support_conversation(public_reference,visitor_key_hash,page_path,last_question,assigned_to)
+    values($1,$2,'/support','Transfer test inquiry',$3) returning id
+  `, [ref, randomUUID(), staffA])).rows[0];
+
+  await assert.rejects(
+    supportBot.adminUpdateConversation(staffA, row.id, { assignToUserId: staffB, reason: "Reassign for coverage" }, `transfer-denied-${suffix}`),
+    hasStatus(403),
+  );
+  const result = await supportBot.adminUpdateConversation(
+    manager, row.id, { assignToUserId: staffB, reason: "Coverage handoff; original owner is unavailable" },
+    `transfer-approved-${suffix}`, true,
+  );
+  assert.equal(result.assignedTo, staffB);
+  assert.equal(result.transferred, true);
+  const audit = (await db.query(
+    "select action,metadata from audit_log where actor_user_id=$1 and resource_type='support_bot' and resource_id=$2 and action='support.inquiry_transferred' order by created_at desc limit 1",
+    [manager, row.id],
+  )).rows[0];
+  assert.ok(audit, "successful transfer must be audited");
+  assert.equal(audit.metadata.toAssignee, staffB);
+  assert.equal(audit.metadata.reason, "Coverage handoff; original owner is unavailable");
+});
+
 after(async () => { await closePool(); });

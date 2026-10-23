@@ -62,6 +62,8 @@ test("support inquiry lists and actions are scoped to unassigned or self-assigne
   const server = read("server.js");
   assert.match(support, /filters\.actorId/);
   assert.match(support, /c\.assigned_to is null or c\.assigned_to=\$2/);
+  assert.match(support, /case when c\.consent_to_contact then c\.contact_email else null end as contact_email/);
+  assert.match(support, /case when c\.consent_to_contact then c\.contact_phone else null end as contact_phone/);
   assert.match(support, /async function assertConversationScope/);
   assert.match(support, /row\.assigned_to!==actorId/);
   assert.match(support, /assertConversationScope\(db,actorId,id,canManageAll,true\)/);

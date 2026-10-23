@@ -32,7 +32,7 @@ test("verification case reads fail closed when no viewer identity is supplied", 
 
 test("reviewer case details enforce assignment unless the viewer has elevated authority", () => {
   const service = read("src/verification/service.js");
-  assert.match(service, /Only the assigned reviewer or an explicitly authorized verification manager may view this case/);
+  assert.match(service, /Only the assigned reviewer, an independent appeal reviewer, or an explicitly authorized verification manager may view this case/);
   assert.match(service, /row\.assigned_reviewer_id!==viewerId/);
 });
 
@@ -106,12 +106,12 @@ test("professional profile edits are available before membership while verificat
   const policy = read("src/platform/identity-policy.js");
   const membership = read("src/membership/service.js");
   const verification = read("src/verification/service.js");
-  assert.match(policy, /export async function assertProfessionalProfileCapability\(db,userId,\{ requireActiveMembership = false \} = \{\}\)/);
+  assert.match(policy, /export async function assertProfessionalProfileCapability\(db,\s*userId,\s*\{\s*requireActiveMembership\s*=\s*false\s*\}\s*=\s*\{\}\)/);
   assert.match(membership, /await assertProfessionalProfileAccess\(db,userId\);/);
   const updateStart = membership.indexOf("export async function updateProfile(");
   const updateEnd = membership.indexOf("export async function listMyApplications(", updateStart);
   assert.ok(updateStart >= 0 && updateEnd > updateStart);
-  assert.doesNotMatch(membership.slice(updateStart, updateEnd), /requireActiveMembership:true/);
+  assert.match(membership.slice(updateStart, updateEnd), /input\.visibility\s*===\s*"public".*requireActiveMembership:\s*true/);
   assert.match(verification, /assertProfessionalProfileCapability\(db,userId,\{requireActiveMembership:true\}\)/);
 });
 test("organization roster and ownership changes remain restricted to the dedicated owner/admin workflow", () => {
@@ -131,7 +131,7 @@ test("administrator audit history is exposed through a protected read-only route
   assert.match(service, /from audit_log/);
   assert.match(server, /p==="api\/v1\/admin\/audit-log".*anyRoleOrPermission\(identity,\["system_admin"\],\["audit\.view"\]\)/);
   assert.match(adminUi, /tab === "audit" && roles\.includes\("system_admin"\)/);
-  assert.match(adminUi, /api<AuditEvent>\("\/api\/v1\/admin\/audit-log\?limit=100"/);
+  assert.match(adminUi, /getList<AuditEvent>\("\/api\/v1\/admin\/audit-log\?limit=100"/);
 });
 
 

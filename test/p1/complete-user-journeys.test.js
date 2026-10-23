@@ -136,7 +136,18 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
  const approved=await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Scope and public description reviewed."},"gate2-service-approve");
  assert.equal(approved.status,"published");
  assert.ok((await journeys.listServices(null,{q:"Gate 2 bookkeeping support"})).items.some(x=>x.id===listing.id));
- const request=await journeys.requestService(listing.id,requester,{message:"Please help us reconcile the last quarter."},"gate2-service-request",randomUUID());
+ const serviceKey=`gate2-service-request-${randomUUID()}`;
+ const servicePayload={message:"Please help us reconcile the last quarter."};
+ const concurrentRequests=await Promise.all([
+  journeys.requestService(listing.id,requester,servicePayload,"gate2-service-request-a",serviceKey),
+  journeys.requestService(listing.id,requester,servicePayload,"gate2-service-request-b",serviceKey)
+ ]);
+ assert.equal(concurrentRequests[0].id,concurrentRequests[1].id,"concurrent retries must resolve to one service request");
+ await assert.rejects(
+  journeys.requestService(listing.id,requester,{message:"Changed request scope with the same key."},"gate2-service-request-conflict",serviceKey),
+  error=>error.code==="IDEMPOTENCY_KEY_CONFLICT"
+ );
+ const request=concurrentRequests[0];
  await assert.rejects(journeys.changeServiceRequestStatus(request.id,await account(),"accepted","unrelated user","gate2-outsider"),e=>e.code==="FORBIDDEN");
  assert.equal((await journeys.changeServiceRequestStatus(request.id,provider,"accepted","Scope confirmed.","gate2-service-accept")).status,"accepted");
  assert.equal((await journeys.changeServiceRequestStatus(request.id,provider,"in_progress","Work started.","gate2-service-start")).status,"in_progress");

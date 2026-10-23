@@ -55,3 +55,16 @@ test("candidate cannot accept an unapproved offer",()=>{
   assert.equal(canCandidateAcceptOffer({status:"offer",approval:"approved"}),true);
   assert.equal(canCandidateAcceptOffer({status:"screening",approval:"approved"}),false);
 });
+test("application draft saving updates an existing draft and restores applicant-owned drafts in the UI",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const [service,page]=await Promise.all([
+    readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8"),
+    readFile(new URL("../../web/app/jobs/page.tsx",import.meta.url),"utf8")
+  ]);
+  const save=service.slice(service.indexOf("export async function saveApplicationDraft"),service.indexOf("export async function updateApplicationDraft"));
+  assert.match(save,/existing\?\.status==="draft"[\s\S]*?update job_application set cover_letter=\$1,profile_snapshot=\$2/);
+  assert.match(save,/existing\?\.status==="withdrawn"/);
+  assert.match(page,/\/api\/v1\/me\/job-applications/);
+  assert.match(page,/saveFormalApplicationDraft/);
+  assert.match(page,/Save draft changes/);
+});

@@ -106,7 +106,7 @@ test("public inquiry retries reuse a stable key and cannot create a second recor
     assert.match(page, /createSubmissionKey/);
     assert.match(page, /X-Idempotency-Key/);
     assert.match(page, /const key=idempotencyKey\|\|createSubmissionKey\(\)/);
-    assert.match(page, /setIdempotencyKey\("\);setForm/);
+    assert.match(page, /setIdempotencyKey\(""\);setForm/);
   }
 });
 
@@ -129,7 +129,7 @@ test("completed inquiry screens show current status and avoid reopening closed r
 });
 
 test("shared loading states and report controls explain pending work without blocking unrelated tasks", async () => {
-  const [dashboard, organizations, admin, reports, membership, status] = await Promise.all([
+  const [dashboard, organizations, admin, reports, membership, status, styles] = await Promise.all([
     source("../../web/app/dashboard/page.tsx"),
     source("../../web/app/organizations/page.tsx"),
     source("../../web/app/admin/page.tsx"),
@@ -145,5 +145,5 @@ test("shared loading states and report controls explain pending work without blo
   assert.match(reports, /disabled=\{viewBusy\|\|!viewName\.trim\(\)\|\|!current\}/);
   assert.match(reports, /disabled=\{reportBusy\}/);
   assert.match(membership, /Loading your saved applications/);
-  assert.match(status, /prefers-reduced-motion/);
+  assert.match(status, /aria-busy/);\n  assert.match(styles, /prefers-reduced-motion:reduce/);
 });

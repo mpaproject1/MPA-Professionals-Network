@@ -59,7 +59,7 @@ export async function assertProfessionalProfileCapability(db, userId, { requireA
     await assertCurrentActiveMembership(
       db,
       userId,
-      "Your membership must be active and within its validity dates to edit a professional profile. View membership options to continue.",
+      "An active membership is required for this verification or member-only revision action. View membership options to continue.",
     );
   }
 }

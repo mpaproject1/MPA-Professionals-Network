@@ -157,6 +157,19 @@ try {
   if (columnErrors.length) throw new Error("Post-migration column checks failed:\\n- " + columnErrors.join("\\n- "));
 
   const requiredForeignKeys = [
+    ["public_opportunity_inquiry","app_user_id","app_user","id"],
+    ["marketplace_demand","requester_user_id","app_user","id"],
+    ["mentorship_request","mentee_user_id","app_user","id"],
+    ["mentorship_match","request_id","mentorship_request","id"],
+    ["mentorship_match","mentor_user_id","app_user","id"],
+    ["mentorship_match","mentee_user_id","app_user","id"],
+    ["service_listing","provider_user_id","app_user","id"],
+    ["service_request","service_listing_id","service_listing","id"],
+    ["service_request","requester_user_id","app_user","id"],
+    ["service_request","provider_user_id","app_user","id"],
+    ["talent_inquiry","requester_user_id","app_user","id"],
+    ["talent_inquiry","professional_user_id","app_user","id"],
+    ["verification_reference_request","case_id","verification_case","id"],
     ["verification_reference_request","requester_user_id","app_user","id"],
     ["verification_reference_request","referee_user_id","app_user","id"],
     ["verification_reference_request","responded_by","app_user","id"],

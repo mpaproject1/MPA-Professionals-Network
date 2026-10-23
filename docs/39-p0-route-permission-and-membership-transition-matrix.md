@@ -91,5 +91,8 @@ The service separates application review, payment verification, activation, and 
 - Add/adjust regression tests for organization-detail access and reviewer list/detail scoping. CI is intentionally deferred until Phase 3 is complete.
 - Decide whether to add a dedicated expiry worker or a safe, auditable lazy-expiry service so persisted status agrees with date-based access checks.
 - Confirm separation of duties: whether reviewers may verify finance evidence, whether finance may approve membership applications, and who may activate.
+- Support inquiry queue and reply/status routes now scope work to unassigned/self-assigned conversations unless explicit broader authority is present; verify this with direct-request tests.
+- A read-only administrator audit endpoint and UI tab were added; verify schema compatibility, route authorization, and completeness of event history.
+- Applicant profile update no longer requires active membership; member-only verification/revision actions remain membership-gated. Test this in the actual UI and API.
 - Verify every API route with both allowed and forbidden direct requests; UI-only hiding is not accepted as evidence.
 - Preserve public-page layout/navigation unless a narrowly scoped privacy correction requires change.

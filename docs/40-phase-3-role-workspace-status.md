@@ -119,7 +119,7 @@
 - Relationship and session actions use participant checks and audit events.
 
 **Important gap to close before describing the journey as end-to-end**
-- A coordinator-proposed match currently becomes an active mentorship as soon as the mentor accepts. The mentee has requested mentorship generally, but does not explicitly accept that specific coordinator-selected mentor before activation.
+- **Addressed in source, pending migration and tests:** coordinator-proposed matches now require mentor acceptance followed by the mentee's explicit acceptance of that exact mentor. A decline returns the request to matching; the response is audited and a coordinator notification is queued. A migration adds consent status, response time and note, and preserves consent for existing relationships.
 - A dedicated private concern/safeguarding workflow and reasoned rematch action are not implemented as a complete participant journey. Do not represent generic Support Desk contact as a complete mentorship concern process.
 - Next source phase should add explicit mentee approval for the exact proposed match, then activate only after both responses; provide private concern reporting, assigned coordinator handling, safety-sensitive visibility, pause/restrict contact where policy allows, and auditable rematch history. Validate database constraints before choosing status values or migrations.
 

@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import {randomUUID} from "node:crypto";
 import test, { after } from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
+import {closePool, getPool} from "../../src/platform/db.js";
 import * as supportBot from "../../src/platform/support-bot.js";
 import * as verification from "../../src/verification/service.js";
-import { closePool, getPool } from "../../src/platform/db.js";
-
 async function account(suffix) {
   const digits = suffix.replace(/[^0-9]/g, "").slice(0, 8).padEnd(8, "7");
   const result = await membership.register({

@@ -105,7 +105,9 @@ test("public inquiry retries reuse a stable key and cannot create a second recor
   for (const page of [job, mentorship]) {
     assert.match(page, /createSubmissionKey/);
     assert.match(page, /X-Idempotency-Key/);
-    assert.match(page, /const key=idempotencyKey\|\|createSubmissionKey\(\)/);\n    assert.match(page, /disabled=\{submitting\|\|submissionUncertain\}/);\n    assert.match(page, /Check submission again/);
+    assert.match(page, /const key=idempotencyKey\|\|createSubmissionKey\(\)/);
+    assert.match(page, /disabled=\{submitting\|\|submissionUncertain\}/);
+    assert.match(page, /Check submission again/);
     assert.match(page, /setIdempotencyKey\(""\);setSubmissionUncertain\(false\);setForm/);
   }
 });

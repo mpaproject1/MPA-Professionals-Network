@@ -88,10 +88,12 @@ export async function listCases(filters={}) {
  const add=(sql,val)=>{args.push(val);where.push(sql.replace("$N",`$${args.length}`));};
  if(!filters.viewerId) throw error(403,"A signed-in reviewer identity is required to list verification cases.","FORBIDDEN");
  const access=(await db.query("select exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code='system_admin') is_admin, exists(select 1 from app_user_permission up where up.user_id=$1 and up.permission_code='verification.manage') can_manage",[filters.viewerId])).rows[0]||{};
+ if(filters.subjectUserId && filters.subjectUserId!==filters.viewerId && !access.is_admin && !access.can_manage) throw error(403,"You may only view your own verification cases.","FORBIDDEN");
  if(filters.subjectUserId) add("vc.subject_user_id=$N",filters.subjectUserId);
  if(filters.status) add("vc.status=$N",filters.status);
  if(filters.programCode) add("vp.program_code=$N",String(filters.programCode).toUpperCase());
- if(access.is_admin||access.can_manage) { if(filters.reviewerId) add("vc.assigned_reviewer_id=$N",filters.reviewerId); }
+ if(filters.subjectUserId===filters.viewerId) { /* Member self-service is limited to the subject's own cases. */ }
+ else if(access.is_admin||access.can_manage) { if(filters.reviewerId) add("vc.assigned_reviewer_id=$N",filters.reviewerId); }
  else { add("vc.assigned_reviewer_id=$N",filters.viewerId); }
  const limit=Math.min(Math.max(Number(filters.limit)||50,1),100),offset=Math.max(Number(filters.offset)||0,0);
  const sql=`select vc.id,vc.status,vc.created_at,vc.updated_at,vc.assigned_reviewer_id,vp.program_code,vp.name program_name,p.user_id subject_user_id,p.display_name subject_name,coalesce((select jsonb_agg(jsonb_build_object('claim_code',ct.claim_code,'claim_type_name',ct.name,'status',cl.status) order by cl.created_at desc) from verification_claim cl join verification_claim_type ct on ct.id=cl.claim_type_id where cl.case_id=vc.id),'[]'::jsonb) claims,coalesce((select jsonb_agg(jsonb_build_object('decision',d.decision,'reason',d.reason,'decided_at',d.decided_at,'member_response_due_at',d.member_response_due_at) order by d.decided_at desc) from verification_decision d where d.case_id=vc.id),'[]'::jsonb) decisions from verification_case vc join verification_program vp on vp.id=vc.program_id join app_user su on su.id=vc.subject_user_id join person p on p.user_id=su.id ${where.length?`where ${where.join(" and ")}`:""} order by vc.created_at desc limit ${limit} offset ${offset}`;

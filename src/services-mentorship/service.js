@@ -580,6 +580,9 @@ export async function createMentorshipRequest(menteeId,input,requestId,idempoten
  const normalized={menteeId,goals,preferredMentor,topics:JSON.parse(topics),modes:JSON.parse(modes),languages:JSON.parse(languages),days:JSON.parse(days)};
  const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
  return withTransaction(async db=>{
+  // Serialize submissions from the same mentee so different keys cannot race past duplicate-request detection.
+  const lockedMentee=(await db.query("select id from app_user where id=$1 for update",[menteeId])).rows[0];
+  if(!lockedMentee)throw error(404,"Mentee account not found.","NOT_FOUND");
   const existing=(await db.query("select * from mentorship_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
   if(existing){
    if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");

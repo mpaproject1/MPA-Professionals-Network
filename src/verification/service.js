@@ -117,6 +117,7 @@ export async function transitionCase(caseId,to,actorId,requestId){
  return getCase(caseId,actorId);
 }
 async function assertEvidenceIdsForCase(db,caseId,evidenceIds){
+ if(evidenceIds!==undefined&&evidenceIds!==null&&!Array.isArray(evidenceIds))throw error(400,"Evidence references must be supplied as a list.","VALIDATION_ERROR");
  const ids=Array.isArray(evidenceIds)?[...new Set(evidenceIds.map(v=>String(v||"").trim()).filter(Boolean))]:[];
  if(!ids.length)return [];
  if(ids.length>100)throw error(400,"Too many evidence references were supplied.","VALIDATION_ERROR");

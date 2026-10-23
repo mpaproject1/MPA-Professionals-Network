@@ -4,6 +4,7 @@ import { FormFeedback } from "../../../components/form-feedback";
 import { TagInput } from "../../../components/tag-input";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
+import { humanStatus } from "../../../lib/status-labels";
 
 type Inquiry = { id: string; public_reference: string; continuationToken: string; status?: string; nextStep?: string; nextAction?: string };
 function createSubmissionKey(): string { if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function") throw new Error("Secure submission is unavailable in this browser. Please reload and try again."); return crypto.randomUUID()+crypto.randomUUID(); }

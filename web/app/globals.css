@@ -82,3 +82,14 @@ button:not(:disabled):active,a.btn:active{transform:translateY(1px)}
 .mentorship-empty-state{display:grid;gap:12px;max-width:900px;padding:24px}
 @media(max-width:700px){.membership-steps{grid-template-columns:1fr}.marketplace-primary-grid,.marketplace-secondary-grid{grid-template-columns:1fr}.marketplace-pathway{min-height:0}.job-journey{grid-template-columns:1fr}.mentorship-empty-state{padding:18px}}
 @media(prefers-reduced-motion:reduce){.marketplace-pathway{transition:none}.marketplace-pathway:hover{transform:none}}
+
+/* Consistent high-contrast form controls across discovery cards in both themes. */
+.card label input:not([type="checkbox"]):not([type="radio"]),.card label select,.card label textarea{width:100%;min-width:0;padding:11px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text)}
+.card label input:focus,.card label select:focus,.card label textarea:focus{outline:2px solid color-mix(in srgb,var(--primary) 45%,transparent);outline-offset:1px}
+.marketplace-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+.marketplace-search label{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-weight:750;font-size:13px}
+.marketplace-search input{width:100%;min-width:0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text)}
+.marketplace-tabs{justify-content:flex-start}
+.marketplace-tabs a{display:inline-flex;align-items:center;padding:8px 12px;border:1px solid var(--border);border-radius:999px;color:var(--text);text-decoration:none;font-size:13px;font-weight:700;background:var(--surface)}
+.marketplace-tabs a[aria-current="page"]{background:color-mix(in srgb,var(--primary) 12%,var(--surface));border-color:var(--primary);color:var(--primary)}
+@media(max-width:700px){.marketplace-search{grid-template-columns:1fr}.marketplace-search label{grid-column:auto}.marketplace-search button{width:100%}}

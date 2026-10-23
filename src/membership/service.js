@@ -161,9 +161,7 @@ export async function getMe(userId){
 export async function updateProfile(userId,input,requestId){
   await withTransaction(async db=>{
     await assertProfessionalProfileAccess(db,userId);
-    if(input.visibility!==undefined&&input.visibility!==null&&String(input.visibility).trim()!==""){
-      await assertProfessionalProfileAccess(db,userId,{requireActiveMembership:true});
-    }
+    // Applicants may update their own profile before membership. Member-only verification/revision actions are gated separately.
     const person=validatePersonInput(input);
     const current=await db.query("select id from person where user_id=$1 for update",[userId]);
     if(!current.rows[0]) throw httpError(404,"Person profile not found.","NOT_FOUND");

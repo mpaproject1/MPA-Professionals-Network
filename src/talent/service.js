@@ -165,6 +165,9 @@ export async function createTalentInquiry(requesterId,input,requestId,idempotenc
  if(requesterId===normalized.professionalUserId)throw error(400,"You cannot inquire about your own professional profile.","SELF_INQUIRY");
  const keyHash=hashValue(idempotencyKey),fingerprint=hashPayload(normalized);
  return withTransaction(async db=>{
+  // Serialize a requester's inquiry writes so distinct keys cannot create duplicate pending inquiries concurrently.
+  const lockedRequester=(await db.query("select id from app_user where id=$1 for update",[requesterId])).rows[0];
+  if(!lockedRequester)throw error(404,"Your account could not be found.","NOT_FOUND");
   const existing=(await db.query("select * from talent_inquiry where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
   if(existing){
    if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");

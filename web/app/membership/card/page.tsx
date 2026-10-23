@@ -2,7 +2,7 @@
 import {QRCodeSVG} from "qrcode.react";
 import {type CSSProperties, useEffect, useState} from "react";
 import {OperationStatus} from "../../../components/operation-status";
-import {api, ApiError} from "../../../lib/api";
+import {ApiError, api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
 import styles from "./card.module.css";
 

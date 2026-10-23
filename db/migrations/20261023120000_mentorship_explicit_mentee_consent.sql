@@ -25,7 +25,7 @@ where m.request_id=mm.request_id
 -- Keep declined proposals as history while allowing a fresh proposal for the same request.
 -- The original table has a UNIQUE(request_id) constraint; remove that one-column uniqueness
 -- and enforce uniqueness only for the currently open/accepted match.
-do $
+do $migration$
 declare constraint_row record;
 begin
   for constraint_row in
@@ -37,7 +37,7 @@ begin
   loop
     execute format('alter table public.mentorship_match drop constraint %I', constraint_row.conname);
   end loop;
-end $;
+end $migration$;
 
 create unique index if not exists ux_mentorship_match_one_open_request
   on mentorship_match(request_id)

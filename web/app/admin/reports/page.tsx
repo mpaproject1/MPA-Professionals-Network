@@ -1,5 +1,6 @@
 "use client";
 import { ChartNoAxesCombined,FileSpreadsheet,FileText,RefreshCw,ShieldCheck } from "lucide-react";
+import { OperationStatus } from "../../../components/operation-status";
 import { useCallback,useEffect,useState } from "react";
 import { FormFeedback } from "../../../components/form-feedback";
 import { Badge, Card} from "../../../components/ui";
@@ -29,7 +30,7 @@ export default function AdminReportsPage(){
  const cell=(v:unknown)=>v==null?"—":v instanceof Date?v.toLocaleString():typeof v==="string"&&v.includes("T")&&!Number.isNaN(Date.parse(v))?new Date(v).toLocaleString():String(v);
  const chartRows=(result?.rows||[]).map(row=>{const values=Object.values(row);const measure=values.find(value=>typeof value==="number");return {label:String(values[0]??"Other"),value:typeof measure==="number"?measure:0};}).filter(row=>row.value>0).slice(0,10);
  const chartMax=Math.max(1,...chartRows.map(row=>row.value));
- if(!hydrated)return <div className="grid" style={{gap:16}}><h1 className="h1">Reports and exports</h1><Card>Loading secure report catalogue…</Card></div>;
+ if(!hydrated)return <div className="grid" style={{gap:16}}><h1 className="h1">Reports and exports</h1><Card><OperationStatus state="loading" title="Loading the secure report catalogue" detail="We’re checking which reports your account is allowed to view before loading report options." /></Card></div>;
  if(!token)return <div className="grid" style={{gap:16}}><h1 className="h1">Reports and exports</h1><Card><p>Sign in with an authorized MPA staff account to access reports.</p><a className="btn btn-primary" href="/login?next=/admin/reports">Sign in</a></Card></div>;
  return <div className="grid" style={{gap:18,minWidth:0}}>
   <AdminPageHeader eyebrow="Administration · Insights and governance" title="Reports and exports" description="Choose a report, set a date range and filters, inspect the result, then export a branded PDF or Excel workbook. Restricted reports require explicit staff authority and every run/export is audited." actions={<><a className="btn btn-ghost" href="/admin">Admin home</a><a className="btn btn-ghost" href="/admin/members">Bulk member administration</a></>}/>

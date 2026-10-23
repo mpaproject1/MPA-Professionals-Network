@@ -9,7 +9,7 @@ import {useUiStore} from "../../lib/store";
 
 type Program={program_code:string;name:string;purpose?:string;risk_level?:string;requires_consent:boolean;appeal_enabled:boolean};
 type ClaimType={claim_code:string;name:string;description?:string|null};
-type CaseRow={id:string;status:string;created_at:string;updated_at:string;program_code:string;program_name:string;subject_user_id:string;subject_name?:string;assigned_reviewer_id?:string|null;claims?:any[];evidence?:any[];decisions?:any[];appeals?:any[];checkResults?:any[];professionalProfileContext?:{profile:any;education:any[];experience:any[];portfolio:any[];references:any[]}|null};
+type CaseRow={id:string;status:string;created_at:string;updated_at:string;program_code:string;program_name:string;subject_user_id:string;subject_name?:string;assigned_reviewer_id?:string|null;claims?:any[];evidence?:any[];decisions?:any[];appeals?:any[];checkResults?:any[];references?:any[];assignmentHistory?:any[];professionalProfileContext?:{profile:any;education:any[];experience:any[];portfolio:any[];references:any[]}|null};
 type Me={user_id:string;roles?:string[];permissions?:string[]};
 type AppealRow={appeal_id:string;case_id:string;status:string;grounds:string;submitted_at:string;subject_user_id:string;case_status:string;subject_name?:string;program_code:string;program_name:string;original_decision:string;original_decider:string};
 type ReferenceRequest={id:string;case_id:string;referee_name:string;relationship:string;consent_status:string;verification_status:string;requested_at:string;responded_at?:string|null;program_name?:string;response_text?:string|null;review_reason?:string|null;reviewed_at?:string|null};

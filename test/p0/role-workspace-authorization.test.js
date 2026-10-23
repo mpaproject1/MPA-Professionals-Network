@@ -92,3 +92,22 @@ test("professional profile edits are available before membership while verificat
   assert.doesNotMatch(membership.slice(updateStart, updateEnd), /requireActiveMembership:true/);
   assert.match(membership, /await assertProfessionalProfileAccess\(db,userId,\{requireActiveMembership:true\}\)/);
 });
+test("organization roster and ownership changes remain restricted to the dedicated owner/admin workflow", () => {
+  const service = read("src/organization-jobs/service.js");
+  const listStart = service.indexOf("export async function listOrganizationUsers(");
+  const listEnd = service.indexOf("async function assertSystemAdmin(", listStart);
+  assert.ok(listStart >= 0 && listEnd > listStart);
+  assert.match(service.slice(listStart, listEnd), /orgRole\(db,orgId,actorUserId,\["owner","administrator"\]\)/);
+  assert.match(service, /Ownership transfer uses a separate controlled workflow/);
+  assert.match(service, /The owner role cannot be changed here/);
+});
+
+test("administrator audit history is exposed through a protected read-only route and workspace tab", () => {
+  const service = read("src/platform/admin-audit.js");
+  const server = read("server.js");
+  const adminUi = read("web/app/admin/page.tsx");
+  assert.match(service, /from audit_log/);
+  assert.match(server, /p==="api\/v1\/admin\/audit-log".*anyRoleOrPermission\(identity,\["system_admin"\],\["audit\.view"\]\)/);
+  assert.match(adminUi, /tab === "audit" && roles\.includes\("system_admin"\)/);
+  assert.match(adminUi, /api<AuditEvent>\("\/api\/v1\/admin\/audit-log\?limit=100"/);
+});

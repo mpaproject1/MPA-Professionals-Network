@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { OperationStatus } from "../../../components/operation-status";
 import { Card } from "../../../components/ui";
 import { api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
@@ -42,7 +43,7 @@ export default function MembershipAdministrationPage() {
   }, [hydrated, token]);
 
   if (!hydrated || access === "loading") {
-    return <Card><p>Checking membership administration access…</p></Card>;
+    return <Card><OperationStatus state="loading" title="Checking membership administration access" detail="We’re verifying your reviewer or finance permissions before loading member records. No membership decision or payment action is being performed." /></Card>;
   }
   if (access === "signin") {
     return <Card><h1 className="h1">Sign in required</h1><p className="muted">Sign in with an authorized MPA administration account to manage membership applications, plan versions and payment review.</p><a className="btn btn-primary" href="/login?next=/admin/membership">Sign in</a></Card>;

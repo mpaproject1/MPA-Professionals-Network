@@ -316,3 +316,16 @@ test("Marketplace routes discovery into existing private workflows without repla
   assert.match(lifecycle, /revision_requested/);
   assert.match(lifecycle, /"disputed"/);
 });
+
+
+test("Mentorship requires both participants to consent before activation", () => {
+ const service = read("src/services-mentorship/service.js");
+ const server = read("server.js");
+ const ui = read("web/app/mentorship/page.tsx");
+ const migration = read("db/migrations/20261023120000_mentorship_explicit_mentee_consent.sql");
+ assert.match(service, /respondToMenteeMatch/);
+ assert.match(service, /mentee_consent_status/);
+ assert.match(server, /mentee-response/);
+ assert.match(ui, /Accept this mentor/);
+ assert.match(migration, /mentee_consent_status/);
+});

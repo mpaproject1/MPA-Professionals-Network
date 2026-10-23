@@ -188,7 +188,7 @@ export async function requestReference(caseId,input,actorId,requestId){
   const referee=(await db.query("select u.id,u.email,p.display_name from app_user u left join person p on p.user_id=u.id where lower(u.email)=lower($1) and u.status='active' limit 1",[email])).rows[0];
   if(!referee)throw error(404,"This reference request currently requires an active MPA account. Ask the referee to register or contact Support Desk for an alternative process.","REFEREE_ACCOUNT_REQUIRED");
   if(referee.id===actorId)throw error(400,"You cannot request a reference from your own account.","SELF_REFERENCE");
-  const duplicate=(await db.query("select id from verification_reference_request where case_id=$1 and referee_user_id=$2 and consent_status in ('pending','consented') limit 1",[caseId,referee.id])).rows[0];
+  const duplicate=(await db.query("select id from verification_reference_request where case_id=$1 and referee_user_id=$2 and consent_status in ('pending','accepted','consented') limit 1",[caseId,referee.id])).rows[0];
   if(duplicate)throw error(409,"A reference request to this person is already open for this case.","DUPLICATE_REFERENCE");
   const created=(await db.query("insert into verification_reference_request(case_id,referee_name,referee_contact,relationship,consent_status,verification_status,requested_at,requester_user_id,referee_user_id,updated_at) values($1,$2,$3,$4,'pending','pending',now(),$5,$6,now()) returning id,case_id,referee_name,relationship,consent_status,verification_status,requested_at,responded_at",[caseId,String(referee.display_name||referee.email).slice(0,240),referee.email,relationship,actorId,referee.id])).rows[0];
   await audit(db,actorId,"verification.reference_requested","verification_reference_request",created.id,requestId,{caseId,refereeUserId:referee.id});
@@ -218,7 +218,7 @@ export async function reviewReferenceRequest(referenceId,input,actorId,requestId
   const r=(await db.query("select rr.*,vc.subject_user_id,vc.id case_id from verification_reference_request rr join verification_case vc on vc.id=rr.case_id where rr.id=$1 for update",[referenceId])).rows[0];
   if(!r)throw error(404,"Reference request not found.","NOT_FOUND");
   await assertAssignedReviewer(db,r.case_id,actorId);
-  if(r.consent_status!=="consented")throw error(409,"A referee must consent and respond before the reviewer can assess this reference.","REFERENCE_CONSENT_REQUIRED");
+  if(!["accepted","consented"].includes(r.consent_status))throw error(409,"A referee must consent and respond before the reviewer can assess this reference.","REFERENCE_CONSENT_REQUIRED");
   const status=String(input.status||"");
   const reason=String(input.reason||"").trim();
   if(!["verified","not_verified","needs_clarification"].includes(status))throw error(400,"Choose a valid reference assessment outcome.","VALIDATION_ERROR");

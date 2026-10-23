@@ -118,7 +118,7 @@ export default function Services(){
 
  return <div className="grid">
    <p className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm"><span>Looking for help that is not listed yet?</span> <a className="btn btn-secondary" href="/service-demand">Explore service requests and unmet needs →</a></p>
-   <div><div className="eyebrow">Professional services</div><h1 className="h1">Find help, then deliver it well.</h1><p className="muted">Browse published service offers. Public offers can be requested by signed-in users; member-only offers require an active membership. Providers must accept before work begins.</p></div>
+   <div><Link href="/marketplace" className="text-link">← Back to Marketplace</Link><div className="eyebrow" style={{marginTop:8}}>Professional services</div><h1 className="h1">Find help, then deliver it well.</h1><p className="muted">Browse published service offers. Public offers can be requested by signed-in users; member-only offers require an active membership. Providers must accept before work begins.</p></div>
    <div className="row" style={{gap:8,flexWrap:"wrap"}}>
      <a className="btn btn-primary" href="#service-discovery">Browse published services</a>
      <a className="btn btn-ghost" href="/service-demand">Service requests and unmet needs</a>

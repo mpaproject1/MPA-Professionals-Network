@@ -4,7 +4,7 @@ import Link from "next/link";
 import {type FormEvent, useCallback, useEffect, useState} from "react";
 import {OperationStatus} from "../../../components/operation-status";
 import {Badge, Card} from "../../../components/ui";
-import {api, ApiError} from "../../../lib/api";
+import {ApiError, api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
 
 type Cv={cv_file_id?:string|null;cv_updated_at?:string|null;cv_file_name?:string|null;cv_content_type?:string|null;cv_byte_size?:number|null};

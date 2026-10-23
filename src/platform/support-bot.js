@@ -118,14 +118,35 @@ export async function adminListConversations(filters={}){
  return r.rows.map(c=>({...c,contactName:c.contact_name,contactEmail:c.contact_email,contactPhone:c.contact_phone,preferredContact:c.preferred_contact,consentToContact:c.consent_to_contact,pagePath:c.page_path,publicReference:c.public_reference,lastQuestion:c.last_question,createdAt:c.created_at,updatedAt:c.updated_at,categoryName:c.category_name,messages:c.messages||[]}));
 }
 export async function adminUpdateConversation(actorId,id,input,requestId,canManageAll=false){
- const status=clean(input.status,20);if(!["open","in_progress","resolved","closed"].includes(status))throw httpError("Choose a valid inquiry status.");
+ const status=input.status===undefined?null:clean(input.status,20);
+ if(status!==null&&!["open","in_progress","resolved","closed"].includes(status))throw httpError("Choose a valid inquiry status.");
+ const hasTransfer=Object.prototype.hasOwnProperty.call(input,"assignToUserId");
+ const requestedAssignee=hasTransfer?(clean(input.assignToUserId,80)||null):undefined;
+ const reason=clean(input.reason,1000)||null;
+ if(hasTransfer&&!canManageAll)throw httpError("Only a support manager may transfer an inquiry to another colleague.",403,"FORBIDDEN");
+ if(hasTransfer&&requestedAssignee===null&&!reason)throw httpError("Add a reason when returning an inquiry to the unassigned queue.");
+ if(hasTransfer&&!reason)throw httpError("Add a short handoff reason so the next colleague understands why this inquiry is being transferred.");
  return withTransaction(async db=>{
   const current=await assertConversationScope(db,actorId,id,canManageAll,true);
-  const assignToSelf=input.assignToSelf===true||(!current.assigned_to&&["in_progress","resolved","closed"].includes(status));
-  const r=await db.query("update support_conversation set status=$2,assigned_to=case when $3 then $4 else assigned_to end,resolved_at=case when $2='resolved' then now() when $2 in ('open','in_progress') then null else resolved_at end,updated_at=now() where id=$1 returning id,public_reference,status,assigned_to",[id,status,assignToSelf,actorId]);
+  if(hasTransfer&&requestedAssignee){
+   const eligible=await db.query(`select u.id from app_user u where u.id=$1 and u.status='active' and (
+    exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($2::text[]))
+    or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code=any($3::text[]))
+   )`,[requestedAssignee,["supporting_staff","system_admin","admin"],["support.manage","support.queue.manage"]]);
+   if(!eligible.rowCount)throw httpError("Choose an active Support Desk colleague with support permissions.",400,"INVALID_ASSIGNEE");
+  }
+  const nextStatus=status||current.status;
+  const assignToSelf=!hasTransfer&&(input.assignToSelf===true||(!current.assigned_to&&["in_progress","resolved","closed"].includes(nextStatus)));
+  const nextAssignee=hasTransfer?requestedAssignee:(assignToSelf?actorId:current.assigned_to);
+  const r=await db.query("update support_conversation set status=$2,assigned_to=$3,resolved_at=case when $2='resolved' then coalesce(resolved_at,now()) when $2 in ('open','in_progress') then null else resolved_at end,updated_at=now() where id=$1 returning id,public_reference,status,assigned_to",[id,nextStatus,nextAssignee]);
   if(!r.rows[0])throw httpError("Inquiry not found.",404,"NOT_FOUND");
-  await logAudit(db,actorId,"support.inquiry_status_changed",id,requestId,{fromStatus:current.status,toStatus:status,assignedTo:r.rows[0].assigned_to,reason:clean(input.reason,1000)||null});
-  return {id:r.rows[0].id,publicReference:r.rows[0].public_reference,status:r.rows[0].status,assignedTo:r.rows[0].assigned_to};
+  if(hasTransfer){
+   await logAudit(db,actorId,"support.inquiry_transferred",id,requestId,{fromAssignee:current.assigned_to,toAssignee:r.rows[0].assigned_to,fromStatus:current.status,toStatus:r.rows[0].status,reason});
+  }
+  if(status!==null&&status!==current.status){
+   await logAudit(db,actorId,"support.inquiry_status_changed",id,requestId,{fromStatus:current.status,toStatus:status,assignedTo:r.rows[0].assigned_to,reason});
+  }
+  return {id:r.rows[0].id,publicReference:r.rows[0].public_reference,status:r.rows[0].status,assignedTo:r.rows[0].assigned_to,transferred:hasTransfer};
  });
 }
 

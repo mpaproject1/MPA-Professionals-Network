@@ -647,7 +647,7 @@ export async function proposeMentorMatch(requestId,mentorUserId,actorUserId,requ
     if(existingRelationship)throw error(409,"This request already became a mentorship relationship. Manage goals, sessions and completion from the active relationship instead of proposing another match.","RELATIONSHIP_ALREADY_CREATED");
     const existingMatch=(await db.query("select * from mentorship_match where request_id=$1 order by proposed_at desc,id desc limit 1 for update",[requestId])).rows[0];
     if(existingMatch?.status==="accepted"&&existingMatch.mentee_consent_status!=="declined")throw error(409,"The mentor already accepted this match. Wait for the mentee to approve or decline this specific match.","MATCH_ALREADY_ACCEPTED");
-    if(existingMatch?.status==="proposed"){if(existingMatch.mentor_user_id===mentorUserId)return {...existingMatch,idempotent:true,nextAction:"The mentor has already been invited. Wait for their response."};throw error(409,"A mentor proposal is already awaiting a response. Wait for the answer before proposing another match.","MATCH_RESPONSE_PENDING");}
+    if(existingMatch?.status==="proposed"&&existingMatch.mentee_consent_status!=="declined"){if(existingMatch.mentor_user_id===mentorUserId)return {...existingMatch,idempotent:true,nextAction:"The mentor has already been invited. Wait for their response."};throw error(409,"A mentor proposal is already awaiting a response. Wait for the answer before proposing another match.","MATCH_RESPONSE_PENDING");}
     const candidates=await mentorCandidates(db,request); const match=candidates.find(x=>x.mentorUserId===mentorUserId);
     if(!match) throw error(409,"Selected mentor is not currently eligible or available.","MENTOR_UNAVAILABLE");
     const row=(await db.query("insert into mentorship_match(request_id,mentor_user_id,mentee_user_id,score,match_reasons,status,mentee_consent_status,proposed_at) values($1,$2,$3,$4,$5,'proposed','pending',now()) returning *",[requestId,mentorUserId,request.mentee_user_id,match.score,JSON.stringify(match.reasons)])).rows[0];
@@ -665,19 +665,26 @@ export async function respondToMatch(matchId,mentorUserId,status,requestIdHeader
     const match=(await db.query("select * from mentorship_match where id=$1 for update",[matchId])).rows[0];
     if(!match) throw error(404,"Mentorship match not found.","NOT_FOUND");
     if(match.mentor_user_id!==mentorUserId) throw error(403,"Only the proposed mentor can respond.","FORBIDDEN");
-    if(match.status===status && (status==="declined"||match.mentee_consent_status!=="declined"))return {...match,idempotent:true,nextAction:status==="accepted"?"The mentor has accepted. The mentee must also approve this specific match before the relationship starts.":"The mentee or Support Desk can propose another mentor."};
+    if(match.status===status && (status==="declined"||match.mentee_consent_status!=="declined"))return {...match,idempotent:true,nextAction:status==="accepted"?(match.mentee_consent_status==="accepted"?"Both participants have accepted. Open the active mentorship to agree goals and sessions.":"The mentor has accepted. The mentee must also approve this specific match before the relationship starts."):"The mentee or Support Desk can propose another mentor."};
     if(match.status!=="proposed"||match.mentee_consent_status==="declined") throw error(409,"This match is no longer awaiting a mentor response.","INVALID_STATE");
-    const updated=(await db.query("update mentorship_match set status=$1,responded_at=now(),mentee_consent_status='pending',mentee_responded_at=null,mentee_response_note=null where id=$2 returning *",[status,matchId])).rows[0];
+    const updated=(await db.query("update mentorship_match set status=$1,responded_at=now() where id=$2 returning *",[status,matchId])).rows[0];
     if(status==="accepted"){
-      await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,updated_at=now() where id=$2",[mentorUserId,match.request_id]);
-      await notify(db,match.mentee_user_id,"mentorship.match_mentor_accepted","mentorship_match",matchId,{message:"The proposed mentor has accepted. The relationship will not start until you approve this specific match.",nextAction:"Review the mentor and accept or decline this match.",actionRequired:true,priority:"high",actionUrl:"/mentorship"});
+      if(match.mentee_consent_status==="accepted"){
+        const existing=(await db.query("select id from mentorship where request_id=$1 for update",[match.request_id])).rows[0];
+        if(!existing)await db.query("insert into mentorship(request_id,mentor_user_id,mentee_user_id,goals,status) select mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mr.goals,'active' from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id where mm.id=$1 and mm.status='accepted' and mm.mentee_consent_status='accepted'",[matchId]);
+        await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,updated_at=now() where id=$2",[mentorUserId,match.request_id]);
+        await notify(db,match.mentee_user_id,"mentorship.match_fully_accepted","mentorship_match",matchId,{message:"Both you and the proposed mentor accepted this match. The mentorship is active.",nextAction:"Open the active mentorship to agree goals and schedule the first session.",actionRequired:true,priority:"normal",actionUrl:"/mentorship"});
+      }else{
+        await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,updated_at=now() where id=$2",[mentorUserId,match.request_id]);
+        await notify(db,match.mentee_user_id,"mentorship.match_mentor_accepted","mentorship_match",matchId,{message:"The proposed mentor has accepted. The relationship will not start until you approve this specific match.",nextAction:"Review the mentor and accept or decline this match.",actionRequired:true,priority:"high",actionUrl:"/mentorship"});
+      }
     } else {
       await db.query("update mentorship_request set status='matching',matched_mentor_user_id=null,matched_at=null,updated_at=now() where id=$1",[match.request_id]);
       const supportUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role ar on ar.id=ur.role_id join app_user u on u.id=ur.user_id where u.status='active' and ar.role_code=any($1::text[])",[["supporting_staff","system_admin"]])).rows;
       for(const member of supportUsers)await notify(db,member.user_id,"mentorship.match_declined","mentorship_request",match.request_id,{message:"A proposed mentor declined a match and the request returned to matching.",nextAction:"Review the request and propose another currently eligible mentor.",actionUrl:"/mentorship",reviewerQueue:true,actionRequired:true,priority:"high"});
     }
-    await audit(db,mentorUserId,"mentorship.match_responded","mentorship_match",matchId,requestIdHeader,{status});
-    return {...updated,nextAction:status==="accepted"?"The mentee must approve this specific match before the relationship becomes active.":"The request is back in matching. Choose another eligible mentor."};
+    await audit(db,mentorUserId,"mentorship.match_responded","mentorship_match",matchId,requestIdHeader,{status,menteeConsentStatus:updated.mentee_consent_status});
+    return {...updated,nextAction:status==="accepted"?(updated.mentee_consent_status==="accepted"?"Both participants accepted. The mentorship is active; agree goals and schedule the first session.":"The mentee must approve this specific match before the relationship becomes active."):"The request is back in matching. Choose another eligible mentor."};
   });
 }
 
@@ -688,22 +695,26 @@ export async function respondToMenteeMatch(matchId,menteeUserId,status,note,requ
     const match=(await db.query("select * from mentorship_match where id=$1 for update",[matchId])).rows[0];
     if(!match)throw error(404,"Mentorship match not found.","NOT_FOUND");
     if(match.mentee_user_id!==menteeUserId)throw error(403,"Only the mentee who requested this match can respond.","FORBIDDEN");
-    if(match.status!=="accepted")throw error(409,"The proposed mentor must accept first; the relationship is not active yet.","INVALID_STATE");
-    if(match.mentee_consent_status===status)return {...match,idempotent:true,nextAction:status==="accepted"?"Your match is approved. Open the mentorship to agree goals and schedule a first session.":"Your response is already recorded; the coordinator can help with another match."};
+    if(!["proposed","accepted"].includes(match.status))throw error(409,"This match is no longer awaiting a response.","INVALID_STATE");
+    if(match.mentee_consent_status===status)return {...match,idempotent:true,nextAction:status==="accepted"?(match.status==="accepted"?"Your match is approved. Open the active mentorship to agree goals and schedule a first session.":"Your consent is recorded. The mentor must also accept before the relationship starts."):"Your response is already recorded; the coordinator can help with another match."};
     if(match.mentee_consent_status!=="pending")throw error(409,"This match has already received your final response.","INVALID_STATE");
     const updated=(await db.query("update mentorship_match set mentee_consent_status=$1,mentee_responded_at=now(),mentee_response_note=$2 where id=$3 returning *",[status,String(note||"").trim()||null,matchId])).rows[0];
     if(status==="accepted"){
-      const existing=(await db.query("select id from mentorship where request_id=$1 for update",[match.request_id])).rows[0];
-      if(!existing)await db.query("insert into mentorship(request_id,mentor_user_id,mentee_user_id,goals,status) select mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mr.goals,'active' from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id where mm.id=$1 and mm.status='accepted' and mm.mentee_consent_status='accepted'",[matchId]);
-      await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,updated_at=now() where id=$2",[match.mentor_user_id,match.request_id]);
-      await notify(db,match.mentor_user_id,"mentorship.match_fully_accepted","mentorship_match",matchId,{message:"The mentee approved this specific match. You can now agree goals and schedule the first session.",nextAction:"Open the active mentorship and agree goals and a first session.",actionRequired:true,priority:"normal",actionUrl:"/mentorship"});
+      if(match.status==="accepted"){
+        const existing=(await db.query("select id from mentorship where request_id=$1 for update",[match.request_id])).rows[0];
+        if(!existing)await db.query("insert into mentorship(request_id,mentor_user_id,mentee_user_id,goals,status) select mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mr.goals,'active' from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id where mm.id=$1 and mm.status='accepted' and mm.mentee_consent_status='accepted'",[matchId]);
+        await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,updated_at=now() where id=$2",[match.mentor_user_id,match.request_id]);
+        await notify(db,match.mentor_user_id,"mentorship.match_fully_accepted","mentorship_match",matchId,{message:"The mentee approved this specific match. You can now agree goals and schedule the first session.",nextAction:"Open the active mentorship and agree goals and a first session.",actionRequired:true,priority:"normal",actionUrl:"/mentorship"});
+      }else{
+        await notify(db,match.mentor_user_id,"mentorship.match_mentee_accepted_first","mentorship_match",matchId,{message:"The mentee has approved this proposed match first. Your separate acceptance is still required before the mentorship starts.",nextAction:"Review the proposed match and accept or decline it.",actionRequired:true,priority:"high",actionUrl:"/mentorship"});
+      }
     }else{
       await db.query("update mentorship_request set status='matching',matched_mentor_user_id=null,matched_at=null,updated_at=now() where id=$1",[match.request_id]);
       const supportUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role ar on ar.id=ur.role_id join app_user u on u.id=ur.user_id where u.status='active' and ar.role_code=any($1::text[])",[["supporting_staff","system_admin"]])).rows;
       for(const member of supportUsers)await notify(db,member.user_id,"mentorship.match_mentee_declined","mentorship_request",match.request_id,{message:"The mentee declined the proposed mentor. The request has returned to matching.",nextAction:"Review the mentee's reason and propose another eligible mentor.",actionUrl:"/mentorship",reviewerQueue:true,actionRequired:true,priority:"high"});
     }
-    await audit(db,menteeUserId,"mentorship.match_mentee_response","mentorship_match",matchId,requestIdHeader,{status,note:note?.trim()||null});
-    return {...updated,nextAction:status==="accepted"?"Both participants accepted. The mentorship is active; agree goals and schedule the first session.":"Your response is recorded and the request returned to matching."};
+    await audit(db,menteeUserId,"mentorship.match_mentee_response","mentorship_match",matchId,requestIdHeader,{status,note:note?.trim()||null,mentorStatus:match.status});
+    return {...updated,nextAction:status==="accepted"?(match.status==="accepted"?"Both participants accepted. The mentorship is active; agree goals and schedule the first session.":"Your consent is recorded. Wait for the mentor to respond; the relationship is not active yet."):"Your response is recorded and the request returned to matching."};
   });
 }
 

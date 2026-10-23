@@ -439,7 +439,7 @@ export async function listMyApplications(userId){
 export async function listCandidates(jobId,userId){
  const db=getPool(); const j=(await db.query("select organization_id from job where id=$1",[jobId])).rows[0]; if(!j) throw error(404,"Job not found.","NOT_FOUND");
  await orgRole(db,j.organization_id,userId,CANDIDATE_ROLES);
- return (await db.query("select a.id,a.status,a.cover_letter,a.profile_snapshot,a.eligibility_snapshot,a.submitted_at,a.updated_at from job_application a where a.job_id=$1 order by a.created_at desc",[jobId])).rows;
+ return (await db.query("select a.id,a.status,a.cover_letter,a.profile_snapshot,a.eligibility_snapshot,a.submitted_at,a.updated_at,coalesce((select jsonb_agg(jsonb_build_object('id',aa.id,'fileObjectId',f.id,'fileName',f.original_name,'contentType',f.content_type,'byteSize',f.byte_size,'attachmentType',aa.attachment_type) order by aa.id) from job_application_attachment aa join file_object f on f.id=aa.file_object_id and f.visibility='private' where aa.application_id=a.id),'[]'::jsonb) attachments from job_application a where a.job_id=$1 order by a.created_at desc",[jobId])).rows;
 }
 
 const APPLICATION_TRANSITIONS={

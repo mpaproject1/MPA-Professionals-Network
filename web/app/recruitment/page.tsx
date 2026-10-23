@@ -1,5 +1,5 @@
 "use client";
-import {BriefcaseBusiness,CalendarClock,RefreshCw,Users} from "lucide-react";
+import {BriefcaseBusiness,Building2,CalendarClock,RefreshCw,Users} from "lucide-react";
 import {type FormEvent,useCallback,useEffect,useState} from "react";
 import { FormFeedback } from "../../components/form-feedback";
 import { OperationStatus } from "../../components/operation-status";
@@ -62,6 +62,7 @@ export default function Recruitment(){
       { title: "Report", description: "Record offers and hiring outcomes and review the recruiting summary.", href: "#recruiting-summary", action: "Review outcomes" },
     ]}
   />
+  <Card id="employer-partnerships"><div className="row" style={{alignItems:"flex-start",gap:12}}><Building2 size={22}/><div style={{flex:1,minWidth:0}}><h2 className="h2">Employer partnerships and mentorship programmes</h2><p className="muted">Alongside hiring, your organization can offer a structured mentorship programme, receive participant requests and record whether a request was accepted, declined, cancelled or completed. These records live in the existing Mentorship workspace and remain subject to organization verification and role permissions.</p><div className="row" style={{gap:8,flexWrap:"wrap"}}><a className="btn btn-secondary" href="/mentorship">Manage organization programmes</a><a className="btn btn-ghost" href="/organizations">Review organization verification</a></div></div></div></Card>
   {error&&<FormFeedback kind="error" message={error} onRetry={()=>void load()} retryLabel="Reload recruiting workspace" busy={loading}/>}{notice&&<FormFeedback kind="success" message={notice}/>} {loading&&<OperationStatus state="loading" title="Loading recruiting records" detail="We’re checking your organization, job pipeline, assigned team, screening questions and interview scorecards. No candidate decisions are being changed." />}
   <Card id="recruiting-jobs"><div className="row"><div><div className="h2">Organization and job</div><p className="muted">Recruiting access depends on organization membership and assigned job role.</p></div><button type="button" className="btn btn-ghost" onClick={()=>void load()} disabled={loading} aria-busy={loading}><RefreshCw size={16}/>{loading?"Checking recruiting records…":"Check latest recruiting records"}</button></div>
    {organizations.length===0?<div className="muted">No organization memberships are available. Register an organization or ask its owner to grant you an appropriate role.</div>:<><label>Organization workspace<select value={orgId} aria-label="Organization workspace" disabled={loading} onChange={e=>{setOrgId(e.target.value);setJobId("");setCandidates([]);setDashboard(null);}}>{organizations.map(o=><option key={o.id} value={o.id}>{o.display_name||o.legal_name} · {o.verification_status||"unverified"}</option>)}</select></label>

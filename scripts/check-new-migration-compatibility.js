@@ -90,6 +90,9 @@ try {
   }
   const ledgerRows = (await client.query("select filename, checksum from public.app_schema_migration")).rows;
   const recorded = new Map(ledgerRows.map(row => [row.filename, row.checksum]));
+  if (recorded.size === 0) {
+    throw new Error("Migration history is empty. Establish an operator-confirmed baseline with the repository migration process before checking compatibility.");
+  }
   const repositoryMigrationFiles = (await readdir(migrationDirectory)).filter(name => name.endsWith(".sql")).sort();
   const repositoryMigrations = new Map();
   for (const filename of repositoryMigrationFiles) {
@@ -102,6 +105,13 @@ try {
     if (recordedChecksum !== current.checksum) {
       throw new Error(`Migration checksum mismatch for ${filename}; do not edit an applied migration. Create a forward corrective migration instead.`);
     }
+  }
+  const lastPreGateMigration = "20261016200000_saved_discovery_items.sql";
+  const baselineIndex = repositoryMigrationFiles.indexOf(lastPreGateMigration);
+  if (baselineIndex < 0) throw new Error(`Expected baseline marker ${lastPreGateMigration} is missing from this revision.`);
+  const missingBaselineFiles = repositoryMigrationFiles.slice(0,baselineIndex+1).filter(filename=>!recorded.has(filename));
+  if (missingBaselineFiles.length) {
+    throw new Error("Migration history is not confirmed through the last pre-gate migration. Reconcile the test database baseline before applying the ten new migrations:\\n- " + missingBaselineFiles.join("\\n- "));
   }
   const migrations = migrationNames.map(filename => {
     const migration = repositoryMigrations.get(filename);

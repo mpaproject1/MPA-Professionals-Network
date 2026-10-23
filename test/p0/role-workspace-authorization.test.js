@@ -295,3 +295,24 @@ test("Reviewer checklist and claim assessment actions are case-scoped and eviden
   assert.match(ui, /Save assessment/);
   assert.match(ui, /Evidence linked to this checklist item/);
 });
+
+test("Marketplace routes discovery into existing private workflows without replacing them", () => {
+  const marketplace = read("web/app/marketplace/page.tsx");
+  const shell = read("web/components/shell.tsx");
+  const services = read("web/app/services/page.tsx");
+  const mentorship = read("web/app/mentorship/page.tsx");
+  const demand = read("web/app/service-demand/page.tsx");
+  const lifecycle = read("src/services-mentorship/service.js");
+  assert.match(marketplace, /href:"\/services"/);
+  assert.match(marketplace, /href:"\/mentorship"/);
+  assert.match(marketplace, /href:"\/service-demand"/);
+  assert.match(marketplace, /href:"\/jobs"/);
+  assert.match(marketplace, /A public listing is not a private agreement/);
+  assert.match(shell, /\["\/marketplace","Marketplace",Search\]/);
+  assert.match(shell, /"\/marketplace","\/services","\/network","\/jobs"/);
+  assert.match(services, /Back to Marketplace/);
+  assert.match(mentorship, /Back to Marketplace/);
+  assert.match(demand, /Back to Marketplace/);
+  assert.match(lifecycle, /revision_requested/);
+  assert.match(lifecycle, /"disputed"/);
+});

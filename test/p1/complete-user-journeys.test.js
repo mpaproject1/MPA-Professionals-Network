@@ -352,6 +352,8 @@ test("Gate 2: declined mentorship match remains in history when a different ment
  const menteeDeclined=await journeys.respondToMenteeMatch(secondMatch.id,mentee,"declined","This mentor's available focus does not fit my goal.","gate2-rematch-mentee-decline");
  assert.equal(menteeDeclined.status,"declined");
  assert.equal(menteeDeclined.mentee_consent_status,"declined");
+ const declineReplay=await journeys.respondToMenteeMatch(secondMatch.id,mentee,"declined","This mentor's available focus does not fit my goal.","gate2-rematch-mentee-decline-replay");
+ assert.equal(declineReplay.idempotent,true,"retrying the same final decline must replay safely");
  const thirdMatch=await journeys.proposeMentorMatch(request.id,thirdMentor,mentee,"gate2-rematch-propose-c");
  assert.notEqual(thirdMatch.id,secondMatch.id,"a mentee-declined match must remain in history when a third mentor is proposed");
  assert.equal(thirdMatch.status,"proposed");

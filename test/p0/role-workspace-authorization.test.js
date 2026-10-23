@@ -274,7 +274,7 @@ test("CV storage remains private by default and sharing is limited to the applic
   assert.match(files, /job_application_attachment aa join job_application a on a\.id=aa\.application_id join job j on j\.id=a\.job_id/);
   assert.match(files, /om\.role_code in \('owner','administrator','recruiter','project_manager'\)/);
   assert.match(files, /jt\.active=true/);
-  assert.match(files, /jt\.role_code in \\(\'hiring_manager\',\'recruiter\',\'interviewer\'\\)/);
+  assert.match(files, /jt\.role_code in \('hiring_manager','recruiter','interviewer'\)/);
   assert.match(migration, /cv_file_id uuid references file_object\(id\)/);
   assert.match(cvPage, /Your CV, your choice/);
   assert.match(cvPage, /Revoke CV access/);

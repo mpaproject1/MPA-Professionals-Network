@@ -274,9 +274,19 @@ try {
       throw new Error(`Required unique index ${name} is missing or not unique.`);
     }
     if (name === "ux_mentorship_match_one_open_request" &&
-        (!row.indexdef.toLowerCase().includes("where") || !row.indexdef.includes("mentee_consent_status"))) {
-      throw new Error("The mentorship rematching index must remain a partial index scoped to non-declined proposals.");
+        (!row.indexdef.toLowerCase().includes("where") ||
+         !row.indexdef.includes("mentee_consent_status") ||
+         !row.indexdef.includes("'proposed'") ||
+         !row.indexdef.includes("'accepted'") ||
+         !row.indexdef.includes("'declined'"))) {
+      throw new Error("The mentorship rematching index must be partial and cover only proposed/accepted matches that have not been declined by the mentee.");
     }
+  }
+  const oldRequestUnique = await client.query(
+    "select count(*)::int as count from pg_constraint where conrelid='public.mentorship_match'::regclass and contype='u' and pg_get_constraintdef(oid)='UNIQUE (request_id)'"
+  );
+  if (oldRequestUnique.rows[0].count > 0) {
+    throw new Error("The old one-match-per-request unique constraint remains and would prevent declined-match rematching.");
   }
 
   const requiredChecks = [

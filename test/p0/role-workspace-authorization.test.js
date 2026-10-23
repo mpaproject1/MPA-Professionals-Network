@@ -133,3 +133,42 @@ test("administrator audit history is exposed through a protected read-only route
   assert.match(adminUi, /tab === "audit" && roles\.includes\("system_admin"\)/);
   assert.match(adminUi, /api<AuditEvent>\("\/api\/v1\/admin\/audit-log\?limit=100"/);
 });
+
+
+test("recruiting interview scheduling validates organization/job-team scope and private notes stay restricted", () => {
+  const service = read("src/organization-jobs/service.js");
+  const start = service.indexOf("export async function scheduleInterview(");
+  const end = service.indexOf("export async function respondInterview(", start);
+  const interview = service.slice(start, end);
+  assert.match(interview, /INVALID_INTERVIEWER/);
+  assert.match(interview, /organization_membership om where om\.organization_id=\$2/);
+  assert.match(interview, /job_team_member jt where jt\.job_id=\$3/);
+  assert.match(interview, /Interviews can only be scheduled for an active application/);
+  const notesStart = service.indexOf("export async function listApplicationNotes(");
+  const notesEnd = service.indexOf("export async function scheduleInterview(", notesStart);
+  assert.match(service.slice(notesStart, notesEnd), /n\.visibility<>'private' or n\.author_user_id=\$2 or \$3::boolean/);
+});
+
+test("verification write routes reject cross-case claim/evidence references and require independent appeal authority", () => {
+  const service = read("src/verification/service.js");
+  assert.match(service, /assertEvidenceIdsForCase/);
+  assert.match(service, /Every evidence reference must belong to this verification case/);
+  assert.match(service, /The selected claim does not belong to this verification case/);
+  assert.match(service, /Independent appeal reviewer role required/);
+  assert.match(service, /A reason is required for every appeal decision/);
+});
+
+test("support escalation, priority and waiting states are persisted and routed", () => {
+  const support = read("src/platform/support-bot.js");
+  const server = read("server.js");
+  const migration = read("db/migrations/20261023_support_inquiry_workflow.sql");
+  assert.match(support, /export async function escalateConversation/);
+  assert.match(support, /support\.inquiry_escalated/);
+  assert.match(support, /support_conversation_workflow/);
+  assert.match(support, /waitingOn/);
+  assert.match(support, /support.inquiries.manage/);
+  assert.match(server, /supportBot\.escalateConversation/);
+  assert.match(migration, /priority text not null default 'normal'/);
+  assert.match(migration, /waiting_on text not null default 'none'/);
+  assert.match(migration, /escalated_at timestamptz/);
+});

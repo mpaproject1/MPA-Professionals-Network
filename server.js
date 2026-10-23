@@ -511,7 +511,7 @@ const server=http.createServer(async (req,res)=>{
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="claim-status"){
       anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]); const b=await body(req);
-      return ok(res,await verification.setClaimStatus(parts[4],b.status,identity.sub,requestId),requestId);
+      return ok(res,await verification.setClaimStatus(b.claimId,b.status,identity.sub,requestId,parts[4]),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="check-results"){
       anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]); const b=await body(req);

@@ -236,6 +236,8 @@ try {
   }
 
   const requiredChecks = [
+    ["verification_reference_request","verification_reference_request_consent_status_check",["pending","accepted","consented","declined","withdrawn"]],
+    ["verification_reference_request","verification_reference_request_verification_status_check",["pending","received","verified","insufficient","disputed","not_verified","needs_clarification"]],
     ["support_conversation_workflow","support_conversation_workflow_priority_check",["low","normal","high","urgent"]],
     ["support_conversation_workflow","support_conversation_workflow_waiting_on_check",["none","member","organization","provider","internal"]],
     ["mentorship_match","mentorship_match_mentee_consent_status_check",["pending","accepted","declined"]]

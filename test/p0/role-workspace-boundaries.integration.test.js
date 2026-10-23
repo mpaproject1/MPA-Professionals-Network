@@ -73,9 +73,11 @@ test("reviewer queue, case detail and write actions enforce assigned-case bounda
   const reviewerA = await account(suffix + "h");
   const reviewerB = await account(suffix + "i");
   const manager = await account(suffix + "j");
+  const permissionManager = await account(suffix + "k");
   await assignRole(reviewerA, "verification_reviewer");
   await assignRole(reviewerB, "verification_reviewer");
   await assignRole(manager, "system_admin");
+  await getPool().query("insert into app_user_permission(user_id,permission_code) values($1,'verification.manage') on conflict do nothing", [permissionManager]);
 
   const programs = await verification.listPrograms();
   assert.ok(programs.length, "At least one active verification program must exist");
@@ -83,6 +85,10 @@ test("reviewer queue, case detail and write actions enforce assigned-case bounda
   const caseB = await verification.createCase(subjectB, programs[0].program_code, subjectB, `case-b-${suffix}`);
   await verification.assignCase(caseA.id, reviewerA, manager, `assign-a-${suffix}`);
   await verification.assignCase(caseB.id, reviewerB, manager, `assign-b-${suffix}`);
+  await assert.rejects(verification.assignCase(caseA.id, reviewerB, reviewerA, `unauthorized-assign-${suffix}`), hasStatus(403));
+  const subjectC = await activeMember(suffix + "l");
+  const caseC = await verification.createCase(subjectC, programs[0].program_code, subjectC, `case-c-${suffix}`);
+  await verification.assignCase(caseC.id, reviewerA, permissionManager, `assign-permission-manager-${suffix}`);
 
   const queue = await verification.listCases({ viewerId: reviewerA, reviewerId: reviewerB, limit: 100 });
   const queueIds = queue.items.map((item) => item.id);

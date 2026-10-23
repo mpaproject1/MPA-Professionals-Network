@@ -21,13 +21,13 @@
 - Both organization-detail roster data and the separate roster endpoint are limited to owner/administrator.
 - Direct assignment of the owner role through ordinary add/update-member actions is blocked; ownership transfer requires a dedicated workflow.
 - Public organization discovery continues through the separate limited public-profile projection.
-- Existing organization/job services are intended to enforce organization scope on job, candidate, applicant, and team actions; this still needs negative cross-organization API tests.
+- Added a database-backed regression scenario covering cross-organization job, application, candidate-list, notes, team-membership and interview IDs. It has not been run.
 
 **Not yet addressed / needs verification**
 - A complete UX pass over the existing recruiter journey: clear task dashboard, job/requisition status, applicants awaiting action, interview/outcome follow-up, empty/error/retry states, and accessible responsive navigation.
 - Verify every candidate, application, team, job, and requisition route against a different organization's resource ID.
 - Confirm recruiter permissions do not expose member-only private profile fields or employer-consent-restricted job-seeker details.
-- Add integration tests proving the owner/admin roster difference and cross-organization denial.
+- Run the new integration scenarios against a safe test database and add browser acceptance for the full recruiter journey.
 
 ### 2. Reviewer
 
@@ -39,7 +39,7 @@
 - The existing reviewer UI already includes reasoned decisions and displays decision history.
 
 **Not yet addressed / needs verification**
-- Runtime tests still need to prove assigned reviewer success, unassigned reviewer denial, reviewer-ID tampering, own-case conflict and manager access.
+- Added source-level guards for cross-case claim/evidence references, checklist evidence IDs and independent appeal-decision authority. Database/browser validation is still required for assigned/unassigned access, assignment history, appeals, reference operations and private file retrieval.
 - Audit every remaining verification write and evidence-download route against the complete permission matrix.
 - Complete browser/API acceptance for assignment changes, race conditions, private evidence and appeal independence.
 
@@ -55,9 +55,10 @@
 
 **Not yet addressed / needs verification**
 - Confirm the new queue behavior against the existing admin/support UI and database schema using runtime tests.
-- **Manager-controlled transfer/reassignment is now implemented in source:** only users with broader queue-management authority may transfer, the target must be an active eligible support colleague, a handoff reason is required, the row is locked in a transaction, and the transfer is audited.
-- Source-structure and database-backed integration tests were added for transfer authorization, recipient validation and audit metadata; neither has been run.
-- Still incomplete: escalation policy, priority, waiting-on-member versus waiting-on-organization states, delivery/receipt confirmation for notifications, and negative runtime tests for another staff member's assignment, manager override, missing/revoked consent, wrong employer and private attachments.
+- **Transfer/reassignment:** manager-only API and UI controls, active eligible colleague list, required handoff reason, row locking and audit event are in source.
+- **Escalation:** added a persisted workflow table migration, high/urgent priority, waiting-on-member/organization/provider/internal states, manager notification queue, a dedicated escalated-inquiry filter and UI controls.
+- Source-structure tests cover the migration, API, queue filter and controls; database integration and browser tests have not been run. The migration has not been applied to any database.
+- Still incomplete: notification delivery/receipt confirmation and runtime negative tests for cross-staff access, missing/revoked consent, private attachments and escalation recovery.
 - A full support ticket lifecycle is not yet proven; the existing support conversation workflow is not automatically equivalent to a complete ticketing system.
 
 ### 4. Finance
@@ -113,10 +114,10 @@ These are **source-structure regression guards**. They do not prove runtime auth
 
 ## Recommended implementation order
 
-1. Add database-backed reviewer, organization and support-assignment tests; source-structure checks alone are insufficient.
-2. Verify the existing Organization/Recruiter journey and test cross-organization resource IDs.
-3. Finish reviewer route coverage, including remaining write actions and evidence downloads.
-4. Verify Support Desk queue, escalation, consent and notification behavior in runtime tests.
+1. Run the new database-backed cross-organization, reviewer-boundary and support-transfer scenarios on a safe test database.
+2. Verify the existing Organization/Recruiter journey in the browser and expand negative tests to every route.
+3. Finish reviewer route coverage, including reference-request operations, assignment history and actual private-evidence file retrieval.
+4. Apply the support workflow migration only through the reviewed migration process, then verify queue, escalation, consent and notification behavior in runtime tests.
 5. Obtain the separation-of-duties decision before implementing the final Finance permission model and finance-first UI.
 6. Finish the administrator mutation audit and validate the new audit view against the deployed schema in a safe test environment.
 7. Verify the startup/hourly membership expiry worker and its failure/retry behavior; confirm all profile editing works for non-members and member-only verification remains gated.

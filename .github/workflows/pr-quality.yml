@@ -196,7 +196,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${WEB_BASE_URL:-}" || { echo "::error::Configure repository variable MPA_E2E_BASE_URL to a dedicated non-production test deployment."; exit 1; }
-          node --input-type=module -e 'const u=new URL(process.env.WEB_BASE_URL); if (!/^(localhost|127\\.0\\.0\\.1)$/.test(u.hostname) && !/(staging|stage|test|e2e|preview|dev)/i.test(u.hostname)) { console.error("Refusing browser tests: target hostname must clearly identify a non-production environment."); process.exit(1); }'
+          node --input-type=module -e 'const u=new URL(process.env.WEB_BASE_URL); if (!["localhost","127.0.0.1"].includes(u.hostname) && !/(staging|stage|test|e2e|preview|dev)/i.test(u.hostname)) { console.error("Refusing browser tests: target hostname must clearly identify a non-production environment."); process.exit(1); }'
           for key in \
             MPA_E2E_NON_MEMBER_EMAIL MPA_E2E_NON_MEMBER_PASSWORD \
             MPA_E2E_ACTIVE_MEMBER_EMAIL MPA_E2E_ACTIVE_MEMBER_PASSWORD \

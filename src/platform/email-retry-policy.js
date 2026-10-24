@@ -6,7 +6,7 @@ const NETWORK_ERROR_CODES = new Set([
 
 export function emailIdempotencyKey(outboxId) {
   const id = String(outboxId ?? "").trim();
-  return id ? \`mpa-email-\${id.slice(0, 120)}\` : null;
+  return id ? "mpa-email-" + id.slice(0, 120) : null;
 }
 
 /** Retry only explicit transient provider/network failures; configuration and validation failures are permanent. */

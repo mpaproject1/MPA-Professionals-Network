@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { escapeEmailHtml, renderBrandedEmail, renderVerificationEmail } from "../../src/platform/email-template.js";
 
 test("branded email includes MPA identity and a responsive table-based shell", () => {

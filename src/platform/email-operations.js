@@ -1,9 +1,9 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getPool, withTransaction } from "./db.js";
-import { resendEmailVerification } from "./email-verification.js";
-import { createInAppNotification } from "./notifications.js";
 import { classifyEmailDeliveryError, emailIdempotencyKey, emailRetryDelaySeconds } from "./email-retry-policy.js";
 import { renderBrandedEmail } from "./email-template.js";
+import { resendEmailVerification } from "./email-verification.js";
+import { createInAppNotification } from "./notifications.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 async function requireAdmin(db,actorId){

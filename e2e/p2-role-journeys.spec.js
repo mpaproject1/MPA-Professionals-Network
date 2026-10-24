@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 const enabled = process.env.MPA_E2E_ROLE_JOURNEYS === "1";
 

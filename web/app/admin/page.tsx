@@ -151,7 +151,7 @@ export default function AdminPage() {
     if (hydrated && token) void load();
   }, [hydrated, token, load]);
   const workspaces = [
-    {title:"Organizations",desc:"Organization workspace and verification review queues.",href:"/organizations",Icon:Building2,group:"Review & service",access:"org"},
+    {title:"Organizations",desc:"Search organizations, inspect linked accounts and open verification review workflows.",href:"/admin/organizations",Icon:Building2,group:"Review & service",access:"org"},
     {title:"Accounts & roles",desc:"Search platform accounts, review status and manage roles with audit reasons.",href:"#account-governance",Icon:Users,group:"People & access",access:"admin"},
     {title:"Member records",desc:"Import approved member registers, resolve conflicts and export records.",href:"/admin/members",Icon:Users,group:"People & access",access:"admin"},
     {title:"Membership operations",desc:"Membership plans, payment review and membership lifecycle controls.",href:"/admin/membership",Icon:ShieldCheck,group:"People & access",access:"admin"},

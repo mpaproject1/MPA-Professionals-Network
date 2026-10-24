@@ -49,7 +49,7 @@ test.describe("institutional homepage responsive acceptance", () => {
       const surface = document.querySelector(".min-h-screen");
       if (!surface) throw new Error("The application surface is missing.");
       const style = getComputedStyle(surface);
-      const parse = (value: string) => value.match(/[0-9.]+/g)?.slice(0, 3).map(Number) ?? [];
+      const parse = (value) => value.match(/[0-9.]+/g)?.slice(0, 3).map(Number) ?? [];
       const luminance = (rgb: number[]) => rgb.reduce((sum, channel, index) => {
         const value = channel / 255;
         return sum + [0.2126, 0.7152, 0.0722][index] * (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);

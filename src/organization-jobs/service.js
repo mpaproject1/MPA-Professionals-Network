@@ -855,3 +855,39 @@ export async function listApplicationAttachments(applicationId,userId){
  if(a.applicant_user_id!==userId) await orgRole(db,a.organization_id,userId,CANDIDATE_ROLES);
  return (await db.query("select aa.id,aa.file_object_id,aa.attachment_type,aa.created_at from job_application_attachment aa where aa.application_id=$1 order by aa.created_at",[applicationId])).rows;
 }
+
+/**
+ * Administrative organization catalogue. The caller must be authorized by the
+ * HTTP route; this read-only query deliberately returns account relationships
+ * separately from organization verification status.
+ */
+export async function listOrganizationsForAdmin(filters = {}) {
+ const db = getPool();
+ const q = String(filters.q || "").trim().slice(0, 160);
+ const status = String(filters.status || "").trim();
+ const limit = Math.min(Math.max(Number(filters.limit) || 25, 1), 100);
+ const offset = Math.max(Number(filters.offset) || 0, 0);
+ const args = [q, status || null];
+ const where = `($1 = '' or o.display_name ilike '%' || $1 || '%' or o.legal_name ilike '%' || $1 || '%' or coalesce(o.email,'') ilike '%' || $1 || '%' or coalesce(o.tracking_reference,'') ilike '%' || $1 || '%') and ($2::text is null or coalesce(vc.status,o.verification_status,'unverified') = $2)`;
+ const total = Number((await db.query(`select count(*)::int count from organization o left join lateral (select c.status from organization_verification_case c where c.organization_id=o.id order by c.created_at desc limit 1) vc on true where ${where}`, args)).rows[0]?.count || 0);
+ const rows = (await db.query(`
+  select o.id,o.tracking_reference,o.legal_name,o.display_name,o.organization_type,o.email,o.phone,o.verification_status,o.public_visible,o.created_at,o.updated_at,
+   coalesce(vc.status,o.verification_status,'unverified') as review_status,
+   vc.submitted_at as verification_submitted_at,
+   coalesce(m.member_count,0)::int as account_count,
+   coalesce(m.active_count,0)::int as active_account_count,
+   coalesce(m.accounts,'[]'::json) as accounts
+  from organization o
+  left join lateral (select c.status,c.submitted_at from organization_verification_case c where c.organization_id=o.id order by c.created_at desc limit 1) vc on true
+  left join lateral (
+   select count(*)::int member_count,
+    count(*) filter(where om.status='active')::int active_count,
+    json_agg(json_build_object('userId',u.id,'email',u.email,'username',u.username,'accountStatus',u.status,'role',om.role_code,'membershipStatus',om.status) order by om.created_at desc) as accounts
+   from organization_membership om join app_user u on u.id=om.user_id where om.organization_id=o.id
+  ) m on true
+  where ${where}
+  order by case when coalesce(vc.status,o.verification_status,'unverified') in ('submitted','pending') then 0 else 1 end, o.updated_at desc nulls last, o.display_name
+  limit ${limit} offset ${offset}
+ `, args)).rows;
+ return {items:rows, total, limit, offset, hasMore:offset+rows.length<total};
+}

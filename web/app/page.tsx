@@ -2,11 +2,11 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import {
-  ArrowDown, ArrowRight, BriefcaseBusiness, Building2, Compass, GraduationCap,
-  LockKeyhole, Network, Search, ShieldCheck, Sparkles, UserRoundCheck, Wrench, Landmark, ClipboardCheck
+  ArrowDown, ArrowRight, BriefcaseBusiness, Building2, ClipboardCheck, Compass, GraduationCap,
+  Landmark, LockKeyhole, Network, Search, ShieldCheck, Sparkles, UserRoundCheck, Wrench
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import styles from "./landing-redesign.module.css";
 import LiveNetworkFeeds from "./live-network-feeds";
 
@@ -48,6 +48,8 @@ function Reveal({ children, delay = 0, className = "" }: { children: React.React
 }
 
 export default function Home() {
+  const journeysHeadingId = useId();
+  const dispatchHeadingId = useId();
   const [journeyFocus, setJourneyFocus] = useState<"all" | "professional" | "organization" | "community">("all");
   const reduceMotion = useReducedMotion();
   const visibleJourneys = journeys.filter((journey) => journeyFocus === "all" || journey.group === journeyFocus);
@@ -172,10 +174,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className={styles.section} aria-labelledby="journeys-heading">
+      <section className={styles.section} aria-labelledby={journeysHeadingId}>
         <Reveal className={styles.sectionHeading}>
           <p className={styles.eyebrow}>Choose your next step</p>
-          <h2 id="journeys-heading">How can we help you today?</h2>
+          <h2 id={journeysHeadingId}>How can we help you today?</h2>
           <p className={styles.sectionIntro}>Start with one goal. You can explore the other parts of the network whenever you are ready.</p>
           <span className={styles.headingRule} />
         </Reveal>
@@ -227,11 +229,11 @@ export default function Home() {
         </Reveal>
       </section>
 
-      <section className={styles.dispatchSection} aria-labelledby="dispatch-title">
+      <section className={styles.dispatchSection} aria-labelledby={dispatchHeadingId}>
         <div className={styles.dispatchBanner}>
           <div className={styles.dispatchCopy}>
             <p className={styles.dispatchEyebrow}>Institutional dispatch</p>
-            <h2 id="dispatch-title">Stay close to the work that matters.</h2>
+            <h2 id={dispatchHeadingId}>Stay close to the work that matters.</h2>
             <p>Ask about professional participation, published opportunities and community-service pathways. MPA does not currently offer an email newsletter subscription through this page.</p>
             <p className={styles.dispatchPrivacy}>Use the support assistant to ask a question or request human follow-up. Contact details are optional, and MPA will not contact you unless you explicitly consent.</p>
           </div>

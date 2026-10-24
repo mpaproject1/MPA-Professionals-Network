@@ -44,7 +44,7 @@ test("service-demand, service delivery and mentorship mutations use synchronous 
   assert.ok(demand.includes("demand:submit"));
   assert.ok(demand.includes("claimAction(lock)"));
   assert.ok(services.includes("provider:save"));
-  assert.ok(services.includes("delivery:"+ "r.id"));
+  assert.ok(services.includes("const lock=\"delivery:\"+r.id"));
   assert.ok(mentorship.includes("propose-match:"));
   assert.ok(mentorship.includes("mentorship-match:"));
   assert.ok(mentorship.includes("mentorship:request"));

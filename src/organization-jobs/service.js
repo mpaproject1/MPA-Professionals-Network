@@ -869,7 +869,7 @@ export async function listOrganizationsForAdmin(filters = {}) {
  const offset = Math.max(Number(filters.offset) || 0, 0);
  const args = [q, status || null];
  const where = `($1 = '' or o.display_name ilike '%' || $1 || '%' or o.legal_name ilike '%' || $1 || '%' or coalesce(o.email,'') ilike '%' || $1 || '%' or coalesce(o.tracking_reference,'') ilike '%' || $1 || '%') and ($2::text is null or coalesce(vc.status,o.verification_status,'unverified') = $2)`;
- const total = Number((await db.query(`select count(*)::int count from organization o left join lateral (select c.status from organization_verification_case c where c.organization_id=o.id order by c.created_at desc limit 1) vc on true where ${where}`, args)).rows[0]?.count || 0);
+ const total = Number((await db.query(`select count(*)::int count from organization o left join lateral (select c.status from organization_verification_case c where c.organization_id=o.id order by c.submitted_at desc limit 1) vc on true where ${where}`, args)).rows[0]?.count || 0);
  const rows = (await db.query(`
   select o.id,o.tracking_reference,o.legal_name,o.display_name,o.organization_type,o.email,o.phone,o.verification_status,o.public_visible,o.created_at,o.updated_at,
    coalesce(vc.status,o.verification_status,'unverified') as review_status,
@@ -878,7 +878,7 @@ export async function listOrganizationsForAdmin(filters = {}) {
    coalesce(m.active_count,0)::int as active_account_count,
    coalesce(m.accounts,'[]'::json) as accounts
   from organization o
-  left join lateral (select c.status,c.submitted_at from organization_verification_case c where c.organization_id=o.id order by c.created_at desc limit 1) vc on true
+  left join lateral (select c.status,c.submitted_at from organization_verification_case c where c.organization_id=o.id order by c.submitted_at desc limit 1) vc on true
   left join lateral (
    select count(*)::int member_count,
     count(*) filter(where om.status='active')::int active_count,

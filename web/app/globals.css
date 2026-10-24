@@ -340,7 +340,4 @@ body{
   outline:3px solid var(--focus-ring);
   outline-offset:3px;
 }
-@media(prefers-reduced-transparency:reduce){
-  .shell-main::after{opacity:.38}
-}
 

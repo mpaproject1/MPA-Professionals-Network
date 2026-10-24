@@ -257,6 +257,7 @@ export default function AdminPage() {
       </section>
       <section className={styles.section} id="account-governance" aria-labelledby="admin-governance-heading">
         <div className={styles.sectionHeader}><div><h2 id="admin-governance-heading">Experience & governance tools</h2><p>Less-frequent configuration tools are kept below the operational workspaces.</p></div></div>
+      </section>
       {error && (
         <div className="field-banner">
           <ShieldCheck size={18} />

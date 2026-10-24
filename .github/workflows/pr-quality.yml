@@ -2,7 +2,7 @@ name: PR Quality - pre-deployment checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, ux/p0-navigation-and-org-privacy]
   push:
     branches:
       - main

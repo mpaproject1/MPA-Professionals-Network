@@ -105,7 +105,7 @@ export default function Home() {
           <div className={styles.visualOrb} aria-hidden="true"><div /><div /><div /></div>
           <div className={styles.visualTopline}>
             <span className={styles.visualMark}><Network size={17} aria-hidden="true" /></span>
-            <span><strong>One network</strong><small>Many ways to contribute</small></span>
+            <span><strong>Participation with clear boundaries</strong><small>Review, consent and access stay distinct</small></span>
             <Sparkles className={styles.sparkle} size={19} aria-hidden="true" />
           </div>
           <p className={styles.visualPrompt}>What would you like to do today?</p>
@@ -125,7 +125,7 @@ export default function Home() {
               </motion.div>
             ))}
           </div>
-          <div className={styles.visualFootnote}><span aria-hidden="true" /> Start with what matters to you. Your path can grow from there.</div>
+          <div className={styles.visualFootnote}><span aria-hidden="true" /> Public discovery does not override privacy settings, eligibility or required approvals.</div>
         </Reveal>
       </section>
 

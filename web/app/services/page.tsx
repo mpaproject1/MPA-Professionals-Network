@@ -13,7 +13,7 @@ import {useSavedDiscoveryItems} from "../../lib/use-saved-discovery-items";
 
 type Service={id:string;title:string;description:string;service_category:string;delivery_mode?:string;location_label?:string;pricing_model:string;price_amount?:number|string|null;currency?:string|null;display_name?:string;provider_name?:string};
 function createSubmissionKey():string{if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function")throw new Error("Secure submission is unavailable in this browser. Please reload and try again.");return crypto.randomUUID()+crypto.randomUUID();}
-type ServiceRequest={id:string;status:string;service_title?:string;created_at?:string;message?:string;provider_user_id?:string;requester_user_id?:string;is_provider?:boolean;provider_completed_at?:string|null;requester_accepted_at?:string|null;outcome_summary?:string|null;nextAction?:string;status_history?:{fromStatus?:string|null;toStatus?:string|null;note?:string|null;createdAt?:string}[]};
+type ServiceRequest={id:string;status:string;idempotent?:boolean;tracking_reference?:string;service_title?:string;created_at?:string;message?:string;provider_user_id?:string;requester_user_id?:string;is_provider?:boolean;provider_completed_at?:string|null;requester_accepted_at?:string|null;outcome_summary?:string|null;nextAction?:string;status_history?:{fromStatus?:string|null;toStatus?:string|null;note?:string|null;createdAt?:string}[]};
 type ServiceDelivery={id:string;request_id:string;description:string;status:string;reviewer_note?:string|null;created_at?:string;submitted_by:string};
 type ProviderListing={nextAction?:string;id:string;title:string;description:string;service_category:string;delivery_mode:string;location_label?:string|null;pricing_model:string;price_amount?:number|string|null;currency?:string|null;visibility:string;status:string;moderation_status:string;moderation_note?:string|null;organization_id?:string|null;provider_name?:string|null};
 type Org={id:string;display_name:string;verification_status?:string;role_code?:string};
@@ -109,13 +109,13 @@ export default function Services(){
      const key=requestIdempotencyKey||createSubmissionKey();setRequestIdempotencyKey(key);
      const created=await api<ServiceRequest>(`/api/v1/services/${encodeURIComponent(selected.id)}/requests`,{method:"POST",headers:{"X-Idempotency-Key":key},body:JSON.stringify({message:message.trim()||undefined})},token);
      setSubmissionUncertain(false);setRequestIdempotencyKey("");
-     setNotice(`Service request reference ${created.id}. Current status: ${humanStatus(created.status||"requested")}. ${created.nextAction||"The provider must respond before delivery begins."}`);
+     setNotice(created.idempotent?`You already have an active request for this service. No duplicate was created; check request history below.`:`Service request reference ${created.tracking_reference||created.id}. Current status: ${humanStatus(created.status||"requested")}. ${created.nextAction||"The provider must respond before delivery begins."}`);setNoticeReference(created.tracking_reference||created.id||"");
      setSelected(null);setMessage("");setRequests(current=>[created,...current.filter(row=>row.id!==created.id)]);
    }catch(e){
      const uncertain=e instanceof ApiError&&(e.status===0||e.status>=500||e.code==="INVALID_RESPONSE");
      setSubmissionUncertain(uncertain);
      setError(uncertain?"We could not confirm whether your service request was received. Keep the same message and retry to retrieve the existing request safely.":e instanceof ApiError?e.message:"We couldn't submit this service request. Your message remains available.");
-   }finally{setSubmitting(false);}
+   }finally{releaseAction(lock);setSubmitting(false);}
  }
 
  return <div className="grid">

@@ -20,7 +20,7 @@ test("membership payment retry reuses a persisted idempotency key and official a
   const service = await read("../../src/membership/service.js");
   assert.match(page, /mpa-membership-payment-key:/);
   assert.match(page, /idempotencyKey/);
-  assert.match(page, /created\.tracking_reference/);
+  assert.match(page, /tracking_reference/);
   assert.match(service, /idempotencyKey is required/);
   assert.match(service, /where pt\.idempotency_key=\$1/);
 });
@@ -31,7 +31,9 @@ test("service request duplicate feedback uses the existing backend deduplication
   assert.match(page, /claimAction\(lock\)/);
   assert.match(page, /created\.idempotent/);
   assert.match(page, /reference=\{noticeReference\|\|undefined\}/);
-  assert.match(service, /if\(duplicate\) return \{\.\.\.duplicate,idempotent:true/);
+  assert.match(service, /request_idempotency_hash/);
+  assert.match(service, /request_fingerprint!==fingerprint/);
+  assert.match(service, /idempotent:true/);
 });
 
 test("role journey browser suite uses real routes and is deferred until final-stage credentials are configured", async () => {

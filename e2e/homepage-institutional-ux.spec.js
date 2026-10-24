@@ -29,10 +29,16 @@ test.describe("institutional homepage responsive acceptance", () => {
     await expect(page.getByRole("checkbox", { name: /I ask MPA support to contact me about this inquiry/i })).toBeVisible();
   });
 
-  test("Serve-Community discovery remains reachable from the homepage announcement", async ({ page }) => {
+  test("Serve-Community discovery remains reachable and the legacy route redirects canonically", async ({ page }) => {
     await page.goto("/");
+    await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Network", exact: true })).toHaveCount(0);
     await page.getByRole("link", { name: /Explore Serve-Community/i }).click();
     await expect(page).toHaveURL(/\/serve-community$/);
     await expect(page.getByRole("heading", { name: /Serve-Community\. More ways to contribute/i })).toBeVisible();
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "/serve-community");
+
+    await page.goto("/marketplace");
+    await expect(page).toHaveURL(/\/serve-community$/);
   });
 });

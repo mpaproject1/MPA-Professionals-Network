@@ -22,7 +22,7 @@ type Result = { items: Organization[]; total: number; limit: number; offset: num
 
 const statuses = [
  { value: "", label: "All statuses" }, { value: "submitted", label: "Submitted for review" },
- { value: "pending", label: "Pending" }, { value: "verified", label: "Verified" },
+ { value: "in_review", label: "In review" }, { value: "verified", label: "Verified" },
  { value: "correction_required", label: "Correction required" }, { value: "rejected", label: "Rejected" },
  { value: "draft", label: "Draft" }, { value: "unverified", label: "Unverified" },
 ];

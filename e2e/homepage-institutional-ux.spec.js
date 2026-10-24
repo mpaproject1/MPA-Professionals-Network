@@ -14,6 +14,36 @@ test.describe("institutional homepage responsive acceptance", () => {
     await expect(page.getByRole("heading", { name: "Field audits" })).toBeVisible();
   });
 
+
+  test("desktop header stays minimal and secondary destinations remain keyboard-accessible in More", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto("/");
+
+    await expect(page.getByRole("link", { name: "MPA", exact: true })).toHaveAttribute("href", "/");
+    const mainNavigation = page.getByRole("navigation", { name: "Main navigation" });
+    await expect(mainNavigation.getByRole("link", { name: "Serve-Community", exact: true })).toBeVisible();
+    await expect(mainNavigation.getByRole("link", { name: "Services", exact: true })).toBeVisible();
+    await expect(mainNavigation.getByRole("link", { name: "Jobs", exact: true })).toBeVisible();
+    await expect(mainNavigation.getByRole("link", { name: "Mentorship", exact: true })).toBeVisible();
+    await expect(mainNavigation.getByRole("link")).toHaveCount(4);
+
+    const moreButton = mainNavigation.getByRole("button", { name: "More" });
+    await expect(moreButton).toHaveAttribute("aria-expanded", "false");
+    await moreButton.click();
+    const menu = page.locator("#desktop-more-menu");
+    await expect(menu.getByRole("link", { name: "Membership", exact: true })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "Saved", exact: true })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "Profile", exact: true })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "About MPA", exact: true })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "Dashboard", exact: true })).toHaveCount(0);
+
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    await expect(moreButton).toHaveAttribute("aria-expanded", "true");
+    await moreButton.click();
+    await expect(menu).toHaveCount(0);
+  });
+
   test("mobile layout has no horizontal overflow and dispatch opens consent-based support", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: "reduce" });

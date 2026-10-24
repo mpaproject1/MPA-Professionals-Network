@@ -13,6 +13,7 @@ const destinations: Destination[] = [
   { href: "/admin", label: "Overview", description: "Review and administration", icon: Activity, exact: true },
   { href: "/admin/organizations", label: "Organizations & accounts", description: "Organization register and account relationships", icon: Building2 },
   { href: "/admin/members", label: "Members", description: "Imports and member records", icon: Users },
+  { href: "/admin/members/catalog", label: "Member catalogue", description: "Search membership records and account links", icon: Users },
   { href: "/admin/membership", label: "Membership administration", description: "Plan versions, reviews and payments", icon: ShieldCheck },
   { href: "/admin/membership-card", label: "Membership card", description: "Credential appearance", icon: ShieldCheck },
   { href: "/admin/reference-portfolio", label: "Reference data", description: "Governed profile options", icon: BookOpenCheck },

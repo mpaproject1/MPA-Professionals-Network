@@ -42,5 +42,5 @@ test("verification email branding escapes the registration reference and verific
   assert.match(html, /MPA&lt;123&gt;/);
   assert.match(html, /token=abc&amp;next=&lt;script&gt;/);
   assert.doesNotMatch(html, /<script>/);
-  assert.match(html, /Confirm your MPA Professionals Network account\./);
+  assert.match(html, /Verify your email address to activate your MPA Professionals Network account\./);
 });

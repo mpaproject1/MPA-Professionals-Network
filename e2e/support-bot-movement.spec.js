@@ -16,11 +16,13 @@ test.describe("MPA support assistant movement and viewport safety", () => {
     expect(before).not.toBeNull();
     expect(handleBox).not.toBeNull();
 
+    // The launcher starts at the right edge; drag left so the horizontal
+    // movement is not swallowed by the viewport clamp at the right boundary.
     await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
     await page.mouse.down();
-    await page.mouse.move(handleBox.x + handleBox.width / 2 + 60, handleBox.y + handleBox.height / 2 + 35, { steps: 6 });
+    await page.mouse.move(handleBox.x + handleBox.width / 2 - 60, handleBox.y + handleBox.height / 2 + 35, { steps: 6 });
     await page.mouse.up();
-    await expect.poll(async () => (await root.boundingBox())?.x).not.toBe(before.x);
+    await expect.poll(async () => (await root.boundingBox())?.x).toBeLessThan(before.x);
 
     const afterMouse = await root.boundingBox();
     await handle.focus();
@@ -28,7 +30,7 @@ test.describe("MPA support assistant movement and viewport safety", () => {
     await expect.poll(async () => (await root.boundingBox())?.x).toBeLessThan(afterMouse.x);
 
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("mpa-support-position-v1") || "null"));
-    expect(saved).toEqual(expect.objectContaining({ left: expect.any(Number), top: expect.any(Number) }));
+    expect(saved).toEqual(expect.objectContaining({ left: expect.any(Number), top: expect.any(Number }));
   });
 
   test("touch drag keeps the launcher above mobile navigation and quick questions work", async ({ browser }) => {

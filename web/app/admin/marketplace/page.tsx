@@ -13,7 +13,7 @@ type Demand={id:string;demand_type:string;title:string;description:string;catego
 type Listing={id:string;listing_type:string;title:string;description:string;category:string;status:string;moderation_status:string;moderation_note?:string|null;provider_user_id:string;owner_name:string;created_at:string};
 type MatchCandidate={id:string;listing_type:string;title:string;provider_name:string;organization_id?:string|null};
 type AssessmentRow={demand_type:string;category:string;location:string;audience:string;interest_level:string;participant_count:number};
-export default function Serve-CommunityModeration(){
+export default function ServeCommunityModeration(){
  const token=useUiStore(s=>s.token),hydrateToken=useUiStore(s=>s.hydrateToken),hydrated=useUiStore(s=>s.hydrated);
  const [tab,setTab]=useState("demand"),[status,setStatus]=useState("submitted"),[demands,setDemands]=useState<Demand[]>([]),[allDemands,setAllDemands]=useState<Demand[]>([]),[listings,setListings]=useState<Listing[]>([]),[mergeTargets,setMergeTargets]=useState<Record<string,string>>({});
   const [matchCandidates,setMatchCandidates]=useState<Record<string,MatchCandidate[]>>({service:[],mentorship:[]}),[matchSelections,setMatchSelections]=useState<Record<string,string>>({}),[matchNotes,setMatchNotes]=useState<Record<string,string>>({});

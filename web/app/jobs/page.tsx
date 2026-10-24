@@ -172,10 +172,12 @@ export default function Jobs(){
    finally{setEligibilityLoading(current=>({...current,[job.id]:false}));}
  }
 
- return <div>
-   <div className="eyebrow">Careers and opportunities</div>
-   <h1 className="h1">Find your next professional opportunity.</h1>
-   <p className="muted">Explore published vacancies from eligible organizations. Review each role’s requirements, check your eligibility and track any formal application from your account.</p>
+ return <div className="mpa-jobs-page">
+   <section className="mpa-signature-intro" aria-labelledby="jobs-page-title">
+     <div className="eyebrow">Careers and opportunities</div>
+     <h1 id="jobs-page-title" className="h1">Find your next professional opportunity.</h1>
+     <p>Explore published vacancies from eligible organizations. Review each role’s requirements, check your eligibility and track any formal application from your account.</p>
+   </section>
    <div className="job-journey grid grid-3" aria-label="Your opportunity journey" style={{gap:10,marginTop:14}}>
     <Card><div className="eyebrow">Step 1</div><b>Prepare your profile</b><p className="muted">Keep your experience and visibility settings up to date.</p><a className="text-link" href="/profile">Review profile →</a></Card>
     <Card><div className="eyebrow">Step 2</div><b>Discover and apply</b><p className="muted">Check requirements and submit the information requested for each role.</p><a className="text-link" href="#job-search">Search opportunities →</a></Card>

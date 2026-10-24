@@ -139,14 +139,18 @@ export default function Mentorship(){
     finally{releaseAction(lock);setSubmitting(false);}
   }
 
- return <div>
-   <div><Link href="/marketplace" className="text-link">← Back to Marketplace</Link><div className="eyebrow" style={{marginTop:8}}>Mentorship and professional growth</div><h1 className="h1">Empower the next generation of leaders.</h1></div>
-   <p className="muted">Explore current mentor profiles from experienced professionals, researchers and specialists. Search by expertise and topic, or submit your goals as an open mentorship request.</p>
-   <div className="row" style={{gap:8,flexWrap:"wrap"}}>
-     <a className="btn btn-primary" href="#mentor-discovery">Explore mentors</a>
-     {token&&<a className="btn btn-ghost" href="#offer-mentorship">Offer your expertise</a>}
-     {token&&<a className="btn btn-ghost" href="#mentorship-requests">Track requests and matches</a>}
-   </div>
+ return <div className="mpa-mentorship-page">
+   <Link href="/marketplace" className="text-link">← Back to Marketplace</Link>
+   <section className="mpa-signature-intro" aria-labelledby="mentorship-page-title">
+     <div className="eyebrow">Mentorship and professional growth</div>
+     <h1 id="mentorship-page-title" className="h1">Empower the next generation of leaders.</h1>
+     <p>Explore current mentor profiles from experienced professionals, researchers and specialists. Search by expertise and topic, or submit your goals as an open mentorship request.</p>
+     <div className="row" style={{gap:8,flexWrap:"wrap"}}>
+       <a className="btn btn-primary" href="#mentor-discovery">Explore mentors</a>
+       {token&&<a className="btn btn-ghost" href="#offer-mentorship">Offer your expertise</a>}
+       {token&&<a className="btn btn-ghost" href="#mentorship-requests">Track requests and matches</a>}
+     </div>
+   </section>
    {token&&<JourneyGuide
      eyebrow="Mentor journey"
      title="Offer expertise → Match → Guide → Close"

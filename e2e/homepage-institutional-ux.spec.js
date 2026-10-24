@@ -39,7 +39,9 @@ test.describe("institutional homepage responsive acceptance", () => {
 
     await page.keyboard.press("Escape");
     await expect(menu).toHaveCount(0);
-    await expect(moreButton).toHaveAttribute("aria-expanded", "true");
+    await expect(moreButton).toHaveAttribute("aria-expanded", "false");
+    await moreButton.click();
+    await expect(menu).toBeVisible();
     await moreButton.click();
     await expect(menu).toHaveCount(0);
   });

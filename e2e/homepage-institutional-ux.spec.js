@@ -78,20 +78,32 @@ test.describe("institutional homepage responsive acceptance", () => {
     expect(focusStyle.outlineWidth).toBeGreaterThanOrEqual(2);
 
     const readTheme = () => page.evaluate(() => {
-      const surface = document.querySelector(".min-h-screen");
-      if (!surface) throw new Error("The application surface is missing.");
-      const style = getComputedStyle(surface);
-      const parse = (value) => value.match(/[0-9.]+/g)?.slice(0, 3).map(Number) ?? [];
+      // The .min-h-screen layout wrapper is intentionally transparent. Measure
+      // the actual theme tokens instead of treating transparent black as a
+      // rendered background, which produced a false contrast failure.
+      const rootStyle = getComputedStyle(document.documentElement);
+      const backgroundToken = rootStyle.getPropertyValue("--bg").trim();
+      const textToken = rootStyle.getPropertyValue("--text").trim();
+      const parseColor = (value) => {
+        const hex = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+        if (hex) {
+          const digits = hex[1].length === 3
+            ? [...hex[1]].map((digit) => digit + digit).join("")
+            : hex[1];
+          return [0, 2, 4].map((index) => Number.parseInt(digits.slice(index, index + 2), 16));
+        }
+        const channels = value.match(/[0-9.]+/g)?.slice(0, 3).map(Number);
+        if (!channels || channels.length !== 3) throw new Error(`Unsupported theme color token: ${value}`);
+        return channels;
+      };
       const luminance = (rgb) => rgb.reduce((sum, channel, index) => {
         const value = channel / 255;
         return sum + [0.2126, 0.7152, 0.0722][index] * (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
       }, 0);
-      const background = parse(style.backgroundColor);
-      const foreground = parse(style.color);
-      const values = [luminance(background), luminance(foreground)].sort((a, b) => b - a);
+      const values = [luminance(parseColor(backgroundToken)), luminance(parseColor(textToken))].sort((a, b) => b - a);
       return {
-        backgroundToken: getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(),
-        textToken: getComputedStyle(document.documentElement).getPropertyValue("--text").trim(),
+        backgroundToken,
+        textToken,
         contrast: (values[0] + 0.05) / (values[1] + 0.05)
       };
     });

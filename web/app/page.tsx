@@ -104,6 +104,11 @@ export default function Home() {
         </div>
 
         <Reveal className={styles.heroVisual}>
+          <svg className={styles.glowingArch} viewBox="0 0 240 250" fill="none" aria-hidden="true" focusable="false">
+            <path d="M18 250V118C18 55 62 12 120 12S222 55 222 118V250" stroke="currentColor" strokeWidth="2" />
+            <path d="M39 250V121C39 69 73 35 120 35S201 69 201 121V250" stroke="currentColor" strokeWidth="1" strokeOpacity=".62" />
+            <path d="M120 12V2M222 118H238" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
           <div className={styles.visualOrb} aria-hidden="true"><div /><div /><div /></div>
           <div className={styles.visualTopline}>
             <span className={styles.visualMark}><Network size={17} aria-hidden="true" /></span>

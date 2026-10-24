@@ -36,6 +36,20 @@ test("service request duplicate feedback uses the existing backend deduplication
   assert.match(service, /idempotent:true/);
 });
 
+test("service-demand, service delivery and mentorship mutations use synchronous in-flight guards", async () => {
+  const demand = await read("../../web/app/service-demand/page.tsx");
+  const services = await read("../../web/app/services/page.tsx");
+  const mentorship = await read("../../web/app/mentorship/page.tsx");
+  assert.ok(demand.includes("const inFlightActions=useRef(new Set<string>())"));
+  assert.ok(demand.includes("demand:submit"));
+  assert.ok(demand.includes("claimAction(lock)"));
+  assert.ok(services.includes("provider:save"));
+  assert.ok(services.includes("delivery:"+ "r.id"));
+  assert.ok(mentorship.includes("propose-match:"));
+  assert.ok(mentorship.includes("mentorship-match:"));
+  assert.ok(mentorship.includes("mentorship:request"));
+});
+
 test("role journey browser suite uses real routes and is deferred until final-stage credentials are configured", async () => {
   const suite = await read("../../e2e/p2-role-journeys.spec.js");
   assert.match(suite, /MPA_E2E_ROLE_JOURNEYS === "1"/);

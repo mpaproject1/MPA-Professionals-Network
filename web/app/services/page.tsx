@@ -71,7 +71,7 @@ export default function Services(){
  useEffect(()=>{void loadProviderWorkspace();},[loadProviderWorkspace]);
 
  async function submitProviderListing(e?:FormEvent){
-   e?.preventDefault();if(!token||providerSaving)return;setProviderSaving(true);setError("");setNotice("");
+   e?.preventDefault();if(!token||providerSaving)return;const lock="provider:save";if(!claimAction(lock))return;setProviderSaving(true);setError("");setNotice("");
    try{
      const body={title:providerForm.title.trim(),description:providerForm.description.trim(),serviceCategory:providerForm.serviceCategory.trim(),deliveryMode:providerForm.deliveryMode,locationLabel:providerForm.locationLabel.trim()||null,pricingModel:providerForm.pricingModel,priceAmount:providerForm.pricingModel==="free"?0:providerForm.priceAmount?Number(providerForm.priceAmount):null,currency:providerForm.currency||"ETB",visibility:providerForm.visibility,organizationId:providerForm.organizationId||undefined};
      const key=editingListingId?null:(providerIdempotencyKey||createSubmissionKey());if(key)setProviderIdempotencyKey(key);const saved=await api<ProviderListing>(editingListingId?`/api/v1/services/${encodeURIComponent(editingListingId)}`:"/api/v1/services",{method:editingListingId?"PATCH":"POST",headers:key?{"X-Idempotency-Key":key}:undefined,body:JSON.stringify(body)},token);setProviderSaveUncertain(false);setProviderIdempotencyKey("");
@@ -79,7 +79,7 @@ export default function Services(){
      setEditingListingId("");setServiceCategoryChoice("");setProviderForm({title:"",description:"",serviceCategory:"",deliveryMode:"remote",locationLabel:"",pricingModel:"quote",priceAmount:"",currency:"ETB",visibility:"public",organizationId:""});
      await loadProviderWorkspace();
    }catch(e){const uncertain=e instanceof ApiError&&(e.status===0||e.status>=500||e.code==="INVALID_RESPONSE");setProviderSaveUncertain(uncertain);setError(uncertain?"We could not confirm whether the listing was saved. Your details are locked so you can safely retry the same save without creating a duplicate draft.":e instanceof ApiError?e.message:"Your listing could not be saved. Your entered details remain in the form.");}
-   finally{setProviderSaving(false);}
+   finally{releaseAction(lock);setProviderSaving(false);}
  }
  async function changeListingStatus(item:ProviderListing,status:"published"|"paused"|"closed"){
    if(!token)return;setTransitioning(item.id,true);setError("");setNotice("");
@@ -101,7 +101,7 @@ export default function Services(){
    }catch(e){setError(e instanceof ApiError?e.message:"We couldn't update this service request.");}
    finally{setTransitioning(r.id,false);}
  }
- async function submitDelivery(r:ServiceRequest){if(!token)return;const description=(deliveryDrafts[r.id]||"").trim();if(description.length<8){setError("Describe the work delivered in at least 8 characters.");return;}setTransitioning(r.id,true);setError("");setNotice("");try{const result=await api<any>(`/api/v1/service-requests/${encodeURIComponent(r.id)}/deliveries`,{method:"POST",body:JSON.stringify({description})},token);setNotice(result?.nextAction||"Delivery recorded. The requester can review it and accept or ask for a revision.");setDeliveryDrafts(v=>({...v,[r.id]:""}));await loadRequests();}catch(e){setError(e instanceof ApiError?e.message:"Delivery could not be submitted. Please retry.");}finally{setTransitioning(r.id,false);}}
+ async function submitDelivery(r:ServiceRequest){if(!token)return;const description=(deliveryDrafts[r.id]||"").trim();if(description.length<8){setError("Describe the work delivered in at least 8 characters.");return;}const lock="delivery:"+r.id;if(!claimAction(lock))return;setTransitioning(r.id,true);setError("");setNotice("");try{const result=await api<any>(`/api/v1/service-requests/${encodeURIComponent(r.id)}/deliveries`,{method:"POST",body:JSON.stringify({description})},token);setNotice(result?.nextAction||"Delivery recorded. The requester can review it and accept or ask for a revision.");setDeliveryDrafts(v=>({...v,[r.id]:""}));await loadRequests();}catch(e){setError(e instanceof ApiError?e.message:"Delivery could not be submitted. Please retry.");}finally{releaseAction(lock);setTransitioning(r.id,false);}}
  async function reviewDelivery(d:ServiceDelivery,status:"accepted"|"revision_requested"){if(!token)return;const note=(deliveryNotes[d.id]||"").trim();if(status==="revision_requested"&&note.length<4){setError("Explain what needs to change before requesting a revision.");return;}setTransitioning(d.id,true);setError("");setNotice("");try{const result=await api<any>(`/api/v1/service-deliveries/${encodeURIComponent(d.id)}/review`,{method:"POST",body:JSON.stringify({status,note:note||undefined})},token);setNotice(result?.nextAction||(status==="accepted"?"Delivery accepted.":"Revision requested."));await loadRequests();}catch(e){setError(e instanceof ApiError?e.message:"Delivery review could not be saved. Please retry.");}finally{setTransitioning(d.id,false);}}
  async function submitRequest(e?:FormEvent){
    e?.preventDefault();if(submitting)return;if(!selected)return;

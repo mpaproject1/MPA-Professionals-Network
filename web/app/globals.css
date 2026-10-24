@@ -341,3 +341,21 @@ body{
   outline-offset:3px;
 }
 
+
+
+/* Shared MPA identity backdrop: one lightweight inline SVG behind every route. */
+.app-shell{min-height:100vh;background:transparent}
+.app-brand-backdrop{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;contain:paint;color:rgba(10,50,88,.44);opacity:.38}
+.app-brand-backdrop__art{display:block;width:100%;height:100%;min-height:100vh}
+.app-brand-backdrop__network{opacity:.2}
+.app-brand-backdrop__nodes{opacity:.3}
+.app-brand-backdrop__arch{stroke:currentColor;opacity:.2}
+.app-brand-backdrop__glow{opacity:.22;transform-box:fill-box;transform-origin:center;animation:mpa-backdrop-breathe 22s ease-in-out infinite alternate}
+.dark .app-brand-backdrop{color:rgba(229,240,68,.72);opacity:.46}
+.dark .app-brand-backdrop__network{opacity:.3}
+.dark .app-brand-backdrop__nodes{opacity:.45}
+.dark .app-brand-backdrop__arch{opacity:.36}
+.dark .app-brand-backdrop__glow{opacity:.34}
+@keyframes mpa-backdrop-breathe{from{opacity:.14;transform:scale(.98)}to{opacity:.32;transform:scale(1.025)}}
+@media(max-width:700px){.app-brand-backdrop{opacity:.24}.dark .app-brand-backdrop{opacity:.3}.app-brand-backdrop__network{opacity:.13}.dark .app-brand-backdrop__network{opacity:.2}.app-brand-backdrop__arch{opacity:.14}.dark .app-brand-backdrop__arch{opacity:.24}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto!important}.app-brand-backdrop__glow{animation:none!important;transform:none!important} .app-brand-backdrop__art{scroll-behavior:auto!important}}

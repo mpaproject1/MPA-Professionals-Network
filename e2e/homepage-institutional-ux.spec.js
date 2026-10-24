@@ -45,18 +45,32 @@ test.describe("institutional homepage responsive acceptance", () => {
     expect(focusStyle.outlineStyle).not.toBe("none");
     expect(focusStyle.outlineWidth).toBeGreaterThanOrEqual(2);
 
-    const light = await page.evaluate(() => ({
-      background: getComputedStyle(document.body).backgroundColor,
-      text: getComputedStyle(document.body).color
-    }));
+    const readTheme = () => page.evaluate(() => {
+      const surface = document.querySelector(".min-h-screen");
+      if (!surface) throw new Error("The application surface is missing.");
+      const style = getComputedStyle(surface);
+      const parse = (value: string) => value.match(/[0-9.]+/g)?.slice(0, 3).map(Number) ?? [];
+      const luminance = (rgb: number[]) => rgb.reduce((sum, channel, index) => {
+        const value = channel / 255;
+        return sum + [0.2126, 0.7152, 0.0722][index] * (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+      }, 0);
+      const background = parse(style.backgroundColor);
+      const foreground = parse(style.color);
+      const values = [luminance(background), luminance(foreground)].sort((a, b) => b - a);
+      return {
+        backgroundToken: getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(),
+        textToken: getComputedStyle(document.documentElement).getPropertyValue("--text").trim(),
+        contrast: (values[0] + 0.05) / (values[1] + 0.05)
+      };
+    });
+    const light = await readTheme();
+    expect(light.contrast).toBeGreaterThanOrEqual(4.5);
     await page.getByRole("button", { name: "Toggle theme" }).click();
     await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(true);
-    const dark = await page.evaluate(() => ({
-      background: getComputedStyle(document.body).backgroundColor,
-      text: getComputedStyle(document.body).color
-    }));
-    expect(dark.background).not.toBe(light.background);
-    expect(dark.text).not.toBe(light.text);
+    const dark = await readTheme();
+    expect(dark.backgroundToken).not.toBe(light.backgroundToken);
+    expect(dark.textToken).not.toBe(light.textToken);
+    expect(dark.contrast).toBeGreaterThanOrEqual(4.5);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 

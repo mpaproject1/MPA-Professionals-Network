@@ -150,6 +150,19 @@ export default function AdminPage() {
   useEffect(() => {
     if (hydrated && token) void load();
   }, [hydrated, token, load]);
+  const workspaces = [
+    {title:"Organizations",desc:"Organization workspace and verification review queues.",href:"/organizations",Icon:Building2,group:"Review & service",access:"org"},
+    {title:"Accounts & roles",desc:"Search platform accounts, review status and manage roles with audit reasons.",href:"#account-governance",Icon:Users,group:"People & access",access:"admin"},
+    {title:"Member records",desc:"Import approved member registers, resolve conflicts and export records.",href:"/admin/members",Icon:Users,group:"People & access",access:"admin"},
+    {title:"Membership operations",desc:"Membership plans, payment review and membership lifecycle controls.",href:"/admin/membership",Icon:ShieldCheck,group:"People & access",access:"admin"},
+    {title:"Serve-Community review",desc:"Moderate shared demand, listings and provider matching.",href:"/admin/marketplace",Icon:ClipboardList,group:"Review & service",access:"staff"},
+    {title:"Support desk",desc:"Manage inquiries, handoffs and the support knowledge base.",href:"/admin/support",Icon:MessageSquareText,group:"Review & service",access:"staff"},
+    {title:"Reports & exports",desc:"Generate scoped reports and audited exports.",href:"/admin/reports",Icon:FileBarChart,group:"Governance",access:"admin"},
+    {title:"Reference data",desc:"Maintain governed professional options and staged imports.",href:"/admin/reference-portfolio",Icon:BookOpenCheck,group:"Governance",access:"admin"},
+    {title:"Security",desc:"Manage administrator passkeys and recovery controls.",href:"/admin/security",Icon:Fingerprint,group:"Governance",access:"admin"},
+    {title:"Email operations",desc:"Review delivery queues, templates and retries.",href:"/admin/email",Icon:Mail,group:"Governance",access:"admin"},
+  ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "org" ? roles.some(role => ["system_admin","reviewer"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin));
+
 
   async function patchCase(item: Demo, active: boolean) {
     try {
@@ -238,22 +251,15 @@ export default function AdminPage() {
       <section className={styles.section} aria-labelledby="admin-workspaces-heading">
         <div className={styles.sectionHeader}><div><h2 id="admin-workspaces-heading">Workspaces</h2><p>Open a focused workspace to search, review and take authorized action.</p></div><span className={styles.sectionCount}>Core administration</span></div>
         <div className={styles.moduleGrid}>
-          {[
-            {title:"Organizations",desc:"Organization workspace and verification review queues.",href:"/organizations",Icon:Building2,group:"Review & service",access:"org"},
-            {title:"Professional accounts",desc:"Search accounts, review status and manage platform roles with audit reasons.",href:"#account-governance",Icon:Users,group:"People & access",access:"admin"},
-            {title:"Member records",desc:"Import approved member registers, resolve conflicts and export records.",href:"/admin/members",Icon:Users,group:"People & access",access:"admin"},
-            {title:"Membership operations",desc:"Membership plans, payment review and membership lifecycle controls.",href:"/admin/membership",Icon:ShieldCheck,group:"People & access",access:"admin"},
-            {title:"Serve-Community review",desc:"Moderate shared demand, listings and provider matching.",href:"/admin/marketplace",Icon:ClipboardList,group:"Review & service",access:"staff"},
-            {title:"Support desk",desc:"Manage inquiries, handoffs and the support knowledge base.",href:"/admin/support",Icon:MessageSquareText,group:"Review & service",access:"staff"},
-            {title:"Reports & exports",desc:"Generate scoped reports and audited exports.",href:"/admin/reports",Icon:FileBarChart,group:"Governance",access:"admin"},
-            {title:"Reference data",desc:"Maintain governed professional options and staged imports.",href:"/admin/reference-portfolio",Icon:BookOpenCheck,group:"Governance",access:"admin"},
-            {title:"Security",desc:"Manage administrator passkeys and recovery controls.",href:"/admin/security",Icon:Fingerprint,group:"Governance",access:"admin"},
-            {title:"Email operations",desc:"Review delivery queues, templates and retries.",href:"/admin/email",Icon:Mail,group:"Governance",access:"admin"},
-          ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "org" ? roles.some(role => ["system_admin","reviewer"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin)).map(({title,desc,href,Icon,group}) => (
-            <a className={styles.moduleCard} href={href} key={href}><span className={styles.moduleIcon}><Icon size={20} aria-hidden="true"/></span><span className={styles.moduleCopy}><small>{group}</small><strong>{title}</strong><span>{desc}</span></span><span className={styles.moduleArrow} aria-hidden="true">↗</span></a>
+          {workspaces.map(({title,desc,href,Icon,group}) => (
+            <a className={styles.moduleCard} href={href} key={href}>
+              <span className={styles.moduleIcon}><Icon size={20} aria-hidden="true"/></span>
+              <span className={styles.moduleCopy}><small>{group}</small><strong>{title}</strong><span>{desc}</span></span>
+              <span className={styles.moduleArrow} aria-hidden="true">↗</span>
+            </a>
           ))}
         </div>
-        {moduleQuery.trim() && <p className={styles.noResults} role="status">Showing workspaces matching “{moduleQuery}”. Clear the search to see all available workspaces.</p>}
+        {moduleQuery.trim() && workspaces.length === 0 && <p className={styles.noResults} role="status">No available workspace matches “{moduleQuery}”. Try another search term or clear the search.</p>}
       </section>
       <section className={styles.section} id="account-governance" aria-labelledby="admin-governance-heading">
         <div className={styles.sectionHeader}><div><h2 id="admin-governance-heading">Experience & governance tools</h2><p>Less-frequent configuration tools are kept below the operational workspaces.</p></div></div>

@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { loadConfig } from "./config.js";
 import { getPool, withTransaction } from "./db.js";
+import { renderVerificationEmail } from "./email-template.js";
 
 const sha256 = value => createHash("sha256").update(String(value)).digest("hex");
 const clean = value => String(value || "").trim();
@@ -55,7 +56,13 @@ export async function deliverEmailVerification(message) {
   const render = (source, html=false) => String(source || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_,key) => { const value=String(vars[key] ?? ""); return html ? value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;") : value; });
   const emailSubject = template ? render(template.subject_template) : "Verify your MPA Professionals Network email";
   const emailText = template ? render(template.text_template) : `Verify your email to activate your MPA Professionals Network account. This link expires in 24 hours. Registration reference: ${message.registrationReference}. Link: ${message.verificationUrl}`;
-  const emailHtml = template ? render(template.html_template, true) : `<p>Verify your email to activate your MPA Professionals Network account.</p><p>Registration reference: <strong>${message.registrationReference}</strong></p><p><a href="${message.verificationUrl}">Verify email address</a></p><p>This link expires in 24 hours.</p>`;
+  const emailHtml = renderVerificationEmail({
+    subject: emailSubject,
+    textBody: emailText,
+    htmlTemplate: template ? render(template.html_template, true) : "",
+    verificationUrl: message.verificationUrl,
+    registrationReference: message.registrationReference
+  });
   const resendKey = clean(process.env.RESEND_API_KEY);
   const emailFrom = clean(process.env.EMAIL_FROM);
   const endpoint = clean(process.env.EMAIL_DELIVERY_WEBHOOK_URL);

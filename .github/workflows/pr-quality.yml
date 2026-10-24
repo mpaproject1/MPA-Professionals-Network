@@ -98,6 +98,13 @@ jobs:
           set -euo pipefail
           test "$(psql "$DATABASE_URL" -X -A -t -v ON_ERROR_STOP=1 -c 'select current_database()')" = "mpa_test"
           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'select current_database(), current_user;'
+      - name: Verify legacy-schema upgrade on a separate disposable PostgreSQL database
+        env:
+          UPGRADE_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/mpa_upgrade_test
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'CREATE DATABASE mpa_upgrade_test'
+          DATABASE_URL="$UPGRADE_DATABASE_URL" bash scripts/ci-migration-upgrade.sh
       - name: Apply repository migrations to disposable CI database
         run: npm run migrate
       - name: Verify migration compatibility in rollback-only transaction

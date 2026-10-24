@@ -154,6 +154,7 @@ export default function AdminPage() {
     {title:"Organizations",desc:"Search organizations, inspect linked accounts and open verification review workflows.",href:"/admin/organizations",Icon:Building2,group:"Review & service",access:"org"},
     {title:"Accounts & roles",desc:"Search platform accounts, review status and manage roles with audit reasons.",href:"#account-governance",Icon:Users,group:"People & access",access:"admin"},
     {title:"Member records",desc:"Import approved member registers, resolve conflicts and export records.",href:"/admin/members",Icon:Users,group:"People & access",access:"admin"},
+    {title:"Member catalogue",desc:"Search individual membership records and linked account status.",href:"/admin/members/catalog",Icon:Users,group:"People & access",access:"admin"},
     {title:"Membership operations",desc:"Membership plans, payment review and membership lifecycle controls.",href:"/admin/membership",Icon:ShieldCheck,group:"People & access",access:"admin"},
     {title:"Serve-Community review",desc:"Moderate shared demand, listings and provider matching.",href:"/admin/marketplace",Icon:ClipboardList,group:"Review & service",access:"staff"},
     {title:"Support desk",desc:"Manage inquiries, handoffs and the support knowledge base.",href:"/admin/support",Icon:MessageSquareText,group:"Review & service",access:"staff"},
@@ -161,7 +162,7 @@ export default function AdminPage() {
     {title:"Reference data",desc:"Maintain governed professional options and staged imports.",href:"/admin/reference-portfolio",Icon:BookOpenCheck,group:"Governance",access:"admin"},
     {title:"Security",desc:"Manage administrator passkeys and recovery controls.",href:"/admin/security",Icon:Fingerprint,group:"Governance",access:"admin"},
     {title:"Email operations",desc:"Review delivery queues, templates and retries.",href:"/admin/email",Icon:Mail,group:"Governance",access:"admin"},
-  ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "org" ? roles.some(role => ["system_admin","reviewer"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin));
+  ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "org" ? roles.some(role => ["system_admin","admin","reviewer"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin));
 
 
   async function patchCase(item: Demo, active: boolean) {

@@ -105,11 +105,11 @@ button:not(:disabled):active,a.btn:active{transform:translateY(1px)}
 /* MPA shared responsive brand system — soft canvas, midnight navy and lime signal. */
 :root{
   color-scheme:light;
-  --bg:#F4F7FB;
+  --bg:#f7ffe6;
   --surface:#FFFFFF;
   --text:#172033;
   --muted:#526176;
-  --border:#DCE5EF;
+  --border:#dce5b8;
   --primary:#0B1630;
   --primary-strong:#142746;
   --primary-contrast:#FFFFFF;
@@ -120,7 +120,7 @@ button:not(:disabled):active,a.btn:active{transform:translateY(1px)}
   --brand-navy:#0B1630;
   --brand-deep:#142746;
   --brand-lime:#C7F36B;
-  --brand-canvas:#F4F7FB;
+  --brand-canvas:#f7ffe6;
 }
 .dark{
   color-scheme:dark;
@@ -144,8 +144,6 @@ button:not(:disabled):active,a.btn:active{transform:translateY(1px)}
 html{background:var(--bg);scroll-padding-top:84px}
 body{
   background:
-    radial-gradient(ellipse at 8% 0%,color-mix(in srgb,var(--brand-lime) 10%,transparent),transparent 34rem),
-    radial-gradient(ellipse at 96% 18%,color-mix(in srgb,#4776A8 8%,transparent),transparent 38rem),
     var(--bg);
   color:var(--text);
   min-height:100vh;
@@ -153,8 +151,6 @@ body{
 }
 .dark body{
   background:
-    radial-gradient(ellipse at 8% 0%,color-mix(in srgb,var(--brand-lime) 6%,transparent),transparent 34rem),
-    radial-gradient(ellipse at 96% 18%,color-mix(in srgb,#4776A8 10%,transparent),transparent 38rem),
     var(--bg);
 }
 .topbar{
@@ -303,38 +299,11 @@ body{
 .shell-main{
   isolation:isolate;
   background-color:transparent;
-  background-image:
-    radial-gradient(circle at 12% 8%,color-mix(in srgb,var(--brand-lime) 8%,transparent) 0 2px,transparent 3px),
-    radial-gradient(circle at 88% 22%,color-mix(in srgb,#4776A8 12%,transparent) 0 2px,transparent 3px),
-    radial-gradient(circle at 76% 64%,color-mix(in srgb,var(--brand-lime) 8%,transparent) 0 2px,transparent 3px),
-    linear-gradient(to right,color-mix(in srgb,var(--primary) 5%,transparent) 1px,transparent 1px),
-    linear-gradient(to bottom,color-mix(in srgb,var(--primary) 5%,transparent) 1px,transparent 1px);
-  background-size:auto,auto,auto,32px 32px,32px 32px;
-  background-position:center,center,center,center top,center top;
-}
-.shell-main::after{
-  content:"";
-  position:absolute;
-  z-index:-1;
-  inset:0;
-  pointer-events:none;
-  background:
-    radial-gradient(ellipse at 10% 12%,color-mix(in srgb,var(--brand-lime) 11%,transparent),transparent 34%),
-    radial-gradient(ellipse at 92% 26%,color-mix(in srgb,#4776A8 10%,transparent),transparent 36%),
-    radial-gradient(ellipse at 72% 76%,color-mix(in srgb,var(--brand-lime) 6%,transparent),transparent 30%);
-  opacity:.72;
+  background-image:none;
 }
 .dark .shell-main{
-  background-image:
-    radial-gradient(circle at 12% 8%,color-mix(in srgb,var(--brand-lime) 14%,transparent) 0 2px,transparent 3px),
-    radial-gradient(circle at 88% 22%,color-mix(in srgb,#72B7FF 16%,transparent) 0 2px,transparent 3px),
-    radial-gradient(circle at 76% 64%,color-mix(in srgb,var(--brand-lime) 12%,transparent) 0 2px,transparent 3px),
-    linear-gradient(to right,color-mix(in srgb,#A9C4E8 7%,transparent) 1px,transparent 1px),
-    linear-gradient(to bottom,color-mix(in srgb,#A9C4E8 7%,transparent) 1px,transparent 1px);
-  background-size:auto,auto,auto,32px 32px,32px 32px;
-  background-position:center,center,center,center top,center top;
+  background-image:none;
 }
-.dark .shell-main::after{opacity:.82}
 .shell-main :where(button,a,input,select,textarea,[role="button"]){min-width:0}
 .shell-main :where(button,a,input,select,textarea,[role="button"]):focus-visible{
   outline:3px solid var(--focus-ring);

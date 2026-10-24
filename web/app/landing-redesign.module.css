@@ -330,3 +330,63 @@
 @media(max-width:980px){.portalGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.announcement,.dispatchBanner{align-items:flex-start}}
 @media(max-width:640px){.announcement,.dispatchBanner{flex-direction:column;align-items:stretch;gap:18px;border-radius:18px}.announcementAction,.dispatchAction{width:100%}.portalGrid{grid-template-columns:minmax(0,1fr)}.portalCard{padding:20px}.dispatchSection{padding-top:28px;padding-bottom:28px}}
 @media(prefers-reduced-motion:reduce){.announcementAction,.dispatchAction,.portalCard{transition:none}.announcementAction:hover,.dispatchAction:hover,.portalCard:hover{transform:none}}
+
+
+/* Homepage hero: translucent glass surface with a lime architectural arch. */
+.heroVisual{
+  overflow:visible;
+  background:rgba(255,255,255,.82);
+  -webkit-backdrop-filter:blur(24px) saturate(135%);
+  backdrop-filter:blur(24px) saturate(135%);
+  border-color:rgba(255,255,255,.36);
+  box-shadow:0 24px 64px rgba(0,0,0,.20),0 0 0 1px rgba(151,192,36,.10),inset 0 1px 0 rgba(255,255,255,.72);
+}
+.heroVisual:before{
+  border-radius:inherit;
+  background:linear-gradient(135deg,rgba(255,255,255,.52),rgba(151,192,36,.28) 28%,transparent 54%,rgba(255,255,255,.20));
+}
+.glowingArch{
+  position:absolute;
+  z-index:0;
+  top:-59px;
+  right:-39px;
+  width:clamp(190px,23vw,270px);
+  height:auto;
+  color:#97C024;
+  overflow:visible;
+  pointer-events:none;
+  filter:drop-shadow(0 0 5px rgba(151,192,36,.9)) drop-shadow(0 0 16px rgba(151,192,36,.62)) drop-shadow(0 0 34px rgba(151,192,36,.30));
+}
+.heroVisual>.visualTopline,
+.heroVisual>.visualPrompt,
+.heroVisual>.quickStarts,
+.heroVisual>.visualFootnote{
+  position:relative;
+  z-index:1;
+}
+.visualOrb{opacity:.88}
+:global(.dark) .heroVisual{
+  background:rgba(15,23,42,.64);
+  -webkit-backdrop-filter:blur(24px) saturate(140%);
+  backdrop-filter:blur(24px) saturate(140%);
+  border-color:rgba(151,192,36,.34);
+  box-shadow:0 24px 64px rgba(0,0,0,.28),0 0 28px rgba(151,192,36,.08),inset 0 1px 0 rgba(255,255,255,.08);
+}
+:global(.dark) .heroVisual:before{
+  background:linear-gradient(135deg,rgba(151,192,36,.32),rgba(255,255,255,.08) 28%,transparent 56%,rgba(151,192,36,.16));
+}
+:global(.dark) .heroVisual .quickStart{
+  background:rgba(15,23,42,.72);
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+}
+@media(max-width:760px){
+  .glowingArch{top:-43px;right:-24px;width:205px;opacity:.88}
+  .heroVisual{overflow:visible}
+}
+@media(max-width:480px){
+  .glowingArch{top:-34px;right:-15px;width:172px;opacity:.78}
+}
+@media(prefers-reduced-motion:reduce){
+  .glowingArch{filter:drop-shadow(0 0 7px rgba(151,192,36,.55))}
+}

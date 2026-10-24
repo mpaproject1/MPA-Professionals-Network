@@ -28,7 +28,10 @@ test("public organization directory is private and named sharing uses bounded se
 });
 test("Services is primary and organization workspace links require a signed-in organization account", () => {
   assert.match(shell, /\["\/services","Services",BriefcaseBusiness\]/);
-  assert.match(shell, /\["\/","\/services","\/network","\/jobs","\/membership"\]/);
+  assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);
+  assert.doesNotMatch(shell, /\["\/","Home",/);
+  assert.doesNotMatch(shell, /\["\/network","Network",/);
+  assert.match(shell, /\["\/serve-community","\/services","\/jobs"\]/);
   assert.doesNotMatch(shell, /\/organizations\/directory/);
   assert.match(shell, /if\(token&&hasOrganizations\)[\s\S]*mobileMore\.push\(orgLink\)/);
 });

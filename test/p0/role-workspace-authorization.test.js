@@ -296,8 +296,8 @@ test("Reviewer checklist and claim assessment actions are case-scoped and eviden
   assert.match(ui, /Evidence linked to this checklist item/);
 });
 
-test("Marketplace routes discovery into existing private workflows without replacing them", () => {
-  const marketplace = read("web/app/marketplace/page.tsx");
+test("Serve-Community routes discovery into existing private workflows without replacing them", () => {
+  const marketplace = read("web/app/serve-community/page.tsx");
   const shell = read("web/components/shell.tsx");
   const services = read("web/app/services/page.tsx");
   const mentorship = read("web/app/mentorship/page.tsx");
@@ -308,11 +308,13 @@ test("Marketplace routes discovery into existing private workflows without repla
   assert.match(marketplace, /href:"\/service-demand"/);
   assert.match(marketplace, /href:"\/jobs"/);
   assert.match(marketplace, /A public listing is not a private agreement/);
-  assert.match(shell, /\["\/marketplace","Marketplace",Search\]/);
-  assert.match(shell, /"\/marketplace","\/services","\/network","\/jobs"/);
-  assert.match(services, /Back to Marketplace/);
-  assert.match(mentorship, /Back to Marketplace/);
-  assert.match(demand, /Back to Marketplace/);
+  assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);
+  assert.match(shell, /\["\/serve-community","\/services","\/jobs"\]/);
+  assert.doesNotMatch(shell, /\["\/marketplace","Marketplace",Search\]/);
+  assert.match(services, /Back to Serve-Community/);
+  assert.match(mentorship, /Back to Serve-Community/);
+  assert.match(demand, /Back to Serve-Community/);
+  assert.match(read("web/next.config.js"), /source: "\/marketplace", destination: "\/serve-community", permanent: true/);
   assert.match(lifecycle, /revision_requested/);
   assert.match(lifecycle, /"disputed"/);
 });

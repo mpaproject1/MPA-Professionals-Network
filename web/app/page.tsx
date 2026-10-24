@@ -2,11 +2,11 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import {
-  ArrowDown, ArrowRight, BriefcaseBusiness, Building2, Compass, GraduationCap,
-  LockKeyhole, Network, Search, ShieldCheck, Sparkles, UserRoundCheck, Wrench
+  ArrowDown, ArrowRight, BriefcaseBusiness, Building2, ClipboardCheck, Compass, GraduationCap,
+  Landmark, LockKeyhole, Network, Search, ShieldCheck, Sparkles, UserRoundCheck, Wrench
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import styles from "./landing-redesign.module.css";
 import LiveNetworkFeeds from "./live-network-feeds";
 
@@ -25,6 +25,13 @@ const quickStarts = [
   { label: "Meet the network", note: "Discover shared profiles", href: "/network", icon: Network }
 ] as const;
 
+const portalPillars = [
+  { id: "directory", title: "Professional directory", status: "Available", description: "Explore profiles intentionally made visible for professional discovery. Visibility and verification status depend on each profile and its workflow.", href: "/network", action: "Explore profiles", icon: Network, planned: false },
+  { id: "mentorship", title: "Executive mentorship", status: "Available", description: "Explore mentor profiles and the existing mentorship request journey. Participation follows the workflow and each person's response.", href: "/mentorship", action: "Explore mentorship", icon: GraduationCap, planned: false },
+  { id: "islamic-finance", title: "Islamic Finance", status: "Planned capability", description: "A dedicated Islamic Finance pathway is planned. For now, explore the professional services that are currently published.", href: "/services", action: "Browse current services", icon: Landmark, planned: true },
+  { id: "field-audits", title: "Field audits", status: "Planned capability", description: "A dedicated field-audit offering is planned. The existing field workspace supports authorized evidence workflows and is not presented as an audit service.", href: "/about", action: "Understand current workflows", icon: ClipboardCheck, planned: true }
+] as const;
+
 function Reveal({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
   const reduceMotion = useReducedMotion();
   return (
@@ -41,6 +48,8 @@ function Reveal({ children, delay = 0, className = "" }: { children: React.React
 }
 
 export default function Home() {
+  const journeysHeadingId = useId();
+  const dispatchHeadingId = useId();
   const [journeyFocus, setJourneyFocus] = useState<"all" | "professional" | "organization" | "community">("all");
   const reduceMotion = useReducedMotion();
   const visibleJourneys = journeys.filter((journey) => journeyFocus === "all" || journey.group === journeyFocus);
@@ -98,7 +107,7 @@ export default function Home() {
           <div className={styles.visualOrb} aria-hidden="true"><div /><div /><div /></div>
           <div className={styles.visualTopline}>
             <span className={styles.visualMark}><Network size={17} aria-hidden="true" /></span>
-            <span><strong>One network</strong><small>Many ways to contribute</small></span>
+            <span><strong>Participation with clear boundaries</strong><small>Review, consent and access stay distinct</small></span>
             <Sparkles className={styles.sparkle} size={19} aria-hidden="true" />
           </div>
           <p className={styles.visualPrompt}>What would you like to do today?</p>
@@ -118,8 +127,17 @@ export default function Home() {
               </motion.div>
             ))}
           </div>
-          <div className={styles.visualFootnote}><span aria-hidden="true" /> Start with what matters to you. Your path can grow from there.</div>
+          <div className={styles.visualFootnote}><span aria-hidden="true" /> Public discovery does not override privacy settings, eligibility or required approvals.</div>
         </Reveal>
+      </section>
+
+      <section className={styles.announcement} aria-labelledby="platform-update-title">
+        <div className={styles.announcementCopy}>
+          <p className={styles.eyebrow}>Platform update</p>
+          <h2 id="platform-update-title">Professional participation, with community service in view.</h2>
+          <p>Explore public opportunities and services. Where verification, review or sharing consent is required, those steps remain governed by the relevant workflow.</p>
+        </div>
+        <Link href="/serve-community" className={styles.announcementAction}>Explore Serve-Community <ArrowRight size={17} aria-hidden="true" /></Link>
       </section>
 
       <section className={styles.section} id="live-network" aria-labelledby="live-network-heading">
@@ -132,10 +150,34 @@ export default function Home() {
         <LiveNetworkFeeds />
       </section>
 
-      <section className={styles.section} aria-labelledby="journeys-heading">
+      <section className={styles.section} aria-labelledby="portal-pillars-heading">
+        <Reveal className={styles.sectionHeading}>
+          <p className={styles.eyebrow}>A connected platform</p>
+          <h2 id="portal-pillars-heading">Clear pathways for professional contribution.</h2>
+          <p className={styles.sectionIntro}>Start with capabilities available today. Future areas are clearly marked; a prominent card does not change eligibility, access or approval requirements.</p>
+          <span className={styles.headingRule} />
+        </Reveal>
+        <div className={styles.portalGrid}>
+          {portalPillars.map(({ id, title, status, description, href, action, icon: Icon, planned }, index) => (
+            <Reveal key={id} delay={index * 0.04} className={styles.cardReveal}>
+              <article className={styles.portalCard}>
+                <div className={styles.portalCardTop}>
+                  <span className={styles.portalIcon}><Icon size={22} aria-hidden="true" /></span>
+                  <span className={planned ? styles.plannedStatus : styles.availableStatus}>{status}</span>
+                </div>
+                <h3>{title}</h3>
+                <p>{description}</p>
+                <Link href={href} className={styles.cardLink}>{action} <ArrowRight size={16} aria-hidden="true" /></Link>
+              </article>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.section} aria-labelledby={journeysHeadingId}>
         <Reveal className={styles.sectionHeading}>
           <p className={styles.eyebrow}>Choose your next step</p>
-          <h2 id="journeys-heading">How can we help you today?</h2>
+          <h2 id={journeysHeadingId}>How can we help you today?</h2>
           <p className={styles.sectionIntro}>Start with one goal. You can explore the other parts of the network whenever you are ready.</p>
           <span className={styles.headingRule} />
         </Reveal>
@@ -185,6 +227,18 @@ export default function Home() {
           </div>
           <div className={styles.bridgeDecor} aria-hidden="true"><span /><span /><span /></div>
         </Reveal>
+      </section>
+
+      <section className={styles.dispatchSection} aria-labelledby={dispatchHeadingId}>
+        <div className={styles.dispatchBanner}>
+          <div className={styles.dispatchCopy}>
+            <p className={styles.dispatchEyebrow}>Institutional dispatch</p>
+            <h2 id={dispatchHeadingId}>Stay close to the work that matters.</h2>
+            <p>Ask about professional participation, published opportunities and community-service pathways. MPA does not currently offer an email newsletter subscription through this page.</p>
+            <p className={styles.dispatchPrivacy}>Use the support assistant to ask a question or request human follow-up. Contact details are optional, and MPA will not contact you unless you explicitly consent.</p>
+          </div>
+          <button type="button" className={styles.dispatchAction} onClick={() => window.dispatchEvent(new Event("mpa:open-support-contact"))}>Ask MPA support <ArrowRight size={17} aria-hidden="true" /></button>
+        </div>
       </section>
 
       <section className={`${styles.section} ${styles.lastSection}`}>

@@ -298,3 +298,49 @@ body{
 .desktop-more-panel a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--text);font-size:13px;font-weight:650;text-decoration:none}
 .desktop-more-panel a:hover,.desktop-more-panel a.active{background:color-mix(in srgb,var(--brand-lime) 22%,var(--surface));color:var(--text)}
 .desktop-more-panel a svg{flex:0 0 auto;color:var(--primary)}
+
+/* Global MPA hero atmosphere: decorative only, always behind page content. */
+.shell-main{
+  isolation:isolate;
+  background-color:transparent;
+  background-image:
+    radial-gradient(circle at 12% 8%,color-mix(in srgb,var(--brand-lime) 8%,transparent) 0 2px,transparent 3px),
+    radial-gradient(circle at 88% 22%,color-mix(in srgb,#4776A8 12%,transparent) 0 2px,transparent 3px),
+    radial-gradient(circle at 76% 64%,color-mix(in srgb,var(--brand-lime) 8%,transparent) 0 2px,transparent 3px),
+    linear-gradient(to right,color-mix(in srgb,var(--primary) 5%,transparent) 1px,transparent 1px),
+    linear-gradient(to bottom,color-mix(in srgb,var(--primary) 5%,transparent) 1px,transparent 1px);
+  background-size:auto,auto,auto,32px 32px,32px 32px;
+  background-position:center,center,center,center top,center top;
+}
+.shell-main::after{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(ellipse at 10% 12%,color-mix(in srgb,var(--brand-lime) 11%,transparent),transparent 34%),
+    radial-gradient(ellipse at 92% 26%,color-mix(in srgb,#4776A8 10%,transparent),transparent 36%),
+    radial-gradient(ellipse at 72% 76%,color-mix(in srgb,var(--brand-lime) 6%,transparent),transparent 30%);
+  opacity:.72;
+}
+.dark .shell-main{
+  background-image:
+    radial-gradient(circle at 12% 8%,color-mix(in srgb,var(--brand-lime) 14%,transparent) 0 2px,transparent 3px),
+    radial-gradient(circle at 88% 22%,color-mix(in srgb,#72B7FF 16%,transparent) 0 2px,transparent 3px),
+    radial-gradient(circle at 76% 64%,color-mix(in srgb,var(--brand-lime) 12%,transparent) 0 2px,transparent 3px),
+    linear-gradient(to right,color-mix(in srgb,#A9C4E8 7%,transparent) 1px,transparent 1px),
+    linear-gradient(to bottom,color-mix(in srgb,#A9C4E8 7%,transparent) 1px,transparent 1px);
+  background-size:auto,auto,auto,32px 32px,32px 32px;
+  background-position:center,center,center,center top,center top;
+}
+.dark .shell-main::after{opacity:.82}
+.shell-main :where(button,a,input,select,textarea,[role="button"]){min-width:0}
+.shell-main :where(button,a,input,select,textarea,[role="button"]):focus-visible{
+  outline:3px solid var(--focus-ring);
+  outline-offset:3px;
+}
+@media(prefers-reduced-transparency:reduce){
+  .shell-main::after{opacity:.38}
+}
+

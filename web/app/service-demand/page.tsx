@@ -21,7 +21,6 @@ export default function ServiceDemand(){
  const [topics,setTopics]=useState<Topic[]>([]),[mine,setMine]=useState<Demand[]>([]),[interests,setInterests]=useState<Interest[]>([]),[orgs,setOrgs]=useState<Org[]>([]),[providerMatches,setProviderMatches]=useState<ProviderMatch[]>([]),[matchResponseNotes,setMatchResponseNotes]=useState<Record<string,string>>({});
  const [form,setForm]=useState(blank),[typeFilter,setTypeFilter]=useState("all"),[query,setQuery]=useState("");
  const [keepDraft,setKeepDraft]=useState(false),[draftReady,setDraftReady]=useState(false),[draftStorageKey,setDraftStorageKey]=useState("");
- const [keepDraft,setKeepDraft]=useState(false),[draftReady,setDraftReady]=useState(false),[draftStorageKey,setDraftStorageKey]=useState("");
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[submissionUncertain,setSubmissionUncertain]=useState(false),[idempotencyKey,setIdempotencyKey]=useState(""),[joiningIds,setJoiningIds]=useState<Record<string,boolean>>({}),[error,setError]=useState(""),[topicsError,setTopicsError]=useState(""),[activityLoadError,setActivityLoadError]=useState(""),[notice,setNotice]=useState("");
  const [levels,setLevels]=useState<Record<string,string>>({});
  useEffect(()=>{hydrateToken();},[hydrateToken]);

@@ -1,7 +1,7 @@
 "use client";
 import {Bookmark,Handshake,MessageSquareText,RefreshCw,ShieldCheck,Star} from "lucide-react";
 import Link from "next/link";
-import {type FormEvent,useCallback,useEffect,useState} from "react";
+import {type FormEvent,useCallback,useEffect,useRef,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
 import { FormFeedback } from "../../components/form-feedback";
 import { OperationStatus } from "../../components/operation-status";
@@ -24,6 +24,7 @@ export default function Services(){
  const [page,setPage]=useState(0);const [hasMore,setHasMore]=useState(false);const pageSize=20;
  const [requests,setRequests]=useState<ServiceRequest[]>([]);
  const [deliveries,setDeliveries]=useState<Record<string,ServiceDelivery[]>>({});
+ const [deliveryErrors,setDeliveryErrors]=useState<Record<string,string>>({});
  const [deliveryDrafts,setDeliveryDrafts]=useState<Record<string,string>>({});
  const [requestNotes,setRequestNotes]=useState<Record<string,string>>({});
  const [deliveryNotes,setDeliveryNotes]=useState<Record<string,string>>({});
@@ -58,8 +59,8 @@ export default function Services(){
    catch(e){setError(e instanceof ApiError?e.message:"Your provider workspace could not be loaded.");}
  },[token]);
  const loadRequests=useCallback(async()=>{
-   if(!token){setRequests([]);return;}
-   try{const [result,me]=await Promise.all([api<ServiceRequest[]>("/api/v1/me/service-requests",{},token),api<{user_id:string}>("/api/v1/me",{},token)]);const rows=Array.isArray(result)?result:[];setRequests(rows);setCurrentUserId(me.user_id);const loaded=await Promise.all(rows.map(async r=>{try{return [r.id,await api<ServiceDelivery[]>(`/api/v1/service-requests/${encodeURIComponent(r.id)}/deliveries`,{},token)] as const;}catch{return [r.id,[]] as const;}}));setDeliveries(Object.fromEntries(loaded));}
+   if(!token){setRequests([]);setDeliveries({});setDeliveryErrors({});return;}
+   try{const [result,me]=await Promise.all([api<ServiceRequest[]>("/api/v1/me/service-requests",{},token),api<{user_id:string}>("/api/v1/me",{},token)]);const rows=Array.isArray(result)?result:[];setRequests(rows);setCurrentUserId(me.user_id);const loaded=await Promise.all(rows.map(async r=>{try{return {id:r.id,rows:await api<ServiceDelivery[]>(`/api/v1/service-requests/${encodeURIComponent(r.id)}/deliveries`,{},token),error:""};}catch(e){return {id:r.id,rows:[] as ServiceDelivery[],error:e instanceof ApiError?e.message:"Delivery history could not be loaded."};}}));setDeliveries(Object.fromEntries(loaded.map(x=>[x.id,x.rows] as const)));setDeliveryErrors(Object.fromEntries(loaded.filter(x=>x.error).map(x=>[x.id,x.error] as const)));}
    catch(e){setError(e instanceof ApiError?e.message:"We couldn't load your service requests.");}
  },[token]);
  useEffect(()=>{const initialQuery=new URLSearchParams(window.location.search).get("q")?.trim()||"";setQuery(initialQuery);void load(initialQuery,0);},[load]);
@@ -102,7 +103,8 @@ export default function Services(){
  async function submitRequest(e?:FormEvent){
    e?.preventDefault();if(submitting)return;if(!selected)return;
    if(!token){setNotice("Sign in to request this service. Member-only offers require an active membership.");return;}
-   setSubmitting(true);setError("");setNotice("");
+   const lock="service-request:"+selected.id;if(!claimAction(lock))return;
+   setSubmitting(true);setError("");setNotice("");setNoticeReference("");
    try{
      const key=requestIdempotencyKey||createSubmissionKey();setRequestIdempotencyKey(key);
      const created=await api<ServiceRequest>(`/api/v1/services/${encodeURIComponent(selected.id)}/requests`,{method:"POST",headers:{"X-Idempotency-Key":key},body:JSON.stringify({message:message.trim()||undefined})},token);

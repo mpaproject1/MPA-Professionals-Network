@@ -1,0 +1,30 @@
+"use client";
+import { RefreshCw, Search, Users } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { FormFeedback } from "../../../../components/form-feedback";
+import { OperationStatus } from "../../../../components/operation-status";
+import { Badge, Card } from "../../../../components/ui";
+import { ApiError, api } from "../../../../lib/api";
+import { useUiStore } from "../../../../lib/store";
+import { AdminPageHeader } from "../../admin-page-header";
+import styles from "./catalog.module.css";
+type Member={id:string;user_id:string|null;membership_number:string;product_code:string|null;product_name:string|null;status:string;start_date:string|null;end_date:string|null;source:string|null;created_at:string;email:string|null;account_status:string|null;phone:string|null;full_name:string|null};
+type Result={items:Member[];total:number;limit:number;offset:number;hasMore:boolean};
+const statuses=["","active","expired","pending","suspended","cancelled"];
+export default function MemberCatalogPage(){
+ const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated),hydrateToken=useUiStore(s=>s.hydrateToken);
+ const [data,setData]=useState<Result|null>(null),[q,setQ]=useState(""),[status,setStatus]=useState(""),[page,setPage]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ const load=useCallback(async()=>{if(!token)return;setBusy(true);setError("");try{const p=new URLSearchParams({q,status,limit:"25",offset:String(page*25)});setData(await api<Result>(`/api/v1/admin/members/catalog?${p}`,{},token));}catch(e){setError(e instanceof ApiError||e instanceof Error?e.message:"Member catalogue failed to load.");}finally{setBusy(false);}},[token,q,status,page]);
+ useEffect(()=>{hydrateToken();},[hydrateToken]);useEffect(()=>{if(hydrated&&token)void load();},[hydrated,token,load]);
+ if(!hydrated)return <div className="grid" style={{gap:16}}><h1 className="h1">Member catalogue</h1><Card><OperationStatus state="loading" title="Preparing member directory" detail="Restoring your authorized session." /></Card></div>;
+ if(!token)return <div className="grid" style={{gap:16}}><h1 className="h1">Member catalogue</h1><Card><p>Sign in with an authorized membership administrator account.</p><a className="btn btn-primary" href="/login?next=/admin/members/catalog">Sign in</a></Card></div>;
+ return <div className="grid" style={{gap:18,minWidth:0}}>
+  <AdminPageHeader eyebrow="Administration · Membership" title="Member catalogue" description="Search membership records independently of account governance. This directory is read-only: payment verification, membership decisions, account access and audited bulk imports remain in their dedicated workflows." actions={<><a className="btn btn-ghost" href="/admin">Admin overview</a><a className="btn btn-primary" href="/admin/members">Import & export</a></>}/>
+  {error&&<FormFeedback kind="error" message={error} onRetry={()=>void load()} retryLabel="Retry loading"/>}
+  <Card><div className={styles.filters}><label htmlFor="member-catalog-search">Search member, email, member number or plan<div className={styles.search}><Search size={17}/><input id="member-catalog-search" value={q} onChange={e=>{setQ(e.target.value);setPage(0);}} placeholder="Search member records"/></div></label><label htmlFor="member-catalog-status">Membership status<select id="member-catalog-status" value={status} onChange={e=>{setStatus(e.target.value);setPage(0);}}>{statuses.map(s=><option key={s} value={s}>{s?s.replaceAll("_"," "):"All statuses"}</option>)}</select></label><button type="button" className="btn btn-ghost" disabled={busy} onClick={()=>void load()}><RefreshCw size={16}/>{busy?"Refreshing…":"Refresh"}</button></div>
+   <div className={styles.heading}><div><h2 className="h2">Membership records</h2><p className="muted">Each row represents a membership record; one person may have historical or multiple records.</p></div><Badge tone="slate">{data?.total??0} records</Badge></div>
+   {busy&&!data?<OperationStatus state="loading" title="Loading member records" detail="Fetching the current authorized catalogue."/>:!data?.items.length?<div className={styles.empty}><Users size={25}/><strong>No matching membership records</strong><span>Change your search or status filter.</span></div>:<div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Member</th><th>Membership</th><th>Status & validity</th><th>Account</th><th>Record actions</th></tr></thead><tbody>{data.items.map(m=><tr key={m.id}><td><strong>{m.full_name||"Name not available"}</strong><small>{m.email||"No linked email"}</small>{m.phone&&<small>{m.phone}</small>}</td><td><strong>{m.membership_number}</strong><small>{m.product_code||"No plan code"} · {m.product_name||"Plan unavailable"}</small></td><td><Badge tone={m.status==="active"?"green":m.status==="pending"?"gold":"slate"}>{m.status}</Badge><small>{m.start_date?new Date(m.start_date).toLocaleDateString():"Start date unavailable"} – {m.end_date?new Date(m.end_date).toLocaleDateString():"No recorded end date"}</small></td><td>{m.user_id?<><Badge tone={m.account_status==="active"?"green":"gold"}>{m.account_status||"status unknown"}</Badge><small>Linked account</small></>:<><Badge tone="slate">No linked account</Badge><small>Requires separate identity review</small></>}</td><td><div className={styles.actions}><a className="btn btn-ghost" href="/admin/members">Import / export</a>{m.user_id&&<a className="btn btn-ghost" href="/admin#account-governance">Account governance</a>}</div></td></tr>)}</tbody></table></div>}
+   <div className={styles.pagination}><span className="muted">Showing {data?.items.length?page*25+1:0}–{page*25+(data?.items.length||0)} of {data?.total||0}</span><div className="row" style={{gap:8}}><button className="btn btn-ghost" type="button" disabled={page===0||busy} onClick={()=>setPage(p=>Math.max(0,p-1))}>Previous</button><button className="btn btn-ghost" type="button" disabled={!data?.hasMore||busy} onClick={()=>setPage(p=>p+1)}>Next</button></div></div>
+  </Card>
+ </div>;
+}

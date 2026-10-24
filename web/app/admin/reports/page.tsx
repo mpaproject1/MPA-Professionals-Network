@@ -38,6 +38,7 @@ export default function AdminReportsPage(){
   {error&&<FormFeedback kind="error" message={error} onRetry={retryAction?()=>void (retryAction==="run"?run():exportAs(retryAction)):undefined} retryLabel={retryAction==="run"?"Retry report":"Retry export"}/>}{notice&&<FormFeedback kind="success" message={notice}/>}
   <section className={styles.catalogue} aria-label="Choose report">
    <div><div className="eyebrow">Step 1 of 3</div><h2 className="h2">Choose a report</h2><p className="muted">Filter by work area, then select one report. Restricted reports remain subject to server-side permissions.</p></div>
+   <label className={styles.searchLabel} htmlFor="report-catalog-search">Find a report<input id="report-catalog-search" value={reportSearch} onChange={event=>setReportSearch(event.target.value)} placeholder="Search title, category or description"/></label>
    <div className={styles.categoryFilters} role="group" aria-label="Filter reports by category">
     <button type="button" aria-pressed={selectedCategory==="all"} className={selectedCategory==="all"?"btn btn-primary":"btn btn-ghost"} onClick={()=>setSelectedCategory("all")}>All reports ({catalogue.length})</button>
     {categories.map(category=><button type="button" aria-pressed={selectedCategory===category} className={selectedCategory===category?"btn btn-primary":"btn btn-ghost"} key={category} onClick={()=>setSelectedCategory(category)}>{category} ({catalogue.filter(report=>report.category===category).length})</button>)}

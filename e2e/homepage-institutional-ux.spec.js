@@ -29,6 +29,37 @@ test.describe("institutional homepage responsive acceptance", () => {
     await expect(page.getByRole("checkbox", { name: /I ask MPA support to contact me about this inquiry/i })).toBeVisible();
   });
 
+  test("tablet layout, keyboard focus and theme contrast remain usable", async ({ page }) => {
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.goto("/");
+    const noTabletOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    expect(noTabletOverflow).toBe(true);
+
+    await page.keyboard.press("Tab");
+    const focusedControl = page.locator(":focus");
+    await expect(focusedControl).toBeVisible();
+    const focusStyle = await focusedControl.evaluate(element => {
+      const style = getComputedStyle(element);
+      return { outlineStyle: style.outlineStyle, outlineWidth: Number.parseFloat(style.outlineWidth) };
+    });
+    expect(focusStyle.outlineStyle).not.toBe("none");
+    expect(focusStyle.outlineWidth).toBeGreaterThanOrEqual(2);
+
+    const light = await page.evaluate(() => ({
+      background: getComputedStyle(document.body).backgroundColor,
+      text: getComputedStyle(document.body).color
+    }));
+    await page.getByRole("button", { name: "Toggle theme" }).click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(true);
+    const dark = await page.evaluate(() => ({
+      background: getComputedStyle(document.body).backgroundColor,
+      text: getComputedStyle(document.body).color
+    }));
+    expect(dark.background).not.toBe(light.background);
+    expect(dark.text).not.toBe(light.text);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
   test("Serve-Community discovery remains reachable and the legacy route redirects canonically", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveCount(0);

@@ -19,6 +19,9 @@ type ProviderListing={nextAction?:string;id:string;title:string;description:stri
 type Org={id:string;display_name:string;verification_status?:string;role_code?:string};
 export default function Services(){
  const token=useUiStore(s=>s.token);
+ const inFlightActions=useRef(new Set<string>());
+ const claimAction=(key:string)=>{if(inFlightActions.current.has(key))return false;inFlightActions.current.add(key);return true;};
+ const releaseAction=(key:string)=>{inFlightActions.current.delete(key);};
  const savedItems=useSavedDiscoveryItems();
  const [items,setItems]=useState<Service[]>([]);
  const [page,setPage]=useState(0);const [hasMore,setHasMore]=useState(false);const pageSize=20;
@@ -39,7 +42,7 @@ export default function Services(){
  const [query,setQuery]=useState("");
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
- const [notice,setNotice]=useState("");
+ const [notice,setNotice]=useState(""),[noticeReference,setNoticeReference]=useState("");
  const [selected,setSelected]=useState<Service|null>(null);
  const [message,setMessage]=useState("");
  const [submitting,setSubmitting]=useState(false);const [submissionUncertain,setSubmissionUncertain]=useState(false);const [requestIdempotencyKey,setRequestIdempotencyKey]=useState("");

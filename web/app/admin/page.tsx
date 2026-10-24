@@ -3,6 +3,13 @@ import {
   Edit3,
   FlaskConical,
   HelpCircle,
+  Building2,
+  BookOpenCheck,
+  ClipboardList,
+  FileBarChart,
+  Fingerprint,
+  MessageSquareText,
+  Users,
   Mail,
   PauseCircle,
   PlayCircle,
@@ -17,6 +24,7 @@ import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
 import { AdminPageHeader } from "./admin-page-header";
+import styles from "./admin-overview.module.css";
 import { type ManagedRole, type ManagedUser, UsersTable } from "./users-table";
 
 type Demo = {
@@ -77,6 +85,7 @@ export default function AdminPage() {
   const [canReviewInquiries, setCanReviewInquiries] = useState(false);
   const [error, setError] = useState("");
   const [sectionErrors, setSectionErrors] = useState<string[]>([]);
+  const [moduleQuery, setModuleQuery] = useState("");
   const [userQuery, setUserQuery] = useState("");
   const [userStatus, setUserStatus] = useState("");
   const [editing, setEditing] = useState<Demo | null>(null);
@@ -215,34 +224,39 @@ export default function AdminPage() {
     );
   return (
     <div className="grid">
-      <AdminPageHeader eyebrow="Platform administration" title="Operate the platform." description="Global account controls are separate from organization roles and business review decisions. Your authority comes from the current account roles shown below." actions={<div className="grid" style={{gap:8}}><div className="row" style={{flexWrap:"wrap"}}>{roles.map((role) => <Badge key={role} tone="slate">{role}</Badge>)}</div><div className="row" style={{flexWrap:"wrap"}}>{(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/support/job-seeker-demands">Review job-seeker demand and consent</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/reference-portfolio">Manage professional reference lists and CSV imports</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/reports">Reports and PDF/XLSX exports</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/members">Bulk approved-member import/export</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/email"><Mail size={16} /> Email operations</a>}{(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-primary" href="/admin/marketplace">Review marketplace listings and service/mentorship demand</a>}</div></div>}/>
-      <section className="grid grid-2" aria-label="Administration overview" style={{gap:12}}>
-        <Card>
-          <div className="eyebrow">Operational work</div>
-          <h2 className="h2">Review and resolve</h2>
-          <p className="muted">Start with a real queue or a decision that needs attention. Each workspace retains its own status, permissions and audit trail.</p>
-          <div className="row" style={{gap:8,flexWrap:"wrap"}}>
-            {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-primary" href="/admin/marketplace">Marketplace review</a>}
-            {roles.some((role) => ["system_admin", "reviewer"].includes(role)) && <a className="btn btn-ghost" href="/organizations">Organization verification</a>}
-            {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/recruitment">Recruitment workflow</a>}
-            {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/admin/support">Support desk</a>}
-            {(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/support/job-seeker-demands">Job-seeker demand and consent</a>}
-          </div>
-        </Card>
-        <Card>
-          <div className="eyebrow">Governance and reporting</div>
-          <h2 className="h2">Manage the platform</h2>
-          <p className="muted">Use separate workspaces for reporting, member records, membership decisions and platform configuration.</p>
-          <div className="row" style={{gap:8,flexWrap:"wrap"}}>
-            {isPlatformAdmin && <a className="btn btn-primary" href="/admin/reports">Reports and exports</a>}
-            {isPlatformAdmin && <a className="btn btn-ghost" href="/admin/members">Members</a>}
-            {isPlatformAdmin && <a className="btn btn-ghost" href="/admin/membership">Membership administration</a>}
-            {isPlatformAdmin && <a className="btn btn-ghost" href="/admin/reference-portfolio">Reference data</a>}
-            {isPlatformAdmin && <a className="btn btn-ghost" href="/admin/email">Email operations</a>}
-            {isPlatformAdmin && <a className="btn btn-ghost" href="/admin/security">Admin security</a>}
-          </div>
-        </Card>
+      <AdminPageHeader eyebrow="MPA · Platform operations" title="Admin overview" description="A single starting point for account governance, member records, organization review, community moderation and platform controls." actions={<div className={styles.roleChips}>{roles.map((role) => <Badge key={role} tone="slate">{role.replaceAll("_", " ")}</Badge>)}</div>} />
+      <section className={styles.welcome} aria-label="Operational overview">
+        <div className={styles.welcomeCopy}><span className={styles.kicker}>OPERATIONS WORKSPACE</span><h2>Good administration starts with clear queues.</h2><p>Choose the workspace for the task at hand. Sensitive records stay within their existing permission boundaries and review flows.</p></div>
+        <div className={styles.searchWrap}><label htmlFor="admin-workspace-search">Find a workspace</label><div className={styles.searchBox}><Search size={18} aria-hidden="true"/><input id="admin-workspace-search" value={moduleQuery} onChange={(event) => setModuleQuery(event.target.value)} placeholder="Search members, organizations, reports…" /></div></div>
       </section>
+      <section className={styles.metrics} aria-label="Loaded operational records">
+        <article className={styles.metric}><span>Account records loaded</span><strong>{isPlatformAdmin ? users.length : "—"}</strong><small>{isPlatformAdmin ? "Up to 200 accounts · current query" : "Platform administrator access required"}</small></article>
+        <article className={styles.metric}><span>Experience scenarios</span><strong>{isPlatformAdmin ? cases.length : "—"}</strong><small>Configured walkthrough scenarios</small></article>
+        <article className={styles.metric}><span>Contextual guides</span><strong>{isPlatformAdmin ? guides.length : "—"}</strong><small>Configured user guides</small></article>
+        <article className={styles.metric}><span>Opportunity inquiries</span><strong>{canReviewInquiries ? inquiries.length : "—"}</strong><small>Records returned to this workspace</small></article>
+      </section>
+      <section className={styles.section} aria-labelledby="admin-workspaces-heading">
+        <div className={styles.sectionHeader}><div><h2 id="admin-workspaces-heading">Workspaces</h2><p>Open a focused workspace to search, review and take authorized action.</p></div><span className={styles.sectionCount}>Core administration</span></div>
+        <div className={styles.moduleGrid}>
+          {[
+            {title:"Organizations",desc:"Organization workspace and verification review queues.",href:"/organizations",Icon:Building2,group:"Review & service",access:"org"},
+            {title:"Professional accounts",desc:"Search accounts, review status and manage platform roles with audit reasons.",href:"#account-governance",Icon:Users,group:"People & access",access:"admin"},
+            {title:"Member records",desc:"Import approved member registers, resolve conflicts and export records.",href:"/admin/members",Icon:Users,group:"People & access",access:"admin"},
+            {title:"Membership operations",desc:"Membership plans, payment review and membership lifecycle controls.",href:"/admin/membership",Icon:ShieldCheck,group:"People & access",access:"admin"},
+            {title:"Serve-Community review",desc:"Moderate shared demand, listings and provider matching.",href:"/admin/marketplace",Icon:ClipboardList,group:"Review & service",access:"staff"},
+            {title:"Support desk",desc:"Manage inquiries, handoffs and the support knowledge base.",href:"/admin/support",Icon:MessageSquareText,group:"Review & service",access:"staff"},
+            {title:"Reports & exports",desc:"Generate scoped reports and audited exports.",href:"/admin/reports",Icon:FileBarChart,group:"Governance",access:"admin"},
+            {title:"Reference data",desc:"Maintain governed professional options and staged imports.",href:"/admin/reference-portfolio",Icon:BookOpenCheck,group:"Governance",access:"admin"},
+            {title:"Security",desc:"Manage administrator passkeys and recovery controls.",href:"/admin/security",Icon:Fingerprint,group:"Governance",access:"admin"},
+            {title:"Email operations",desc:"Review delivery queues, templates and retries.",href:"/admin/email",Icon:Mail,group:"Governance",access:"admin"},
+          ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "org" ? roles.some(role => ["system_admin","reviewer"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin)).map(({title,desc,href,Icon,group}) => (
+            <a className={styles.moduleCard} href={href} key={href}><span className={styles.moduleIcon}><Icon size={20} aria-hidden="true"/></span><span className={styles.moduleCopy}><small>{group}</small><strong>{title}</strong><span>{desc}</span></span><span className={styles.moduleArrow} aria-hidden="true">↗</span></a>
+          ))}
+        </div>
+        {moduleQuery.trim() && <p className={styles.noResults} role="status">Showing workspaces matching “{moduleQuery}”. Clear the search to see all available workspaces.</p>}
+      </section>
+      <section className={styles.section} id="account-governance" aria-labelledby="admin-governance-heading">
+        <div className={styles.sectionHeader}><div><h2 id="admin-governance-heading">Experience & governance tools</h2><p>Less-frequent configuration tools are kept below the operational workspaces.</p></div></div>
       {error && (
         <div className="field-banner">
           <ShieldCheck size={18} />

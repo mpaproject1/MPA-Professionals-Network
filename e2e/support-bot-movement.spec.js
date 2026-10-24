@@ -30,7 +30,7 @@ test.describe("MPA support assistant movement and viewport safety", () => {
     await expect.poll(async () => (await root.boundingBox())?.x).toBeLessThan(afterMouse.x);
 
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("mpa-support-position-v1") || "null"));
-    expect(saved).toEqual(expect.objectContaining({ left: expect.any(Number), top: expect.any(Number }));
+    expect(saved).toEqual(expect.objectContaining({ left: expect.any(Number), top: expect.any(Number) }));
   });
 
   test("touch drag keeps the launcher above mobile navigation and quick questions work", async ({ browser }) => {

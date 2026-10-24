@@ -93,3 +93,11 @@ button:not(:disabled):active,a.btn:active{transform:translateY(1px)}
 .marketplace-tabs a{display:inline-flex;align-items:center;padding:8px 12px;border:1px solid var(--border);border-radius:999px;color:var(--text);text-decoration:none;font-size:13px;font-weight:700;background:var(--surface)}
 .marketplace-tabs a[aria-current="page"]{background:color-mix(in srgb,var(--primary) 12%,var(--surface));border-color:var(--primary);color:var(--primary)}
 @media(max-width:700px){.marketplace-search{grid-template-columns:1fr}.marketplace-search label{grid-column:auto}.marketplace-search button{width:100%}}
+
+/* P2 UX resilience: prevent long user content and form controls from widening narrow viewports. */
+.card,.grid,.case-row{min-width:0}
+.case-row{grid-template-columns:minmax(0,1fr) auto}
+.case-row>:first-child{min-width:0;overflow-wrap:anywhere}
+.form-stack :is(input,select,textarea),form.grid>label :is(input,select,textarea){min-width:0;max-width:100%}
+.btn{min-height:44px}
+@media(max-width:600px){.case-row{grid-template-columns:minmax(0,1fr);gap:8px}.case-row .row{flex-wrap:wrap}.form-stack>.btn{width:100%}}

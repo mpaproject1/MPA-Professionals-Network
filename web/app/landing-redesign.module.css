@@ -390,3 +390,75 @@
 @media(prefers-reduced-motion:reduce){
   .glowingArch{filter:drop-shadow(0 0 7px rgba(151,192,36,.55))}
 }
+
+
+/* Theme-reversing architectural hero: lime + navy mesh in light mode,
+   navy + luminous lime mesh in dark mode. Decorative layers never intercept input. */
+.hero{
+  isolation:isolate;
+  overflow:hidden;
+  border:1px solid rgba(7,25,39,.12);
+  border-radius:30px;
+  background:#97C024;
+  color:#071927;
+  box-shadow:0 22px 65px rgba(7,25,39,.13);
+}
+.heroCopy,.heroVisual{z-index:2}
+.heroBackdrop{position:absolute;z-index:0;inset:0;overflow:hidden;pointer-events:none;color:#071927}
+.heroMesh{position:absolute;inset:0;width:100%;height:100%;opacity:.43}
+.meshDark,.archDark{display:none}
+.meshLight{display:block}
+.archLight{display:block}
+.heroGlowOne,.heroGlowTwo{position:absolute;display:block;pointer-events:none;border-radius:50%;filter:blur(65px)}
+.heroGlowOne{top:-110px;left:20%;width:360px;height:360px;background:rgba(255,255,255,.24)}
+.heroGlowTwo{right:0;bottom:-130px;width:340px;height:340px;background:rgba(7,25,39,.11)}
+.heroTitle,.heroSubtitle,.networkTag,.trustSignals,.scrollHint{color:#071927}
+.heroSubtitle,.trustSignals span,.scrollHint{color:rgba(7,25,39,.82)}
+.networkTag{background:rgba(255,255,255,.24);border-color:rgba(7,25,39,.2);backdrop-filter:blur(14px)}
+.heroTitle span{background-image:linear-gradient(105deg,#071927 0%,#0A3258 55%,#1B4D80 100%);-webkit-text-fill-color:transparent}
+.liveDot{background:#071927;box-shadow:0 0 0 4px rgba(7,25,39,.12)}
+.trustSignals svg{color:#071927}
+.heroVisual{background:rgba(255,255,255,.78);border-color:rgba(7,25,39,.17);box-shadow:0 24px 64px rgba(7,25,39,.18),inset 0 1px 0 rgba(255,255,255,.6)}
+.heroVisual:before{background:linear-gradient(135deg,rgba(255,255,255,.58),rgba(7,25,39,.08) 34%,transparent 58%,rgba(255,255,255,.18))}
+.visualTopline strong,.visualPrompt,.quickText strong{color:#071927}
+.visualTopline small,.quickText small,.visualFootnote{color:#334155}
+.quickStart{background:rgba(255,255,255,.72);border-color:rgba(7,25,39,.14);color:#071927}
+.quickIcon{background:rgba(7,25,39,.08);color:#0A3258}
+.quickArrow,.sparkle{color:#0A3258}
+.visualFootnote span{background:#071927}
+.glowingArch{color:#0A3258;filter:drop-shadow(0 0 5px rgba(10,50,88,.38)) drop-shadow(0 0 16px rgba(10,50,88,.22))}
+:global(.dark) .hero{
+  border-color:rgba(151,192,36,.22);
+  background:#071927;
+  color:#F8FAFC;
+  box-shadow:0 22px 65px rgba(0,0,0,.24);
+}
+:global(.dark) .heroBackdrop{color:#97C024}
+:global(.dark) .heroMesh{opacity:.64}
+:global(.dark) .meshLight,:global(.dark) .archLight{display:none}
+:global(.dark) .meshDark,:global(.dark) .archDark{display:block}
+:global(.dark) .heroGlowOne{background:rgba(27,77,128,.22)}
+:global(.dark) .heroGlowTwo{background:rgba(151,192,36,.12)}
+:global(.dark) .heroTitle,:global(.dark) .networkTag,:global(.dark) .trustSignals,:global(.dark) .scrollHint{color:#F8FAFC}
+:global(.dark) .heroSubtitle,:global(.dark) .trustSignals span,:global(.dark) .scrollHint{color:#D1DCE8}
+:global(.dark) .networkTag{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.16)}
+:global(.dark) .heroTitle span{background-image:linear-gradient(105deg,#F8FAFC 0%,#DDE8F5 52%,#97C024 100%);-webkit-text-fill-color:transparent}
+:global(.dark) .liveDot{background:#97C024;box-shadow:0 0 0 4px rgba(151,192,36,.17)}
+:global(.dark) .trustSignals svg{color:#97C024}
+:global(.dark) .heroVisual{background:rgba(7,25,39,.78);border-color:rgba(151,192,36,.3);box-shadow:0 24px 64px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.08)}
+:global(.dark) .heroVisual:before{background:linear-gradient(135deg,rgba(151,192,36,.24),rgba(255,255,255,.06) 30%,transparent 58%,rgba(151,192,36,.12))}
+:global(.dark) .visualTopline strong,:global(.dark) .visualPrompt,:global(.dark) .quickText strong{color:#F8FAFC}
+:global(.dark) .visualTopline small,:global(.dark) .quickText small,:global(.dark) .visualFootnote{color:#C1CDDC}
+:global(.dark) .quickStart{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.13);color:#F8FAFC}
+:global(.dark) .quickIcon{background:rgba(151,192,36,.14);color:#97C024}
+:global(.dark) .quickArrow,:global(.dark) .sparkle{color:#97C024}
+:global(.dark) .visualFootnote span{background:#97C024}
+:global(.dark) .glowingArch{color:#97C024;filter:drop-shadow(0 0 6px rgba(151,192,36,.65)) drop-shadow(0 0 20px rgba(151,192,36,.3))}
+@media(max-width:760px){
+  .hero{border-radius:22px}
+  .heroMesh{width:145%;max-width:none;left:-20%;opacity:.32}
+  :global(.dark) .heroMesh{opacity:.5}
+}
+@media(prefers-reduced-motion:reduce){
+  .heroGlowOne,.heroGlowTwo{filter:blur(45px)}
+}

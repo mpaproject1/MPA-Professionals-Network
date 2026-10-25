@@ -322,7 +322,7 @@ try {
     if (!row || !row.indexdef.toUpperCase().includes("CREATE UNIQUE INDEX")) {
       throw new Error(`Required unique index ${name} is missing or not unique.`);
     }
-    if (name !== "ux_mentorship_match_one_open_request" &&
+    if (["ux_marketplace_demand_idempotency_hash","ux_mentorship_request_idempotency_hash","ux_service_request_idempotency_hash","ux_service_listing_idempotency_hash","ux_talent_inquiry_idempotency_hash"].includes(name) &&
         (!row.indexdef.includes("request_idempotency_hash") || !row.indexdef.toLowerCase().includes("where"))) {
       throw new Error(`Idempotency index ${name} must uniquely index the request hash and exclude null keys.`);
     }

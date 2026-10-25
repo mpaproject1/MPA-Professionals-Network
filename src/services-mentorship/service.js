@@ -805,7 +805,10 @@ export async function submitMentorshipFeedback(mentorshipId,userId,input,request
     } else if(m.status!=="completed") {
       throw error(409,"Program feedback requires a completed mentorship.","MENTORSHIP_NOT_COMPLETED");
     }
-    const row=(await db.query("insert into mentorship_feedback(mentorship_id,session_id,reviewer_user_id,target_role,rating,comments) values($1,$2,$3,$4,$5,$6) on conflict(session_id,reviewer_user_id,target_role) do update set rating=excluded.rating,comments=excluded.comments returning *",[mentorshipId,input.sessionId||null,userId,input.targetRole,input.rating??null,input.comments||null])).rows[0];
+    const rating=Number(input.rating),comments=String(input.comments||"").trim();
+    if(!Number.isInteger(rating)||rating<1||rating>5)throw error(400,"Feedback rating must be an integer from 1 to 5.","VALIDATION_ERROR");
+    if(comments.length<10||comments.length>2000)throw error(400,"Feedback comments must contain 10 to 2,000 characters.","VALIDATION_ERROR");
+    const row=(await db.query("insert into mentorship_feedback(mentorship_id,session_id,reviewer_user_id,target_role,rating,comments) values($1,$2,$3,$4,$5,$6) on conflict(session_id,reviewer_user_id,target_role) do update set rating=excluded.rating,comments=excluded.comments returning *",[mentorshipId,input.sessionId||null,userId,input.targetRole,rating,comments])).rows[0];
     await audit(db,userId,"mentorship.feedback_submitted","mentorship_feedback",row.id,requestId,{targetRole:input.targetRole,sessionId:input.sessionId||null});
     return row;
   });

@@ -156,8 +156,8 @@ export async function changeServiceListingStatus(listingId,userId,status,request
     const row=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row) throw error(404,"Service listing not found.","NOT_FOUND");
     const organization=await assertServiceListingAccess(db,row,userId);
-    if(row.status==="closed" && status!=="closed") throw error(409,"Closed service listings cannot be reopened.","INVALID_STATE");
-    if(["fulfilled","archived"].includes(status) && String(reason||"").trim().length<4) throw error(400,"A reason of at least four characters is required to fulfil or archive a listing.","LIFECYCLE_REASON_REQUIRED");
+    if(row.status==="closed" && !["closed","archived"].includes(status)) throw error(409,"Closed service listings cannot be reopened.","INVALID_STATE");
+    if(["fulfilled","archived","closed"].includes(status) && String(reason||"").trim().length<4) throw error(400,"A reason of at least four characters is required to fulfil or archive a listing.","LIFECYCLE_REASON_REQUIRED");
     if(status==="published" && row.moderation_status!=="approved"){
       if(row.moderation_status==="rejected") throw error(409,"This listing was rejected and cannot be resubmitted. Create a new listing if the offer has materially changed.","LISTING_REJECTED");
       if(row.organization_id && organization?.verification_status!=="verified") throw error(409,"The organization must be verified before it can submit a service listing.","ORGANIZATION_NOT_VERIFIED");
@@ -320,7 +320,7 @@ export async function requestService(listingId,requesterId,input,requestId,idemp
    if(racedExisting.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
    return {...racedExisting,idempotent:true,replayed:true,nextAction:racedExisting.status==="requested"?"Wait for the provider to respond.":racedExisting.status==="accepted"?"Confirm scope, timing and milestones.":racedExisting.status==="in_progress"?"Track delivery and review the provider's submitted outcome.":"Review the recorded request outcome; do not submit the same request again."};
   }
-  if(!listing||listing.status!=="published"||listing.moderation_status!=="approved"||listing.visibility==="private") throw error(404,"Service listing is not available.","NOT_FOUND");
+  if(!listing||listing.status!=="published"||listing.lifecycle_status!=="active"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date())||listing.visibility==="private") throw error(404,"Service listing is not available.","NOT_FOUND");
   if(listing.organization_id){const org=(await db.query("select verification_status from organization where id=$1",[listing.organization_id])).rows[0];if(!org||org.verification_status!=="verified")throw error(404,"Service listing is not available.","NOT_FOUND");}
   else if(!(await activeMember(db,listing.provider_user_id))) throw error(404,"Service listing is not available.","NOT_FOUND");
   if(listing.visibility!=="public"&&!(await activeMember(db,requesterId))) throw error(403,"An active membership is required to request a member-only service.","MEMBERSHIP_REQUIRED");

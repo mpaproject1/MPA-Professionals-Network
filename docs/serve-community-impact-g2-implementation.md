@@ -38,6 +38,7 @@
 3. Run the existing service/mentorship integration tests to prove the new lifecycle field does not regress existing publication, requests, payment verification, delivery, feedback or PR #15 mentorship behavior.
 4. Add/verify an authorized announcement publication/review workflow only if the existing request announcement and notification paths do not already satisfy the intended auditable communication requirement. The new announcement table is a schema foundation, not proof that a complete announcement workflow exists.
 5. Decide and implement the full impact/pricing taxonomy (pro-bono, discounted rate, capacity grant) before claiming all program models are supported; the current agreement snapshot binds the existing legacy pricing fields.
-6. Verify the exact migration against a clean disposable baseline and review the full diff before running CI at the final gate.
+6. Reconcile the shared `server.js` and `src/services-mentorship/service.js` changes with PR #15 (`feat/mentorship-operational-workflows`) before merge. PR #17 intentionally remains based on PR #5 and does not copy PR #15 code or overwrite its branch; verify the final combined diff after the intended merge order is established.
+7. Verify the exact migration against a clean disposable baseline and review the full diff before running CI at the final gate.
 
 **Important limitation:** The GitHub connector can commit code and inspect remote files, but no disposable database connection or local repository execution was available in this work session. Therefore these database-backed tests have been authored but not executed; G2 is not yet certified as passing. No production database or deployment was touched.

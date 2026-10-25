@@ -600,6 +600,7 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
     if(r.status==="disputed"&&status==="in_progress"){
       await db.query("update service_request set provider_completed_at=null,provider_completion_submitted_by=null,requester_outcome_decision=null,requester_outcome_decision_by=null,requester_outcome_decision_at=null,requester_outcome_note=null,completion_evidence_delivery_id=null where id=$1",[requestId]);
       Object.assign(updated,{provider_completed_at:null,provider_completion_submitted_by:null,requester_outcome_decision:null,requester_outcome_decision_by:null,requester_outcome_decision_at:null,requester_outcome_note:null,completion_evidence_delivery_id:null});
+      await db.query("insert into service_request_completion_event(request_id,actor_user_id,event_type,note) values($1,$2,'reopened',$3)",[requestId,userId,String(note||"Delivery resumed after dispute resolution.").trim()]);
     }
     if(status==="accepted"){
       const terms={scope:r.scope||null,listingPricingModel:r.listing_pricing_model||null,listingPriceAmount:r.listing_price_amount===null?null:Number(r.listing_price_amount),listingCurrency:r.listing_currency||null,agreedPrice:r.agreed_price===null?null:Number(r.agreed_price),currency:r.agreed_currency||null,completionDueAt:r.completion_due_at||null,requestedStartAt:r.requested_start_at||null,requestedEndAt:r.requested_end_at||null};

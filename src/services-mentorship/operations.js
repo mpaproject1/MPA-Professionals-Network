@@ -1,7 +1,7 @@
 import { getPool, withTransaction } from "../platform/db.js";
 import { hasCurrentActiveMembership, hasProfessionalIdentity } from "../platform/identity-policy.js";
 import { createInAppNotification } from "../platform/notifications.js";
-import { getMyMentorProfile } from "./service.js";
+import { getMyMentorProfile, proposeMentorMatch } from "./service.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 function redactContactText(value){return String(value||"").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[redacted email]").replace(/\+?\d[\d\s().-]{7,}\d/g,"[redacted phone]");}
@@ -24,6 +24,36 @@ async function eligibleMentor(db,userId){
  if(activeCount>=Number(profile.max_active_mentees||3))fail(409,"Your current active mentorship capacity is full. Update capacity through the governed profile workflow before expressing further interest.","MENTOR_CAPACITY_FULL");
  return profile;
 }
+export async function listMentorshipInterestReviewQueue(actorId){
+ const db=getPool();
+ if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized matching-team access is required.","FORBIDDEN");
+ return (await db.query("select mi.id interest_id,mi.request_id,mi.mentor_user_id,mi.status interest_status,mi.created_at interest_created_at,mr.goals,mr.topics,mr.preferred_modes,mr.preferred_languages,mr.created_at request_created_at,pm.display_name mentor_name,mp.headline mentor_headline,pe.display_name mentee_name from mentorship_match_interest mi join mentorship_request mr on mr.id=mi.request_id join mentor_profile mp on mp.user_id=mi.mentor_user_id join person pm on pm.user_id=mi.mentor_user_id join person pe on pe.user_id=mr.mentee_user_id where mi.status='pending' and mr.share_with_eligible_mentors=true and mr.status in ('requested','matching') and mp.status='active' and mp.moderation_status='approved' and not exists(select 1 from mentorship_match mm where mm.request_id=mr.id and mm.status in ('proposed','accepted') and mm.mentee_consent_status<>'declined') and not exists(select 1 from mentorship m where m.request_id=mr.id) order by mi.created_at asc limit 100",[])).rows;
+}
+export async function proposeMentorshipInterestMatch(actorId,interestId,requestId){
+ const db=getPool();
+ if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized matching-team access is required.","FORBIDDEN");
+ const interest=(await db.query("select mi.*,mr.share_with_eligible_mentors,mr.status request_status from mentorship_match_interest mi join mentorship_request mr on mr.id=mi.request_id where mi.id=$1",[interestId])).rows[0];
+ if(!interest)fail(404,"Mentor interest record not found.","NOT_FOUND");
+ if(interest.status!=="pending"||!interest.share_with_eligible_mentors||!["requested","matching"].includes(interest.request_status))fail(409,"This interest is no longer eligible for a match proposal.","INTEREST_NOT_AVAILABLE");
+ const match=await proposeMentorMatch(interest.request_id,interest.mentor_user_id,actorId,requestId);
+ await db.query("update mentorship_match_interest set status='reviewed',updated_at=now() where id=$1 and status='pending'",[interestId]);
+ await audit(db,actorId,"mentorship.interest_match_proposed","mentorship_match_interest",interestId,requestId,{requestId:interest.request_id,matchId:match.id});
+ return {...match,nextAction:"A specific mentor proposal was created. The mentor must respond, and the mentee must separately accept before the relationship starts."};
+}
+export async function markMentorshipInterestReviewed(actorId,interestId,requestId){
+ const db=getPool();
+ if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized matching-team access is required.","FORBIDDEN");
+ return withTransaction(async tx=>{
+  const row=(await tx.query("select * from mentorship_match_interest where id=$1 for update",[interestId])).rows[0];
+  if(!row)fail(404,"Mentor interest record not found.","NOT_FOUND");
+  if(row.status!=="pending")return {...row,idempotent:true,nextAction:"This interest has already been reviewed or withdrawn."};
+  const updated=(await tx.query("update mentorship_match_interest set status='reviewed',updated_at=now() where id=$1 returning id,request_id,mentor_user_id,status,updated_at",[interestId])).rows[0];
+  await audit(tx,actorId,"mentorship.interest_reviewed_without_proposal","mentorship_match_interest",interestId,requestId,{requestId:row.request_id});
+  await notify(tx,row.mentor_user_id,"mentorship.interest_reviewed","mentorship_match_interest",interestId,{message:"The matching team reviewed your expression of interest.",nextAction:"Check your mentorship workspace for any specific match invitation. No match was created by this review.",actionUrl:"/mentorship",actionRequired:false});
+  return {...updated,nextAction:"Interest marked reviewed. No match was created and no contact details were shared."};
+ });
+}
+
 export async function listMentorshipInterestPool(userId){
  const db=getPool();await eligibleMentor(db,userId);
  const rows=(await db.query("select r.id request_id,r.goals,r.topics,r.preferred_modes,r.preferred_languages,r.preferred_days,r.created_at,(select count(*)::int from mentorship_match_interest mi where mi.request_id=r.id and mi.status='pending') interest_count from mentorship_request r where r.share_with_eligible_mentors=true and r.status in ('requested','matching') and (r.preferred_mentor_user_id is null or r.preferred_mentor_user_id=$1) and not exists(select 1 from mentorship_match mm where mm.request_id=r.id and mm.status in ('proposed','accepted') and mm.mentee_consent_status<>'declined') and not exists(select 1 from mentorship m where m.request_id=r.id) and not exists(select 1 from mentorship_match_interest mine where mine.request_id=r.id and mine.mentor_user_id=$1 and mine.status='pending') order by r.created_at asc limit 100",[userId])).rows;

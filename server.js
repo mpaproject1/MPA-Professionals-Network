@@ -223,6 +223,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/me/report-saved-views") { const identity=await auth(req); return ok(res,await reports.listSavedViews(identity),requestId); }
     if(req.method==="POST" && p==="api/v1/me/report-saved-views") { const identity=await auth(req); return ok(res,await reports.saveSavedView(identity,await body(req),requestId),requestId,201); }
     if(req.method==="DELETE" && parts.length===5 && p.startsWith("api/v1/me/report-saved-views/")) { const identity=await auth(req); return ok(res,await reports.deleteSavedView(identity,parts[4],requestId),requestId); }
+    if(req.method==="PATCH" && parts.length===7 && p.startsWith("api/v1/services/listings/") && parts[6]==="completion-policy") return ok(res,await servicesMentorship.configureServiceCompletionPolicy(parts[5],identity.sub,await body(req),requestId),requestId);
     if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/services/listings/") && parts[5]==="impact-report") {
       const identity=await auth(req),q=query(req.url);
       const result=await serveCommunityImpactReports.runImpactReport(identity,parts[4],{from:q.get("from"),to:q.get("to")},requestId,q.get("view")||"owner");
@@ -362,6 +363,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="status") { const b=await body(req); return ok(res,await servicesMentorship.changeServiceRequestStatus(parts[3],identity.sub,b.status,b.note,requestId),requestId); }
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="agreement") return ok(res,await servicesMentorship.acceptServiceAgreement(parts[3],identity.sub,requestId),requestId);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="accept-completion") { const b=await body(req); return ok(res,await servicesMentorship.acceptServiceCompletion(parts[3],identity.sub,b.note,requestId),requestId); }
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="review-completion") return ok(res,await servicesMentorship.reviewServiceCompletion(parts[3],identity.sub,await body(req),requestId),requestId);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="payment") return ok(res,await servicesMentorship.submitServicePayment(parts[3],identity.sub,await body(req),requestId),requestId,201);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-payments/") && parts[4]==="verify") { anyRoleOrPermission(identity,["finance_officer","reviewer","system_admin"],["finance.manage"]); return ok(res,await servicesMentorship.verifyServicePayment(parts[3],identity.sub,await body(req),requestId),requestId); }
     if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="milestones") return ok(res,await servicesMentorship.listServiceMilestones(parts[3],identity.sub),requestId);

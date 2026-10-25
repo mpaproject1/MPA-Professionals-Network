@@ -54,6 +54,8 @@ const requiredColumns = [
   ["mentorship", "status", "text"],
   ["service_listing", "id", "uuid"],
   ["service_request", "id", "uuid"],
+  ["service_request_feedback", "request_id", "uuid"],
+  ["service_request_feedback", "reviewer_user_id", "uuid"],
   ["talent_inquiry", "id", "uuid"],
   ["verification_reference_request", "id", "uuid"],
   ["verification_reference_request", "case_id", "uuid"],

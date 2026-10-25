@@ -138,7 +138,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
   try{
    let subject=row.subject||"",textBody=row.text_body||row.payload?.text||"",htmlBody=row.html_body||row.payload?.html||"";
    const template=(await db.query("select subject_template,text_template,html_template,enabled from email_notification_template where template_code=$1",[row.template_code])).rows[0];
-   if(template&&!template.enabled){await db.query("update notification_outbox set status='cancelled',last_error='Notification template disabled by administrator',locked_at=null,updated_at=now() where id=$1",[row.id]);results.push({id:row.id,status:"cancelled"});continue;}
+   if(template&&!template.enabled){await db.query("update notification_outbox set status='cancelled',delivery_status='cancelled',delivery_event_type='template_disabled',delivery_event_at=now(),last_error='Notification template disabled by administrator',locked_at=null,updated_at=now() where id=$1",[row.id]);results.push({id:row.id,status:"cancelled"});continue;}
    if(template?.enabled){const vars={...(row.payload||{}),...(row.payload?.variables||{})};subject=render(template.subject_template,vars);textBody=render(template.text_template,vars);htmlBody=render(template.html_template,vars,{html:true});}
    const humanEvent=String(row.template_code||"account update").replace(/[._-]+/g," ").replace(/\b\w/g,ch=>ch.toUpperCase());
    if(!subject)subject=`${humanEvent} · MPA Professionals Network`;

@@ -1,13 +1,25 @@
 import assert from "node:assert/strict";
 import {randomUUID} from "node:crypto";
+import {inflateRawSync} from "node:zlib";
 import test from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import {closePool,getPool} from "../../src/platform/db.js";
 import * as services from "../../src/services-mentorship/service.js";
 import {runImpactReport,toImpactExportData,MIN_GROUP_SIZE} from "../../src/platform/serve-community-impact-reports.js";
-import {makePdf} from "../../src/platform/reports.js";
+import {makePdf,makeXlsx} from "../../src/platform/reports.js";
 
+function unzipXlsxText(buffer){
+ let offset=0;const entries=[];
+ while(offset+4<buffer.length&&buffer.readUInt32LE(offset)===0x04034b50){
+  const compressedSize=buffer.readUInt32LE(offset+18),nameLength=buffer.readUInt16LE(offset+26),extraLength=buffer.readUInt16LE(offset+28);
+  const name=buffer.subarray(offset+30,offset+30+nameLength).toString("utf8");
+  const start=offset+30+nameLength+extraLength,data=buffer.subarray(start,start+compressedSize);
+  entries.push(name+" "+inflateRawSync(data).toString("utf8"));
+  offset=start+compressedSize;
+ }
+ return entries.join("\\n");
+}
 test.after(async()=>{await closePool();});
 function identityInput(suffix){
  const digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
@@ -62,6 +74,10 @@ test("G5 database: small groups are suppressed and participant contact details n
  const exportData=toImpactExportData(large,listing.id);
  const pdf=makePdf(exportData).toString("latin1");
  assert.equal(pdf.includes("@example.test"),false,"PDF export must not contain participant emails");
+ const xlsx=unzipXlsxText(makeXlsx(exportData));
+ assert.ok(xlsx.includes("xl/worksheets/sheet1.xml"),"XLSX export should contain its report worksheet");
+ assert.equal(xlsx.includes("@example.test"),false,"XLSX export must not contain participant emails");
+ for(const person of people)assert.equal(xlsx.includes(person),false,"XLSX export must not contain participant IDs");
  for(const person of people)assert.equal(pdf.includes(person),false,"PDF export must not contain participant IDs");
  assert.ok(exportData.rows.every(row=>Object.keys(row).every(key=>!/(email|phone|address|contact|participant.?id|actor.?id)/i.test(key))),"export columns must exclude contact and identity fields");
  assert.ok(exportData.rows.every(row=>row.Suppressed==="Yes" ? row.Value==="Suppressed" : row.Value!=="Suppressed"),"suppressed groups must be labelled in exports");

@@ -5,9 +5,9 @@ import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import { closePool, getPool } from "../../src/platform/db.js";
 import * as marketplace from "../../src/services-mentorship/demand.js";
+import * as mentorshipOperations from "../../src/services-mentorship/operations.js";
 import * as organizationOffers from "../../src/services-mentorship/organization-offers.js";
 import * as journeys from "../../src/services-mentorship/service.js";
-import * as mentorshipOperations from "../../src/services-mentorship/operations.js";
 import * as talent from "../../src/talent/service.js";
 import * as verification from "../../src/verification/service.js";
 

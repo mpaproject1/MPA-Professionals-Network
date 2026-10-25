@@ -226,7 +226,8 @@ export default function Services(){
        <div className="service-card-terms"><div><span>Price / commitment</span><strong>{priceLabel(service)}</strong>{service.impact_model==="community_discount"&&Number(service.reference_price_amount)>Number(service.price_amount)&&<small>Reference {service.currency||""} {Number(service.reference_price_amount).toLocaleString()} · {Math.round((1-Number(service.price_amount)/Number(service.reference_price_amount))*100)}% discount</small>}</div><div><span>Program status</span><strong>{lifecycleLabel(service)}</strong></div></div>
        <div className="service-card-metrics" aria-label="Service engagement metrics">
          <div><UsersRound size={16} aria-hidden="true"/><strong>{Number(service.organizations_interested||0).toLocaleString()}</strong><span>Organizations interested</span></div>
-         <div><UsersRound size={16} aria-hidden="true"/><strong>{Number(service.users_interested||0).toLocaleString()}</strong><span>Users interested / pledged</span></div>
+         <div><UsersRound size={16} aria-hidden="true"/><strong>{Number(service.users_interested||0).toLocaleString()}</strong><span>Users interested</span></div>
+         <div><Handshake size={16} aria-hidden="true"/><strong>{(Number(service.users_pledged||0)+Number(service.organizations_pledged||0)).toLocaleString()}</strong><span>Pledges · {Number(service.users_pledged||0).toLocaleString()} people / {Number(service.organizations_pledged||0).toLocaleString()} organizations</span></div>
          <div><Handshake size={16} aria-hidden="true"/><strong>{Number(service.agreed_services||0).toLocaleString()}</strong><span>Agreed services</span></div>
        </div>
        <div className="service-card-footer"><Link className="btn btn-ghost service-details-link" href={`/services/${encodeURIComponent(service.id)}`}>Service details <ArrowRight size={16} aria-hidden="true"/></Link>

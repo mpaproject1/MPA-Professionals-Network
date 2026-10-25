@@ -11,14 +11,14 @@
 - Backfill maps existing `published` listings to `active`, `closed` to `archived`, `paused` to `suspended`, and other legacy statuses to `draft`. It does not assign an expiry to existing rows; `expires_at` remains nullable with no default.
 - Creation defaults to no expiry; explicit future expiry is validated. Owners can clear expiry with `clearExpiry: true` when editing.
 - Published service discovery and request/interest/pledge creation check lifecycle state and expiry at the server boundary.
-- Owner status actions accept `fulfilled` and `archived`, require a reason, retain old engagement history and write `service_listing_lifecycle_event` plus platform audit records. Fulfilled/archived listings cannot be silently edited or reopened.
+- Owner status actions accept `fulfilled` and `archived`, require a reason, retain old engagement history and write `service_listing_lifecycle_event` plus platform audit records. Fulfilled/archived listings cannot be silently edited or reopened. Owner pause is distinct from moderator suspension; invalid lifecycle transitions are rejected and repeated identical state actions replay idempotently.
 - Submitting a listing for moderation records `pending_review`; publication requires existing moderation approval. Material edits return the listing to draft/review and are audited.
 
 ### Separate interest and pledge records
 - `service_listing_interest` persists individual interest by `individual_user_id`, and organization interest by `organization_id` plus the acting `actor_user_id`.
-- Partial unique indexes prevent duplicate active interest for the same listing and represented party. Withdrawal changes state and preserves history; a new expression creates a new record.
+- Partial unique indexes prevent duplicate active interest for the same listing and represented party. Withdrawal changes state and preserves history; a new expression creates a new record. Owners can view per-listing aggregate interest counts without receiving individual contact details.
 - `service_listing_pledge` is separate from interest and service requests. It records the represented party, author, description and lifecycle status. Pledge submission uses a hashed idempotency key and payload fingerprint; retry with the same key/payload replays the original record, while key reuse with a different payload conflicts.
-- Owner decisions and pledge-author withdrawal are server-authorized and state-guarded. Pledge counts are not service engagements or verified outcomes.
+- Owner decisions and pledge-author withdrawal are server-authorized and state-guarded. Owners receive an in-app pledge notification and have an authorized pledge-review queue. Pledge counts are not service engagements or verified outcomes.
 
 ### Explicit service agreement before delivery
 - `service_request_agreement` persists a versioned terms snapshot and hash, provider acceptance actor/time, and requester acceptance actor/time.
@@ -37,6 +37,7 @@
 2. Run `node --test test/services-mentorship/serve-community-g2.test.js` against that disposable database and fix any schema, fixture or behavioral failures.
 3. Run the existing service/mentorship integration tests to prove the new lifecycle field does not regress existing publication, requests, payment verification, delivery, feedback or PR #15 mentorship behavior.
 4. Add/verify an authorized announcement publication/review workflow only if the existing request announcement and notification paths do not already satisfy the intended auditable communication requirement. The new announcement table is a schema foundation, not proof that a complete announcement workflow exists.
-5. Verify the exact migration against a clean disposable baseline and review the full diff before running CI at the final gate.
+5. Decide and implement the full impact/pricing taxonomy (pro-bono, discounted rate, capacity grant) before claiming all program models are supported; the current agreement snapshot binds the existing legacy pricing fields.
+6. Verify the exact migration against a clean disposable baseline and review the full diff before running CI at the final gate.
 
 **Important limitation:** The GitHub connector can commit code and inspect remote files, but no disposable database connection or local repository execution was available in this work session. Therefore these database-backed tests have been authored but not executed; G2 is not yet certified as passing. No production database or deployment was touched.

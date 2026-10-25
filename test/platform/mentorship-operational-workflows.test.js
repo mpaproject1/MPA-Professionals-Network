@@ -45,6 +45,8 @@ test("mentorship operational workflows require explicit sharing and preserve par
 
   for (const route of [
     'api/v1/me/mentorship-interest',
+    'api/v1/me/mentorship-reports',
+    'api/v1/mentorship/requests/',
     'api/v1/me/mentorship-operations',
     'api/v1/admin/mentorship-reports',
     'api/v1/email/delivery-webhook',
@@ -60,12 +62,13 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(page, /Mentorship operations/);
   assert.match(page, /Confirm session/);
   assert.match(page, /Submit confidential report/);
+  assert.match(page, /Check my report history/);
   assert.match(page, /feedbackRatings/);
   assert.doesNotMatch(page, /rating:5,comments:"Submitted through the mentorship workspace\."/);
   assert.match(page, /circle_joined_count/);
 
   assert.match(email, /EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET/);
-  assert.match(email, /delivery_status='delivered'/);
+  assert.match(email, /deliveryStatus=eventType/);
   assert.match(email, /does not prove the recipient read the message/i);
   assert.match(reportPage, /api\/v1\/admin\/mentorship-reports/);
   assert.match(reportPage, /no contact address is collected/i);

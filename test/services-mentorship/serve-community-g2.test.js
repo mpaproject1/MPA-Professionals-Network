@@ -193,3 +193,28 @@ test("G2 database: provider acceptance is not enough to start delivery; requeste
  assert.equal(metrics.agreed_services,1);
  assert.equal(metrics.active_deliveries,1);
 });
+
+test("G4 database: listing announcements reject contact details and cannot target engagement-only participants",async()=>{
+ const {owner,listing}=await setupListing();
+ const key=`serve-g4-announcement-key-${listing.id.replaceAll("-","")}-0123456789`;
+ await assert.rejects(services.createServiceListingAnnouncement(listing.id,owner,{audience:"participants",title:"Private request update",body:"A private update about a service request."},`serve-g4-announcement-audience-${listing.id}`,key),e=>e.code==="INVALID_ANNOUNCEMENT_AUDIENCE");
+ await assert.rejects(services.createServiceListingAnnouncement(listing.id,owner,{audience:"public",title:"Community program update",body:"Contact the coordinator at help@example.org for more details."},`serve-g4-announcement-contact-${listing.id}`,key+"x"),e=>e.code==="SENSITIVE_CONTENT");
+});
+
+test("G4 database: operational updates are idempotent and visible only to service-request participants",async()=>{
+ const {owner,listing,db,suffix}=await setupListing(), requester=await account(), outsider=await account();
+ const request=await services.requestService(listing.id,requester,{message:"Please help with the listed service.",scope:"Initial consultation"},`serve-g4-request-${suffix}`,`serve-g4-request-key-${suffix}-0123456789`);
+ const key=`serve-g4-update-key-${suffix}-0123456789`;
+ const input={category:"progress",body:"The initial requirements review has been completed and the next step is scheduled."};
+ const update=await services.createServiceRequestUpdate(request.id,requester,input,`serve-g4-update-${suffix}`,key);
+ assert.equal(update.audience,"participants");
+ const replay=await services.createServiceRequestUpdate(request.id,requester,input,`serve-g4-update-retry-${suffix}`,key);
+ assert.equal(replay.id,update.id);
+ assert.equal(replay.replayed,true);
+ assert.equal((await services.listServiceRequestUpdates(request.id,requester)).length,1);
+ await assert.rejects(services.listServiceRequestUpdates(request.id,outsider),e=>e.code==="FORBIDDEN");
+ await assert.rejects(services.createServiceRequestUpdate(request.id,outsider,input,`serve-g4-update-outsider-${suffix}`,`serve-g4-update-outsider-key-${suffix}-0123456789`),e=>e.code==="FORBIDDEN");
+ await assert.rejects(services.createServiceRequestUpdate(request.id,requester,{category:"progress",body:"Call me at +1 (202) 555-0184 for details."},`serve-g4-update-contact-${suffix}`,`serve-g4-update-contact-key-${suffix}-0123456789`),e=>e.code==="SENSITIVE_CONTENT");
+ const notification=(await db.query("select action_url from notification_event where user_id=$1 and resource_type='service_request_update' and resource_id=$2 order by created_at desc limit 1",[owner,update.id])).rows[0];
+ assert.ok(notification?.action_url?.includes(request.id),"official notification links to the specific request record");
+});

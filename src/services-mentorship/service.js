@@ -27,6 +27,9 @@ function validateCommunityText(value,{field="Text",min=10,max=2000}={}){
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
   /(?:https?:\/\/|www\.)\S+/i,
   /(?:telegram|whatsapp|signal|instagram|facebook|tiktok)\s*(?:handle|username|me|us|at)?\s*[:@]\s*[\w.]{3,}/i,
+  /(?:^|\s)@[A-Z0-9_.]{3,}\b/i,
+  /\b(?:[a-z0-9-]+\.)+(?:com|org|net|io|et|info|co|me|app)\b/i,
+  /\b(?:id|passport|account)\s*(?:no\.?|number|#|:)\s*[A-Z0-9-]{5,}\b/i,
   /\b(?:passport number|national id|national identification|medical record|patient record|bank account|account number|diagnosis|medical condition|private address)\b/i
  ];
  const digitMatches=text.match(/(?:\+?\d[\d\s().-]{7,}\d)/g)||[];

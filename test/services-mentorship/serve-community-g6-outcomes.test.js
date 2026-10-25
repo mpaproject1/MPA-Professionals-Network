@@ -99,6 +99,7 @@ test("G6 database: configured single-engagement fulfilment occurs only after req
  await submitAndAcceptDelivery(e);
  await services.changeServiceRequestStatus(e.request.id,e.owner,"completed","The agreed service work is ready for outcome review.","serve-g6-single-submit-"+e.suffix);
  assert.equal((await services.getServiceListing(f.listing.id,null)).lifecycle_status,"active","provider submission cannot fulfil the program");
+ await assert.rejects(services.changeServiceListingStatus(f.listing.id,f.owner,"fulfilled","serve-g6-premature-fulfil-"+e.suffix,"Premature program fulfilment"),x=>x.code==="FULFILMENT_RULE_NOT_MET");
  await services.acceptServiceCompletion(e.request.id,e.requester,"The service outcome meets the agreed success criteria and the deliverables are accepted.","serve-g6-single-accept-"+e.suffix);
  assert.equal((await services.getServiceListing(f.listing.id,null)).lifecycle_status,"fulfilled","single-engagement listing fulfils only after requester acceptance");
 });

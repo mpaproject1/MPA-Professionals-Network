@@ -13,7 +13,7 @@ async function account(label) {
     email,
     password: "OrgMembershipP1Password!2026",
     firstName: "Organization",
-    lastName: "AdminTest",
+    lastName: "AdminTest" + suffix.slice(0, 8),
     phone: "07" + digits,
   }, "org-membership-test-" + suffix);
   return { ...created.user, email };

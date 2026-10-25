@@ -26,7 +26,7 @@ test("G2 database: new listings have no expiry and lifecycle actions require an 
  const {owner,listing,db,suffix}=await setupListing();
  assert.equal(listing.expires_at,null,"new listings must remain permanent unless an expiry is explicitly selected");
  const outsider=await account();
- await assert.rejects(services.changeServiceListingStatus(listing.id,outsider,"fulfilled",`serve-g2-unauth-${suffix}`,"Program completed"),e=>e.code==="FORBIDDEN");
+ await assert.rejects(services.changeServiceListingStatus(listing.id,outsider,"fulfilled",`serve-g2-unauth-${suffix}`,"Program completed"),e=>e.statusCode===403);
  await assert.rejects(services.changeServiceListingStatus(listing.id,owner,"fulfilled",`serve-g2-noreason-${suffix}`),e=>e.code==="LIFECYCLE_REASON_REQUIRED");
  const fulfilled=await services.changeServiceListingStatus(listing.id,owner,"fulfilled",`serve-g2-fulfil-${suffix}`,"Program objectives achieved");
  assert.equal(fulfilled.lifecycle_status,"fulfilled");
@@ -57,7 +57,8 @@ test("G2 database: concurrent duplicate interest creates one active record; with
 
 
 test("G2 database: organization interest is persisted against the organization, not collapsed into the acting user",async()=>{
- const {listing,db,suffix}=await setupListing(), actor=await account(), orgOwner=await account();
+ const {listing,db,suffix}=await setupListing(), orgOwner=await account();
+ const actor=orgOwner;
  const org=await organizationJobs.registerOrganization(orgOwner,{legalName:`Interest Organization ${suffix}`,displayName:`Interest Organization ${suffix}`},`serve-g2-interest-org-${suffix}`);
  await db.query("update organization set verification_status='verified',verified_at=now(),verified_by=$2,public_visible=true where id=$1",[org.id,orgOwner]);
  const results=await Promise.all([

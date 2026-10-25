@@ -164,6 +164,7 @@ export async function changeServiceListingStatus(listingId,userId,status,request
     const currentLifecycleStatus=row.lifecycle_status||({published:"active",paused:"paused",closed:"archived"}[row.status]||"draft");
     const requestedLifecycleStatus=status==="published"?"active":status==="paused"?"paused":status==="closed"?"archived":status;
     if(currentLifecycleStatus===requestedLifecycleStatus && (status!=="published"||row.moderation_status==="approved")) return {...row,idempotent:true};
+    if(status==="published" && currentLifecycleStatus==="pending_review" && !["approved","rejected"].includes(row.moderation_status)) return {...row,idempotent:true};
     if(row.status==="closed" && !["closed","archived"].includes(status)) throw error(409,"Closed service listings cannot be reopened.","INVALID_STATE");
     if(["fulfilled","archived","closed"].includes(status) && String(reason||"").trim().length<4) throw error(400,"A reason of at least four characters is required to fulfil or archive a listing.","LIFECYCLE_REASON_REQUIRED");
     if(status==="published" && row.moderation_status!=="approved"){

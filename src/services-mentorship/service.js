@@ -18,6 +18,22 @@ function validateImpactPricing({impactModel="standard",pricingModel,priceAmount,
  return {impactModel,priceAmount:price,referencePriceAmount:reference};
 }
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
+const ENGAGEMENT_UPDATE_CATEGORIES=new Set(["progress","schedule_change","delivery_note","blocker","handover"]);
+const FEEDBACK_CATEGORIES=new Set(["service_quality","communication","timeliness","outcome","accessibility","other"]);
+function validateCommunityText(value,{field="Text",min=10,max=2000}={}){
+ const text=String(value??"").trim();
+ if(text.length<min||text.length>max)throw error(400,`${field} must be ${min}–${max} characters.`,"VALIDATION_ERROR");
+ const contactPatterns=[
+  /\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/i,
+  /(?:https?:\\/\\/|www\\.)\\S+/i,
+  /(?:telegram|whatsapp|signal|instagram|facebook|tiktok)\\s*(?:handle|username|me|us|at)?\\s*[:@]\\s*[\\w.]{3,}/i,
+  /\\b(?:passport number|national id|national identification|medical record|patient record|bank account|account number|diagnosis|medical condition|private address)\\b/i
+ ];
+ const digitMatches=text.match(/(?:\\+?\\d[\\d\\s().-]{7,}\\d)/g)||[];
+ if(contactPatterns.some(pattern=>pattern.test(text))||digitMatches.some(match=>match.replace(/\\D/g,"").length>=9))
+  throw error(400,"Remove personal contact details, external contact links and sensitive participant information. Use the authorized service/request workflow instead.","SENSITIVE_CONTENT");
+ return text;
+}
 const PROFESSIONAL_CLAIMS=["professional_certification","education","employment","experience","service_capability"];
 
 async function audit(db,actor,action,type,id,requestId,metadata={}) {
@@ -352,9 +368,8 @@ export async function listMyServiceListingPledges(userId){
 
 export async function createServiceListingAnnouncement(listingId,userId,input,requestId,idempotencyKey=null){
  if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))throw error(400,"This announcement needs a secure submission key. Reload and retry.","IDEMPOTENCY_KEY_REQUIRED");
- const title=String(input.title||"").trim(),body=String(input.body||"").trim(),audience=String(input.audience||"participants");
- if(title.length<4||title.length>180||body.length<10||body.length>8000)throw error(400,"Announcement title must be 4–180 characters and body 10–8,000 characters.","VALIDATION_ERROR");
- if(!["public","members","participants"].includes(audience))throw error(400,"Unsupported announcement audience.","VALIDATION_ERROR");
+ const title=validateCommunityText(input.title,{field:"Announcement title",min:4,max:180}),body=validateCommunityText(input.body,{field:"Announcement body",min:10,max:8000}),audience=String(input.audience||"");
+ if(!["public","members"].includes(audience))throw error(400,"Listing announcements must target public or active members. Engagement-only updates belong on the specific service request.","INVALID_ANNOUNCEMENT_AUDIENCE");
  const keyHash=hashValue(idempotencyKey),fingerprint=hashPayload({listingId,userId,title,body,audience});
  return withTransaction(async db=>{
   const existing=(await db.query("select * from service_listing_announcement where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
@@ -410,7 +425,6 @@ export async function listServiceListingAnnouncements(listingId,viewerId=null){
   (a.status='published' and s.status='published' and s.lifecycle_status='active' and (s.expires_at is null or s.expires_at>now()) and (
    (a.audience='public' and (s.visibility='public' or ($2::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$2 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date)))))
    or (a.audience='members' and $2::uuid is not null and exists(select 1 from membership_record m where m.user_id=$2 and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)))
-   or (a.audience='participants' and $2::uuid is not null and (exists(select 1 from service_request r where r.service_listing_id=s.id and (r.requester_user_id=$2 or r.provider_user_id=$2)) or exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$2 and om.status='active')))
   ))
   or ($2::uuid is not null and (a.author_user_id=$2 or s.provider_user_id=$2 or exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$2 and om.status='active' and om.role_code=any(array['owner','administrator','recruiter','project_manager']::text[]))))
  ) order by a.created_at desc`,[listingId,viewerId||null])).rows;
@@ -705,19 +719,65 @@ export async function verifyServicePayment(servicePaymentId,verifierId,input,req
  });
 }
 
+export async function createServiceRequestUpdate(requestId,userId,input,requestIdHeader,idempotencyKey=null){
+ if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))throw error(400,"This update needs a secure submission key. Reload and retry.","IDEMPOTENCY_KEY_REQUIRED");
+ const category=String(input.category||"");
+ if(!ENGAGEMENT_UPDATE_CATEGORIES.has(category))throw error(400,"Choose a supported service-request update category.","VALIDATION_ERROR");
+ const body=validateCommunityText(input.body,{field:"Update",min:10,max:2000});
+ const keyHash=hashValue(idempotencyKey),fingerprint=hashPayload({requestId,userId,category,body});
+ return withTransaction(async db=>{
+  const request=(await db.query("select * from service_request where id=$1 for update",[requestId])).rows[0];
+  if(!request)throw error(404,"Service request not found.","NOT_FOUND");
+  const providerActor=await isServiceProviderActor(db,requestId,userId);
+  if(request.requester_user_id!==userId&&!providerActor)throw error(403,"Only the requester or authorized provider-side participant can add an operational update.","FORBIDDEN");
+  const existing=(await db.query("select * from service_request_update where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){
+   if(existing.request_id!==requestId||existing.author_user_id!==userId||existing.request_fingerprint!==fingerprint)throw error(409,"This update key was already used for different content.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,idempotent:true,replayed:true};
+  }
+  const row=(await db.query("insert into service_request_update(request_id,author_user_id,category,body,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6) returning id,request_id,author_user_id,category,body,created_at",[requestId,userId,category,body,keyHash,fingerprint])).rows[0];
+  await audit(db,userId,"service.request_update_created","service_request_update",row.id,requestIdHeader,{requestId,category,audience:"participants"});
+  const actionUrl="/services#service-request-"+requestId;
+  const payload={message:"A participant added an operational update to your service request.",nextAction:"Review the update on the service request.",actionUrl,actionRequired:true};
+  if(providerActor)await notify(db,request.requester_user_id,"service.request_update_created","service_request_update",row.id,payload);
+  else for(const recipient of await serviceProviderRecipients(db,requestId))if(recipient!==userId)await notify(db,recipient,"service.request_update_created","service_request_update",row.id,payload);
+  return {...row,audience:"participants",idempotent:false,replayed:false};
+ });
+}
+
+export async function listServiceRequestUpdates(requestId,userId){
+ const db=getPool();
+ const request=(await db.query("select id,requester_user_id from service_request where id=$1",[requestId])).rows[0];
+ if(!request)throw error(404,"Service request not found.","NOT_FOUND");
+ const providerActor=await isServiceProviderActor(db,requestId,userId);
+ if(request.requester_user_id!==userId&&!providerActor)throw error(403,"Operational updates are available only to the authorized participants of this service request.","FORBIDDEN");
+ return (await db.query("select u.id,u.request_id,u.author_user_id,u.category,u.body,u.created_at from service_request_update u where u.request_id=$1 order by u.created_at asc,u.id asc",[requestId])).rows;
+}
+
 export async function submitServiceFeedback(requestId,userId,input,requestIdHeader){
   return withTransaction(async db=>{
     const r=(await db.query("select * from service_request where id=$1",[requestId])).rows[0];
     if(!r) throw error(404,"Service request not found.","NOT_FOUND");
     if(r.requester_user_id!==userId&&!(await isServiceProviderActor(db,requestId,userId))) throw error(403,"You are not a participant in this service request.","FORBIDDEN");
     if(r.status!=="completed") throw error(409,"Service feedback requires a completed engagement.","SERVICE_NOT_COMPLETED");
-    const target=input.targetRole||"service";
+    const target=input.targetRole||"service",category=String(input.category||"");
+    if(!FEEDBACK_CATEGORIES.has(category))throw error(400,"Choose a structured feedback category.","FEEDBACK_CATEGORY_REQUIRED");
     if(target==="provider"&&r.provider_user_id===userId) throw error(400,"A provider cannot rate themselves.","SELF_RATING");
     if(target==="requester"&&r.requester_user_id===userId) throw error(400,"A requester cannot rate themselves.","SELF_RATING");
     if(!["provider","requester","service"].includes(target)) throw error(400,"Unsupported feedback target.","VALIDATION_ERROR");
-    const row=(await db.query("insert into service_request_feedback(request_id,reviewer_user_id,target_role,rating,comments) values($1,$2,$3,$4,$5) on conflict(request_id,reviewer_user_id,target_role) do update set rating=excluded.rating,comments=excluded.comments returning *",[requestId,userId,target,input.rating??null,input.comments||null])).rows[0];
-    await audit(db,userId,"service.feedback_submitted","service_request_feedback",row.id,requestIdHeader);
-    return row;
+    const rating=input.rating===undefined||input.rating===null||input.rating===""?null:Number(input.rating);
+    if(rating!==null&&(!Number.isInteger(rating)||rating<1||rating>5))throw error(400,"Rating must be a whole number from 1 to 5.","VALIDATION_ERROR");
+    const comments=String(input.comments||"").trim();
+    if(comments.length>1000)throw error(400,"Feedback comments must be 1,000 characters or fewer.","VALIDATION_ERROR");
+    if(comments)validateCommunityText(comments,{field:"Feedback comments",min:1,max:1000});
+    if(rating===null&&!comments)throw error(400,"Provide a rating or concise feedback with a category.","VALIDATION_ERROR");
+    const row=(await db.query("insert into service_request_feedback(request_id,reviewer_user_id,target_role,category,rating,comments) values($1,$2,$3,$4,$5,$6) on conflict(request_id,reviewer_user_id,target_role) do update set category=excluded.category,rating=excluded.rating,comments=excluded.comments returning *",[requestId,userId,target,category,rating,comments||null])).rows[0];
+    await audit(db,userId,"service.feedback_submitted","service_request_feedback",row.id,requestIdHeader,{category,target,audience:"participants"});
+    const actionUrl="/services#service-request-"+requestId;
+    const payload={message:"Feedback was submitted for a completed service engagement.",nextAction:"Review the completed service record.",actionUrl,actionRequired:true};
+    if(r.requester_user_id===userId)for(const recipient of await serviceProviderRecipients(db,requestId))await notify(db,recipient,"service.feedback_submitted","service_request_feedback",row.id,payload);
+    else await notify(db,r.requester_user_id,"service.feedback_submitted","service_request_feedback",row.id,payload);
+    return {...row,audience:"participants"};
   });
 }
 

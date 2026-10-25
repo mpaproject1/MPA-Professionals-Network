@@ -15,8 +15,12 @@ test("dashboard routes application attention to the matching workspace", async (
   assert.match(page, /href=\{trackingHref\(item\.type\)\}/);
 });
 
-test("admin overview uses a stable loader callback to prevent repeated fetches on every render", async () => {
-  const admin = await source("../../web/app/admin/page.tsx");
+test("admin overview, support and security loaders stay stable and distinguish unavailable data", async () => {
+  const [admin, support, security] = await Promise.all([
+    source("../../web/app/admin/page.tsx"),
+    source("../../web/app/admin/support/page.tsx"),
+    source("../../web/app/admin/security/page.tsx"),
+  ]);
   assert.ok(admin.includes("const load = useCallback(async () => {"));
   assert.ok(admin.includes("}, [token, userQuery, userStatus]);"));
   assert.ok(admin.includes("}, [hydrated, token, load]);"));
@@ -24,6 +28,12 @@ test("admin overview uses a stable loader callback to prevent repeated fetches o
   assert.ok(admin.includes('sectionErrors.includes("opportunity inquiries") ? "Unavailable"'));
   assert.ok(admin.includes('onClick={() => void load()} disabled={loading}'));
   assert.ok(admin.includes('role="alert"'));
+  assert.ok(support.includes("const refresh=useCallback(async()=>"));
+  assert.ok(support.includes("},[token,status]);"));
+  assert.ok(support.includes("useEffect(()=>{void refresh();},[refresh]);"));
+  assert.ok(security.includes("const load=useCallback(async()=>"));
+  assert.ok(security.includes("},[token]);"));
+  assert.ok(security.includes("Checking passkey status…"));
 });
 
 test("dashboard and tracker use the shared human-readable status vocabulary", async () => {

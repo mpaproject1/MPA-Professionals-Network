@@ -29,7 +29,7 @@ test("admin overview, support and security loaders stay stable and distinguish u
   assert.ok(admin.includes('onClick={() => void load()} disabled={loading}'));
   assert.ok(admin.includes('role="alert"'));
   assert.ok(support.includes("const refresh=useCallback(async()=>"));
-  assert.ok(support.includes("},[token,status]);"));
+  assert.ok(support.includes("},[token,status,inquiryPage,inquirySearch]);"), "support loader must refresh for page and search changes without an unstable callback");
   assert.ok(support.includes("useEffect(()=>{void refresh();},[refresh]);"));
   assert.ok(security.includes("const load=useCallback(async()=>"));
   assert.ok(security.includes("},[token]);"));

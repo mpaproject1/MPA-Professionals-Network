@@ -24,6 +24,25 @@ async function setupListing({approved=true,impactModel="standard",pricingModel="
  return {owner,org,listing:active,db,suffix};
 }
 
+test("G3 database: announcements require owner authorization, moderation and idempotent creation",async()=>{
+ const {owner,listing,db,suffix}=await setupListing(), outsider=await account();
+ const key=`serve-g3-announcement-key-${suffix}-0123456789`;
+ const input={audience:"public",title:"Community program update",body:"The program schedule is being coordinated with participating community members."};
+ const announcement=await services.createServiceListingAnnouncement(listing.id,owner,input,`serve-g3-announcement-${suffix}`,key);
+ assert.equal(announcement.status,"draft");
+ const replay=await services.createServiceListingAnnouncement(listing.id,owner,input,`serve-g3-announcement-retry-${suffix}`,key);
+ assert.equal(replay.id,announcement.id);
+ assert.equal(replay.idempotent,true);
+ assert.equal((await services.listServiceListingAnnouncements(listing.id,null)).some(row=>row.id===announcement.id),false,"draft announcements are not publicly visible");
+ await assert.rejects(services.changeServiceListingAnnouncementStatus(announcement.id,outsider,"published","Publish this announcement",`serve-g3-announcement-unauth-${suffix}`),e=>e.code==="FORBIDDEN");
+ const submitted=await services.changeServiceListingAnnouncementStatus(announcement.id,owner,"pending_review","Submit for moderation",`serve-g3-announcement-submit-${suffix}`);
+ assert.equal(submitted.status,"pending_review");
+ await assert.rejects(services.changeServiceListingAnnouncementStatus(announcement.id,owner,"published","Owner cannot self-publish",`serve-g3-announcement-self-publish-${suffix}`),e=>e.code==="FORBIDDEN");
+ assert.equal((await services.listServiceListingAnnouncements(listing.id,null)).some(row=>row.id===announcement.id),false,"pending announcements are not publicly visible");
+ const audit=(await db.query("select 1 from audit_log where resource_type='service_listing_announcement' and resource_id=$1",[announcement.id])).rowCount;
+ assert.ok(audit>=2,"announcement creation and submission are auditable");
+});
+
 test("G3 database: impact badges require persisted pricing evidence and metrics use eligible records",async()=>{
  const proBono=await setupListing({impactModel:"pro_bono"});
  assert.equal(proBono.listing.impact_model,"pro_bono");

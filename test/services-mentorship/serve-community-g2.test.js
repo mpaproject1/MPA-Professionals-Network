@@ -31,6 +31,9 @@ test("G2 database: new listings have no expiry and lifecycle actions require an 
  const fulfilled=await services.changeServiceListingStatus(listing.id,owner,"fulfilled",`serve-g2-fulfil-${suffix}`,"Program objectives achieved");
  assert.equal(fulfilled.lifecycle_status,"fulfilled");
  assert.equal(fulfilled.expires_at,null);
+ const retry=await services.changeServiceListingStatus(listing.id,owner,"fulfilled",`serve-g2-fulfil-retry-${suffix}`);
+ assert.equal(retry.idempotent,true,"retrying the same lifecycle action must not create a second transition");
+ await assert.rejects(services.changeServiceListingStatus(listing.id,owner,"published",`serve-g2-reopen-${suffix}`),e=>e.code==="INVALID_STATE");
  const event=(await db.query("select from_status,to_status,reason,actor_user_id from service_listing_lifecycle_event where listing_id=$1 order by created_at desc limit 1",[listing.id])).rows[0];
  assert.equal(event.to_status,"fulfilled");
  assert.equal(event.reason,"Program objectives achieved");

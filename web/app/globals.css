@@ -345,3 +345,15 @@ body{
 .dark .auth-register-button:hover{border-color:#F1F88A;background:#F1F88A}
 @media(max-width:700px){.auth-register-cta{grid-template-columns:1fr;gap:14px;padding:17px}.auth-register-button{width:100%;white-space:normal}}
 @media(prefers-reduced-motion:reduce){.auth-register-button{transition:none}.auth-register-button:hover,.auth-register-button:active{transform:none}}
+
+
+/* Membership journey: responsive, state-aware plan selection and application dialog. */
+.membership-mode-switch{display:flex;flex-wrap:wrap;gap:.65rem;margin-block:.25rem .75rem}
+.membership-mode-switch .btn{min-height:46px;flex:1 1 220px;justify-content:center}
+.membership-plan__apply{width:100%;min-height:46px;margin-top:1rem;justify-content:center}
+.membership-progress [role="dialog"]{outline:none}
+@media(max-width:640px){
+ .membership-mode-switch{display:grid;grid-template-columns:1fr}
+ .membership-mode-switch .btn{width:100%}
+ .membership-plan__apply{width:100%}
+}

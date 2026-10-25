@@ -587,9 +587,10 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
 
 export async function submitServicePayment(requestId,userId,input,requestIdHeader){
   return withTransaction(async db=>{
-    const r=(await db.query("select * from service_request where id=$1 for update",[requestId])).rows[0];
+    const r=(await db.query("select sr.*,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.impact_model listing_impact_model from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
     if(!r) throw error(404,"Service request not found.","NOT_FOUND");
     if(r.requester_user_id!==userId) throw error(403,"Only the requester can submit service payment.","FORBIDDEN");
+    if(r.listing_impact_model==="pro_bono"||r.listing_pricing_model==="free"||Number(r.agreed_price||r.listing_price_amount||0)<=0)throw error(409,"This engagement does not require paid-payment submission; continue using its agreed service evidence and outcome workflow.","PAYMENT_NOT_REQUIRED");
     if(!["accepted","in_progress"].includes(r.status)) throw error(409,"Payment can only be submitted after the service request is accepted.","INVALID_STATE");
     const amount=input.amount===undefined||input.amount===null?r.agreed_price:Number(input.amount);
     if(!Number.isFinite(Number(amount))||Number(amount)<0) throw error(400,"A valid non-negative payment amount is required.","VALIDATION_ERROR");

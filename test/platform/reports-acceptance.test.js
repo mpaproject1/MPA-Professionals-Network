@@ -116,7 +116,7 @@ test("administrative audit report applies date, outcome and search filters to kn
     assert.equal(Number(queueReport.rows[0].Unreviewed), 1, "unreviewed count should come from the persisted review timestamp/status");
   } finally {
     await db.query(
-      "delete from audit_log where request_id = any($1::text[])",
+      "delete from audit_log where request_id::text = any($1::text[])",
       [[seedRequestId, runRequestId, pdfRequestId, xlsxRequestId]]
     );
   }

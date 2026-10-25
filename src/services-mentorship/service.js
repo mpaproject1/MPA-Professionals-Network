@@ -852,7 +852,7 @@ export async function getMentorship(mentorshipId,userId){
 
 export async function listMyMentorshipRequests(userId){
  const db=getPool();
- return (await db.query("select id,mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,created_at,updated_at from mentorship_request where mentee_user_id=$1 order by created_at desc",[userId])).rows;
+ return (await db.query("select id,mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,share_with_eligible_mentors,created_at,updated_at from mentorship_request where mentee_user_id=$1 order by created_at desc",[userId])).rows;
 }
 
 

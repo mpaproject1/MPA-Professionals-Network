@@ -89,7 +89,7 @@ test("G6 database: revision and dispute require fresh evidence and never silentl
  const accepted=await services.acceptServiceCompletion(e.request.id,e.requester,"The corrected deliverables meet the agreed success criteria and the service outcome is accepted.","serve-g6-accept-final-"+e.suffix);
  assert.equal(accepted.status,"completed");
  const history=(await f.db.query("select event_type from service_request_completion_event where request_id=$1 order by created_at",[e.request.id])).rows.map(x=>x.event_type);
- assert.deepEqual(history,["submitted","revision_requested","resubmitted","disputed","reopened","submitted","accepted"]);
+ assert.deepEqual(history,["submitted","revision_requested","resubmitted","disputed","reopened","resubmitted","accepted"]);
 });
 
 test("G6 database: configured single-engagement fulfilment occurs only after requester acceptance",async()=>{

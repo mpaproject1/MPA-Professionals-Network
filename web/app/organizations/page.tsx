@@ -581,8 +581,7 @@ export default function Organizations() {
                 ? "Close registration form"
                 : "Register an organization"}
             </button>
-            {showForm && (
-              {registrationStep < 3 ? (
+            {showForm && (registrationStep < 3 ? (
                 <form
                   className="form-stack"
                   onSubmit={register}
@@ -654,8 +653,7 @@ export default function Organizations() {
                     <button className="btn btn-ghost" type="button" onClick={() => { setRegistrationStep(1); setForm(blank); setOrganizationTypeChoice(""); setShowForm(false); }}>Close wizard</button>
                   </div>
                 </div>
-              )}       </form>
-            )}
+              ))}
           </Card>
           <Card>
             <div className="row">

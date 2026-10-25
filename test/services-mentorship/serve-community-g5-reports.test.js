@@ -49,6 +49,7 @@ test("G5 database: small groups are suppressed and participant contact details n
  assert.deepEqual(small.metrics.interested_users,{value:null,suppressed:true,minimumGroupSize:MIN_GROUP_SIZE});
  for(let i=4;i<5;i++){
   const person=await account();
+  people.push(person);
   await services.createServiceListingInterest(listing.id,person,{},`serve-g5-interest-${i}-${suffix}`);
  }
  const large=await runImpactReport(identity,listing.id,{},`serve-g5-large-${suffix}`);

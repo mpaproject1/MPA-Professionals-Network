@@ -394,7 +394,7 @@ test("organization workspace uses state-aware onboarding and exposes only suppor
   assert.ok(page.includes("/recruitment"));
   assert.ok(page.includes("/service-demand"));
   assert.ok(page.includes("/mentorship"));
-  assert.ok(page.includes("Volunteer drives and skill dispatch are not implemented"));
+  assert.ok(page.includes("Organization-scoped volunteer drives and skill dispatch are not implemented as a verified workflow yet"), "the workspace must explicitly disclose the unavailable volunteer workflow");
   assert.ok(page.includes('href="/organizations/reports"'), "the organization hub must link to the real scoped outcome report");
   assert.ok(page.includes("does not persist a structured TIN, representative name/position, or verification-fee payment/receipt"));
   assert.doesNotMatch(page, /Zepko Enterprise Solutions|22 Total Applicants|120 Volunteer Hours Engaged|Download Q1 2026 Audit Report/);

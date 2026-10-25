@@ -108,7 +108,7 @@ export default function Services(){
      if(["declined","cancelled","disputed"].includes(action)&&note.length<4){setError("Add a short explanation so the other participant understands this decision.");return;}
      const result=action==="accept_completion"?await api<any>(`/api/v1/service-requests/${encodeURIComponent(r.id)}/accept-completion`,{method:"POST",body:JSON.stringify({note:note||"Requester accepted the delivered outcome."})},token):await api<any>(`/api/v1/service-requests/${encodeURIComponent(r.id)}/status`,{method:"POST",body:JSON.stringify({status:action,note:note||undefined})},token);
      setNotice(result?.nextAction|| (action==="accept_completion"?"Delivered outcome accepted.":`Service request updated: ${action.replaceAll("_"," ")}.`));
-     await loadRequests();
+     await loadRequests();await load(query,page);
    }catch(e){setError(e instanceof ApiError?e.message:"We couldn't update this service request.");}
    finally{setTransitioning(r.id,false);}
  }
@@ -138,7 +138,7 @@ export default function Services(){
      const created=await api<ServiceRequest>(`/api/v1/services/${encodeURIComponent(selected.id)}/requests`,{method:"POST",headers:{"X-Idempotency-Key":key},body:JSON.stringify({message:message.trim()||undefined})},token);
      setSubmissionUncertain(false);setRequestIdempotencyKey("");
      setNotice(created.idempotent?`You already have an active request for this service. No duplicate was created; check request history below.`:`Service request reference ${created.tracking_reference||created.id}. Current status: ${humanStatus(created.status||"requested")}. ${created.nextAction||"The provider must respond before delivery begins."}`);setNoticeReference(created.tracking_reference||created.id||"");
-     setSelected(null);setMessage("");setRequests(current=>[created,...current.filter(row=>row.id!==created.id)]);
+     setSelected(null);setMessage("");setRequests(current=>[created,...current.filter(row=>row.id!==created.id)]);await load(query,page);
    }catch(e){
      const uncertain=e instanceof ApiError&&(e.status===0||e.status>=500||e.code==="INVALID_RESPONSE");
      setSubmissionUncertain(uncertain);

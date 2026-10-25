@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { Activity, ChevronLeft, ChevronRight, Ellipsis, ShieldCheck, UserRound, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
 import { Badge } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
@@ -93,7 +93,7 @@ export function UsersTable({ users, roleCatalog, permissionCatalog, auditEvents 
             <div className={styles.menuWrap}>
               <button className="btn btn-ghost" type="button" aria-label={`Actions for ${user.email}`} aria-expanded={openMenu === user.id} onClick={() => setOpenMenu(openMenu === user.id ? null : user.id)}><Ellipsis size={18}/></button>
               {openMenu === user.id && <div className={styles.menu} role="menu">
-                <button type="button" role="menuitem" onClick={() => open(user, "access")} disabled={!manageable}>Manage access</button>
+                <button type="button" role="menuitem" onClick={() => open(user, "access")} disabled={!targetManageable}>Manage access</button>
                 <button type="button" role="menuitem" onClick={() => open(user, "status")} disabled={!manageable}>{user.status === "active" ? "Suspend account…" : "Reactivate account…"}</button>
                 <button type="button" role="menuitem" onClick={() => open(user, "recovery")} disabled={!manageable}>Send sign-in recovery link…</button>
                 <button type="button" role="menuitem" onClick={() => open(user, "sessions")} disabled={!manageable}>Revoke sessions…</button>

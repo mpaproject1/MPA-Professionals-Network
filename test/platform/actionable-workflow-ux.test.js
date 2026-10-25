@@ -302,7 +302,7 @@ test("member catalogue stays read-only while organization membership uses dedica
   assert.ok(organizations.includes('method:"PATCH"'));
   assert.ok(server.includes('p==="api/v1/admin/members/catalog"'));
   assert.ok(server.includes('p==="api/v1/admin/organizations"'));
-  assert.ok(server.includes('p==="api/v1/organizations/") && parts[4]==="users"'), "existing organization-member mutations are organization-scoped, not platform-admin endpoints");
+  assert.ok(server.includes('p.startsWith("api/v1/organizations/") && parts[4]==="users"'), "existing organization-member mutations are organization-scoped, not platform-admin endpoints");
   assert.ok(reports.includes('id:"support-demand-response"'));
   assert.ok(reports.includes('id:"audit-activity"'));
   assert.ok(reports.includes("'report.exported'"));

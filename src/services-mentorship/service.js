@@ -556,7 +556,7 @@ export async function listMyServiceRequests(userId){
 
 export async function changeServiceRequestStatus(requestId,userId,status,note,requestIdHeader){
   return withTransaction(async db=>{
-    const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
+    const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency,sl.completion_evidence_policy listing_completion_evidence_policy,sl.impact_model listing_impact_model,sl.fulfilment_rule listing_fulfilment_rule,sl.fulfilment_target_count listing_fulfilment_target_count from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
     if(!r) throw error(404,"Service request not found.","NOT_FOUND");
     const providerActor=await isServiceProviderActor(db,requestId,userId);
     if(!providerActor && r.requester_user_id!==userId) throw error(403,"You are not a participant in this service request.","FORBIDDEN");

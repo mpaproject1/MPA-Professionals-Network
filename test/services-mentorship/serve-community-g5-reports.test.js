@@ -33,6 +33,10 @@ test("G5 database: listing owners can run aggregate reports; unrelated users can
  const report=await runImpactReport(ownerIdentity,listing.id,{},`serve-g5-report-${suffix}`);
  assert.equal(report.view,"owner");
  assert.equal(report.minimumGroupSize,MIN_GROUP_SIZE);
+ const manager=await account();
+ await (await import("../../src/platform/db.js")).getPool().query("insert into organization_membership(organization_id,user_id,role_code,status) values($1,$2,'project_manager','active')",[ (await (await import("../../src/services-mentorship/service.js")).getServiceListing(listing.id,owner)).organization_id, manager ]);
+ const managed=await runImpactReport({sub:manager,roles:[],permissions:[]},listing.id,{},`serve-g5-manager-${suffix}`);
+ assert.equal(managed.view,"owner","permitted organization managers can access their organization's listing report");
  await assert.rejects(runImpactReport({sub:outsider,roles:[],permissions:[]},listing.id,{},`serve-g5-denied-${suffix}`),e=>e.statusCode===403&&e.code==="IMPACT_REPORT_FORBIDDEN");
 });
 
@@ -60,7 +64,7 @@ test("G5 database: small groups are suppressed and participant contact details n
  assert.equal(pdf.includes("@example.test"),false,"PDF export must not contain participant emails");
  for(const person of people)assert.equal(pdf.includes(person),false,"PDF export must not contain participant IDs");
  assert.ok(exportData.rows.every(row=>Object.keys(row).every(key=>!/(email|phone|address|contact|participant.?id|actor.?id)/i.test(key))),"export columns must exclude contact and identity fields");
- assert.ok(exportData.rows.every(row=>row.Suppressed==="Yes"||row.Value!=="Suppressed"||row.Suppressed==="Yes"),"suppressed groups must be labelled in exports");
+ assert.ok(exportData.rows.every(row=>row.Suppressed==="Yes" ? row.Value==="Suppressed" : row.Value!=="Suppressed"),"suppressed groups must be labelled in exports");
 });
 
 test("G5 database: governance decision audit is separately permission-gated and aggregate-only",async()=>{

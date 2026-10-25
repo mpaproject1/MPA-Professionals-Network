@@ -573,6 +573,7 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
     }
     if(status==="completed"&&r.status==="in_progress"){
       if(String(note||"").trim().length<10) throw error(400,"Provide a meaningful completion summary of at least 10 characters.","COMPLETION_SUMMARY_REQUIRED");
+      validateCommunityText(note,{field:"Completion summary",min:10,max:3000});
       const pending=(await db.query("select count(*)::int count from service_request_milestone where request_id=$1 and status not in ('accepted','completed','cancelled')",[requestId])).rows[0].count;
       if(Number(pending)>0) throw error(409,"All active delivery milestones must be accepted or completed before completion.","OUTCOMES_INCOMPLETE");
       const policy=r.listing_completion_evidence_policy||"accepted_delivery";
@@ -660,6 +661,7 @@ export async function reviewServiceCompletion(requestId,userId,input,requestIdHe
     const note=String(input.note||input.outcomeSummary||"").trim();
     if(decision==="accepted"&&note.length<10)throw error(400,"Record the final outcome in at least 10 characters before accepting completion.","FINAL_OUTCOME_REQUIRED");
     if(decision!=="accepted"&&note.length<4)throw error(400,"Explain the revision request or dispute in at least four characters.","OUTCOME_NOTE_REQUIRED");
+    validateCommunityText(note,{field:decision==="accepted"?"Final outcome":"Outcome decision note",min:decision==="accepted"?10:4,max:3000});
     if(decision==="accepted"){
       const policy=r.listing_completion_evidence_policy||"accepted_delivery";
       const latest=(await db.query("select id,status,file_object_id from service_request_delivery where request_id=$1 order by created_at desc,id desc limit 1",[requestId])).rows[0];

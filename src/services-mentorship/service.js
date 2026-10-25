@@ -764,7 +764,7 @@ export async function createMentorshipSession(mentorshipId,userId,input,requestI
     if(!input.scheduledStartAt||!input.scheduledEndAt) throw error(400,"scheduledStartAt and scheduledEndAt are required.","VALIDATION_ERROR");
     const meetingReference=String(input.meetingReference||"").trim(),locationLabel=String(input.locationLabel||"").trim(),agenda=String(input.agenda||"").trim(),proposalNote=String(input.proposalNote||"").trim();
     if(meetingReference.length>1000||locationLabel.length>250||agenda.length>1000||proposalNote.length>1000)throw error(400,"Meeting details exceed the allowed length.","VALIDATION_ERROR");
-    let meetingUrl=null;try{if(meetingReference)meetingUrl=new URL(meetingReference);}catch{}
+    let meetingUrl=null;try{if(meetingReference)meetingUrl=new URL(meetingReference);}catch{meetingUrl=null;}
     const sharedText=locationLabel+" "+agenda+" "+proposalNote;
     if((meetingReference&&(!meetingUrl||meetingUrl.protocol!=="https:"||meetingUrl.username||meetingUrl.password))||/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(meetingReference+" "+sharedText)||/(?:tel:|whatsapp:)/i.test(meetingReference+" "+sharedText)||/(?:\+\d{7,}|\(\d{2,4}\)\s*\d{3,}|\b\d{3,}[- ]\d{3,}[- ]\d{3,}\b)/.test(sharedText))throw error(400,"Use an HTTPS meeting link or public meeting location only; do not enter personal email addresses or phone contact details in the shared session details.","PRIVATE_CONTACT_NOT_ALLOWED");
     await assertSessionFitsAvailability(db,m.mentor_user_id,input.scheduledStartAt,input.scheduledEndAt);

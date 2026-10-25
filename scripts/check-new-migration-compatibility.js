@@ -144,6 +144,8 @@ try {
     ["service_listing_pledge","individual_user_id","uuid"],
     ["service_listing_pledge","organization_id","uuid"],
     ["service_listing_pledge","actor_user_id","uuid"],
+    ["service_listing_pledge","request_idempotency_hash","text"],
+    ["service_listing_pledge","request_fingerprint","text"],
     ["service_request_agreement","request_id","uuid"],
     ["service_request_agreement","terms_version","int4"],
     ["service_request_agreement","terms_hash","text"],
@@ -311,6 +313,7 @@ try {
     "ux_service_listing_idempotency_hash",
     "ux_service_listing_interest_active_individual",
     "ux_service_listing_interest_active_organization",
+    "ux_service_listing_pledge_idempotency_hash",
     "ux_talent_inquiry_idempotency_hash",
     "ux_mentorship_match_one_open_request"
   ];

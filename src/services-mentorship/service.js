@@ -273,6 +273,8 @@ export async function createServiceListingPledge(listingId,userId,input={},reque
   const row=(await db.query("insert into service_listing_pledge(listing_id,individual_user_id,organization_id,actor_user_id,description,status,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,'submitted',$6,$7) on conflict do nothing returning *",[listingId,organizationId?null:userId,organizationId,userId,description,keyHash,fingerprint])).rows[0];
   if(!row){const raced=(await db.query("select * from service_listing_pledge where request_idempotency_hash=$1 for update",[keyHash])).rows[0];if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different pledge details.","IDEMPOTENCY_KEY_CONFLICT");return {...raced,idempotent:true,replayed:true};}
   await audit(db,userId,"service.listing_pledge_submitted","service_listing_pledge",row.id,requestId,{listingId,organizationId:organizationId||null});
+  const recipients=listing.organization_id?(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code=any($2::text[])",[listing.organization_id,["owner","administrator","recruiter","project_manager"]])).rows.map(x=>x.user_id):[listing.provider_user_id];
+  for(const recipient of new Set(recipients))if(recipient&&recipient!==userId)await notify(db,recipient,"service.listing_pledge_submitted","service_listing_pledge",row.id,{message:"A new pledge of support was submitted for your program.",nextAction:"Review the pledge and accept or decline it with a reason.",actionUrl:"/services",actionRequired:true,priority:"normal"});
   return {...row,idempotent:false,replayed:false};
  });
 }
@@ -301,6 +303,30 @@ export async function changeServiceListingPledgeStatus(pledgeId,userId,status,re
   await audit(db,userId,"service.listing_pledge_status_changed","service_listing_pledge",pledgeId,requestId,{from:row.status,to:status,reason:String(reason||"").trim()||null});
   return updated;
  });
+}
+
+
+export async function listMyServiceListingInterestSummary(userId){
+ const db=getPool(),roles=["owner","administrator","recruiter","project_manager"];
+ return (await db.query(`select s.id listing_id,s.title,
+   count(i.id) filter(where i.status='interested' and i.individual_user_id is not null)::int individual_interest_count,
+   count(i.id) filter(where i.status='interested' and i.organization_id is not null)::int organization_interest_count,
+   count(i.id) filter(where i.status='withdrawn')::int withdrawn_history_count
+  from service_listing s left join service_listing_interest i on i.listing_id=s.id
+  where (s.organization_id is null and s.provider_user_id=$1)
+     or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[])))
+  group by s.id,s.title order by s.updated_at desc`,[userId,roles])).rows;
+}
+
+export async function listMyServiceListingPledges(userId){
+ const db=getPool(),roles=["owner","administrator","recruiter","project_manager"];
+ return (await db.query(`select p.*,s.title service_title,coalesce(pledged_org.display_name,actor_person.display_name) pledged_by_display_name,pledged_org.display_name pledged_organization_name
+  from service_listing_pledge p join service_listing s on s.id=p.listing_id
+  left join person actor_person on actor_person.user_id=p.actor_user_id
+  left join organization pledged_org on pledged_org.id=p.organization_id
+  where (s.organization_id is null and s.provider_user_id=$1)
+     or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[])))
+  order by p.created_at desc`,[userId,roles])).rows;
 }
 
 export async function listServices(viewerId=null,filters={}){

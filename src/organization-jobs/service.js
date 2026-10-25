@@ -582,7 +582,7 @@ function requireAdminMembershipReason(input){const reason=String(input?.reason||
 export async function adminAddOrganizationUser(identity,orgId,input,requestId){
  assertOrganizationAdminMutation(identity);
  const reason=requireAdminMembershipReason(input),email=String(input?.email||"").trim().toLowerCase(),roleCode=String(input?.roleCode||"").trim();
- if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))throw error(400,"Enter a valid account email address.","VALIDATION_ERROR");
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw error(400,"Enter a valid account email address.","VALIDATION_ERROR");
  if(!ADMIN_ORG_ROLES.includes(roleCode))throw error(400,"Choose a supported organization role. Ownership transfer uses a separate controlled workflow.","VALIDATION_ERROR");
  return withTransaction(async db=>{
   const org=(await db.query("select id,display_name from organization where id=$1 for update",[orgId])).rows[0];

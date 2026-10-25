@@ -5,10 +5,12 @@ ALTER TABLE service_listing
   ADD COLUMN IF NOT EXISTS lifecycle_status text;
 
 UPDATE service_listing
-   SET lifecycle_status = CASE status
-     WHEN 'published' THEN 'active'
-     WHEN 'closed' THEN 'archived'
-     WHEN 'paused' THEN 'paused'
+   SET lifecycle_status = CASE
+     WHEN status='published' AND moderation_status='approved' THEN 'active'
+     WHEN status='published' AND moderation_status='rejected' THEN 'rejected'
+     WHEN status='published' THEN 'pending_review'
+     WHEN status='closed' THEN 'archived'
+     WHEN status='paused' THEN 'paused'
      ELSE 'draft'
    END
  WHERE lifecycle_status IS NULL;

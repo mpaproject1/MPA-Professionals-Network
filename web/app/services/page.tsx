@@ -11,6 +11,7 @@ import { humanStatus } from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 import {useSavedDiscoveryItems} from "../../lib/use-saved-discovery-items";
 
+type ServiceAnnouncement={id:string;listing_id:string;listing_title:string;title:string;body:string;audience:"public"|"members";status:string;created_at:string};
 type Service={id:string;title:string;description:string;service_category:string;delivery_mode?:string;location_label?:string;pricing_model:string;price_amount?:number|string|null;reference_price_amount?:number|string|null;impact_model?:string;lifecycle_status?:string;expires_at?:string|null;organizations_interested?:number;users_interested?:number;users_pledged?:number;organizations_pledged?:number;agreed_services?:number;active_deliveries?:number;verified_outcomes?:number;currency?:string|null;display_name?:string;provider_name?:string};
 function createSubmissionKey():string{if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function")throw new Error("Secure submission is unavailable in this browser. Please reload and try again.");return crypto.randomUUID()+crypto.randomUUID();}
 function impactLabel(model?:string):string|null {return model==="pro_bono"?"100% Pro-Bono / Impact":model==="community_discount"?"Community Discounted Rate":model==="capacity_grant"?"Capacity Grant":null;}
@@ -30,6 +31,7 @@ export default function Services(){
  const savedItems=useSavedDiscoveryItems();
  const [items,setItems]=useState<Service[]>([]);
  const [page,setPage]=useState(0);const [hasMore,setHasMore]=useState(false);const pageSize=20;
+ const [announcements,setAnnouncements]=useState<ServiceAnnouncement[]>([]),[announcementFeedError,setAnnouncementFeedError]=useState("");
  const [requests,setRequests]=useState<ServiceRequest[]>([]);const [agreementConsents,setAgreementConsents]=useState<Record<string,boolean>>({});
  const [deliveries,setDeliveries]=useState<Record<string,ServiceDelivery[]>>({});
  const [deliveryErrors,setDeliveryErrors]=useState<Record<string,string>>({});
@@ -64,6 +66,11 @@ export default function Services(){
    }catch(e){setItems([]);setError(e instanceof ApiError?e.message:"We couldn't load services right now.");}
    finally{setLoading(false);}
  },[token]);
+ const loadPublicAnnouncements=useCallback(async()=>{
+  setAnnouncementFeedError("");
+  try{const rows=await api<ServiceAnnouncement[]>("/api/v1/service-announcements?limit=30",{},token||undefined);setAnnouncements(Array.isArray(rows)?rows.filter(row=>row.status==="published"&&(row.audience==="public"||row.audience==="members")):[]);}
+  catch(e){setAnnouncements([]);setAnnouncementFeedError(e instanceof ApiError?e.message:"Published announcements could not be loaded.");}
+ },[token]);
  const loadProviderWorkspace=useCallback(async()=>{
    if(!token){setMyListings([]);setOrganizations([]);return;}
    try{const [listings,orgs]=await Promise.all([api<ProviderListing[]>("/api/v1/me/service-listings",{},token),api<Org[]>("/api/v1/organizations",{},token)]);setMyListings(Array.isArray(listings)?listings:[]);setOrganizations(Array.isArray(orgs)?orgs:[]);}
@@ -84,6 +91,7 @@ export default function Services(){
  useEffect(()=>{void loadRequests();},[loadRequests]);
  useEffect(()=>{const requestId=new URLSearchParams(window.location.search).get("requestId");if(requestId&&requests.some(r=>r.id===requestId)){document.getElementById("service-request-"+requestId)?.scrollIntoView({behavior:"smooth",block:"start"});}},[requests]);
  useEffect(()=>{void loadProviderWorkspace();},[loadProviderWorkspace]);
+ useEffect(()=>{void loadPublicAnnouncements();},[loadPublicAnnouncements]);
 
  async function submitProviderListing(e?:FormEvent){
    e?.preventDefault();if(!token||providerSaving)return;const lock="provider:save";if(!claimAction(lock))return;setProviderSaving(true);setError("");setNotice("");
@@ -180,6 +188,10 @@ export default function Services(){
      <a className="btn btn-primary" href="#service-discovery">Browse published services</a>
      <a className="btn btn-ghost" href="/service-demand">Service requests and unmet needs</a>
    </div>
+   <Card><div className="row" style={{justifyContent:"space-between",flexWrap:"wrap"}}><div><div className="eyebrow">Official updates</div><h2 className="h2">Community service announcements</h2><p className="muted">Published listing updates only. Request-specific operational records stay private to authorized participants.</p></div><Badge>Moderated feed</Badge></div>
+    {announcementFeedError&&<p role="alert" className="form-error">{announcementFeedError}</p>}
+    {announcements.length===0&&!announcementFeedError?<p className="muted">No published announcements at the moment.</p>:<div className="grid" style={{gap:8,marginTop:10}}>{announcements.slice(0,5).map(a=><article className="case-row" key={a.id}><div className="row" style={{justifyContent:"space-between",gap:8,flexWrap:"wrap"}}><b>{a.title}</b><Badge>{a.audience==="public"?"Public":"Members"}</Badge></div><p className="muted" style={{marginTop:6}}>For <Link className="text-link" href={"/services/"+encodeURIComponent(a.listing_id)}>{a.listing_title}</Link> · {new Date(a.created_at).toLocaleString()}</p><p style={{whiteSpace:"pre-wrap"}}>{a.body}</p></article>)}</div>}
+   </Card>
    <details id="provider-listing-details" className="grid" style={{gap:8}}><summary className="case-row" style={{cursor:"pointer"}}><b>Providers: create or manage a service listing</b><span className="muted" style={{display:"block"}}>Drafts, moderation decisions and your existing listings are kept here.</span></summary>
    <Card id="provider-workspace"><div className="row" style={{justifyContent:"space-between",flexWrap:"wrap"}}><div><div className="eyebrow">Provider workspace</div><h2 className="h2">Offer a professional service</h2><p className="muted">Create a draft, submit it for review, and track moderation status here. Public discovery begins only after approval.</p></div><Badge>Moderated publication</Badge></div>
     {!token?<p className="muted">Sign in to create or manage a service listing. Individual provider listings require an active membership; verified organizations can publish through an authorized organization role.</p>:<form className="grid" style={{gap:12,marginTop:14}} onSubmit={submitProviderListing}>

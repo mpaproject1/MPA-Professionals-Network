@@ -82,6 +82,7 @@ export default function Services(){
  },[token]);
  useEffect(()=>{const params=new URLSearchParams(window.location.search);const initialQuery=params.get("q")?.trim()||"";const serviceId=params.get("serviceId");setQuery(initialQuery);void load(initialQuery,0);if(serviceId){void api<Service>("/api/v1/services/"+encodeURIComponent(serviceId)).then(service=>{setSelected(service);setMessage("");}).catch(e=>setError(e instanceof ApiError?e.message:"The selected service could not be loaded."));}},[load]);
  useEffect(()=>{void loadRequests();},[loadRequests]);
+ useEffect(()=>{const requestId=new URLSearchParams(window.location.search).get("requestId");if(requestId&&requests.some(r=>r.id===requestId)){document.getElementById("service-request-"+requestId)?.scrollIntoView({behavior:"smooth",block:"start"});}},[requests]);
  useEffect(()=>{void loadProviderWorkspace();},[loadProviderWorkspace]);
 
  async function submitProviderListing(e?:FormEvent){

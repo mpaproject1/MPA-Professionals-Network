@@ -56,6 +56,9 @@ test("G2 database: concurrent duplicate interest creates one active record; with
  rows=(await db.query("select status from service_listing_interest where listing_id=$1 and individual_user_id=$2",[listing.id,person])).rows;
  assert.equal(rows.length,2,"withdrawn interest remains as history");
  assert.equal(rows.filter(x=>x.status==="interested").length,1);
+ const listingOwner=(await db.query("select provider_user_id from service_listing where id=$1",[listing.id])).rows[0].provider_user_id;
+ const summary=await services.listMyServiceListingInterestSummary(listingOwner);
+ assert.equal(summary.find(x=>x.listing_id===listing.id).individual_interest_count,1);
 });
 
 
@@ -74,6 +77,9 @@ test("G2 database: organization interest is persisted against the organization, 
  assert.equal(stored[0].individual_user_id,null);
  assert.equal(stored[0].organization_id,org.id);
  assert.equal(stored[0].actor_user_id,actor);
+ const listingOwner=(await db.query("select provider_user_id from service_listing where id=$1",[listing.id])).rows[0].provider_user_id;
+ const summary=await services.listMyServiceListingInterestSummary(listingOwner);
+ assert.equal(summary.find(x=>x.listing_id===listing.id).organization_interest_count,1);
 });
 
 test("G2 database: pledge is separate from interest/request and only the listing owner can decide it",async()=>{
@@ -92,6 +98,8 @@ test("G2 database: pledge is separate from interest/request and only the listing
  assert.equal(stored.actor_user_id,pledger);
  assert.equal(stored.individual_user_id,pledger);
  assert.equal(stored.organization_id,null);
+ const queue=await services.listMyServiceListingPledges(owner);
+ assert.ok(queue.some(x=>x.id===pledge.id),"authorized listing owner can retrieve the pledge for review");
 });
 
 test("G2 database: provider acceptance is not enough to start delivery; requester must accept the same terms version",async()=>{

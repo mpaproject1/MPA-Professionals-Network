@@ -7,7 +7,7 @@ async function source(path) {
 }
 
 test("mentorship operational workflows require explicit sharing and preserve participant privacy", async () => {
-  const [migration, operations, service, server, page, email, reportPage, admin, adminEmail] = await Promise.all([
+  const [migration, operations, service, server, page, email, reportPage, admin, adminEmail, interestPage] = await Promise.all([
     source("../../db/migrations/20261025100000_mentorship_operational_workflows.sql"),
     source("../../src/services-mentorship/operations.js"),
     source("../../src/services-mentorship/service.js"),
@@ -17,6 +17,7 @@ test("mentorship operational workflows require explicit sharing and preserve par
     source("../../web/app/admin/mentorship-reports/page.tsx"),
     source("../../web/app/admin/page.tsx"),
     source("../../web/app/admin/email/page.tsx"),
+    source("../../web/app/admin/mentorship-interest/page.tsx"),
   ]);
 
   assert.match(migration, /share_with_eligible_mentors boolean NOT NULL DEFAULT false/);
@@ -34,6 +35,8 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(operations, /Only a participant can submit a report/);
   assert.match(operations, /Authorized Support Desk access is required/);
   assert.match(operations, /setMentorshipRequestSharing/);
+  assert.match(operations, /listMentorshipInterestReviewQueue/);
+  assert.match(operations, /proposeMentorshipInterestMatch/);
   assert.match(operations, /joined_count/);
   assert.match(operations, /not participant identities/i);
 
@@ -50,6 +53,7 @@ test("mentorship operational workflows require explicit sharing and preserve par
     'api/v1/mentorship/requests/',
     'api/v1/me/mentorship-operations',
     'api/v1/admin/mentorship-reports',
+    'api/v1/admin/mentorship-interest',
     'api/v1/email/delivery-webhook',
     'api/v1/mentorship/sessions/',
   ]) assert.ok(server.includes(route), "missing route " + route);
@@ -75,5 +79,7 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(reportPage, /no contact address is collected/i);
   assert.match(admin, /\/admin\/mentorship-reports/);
   assert.match(adminEmail, /delivery_status/);
+  assert.match(interestPage, /Propose this mentor/);
+  assert.match(interestPage, /no contact addresses/i);
   assert.match(page, /Notification evidence/);
 });

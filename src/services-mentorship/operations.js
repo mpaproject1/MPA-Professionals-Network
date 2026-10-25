@@ -170,12 +170,18 @@ export async function listMentorshipParticipantReports(actorId,filters={}){
  return (await db.query("select r.id,r.mentorship_id,r.session_id,r.reporter_user_id,pr.display_name reporter_name,r.category,r.description,r.status,r.created_at,r.reviewed_at,r.reviewed_by,r.resolution_note from mentorship_participant_report r left join person pr on pr.user_id=r.reporter_user_id where ($1='all' or r.status=$1) order by r.created_at asc limit $2 offset $3",[status,limit,offset])).rows;
 }
 export async function updateMentorshipParticipantReport(actorId,reportId,input,requestId){
- const db=getPool();if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized Support Desk access is required.","FORBIDDEN");
  const status=String(input.status||"");if(!["reviewing","resolved","closed"].includes(status))fail(400,"Choose a supported report review status.","VALIDATION_ERROR");
  const note=String(input.resolutionNote||"").trim();if(status==="resolved"&&note.length<4)fail(400,"A resolution note is required before resolving a report.","RESOLUTION_NOTE_REQUIRED");
- const row=(await db.query("update mentorship_participant_report set status=$1,reviewed_at=now(),reviewed_by=$2,resolution_note=coalesce($3,resolution_note) where id=$4 returning id,reporter_user_id,status,reviewed_at,reviewed_by,resolution_note",[status,actorId,note||null,reportId])).rows[0];
- if(!row)fail(404,"Participant report not found.","NOT_FOUND");
- await audit(db,actorId,"mentorship.participant_report_updated","mentorship_participant_report",reportId,requestId,{status});
- await notify(db,row.reporter_user_id,"mentorship.participant_report_status_updated","mentorship_participant_report",reportId,{message:"The Support Desk updated the status of your mentorship report.",nextAction:status==="resolved"?"Review the recorded resolution in your report history.":"Check your mentorship report history for the current status.",actionUrl:"/mentorship",actionRequired:false});
- return row;
+ return withTransaction(async db=>{
+  if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized Support Desk access is required.","FORBIDDEN");
+  const current=(await db.query("select * from mentorship_participant_report where id=$1 for update",[reportId])).rows[0];
+  if(!current)fail(404,"Participant report not found.","NOT_FOUND");
+  if(current.status===status)return {...current,idempotent:true};
+  if(current.status==="closed")fail(409,"Closed reports cannot be reopened or changed.","INVALID_STATE");
+  if(current.status==="resolved"&&status==="reviewing")fail(409,"Resolved reports cannot return to reviewing. Record a new report if a new concern arises.","INVALID_STATE");
+  const row=(await db.query("update mentorship_participant_report set status=$1,reviewed_at=now(),reviewed_by=$2,resolution_note=coalesce($3,resolution_note) where id=$4 returning id,reporter_user_id,status,reviewed_at,reviewed_by,resolution_note",[status,actorId,note||null,reportId])).rows[0];
+  await audit(db,actorId,"mentorship.participant_report_updated","mentorship_participant_report",reportId,requestId,{status});
+  await notify(db,row.reporter_user_id,"mentorship.participant_report_status_updated","mentorship_participant_report",reportId,{message:"The Support Desk updated the status of your mentorship report.",nextAction:status==="resolved"?"Review the recorded resolution in your report history.":"Check your mentorship report history for the current status.",actionUrl:"/mentorship",actionRequired:false});
+  return row;
+ });
 }

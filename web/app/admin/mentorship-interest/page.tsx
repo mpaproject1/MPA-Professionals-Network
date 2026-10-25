@@ -25,7 +25,7 @@ type InterestItem = {
 function displayList(value: unknown): string {
   if (Array.isArray(value)) return value.map((item) => String(item)).join(", ") || "Not specified";
   if (typeof value === "string") {
-    try { const parsed: unknown = JSON.parse(value); if (Array.isArray(parsed)) return parsed.map((item) => String(item)).join(", ") || "Not specified"; } catch {}
+    try { const parsed: unknown = JSON.parse(value); if (Array.isArray(parsed)) return parsed.map((item) => String(item)).join(", ") || "Not specified"; } catch { return value || "Not specified"; }
     return value || "Not specified";
   }
   return "Not specified";

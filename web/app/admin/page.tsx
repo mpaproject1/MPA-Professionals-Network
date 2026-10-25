@@ -77,8 +77,6 @@ export default function AdminPage() {
   const [canReviewInquiries, setCanReviewInquiries] = useState(false);
   const [error, setError] = useState("");
   const [sectionErrors, setSectionErrors] = useState<string[]>([]);
-  const [userQuery, setUserQuery] = useState("");
-  const [userStatus, setUserStatus] = useState("");
   const [editing, setEditing] = useState<Demo | null>(null);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
@@ -104,15 +102,7 @@ export default function AdminPage() {
       settle("user guides", getList<Guide>("/api/v1/experience/guides", "guides"), setGuides),
       settle("opportunity inquiries", getList<Inquiry>("/api/v1/opportunity-inquiries", "inquiries"), setInquiries),
     ];
-    if (userQuery.trim() || userStatus) {
-      const params = new URLSearchParams();
-      if (userQuery.trim()) params.set("q", userQuery.trim());
-      if (userStatus) params.set("status", userStatus);
-      params.set("limit", "200");
-      tasks.push(settle("users", getList<ManagedUser>(`/api/v1/admin/users?${params.toString()}`, "users"), setUsers));
-    } else {
-      tasks.push(settle("users", getList<ManagedUser>("/api/v1/admin/users?limit=200", "users"), setUsers));
-    }
+    tasks.push(settle("users", getList<ManagedUser>("/api/v1/admin/users?limit=200", "users"), setUsers));
     try {
       const catalog = await api<any>("/api/v1/admin/roles", {}, token);
       const normalizedCatalog = Array.isArray(catalog) ? catalog : (Array.isArray(catalog?.roles) ? catalog.roles : []);
@@ -462,42 +452,9 @@ export default function AdminPage() {
             disable access rather than deleting an account. Each action needs a
             reason in that account’s row. Invitations are not implemented yet.
           </p>
-          <form
-            className="row"
-            style={{ flexWrap: "wrap", margin: "14px 0" }}
-            onSubmit={(event) => {
-              event.preventDefault();
-              void load();
-            }}
-          >
-            <label style={{ flex: "1 1 240px" }}>
-              Search accounts
-              <input
-                value={userQuery}
-                onChange={(event) => setUserQuery(event.target.value)}
-                placeholder="Email or username"
-              />
-            </label>
-            <label>
-              Status
-              <select
-                value={userStatus}
-                onChange={(event) => setUserStatus(event.target.value)}
-              >
-                <option value="">All statuses</option>
-                <option value="active">Active</option>
-                <option value="suspended">Suspended</option>
-                <option value="disabled">Disabled</option>
-              </select>
-            </label>
-            <button className="btn btn-primary" type="submit">
-              <Search size={15} /> Search
-            </button>
-          </form>
           <p className="muted">
-            Showing up to 200 matching accounts. “Remove role” changes a
-            platform role only; organization/job roles remain in their own
-            scoped workspaces.
+            Search, status filters, pagination and account actions are available in the catalogue below.
+            Account changes require a reason, are enforced by the API and must preserve audit history.
           </p>
           <UsersTable
             users={users}

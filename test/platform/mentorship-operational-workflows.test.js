@@ -36,6 +36,8 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(operations, /Authorized Support Desk access is required/);
   assert.match(operations, /setMentorshipRequestSharing/);
   assert.match(operations, /listMentorshipInterestReviewQueue/);
+  assert.match(operations, /active_relationship_count/);
+  assert.match(operations, /MENTOR_CAPACITY_FULL/);
   assert.match(operations, /proposeMentorshipInterestMatch/);
   assert.match(operations, /joined_count/);
   assert.match(operations, /not participant identities/i);
@@ -71,6 +73,7 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(page, /feedbackRatings/);
   assert.doesNotMatch(page, /rating:5,comments:"Submitted through the mentorship workspace\."/);
   assert.match(page, /circle_joined_count/);
+  assert.match(page, /circle_joined_by_me/);
 
   assert.match(email, /EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET/);
   assert.match(email, /deliveryStatus=eventType/);

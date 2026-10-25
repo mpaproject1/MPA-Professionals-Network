@@ -96,6 +96,21 @@ test("G6 database: revision and dispute require fresh evidence and never silentl
  assert.deepEqual(history,["submitted","revision_requested","resubmitted","disputed","reopened","resubmitted","accepted"]);
 });
 
+test("G6 database: explicit evidence policies control whether delivery records or private files are required",async()=>{
+ const descriptionOnly=await setupListing({impactModel:"pro_bono",pricingModel:"free"});
+ await services.configureServiceCompletionPolicy(descriptionOnly.listing.id,descriptionOnly.owner,{evidencePolicy:"description_only",fulfilmentRule:"manual",fulfilmentTargetCount:1},"serve-g6-description-policy-"+descriptionOnly.suffix);
+ const textOnly=await startEngagement(descriptionOnly);
+ await services.changeServiceRequestStatus(textOnly.request.id,textOnly.owner,"completed","The provider completed the agreed consultation and documented actionable next steps.","serve-g6-description-submit-"+textOnly.suffix);
+ const textAccepted=await services.acceptServiceCompletion(textOnly.request.id,textOnly.requester,"The consultation met the agreed scope and the requester has an actionable follow-up plan.","serve-g6-description-accept-"+textOnly.suffix);
+ assert.equal(textAccepted.status,"completed","explicit description-only policy permits the defined written evidence");
+
+ const privateFile=await setupListing();
+ await services.configureServiceCompletionPolicy(privateFile.listing.id,privateFile.owner,{evidencePolicy:"private_file",fulfilmentRule:"manual",fulfilmentTargetCount:1},"serve-g6-private-policy-"+privateFile.suffix);
+ const fileEngagement=await startEngagement(privateFile);
+ await submitAndAcceptDelivery(fileEngagement);
+ await assert.rejects(services.changeServiceRequestStatus(fileEngagement.request.id,fileEngagement.owner,"completed","The provider has delivered the agreed work and final outcome summary.","serve-g6-private-missing-file-"+fileEngagement.suffix),x=>x.code==="PRIVATE_FILE_EVIDENCE_REQUIRED");
+});
+
 test("G6 database: discounted paid completion remains separate from finance settlement",async()=>{
  const f=await setupListing({impactModel:"community_discount",pricingModel:"fixed",priceAmount:50,referencePriceAmount:100});
  const e=await startEngagement(f);

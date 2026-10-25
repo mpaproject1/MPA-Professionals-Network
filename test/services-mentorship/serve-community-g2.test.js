@@ -13,16 +13,26 @@ function identity(suffix){
  return {email:`serve-g2-${suffix}@example.test`,password:"ServeCommunityG2Password!2026",firstName:"Serve",lastName:`Gate${suffix.slice(0,8)}`,phone:`06${digits}`};
 }
 async function account(){const suffix=randomUUID().replaceAll("-","").slice(0,16);return (await membership.register(identity(suffix),`serve-community-g2-${suffix}`)).user.id;}
-async function setupListing(){
+async function setupListing({approved=true}={}){
  const owner=await account(), suffix=randomUUID().replaceAll("-","").slice(0,12);
  const org=await organizationJobs.registerOrganization(owner,{legalName:`Serve Community G2 ${suffix}`,displayName:`Serve Community G2 ${suffix}`},`serve-g2-org-${suffix}`);
  const db=getPool();
  await db.query("update organization set verification_status='verified',verified_at=now(),verified_by=$2,public_visible=true where id=$1",[org.id,owner]);
  const listing=await services.createServiceListing(owner,{organizationId:org.id,title:"Community legal support",description:"Pro-bono guidance for local community members.",serviceCategory:"legal",visibility:"public",pricingModel:"free"},`serve-g2-listing-${suffix}`,`serve-g2-listing-key-${suffix}-0123456789`);
- await db.query("update service_listing set moderation_status='approved',moderated_by=$2,moderated_at=now() where id=$1",[listing.id,owner]);
- const active=await services.changeServiceListingStatus(listing.id,owner,"published",`serve-g2-publish-${suffix}`);
+ if(approved) await db.query("update service_listing set moderation_status='approved',moderated_by=$2,moderated_at=now() where id=$1",[listing.id,owner]);
+ const active=approved?await services.changeServiceListingStatus(listing.id,owner,"published",`serve-g2-publish-${suffix}`):listing;
  return {owner,org,listing:active,db,suffix};
 }
+
+test("G2 database: moderation submission retries do not duplicate lifecycle events",async()=>{
+ const {owner,listing,db,suffix}=await setupListing({approved:false});
+ const submitted=await services.changeServiceListingStatus(listing.id,owner,"published",`serve-g2-submit-${suffix}`);
+ assert.equal(submitted.lifecycle_status,"pending_review");
+ const retry=await services.changeServiceListingStatus(listing.id,owner,"published",`serve-g2-submit-retry-${suffix}`);
+ assert.equal(retry.idempotent,true);
+ const events=(await db.query("select id from service_listing_lifecycle_event where listing_id=$1 and to_status='pending_review'",[listing.id])).rows;
+ assert.equal(events.length,1);
+});
 
 test("G2 database: new listings have no expiry and lifecycle actions require an owner, reason and audit event",async()=>{
  const {owner,listing,db,suffix}=await setupListing();

@@ -4,7 +4,7 @@ import { createInAppNotification } from "../platform/notifications.js";
 import { getMyMentorProfile } from "./service.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
-function redactContactText(value){return String(value||"").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi,"[redacted email]").replace(/\\+?\\d[\\d\\s().-]{7,}\\d/g,"[redacted phone]");}
+function redactContactText(value){return String(value||"").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[redacted email]").replace(/\+?\d[\d\s().-]{7,}\d/g,"[redacted phone]");}
 async function audit(db,actor,action,type,id,requestId,metadata={}){
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,metadata]);
 }

@@ -245,21 +245,26 @@ export async function withdrawServiceListingInterest(interestId,userId,reason,re
  });
 }
 
-export async function createServiceListingPledge(listingId,userId,input={},requestId){
+export async function createServiceListingPledge(listingId,userId,input={},requestId,idempotencyKey=null){
  const description=String(input.description||"").trim();
  if(description.length<4)throw error(400,"A pledge description of at least four characters is required.","VALIDATION_ERROR");
+ if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
+ const organizationId=input.organizationId||null;
+ const fingerprint=hashPayload({listingId,userId,organizationId,description}),keyHash=hashValue(idempotencyKey);
  return withTransaction(async db=>{
+  const existing=(await db.query("select * from service_listing_pledge where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different pledge details.","IDEMPOTENCY_KEY_CONFLICT");return {...existing,idempotent:true,replayed:true};}
   const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
   if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
   if(listing.lifecycle_status!=="active"||listing.status!=="published"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date()))throw error(409,"This listing is not accepting pledges.","LISTING_NOT_ACTIVE");
-  const organizationId=input.organizationId||null;
   if(organizationId){
    if(listing.organization_id===organizationId)throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
    try{await assertOrganizationCapability(db,organizationId,userId);}catch(cause){throw error(cause.statusCode||403,cause.message||"Authorized active organization membership is required.",cause.code||"ORGANIZATION_FORBIDDEN");}
   }else if(listing.organization_id===null&&listing.provider_user_id===userId)throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
-  const row=(await db.query("insert into service_listing_pledge(listing_id,individual_user_id,organization_id,actor_user_id,description,status) values($1,$2,$3,$4,$5,'submitted') returning *",[listingId,organizationId?null:userId,organizationId,userId,description])).rows[0];
+  const row=(await db.query("insert into service_listing_pledge(listing_id,individual_user_id,organization_id,actor_user_id,description,status,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,'submitted',$6,$7) on conflict do nothing returning *",[listingId,organizationId?null:userId,organizationId,userId,description,keyHash,fingerprint])).rows[0];
+  if(!row){const raced=(await db.query("select * from service_listing_pledge where request_idempotency_hash=$1 for update",[keyHash])).rows[0];if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different pledge details.","IDEMPOTENCY_KEY_CONFLICT");return {...raced,idempotent:true,replayed:true};}
   await audit(db,userId,"service.listing_pledge_submitted","service_listing_pledge",row.id,requestId,{listingId,organizationId:organizationId||null});
-  return row;
+  return {...row,idempotent:false,replayed:false};
  });
 }
 

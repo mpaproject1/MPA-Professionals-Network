@@ -426,5 +426,7 @@ test("organization impact report reads scoped outcomes and does not invent unsup
   assert.ok(hub.includes('href="/organizations/reports"'));
   assert.ok(server.includes('parts[4]==="outcomes"'));
   assert.ok(service.includes("organization_membership"));
+  assert.ok(service.includes("count(distinct a.id)::int applications"), "multiple interviews must not inflate application totals");
+  assert.ok(service.includes("count(distinct a.id) filter(where a.status='hired')::int hires"), "multiple interviews must not inflate hire totals");
   assert.doesNotMatch(page, /120 Volunteer Hours Engaged|\$[0-9,]+ funded|Download Q1 2026 Audit Report/);
 });

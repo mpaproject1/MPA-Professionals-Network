@@ -73,7 +73,7 @@ export default function AdminPage() {
   const hydrated = useUiStore((s) => s.hydrated);
   const token = useUiStore((s) => s.token);
   const hydrateToken = useUiStore((s) => s.hydrateToken);
-  const [tab, setTab] = useState<"cases" | "guides" | "inquiries" | "users" | "audit">("cases");
+  const [tab, setTab] = useState<"cases" | "guides" | "inquiries" | "users" | "audit">("inquiries");
   const [cases, setCases] = useState<Demo[]>([]);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
@@ -332,126 +332,16 @@ export default function AdminPage() {
           </span>
         </div>
       )}
-      <div className="admin-tabs">
-        {(
-          [
-            ...(isPlatformAdmin
-              ? [
-                  ["cases", "Demo cases", loading ? "…" : sectionErrors.includes("demo cases") ? "—" : cases.length],
-                  ["guides", "User guides", loading ? "…" : sectionErrors.includes("user guides") ? "—" : guides.length],
-                  ["users", "Users & roles", loading ? "…" : sectionErrors.includes("users") ? "—" : users.length],
-                  ...(roles.includes("system_admin") ? [["audit", "Audit history", loading ? "…" : sectionErrors.includes("audit history") ? "—" : auditEvents.length] as [typeof tab, string, string | number]] : []),
-                ]
-              : []),
-            ...(canReviewInquiries
-              ? [["inquiries", "Opportunity inquiries", loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "—" : inquiries.length]]
-              : []),
-          ] as [typeof tab, string, string | number][]
-        ).map(([key, label, count]) => (
-          <button type="button"
-            key={key}
-            className={
-              `btn admin-tab ${tab === key ? "btn-primary" : "btn-ghost"}`
-            }
-            onClick={() => setTab(key)}
-          >
-            {key === "cases" ? (
-              <FlaskConical size={16} />
-            ) : key === "guides" ? (
-              <HelpCircle size={16} />
-            ) : key === "inquiries" ? (
-              <UserCog size={16} />
-            ) : (
-              <ShieldCheck size={16} />
-            )}{" "}
-            {label} ({count})
+      <div className="admin-tabs" aria-label="Admin review tabs">
+        {([
+          ...(canReviewInquiries ? [["inquiries", "Opportunity inquiries", loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "—" : inquiries.length] as [typeof tab, string, string | number]] : []),
+          ...(roles.includes("system_admin") ? [["audit", "Audit history", loading ? "…" : sectionErrors.includes("audit history") ? "—" : auditEvents.length] as [typeof tab, string, string | number]] : []),
+        ] as [typeof tab, string, string | number][]).map(([key, label, count]) => (
+          <button type="button" key={key} className={`btn admin-tab ${tab === key ? "btn-primary" : "btn-ghost"}`} onClick={() => setTab(key)}>
+            {key === "inquiries" ? <UserCog size={16} /> : <ShieldCheck size={16} />} {label} ({count})
           </button>
         ))}
       </div>
-      {tab === "cases" && (
-        <Card>
-          <div className="row">
-            <div>
-              <div className="h2">Business scenario catalogue</div>
-              <div className="muted">
-                Controlled experiences for training, UAT and stakeholder
-                walkthroughs.
-              </div>
-            </div>
-          </div>
-          {cases.map((d) => (
-            <div className="case-row" key={d.id}>
-              <div>
-                <div className="row" style={{ justifyContent: "flex-start" }}>
-                  <b>{d.title}</b>
-                  <Badge tone={d.active ? "green" : "slate"}>
-                    {d.active ? "Active" : "Paused"}
-                  </Badge>
-                </div>
-                <div className="muted">
-                  {d.business_area} · {d.persona}
-                </div>
-                <p className="muted">{d.description}</p>
-              </div>
-              <div className="row" style={{ justifyContent: "flex-end" }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setEditing(d)}>
-                  <Edit3 size={15} /> Edit
-                </button>
-                <button type="button"
-                  className="btn btn-primary"
-                  onClick={() => launch(d)}
-                  disabled={!d.active}
-                >
-                  <PlayCircle size={15} /> Play
-                </button>
-                <button type="button"
-                  className="btn btn-ghost"
-                  onClick={() => patchCase(d, !d.active)}
-                >
-                  {d.active ? (
-                    <PauseCircle size={15} />
-                  ) : (
-                    <PlayCircle size={15} />
-                  )}{" "}
-                  {d.active ? "Pause" : "Activate"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </Card>
-      )}
-      {tab === "guides" && (
-        <Card>
-          <div className="h2">Contextual walkthroughs</div>
-          <p className="muted">
-            Guides spotlight real controls and explain each workspace
-            step-by-step.
-          </p>
-          {guides.map((g) => (
-            <div className="case-row" key={g.id}>
-              <div>
-                <div className="row" style={{ justifyContent: "flex-start" }}>
-                  <b>{g.title}</b>
-                  <Badge>{g.route_pattern}</Badge>
-                </div>
-                <div className="muted">{g.description}</div>
-                <small className="muted">{g.steps.length} guided steps</small>
-              </div>
-              <button type="button"
-                className="btn btn-ghost"
-                onClick={() => patchGuide(g, !g.active)}
-              >
-                {g.active ? (
-                  <PauseCircle size={15} />
-                ) : (
-                  <PlayCircle size={15} />
-                )}{" "}
-                {g.active ? "Disable" : "Enable"}
-              </button>
-            </div>
-          ))}
-        </Card>
-      )}
       {tab === "audit" && roles.includes("system_admin") && (
         <Card>
           <div className="h2">Administrative audit history</div>
@@ -528,41 +418,6 @@ export default function AdminPage() {
           )}
         </Card>
       )}
-      {tab === "users" && isPlatformAdmin && (
-        <Card>
-          <div className="h2">Accounts and platform roles</div>
-          <p className="muted">
-            Account records are retained for audit and history. Suspend or
-            disable access rather than deleting an account. Each action needs a
-            reason in that account’s row. Invitations are not implemented yet.
-          </p>
-          <p className="muted">
-            Search, status filters, pagination and account actions are organized in the catalogue below.
-            Account changes require a reason and remain subject to server-side permissions and audit history.
-            Organization and job roles continue to be managed in their own scoped workspaces.
-          </p>
-          <UsersTable
-            users={users}
-            roleCatalog={roleCatalog}
-            permissionCatalog={permissionCatalog}
-            auditEvents={auditEvents}
-            currentRoles={roles}
-            currentUserId={currentUserId}
-            token={token}
-            onChanged={load}
-            onError={setError}
-            usersLoadFailed={sectionErrors.includes('users')}
-          />
-        </Card>
-      )}
-      {editing && (
-        <CaseEditor
-          demo={editing}
-          token={token}
-          onClose={() => setEditing(null)}
-          onSaved={load}
-        />
-      )}
       <div className="footer-note">
         Amanah (Trust) · Tabayyun (Verification) · Satr (Confidentiality) ·
         Ihsan (Excellence)
@@ -570,84 +425,3 @@ export default function AdminPage() {
     </div>
   );
 }
-function CaseEditor({
-  demo,
-  token,
-  onClose,
-  onSaved,
-}: {
-  demo: Demo;
-  token: string;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const [title, setTitle] = useState(demo.title),
-    [description, setDescription] = useState(demo.description),
-    [persona, setPersona] = useState(demo.persona),
-    [saving, setSaving] = useState(false);
-  async function save() {
-    setSaving(true);
-    try {
-      await api(
-        `/api/v1/admin/experience/demo-cases/${demo.id}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ title, description, persona }),
-        },
-        token,
-      );
-      await onSaved();
-      onClose();
-    } finally {
-      setSaving(false);
-    }
-  }
-  return (
-    <div className="guide-overlay">
-      <button type="button" className="guide-dim" aria-label="Close guide overlay" onClick={onClose} />
-      <aside className="guide-card">
-        <div className="row">
-          <b>Edit demo case</b>
-          <button type="button" className="icon-btn" onClick={onClose}>
-            ×
-          </button>
-        </div>
-        <label>
-          Title
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={field}
-          />
-        </label>
-        <label>
-          Persona
-          <input
-            value={persona}
-            onChange={(e) => setPersona(e.target.value)}
-            style={field}
-          />
-        </label>
-        <label>
-          Description
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={5}
-            style={field}
-          />
-        </label>
-        <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
-          <Save size={15} /> {saving ? "Saving…" : "Save changes"}
-        </button>
-      </aside>
-    </div>
-  );
-}
-const field: CSSProperties = {
-  padding: 10,
-  border: "1px solid var(--border)",
-  borderRadius: 10,
-  background: "var(--bg)",
-  color: "var(--text)",
-};

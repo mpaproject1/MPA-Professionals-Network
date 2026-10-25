@@ -76,7 +76,7 @@ export default function MentorshipReportsPage() {
           <label>Review / resolution note<textarea maxLength={2000} value={notes[report.id] ?? report.resolution_note ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [report.id]: event.target.value }))} placeholder="Record the action taken. A note is required to resolve." /></label>
           <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 8 }}>
             {report.status === "open" && <button className="btn btn-ghost" type="button" disabled={busyId === report.id} onClick={() => void update(report, "reviewing")}>Start review</button>}
-            {report.status !== "resolved" && <button className="btn btn-primary" type="button" disabled={busyId === report.id} onClick={() => void update(report, "resolved")}>Resolve report</button>}
+            {!["resolved", "closed"].includes(report.status) && <button className="btn btn-primary" type="button" disabled={busyId === report.id} onClick={() => void update(report, "resolved")}>Resolve report</button>}
             {report.status !== "closed" && <button className="btn btn-ghost" type="button" disabled={busyId === report.id} onClick={() => void update(report, "closed")}>Close report</button>}
           </div>
         </section>)}

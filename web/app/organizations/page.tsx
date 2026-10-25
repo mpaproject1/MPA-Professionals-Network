@@ -538,7 +538,7 @@ export default function Organizations() {
         primaryLabel={token ? "Continue organization setup" : "Sign in to begin"}
         primaryHref={token ? "#org-registration" : "/login?next=/organizations"}
         steps={[
-          { title: "Verify", description: "Register the legal identity, nominate an authorized representative and provide required evidence.", href: token ? "#org-registration" : "/login?next=/organizations", action: "Register organization" },
+          { title: "Verify", description: "Register the legal identity and institutional contact, then upload the required private evidence. Structured TIN and representative identity fields are not yet supported by the current registration API.", href: token ? "#org-registration" : "/login?next=/organizations", action: "Register organization" },
           { title: "Publish", description: "After verification, prepare a vacancy or paid project with clear eligibility and terms.", href: "/recruitment", action: "Open recruitment" },
           { title: "Review", description: "Review applicants for your own opportunities and respond to moderation or correction requests.", href: "/recruitment", action: "Review applicants" },
           { title: "Report", description: "Record interview decisions, hiring outcomes and follow-up feedback through the authorized workflow.", href: "/recruitment", action: "Track hiring" },

@@ -7,7 +7,7 @@ import { getPool } from "../../src/platform/db.js";
 
 async function account(label) {
   const suffix = randomUUID();
-  const digits = suffix.replace(/[^0-9]/g, "").slice(0, 8).padEnd(8, "7");
+  const digits = [...suffix.replace(/-/g, "")].map(character => String(Number.parseInt(character, 16) % 10)).join("").slice(0, 8);
   const email = "org-membership-" + label + "-" + suffix + "@example.test";
   const created = await membership.register({
     email,

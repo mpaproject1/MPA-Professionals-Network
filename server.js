@@ -28,6 +28,7 @@ import {beginAdminPasskeyAuthentication, beginAdminPasskeyRegistration, finishAd
 import * as marketplaceDemand from "./src/services-mentorship/demand.js";
 import * as organizationMentorshipOffers from "./src/services-mentorship/organization-offers.js";
 import * as servicesMentorship from "./src/services-mentorship/service.js";
+import * as mentorshipOperations from "./src/services-mentorship/operations.js";
 import * as talent from "./src/talent/service.js";
 import * as verification from "./src/verification/service.js";
 
@@ -345,12 +346,20 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && p==="api/v1/me/mentor-profile") return ok(res,await servicesMentorship.createMentorProfile(identity.sub,await body(req),requestId),requestId,201);
     if(req.method==="PATCH" && parts.length===4 && p.startsWith("api/v1/mentor-profiles/")) return ok(res,await servicesMentorship.updateMentorProfile(parts[3],identity.sub,await body(req),requestId),requestId);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/mentor-profiles/") && parts[4]==="status") { const b=await body(req); return ok(res,await servicesMentorship.changeMentorStatus(parts[3],identity.sub,b.status,requestId),requestId); }
+    if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/mentor-profiles/") && parts[4]==="circle") return ok(res,await mentorshipOperations.getMentorshipCircleSummary(parts[3],identity.sub),requestId);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/mentor-profiles/") && parts[4]==="circle" && parts[5]==="join") return ok(res,await mentorshipOperations.joinMentorshipCircle(parts[3],identity.sub,requestId),requestId,201);
+    if(req.method==="DELETE" && parts.length===6 && p.startsWith("api/v1/mentor-profiles/") && parts[4]==="circle" && parts[5]==="join") return ok(res,await mentorshipOperations.leaveMentorshipCircle(parts[3],identity.sub,requestId),requestId);
     if(req.method==="PUT" && parts.length===5 && p.startsWith("api/v1/mentor-profiles/") && parts[4]==="availability") return ok(res,await servicesMentorship.setMentorAvailability(parts[3],identity.sub,await body(req),requestId),requestId);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/mentor-profiles/") && parts[4]==="time-off") return ok(res,await servicesMentorship.addMentorTimeOff(parts[3],identity.sub,await body(req),requestId),requestId,201);
     if(req.method==="GET" && p==="api/v1/me/mentorship-requests") return ok(res,await servicesMentorship.listMyMentorshipRequests(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/me/mentorship-interest") return ok(res,await mentorshipOperations.listMentorshipInterestPool(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/me/mentorship-operations") return ok(res,await mentorshipOperations.getMentorshipOperationalReport(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/admin/mentorship-reports") return ok(res,await mentorshipOperations.listMentorshipParticipantReports(identity.sub,{status:query(req.url).get("status")||"open",limit:query(req.url).get("limit")||25,offset:query(req.url).get("offset")||0}),requestId);
+    if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/admin/mentorship-reports/")) return ok(res,await mentorshipOperations.updateMentorshipParticipantReport(identity.sub,parts[4],await body(req),requestId),requestId);
     if(req.method==="GET" && p==="api/v1/me/mentorship-matches") return ok(res,await servicesMentorship.listMyMentorshipMatches(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/me/mentorships") return ok(res,await servicesMentorship.listMyMentorships(identity.sub),requestId);
     if(req.method==="POST" && p==="api/v1/mentorship/requests") return ok(res,await servicesMentorship.createMentorshipRequest(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/mentorship/requests/") && parts[5]==="interest") return ok(res,await mentorshipOperations.registerMentorshipInterest(parts[4],identity.sub,requestId),requestId,201);
     if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/mentorship/requests/")) return ok(res,await servicesMentorship.getMentorshipRequest(parts[4],identity.sub),requestId);
     if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/mentorship/requests/") && parts[5]==="matches") return ok(res,await servicesMentorship.findMentorMatches(parts[4],identity.sub),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/mentorship/requests/") && parts[5]==="match") { const b=await body(req); return ok(res,await servicesMentorship.proposeMentorMatch(parts[4],b.mentorUserId,identity.sub,requestId),requestId,201); }
@@ -363,8 +372,10 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/mentorship/") && parts[4]==="status") { const b=await body(req); return ok(res,await servicesMentorship.changeMentorshipStatus(parts[3],identity.sub,b.status,b.note,requestId),requestId); }
     if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/mentorship/") && parts[4]==="sessions") return ok(res,await servicesMentorship.listMentorshipSessions(parts[3],identity.sub),requestId);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/mentorship/") && parts[4]==="sessions") return ok(res,await servicesMentorship.createMentorshipSession(parts[3],identity.sub,await body(req),requestId),requestId,201);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/mentorship/sessions/") && parts[5]==="response") { const b=await body(req); return ok(res,await mentorshipOperations.respondToSessionProposal(parts[4],identity.sub,b.status,b.note,requestId),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/mentorship/sessions/") && parts[5]==="status") { const b=await body(req); return ok(res,await servicesMentorship.changeMentorshipSession(parts[4],identity.sub,b.status,b.notes,requestId),requestId); }
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/mentorship/") && parts[4]==="feedback") return ok(res,await servicesMentorship.submitMentorshipFeedback(parts[3],identity.sub,await body(req),requestId),requestId,201);
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/mentorship/") && parts[4]==="reports") return ok(res,await mentorshipOperations.createMentorshipParticipantReport(parts[3],identity.sub,await body(req),requestId),requestId,201);
     if(req.method==="GET" && p==="api/v1/me/outcomes") return ok(res,await stakeholderOutcomes.getMyOutcomeWorkspace(identity.sub),requestId);
     if(req.method==="GET" && parts.length===5 && p==="api/v1/support/job-seeker-demands/organizations") { const identity=await auth(req); return ok(res,await publicOpportunity.listShareableOrganizations(identity.sub),requestId); }
     if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/organizations/") && parts[4]==="job-seeker-demands") { const identity=await auth(req); return ok(res,await publicOpportunity.listSharedJobSeekerDemands(parts[3],identity.sub),requestId); }

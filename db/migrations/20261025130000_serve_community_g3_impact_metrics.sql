@@ -4,6 +4,9 @@ ALTER TABLE service_listing
   ADD COLUMN IF NOT EXISTS impact_model text NOT NULL DEFAULT 'standard',
   ADD COLUMN IF NOT EXISTS reference_price_amount numeric(12,2);
 
+UPDATE service_listing SET impact_model='standard' WHERE impact_model IS NULL;
+ALTER TABLE service_listing ALTER COLUMN impact_model SET DEFAULT 'standard', ALTER COLUMN impact_model SET NOT NULL;
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='service_listing_impact_model_check') THEN

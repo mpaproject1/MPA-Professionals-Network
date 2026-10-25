@@ -326,6 +326,7 @@ try {
     "ux_service_listing_interest_active_individual",
     "ux_service_listing_interest_active_organization",
     "ux_service_listing_pledge_idempotency_hash",
+    "ux_service_listing_announcement_idempotency_hash",
     "ux_talent_inquiry_idempotency_hash",
     "ux_mentorship_match_one_open_request"
   ];

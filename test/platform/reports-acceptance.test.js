@@ -1,8 +1,25 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { inflateRawSync } from "node:zlib";
 import test from "node:test";
 import { getPool } from "../../src/platform/db.js";
 import { exportReport, runReport } from "../../src/platform/reports.js";
+
+function readZipEntry(buffer, wanted) {
+  let offset = 0;
+  while (offset + 30 <= buffer.length && buffer.readUInt32LE(offset) === 0x04034b50) {
+    const compressedSize = buffer.readUInt32LE(offset + 18);
+    const nameLength = buffer.readUInt16LE(offset + 26);
+    const extraLength = buffer.readUInt16LE(offset + 28);
+    const nameStart = offset + 30;
+    const name = buffer.subarray(nameStart, nameStart + nameLength).toString("utf8");
+    const dataStart = nameStart + nameLength + extraLength;
+    const compressed = buffer.subarray(dataStart, dataStart + compressedSize);
+    if (name === wanted) return inflateRawSync(compressed).toString("utf8");
+    offset = dataStart + compressedSize;
+  }
+  throw new Error("Missing XLSX entry: " + wanted);
+}
 
 test("administrative audit report applies date, outcome and search filters to known test data and exports both formats", async t => {
   if (!process.env.DATABASE_URL) {
@@ -42,6 +59,7 @@ test("administrative audit report applies date, outcome and search filters to kn
     assert.equal(pdf.contentType, "application/pdf");
     assert.match(pdf.filename, /\.pdf$/);
     assert.equal(pdf.buffer.subarray(0, 8).toString("ascii"), "%PDF-1.4");
+    assert.ok(pdf.buffer.toString("ascii").includes(marker), "PDF export should contain the known matching row");
 
     const xlsx = await exportReport(identity, "audit-activity", {
       from: today, to: today, status: "success", q: marker
@@ -49,6 +67,9 @@ test("administrative audit report applies date, outcome and search filters to kn
     assert.equal(xlsx.contentType, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     assert.match(xlsx.filename, /\.xlsx$/);
     assert.equal(xlsx.buffer.subarray(0, 2).toString("ascii"), "PK");
+    const worksheet = readZipEntry(xlsx.buffer, "xl/worksheets/sheet1.xml");
+    assert.ok(worksheet.includes(marker), "XLSX export should contain the known matching row");
+    assert.ok(worksheet.includes("success"), "XLSX export should preserve the filtered outcome");
 
     await assert.rejects(
       runReport(identity, "audit-activity", { from: today, to: "2000-01-01" }, randomUUID()),
@@ -56,7 +77,7 @@ test("administrative audit report applies date, outcome and search filters to kn
     );
 
     const audit = await db.query(
-      "select action,metadata from audit_log where request_id = any($1::text[]) order by action",
+      "select action,metadata from audit_log where request_id::text = any($1::text[]) order by action",
       [[runRequestId, pdfRequestId, xlsxRequestId]]
     );
     assert.ok(audit.rows.some(row => row.action === "report.generated"));

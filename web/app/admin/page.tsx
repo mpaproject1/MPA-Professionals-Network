@@ -84,6 +84,7 @@ export default function AdminPage() {
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [canReviewInquiries, setCanReviewInquiries] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [sectionErrors, setSectionErrors] = useState<string[]>([]);
   const [moduleQuery, setModuleQuery] = useState("");
   const [userQuery, setUserQuery] = useState("");
@@ -94,7 +95,9 @@ export default function AdminPage() {
 
   const load = useCallback(async () => {
     if (!token) return;
+    setLoading(true);
     setError("");
+    setSectionErrors([]);
     const errors: string[] = [];
     const getList = async <T,>(path: string, key?: string): Promise<T[]> => {
       const payload = await api<any>(path, {}, token);
@@ -145,6 +148,7 @@ export default function AdminPage() {
     }
     await Promise.all(tasks);
     setSectionErrors(errors);
+    setLoading(false);
   }, [token, userQuery, userStatus]);
 
   useEffect(() => {
@@ -244,10 +248,10 @@ export default function AdminPage() {
         <div className={styles.searchWrap}><label htmlFor="admin-workspace-search">Find a workspace</label><div className={styles.searchBox}><Search size={18} aria-hidden="true"/><input id="admin-workspace-search" value={moduleQuery} onChange={(event) => setModuleQuery(event.target.value)} placeholder="Search members, organizations, reports…" /></div></div>
       </section>
       <section className={styles.metrics} aria-label="Loaded operational records">
-        <article className={styles.metric}><span>Account records loaded</span><strong>{isPlatformAdmin ? users.length : "—"}</strong><small>{isPlatformAdmin ? "Up to 200 accounts · current query" : "Platform administrator access required"}</small></article>
-        <article className={styles.metric}><span>Experience scenarios</span><strong>{isPlatformAdmin ? cases.length : "—"}</strong><small>Configured walkthrough scenarios</small></article>
-        <article className={styles.metric}><span>Contextual guides</span><strong>{isPlatformAdmin ? guides.length : "—"}</strong><small>Configured user guides</small></article>
-        <article className={styles.metric}><span>Opportunity inquiries</span><strong>{canReviewInquiries ? inquiries.length : "—"}</strong><small>Records returned to this workspace</small></article>
+        <article className={styles.metric}><span>Account records loaded</span><strong>{!isPlatformAdmin ? "—" : loading ? "…" : sectionErrors.includes("users") ? "Unavailable" : users.length}</strong><small>{!isPlatformAdmin ? "Platform administrator access required" : loading ? "Retrieving current results" : sectionErrors.includes("users") ? "Could not verify this count · retry to check" : "Up to 200 accounts · current query"}</small></article>
+        <article className={styles.metric}><span>Experience scenarios</span><strong>{!isPlatformAdmin ? "—" : loading ? "…" : sectionErrors.includes("demo cases") ? "Unavailable" : cases.length}</strong><small>{loading ? "Retrieving current results" : sectionErrors.includes("demo cases") ? "Could not verify this count · retry to check" : "Configured walkthrough scenarios"}</small></article>
+        <article className={styles.metric}><span>Contextual guides</span><strong>{!isPlatformAdmin ? "—" : loading ? "…" : sectionErrors.includes("user guides") ? "Unavailable" : guides.length}</strong><small>{loading ? "Retrieving current results" : sectionErrors.includes("user guides") ? "Could not verify this count · retry to check" : "Configured user guides"}</small></article>
+        <article className={styles.metric}><span>Opportunity inquiries</span><strong>{!canReviewInquiries ? "—" : loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "Unavailable" : inquiries.length}</strong><small>{!canReviewInquiries ? "Review permission required" : loading ? "Retrieving current results" : sectionErrors.includes("opportunity inquiries") ? "Could not verify this count · retry to check" : "Records returned to this workspace"}</small></article>
       </section>
       <section className={styles.section} aria-labelledby="admin-workspaces-heading">
         <div className={styles.sectionHeader}><div><h2 id="admin-workspaces-heading">Workspaces</h2><p>Open a focused workspace to search, review and take authorized action.</p></div><span className={styles.sectionCount}>Core administration</span></div>
@@ -266,9 +270,10 @@ export default function AdminPage() {
         <div className={styles.sectionHeader}><div><h2 id="admin-governance-heading">Experience & governance tools</h2><p>Less-frequent configuration tools are kept below the operational workspaces.</p></div></div>
       </section>
       {error && (
-        <div className="field-banner">
+        <div className="field-banner" role="alert">
           <ShieldCheck size={18} />
           <span>{error}</span>
+          <button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={loading}>{loading ? "Checking…" : "Retry overview"}</button>
         </div>
       )}
       {sectionErrors.length > 0 && (
@@ -285,16 +290,16 @@ export default function AdminPage() {
           [
             ...(isPlatformAdmin
               ? [
-                  ["cases", "Demo cases", cases.length],
-                  ["guides", "User guides", guides.length],
-                  ["users", "Users & roles", users.length],
-                  ...(roles.includes("system_admin") ? [["audit", "Audit history", auditEvents.length] as [typeof tab, string, number]] : []),
+                  ["cases", "Demo cases", loading ? "…" : sectionErrors.includes("demo cases") ? "—" : cases.length],
+                  ["guides", "User guides", loading ? "…" : sectionErrors.includes("user guides") ? "—" : guides.length],
+                  ["users", "Users & roles", loading ? "…" : sectionErrors.includes("users") ? "—" : users.length],
+                  ...(roles.includes("system_admin") ? [["audit", "Audit history", loading ? "…" : sectionErrors.includes("audit history") ? "—" : auditEvents.length] as [typeof tab, string, string | number]] : []),
                 ]
               : []),
             ...(canReviewInquiries
-              ? [["inquiries", "Opportunity inquiries", inquiries.length]]
+              ? [["inquiries", "Opportunity inquiries", loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "—" : inquiries.length]]
               : []),
-          ] as [typeof tab, string, number][]
+          ] as [typeof tab, string, string | number][]
         ).map(([key, label, count]) => (
           <button type="button"
             key={key}

@@ -22,7 +22,7 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(migration, /mentorship_match_interest/);
   assert.match(migration, /mentorship_circle_membership/);
   assert.match(migration, /mentorship_participant_report/);
-  assert.match(migration, /delivery_status IN \('unknown','queued','sent','delivered','failed'\)/);
+  assert.match(migration, /delivery_status IN \('unknown','queued','sent','delivered','failed','cancelled'\)/);
 
   const poolStart = operations.indexOf("export async function listMentorshipInterestPool");
   const poolEnd = operations.indexOf("export async function registerMentorshipInterest");

@@ -12,6 +12,7 @@ import {
   MessageSquareText,
   PauseCircle,
   PlayCircle,
+  RefreshCw,
   Save,
   Search,
   ShieldCheck,

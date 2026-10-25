@@ -129,7 +129,7 @@ export default function Services(){
   if(!token)return;const body=(requestUpdateDrafts[r.id]||"").trim(),category=requestUpdateCategories[r.id]||"progress";
   if(body.length<10){setError("Write an operational update of at least 10 characters.");return;}
   setRequestUpdateBusy(v=>({...v,[r.id]:true}));setError("");setNotice("");
-  try{const key=requestUpdateKeys[r.id]||createSubmissionKey();setRequestUpdateKeys(v=>({...v,[r.id]:key}));await api(`/api/v1/service-requests/${encodeURIComponent(r.id)}/updates`,{method:"POST",headers:{"X-Idempotency-Key":key},body:JSON.stringify({category,body})},token);setRequestUpdateDrafts(v=>({...v,[r.id]:""}));setRequestUpdateKeys(v=>({...v,[r.id]:""}));setNotice("Operational update recorded and the other authorized participant(s) notified. This is not a private message inbox.");await loadRequests();}
+  try{const key=requestUpdateKeys[r.id]||createSubmissionKey();setRequestUpdateKeys(v=>({...v,[r.id]:key}));await api(`/api/v1/service-requests/${encodeURIComponent(r.id)}/updates`,{method:"POST",headers:{"X-Idempotency-Key":key},body:JSON.stringify({category,body})},token);setRequestUpdateDrafts(v=>({...v,[r.id]:""}));setRequestUpdateKeys(v=>({...v,[r.id]:""}));setNotice("Operational update recorded. System notifications follow recipient preferences; this request record remains the source of truth. This is not a private message inbox.");await loadRequests();}
   catch(e){setError(e instanceof ApiError?e.message:"The update could not be confirmed. Retry without changing its text to safely check the same submission.");}
   finally{setRequestUpdateBusy(v=>({...v,[r.id]:false}));}
  }

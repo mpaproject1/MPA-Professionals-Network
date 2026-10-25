@@ -237,9 +237,6 @@ export default function AdminPage() {
         </div>
         {moduleQuery.trim() && workspaces.length === 0 && <p className={styles.noResults} role="status">No available workspace matches “{moduleQuery}”. Try another search term or clear the search.</p>}
       </section>
-      <section className={styles.section} id="account-governance" aria-labelledby="admin-governance-heading">
-        <div className={styles.sectionHeader}><div><h2 id="admin-governance-heading">Experience & governance tools</h2><p>Less-frequent configuration tools are kept below the operational workspaces.</p></div></div>
-      </section>
       {error && (
         <div className="field-banner" role="alert">
           <ShieldCheck size={18} />

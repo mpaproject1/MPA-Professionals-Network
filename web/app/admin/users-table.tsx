@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Activity, ChevronLeft, ChevronRight, Ellipsis, KeyRound, LogOut, MailCheck, ShieldCheck, UserRound, Users, X } from "lucide-react";
+import { Activity, ChevronLeft, ChevronRight, Ellipsis, ShieldCheck, UserRound, X } from "lucide-react";
 import { FormFeedback } from "../../components/form-feedback";
 import { Badge } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";

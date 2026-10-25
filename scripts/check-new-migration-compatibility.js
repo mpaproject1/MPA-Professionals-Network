@@ -27,7 +27,8 @@ const migrationNames = [
   "20261023110000_verification_reference_and_assignment_history.sql",
   "20261023111000_member_cv_vault.sql",
   "20261023120000_mentorship_explicit_mentee_consent.sql",
-  "20261023_support_inquiry_workflow.sql"
+  "20261023_support_inquiry_workflow.sql",
+  "20261025120000_serve_community_g2_lifecycle.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [

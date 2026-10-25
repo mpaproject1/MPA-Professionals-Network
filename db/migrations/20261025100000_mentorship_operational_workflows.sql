@@ -12,7 +12,7 @@ ALTER TABLE mentorship_match
   ADD COLUMN IF NOT EXISTS mentor_notification_detail text;
 ALTER TABLE mentorship_match DROP CONSTRAINT IF EXISTS mentorship_match_mentor_notification_status_check;
 ALTER TABLE mentorship_match ADD CONSTRAINT mentorship_match_mentor_notification_status_check
-  CHECK (mentor_notification_status IN ('unknown','queued','delivered','failed'));
+  CHECK (mentor_notification_status IN ('unknown','queued','sent','delivered','failed','cancelled'));
 COMMENT ON COLUMN mentorship_match.mentor_notification_status IS
   'Notification evidence state. queued is not delivery confirmation; delivered is only valid after a trusted provider delivery event.';
 

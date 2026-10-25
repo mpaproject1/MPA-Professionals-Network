@@ -407,3 +407,24 @@ test("organization workspace uses state-aware onboarding and exposes only suppor
   assert.ok(outcomes.includes("organization_membership"));
   assert.ok(outcomes.includes('["owner","administrator","recruiter","read_only","finance","project_manager","event_manager"]'));
 });
+
+test("organization impact report reads scoped outcomes and does not invent unsupported impact data", async () => {
+  const [page, hub, server, service] = await Promise.all([
+    source("../../web/app/organizations/reports/page.tsx"),
+    source("../../web/app/organizations/page.tsx"),
+    source("../../server.js"),
+    source("../../src/platform/stakeholder-outcomes.js"),
+  ]);
+  assert.ok(page.includes("/api/v1/organizations/${encodeURIComponent(organizationId)}/outcomes"));
+  assert.ok(page.includes("setOutcomes(null)"), "failed or incomplete responses must not leave stale report figures visible");
+  assert.ok(page.includes("The outcome service returned an incomplete report"));
+  assert.ok(page.includes("window.print()"));
+  assert.ok(page.includes("Recorded hires"));
+  assert.ok(page.includes("Requisition register"));
+  assert.ok(page.includes("volunteer hours"));
+  assert.ok(page.includes("not a signed server-generated audit artifact"));
+  assert.ok(hub.includes('href="/organizations/reports"'));
+  assert.ok(server.includes('parts[4]==="outcomes"'));
+  assert.ok(service.includes("organization_membership"));
+  assert.doesNotMatch(page, /120 Volunteer Hours Engaged|\$[0-9,]+ funded|Download Q1 2026 Audit Report/);
+});

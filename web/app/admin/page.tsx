@@ -7,9 +7,7 @@ import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
 import styles from "./admin-overview.module.css";
 import { AdminPageHeader } from "./admin-page-header";
-import { type ManagedRole, type ManagedUser, UsersTable } from "./users-table";
 
-type AuditEvent = { id: string; actor_user_id?: string | null; action: string; resource_type: string; resource_id?: string | null; request_id?: string | null; outcome: string; metadata?: Record<string, unknown>; created_at: string };
 type OperationalQueueRow = { Queue: string; Status: string; Requests: number; Unreviewed: number; "Average response hours": number | string | null };
 type OperationalQueueSnapshot = { rows: OperationalQueueRow[]; generatedAt: string };
 type Inquiry = {
@@ -33,15 +31,9 @@ export default function AdminPage() {
   const token = useUiStore((s) => s.token);
   const hydrateToken = useUiStore((s) => s.hydrateToken);
   const [tab, setTab] = useState<"inquiries" | "audit">("inquiries");
-  const [cases, setCases] = useState<Demo[]>([]);
-  const [guides, setGuides] = useState<Guide[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
-  const [users, setUsers] = useState<ManagedUser[]>([]);
-  const [roleCatalog, setRoleCatalog] = useState<ManagedRole[]>([]);
-  const [permissionCatalog, setPermissionCatalog] = useState<ManagedPermission[]>([]);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
-  const [currentUserId, setCurrentUserId] = useState("");
   const [scopeResolved, setScopeResolved] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [canReviewInquiries, setCanReviewInquiries] = useState(false);
@@ -52,7 +44,6 @@ export default function AdminPage() {
   const [operationalQueueLoading, setOperationalQueueLoading] = useState(false);
   const [operationalQueueError, setOperationalQueueError] = useState("");
   const [moduleQuery, setModuleQuery] = useState("");
-  const [editing, setEditing] = useState<Demo | null>(null);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 
@@ -75,11 +66,8 @@ export default function AdminPage() {
       }
     };
     const tasks: Promise<void>[] = [
-      settle("demo cases", getList<Demo>("/api/v1/experience/demo-cases", "cases"), setCases),
-      settle("user guides", getList<Guide>("/api/v1/experience/guides", "guides"), setGuides),
       settle("opportunity inquiries", getList<Inquiry>("/api/v1/opportunity-inquiries", "inquiries"), setInquiries),
     ];
-    tasks.push(settle("users", getList<ManagedUser>("/api/v1/admin/users?limit=200", "users"), setUsers));
     try {
       let claims: any = {};
       try { const segment = token.split(".")[1]; if (segment) claims = JSON.parse(atob(segment.replace(/-/g, "+").replace(/_/g, "/"))); } catch { /* Display hints only; server authorization remains authoritative. */ }

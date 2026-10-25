@@ -218,3 +218,13 @@ test("G4 database: operational updates are idempotent and visible only to servic
  const notification=(await db.query("select action_url from notification_event where user_id=$1 and resource_type='service_request_update' and resource_id=$2 order by created_at desc limit 1",[owner,update.id])).rows[0];
  assert.ok(notification?.action_url?.includes(request.id),"official notification links to the specific request record");
 });
+
+test("G4 database: public listing announcements are anonymous-readable while members-only announcements are not",async()=>{
+ const {owner,listing,db,suffix}=await setupListing();
+ const publicRow=await services.createServiceListingAnnouncement(listing.id,owner,{audience:"public",title:"Public program notice",body:"The next community service orientation begins next week."},`serve-g4-public-${suffix}`,`serve-g4-public-key-${suffix}-0123456789`);
+ const membersRow=await services.createServiceListingAnnouncement(listing.id,owner,{audience:"members",title:"Member program notice",body:"Active members can review the updated program schedule."},`serve-g4-members-${suffix}`,`serve-g4-members-key-${suffix}-0123456789`);
+ await db.query("update service_listing_announcement set status='published',moderated_by=$2,moderated_at=now() where id=any($1::uuid[])",[[publicRow.id,membersRow.id],owner]);
+ const anonymous=await services.listServiceListingAnnouncements(listing.id,null);
+ assert.ok(anonymous.some(row=>row.id===publicRow.id),"published public announcement is visible anonymously");
+ assert.equal(anonymous.some(row=>row.id===membersRow.id),false,"members-only announcement is not exposed anonymously");
+});

@@ -565,6 +565,7 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
     if(r.status==="requested" && !providerActor) throw error(403,"Only the provider can accept or decline a service request.","FORBIDDEN");
     if(r.status==="accepted" && status==="in_progress" && !providerActor) throw error(403,"Only the provider can start service delivery.","FORBIDDEN");
     if(r.status==="disputed" && status==="in_progress" && !providerActor) throw error(403,"Only the provider can resume delivery after the concern is addressed.","FORBIDDEN");
+    if(r.status==="disputed"&&status==="in_progress")validateCommunityText(note,{field:"Dispute resolution note",min:4,max:1000});
     if(r.status==="in_progress" && status==="completed" && !providerActor) throw error(403,"Only the provider can mark delivery complete; the requester must accept the outcome separately.","FORBIDDEN");
     if(r.status==="accepted" && status==="cancelled" && !providerActor) {
       // requester cancellation is allowed before delivery starts

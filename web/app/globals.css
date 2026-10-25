@@ -366,7 +366,7 @@ body{
 .service-card-terms span{color:var(--muted);font-size:10px;font-weight:700}
 .service-card-terms strong{color:var(--text);font-size:12px;line-height:1.45;overflow-wrap:anywhere}
 .service-card-terms small{color:var(--muted);font-size:10px;line-height:1.45}
-.service-card-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+.service-card-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px}
 .service-card-metrics>div{display:flex;min-width:0;flex-direction:column;align-items:flex-start;gap:5px;padding:11px 10px;border:1px solid var(--border);border-radius:13px;background:color-mix(in srgb,var(--primary) 3%,var(--surface))}
 .service-card-metrics svg{color:var(--primary)}
 .service-card-metrics strong{color:var(--text);font-size:20px;line-height:1.1;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
@@ -376,7 +376,13 @@ body{
 .service-card-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .service-card-actions .btn{min-height:46px;padding:11px 10px;font-size:12px;white-space:normal;text-align:center}
 .service-card-closed{color:var(--muted);font-size:11px;line-height:1.5}
-@media(max-width:760px){.service-list{grid-template-columns:minmax(0,1fr);gap:12px}.service-card-title{font-size:20px}.service-card-description{font-size:13px}.service-card-terms{gap:8px}.service-card-terms>div{padding:10px}.service-card-metrics{gap:6px}.service-card-metrics>div{padding:10px 8px}.service-card-metrics strong{font-size:18px}.service-card-metrics span{font-size:10px}.service-card-actions .btn{min-width:0;font-size:12px}}
+@media(max-width:760px){.service-card-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.service-list{grid-template-columns:minmax(0,1fr);gap:12px}.service-card-title{font-size:20px}.service-card-description{font-size:13px}.service-card-terms{gap:8px}.service-card-terms>div{padding:10px}.service-card-metrics{gap:6px}.service-card-metrics>div{padding:10px 8px}.service-card-metrics strong{font-size:18px}.service-card-metrics span{font-size:10px}.service-card-actions .btn{min-width:0;font-size:12px}}
 @media(max-width:360px){.service-card-metrics{grid-template-columns:1fr}.service-card-metrics>div{display:grid;grid-template-columns:20px 1fr;align-items:center;column-gap:8px}.service-card-metrics>div span{grid-column:2}.service-card-actions{grid-template-columns:1fr}.service-card-terms{grid-template-columns:1fr}}
 @media(max-width:900px){.top-actions>.btn-primary{display:none}}
 @media(prefers-reduced-motion:reduce){.service-card-actions .btn{transition:none}}
+
+.service-detail-overview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:18px}
+.service-detail-overview-card{min-width:0;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--bg)}
+.service-detail-overview-card>span{display:block;margin-bottom:7px;color:var(--primary);font-size:10px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
+.service-detail-overview-card p{margin:0;color:var(--text);font-size:12px;line-height:1.65;overflow-wrap:anywhere}
+@media(max-width:640px){.service-detail-overview{grid-template-columns:minmax(0,1fr);gap:8px}.service-detail-overview-card{padding:12px}}

@@ -50,6 +50,8 @@ type Guide = {
 type CurrentUser = { user_id: string; roles: string[] };
 type ManagedPermission = { permission_code: string; area: string; label: string; description: string; sensitive: boolean; system_only: boolean };
 type AuditEvent = { id: string; actor_user_id?: string | null; action: string; resource_type: string; resource_id?: string | null; request_id?: string | null; outcome: string; metadata?: Record<string, unknown>; created_at: string };
+type OperationalQueueRow = { Queue: string; Status: string; Requests: number; Unreviewed: number; "Average response hours": number | string | null };
+type OperationalQueueSnapshot = { rows: OperationalQueueRow[]; generatedAt: string };
 type Inquiry = {
   id: string;
   public_reference: string;
@@ -86,6 +88,9 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [sectionErrors, setSectionErrors] = useState<string[]>([]);
+  const [operationalQueues, setOperationalQueues] = useState<OperationalQueueSnapshot | null>(null);
+  const [operationalQueueLoading, setOperationalQueueLoading] = useState(false);
+  const [operationalQueueError, setOperationalQueueError] = useState("");
   const [moduleQuery, setModuleQuery] = useState("");
   const [userQuery, setUserQuery] = useState("");
   const [userStatus, setUserStatus] = useState("");
@@ -154,6 +159,33 @@ export default function AdminPage() {
   useEffect(() => {
     if (hydrated && token) void load();
   }, [hydrated, token, load]);
+  const canSeeOperationalQueues = roles.some((role) => ["system_admin", "admin", "platform_admin", "supporting_staff", "reviewer"].includes(role));
+  const loadOperationalQueues = useCallback(async () => {
+    if (!token) return;
+    setOperationalQueueLoading(true);
+    setOperationalQueueError("");
+    try {
+      const catalogue = await api<{ id: string }[]>("/api/v1/admin/reports", {}, token);
+      if (!Array.isArray(catalogue) || !catalogue.some((report) => report.id === "support-demand-response")) {
+        throw new Error("Your account cannot access the authoritative Support Desk queue report.");
+      }
+      const snapshot = await api<OperationalQueueSnapshot>("/api/v1/admin/reports/support-demand-response/run", { method: "POST", body: JSON.stringify({}) }, token);
+      if (!snapshot || !Array.isArray(snapshot.rows) || !snapshot.generatedAt) {
+        throw new Error("The queue report returned an incomplete response; counts cannot be confirmed.");
+      }
+      setOperationalQueues(snapshot);
+    } catch (cause) {
+      setOperationalQueues(null);
+      setOperationalQueueError(cause instanceof Error ? cause.message : "Operational queue counts could not be verified.");
+    } finally {
+      setOperationalQueueLoading(false);
+    }
+  }, [token]);
+  useEffect(() => {
+    if (hydrated && token && canSeeOperationalQueues) void loadOperationalQueues();
+  }, [hydrated, token, canSeeOperationalQueues, loadOperationalQueues]);
+  const totalUnreviewed = (operationalQueues?.rows || []).reduce((sum, row) => sum + Math.max(0, Number(row.Unreviewed) || 0), 0);
+  const operationalQueueLinks: Record<string, string> = { "Membership application": "/admin/membership", "Professional verification": "/verification", "Organization verification": "/admin/organizations", "Marketplace demand": "/admin/marketplace" };
   const workspaces = [
     {title:"Organizations",desc:"Search organizations, inspect linked accounts and open verification review workflows.",href:"/admin/organizations",Icon:Building2,group:"Review & service",access:"org"},
     {title:"Accounts & roles",desc:"Search platform accounts, review status and manage roles with audit reasons.",href:"#account-governance",Icon:Users,group:"People & access",access:"admin"},
@@ -253,6 +285,30 @@ export default function AdminPage() {
         <article className={styles.metric}><span>Contextual guides</span><strong>{!isPlatformAdmin ? "—" : loading ? "…" : sectionErrors.includes("user guides") ? "Unavailable" : guides.length}</strong><small>{loading ? "Retrieving current results" : sectionErrors.includes("user guides") ? "Could not verify this count · retry to check" : "Configured user guides"}</small></article>
         <article className={styles.metric}><span>Opportunity inquiries</span><strong>{!canReviewInquiries ? "—" : loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "Unavailable" : inquiries.length}</strong><small>{!canReviewInquiries ? "Review permission required" : loading ? "Retrieving current results" : sectionErrors.includes("opportunity inquiries") ? "Could not verify this count · retry to check" : "Records returned to this workspace"}</small></article>
       </section>
+      {canSeeOperationalQueues && (
+        <section className={styles.section} aria-labelledby="admin-operational-queues-heading">
+          <div className={styles.sectionHeader}>
+            <div><h2 id="admin-operational-queues-heading">Live operational queues</h2><p>Counts come from the existing audited Support Desk report, which groups authoritative membership, professional verification, organization verification and Serve-Community demand records. No counts are inferred from the first page of a catalogue.</p></div>
+            <button type="button" className="btn btn-ghost" onClick={() => void loadOperationalQueues()} disabled={operationalQueueLoading}><RefreshCw size={16} aria-hidden="true"/>{operationalQueueLoading ? "Checking queues…" : "Refresh queue counts"}</button>
+          </div>
+          {operationalQueueLoading && !operationalQueues ? <Card><OperationStatus state="loading" title="Checking authoritative queue counts" detail="Retrieving the latest grouped counts and stored review timing from the backend report." /></Card> : operationalQueueError ? <Card><div role="alert"><strong>Operational queue counts unavailable</strong><p className="muted">{operationalQueueError} The dashboard will not substitute zero or a partial page count.</p><button type="button" className="btn btn-ghost" onClick={() => void loadOperationalQueues()} disabled={operationalQueueLoading}>Retry queue report</button></div></Card> : operationalQueues ? <>
+            <div className={styles.metrics} aria-label="Authoritative review alerts">
+              <article className={styles.metric}><span>Unreviewed work items</span><strong>{totalUnreviewed}</strong><small>{totalUnreviewed ? "Backend-reported items awaiting review" : "No unreviewed items reported by this snapshot"}</small></article>
+              <article className={styles.metric}><span>Queue groups</span><strong>{new Set(operationalQueues.rows.map(row => row.Queue)).size}</strong><small>Across the report's supported work areas</small></article>
+              <article className={styles.metric}><span>Report snapshot</span><strong>{new Date(operationalQueues.generatedAt).toLocaleTimeString()}</strong><small>{new Date(operationalQueues.generatedAt).toLocaleDateString()} · backend generation time</small></article>
+            </div>
+            {totalUnreviewed > 0 && <div className="field-banner" role="status"><ShieldCheck size={18} aria-hidden="true"/><span>{totalUnreviewed} unreviewed item{totalUnreviewed === 1 ? "" : "s"} reported. Open the relevant workflow below to review the actual records; this alert does not change their status.</span></div>}
+            <div className={styles.moduleGrid}>
+              {[...new Set(operationalQueues.rows.map(row => row.Queue))].map(queue => {
+                const rows = operationalQueues.rows.filter(row => row.Queue === queue);
+                const unreviewed = rows.reduce((sum, row) => sum + Math.max(0, Number(row.Unreviewed) || 0), 0);
+                const requests = rows.reduce((sum, row) => sum + Math.max(0, Number(row.Requests) || 0), 0);
+                return <a className={styles.moduleCard} href={operationalQueueLinks[queue] || "/admin/reports"} key={queue}><span className={styles.moduleIcon}><ClipboardList size={20} aria-hidden="true"/></span><span className={styles.moduleCopy}><small>{unreviewed ? "Needs review" : "Queue snapshot"}</small><strong>{queue}</strong><span>{requests} requests in the report; {unreviewed} unreviewed. Counts are grouped by stored status.</span></span><span className={styles.moduleArrow} aria-hidden="true">↗</span></a>;
+              })}
+            </div>
+          </> : <Card><p className="muted">No queue report snapshot has been loaded yet.</p><button type="button" className="btn btn-ghost" onClick={() => void loadOperationalQueues()}>Load queue counts</button></Card>}
+        </section>
+      )}
       <section className={styles.section} aria-labelledby="admin-workspaces-heading">
         <div className={styles.sectionHeader}><div><h2 id="admin-workspaces-heading">Workspaces</h2><p>Open a focused workspace to search, review and take authorized action.</p></div><span className={styles.sectionCount}>Core administration</span></div>
         <div className={styles.moduleGrid}>

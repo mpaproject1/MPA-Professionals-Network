@@ -191,7 +191,7 @@ export async function changeServiceListingStatus(listingId,userId,status,request
 
 export async function acceptServiceAgreement(requestId,userId,requestIdHeader){
  return withTransaction(async db=>{
-  const r=(await db.query("select sr.*,sl.organization_id from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
+  const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
   if(!r)throw error(404,"Service request not found.","NOT_FOUND");
   if(r.requester_user_id!==userId)throw error(403,"Only the requester can confirm agreement to the provider's terms.","FORBIDDEN");
   if(r.status!=="accepted")throw error(409,"The provider must accept the request before the requester can confirm the agreement.","INVALID_STATE");
@@ -400,7 +400,7 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
     }
     const updated=(await db.query("update service_request set status=$1,provider_note=case when $2::uuid<>requester_user_id then $3 else provider_note end,requester_note=case when $2::uuid=requester_user_id then $3 else requester_note end,outcome_summary=case when $1 in ('declined','cancelled','disputed') then coalesce($3,outcome_summary) else outcome_summary end,accepted_at=case when $1='accepted' then now() else accepted_at end,started_at=case when $1='in_progress' then now() else started_at end,cancelled_at=case when $1='cancelled' then now() else cancelled_at end,updated_at=now() where id=$4 returning *",[status,userId,note||null,requestId])).rows[0];
     if(status==="accepted"){
-      const terms={scope:r.scope||null,agreedPrice:r.agreed_price===null?null:Number(r.agreed_price),currency:r.agreed_currency||null,completionDueAt:r.completion_due_at||null,requestedStartAt:r.requested_start_at||null,requestedEndAt:r.requested_end_at||null};
+      const terms={scope:r.scope||null,listingPricingModel:r.listing_pricing_model||null,listingPriceAmount:r.listing_price_amount===null?null:Number(r.listing_price_amount),listingCurrency:r.listing_currency||null,agreedPrice:r.agreed_price===null?null:Number(r.agreed_price),currency:r.agreed_currency||null,completionDueAt:r.completion_due_at||null,requestedStartAt:r.requested_start_at||null,requestedEndAt:r.requested_end_at||null};
       const termsHash=hashPayload(terms);
       await db.query("insert into service_request_agreement(request_id,terms_version,terms,terms_hash,provider_accepted_by,provider_accepted_at) values($1,1,$2,$3,$4,now()) on conflict(request_id,terms_version) do nothing",[requestId,terms,termsHash,userId]);
     }

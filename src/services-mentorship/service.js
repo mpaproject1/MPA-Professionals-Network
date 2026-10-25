@@ -396,7 +396,7 @@ export async function changeServiceListingAnnouncementStatus(announcementId,user
   if(["published","rejected"].includes(status))await notify(db,announcement.author_user_id,status==="published"?"service.listing_announcement_published":"service.listing_announcement_rejected","service_listing_announcement",announcementId,{message:status==="published"?"Your announcement was published.":"Your announcement was not approved.",nextAction:status==="published"?"Review the published announcement.":"Review the moderator reason and revise if permitted.",actionUrl:"/services",reason:note});
   if(status==="published"&&announcement.audience==="participants"){
    const participants=(await db.query("select requester_user_id user_id from service_request where service_listing_id=$1 union select provider_user_id from service_request where service_listing_id=$1",[listing.id])).rows;
-   for(const participant of new Set(participants.map(x=>x.user_id)))if(participant&&participant!==userId)await notify(db,participant.user_id,"service.listing_announcement_published","service_listing_announcement",announcementId,{message:"A service program you participate in has a new announcement.",nextAction:"Review the program update.",actionUrl:"/services/"+listing.id});
+   for(const participantId of new Set(participants.map(x=>x.user_id)))if(participantId&&participantId!==userId)await notify(db,participantId,"service.listing_announcement_published","service_listing_announcement",announcementId,{message:"A service program you participate in has a new announcement.",nextAction:"Review the program update.",actionUrl:"/services/"+listing.id});
   }
   return updated;
  });

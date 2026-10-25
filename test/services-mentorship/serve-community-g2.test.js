@@ -3,8 +3,10 @@ import {randomUUID} from "node:crypto";
 import test from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
-import {getPool} from "../../src/platform/db.js";
+import {closePool,getPool} from "../../src/platform/db.js";
 import * as services from "../../src/services-mentorship/service.js";
+
+test.after(async()=>{await closePool();});
 
 function identity(suffix){
  const digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");

@@ -289,7 +289,7 @@ export async function changeServiceListingPledgeStatus(pledgeId,userId,status,re
   }else{
    if(!isOwner)throw error(403,"Only the listing owner or authorized organization manager can decide a pledge.","FORBIDDEN");
    if(!["submitted","accepted"].includes(row.status))throw error(409,"This pledge is no longer awaiting an owner decision or fulfilment.","INVALID_STATE");
-   if(["declined","cancelled"].includes(status)&&String(reason||"").trim().length<4)throw error(400,"A reason of at least four characters is required for this pledge decision.","REASON_REQUIRED");
+   if(["declined","cancelled","fulfilled"].includes(status)&&String(reason||"").trim().length<4)throw error(400,"A reason or evidence summary of at least four characters is required for this pledge decision.","REASON_REQUIRED");
    if(status==="accepted"&&row.status!=="submitted")throw error(409,"Only a submitted pledge can be accepted.","INVALID_STATE");
    if(status==="declined"&&row.status!=="submitted")throw error(409,"Only a submitted pledge can be declined.","INVALID_STATE");
    if(status==="fulfilled"&&row.status!=="accepted")throw error(409,"Only an accepted pledge can be fulfilled.","INVALID_STATE");

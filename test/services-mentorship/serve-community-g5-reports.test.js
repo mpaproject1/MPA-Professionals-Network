@@ -5,7 +5,8 @@ import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import {closePool,getPool} from "../../src/platform/db.js";
 import * as services from "../../src/services-mentorship/service.js";
-import {runImpactReport,MIN_GROUP_SIZE} from "../../src/platform/serve-community-impact-reports.js";
+import {runImpactReport,toImpactExportData,MIN_GROUP_SIZE} from "../../src/platform/serve-community-impact-reports.js";
+import {makePdf} from "../../src/platform/reports.js";
 
 test.after(async()=>{await closePool();});
 function identityInput(suffix){
@@ -54,6 +55,12 @@ test("G5 database: small groups are suppressed and participant contact details n
  assert.equal(serialized.includes("06"),false,"phone-like personal data must not be present in reports");
  assert.equal("participants" in large,false,"report must not expose participant lists");
  assert.equal("rows" in large,false,"report must not expose raw records");
+ const exportData=toImpactExportData(large,listing.id);
+ const pdf=makePdf(exportData).toString("latin1");
+ assert.equal(pdf.includes("@example.test"),false,"PDF export must not contain participant emails");
+ for(const person of people)assert.equal(pdf.includes(person),false,"PDF export must not contain participant IDs");
+ assert.ok(exportData.rows.every(row=>Object.keys(row).every(key=>!/(email|phone|address|contact|participant.?id|actor.?id)/i.test(key))),"export columns must exclude contact and identity fields");
+ assert.ok(exportData.rows.every(row=>row.Suppressed==="Yes"||row.Value!=="Suppressed"||row.Suppressed==="Yes"),"suppressed groups must be labelled in exports");
 });
 
 test("G5 database: governance decision audit is separately permission-gated and aggregate-only",async()=>{

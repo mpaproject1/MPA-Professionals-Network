@@ -217,6 +217,8 @@ test("G4 database: operational updates are idempotent and visible only to servic
  await assert.rejects(services.createServiceRequestUpdate(request.id,requester,{category:"progress",body:"Call me at +1 (202) 555-0184 for details."},`serve-g4-update-contact-${suffix}`,`serve-g4-update-contact-key-${suffix}-0123456789`),e=>e.code==="SENSITIVE_CONTENT");
  const notification=(await db.query("select action_url from notification_event where user_id=$1 and resource_type='service_request_update' and resource_id=$2 order by created_at desc limit 1",[owner,update.id])).rows[0];
  assert.ok(notification?.action_url?.includes(request.id),"official notification links to the specific request record");
+ const outsiderNotifications=(await db.query("select id from notification_event where user_id=$1 and resource_type='service_request_update' and resource_id=$2",[outsider,update.id])).rowCount;
+ assert.equal(outsiderNotifications,0,"operational update notifications do not fan out to unrelated users");
 });
 
 test("G4 database: public listing announcements are anonymous-readable while members-only announcements are not",async()=>{

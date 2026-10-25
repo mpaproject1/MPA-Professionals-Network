@@ -149,7 +149,8 @@ export async function updateServiceListing(listingId,userId,input,requestId){
     const expiryInput=input.expiresAt===undefined||input.expiresAt===null||input.expiresAt===""?null:new Date(input.expiresAt);
     if(expiryInput && (!Number.isFinite(expiryInput.getTime())||expiryInput.getTime()<=Date.now())) throw error(400,"Expiry must be a valid future date/time or left empty for no expiry.","INVALID_EXPIRY");
     const updated=(await db.query("update service_listing set status='draft',lifecycle_status='draft',moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,title=coalesce($1,title),description=coalesce($2,description),service_category=coalesce($3,service_category),delivery_mode=coalesce($4,delivery_mode),location_label=coalesce($5,location_label),pricing_model=coalesce($6,pricing_model),price_amount=coalesce($7,price_amount),currency=coalesce($8,currency),visibility=coalesce($9,visibility),max_active_requests=coalesce($10,max_active_requests),expires_at=case when $11::boolean then null else coalesce($12,expires_at) end,updated_at=now() where id=$13 returning *",[input.title||null,input.description||null,input.serviceCategory||null,input.deliveryMode||null,input.locationLabel||null,input.pricingModel||null,input.priceAmount??null,input.currency||null,input.visibility||null,input.maxActiveRequests??null,input.clearExpiry===true,expiryInput?expiryInput.toISOString():null,listingId])).rows[0];
-    await audit(db,userId,"service.listing_updated","service_listing",listingId,requestId);
+    if((row.lifecycle_status||"draft")!=="draft") await db.query("insert into service_listing_lifecycle_event(listing_id,actor_user_id,from_status,to_status,reason,request_id) values($1,$2,$3,'draft',$4,$5)",[listingId,userId,row.lifecycle_status||row.status,"Listing terms edited; moderation review required.",requestId]);
+    await audit(db,userId,"service.listing_updated","service_listing",listingId,requestId,{from:row.lifecycle_status||row.status,to:"draft",requiresModeration:true});
     return updated;
   });
 }
@@ -215,8 +216,9 @@ export async function createServiceListingInterest(listingId,userId,input={},req
   if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
   if(listing.lifecycle_status!=="active"||listing.status!=="published"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date()))throw error(409,"This listing is not accepting new interest.","LISTING_NOT_ACTIVE");
   const organizationId=input.organizationId||null;
+  if(listing.visibility!=="public" && !(await activeMember(db,userId)))throw error(403,"An active membership is required to express interest in this listing.","MEMBERSHIP_REQUIRED");
   if(organizationId){
-   if(listing.organization_id===organizationId)throw error(400,"A listing owner cannot express interest in their own program.","SELF_INTEREST");
+   if(listing.organization_id===organizationId||listing.provider_user_id===userId)throw error(400,"A listing owner cannot express interest in their own program.","SELF_INTEREST");
    try{await assertOrganizationCapability(db,organizationId,userId);}catch(cause){throw error(cause.statusCode||403,cause.message||"Authorized active organization membership is required.",cause.code||"ORGANIZATION_FORBIDDEN");}
   }else if(listing.organization_id===null&&listing.provider_user_id===userId)throw error(400,"A listing owner cannot express interest in their own program.","SELF_INTEREST");
   const q=organizationId

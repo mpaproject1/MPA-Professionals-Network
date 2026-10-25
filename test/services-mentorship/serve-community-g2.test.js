@@ -228,3 +228,19 @@ test("G4 database: public listing announcements are anonymous-readable while mem
  assert.ok(anonymous.some(row=>row.id===publicRow.id),"published public announcement is visible anonymously");
  assert.equal(anonymous.some(row=>row.id===membersRow.id),false,"members-only announcement is not exposed anonymously");
 });
+
+test("G4 database: feedback is structured, completed-engagement-only and rejects contact details",async()=>{
+ const {listing,db,suffix}=await setupListing(), requester=await account();
+ const request=await services.requestService(listing.id,requester,{message:"Please help with the listed service.",scope:"Initial consultation"},`serve-g4-feedback-request-${suffix}`,`serve-g4-feedback-key-${suffix}-0123456789`);
+ await assert.rejects(services.submitServiceFeedback(request.id,requester,{category:"service_quality",rating:5},"serve-g4-feedback-too-early"),e=>e.code==="SERVICE_NOT_COMPLETED");
+ await db.query("update service_request set status='completed' where id=$1",[request.id]);
+ await assert.rejects(services.submitServiceFeedback(request.id,requester,{rating:5},"serve-g4-feedback-no-category"),e=>e.code==="FEEDBACK_CATEGORY_REQUIRED");
+ const feedback=await services.submitServiceFeedback(request.id,requester,{category:"communication",rating:5,comments:"The service provider explained the next steps clearly."},"serve-g4-feedback-valid");
+ assert.equal(feedback.category,"communication");
+ assert.equal(feedback.audience,"participants");
+ assert.equal(Number(feedback.rating),5);
+ await assert.rejects(services.submitServiceFeedback(request.id,requester,{category:"other",comments:"Call me at +1 (202) 555-0184 please."},"serve-g4-feedback-contact"),e=>e.code==="SENSITIVE_CONTENT");
+ const stored=(await db.query("select category,rating,comments from service_request_feedback where request_id=$1 and reviewer_user_id=$2",[request.id,requester])).rows[0];
+ assert.equal(stored.category,"communication");
+ assert.equal(Number(stored.rating),5);
+});

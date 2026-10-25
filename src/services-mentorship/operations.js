@@ -4,6 +4,7 @@ import { createInAppNotification } from "../platform/notifications.js";
 import { getMyMentorProfile } from "./service.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
+function redactContactText(value){return String(value||"").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi,"[redacted email]").replace(/\\+?\\d[\\d\\s().-]{7,}\\d/g,"[redacted phone]");}
 async function audit(db,actor,action,type,id,requestId,metadata={}){
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,metadata]);
 }
@@ -23,7 +24,8 @@ async function eligibleMentor(db,userId){
 }
 export async function listMentorshipInterestPool(userId){
  const db=getPool();await eligibleMentor(db,userId);
- return (await db.query("select r.id request_id,r.goals,r.topics,r.preferred_modes,r.preferred_languages,r.preferred_days,r.created_at,(select count(*)::int from mentorship_match_interest mi where mi.request_id=r.id and mi.status='pending') interest_count from mentorship_request r where r.share_with_eligible_mentors=true and r.status in ('requested','matching') and (r.preferred_mentor_user_id is null or r.preferred_mentor_user_id=$1) and not exists(select 1 from mentorship_match mm where mm.request_id=r.id and mm.status in ('proposed','accepted') and mm.mentee_consent_status<>'declined') and not exists(select 1 from mentorship m where m.request_id=r.id) and not exists(select 1 from mentorship_match_interest mine where mine.request_id=r.id and mine.mentor_user_id=$1 and mine.status='pending') order by r.created_at asc limit 100",[userId])).rows;
+ const rows=(await db.query("select r.id request_id,r.goals,r.topics,r.preferred_modes,r.preferred_languages,r.preferred_days,r.created_at,(select count(*)::int from mentorship_match_interest mi where mi.request_id=r.id and mi.status='pending') interest_count from mentorship_request r where r.share_with_eligible_mentors=true and r.status in ('requested','matching') and (r.preferred_mentor_user_id is null or r.preferred_mentor_user_id=$1) and not exists(select 1 from mentorship_match mm where mm.request_id=r.id and mm.status in ('proposed','accepted') and mm.mentee_consent_status<>'declined') and not exists(select 1 from mentorship m where m.request_id=r.id) and not exists(select 1 from mentorship_match_interest mine where mine.request_id=r.id and mine.mentor_user_id=$1 and mine.status='pending') order by r.created_at asc limit 100",[userId])).rows;
+ return rows.map(row=>({...row,goals:redactContactText(row.goals),topics:Array.isArray(row.topics)?row.topics.map(redactContactText):row.topics,preferred_languages:Array.isArray(row.preferred_languages)?row.preferred_languages.map(redactContactText):row.preferred_languages}));
 }
 export async function registerMentorshipInterest(requestId,mentorUserId,requestIdHeader){
  return withTransaction(async db=>{

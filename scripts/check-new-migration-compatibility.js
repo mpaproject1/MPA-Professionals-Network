@@ -28,7 +28,8 @@ const migrationNames = [
   "20261023111000_member_cv_vault.sql",
   "20261023120000_mentorship_explicit_mentee_consent.sql",
   "20261023_support_inquiry_workflow.sql",
-  "20261025120000_serve_community_g2_lifecycle.sql"
+  "20261025120000_serve_community_g2_lifecycle.sql",
+  "20261025130000_serve_community_g3_impact_metrics.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -358,6 +359,7 @@ try {
 
   const requiredChecks = [
     ["service_listing","service_listing_lifecycle_status_check",["draft","pending_review","active","paused","fulfilled","archived","suspended","rejected"]],
+    ["service_listing","service_listing_impact_model_check",["standard","pro_bono","community_discount","capacity_grant"]],
     ["service_listing_lifecycle_event","service_listing_lifecycle_event_to_status_check",["draft","pending_review","active","paused","fulfilled","archived","suspended","rejected"]],
     ["verification_reference_request","verification_reference_request_consent_status_check",["pending","accepted","consented","declined","withdrawn"]],
     ["verification_reference_request","verification_reference_request_verification_status_check",["pending","received","verified","insufficient","disputed","not_verified","needs_clarification"]],

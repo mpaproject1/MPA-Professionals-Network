@@ -39,7 +39,7 @@ export default function AdminAccountsPage() {
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!token || !isPlatformAdmin) return;
     setLoading(true); setError(""); setLoadFailed(false);
     try {
       const [userPayload, rolePayload] = await Promise.all([
@@ -66,9 +66,9 @@ export default function AdminAccountsPage() {
       setLoadFailed(true);
       setError(cause instanceof Error ? cause.message : "Account and team data could not be loaded.");
     } finally { setLoading(false); }
-  }, [token, roleKey]);
+  }, [token, roleKey, isPlatformAdmin]);
 
-  useEffect(() => { if (hydrated && token) void load(); }, [hydrated, token, load]);
+  useEffect(() => { if (hydrated && token && isPlatformAdmin) void load(); }, [hydrated, token, isPlatformAdmin, load]);
 
   if (!hydrated) return <div className="grid"><Card><OperationStatus state="loading" title="Preparing account and team" detail="Restoring your session before loading account records." /></Card></div>;
   if (!token) return <div className="grid"><AdminPageHeader eyebrow="Administration · People & access" title="Account and Team" description="Manage platform accounts and access with auditable, permission-checked actions."/><Card><p className="muted">Sign in with an authorized administrator account to continue.</p><a className="btn btn-primary" href="/login?next=/admin/accounts">Sign in</a></Card></div>;

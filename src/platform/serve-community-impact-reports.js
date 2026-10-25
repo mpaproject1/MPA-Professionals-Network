@@ -7,7 +7,6 @@ function fail(status,message,code="IMPACT_REPORT_ERROR"){const e=new Error(messa
 function isGovernanceReviewer(identity){return (identity?.roles||[]).some(role=>GOVERNANCE_ROLES.has(role))||(identity?.permissions||[]).some(permission=>["serve_community.governance_reports","reports.governance"].includes(permission));}
 function safeCount(value){const n=Number(value||0);return Number.isFinite(n)&&n>=0?Math.trunc(n):0;}
 function suppress(value){const n=safeCount(value);return n<MIN_GROUP_SIZE?{value:null,suppressed:true,minimumGroupSize:MIN_GROUP_SIZE}:{value:n,suppressed:false,minimumGroupSize:MIN_GROUP_SIZE};}
-function suppressRows(rows,key){return rows.map(row=>({...row,[key]:suppress(row.count)}));}
 function cleanFilters(input={}){const from=String(input.from||"").trim(),to=String(input.to||"").trim();const valid=v=>!v||(/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v+"T00:00:00Z")));if(!valid(from)||!valid(to)||(from&&to&&from>to))throw fail(400,"Dates must use YYYY-MM-DD and the start date must not follow the end date.","INVALID_DATE_RANGE");return {from,to};}
 async function authorizeListing(db,identity,listingId,view){
  if(typeof listingId!=="string"||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(listingId))throw fail(400,"A valid listing ID is required.","LISTING_ID_REQUIRED");

@@ -229,6 +229,9 @@ test("G4 database: public listing announcements are anonymous-readable while mem
  const anonymous=await services.listServiceListingAnnouncements(listing.id,null);
  assert.ok(anonymous.some(row=>row.id===publicRow.id),"published public announcement is visible anonymously");
  assert.equal(anonymous.some(row=>row.id===membersRow.id),false,"members-only announcement is not exposed anonymously");
+ const globalFeed=await services.listPublicServiceAnnouncements(null,{limit:30});
+ assert.ok(globalFeed.some(row=>row.id===publicRow.id),"public announcement appears in the public catalog feed");
+ assert.equal(globalFeed.some(row=>row.id===membersRow.id),false,"members-only announcement never appears in the anonymous catalog feed");
 });
 
 test("G4 database: feedback is structured, completed-engagement-only and rejects contact details",async()=>{

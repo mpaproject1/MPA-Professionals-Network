@@ -273,7 +273,7 @@ test("admin queues use authoritative report counts and moderation/support lists 
   assert.ok(moderation.includes("const visibleListings=useMemo"));
   assert.ok(moderation.includes("const listingStatuses=useMemo"));
   assert.ok(moderation.includes("Moderation status<select"));
-  assert.equal((moderation.match(/window\\.confirm/g)||[]).length, 3, "demand decisions, duplicate merges and listing moderation require confirmation");
+  assert.equal(moderation.split("window.confirm").length - 1, 3, "demand decisions, duplicate merges and listing moderation require confirmation");
   assert.ok(moderation.includes("paginatedDemands.map"));
   assert.ok(moderation.includes("paginatedListings.map"));
   assert.ok(moderation.includes("Showing {visibleDemands.length"));

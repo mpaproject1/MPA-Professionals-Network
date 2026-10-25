@@ -6,7 +6,7 @@
 
 ## Audience boundary
 
-- Public listing announcements are attached to a listing, carry author/time/audience/moderation fields, require owner/authorized organization-manager submission and moderator publication, and are visible only after publication.
+- Public listing announcements are attached to a listing, carry author/time/audience/moderation fields, require owner/authorized organization-manager submission and moderator publication, and are visible only after publication. The public catalog has a global feed plus a listing-specific feed; both use the same server-side audience filter.
 - Listing announcement audiences are now `public` or `members`. New listing announcements cannot use `participants`; engagement-only information belongs on the specific request.
 - G4 migration archives all legacy participant-audience listing announcements and adds a database guard that participant-audience legacy records must remain archived.
 - Operational updates live in `service_request_update`, keyed to one `service_request`, and can be created/read only by the requester or an authorized provider-side participant. They are append-only structured records (`progress`, `schedule_change`, `delivery_note`, `blocker`, `handover`), not a private DM channel.
@@ -32,7 +32,8 @@
 - `db/migrations/20261025140000_serve_community_g4_announcement_commitment_experience.sql`
 - `src/services-mentorship/service.js`
 - `server.js`
-- `web/app/services/[id]/page.tsx`
+- `web/app/services/[id]/page.tsx` (listing-specific feed and owner submission form)
+- `web/app/services/page.tsx` (global public feed, participant-only request updates and structured feedback)
 - `web/app/services/page.tsx`
 - `test/services-mentorship/serve-community-g2.test.js`
 - `scripts/check-new-migration-compatibility.js`

@@ -15,6 +15,13 @@ test("dashboard routes application attention to the matching workspace", async (
   assert.match(page, /href=\{trackingHref\(item\.type\)\}/);
 });
 
+test("admin overview uses a stable loader callback to prevent repeated fetches on every render", async () => {
+  const admin = await source("../../web/app/admin/page.tsx");
+  assert.match(admin, /const load = useCallback\\(async \\(\\) => \\{/);
+  assert.match(admin, /\\}, \\[token, userQuery, userStatus\\]\\);/);
+  assert.match(admin, /if \\(hydrated && token\\) void load\\(\\);\\s*\\}, \\[hydrated, token, load\\]\\);/);
+});
+
 test("dashboard and tracker use the shared human-readable status vocabulary", async () => {
   const [dashboard, tracker, labels] = await Promise.all([
     source("../../web/app/dashboard/page.tsx"),

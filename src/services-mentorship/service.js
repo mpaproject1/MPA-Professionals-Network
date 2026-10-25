@@ -417,6 +417,19 @@ export async function changeServiceListingAnnouncementStatus(announcementId,user
  });
 }
 
+export async function listPublicServiceAnnouncements(viewerId=null,{limit=30}={}){
+ const db=getPool(),n=Math.min(Math.max(Number.parseInt(limit,10)||30,1),100);
+ return (await db.query(`select a.id,a.listing_id,s.title listing_title,a.author_user_id,a.audience,a.status,a.title,a.body,a.created_at,a.updated_at
+ from service_listing_announcement a join service_listing s on s.id=a.listing_id
+ where a.status='published' and s.status='published' and s.moderation_status='approved' and s.lifecycle_status='active'
+   and (s.expires_at is null or s.expires_at>now())
+   and (
+    (a.audience='public' and (s.visibility='public' or ($1::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$1 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date)))))
+    or (a.audience='members' and $1::uuid is not null and exists(select 1 from membership_record m where m.user_id=$1 and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)))
+   )
+ order by a.created_at desc,a.id desc limit $2`,[viewerId||null,n])).rows;
+}
+
 export async function listServiceListingAnnouncements(listingId,viewerId=null){
  const db=getPool();
  const rows=(await db.query(`select a.id,a.listing_id,a.author_user_id,a.audience,a.status,a.title,a.body,a.moderation_reason,a.moderated_by,a.moderated_at,a.created_at,a.updated_at

@@ -1,121 +1,28 @@
-.wrap {
-  display: grid;
-  gap: 22px;
-  min-width: 0;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: auto;
-  color: var(--text);
-  font-size: 12px;
-}
-
-.table th,
-.table td {
-  padding: 12px 10px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  vertical-align: top;
-}
-
-.table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.account {
-  min-width: 170px;
-  overflow-wrap: anywhere;
-  font-weight: 700;
-}
-
-.account small,
-.muted {
-  display: block;
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 400;
-}
-
-.roleList {
-  display: grid;
-  gap: 8px;
-  min-width: 150px;
-}
-
-.role {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.roleAction,
-.accountActions {
-  display: grid;
-  justify-items: start;
-  gap: 7px;
-  min-width: 150px;
-}
-
-.roleAction select,
-.reasonField textarea {
-  width: 100%;
-  min-width: 150px;
-}
-
-.reasonField {
-  display: grid;
-  gap: 5px;
-  min-width: 180px;
-  color: var(--text);
-  font-size: 11px;
-}
-
-.reasonField textarea {
-  min-height: 64px;
-  resize: vertical;
-}
-
-.accountActions button {
-  white-space: nowrap;
-}
-
-.empty {
-  padding: 24px;
-  color: var(--muted);
-  text-align: center;
-}
-
-.catalog {
-  padding-top: 5px;
-  border-top: 1px solid var(--border);
-}
-
-.catalog summary {
-  padding: 10px 0;
-  color: var(--primary);
-  cursor: pointer;
-  font-weight: 700;
-}
-
-@media (max-width: 900px) {
-  .wrap {
-    overflow-x: auto;
-  }
-
-  .table {
-    min-width: 1050px;
-  }
-}
-/* Keep account recovery actions readable on narrow admin workspaces. */
-.accountActions{display:flex;flex-wrap:wrap;gap:8px;min-width:220px}.accountActions button{white-space:normal;text-align:left}
+.wrap{display:grid;gap:14px;min-width:0;color:var(--text)}
+.toolbar{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
+.search,.filter{display:grid;gap:5px;font-size:12px;font-weight:700;color:var(--text)}
+.search{flex:1 1 260px}.filter{flex:0 1 170px}
+.search input,.filter select,.dialogBody select,.reason textarea{width:100%;min-width:0;padding:10px 11px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text)}
+.resultCount{margin-left:auto;color:var(--muted);font-size:12px;padding:10px 0}
+.list{display:grid;gap:8px}
+.accountCard{display:grid;grid-template-columns:minmax(190px,1.4fr) minmax(110px,.65fr) minmax(150px,1fr) minmax(135px,.8fr) auto;gap:14px;align-items:center;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.identity{display:flex;align-items:center;gap:10px;min-width:0}.avatar{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:50%;background:var(--surface-secondary);color:var(--muted)}
+.identityText{display:grid;gap:3px;min-width:0}.identityText b,.identityText span,.identityText small{overflow-wrap:anywhere}.identityText b{font-size:13px}.identityText span{font-size:12px}.identityText small,.mutedLabel{font-size:11px;color:var(--muted);font-weight:400}
+.stateCol,.lastActivity{display:grid;justify-items:start;gap:6px;font-size:12px}.stateCol small{font-size:11px;color:var(--muted)}
+.roleCol{display:grid;gap:6px;min-width:0}.roles{display:flex;flex-wrap:wrap;gap:4px}
+.actions{display:flex;align-items:center;gap:4px;justify-content:flex-end}.menuWrap{position:relative}.menu{position:absolute;right:0;top:calc(100% + 5px);z-index:20;display:grid;gap:2px;min-width:210px;padding:6px;border:1px solid var(--border);border-radius:10px;background:var(--surface);box-shadow:0 12px 32px #0002}.menu button{border:0;border-radius:6px;background:transparent;color:var(--text);padding:9px 10px;text-align:left;font:inherit;font-size:12px;cursor:pointer}.menu button:hover,.menu button:focus-visible{background:var(--surface-secondary)}.menu button:disabled{opacity:.45;cursor:not-allowed}.menu small{padding:8px;color:var(--muted);font-size:11px}
+.pagination{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:12px}.pagination>div{display:flex;align-items:center;gap:8px}.pagination button{display:inline-flex;align-items:center;gap:4px}
+.emptyState{padding:28px 18px;border:1px dashed var(--border);border-radius:12px;text-align:center;color:var(--muted)}.emptyState b{color:var(--text)}.emptyState p{margin:7px 0 0;font-size:12px}
+.catalog{border-top:1px solid var(--border);padding-top:10px}.catalog summary{cursor:pointer;color:var(--text);font-size:12px;font-weight:700}.roleCatalog{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:10px}.roleCatalog>div{display:grid;gap:5px;padding:12px;border:1px solid var(--border);border-radius:9px}.roleCatalog span,.roleCatalog small,.roleCatalog p{font-size:11px;color:var(--muted);margin:0}
+.overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(4,10,22,.62);overflow-y:auto}
+.dialog{width:min(680px,100%);max-height:min(88vh,900px);overflow:auto;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text);box-shadow:0 24px 80px #0004}
+.dialogHeader{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;gap:14px;align-items:start;padding:20px;border-bottom:1px solid var(--border);background:var(--surface)}
+.dialogHeader h2{margin:4px 0;font-size:21px}.dialogHeader p{margin:0;color:var(--muted);font-size:12px}.eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800}
+.dialogBody,.detailBody{display:grid;gap:16px;padding:20px}.dialogBody>label{display:grid;gap:6px;font-size:12px;font-weight:700}.help{font-size:12px;line-height:1.5;color:var(--muted);margin:0}
+.reason{display:grid;gap:6px;font-size:12px;font-weight:700}.reason textarea{resize:vertical;min-height:78px;font:inherit;font-weight:400}
+.currentRoles{display:grid;gap:8px;padding:12px;border:1px solid var(--border);border-radius:10px}.currentRoles>div{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--border);padding-top:8px;font-size:12px}.currentRoles p{font-size:12px;color:var(--muted)}
+.permissionDetails{border-top:1px solid var(--border);padding-top:12px}.permissionDetails summary{cursor:pointer;font-size:12px;font-weight:700}.permissionList{display:grid;gap:10px;padding:12px 0}.permissionList label{display:flex;align-items:flex-start;gap:8px;font-size:12px}.permissionList input{margin-top:3px}.permissionList small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+.warning{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-secondary)}.warning p{margin:0;font-size:12px;line-height:1.5}
+.dialogActions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}.detailBody>section{padding-bottom:14px;border-bottom:1px solid var(--border)}.detailBody h3{display:flex;align-items:center;gap:7px;margin:0 0 10px;font-size:13px}.detailBody dl{display:grid;grid-template-columns:minmax(120px,.6fr) minmax(0,1.4fr);gap:8px 14px;margin:0;font-size:12px}.detailBody dt{color:var(--muted);text-transform:capitalize}.detailBody dd{margin:0;overflow-wrap:anywhere}
+@media(max-width:1000px){.accountCard{grid-template-columns:minmax(0,1fr) auto;gap:12px}.identity{grid-column:1}.stateCol{grid-column:2;grid-row:1}.roleCol,.lastActivity{grid-column:1/-1}.actions{grid-column:1/-1;justify-content:flex-start;border-top:1px solid var(--border);padding-top:10px}}
+@media(max-width:560px){.toolbar{align-items:stretch}.search,.filter{flex-basis:100%}.accountCard{padding:11px}.pagination{align-items:flex-start}.pagination>div{width:100%;justify-content:space-between}.overlay{padding:8px}.dialog{max-height:94vh;border-radius:12px}.dialogHeader,.dialogBody,.detailBody{padding:14px}.detailBody dl{grid-template-columns:1fr;gap:3px}.detailBody dd{margin-bottom:7px}}

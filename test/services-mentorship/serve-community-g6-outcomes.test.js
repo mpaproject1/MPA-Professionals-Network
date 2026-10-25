@@ -42,6 +42,7 @@ test("G6 database: provider submission, requester acceptance, pro-bono payment s
  const f=await setupListing({impactModel:"pro_bono",pricingModel:"free"});
  await services.configureServiceCompletionPolicy(f.listing.id,f.owner,{evidencePolicy:"accepted_delivery",fulfilmentRule:"manual",fulfilmentTargetCount:1},"serve-g6-policy-"+f.suffix);
  const e=await startEngagement(f);
+ await assert.rejects(services.submitServiceFeedback(e.request.id,e.requester,{category:"outcome",rating:5},"serve-g6-feedback-too-early-"+e.suffix),x=>x.code==="SERVICE_NOT_COMPLETED");
  await assert.rejects(services.acceptServiceCompletion(e.request.id,e.requester,"The outcome is accepted and complete.","serve-g6-too-early-"+e.suffix),x=>x.code==="COMPLETION_NOT_SUBMITTED");
  await assert.rejects(services.changeServiceRequestStatus(e.request.id,e.owner,"completed","The agreed work has been delivered successfully.","serve-g6-no-evidence-"+e.suffix),x=>x.code==="DELIVERY_EVIDENCE_REQUIRED");
  await assert.rejects(services.submitServicePayment(e.request.id,e.requester,{amount:0,currency:"ETB",idempotencyKey:"serve-g6-free-payment-"+e.suffix},"serve-g6-free-payment-request"),x=>x.code==="PAYMENT_NOT_REQUIRED");
@@ -59,6 +60,9 @@ test("G6 database: provider submission, requester acceptance, pro-bono payment s
  assert.ok(accepted.requester_outcome_decision_at);
  assert.equal(accepted.completion_evidence_delivery_id,delivery.id);
  assert.equal(accepted.final_outcome_summary,"The agreed deliverables were received and the community team can apply the recommendations.");
+ const feedback=await services.submitServiceFeedback(e.request.id,e.requester,{category:"outcome",rating:5,comments:"The delivered recommendations are usable and meet the agreed outcome."},"serve-g6-feedback-after-"+e.suffix);
+ assert.equal(feedback.reviewer_user_id,e.requester);
+ assert.ok(feedback.created_at);
  assert.equal((await services.getServiceListing(f.listing.id,null)).lifecycle_status,"active","ongoing/manual program remains active after one completed engagement");
  const history=(await f.db.query("select event_type,actor_user_id,created_at from service_request_completion_event where request_id=$1 order by created_at",[e.request.id])).rows;
  assert.deepEqual(history.map(x=>x.event_type),["submitted","accepted"]);

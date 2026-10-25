@@ -762,8 +762,10 @@ export async function createMentorshipSession(mentorshipId,userId,input,requestI
     const m=await mentorshipParticipant(db,mentorshipId,userId);
     if(m.status!=="active") throw error(409,"Sessions can only be scheduled for an active mentorship.","MENTORSHIP_NOT_ACTIVE");
     if(!input.scheduledStartAt||!input.scheduledEndAt) throw error(400,"scheduledStartAt and scheduledEndAt are required.","VALIDATION_ERROR");
-    const coordinationDetails=String(input.meetingReference||"")+" "+String(input.locationLabel||"");
-    if(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(coordinationDetails)||/(?:tel:|whatsapp:)/i.test(coordinationDetails)||/\+\d[\d ().-]{7,}/.test(coordinationDetails))throw error(400,"Use a meeting link or public meeting location only; do not enter personal email addresses or phone contact details.","PRIVATE_CONTACT_NOT_ALLOWED");
+    const meetingReference=String(input.meetingReference||"").trim(),locationLabel=String(input.locationLabel||"").trim();
+    if(meetingReference.length>1000||locationLabel.length>250)throw error(400,"Meeting details exceed the allowed length.","VALIDATION_ERROR");
+    let meetingUrl=null;try{if(meetingReference)meetingUrl=new URL(meetingReference);}catch{}
+    if((meetingReference&&(!meetingUrl||meetingUrl.protocol!=="https:"||meetingUrl.username||meetingUrl.password))||/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(meetingReference+" "+locationLabel)||/(?:tel:|whatsapp:)/i.test(meetingReference+" "+locationLabel)||/\+?\d[\d ().-]{7,}\d/.test(locationLabel))throw error(400,"Use an HTTPS meeting link or public meeting location only; do not enter personal email addresses or phone contact details.","PRIVATE_CONTACT_NOT_ALLOWED");
     await assertSessionFitsAvailability(db,m.mentor_user_id,input.scheduledStartAt,input.scheduledEndAt);
     const row=(await db.query("insert into mentorship_session(mentorship_id,scheduled_start_at,scheduled_end_at,mode,location_label,meeting_reference,agenda,created_by,coordination_status,proposed_by,proposal_note) values($1,$2,$3,$4,$5,$6,$7,$8,'proposed',$8,$9) returning *",[mentorshipId,input.scheduledStartAt,input.scheduledEndAt,input.mode||"remote",input.locationLabel||null,input.meetingReference||null,input.agenda||null,userId,String(input.proposalNote||"").trim().slice(0,1000)||null])).rows[0];
     await audit(db,userId,"mentorship.session_created","mentorship_session",row.id,requestId);

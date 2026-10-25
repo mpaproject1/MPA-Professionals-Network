@@ -74,7 +74,7 @@ test("G2 database: organization interest is persisted against the organization, 
 
 test("G2 database: pledge is separate from interest/request and only the listing owner can decide it",async()=>{
  const {owner,listing,db,suffix}=await setupListing(), pledger=await account(), outsider=await account();
- const pledge=await services.createServiceListingPledge(listing.id,pledger,{description:"Offer ten volunteer hours"},`serve-g2-pledge-${suffix}`);
+ const pledge=await services.createServiceListingPledge(listing.id,pledger,{description:"Offer ten volunteer hours"},`serve-g2-pledge-${suffix}`,`serve-g2-pledge-key-${suffix}-0123456789`);
  assert.equal(pledge.status,"submitted");
  await assert.rejects(services.changeServiceListingPledgeStatus(pledge.id,outsider,"accepted","Approved",`serve-g2-pledge-unauth-${suffix}`),e=>e.code==="FORBIDDEN");
  const accepted=await services.changeServiceListingPledgeStatus(pledge.id,owner,"accepted","Capacity confirmed",`serve-g2-pledge-accept-${suffix}`);

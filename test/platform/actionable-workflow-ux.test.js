@@ -39,8 +39,10 @@ test("admin overview, support and security loaders stay stable and distinguish u
 test("account catalogue dialog uses the same guarded manageability value as access actions", async () => {
   const users = await source("../../web/app/admin/users-table.tsx");
   assert.ok(users.includes("const targetManageable = selected ? canManage(selected) : false;"));
-  assert.ok(users.includes('onClick={() => open(selected, "access")} disabled={!targetManageable}'));
-  assert.ok(!users.includes("disabled={!manageable}"), "dialog controls must not reference an out-of-scope variable");
+  assert.ok(users.includes('onClick={() => open(user, "access")} disabled={!manageable}'), "catalogue actions must use the current row account guard");
+  assert.ok(users.includes('onClick={() => open(selected, "access")} disabled={!targetManageable}'), "detail actions must use the selected account guard");
+  assert.equal(users.split("disabled={!manageable}").length - 1, 3, "only row-level status, recovery and session actions use the row-local guard");
+  assert.ok(!users.includes('open(selected, "access")} disabled={!manageable}'), "detail controls must not reference the row-local variable");
 });
 
 test("dashboard and tracker use the shared human-readable status vocabulary", async () => {

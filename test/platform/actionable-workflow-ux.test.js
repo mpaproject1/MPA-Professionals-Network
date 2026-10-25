@@ -20,6 +20,10 @@ test("admin overview uses a stable loader callback to prevent repeated fetches o
   assert.ok(admin.includes("const load = useCallback(async () => {"));
   assert.ok(admin.includes("}, [token, userQuery, userStatus]);"));
   assert.ok(admin.includes("}, [hydrated, token, load]);"));
+  assert.ok(admin.includes('sectionErrors.includes("users") ? "Unavailable"'));
+  assert.ok(admin.includes('sectionErrors.includes("opportunity inquiries") ? "Unavailable"'));
+  assert.ok(admin.includes('onClick={() => void load()} disabled={loading}'));
+  assert.ok(admin.includes('role="alert"'));
 });
 
 test("dashboard and tracker use the shared human-readable status vocabulary", async () => {

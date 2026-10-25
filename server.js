@@ -26,9 +26,9 @@ import * as supportBot from "./src/platform/support-bot.js";
 import * as userAdmin from "./src/platform/user-admin.js";
 import {beginAdminPasskeyAuthentication, beginAdminPasskeyRegistration, finishAdminPasskeyAuthentication, finishAdminPasskeyRegistration, listAdminPasskeys, recoverAdminPasskey, revokeAdminPasskey} from "./src/platform/webauthn.js";
 import * as marketplaceDemand from "./src/services-mentorship/demand.js";
+import * as mentorshipOperations from "./src/services-mentorship/operations.js";
 import * as organizationMentorshipOffers from "./src/services-mentorship/organization-offers.js";
 import * as servicesMentorship from "./src/services-mentorship/service.js";
-import * as mentorshipOperations from "./src/services-mentorship/operations.js";
 import * as talent from "./src/talent/service.js";
 import * as verification from "./src/verification/service.js";
 

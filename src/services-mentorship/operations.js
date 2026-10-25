@@ -27,6 +27,24 @@ export async function listMentorshipInterestPool(userId){
  const rows=(await db.query("select r.id request_id,r.goals,r.topics,r.preferred_modes,r.preferred_languages,r.preferred_days,r.created_at,(select count(*)::int from mentorship_match_interest mi where mi.request_id=r.id and mi.status='pending') interest_count from mentorship_request r where r.share_with_eligible_mentors=true and r.status in ('requested','matching') and (r.preferred_mentor_user_id is null or r.preferred_mentor_user_id=$1) and not exists(select 1 from mentorship_match mm where mm.request_id=r.id and mm.status in ('proposed','accepted') and mm.mentee_consent_status<>'declined') and not exists(select 1 from mentorship m where m.request_id=r.id) and not exists(select 1 from mentorship_match_interest mine where mine.request_id=r.id and mine.mentor_user_id=$1 and mine.status='pending') order by r.created_at asc limit 100",[userId])).rows;
  return rows.map(row=>({...row,goals:redactContactText(row.goals),topics:Array.isArray(row.topics)?row.topics.map(redactContactText):row.topics,preferred_languages:Array.isArray(row.preferred_languages)?row.preferred_languages.map(redactContactText):row.preferred_languages}));
 }
+export async function setMentorshipRequestSharing(requestId,userId,enabled,requestIdHeader){
+ if(typeof enabled!=="boolean")fail(400,"Choose whether eligible mentors may view the minimized request summary.","VALIDATION_ERROR");
+ return withTransaction(async db=>{
+  const request=(await db.query("select * from mentorship_request where id=$1 for update",[requestId])).rows[0];
+  if(!request)fail(404,"Mentorship request not found.","NOT_FOUND");
+  if(request.mentee_user_id!==userId)fail(403,"Only the request owner can change sharing consent.","FORBIDDEN");
+  if(enabled){
+   if(!["requested","matching"].includes(request.status))fail(409,"Sharing can only be enabled while the request is open for matching.","REQUEST_NOT_AVAILABLE");
+   if(!(await hasCurrentActiveMembership(db,userId)))fail(403,"An active membership is required to enable mentor-pool sharing.","MEMBERSHIP_REQUIRED");
+  }
+  if(Boolean(request.share_with_eligible_mentors)===enabled)return {...request,idempotent:true,nextAction:enabled?"Your request is already shared with eligible mentors.":"Your request is already excluded from the mentor interest pool."};
+  const row=(await db.query("update mentorship_request set share_with_eligible_mentors=$1,updated_at=now() where id=$2 returning id,status,share_with_eligible_mentors,updated_at",[enabled,requestId])).rows[0];
+  if(!enabled)await db.query("update mentorship_match_interest set status='withdrawn',updated_at=now() where request_id=$1 and status='pending'",[requestId]);
+  await audit(db,userId,enabled?"mentorship.request_sharing_enabled":"mentorship.request_sharing_disabled","mentorship_request",requestId,requestIdHeader,{enabled});
+  return {...row,nextAction:enabled?"Your minimized request summary is available to eligible approved mentors; contact details are not shared.":"Your request is no longer available in the mentor interest pool. Any pending expressions of interest were withdrawn; specific match consent remains separate."};
+ });
+}
+
 export async function registerMentorshipInterest(requestId,mentorUserId,requestIdHeader){
  return withTransaction(async db=>{
   await eligibleMentor(db,mentorUserId);

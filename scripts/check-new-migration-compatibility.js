@@ -29,7 +29,8 @@ const migrationNames = [
   "20261023120000_mentorship_explicit_mentee_consent.sql",
   "20261023_support_inquiry_workflow.sql",
   "20261025120000_serve_community_g2_lifecycle.sql",
-  "20261025130000_serve_community_g3_impact_metrics.sql"
+  "20261025130000_serve_community_g3_impact_metrics.sql",
+  "20261025140000_serve_community_g4_announcement_commitment_experience.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -152,6 +153,12 @@ try {
     ["service_request_agreement","terms_hash","text"],
     ["service_listing_announcement","listing_id","uuid"],
     ["service_listing_announcement","author_user_id","uuid"],
+    ["service_request_feedback","category","text"],
+    ["service_request_update","request_id","uuid"],
+    ["service_request_update","author_user_id","uuid"],
+    ["service_request_update","category","text"],
+    ["service_request_update","request_idempotency_hash","text"],
+    ["service_request_update","request_fingerprint","text"],
     ["public_opportunity_inquiry","idempotency_request_hash","text"],
     ...["marketplace_demand","mentorship_request","service_request","service_listing","talent_inquiry"].flatMap(table=>[[table,"request_idempotency_hash","text"],[table,"request_fingerprint","text"]]),
     ["verification_reference_request","requester_user_id","uuid"],

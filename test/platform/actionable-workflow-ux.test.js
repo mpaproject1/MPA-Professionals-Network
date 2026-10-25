@@ -22,7 +22,7 @@ test("admin overview, support and security loaders stay stable and distinguish u
     source("../../web/app/admin/security/page.tsx"),
   ]);
   assert.ok(admin.includes("const load = useCallback(async () => {"));
-  assert.ok(admin.includes("}, [token, userQuery, userStatus]);"));
+  assert.ok(admin.includes("}, [token]);"), "admin loader must depend only on the token used by its requests");
   assert.ok(admin.includes("}, [hydrated, token, load]);"));
   assert.ok(admin.includes('sectionErrors.includes("users") ? "Unavailable"'));
   assert.ok(admin.includes('sectionErrors.includes("opportunity inquiries") ? "Unavailable"'));
@@ -34,6 +34,13 @@ test("admin overview, support and security loaders stay stable and distinguish u
   assert.ok(security.includes("const load=useCallback(async()=>"));
   assert.ok(security.includes("},[token]);"));
   assert.ok(security.includes("Checking passkey status…"));
+});
+
+test("account catalogue dialog uses the same guarded manageability value as access actions", async () => {
+  const users = await source("../../web/app/admin/users-table.tsx");
+  assert.ok(users.includes("const targetManageable = selected ? canManage(selected) : false;"));
+  assert.ok(users.includes('onClick={() => open(selected, "access")} disabled={!targetManageable}'));
+  assert.ok(!users.includes("disabled={!manageable}"), "dialog controls must not reference an out-of-scope variable");
 });
 
 test("dashboard and tracker use the shared human-readable status vocabulary", async () => {

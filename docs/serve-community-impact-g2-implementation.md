@@ -8,7 +8,7 @@
 
 ### Optional expiry and canonical listing lifecycle
 - Additive migration `20261025120000_serve_community_g2_lifecycle.sql` adds nullable `service_listing.expires_at` and a canonical `lifecycle_status` separate from legacy publication/moderation fields.
-- Backfill maps existing `published` listings to `active`, `closed` to `archived`, `paused` to `suspended`, and other legacy statuses to `draft`. It does not assign an expiry to existing rows; `expires_at` remains nullable with no default.
+- Backfill maps existing `published` listings to `active`, `closed` to `archived`, `paused` to `paused`, and other legacy statuses to `draft`. G3 includes a defensive correction for databases where the earlier paused mapping was already applied. It does not assign an expiry to existing rows; `expires_at` remains nullable with no default.
 - Creation defaults to no expiry; explicit future expiry is validated. Owners can clear expiry with `clearExpiry: true` when editing.
 - Published service discovery and request/interest/pledge creation check lifecycle state and expiry at the server boundary.
 - Owner status actions accept `fulfilled` and `archived`, require a reason, retain old engagement history and write `service_listing_lifecycle_event` plus platform audit records. Fulfilled/archived listings cannot be silently edited or reopened. Owner pause is distinct from moderator suspension; invalid lifecycle transitions are rejected and repeated identical state actions replay idempotently.
@@ -36,9 +36,9 @@
 1. Run the migration compatibility script against an explicitly named disposable test database with a verified migration baseline; confirm all DDL rolls back.
 2. Run `node --test test/services-mentorship/serve-community-g2.test.js` against that disposable database and fix any schema, fixture or behavioral failures.
 3. Run the existing service/mentorship integration tests to prove the new lifecycle field does not regress existing publication, requests, payment verification, delivery, feedback or PR #15 mentorship behavior.
-4. Add/verify an authorized announcement publication/review workflow only if the existing request announcement and notification paths do not already satisfy the intended auditable communication requirement. The new announcement table is a schema foundation, not proof that a complete announcement workflow exists.
-5. Decide and implement the full impact/pricing taxonomy (pro-bono, discounted rate, capacity grant) before claiming all program models are supported; the current agreement snapshot binds the existing legacy pricing fields.
+4. G3 now adds the source/schema announcement lifecycle: idempotent creation, owner submission/archive, moderator-only publish/reject, audience-aware reads and audit/notification records. It still needs database-backed verification.
+5. G3 adds the impact taxonomy and pricing evidence constraints; see `docs/serve-community-impact-g3-implementation.md`.
 6. Reconcile the shared `server.js` and `src/services-mentorship/service.js` changes with PR #15 (`feat/mentorship-operational-workflows`) before merge. PR #17 intentionally remains based on PR #5 and does not copy PR #15 code or overwrite its branch; verify the final combined diff after the intended merge order is established.
-7. Verify the exact migration against a clean disposable baseline and review the full diff before running CI at the final gate.
+7. Verify the exact G2+G3 migrations against a clean disposable baseline and review the full diff before running CI at the final gate.
 
 **Important limitation:** The GitHub connector can commit code and inspect remote files, but no disposable database connection or local repository execution was available in this work session. Therefore these database-backed tests have been authored but not executed; G2 is not yet certified as passing. No production database or deployment was touched.

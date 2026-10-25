@@ -386,3 +386,18 @@ body{
 .service-detail-overview-card>span{display:block;margin-bottom:7px;color:var(--primary);font-size:10px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
 .service-detail-overview-card p{margin:0;color:var(--text);font-size:12px;line-height:1.65;overflow-wrap:anywhere}
 @media(max-width:640px){.service-detail-overview{grid-template-columns:minmax(0,1fr);gap:8px}.service-detail-overview-card{padding:12px}}
+
+.service-impact-report{margin-top:22px;padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--bg)}
+.service-impact-report-intro{display:flex;align-items:flex-start;gap:11px}
+.service-impact-report-icon{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:12px;background:color-mix(in srgb,var(--primary) 10%,var(--surface));color:var(--primary)}
+.service-impact-report-intro h2{margin:0;color:var(--text);font-size:16px;font-weight:800;letter-spacing:-.02em}
+.service-impact-report-intro p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+.service-impact-report-trigger{display:inline-flex;margin-top:14px;min-height:44px}
+.service-impact-report-results{margin-top:14px}
+.service-impact-report-results-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--text);font-size:13px}
+.service-impact-report-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.service-impact-report-metrics>div{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:10px;padding:10px;border:1px solid var(--border);border-radius:11px;background:var(--surface)}
+.service-impact-report-metrics span{color:var(--muted);font-size:11px;text-transform:capitalize;overflow-wrap:anywhere}
+.service-impact-report-metrics strong{color:var(--text);font-size:13px;white-space:nowrap}
+.service-impact-report-policy{margin:12px 0 8px;color:var(--muted);font-size:11px;line-height:1.65}
+@media(max-width:480px){.service-impact-report{padding:12px}.service-impact-report-metrics{grid-template-columns:minmax(0,1fr)}.service-impact-report-metrics>div{align-items:flex-start}}

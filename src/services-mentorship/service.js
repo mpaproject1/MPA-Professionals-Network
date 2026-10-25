@@ -574,7 +574,7 @@ export async function listMentors(viewerId,filters={}){
   if(filters.q){ args.push(`%${String(filters.q).trim()}%`); where.push(`(mp.headline ilike $${args.length} or mp.bio ilike $${args.length})`); }
   if(filters.topic){ args.push(`%${String(filters.topic).trim().toLowerCase()}%`); where.push(`mp.expertise::text ilike $${args.length}`); }
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
-  const rows=(await db.query(`select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees,mp.circle_enabled,mp.circle_name,(select count(*)::int from mentorship_circle_membership cm where cm.mentor_profile_id=mp.id and cm.left_at is null) circle_joined_count from mentor_profile mp join app_user u on u.id=mp.user_id join person p on p.user_id=u.id join membership_record m on m.user_id=u.id where ${where.join(" and ")} order by p.display_name limit ${limit+1} offset ${offset}`,args)).rows;
+  const rows=(await db.query(`select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees,mp.circle_enabled,mp.circle_name,(select count(*)::int from mentorship_circle_membership cm where cm.mentor_profile_id=mp.id and cm.left_at is null) circle_joined_count,exists(select 1 from mentorship_circle_membership cm where cm.mentor_profile_id=mp.id and cm.participant_user_id=$1 and cm.left_at is null) circle_joined_by_me from mentor_profile mp join app_user u on u.id=mp.user_id join person p on p.user_id=u.id join membership_record m on m.user_id=u.id where ${where.join(" and ")} order by p.display_name limit ${limit+1} offset ${offset}`,args)).rows;
   return rows;
 }
 

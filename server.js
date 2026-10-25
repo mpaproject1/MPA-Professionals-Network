@@ -235,7 +235,7 @@ const server=http.createServer(async (req,res)=>{
       const format=q.get("format")||"pdf";
       if(!["pdf","xlsx"].includes(format)) throw Object.assign(new Error("Choose PDF or XLSX export format."),{statusCode:400,code:"INVALID_EXPORT_FORMAT"});
       const buffer=format==="pdf"?reports.makePdf(exportData):reports.makeXlsx(exportData);
-      await getPool().query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'service_listing',$3,$4,'success',$5)",[identity.sub,view==="governance"?"serve_community.impact_governance_report_exported":"serve_community.impact_report_exported",parts[4],requestId,JSON.stringify({format,view,rows:rows.length,minimumGroupSize:result.minimumGroupSize})]);
+      await getPool().query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'service_listing',$3,$4,'success',$5)",[identity.sub,view==="governance"?"serve_community.impact_governance_report_exported":"serve_community.impact_report_exported",parts[4],requestId,JSON.stringify({format,view,rows:exportData.rows.length,minimumGroupSize:result.minimumGroupSize})]);
       res.writeHead(200,{"content-type":format==="pdf"?"application/pdf":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":`attachment; filename=serve-community-impact-${new Date().toISOString().slice(0,10)}.${format}`,"content-length":String(buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId});
       return res.end(buffer);
     }

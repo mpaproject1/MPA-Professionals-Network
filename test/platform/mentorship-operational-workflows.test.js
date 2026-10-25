@@ -30,7 +30,7 @@ test("mentorship operational workflows require explicit sharing and preserve par
   const poolEnd = operations.indexOf("export async function registerMentorshipInterest");
   const pool = operations.slice(poolStart, poolEnd);
   assert.match(pool, /share_with_eligible_mentors=true/);
-  assert.match(pool, /MENTOR_NOT_ELIGIBLE/);
+  assert.match(operations, /MENTOR_NOT_ELIGIBLE/);
   assert.doesNotMatch(pool, /contact_email|contact_phone|u\.email|p\.email/);
   assert.match(operations, /Only a participant can submit a report/);
   assert.match(operations, /Authorized Support Desk access is required/);

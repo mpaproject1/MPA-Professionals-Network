@@ -132,6 +132,23 @@ try {
     console.log(`PASS: ${migration.filename} applied inside rollback-only transaction`);
   }
   const postMigrationColumns = [
+    ["service_listing","lifecycle_status","text"],
+    ["service_listing","expires_at","timestamptz"],
+    ["service_listing_lifecycle_event","listing_id","uuid"],
+    ["service_listing_lifecycle_event","actor_user_id","uuid"],
+    ["service_listing_interest","listing_id","uuid"],
+    ["service_listing_interest","individual_user_id","uuid"],
+    ["service_listing_interest","organization_id","uuid"],
+    ["service_listing_interest","actor_user_id","uuid"],
+    ["service_listing_pledge","listing_id","uuid"],
+    ["service_listing_pledge","individual_user_id","uuid"],
+    ["service_listing_pledge","organization_id","uuid"],
+    ["service_listing_pledge","actor_user_id","uuid"],
+    ["service_request_agreement","request_id","uuid"],
+    ["service_request_agreement","terms_version","int4"],
+    ["service_request_agreement","terms_hash","text"],
+    ["service_listing_announcement","listing_id","uuid"],
+    ["service_listing_announcement","author_user_id","uuid"],
     ["public_opportunity_inquiry","idempotency_request_hash","text"],
     ...["marketplace_demand","mentorship_request","service_request","service_listing","talent_inquiry"].flatMap(table=>[[table,"request_idempotency_hash","text"],[table,"request_fingerprint","text"]]),
     ["verification_reference_request","requester_user_id","uuid"],
@@ -215,6 +232,22 @@ try {
   }
 
   const requiredForeignKeys = [
+    ["service_listing_lifecycle_event","listing_id","service_listing","id"],
+    ["service_listing_lifecycle_event","actor_user_id","app_user","id"],
+    ["service_listing_interest","listing_id","service_listing","id"],
+    ["service_listing_interest","individual_user_id","app_user","id"],
+    ["service_listing_interest","organization_id","organization","id"],
+    ["service_listing_interest","actor_user_id","app_user","id"],
+    ["service_listing_pledge","listing_id","service_listing","id"],
+    ["service_listing_pledge","individual_user_id","app_user","id"],
+    ["service_listing_pledge","organization_id","organization","id"],
+    ["service_listing_pledge","actor_user_id","app_user","id"],
+    ["service_request_agreement","request_id","service_request","id"],
+    ["service_request_agreement","provider_accepted_by","app_user","id"],
+    ["service_request_agreement","requester_accepted_by","app_user","id"],
+    ["service_listing_announcement","listing_id","service_listing","id"],
+    ["service_listing_announcement","author_user_id","app_user","id"],
+    ["service_listing_announcement","moderated_by","app_user","id"],
     ["public_opportunity_inquiry","app_user_id","app_user","id"],
     ["marketplace_demand","requester_user_id","app_user","id"],
     ["mentorship_request","mentee_user_id","app_user","id"],
@@ -276,6 +309,8 @@ try {
     "ux_mentorship_request_idempotency_hash",
     "ux_service_request_idempotency_hash",
     "ux_service_listing_idempotency_hash",
+    "ux_service_listing_interest_active_individual",
+    "ux_service_listing_interest_active_organization",
     "ux_talent_inquiry_idempotency_hash",
     "ux_mentorship_match_one_open_request"
   ];

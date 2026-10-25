@@ -378,7 +378,7 @@ export async function changeServiceListingAnnouncementStatus(announcementId,user
   if(!announcement)throw error(404,"Announcement not found.","NOT_FOUND");
   const listing=(await db.query("select * from service_listing where id=$1 for update",[announcement.listing_id])).rows[0];
   if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
-  const owner=await assertServiceListingAccess(db,listing,userId).then(()=>true).catch(()=>false);
+  const owner=listing.provider_user_id===userId || Boolean(listing.organization_id && (await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code=any($3::text[]) limit 1",[listing.organization_id,userId,["owner","administrator","recruiter","project_manager"]])).rowCount);
   const moderator=Boolean((await db.query("select 1 where exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code in ('supporting_staff','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=$1 and up.permission_code='marketplace.moderate')",[userId])).rows[0]);
   if(["published","rejected"].includes(status)){
    if(!moderator)throw error(403,"Only an authorized moderator can publish or reject an announcement.","FORBIDDEN");

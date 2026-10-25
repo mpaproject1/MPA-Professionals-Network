@@ -59,6 +59,7 @@ test("G5 database: small groups are suppressed and participant contact details n
  const identity={sub:owner,roles:[],permissions:[]};
  const small=await runImpactReport(identity,listing.id,{},`serve-g5-small-${suffix}`);
  assert.deepEqual(small.metrics.interested_users,{value:null,suppressed:true,minimumGroupSize:MIN_GROUP_SIZE});
+ assert.ok(small.monthlySummary.every(item=>item.suppressed),"monthly activity with fewer than five distinct participants must be suppressed");
  for(let i=4;i<5;i++){
   const person=await account();
   people.push(person);
@@ -66,6 +67,7 @@ test("G5 database: small groups are suppressed and participant contact details n
  }
  const large=await runImpactReport(identity,listing.id,{},`serve-g5-large-${suffix}`);
  assert.deepEqual(large.metrics.interested_users,{value:5,suppressed:false,minimumGroupSize:MIN_GROUP_SIZE});
+ assert.ok(large.monthlySummary.every(item=>!item.suppressed),"monthly activity may be shown only after five distinct participants are represented");
  const serialized=JSON.stringify(large);
  for(const person of people)assert.equal(serialized.includes(person),false,"user IDs must not be present in reports");
  assert.equal(serialized.includes("@example.test"),false,"email addresses must not be present in reports");
@@ -92,6 +94,7 @@ test("G5 database: governance decision audit is separately permission-gated and 
  const governance=await runImpactReport({sub:reviewer,roles:["reviewer"],permissions:[]},listing.id,{},`serve-g5-governance-${suffix}`,"governance");
  assert.equal(governance.view,"governance");
  assert.ok(Array.isArray(governance.decisionAudit));
+ assert.ok(governance.decisionAudit.every(item=>item.suppressed&&item.latestAt===null),"small governance groups must suppress both counts and timestamps");
  assert.equal(JSON.stringify(governance).includes(owner),false,"governance report must not reveal decision actor IDs");
  assert.equal(JSON.stringify(governance).includes("Governance audit fixture"),false,"governance report must not expose free-text decision reasons");
 });

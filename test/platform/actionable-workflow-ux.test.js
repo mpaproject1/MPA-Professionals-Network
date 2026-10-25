@@ -280,6 +280,8 @@ test("admin queues use authoritative report counts and moderation/support lists 
   assert.ok(supportPage.includes("offset=${inquiryPage*25}"));
   assert.ok(supportPage.includes("q=${encodeURIComponent(inquirySearch.trim())}"));
   assert.ok(supportPage.includes("hasMoreInquiries"));
+  assert.ok(supportPage.includes("sequence!==refreshSequence.current"), "stale inbox searches must not overwrite newer results");
+  assert.equal((supportPage.match(/finally\\{setActionBusy\\\(""\\\);\\}/g)||[]).length, 4, "status, workflow, transfer and escalation actions must always release their pending state");
   assert.ok(supportService.includes("limit $4 offset $6"));
   assert.ok(supportService.includes("const search=String(filters.q||\"\")"));
   assert.ok(supportService.includes("case when c.consent_to_contact then coalesce(c.contact_name"));

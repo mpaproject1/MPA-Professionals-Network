@@ -59,7 +59,8 @@ The canonical lifecycle is separate from moderation decisions. Implementation mu
 |---|---|---|---|
 | `draft` | Private work in progress; not discoverable and accepts no interest/pledge/request | `pending_review`; remain `draft`; archive only under owner policy | Listing owner or authorized organization manager |
 | `pending_review` | Submitted for moderation; not publicly discoverable and accepts no new commitments | `active` after approval; `draft` on return for changes; `rejected` with reason | Authorized moderator/reviewer decides; owner may withdraw submission to draft if policy allows |
-| `active` | Approved and discoverable within listing visibility and provider eligibility rules | `fulfilled`, `archived`, `suspended`; edit that changes material public terms returns to review | Owner/authorized organization manager for fulfil/archive; authorized moderator for suspension |
+| `active` | Approved and discoverable within listing visibility and provider eligibility rules | `paused`, `fulfilled`, `archived`, `suspended`; edit that changes material public terms returns to review | Owner/authorized organization manager for pause/fulfil/archive; authorized moderator for suspension |
+| `paused` | Owner-initiated temporary pause; no new commitments while paused | `active` after owner resumes; `archived` | Listing owner or authorized organization manager; audit the action |
 | `fulfilled` | Owner explicitly declares the program fulfilled; read-only historical listing | `active` only through the explicit reopening policy below; `archived` | Owner/authorized organization manager; audited reason required |
 | `archived` | Intentionally retained as inactive history; no new commitments | Terminal by default; reopening requires explicit authorized policy and audit | Owner/authorized organization manager plus moderator approval when reopening public discovery |
 | `suspended` | Temporarily unavailable due to safety, policy, verification or operational concern | `active` after authorized clearance; `rejected` or `archived` after reasoned decision | Authorized moderator/reviewer; owner cannot self-clear a moderation suspension |
@@ -71,7 +72,7 @@ The canonical lifecycle is separate from moderation decisions. Implementation mu
 - Approval is required before `active`; verified organization status and existing personal professional/member eligibility checks remain enforced.
 - Rejection and suspension require a reason, actor, timestamp and audit event.
 - Material edits to an active listing must not bypass review. They return to draft/pending review according to the implementation policy; the previous published terms must not be silently rewritten for existing engagements.
-- `fulfilled`, `archived`, `suspended`, `rejected`, `draft`, and `pending_review` listings reject new interest, pledges, and service requests at the server boundary. Public UI hiding alone is insufficient.
+- `fulfilled`, `archived`, `paused`, `suspended`, `rejected`, `draft`, and `pending_review` listings reject new interest, pledges, and service requests at the server boundary. Public UI hiding alone is insufficient.
 - No expiry is applied by default. If an owner later chooses an expiry, it is an explicit field/action and does not silently fulfil the listing.
 - Fulfilment is a deliberate owner action with a reason and optional outcome summary. Existing engagements remain accessible to their authorized participants and retain their history.
 - A completed request does not automatically fulfil the listing.

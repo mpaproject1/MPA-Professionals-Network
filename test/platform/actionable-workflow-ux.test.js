@@ -16,15 +16,16 @@ test("dashboard routes application attention to the matching workspace", async (
 });
 
 test("admin overview, support and security loaders stay stable and distinguish unavailable data", async () => {
-  const [admin, support, security] = await Promise.all([
+  const [admin, support, security, accounts] = await Promise.all([
     source("../../web/app/admin/page.tsx"),
     source("../../web/app/admin/support/page.tsx"),
     source("../../web/app/admin/security/page.tsx"),
+    source("../../web/app/admin/accounts/page.tsx"),
   ]);
   assert.ok(admin.includes("const load = useCallback(async () => {"));
   assert.ok(admin.includes("}, [token]);"), "admin loader must depend only on the token used by its requests");
   assert.ok(admin.includes("}, [hydrated, token, load]);"));
-  assert.ok(admin.includes('sectionErrors.includes("users") ? "Unavailable"'));
+  assert.ok(accounts.includes("usersLoadFailed={loadFailed}"), "account loading failures must be explicit and retryable");
   assert.ok(admin.includes('sectionErrors.includes("opportunity inquiries") ? "Unavailable"'));
   assert.ok(admin.includes('onClick={() => void load()} disabled={loading}'));
   assert.ok(admin.includes('role="alert"'));
@@ -34,6 +35,27 @@ test("admin overview, support and security loaders stay stable and distinguish u
   assert.ok(security.includes("const load=useCallback(async()=>"));
   assert.ok(security.includes("},[token]);"));
   assert.ok(security.includes("Checking passkey status…"));
+});
+
+test("admin keeps Account and Team and Help, Guides & Demos in separate navigable workspaces", async () => {
+  const [overview, navigation, accounts, experience] = await Promise.all([
+    source("../../web/app/admin/page.tsx"),
+    source("../../web/app/admin/admin-workspace.tsx"),
+    source("../../web/app/admin/accounts/page.tsx"),
+    source("../../web/app/admin/experience/page.tsx"),
+  ]);
+  assert.ok(navigation.includes('href: "/admin/accounts", label: "Account and Team"'));
+  assert.ok(navigation.includes('href: "/admin/experience", label: "Help, guides and demos"'));
+  assert.ok(overview.includes('href:"/admin/accounts"'));
+  assert.ok(overview.includes('href:"/admin/experience"'));
+  assert.ok(!overview.includes('tab === "users"'), "account catalogue must not be duplicated inside the overview tabs");
+  assert.ok(!overview.includes('tab === "guides"') && !overview.includes('tab === "cases"'), "guides and demos must live in their dedicated workspace");
+  assert.ok(accounts.includes("<UsersTable"));
+  assert.ok(accounts.includes("/api/v1/admin/users?limit=200"));
+  assert.ok(experience.includes('role="tablist" aria-label="Help and learning sections"'));
+  assert.ok(experience.includes("Contextual user guides"));
+  assert.ok(experience.includes("Demo and training scenarios"));
+  assert.ok(experience.includes("Support knowledge base"));
 });
 
 test("account catalogue dialog uses the same guarded manageability value as access actions", async () => {

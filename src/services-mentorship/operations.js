@@ -133,7 +133,7 @@ export async function listMentorshipParticipantReports(actorId,filters={}){
  const db=getPool();if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized Support Desk access is required.","FORBIDDEN");
  const status=String(filters.status||"open");if(!["open","reviewing","resolved","closed","all"].includes(status))fail(400,"Unsupported report status filter.","VALIDATION_ERROR");
  const limit=Math.min(Math.max(Number(filters.limit)||25,1),100),offset=Math.max(Number(filters.offset)||0,0);
- return (await db.query("select r.id,r.mentorship_id,r.session_id,r.reporter_user_id,pr.display_name reporter_name,r.category,r.description,r.status,r.created_at,r.reviewed_at,r.reviewed_by,r.resolution_note from mentorship_participant_report r join person pr on pr.user_id=r.reporter_user_id where ($1='all' or r.status=$1) order by r.created_at asc limit $2 offset $3",[status,limit,offset])).rows;
+ return (await db.query("select r.id,r.mentorship_id,r.session_id,r.reporter_user_id,pr.display_name reporter_name,r.category,r.description,r.status,r.created_at,r.reviewed_at,r.reviewed_by,r.resolution_note from mentorship_participant_report r left join person pr on pr.user_id=r.reporter_user_id where ($1='all' or r.status=$1) order by r.created_at asc limit $2 offset $3",[status,limit,offset])).rows;
 }
 export async function updateMentorshipParticipantReport(actorId,reportId,input,requestId){
  const db=getPool();if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized Support Desk access is required.","FORBIDDEN");

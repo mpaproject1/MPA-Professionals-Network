@@ -199,6 +199,11 @@ export async function changeServiceListingStatus(listingId,userId,status,request
     if(!row) throw error(404,"Service listing not found.","NOT_FOUND");
     const organization=await assertServiceListingAccess(db,row,userId);
     const currentLifecycleStatus=row.lifecycle_status||({published:"active",paused:"paused",closed:"archived"}[row.status]||"draft");
+    if(status==="fulfilled"&&(row.fulfilment_rule||"manual")!=="manual"){
+      const completed=Number((await db.query("select count(*)::int count from service_request where service_listing_id=$1 and status='completed' and requester_accepted_at is not null",[listingId])).rows[0].count);
+      const target=row.fulfilment_rule==="single_engagement"?1:Number(row.fulfilment_target_count||1);
+      if(completed<target)throw error(409,"This listing can be fulfilled only after its configured number of requester-accepted engagements is reached.","FULFILMENT_RULE_NOT_MET");
+    }
     const requestedLifecycleStatus=status==="published"?"active":status==="paused"?"paused":status==="closed"?"archived":status;
     if(currentLifecycleStatus===requestedLifecycleStatus && (status!=="published"||row.moderation_status==="approved")) return {...row,idempotent:true};
     if(status==="published" && currentLifecycleStatus==="pending_review" && !["approved","rejected"].includes(row.moderation_status)) return {...row,idempotent:true};
@@ -232,6 +237,25 @@ export async function changeServiceListingStatus(listingId,userId,status,request
   });
 }
 
+
+export async function configureServiceCompletionPolicy(listingId,userId,input,requestIdHeader){
+  const evidencePolicy=String(input.evidencePolicy||"");
+  const fulfilmentRule=String(input.fulfilmentRule||"");
+  const target=Number(input.fulfilmentTargetCount??1);
+  if(!["accepted_delivery","private_file","description_only"].includes(evidencePolicy))throw error(400,"Choose an allowed completion evidence policy.","VALIDATION_ERROR");
+  if(!["manual","single_engagement","engagement_count"].includes(fulfilmentRule))throw error(400,"Choose an allowed listing fulfilment rule.","VALIDATION_ERROR");
+  if(!Number.isInteger(target)||target<1||target>1000000)throw error(400,"Fulfilment target must be a whole number from 1 to 1,000,000.","VALIDATION_ERROR");
+  if(fulfilmentRule==="single_engagement"&&target!==1)throw error(400,"Single-engagement fulfilment must have a target of one.","VALIDATION_ERROR");
+  return withTransaction(async db=>{
+    const row=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
+    if(!row)throw error(404,"Service listing not found.","NOT_FOUND");
+    await assertServiceListingAccess(db,row,userId);
+    if(["fulfilled","archived","rejected"].includes(row.lifecycle_status))throw error(409,"Completion and fulfilment policy cannot be changed on a closed listing.","INVALID_STATE");
+    const updated=(await db.query("update service_listing set completion_evidence_policy=$1,fulfilment_rule=$2,fulfilment_target_count=$3,updated_at=now() where id=$4 returning id,completion_evidence_policy,fulfilment_rule,fulfilment_target_count",[evidencePolicy,fulfilmentRule,target,listingId])).rows[0];
+    await audit(db,userId,"service.listing_completion_policy_changed","service_listing",listingId,requestIdHeader,{evidencePolicy,fulfilmentRule,fulfilmentTargetCount:target});
+    return updated;
+  });
+}
 
 export async function acceptServiceAgreement(requestId,userId,requestIdHeader){
  return withTransaction(async db=>{
@@ -571,6 +595,10 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
       if(!agreement || !agreement.provider_accepted_at || !agreement.requester_accepted_at) throw error(409,"Both parties must accept the same persisted service terms before delivery can start.","AGREEMENT_REQUIRED");
     }
     const updated=(await db.query("update service_request set status=$1,provider_note=case when $2::uuid<>requester_user_id then $3 else provider_note end,requester_note=case when $2::uuid=requester_user_id then $3 else requester_note end,outcome_summary=case when $1 in ('declined','cancelled','disputed') then coalesce($3,outcome_summary) else outcome_summary end,accepted_at=case when $1='accepted' then now() else accepted_at end,started_at=case when $1='in_progress' then now() else started_at end,cancelled_at=case when $1='cancelled' then now() else cancelled_at end,updated_at=now() where id=$4 returning *",[status,userId,note||null,requestId])).rows[0];
+    if(r.status==="disputed"&&status==="in_progress"){
+      await db.query("update service_request set provider_completed_at=null,provider_completion_submitted_by=null,requester_outcome_decision=null,requester_outcome_decision_by=null,requester_outcome_decision_at=null,requester_outcome_note=null,completion_evidence_delivery_id=null where id=$1",[requestId]);
+      Object.assign(updated,{provider_completed_at:null,provider_completion_submitted_by:null,requester_outcome_decision:null,requester_outcome_decision_by:null,requester_outcome_decision_at:null,requester_outcome_note:null,completion_evidence_delivery_id:null});
+    }
     if(status==="accepted"){
       const terms={scope:r.scope||null,listingPricingModel:r.listing_pricing_model||null,listingPriceAmount:r.listing_price_amount===null?null:Number(r.listing_price_amount),listingCurrency:r.listing_currency||null,agreedPrice:r.agreed_price===null?null:Number(r.agreed_price),currency:r.agreed_currency||null,completionDueAt:r.completion_due_at||null,requestedStartAt:r.requested_start_at||null,requestedEndAt:r.requested_end_at||null};
       const termsHash=hashPayload(terms);

@@ -11,13 +11,15 @@ import styles from "./admin-workspace.module.css";
 type Destination = { href: string; label: string; description: string; icon: typeof Activity; exact?: boolean };
 const destinations: Destination[] = [
   { href: "/admin", label: "Overview", description: "Review and administration", icon: Activity, exact: true },
+  { href: "/admin/accounts", label: "Account and Team", description: "Account catalogue, roles and access actions", icon: Users },
+  { href: "/admin/experience", label: "Help, guides and demos", description: "Contextual guides, training scenarios and support resources", icon: BookOpenCheck },
   { href: "/admin/organizations", label: "Organizations & accounts", description: "Organization register and account relationships", icon: Building2 },
   { href: "/admin/members", label: "Members", description: "Imports and member records", icon: Users },
   { href: "/admin/members/catalog", label: "Member catalogue", description: "Search membership records and account links", icon: Users },
   { href: "/admin/membership", label: "Membership administration", description: "Plan versions, reviews and payments", icon: ShieldCheck },
   { href: "/admin/membership-card", label: "Membership card", description: "Credential appearance", icon: ShieldCheck },
   { href: "/admin/reference-portfolio", label: "Reference data", description: "Governed profile options", icon: BookOpenCheck },
-  { href: "/admin/marketplace", label: "Marketplace", description: "Demand and listing review", icon: ClipboardList },
+  { href: "/admin/marketplace", label: "Serve-Community review", description: "Demand and listing review", icon: ClipboardList },
   { href: "/organizations", label: "Organizations", description: "Verification, evidence and partner workspace", icon: Building2 },
   { href: "/admin/reports", label: "Reports", description: "Reporting and exports", icon: FileBarChart },
   { href: "/admin/email", label: "Email operations", description: "Queues, templates and delivery", icon: Mail },

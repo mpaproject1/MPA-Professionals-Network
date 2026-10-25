@@ -7,6 +7,7 @@ import { closePool, getPool } from "../../src/platform/db.js";
 import * as marketplace from "../../src/services-mentorship/demand.js";
 import * as organizationOffers from "../../src/services-mentorship/organization-offers.js";
 import * as journeys from "../../src/services-mentorship/service.js";
+import * as mentorshipOperations from "../../src/services-mentorship/operations.js";
 import * as talent from "../../src/talent/service.js";
 import * as verification from "../../src/verification/service.js";
 
@@ -291,6 +292,7 @@ test("Gate 2: mentorship offer is reviewed, matched, accepted, scheduled, comple
  const sessionStart=start.toISOString(),sessionEnd=new Date(start.getTime()+60*60*1000).toISOString();
  const session=await journeys.createMentorshipSession(engagement.id,mentor,{scheduledStartAt:sessionStart,scheduledEndAt:sessionEnd,mode:"remote",agenda:"Review the discovery plan"},"gate2-mentorship-session");
  assert.equal(session.status,"scheduled");
+ assert.equal((await mentorshipOperations.respondToSessionProposal(session.id,mentee,"accepted","I confirm the proposed session time.","gate2-session-confirm")).coordination_status,"accepted");
  assert.equal((await journeys.changeMentorshipSession(session.id,mentee,"completed","Session completed with agreed next steps.","gate2-session-complete")).status,"completed");
  const sessionFeedback=await journeys.submitMentorshipFeedback(engagement.id,mentee,{targetRole:"mentor",rating:5,comments:"Useful and practical.",sessionId:session.id},"gate2-session-feedback");
  assert.equal(Number(sessionFeedback.rating),5);

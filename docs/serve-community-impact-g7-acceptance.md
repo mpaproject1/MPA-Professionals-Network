@@ -58,11 +58,11 @@
 
 ## Merge sequence
 
-1. Reconcile and validate the G6 increment on the reconciled G5 branch.
-2. Complete PR #15 mentorship-specific validation and reconcile its overlapping `server.js` and `src/services-mentorship/service.js` changes without replacing either branch's valid work.
-3. Execute every G7 check on the exact combined feature head and attach the workflow/test evidence.
-4. Merge the stacked increments through their reviewable PRs into `feat/serve-community-impact-workflows`.
-5. Merge PR #17 into `ux/p0-navigation-and-org-privacy` only after review and all required checks pass.
+1. Reconcile the G6 source with G5 and complete the G0–G6 implementation on the stacked feature branch.
+2. Execute every G7 check on the exact G0–G7 feature head and record the workflow/test evidence.
+3. Merge the stacked G7 → G6 → G5 increments through their reviewable PRs into `feat/serve-community-impact-workflows`, then merge PR #17 into `ux/p0-navigation-and-org-privacy` only after review and all required checks pass.
+4. After PR #17 lands on `ux/p0-navigation-and-org-privacy`, reconcile the overlapping PR #15 changes in `server.js`, `src/services-mentorship/service.js`, and any affected UI/configuration files. Preserve both the Serve-Community lifecycle/outcome work and the mentorship operations; do not replace either whole file with an older branch version.
+5. Complete PR #15's mentorship-specific validation separately on the reconciled revision, including its migration, authorization, consent, session-confirmation, confidential-report and trusted email-delivery behavior. Merge PR #15 only after those checks pass.
 6. Finish PR #5's remaining Phase 2 requirements and run the complete pre-deployment CI/acceptance process on the combined PR #5 head.
 7. Merge PR #5 into `main` only after required checks and reviews pass.
 

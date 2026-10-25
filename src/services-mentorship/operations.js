@@ -123,14 +123,16 @@ export async function joinMentorshipCircle(profileId,userId,requestId){
   const row=(await tx.query("insert into mentorship_circle_membership(mentor_profile_id,participant_user_id) values($1,$2) on conflict(mentor_profile_id,participant_user_id) do update set joined_at=now(),left_at=null where mentorship_circle_membership.left_at is not null returning id,joined_at",[profileId,userId])).rows[0];
   if(!row)fail(409,"You have already joined this mentor circle.","ALREADY_JOINED");
   await audit(tx,userId,"mentorship.circle_joined","mentor_profile",profileId,requestId);
-  return {joined:true,joinedAt:row.joined_at,nextAction:"Your participation is recorded. The mentor sees only an aggregate count, not participant identities."};
+  const joinedCount=Number((await tx.query("select count(*)::int count from mentorship_circle_membership where mentor_profile_id=$1 and left_at is null",[profileId])).rows[0]?.count||0);
+  return {joined:true,joinedAt:row.joined_at,joinedCount,nextAction:"Your participation is recorded. The mentor sees only an aggregate count, not participant identities."};
  });
 }
 export async function leaveMentorshipCircle(profileId,userId,requestId){
  const db=getPool();const row=(await db.query("update mentorship_circle_membership set left_at=now() where mentor_profile_id=$1 and participant_user_id=$2 and left_at is null returning id",[profileId,userId])).rows[0];
  if(!row)return {joined:false,nextAction:"You are not currently in this circle."};
  await audit(db,userId,"mentorship.circle_left","mentor_profile",profileId,requestId);
- return {joined:false,nextAction:"You left the circle; its active count updates from the saved membership record."};
+ const joinedCount=Number((await db.query("select count(*)::int count from mentorship_circle_membership where mentor_profile_id=$1 and left_at is null",[profileId])).rows[0]?.count||0);
+ return {joined:false,joinedCount,nextAction:"You left the circle; its active count updates from the saved membership record."};
 }
 export async function getMentorshipCircleSummary(profileId,userId){
  const db=getPool();const row=(await db.query("select mp.id,mp.circle_name,mp.user_id,(select count(*)::int from mentorship_circle_membership cm where cm.mentor_profile_id=mp.id and cm.left_at is null) joined_count,exists(select 1 from mentorship_circle_membership cm where cm.mentor_profile_id=mp.id and cm.participant_user_id=$2 and cm.left_at is null) joined_by_me from mentor_profile mp where mp.id=$1 and mp.status='active' and mp.moderation_status='approved' and mp.circle_enabled=true",[profileId,userId])).rows[0];

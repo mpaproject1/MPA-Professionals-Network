@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { inflateRawSync } from "node:zlib";
 import test from "node:test";
-import { getPool } from "../../src/platform/db.js";
 import * as membership from "../../src/membership/service.js";
-import * as marketplaceDemand from "../../src/services-mentorship/demand.js";
+import { getPool } from "../../src/platform/db.js";
 import { exportReport, runReport } from "../../src/platform/reports.js";
+import * as marketplaceDemand from "../../src/services-mentorship/demand.js";
 
 async function createRequester() {
   const suffix = randomUUID();

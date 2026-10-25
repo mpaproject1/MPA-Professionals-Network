@@ -379,9 +379,9 @@ export async function createServiceListingAnnouncement(listingId,userId,input,re
   const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
   if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
   await assertServiceListingAccess(db,listing,userId);
-  if(!["active","paused"].includes(listing.lifecycle_status)||listing.moderation_status!=="approved"||!["published","paused"].includes(listing.status))throw error(409,"Announcements can only be created for approved active or paused programs.","LISTING_NOT_ACTIVE");
   const existing=(await db.query("select * from service_listing_announcement where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
   if(existing){if(existing.listing_id!==listingId||existing.author_user_id!==userId||existing.request_fingerprint!==fingerprint)throw error(409,"This announcement key was already used for different content.","IDEMPOTENCY_KEY_CONFLICT");return {...existing,idempotent:true,replayed:true};}
+  if(!["active","paused"].includes(listing.lifecycle_status)||listing.moderation_status!=="approved"||!["published","paused"].includes(listing.status))throw error(409,"Announcements can only be created for approved active or paused programs.","LISTING_NOT_ACTIVE");
   const row=(await db.query("insert into service_listing_announcement(listing_id,author_user_id,audience,status,title,body,request_idempotency_hash,request_fingerprint) values($1,$2,$3,'draft',$4,$5,$6,$7) returning *",[listingId,userId,audience,title,body,keyHash,fingerprint])).rows[0];
   await audit(db,userId,"service.listing_announcement_created","service_listing_announcement",row.id,requestId,{listingId,audience,status:"draft"});
   return {...row,idempotent:false,replayed:false,nextAction:"Submit the announcement for review before it is published."};
@@ -732,7 +732,6 @@ export async function createServiceRequestUpdate(requestId,userId,input,requestI
  return withTransaction(async db=>{
   const request=(await db.query("select * from service_request where id=$1 for update",[requestId])).rows[0];
   if(!request)throw error(404,"Service request not found.","NOT_FOUND");
-  if(!["requested","accepted","in_progress","disputed"].includes(request.status))throw error(409,"Operational updates are available only while the service request is open.","SERVICE_REQUEST_NOT_OPEN");
   const providerActor=await isServiceProviderActor(db,requestId,userId);
   if(request.requester_user_id!==userId&&!providerActor)throw error(403,"Only the requester or authorized provider-side participant can add an operational update.","FORBIDDEN");
   const existing=(await db.query("select * from service_request_update where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
@@ -740,6 +739,7 @@ export async function createServiceRequestUpdate(requestId,userId,input,requestI
    if(existing.request_id!==requestId||existing.author_user_id!==userId||existing.request_fingerprint!==fingerprint)throw error(409,"This update key was already used for different content.","IDEMPOTENCY_KEY_CONFLICT");
    return {...existing,idempotent:true,replayed:true};
   }
+  if(!["requested","accepted","in_progress","disputed"].includes(request.status))throw error(409,"Operational updates are available only while the service request is open.","SERVICE_REQUEST_NOT_OPEN");
   const row=(await db.query("insert into service_request_update(request_id,author_user_id,category,body,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6) returning id,request_id,author_user_id,category,body,created_at",[requestId,userId,category,body,keyHash,fingerprint])).rows[0];
   await audit(db,userId,"service.request_update_created","service_request_update",row.id,requestIdHeader,{requestId,category,audience:"participants"});
   const actionUrl="/services?requestId="+ requestId +"#service-request-"+requestId;

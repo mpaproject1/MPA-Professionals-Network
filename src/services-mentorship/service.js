@@ -235,7 +235,7 @@ export async function changeServiceListingStatus(listingId,userId,status,request
 
 export async function acceptServiceAgreement(requestId,userId,requestIdHeader){
  return withTransaction(async db=>{
-  const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
+  const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency,sl.completion_evidence_policy listing_completion_evidence_policy,sl.impact_model listing_impact_model,sl.fulfilment_rule listing_fulfilment_rule,sl.fulfilment_target_count listing_fulfilment_target_count from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
   if(!r)throw error(404,"Service request not found.","NOT_FOUND");
   if(r.requester_user_id!==userId)throw error(403,"Only the requester can confirm agreement to the provider's terms.","FORBIDDEN");
   if(r.status!=="accepted")throw error(409,"The provider must accept the request before the requester can confirm the agreement.","INVALID_STATE");
@@ -548,13 +548,21 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
       throw error(409,"The provider cannot cancel an accepted engagement; use the dispute path if delivery is blocked.","INVALID_STATE");
     }
     if(status==="completed"&&r.status==="in_progress"){
+      if(String(note||"").trim().length<10) throw error(400,"Provide a meaningful completion summary of at least 10 characters.","COMPLETION_SUMMARY_REQUIRED");
       const pending=(await db.query("select count(*)::int count from service_request_milestone where request_id=$1 and status not in ('accepted','completed','cancelled')",[requestId])).rows[0].count;
       if(Number(pending)>0) throw error(409,"All active delivery milestones must be accepted or completed before completion.","OUTCOMES_INCOMPLETE");
-      const updated=(await db.query("update service_request set provider_completed_at=now(),provider_note=coalesce($1,provider_note),updated_at=now() where id=$2 returning *",[note||null,requestId])).rows[0];
-      await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$4,$5)",[requestId,userId,r.status,r.status,note||"Provider submitted completion; requester acceptance is still required."]);
-      await audit(db,userId,"service.request_completion_submitted","service_request",requestId,requestIdHeader,{status:r.status});
-      await notify(db,r.requester_user_id,"service.completion_submitted","service_request",requestId,{message:"The provider says the work is complete. Review the delivery and accept it or raise a concern.",nextAction:"Review submitted delivery and accept completion when satisfied.",actionUrl:"/services?requestId="+ requestId +"#service-request-"+requestId,actionRequired:true});
-      return {...updated,nextAction:"The requester must review the outcome and accept completion. Paid work also requires verified settlement."};
+      const policy=r.listing_completion_evidence_policy||"accepted_delivery";
+      const latest=(await db.query("select id,status,file_object_id from service_request_delivery where request_id=$1 order by created_at desc,id desc limit 1",[requestId])).rows[0];
+      if(policy==="accepted_delivery"&&(!latest||latest.status!=="accepted")) throw error(409,"Submit delivery evidence and wait for the requester to accept the latest delivery before submitting completion.","DELIVERY_EVIDENCE_REQUIRED");
+      if(policy==="private_file"&&(!latest||latest.status!=="accepted"||!latest.file_object_id)) throw error(409,"This service requires an accepted delivery backed by a private evidence file.","PRIVATE_FILE_EVIDENCE_REQUIRED");
+      if(policy==="description_only"&&String(note||"").trim().length<10) throw error(400,"This service requires a meaningful written outcome summary.","COMPLETION_SUMMARY_REQUIRED");
+      const previous=(await db.query("select 1 from service_request_completion_event where request_id=$1 and event_type in ('submitted','resubmitted') limit 1",[requestId])).rowCount>0;
+      const updated=(await db.query("update service_request set provider_completed_at=now(),provider_completion_submitted_by=$1,provider_note=$2,requester_outcome_decision=null,requester_outcome_decision_by=null,requester_outcome_decision_at=null,requester_outcome_note=null,completion_evidence_delivery_id=$3,updated_at=now() where id=$4 returning *",[userId,String(note).trim(),latest?.id||null,requestId])).rows[0];
+      await db.query("insert into service_request_completion_event(request_id,actor_user_id,event_type,outcome_summary,evidence_delivery_id,note) values($1,$2,$3,$4,$5,$6)",[requestId,userId,previous?"resubmitted":"submitted",String(note).trim(),latest?.id||null,String(note).trim()]);
+      await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$4,$5)",[requestId,userId,r.status,r.status,"Provider submitted completion; requester decision is required."]);
+      await audit(db,userId,"service.request_completion_submitted","service_request",requestId,requestIdHeader,{status:r.status,evidencePolicy:policy,evidenceDeliveryId:latest?.id||null});
+      await notify(db,r.requester_user_id,"service.completion_submitted","service_request",requestId,{message:"The provider submitted completion evidence. Review the outcome and accept it, request revision, or dispute it.",nextAction:"Review the completion evidence and record your outcome decision.",actionUrl:"/services?requestId="+ requestId +"#service-request-"+requestId,actionRequired:true});
+      return {...updated,nextAction:"The requester must accept the submitted outcome, request a revision or dispute it. Payment verification remains a separate finance step for paid engagements."};
     }
     if(!allowedServiceRequestTransition(r.status,status)) throw error(409,"Invalid service request transition.","INVALID_STATE");
     if(["declined","cancelled","disputed"].includes(status)&&String(note||"").trim().length<4) throw error(400,"Add a short explanation so the other participant understands this decision and the next step.","OUTCOME_NOTE_REQUIRED");

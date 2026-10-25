@@ -355,6 +355,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/me/mentorship-requests") return ok(res,await servicesMentorship.listMyMentorshipRequests(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/me/mentorship-interest") return ok(res,await mentorshipOperations.listMentorshipInterestPool(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/me/mentorship-operations") return ok(res,await mentorshipOperations.getMentorshipOperationalReport(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/me/mentorship-reports") return ok(res,await mentorshipOperations.listMyMentorshipParticipantReports(identity.sub,{limit:query(req.url).get("limit")||50}),requestId);
     if(req.method==="GET" && p==="api/v1/admin/mentorship-reports") return ok(res,await mentorshipOperations.listMentorshipParticipantReports(identity.sub,{status:query(req.url).get("status")||"open",limit:query(req.url).get("limit")||25,offset:query(req.url).get("offset")||0}),requestId);
     if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/admin/mentorship-reports/")) return ok(res,await mentorshipOperations.updateMentorshipParticipantReport(identity.sub,parts[4],await body(req),requestId),requestId);
     if(req.method==="GET" && p==="api/v1/me/mentorship-matches") return ok(res,await servicesMentorship.listMyMentorshipMatches(identity.sub),requestId);

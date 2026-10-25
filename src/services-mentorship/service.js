@@ -372,12 +372,12 @@ export async function createServiceListingAnnouncement(listingId,userId,input,re
  if(!["public","members"].includes(audience))throw error(400,"Listing announcements must target public or active members. Engagement-only updates belong on the specific service request.","INVALID_ANNOUNCEMENT_AUDIENCE");
  const keyHash=hashValue(idempotencyKey),fingerprint=hashPayload({listingId,userId,title,body,audience});
  return withTransaction(async db=>{
-  const existing=(await db.query("select * from service_listing_announcement where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
-  if(existing){if(existing.request_fingerprint!==fingerprint)throw error(409,"This announcement key was already used for different content.","IDEMPOTENCY_KEY_CONFLICT");return {...existing,idempotent:true,replayed:true};}
   const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
   if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
   await assertServiceListingAccess(db,listing,userId);
   if(!["active","paused"].includes(listing.lifecycle_status)||listing.moderation_status!=="approved"||!["published","paused"].includes(listing.status))throw error(409,"Announcements can only be created for approved active or paused programs.","LISTING_NOT_ACTIVE");
+  const existing=(await db.query("select * from service_listing_announcement where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){if(existing.listing_id!==listingId||existing.author_user_id!==userId||existing.request_fingerprint!==fingerprint)throw error(409,"This announcement key was already used for different content.","IDEMPOTENCY_KEY_CONFLICT");return {...existing,idempotent:true,replayed:true};}
   const row=(await db.query("insert into service_listing_announcement(listing_id,author_user_id,audience,status,title,body,request_idempotency_hash,request_fingerprint) values($1,$2,$3,'draft',$4,$5,$6,$7) returning *",[listingId,userId,audience,title,body,keyHash,fingerprint])).rows[0];
   await audit(db,userId,"service.listing_announcement_created","service_listing_announcement",row.id,requestId,{listingId,audience,status:"draft"});
   return {...row,idempotent:false,replayed:false,nextAction:"Submit the announcement for review before it is published."};

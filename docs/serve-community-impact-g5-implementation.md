@@ -25,10 +25,10 @@
 
 - Interested individual and organization counts.
 - Submitted pledges and accepted commitments.
-- Active engagements with a mutually accepted persisted agreement.
+- Provider and requester agreement-confirmation counts, plus active engagements with a mutually accepted persisted agreement.
 - Completed engagements with provider completion, requester confirmation, and a non-empty recorded outcome summary (the summary text itself is never exposed).
 - Feedback completion by structured category and operational update/milestone activity by category.
-- Time-based activity summaries and, in the governance view, aggregated lifecycle decision history.
+- Time-based activity summaries and, in the governance view, aggregated listing-lifecycle and service-request decision history.
 
 ## API
 

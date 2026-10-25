@@ -53,4 +53,15 @@ export async function runImpactReport(identity,listingId,filters={},requestId,vi
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'service_listing',$3,$4,'success',$5)",[identity.sub,listing.view==="governance"?"serve_community.impact_governance_report_generated":"serve_community.impact_report_generated",listing.id,requestId,JSON.stringify({view:listing.view,filters:applied,minimumGroupSize:MIN_GROUP_SIZE,suppressedMetricCount:Object.values(metrics).filter(x=>x.suppressed).length})]);
  return report;
 }
+
+export function toImpactExportData(result,listingId){
+ const rows=[];
+ for(const [key,value] of Object.entries(result.metrics))rows.push({Section:"Impact metrics",Measure:key,Period:"Selected period",Value:value.value===null?"Suppressed":value.value,Suppressed:value.suppressed?"Yes":"No"});
+ for(const item of result.monthlySummary)rows.push({Section:"Time summary",Measure:"Activity records",Period:item.month,Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
+ for(const item of result.feedbackCompletionByCategory)rows.push({Section:"Feedback completion",Measure:item.category,Period:"Selected period",Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
+ for(const item of result.milestoneActivity)rows.push({Section:"Milestone activity",Measure:item.milestoneType,Period:"Selected period",Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
+ for(const item of result.decisionAudit||[])rows.push({Section:"Governance decisions",Measure:item.decision,Period:item.latestAt?new Date(item.latestAt).toISOString():"Selected period",Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
+ return {report:{title:result.title,scope:result.view==="governance"?"Restricted governance aggregates":"Listing-owner privacy-safe aggregates",definition:result.suppressionPolicy,columns:["Section","Measure","Period","Value","Suppressed"]},generatedAt:result.generatedAt,filters:{...result.filters,listingId,view:result.view},totals:{rows:rows.length,minimumGroupSize:result.minimumGroupSize},rows};
+}
+
 export {MIN_GROUP_SIZE};

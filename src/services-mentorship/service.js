@@ -382,6 +382,7 @@ export async function changeServiceListingAnnouncementStatus(announcementId,user
   const moderator=Boolean((await db.query("select 1 where exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code in ('supporting_staff','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=$1 and up.permission_code='marketplace.moderate')",[userId])).rows[0]);
   if(["published","rejected"].includes(status)){
    if(!moderator)throw error(403,"Only an authorized moderator can publish or reject an announcement.","FORBIDDEN");
+   if(status==="published"&&(!["active","paused"].includes(listing.lifecycle_status)||listing.status!=="published"||listing.moderation_status!=="approved"))throw error(409,"Announcements can only be published for a currently approved active or paused program.","LISTING_NOT_ACTIVE");
    if(announcement.status!=="pending_review")throw error(409,"Only announcements pending review can be published or rejected.","INVALID_STATE");
   }else{
    if(!owner)throw error(403,"Only the listing owner or authorized organization manager can submit or archive this announcement.","FORBIDDEN");

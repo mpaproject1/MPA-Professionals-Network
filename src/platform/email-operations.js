@@ -198,8 +198,8 @@ export async function receiveInboundEmail(input,providedSecret){
 }
 
 export async function receiveDeliveryWebhook(input,providedSecret){
- const expected=clean(process.env.EMAIL_DELIVERY_WEBHOOK_SECRET,500);
- if(!expected||!providedSecret||Buffer.byteLength(expected)!==Buffer.byteLength(providedSecret)||!timingSafeEqual(Buffer.from(expected),Buffer.from(providedSecret)))fail(401,"Email delivery webhook is not authorized.","UNAUTHENTICATED");
+ const expected=clean(process.env.EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET,500);
+ if(!expected||!providedSecret||Buffer.byteLength(expected)!==Buffer.byteLength(providedSecret)||!timingSafeEqual(Buffer.from(expected),Buffer.from(providedSecret)))fail(401,"Email delivery event webhook is not authorized.","UNAUTHENTICATED");
  const providerMessageId=clean(input.providerMessageId||input.messageId,300);
  const eventType=clean(input.eventType||input.type,80).toLowerCase();
  if(!providerMessageId)fail(400,"providerMessageId is required.","VALIDATION_ERROR");

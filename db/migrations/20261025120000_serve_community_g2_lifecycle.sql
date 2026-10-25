@@ -116,3 +116,15 @@ CREATE INDEX IF NOT EXISTS service_listing_announcement_listing_created_idx
 
 COMMENT ON COLUMN service_listing.expires_at IS 'Optional owner-selected expiry. NULL means no expiry; existing listings are not assigned expiry during migration.';
 COMMENT ON COLUMN service_listing.lifecycle_status IS 'Canonical Serve-Community lifecycle, separate from legacy moderation and publication status.';
+
+-- Formal pledge submissions must be safe to retry after uncertain network outcomes.
+ALTER TABLE service_listing_pledge
+  ADD COLUMN IF NOT EXISTS request_idempotency_hash text,
+  ADD COLUMN IF NOT EXISTS request_fingerprint text;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_service_listing_pledge_idempotency_hash
+  ON service_listing_pledge(request_idempotency_hash)
+  WHERE request_idempotency_hash IS NOT NULL;
+COMMENT ON COLUMN service_listing_pledge.request_idempotency_hash IS
+  'Hash of the one-time client submission key used to replay pledge creation safely.';
+COMMENT ON COLUMN service_listing_pledge.request_fingerprint IS
+  'Hash of normalized pledge details and author identity bound to the submission key.';

@@ -698,8 +698,8 @@ export default function Organizations() {
                       <Badge>Not available</Badge>
                     </div>
                     <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                      <span><b>Impact reports</b><small className="muted" style={{ display: "block" }}>Recruitment outcomes data exists; a scoped downloadable organization PDF is not implemented</small></span>
-                      <Badge>Export not available</Badge>
+                      <span><b>Impact & outcome reports</b><small className="muted" style={{ display: "block" }}>View server-returned recruitment and requisition outcomes; print or save the loaded report as PDF</small></span>
+                      <a className="btn btn-ghost" href="/organizations/reports">Open report</a>
                     </div>
                   </div>
                 </section>;

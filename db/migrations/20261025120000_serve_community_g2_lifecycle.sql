@@ -8,7 +8,7 @@ UPDATE service_listing
    SET lifecycle_status = CASE status
      WHEN 'published' THEN 'active'
      WHEN 'closed' THEN 'archived'
-     WHEN 'paused' THEN 'suspended'
+     WHEN 'paused' THEN 'paused'
      ELSE 'draft'
    END
  WHERE lifecycle_status IS NULL;
@@ -21,7 +21,7 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='service_listing_lifecycle_status_check') THEN
     ALTER TABLE service_listing ADD CONSTRAINT service_listing_lifecycle_status_check
-      CHECK (lifecycle_status IN ('draft','pending_review','active','fulfilled','archived','suspended','rejected'));
+      CHECK (lifecycle_status IN ('draft','pending_review','active','paused','fulfilled','archived','suspended','rejected'));
   END IF;
 END $$;
 
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS service_listing_lifecycle_event (
   listing_id uuid NOT NULL REFERENCES service_listing(id) ON DELETE RESTRICT,
   actor_user_id uuid NOT NULL REFERENCES app_user(id) ON DELETE RESTRICT,
   from_status text,
-  to_status text NOT NULL CHECK (to_status IN ('draft','pending_review','active','fulfilled','archived','suspended','rejected')),
+  to_status text NOT NULL CHECK (to_status IN ('draft','pending_review','active','paused','fulfilled','archived','suspended','rejected')),
   reason text NOT NULL CHECK (length(trim(reason)) >= 4),
   request_id text,
   created_at timestamptz NOT NULL DEFAULT now()

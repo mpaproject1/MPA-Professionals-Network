@@ -18,7 +18,7 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useState } from "react";
+import { useCallback, type CSSProperties, useEffect, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
@@ -92,7 +92,7 @@ export default function AdminPage() {
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!token) return;
     setError("");
     const errors: string[] = [];
@@ -105,7 +105,7 @@ export default function AdminPage() {
     const settle = async <T,>(name: string, request: Promise<T>, apply: (value: T) => void) => {
       try { apply(await request); } catch (cause) {
         errors.push(name);
-        if (cause instanceof Error && !error) setError(cause.message);
+        if (cause instanceof Error && errors.length === 1) setError(cause.message);
       }
     };
     const tasks: Promise<void>[] = [
@@ -145,7 +145,7 @@ export default function AdminPage() {
     }
     await Promise.all(tasks);
     setSectionErrors(errors);
-  }
+  }, [token, userQuery, userStatus]);
 
   useEffect(() => {
     if (hydrated && token) void load();

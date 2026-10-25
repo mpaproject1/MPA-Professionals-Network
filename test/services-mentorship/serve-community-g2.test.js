@@ -70,6 +70,8 @@ test("G2 database: moderation submission retries do not duplicate lifecycle even
  const {owner,listing,db,suffix}=await setupListing({approved:false});
  const submitted=await services.changeServiceListingStatus(listing.id,owner,"published",`serve-g2-submit-${suffix}`);
  assert.equal(submitted.lifecycle_status,"pending_review");
+ const ownerDetail=await services.getServiceListing(listing.id,owner);
+ assert.equal(ownerDetail.lifecycle_status,"pending_review","listing owner can inspect the under-review lifecycle state");
  const retry=await services.changeServiceListingStatus(listing.id,owner,"published",`serve-g2-submit-retry-${suffix}`);
  assert.equal(retry.idempotent,true);
  const events=(await db.query("select id from service_listing_lifecycle_event where listing_id=$1 and to_status='pending_review'",[listing.id])).rows;
@@ -92,6 +94,10 @@ test("G2 database: new listings have no expiry and lifecycle actions require an 
  assert.equal(event.to_status,"fulfilled");
  assert.equal(event.reason,"Program objectives achieved");
  assert.equal(event.actor_user_id,owner);
+ const detail=await services.getServiceListing(listing.id,null);
+ assert.equal(detail.lifecycle_status,"fulfilled","fulfilled programs remain visible with their explicit lifecycle state");
+ const catalog=await services.listServices(null,{q:"Community legal support",limit:100});
+ assert.ok(catalog.items.some(row=>row.id===listing.id&&row.lifecycle_status==="fulfilled"));
  await assert.rejects(services.createServiceListingInterest(listing.id,outsider,{},`serve-g2-closed-interest-${suffix}`),e=>e.code==="LISTING_NOT_ACTIVE");
 });
 

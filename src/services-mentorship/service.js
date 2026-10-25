@@ -223,6 +223,7 @@ export async function createServiceListingInterest(listingId,userId,input={},req
   if(listing.lifecycle_status!=="active"||listing.status!=="published"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date()))throw error(409,"This listing is not accepting new interest.","LISTING_NOT_ACTIVE");
   const organizationId=input.organizationId||null;
   if(listing.visibility!=="public" && !(await activeMember(db,userId)))throw error(403,"An active membership is required to express interest in this listing.","MEMBERSHIP_REQUIRED");
+  if(listing.provider_user_id===userId || (listing.organization_id && (await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code=any($3::text[]) limit 1",[listing.organization_id,userId,["owner","administrator","recruiter","project_manager"]])).rowCount))throw error(400,"A listing owner cannot express interest in their own program.","SELF_INTEREST");
   if(organizationId){
    if(listing.organization_id===organizationId||listing.provider_user_id===userId)throw error(400,"A listing owner cannot express interest in their own program.","SELF_INTEREST");
    try{await assertOrganizationCapability(db,organizationId,userId);}catch(cause){throw error(cause.statusCode||403,cause.message||"Authorized active organization membership is required.",cause.code||"ORGANIZATION_FORBIDDEN");}
@@ -266,6 +267,7 @@ export async function createServiceListingPledge(listingId,userId,input={},reque
   if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
   if(listing.lifecycle_status!=="active"||listing.status!=="published"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date()))throw error(409,"This listing is not accepting pledges.","LISTING_NOT_ACTIVE");
   if(listing.visibility!=="public" && !(await activeMember(db,userId)))throw error(403,"An active membership is required to pledge support to this listing.","MEMBERSHIP_REQUIRED");
+  if(listing.provider_user_id===userId || (listing.organization_id && (await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code=any($3::text[]) limit 1",[listing.organization_id,userId,["owner","administrator","recruiter","project_manager"]])).rowCount))throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
   if(organizationId){
    if(listing.organization_id===organizationId||listing.provider_user_id===userId)throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
    try{await assertOrganizationCapability(db,organizationId,userId);}catch(cause){throw error(cause.statusCode||403,cause.message||"Authorized active organization membership is required.",cause.code||"ORGANIZATION_FORBIDDEN");}

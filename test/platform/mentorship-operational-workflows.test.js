@@ -31,6 +31,8 @@ test("mentorship operational workflows require explicit sharing and preserve par
   const pool = operations.slice(poolStart, poolEnd);
   assert.match(pool, /share_with_eligible_mentors=true/);
   assert.match(operations, /MENTOR_NOT_ELIGIBLE/);
+  assert.match(operations, /Only an active, approved, verified mentor with current membership can use this workflow/);
+  assert.match(operations, /PROFESSIONAL_VERIFICATION_REQUIRED/);
   assert.doesNotMatch(pool, /contact_email|contact_phone|u\.email|p\.email/);
   assert.match(operations, /Only a participant can submit a report/);
   assert.match(operations, /Authorized Support Desk access is required/);

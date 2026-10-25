@@ -293,7 +293,8 @@ test("member and organization catalogues do not expose unsupported lifecycle mut
     source("../../test/platform/reports-acceptance.test.js"),
   ]);
   assert.ok(members.includes("This directory is read-only"));
-  assert.ok(members.includes('href="/admin/membership"') === false, "catalogue must not imply a deep-linked member mutation contract");
+  assert.ok(members.includes('href="/admin/membership"'), "membership decisions and payment review stay in their supported workflow");
+  assert.ok(members.includes("This directory is read-only"));
   assert.ok(!members.includes("method:"));
   assert.ok(organizations.includes("This catalogue is read-only"));
   assert.ok(!organizations.includes("method:"));

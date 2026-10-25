@@ -12,7 +12,7 @@ const destinations = [
 
 export default function Home() {
   return (
-    <main className={styles.homeMinimal}>
+    <div className={styles.homeMinimal}>
       <header className={styles.homeIntro}>
         <span className={styles.homeKicker}><UsersRound size={15} aria-hidden="true" /> Ethiopian Muslim Professionals Association</span>
         <h1>Professional connection.<br /><span>Community impact.</span></h1>
@@ -31,7 +31,6 @@ export default function Home() {
           </Link>
         ))}
       </nav>
-      <p className={styles.homeTrust}><ShieldCheck size={15} aria-hidden="true" /> Participation follows applicable verification, consent and approval requirements.</p>
-    </main>
+    </div>
   );
 }

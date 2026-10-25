@@ -519,7 +519,7 @@ export default function Profile() {
                 Fields marked <b>*</b> are required to save your identity. Other
                 details are optional and can be added later.
               </p>
-              <div className="grid grid-2">
+              <fieldset className="form-category grid" style={{gap:12}}><legend>1. Identity and contact</legend><div className="grid grid-2">
                 {(
                   [
                     ["firstName", "First name *"],
@@ -557,8 +557,8 @@ export default function Profile() {
                     )}
                   </div>
                 ))}
-              </div>
-              <div>
+              </div></fieldset>
+              <fieldset className="form-category grid" style={{gap:12}}><legend>2. Professional summary and visibility</legend><div>
                 <label htmlFor={`${profileId}-headline`}>Professional headline</label>
                 <input
                   id={`${profileId}-headline`}
@@ -608,6 +608,7 @@ export default function Profile() {
                   <a className="btn btn-ghost" href="/membership">Review membership options</a>
                 </div>
               )}
+              </fieldset>
               <div className="row" style={{ justifyContent: "space-between" }}>
                 <span className="muted">
                   Profile completion: {profile?.completion_percent ?? 0}%

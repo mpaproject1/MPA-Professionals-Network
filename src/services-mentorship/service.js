@@ -182,6 +182,108 @@ export async function changeServiceListingStatus(listingId,userId,status,request
   });
 }
 
+
+export async function acceptServiceAgreement(requestId,userId,requestIdHeader){
+ return withTransaction(async db=>{
+  const r=(await db.query("select sr.*,sl.organization_id from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
+  if(!r)throw error(404,"Service request not found.","NOT_FOUND");
+  if(r.requester_user_id!==userId)throw error(403,"Only the requester can confirm agreement to the provider's terms.","FORBIDDEN");
+  if(r.status!=="accepted")throw error(409,"The provider must accept the request before the requester can confirm the agreement.","INVALID_STATE");
+  const agreement=(await db.query("select * from service_request_agreement where request_id=$1 order by terms_version desc limit 1 for update",[requestId])).rows[0];
+  if(!agreement||!agreement.provider_accepted_at)throw error(409,"Provider acceptance and a persisted terms version are required.","AGREEMENT_REQUIRED");
+  if(agreement.requester_accepted_at){
+   if(agreement.requester_accepted_by!==userId)throw error(409,"The current terms acceptance belongs to another actor.","AGREEMENT_CONFLICT");
+   return {...agreement,idempotent:true,nextAction:"Both parties have accepted these terms. The provider may start delivery."};
+  }
+  const accepted=(await db.query("update service_request_agreement set requester_accepted_by=$1,requester_accepted_at=now() where id=$2 and requester_accepted_at is null returning *",[userId,agreement.id])).rows[0];
+  if(!accepted)throw error(409,"The agreement changed concurrently. Reload and review the current terms.","AGREEMENT_CONFLICT");
+  await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$3,$4)",[requestId,userId,r.status,"Requester accepted persisted terms version "+agreement.terms_version]);
+  await audit(db,userId,"service.request_agreement_accepted","service_request",requestId,requestIdHeader,{termsVersion:agreement.terms_version,termsHash:agreement.terms_hash});
+  await notify(db,r.provider_user_id,"service.request_agreement_accepted","service_request",requestId,{message:"The requester accepted the same persisted service terms.",nextAction:"Start delivery when ready."});
+  return {...accepted,idempotent:false,nextAction:"Both parties have accepted these terms. The provider may start delivery."};
+ });
+}
+
+export async function createServiceListingInterest(listingId,userId,input={},requestId){
+ return withTransaction(async db=>{
+  const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
+  if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
+  if(listing.lifecycle_status!=="active"||listing.status!=="published"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date()))throw error(409,"This listing is not accepting new interest.","LISTING_NOT_ACTIVE");
+  const organizationId=input.organizationId||null;
+  if(organizationId){
+   if(listing.organization_id===organizationId)throw error(400,"A listing owner cannot express interest in their own program.","SELF_INTEREST");
+   try{await assertOrganizationCapability(db,organizationId,userId);}catch(cause){throw error(cause.statusCode||403,cause.message||"Authorized active organization membership is required.",cause.code||"ORGANIZATION_FORBIDDEN");}
+  }else if(listing.organization_id===null&&listing.provider_user_id===userId)throw error(400,"A listing owner cannot express interest in their own program.","SELF_INTEREST");
+  const q=organizationId
+   ? await db.query("insert into service_listing_interest(listing_id,organization_id,actor_user_id,status) values($1,$2,$3,'interested') on conflict do nothing returning *",[listingId,organizationId,userId])
+   : await db.query("insert into service_listing_interest(listing_id,individual_user_id,actor_user_id,status) values($1,$2,$2,'interested') on conflict do nothing returning *",[listingId,userId]);
+  const row=q.rows[0]|| (organizationId?(await db.query("select * from service_listing_interest where listing_id=$1 and organization_id=$2 and status='interested'",[listingId,organizationId])).rows[0]:(await db.query("select * from service_listing_interest where listing_id=$1 and individual_user_id=$2 and status='interested'",[listingId,userId])).rows[0]);
+  if(!row)throw error(409,"Interest changed concurrently. Reload and try again.","INTEREST_CONFLICT");
+  if(q.rows[0])await audit(db,userId,"service.listing_interest_created","service_listing_interest",row.id,requestId,{listingId,organizationId:organizationId||null});
+  return {...row,idempotent:!q.rows[0]};
+ });
+}
+
+export async function withdrawServiceListingInterest(interestId,userId,reason,requestId){
+ return withTransaction(async db=>{
+  const row=(await db.query("select * from service_listing_interest where id=$1 for update",[interestId])).rows[0];
+  if(!row)throw error(404,"Interest record not found.","NOT_FOUND");
+  let authorized=row.actor_user_id===userId;
+  if(row.organization_id){try{await assertOrganizationCapability(db,row.organization_id,userId);authorized=true;}catch{authorized=false;}}
+  if(!authorized)throw error(403,"Only the original actor or an authorized organization manager may withdraw this interest.","FORBIDDEN");
+  if(row.status==="withdrawn")return {...row,idempotent:true};
+  if(row.status!=="interested")throw error(409,"Only active interest can be withdrawn.","INVALID_STATE");
+  const updated=(await db.query("update service_listing_interest set status='withdrawn',updated_at=now() where id=$1 and status='interested' returning *",[interestId])).rows[0];
+  if(!updated)throw error(409,"Interest changed concurrently. Reload and try again.","INTEREST_CONFLICT");
+  await audit(db,userId,"service.listing_interest_withdrawn","service_listing_interest",interestId,requestId,{reason:String(reason||"").trim()||null});
+  return updated;
+ });
+}
+
+export async function createServiceListingPledge(listingId,userId,input={},requestId){
+ const description=String(input.description||"").trim();
+ if(description.length<4)throw error(400,"A pledge description of at least four characters is required.","VALIDATION_ERROR");
+ return withTransaction(async db=>{
+  const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
+  if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
+  if(listing.lifecycle_status!=="active"||listing.status!=="published"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date()))throw error(409,"This listing is not accepting pledges.","LISTING_NOT_ACTIVE");
+  const organizationId=input.organizationId||null;
+  if(organizationId){
+   if(listing.organization_id===organizationId)throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
+   try{await assertOrganizationCapability(db,organizationId,userId);}catch(cause){throw error(cause.statusCode||403,cause.message||"Authorized active organization membership is required.",cause.code||"ORGANIZATION_FORBIDDEN");}
+  }else if(listing.organization_id===null&&listing.provider_user_id===userId)throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
+  const row=(await db.query("insert into service_listing_pledge(listing_id,individual_user_id,organization_id,actor_user_id,description,status) values($1,$2,$3,$4,$5,'submitted') returning *",[listingId,organizationId?null:userId,organizationId,userId,description])).rows[0];
+  await audit(db,userId,"service.listing_pledge_submitted","service_listing_pledge",row.id,requestId,{listingId,organizationId:organizationId||null});
+  return row;
+ });
+}
+
+export async function changeServiceListingPledgeStatus(pledgeId,userId,status,reason,requestId){
+ if(!["accepted","declined","withdrawn","fulfilled","cancelled"].includes(status))throw error(400,"Unsupported pledge status.","VALIDATION_ERROR");
+ return withTransaction(async db=>{
+  const row=(await db.query("select p.*,l.provider_user_id,l.organization_id listing_organization_id from service_listing_pledge p join service_listing l on l.id=p.listing_id where p.id=$1 for update of p",[pledgeId])).rows[0];
+  if(!row)throw error(404,"Pledge not found.","NOT_FOUND");
+  const isPledger=row.actor_user_id===userId;
+  let isOwner=row.listing_organization_id?false:row.provider_user_id===userId;
+  if(row.listing_organization_id){try{await assertOrganizationCapability(db,row.listing_organization_id,userId);isOwner=true;}catch{isOwner=false;}}
+  if(status==="withdrawn"){
+   if(!isPledger)throw error(403,"Only the pledge author can withdraw a pledge.","FORBIDDEN");
+   if(row.status!=="submitted")throw error(409,"Only a submitted pledge may be withdrawn; accepted pledges require an authorized cancellation decision.","INVALID_STATE");
+  }else{
+   if(!isOwner)throw error(403,"Only the listing owner or authorized organization manager can decide a pledge.","FORBIDDEN");
+   if(!["submitted","accepted"].includes(row.status))throw error(409,"This pledge is no longer awaiting an owner decision or fulfilment.","INVALID_STATE");
+   if(["declined","cancelled"].includes(status)&&String(reason||"").trim().length<4)throw error(400,"A reason of at least four characters is required for this pledge decision.","REASON_REQUIRED");
+   if(status==="accepted"&&row.status!=="submitted")throw error(409,"Only a submitted pledge can be accepted.","INVALID_STATE");
+   if(status==="declined"&&row.status!=="submitted")throw error(409,"Only a submitted pledge can be declined.","INVALID_STATE");
+   if(status==="fulfilled"&&row.status!=="accepted")throw error(409,"Only an accepted pledge can be fulfilled.","INVALID_STATE");
+   if(status==="cancelled"&&row.status!=="accepted")throw error(409,"Only an accepted pledge can be cancelled.","INVALID_STATE");
+  }
+  const updated=(await db.query("update service_listing_pledge set status=$1,decision_reason=$2,updated_at=now() where id=$3 returning *",[status,String(reason||"").trim()||null,pledgeId])).rows[0];
+  await audit(db,userId,"service.listing_pledge_status_changed","service_listing_pledge",pledgeId,requestId,{from:row.status,to:status,reason:String(reason||"").trim()||null});
+  return updated;
+ });
+}
+
 export async function listServices(viewerId=null,filters={}){
   const db=getPool(); const args=[viewerId||null]; const where=["s.status='published'","s.moderation_status='approved'","s.lifecycle_status='active'","(s.expires_at is null or s.expires_at>now())","((s.organization_id is not null and exists (select 1 from organization o where o.id=s.organization_id and o.verification_status='verified')) or (s.organization_id is null and exists (select 1 from membership_record m where m.user_id=s.provider_user_id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date))))","(s.visibility='public' or ($1::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$1 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date))))"];
   if(filters.category){ args.push(String(filters.category)); where.push(`s.service_category=$${args.length}`); }
@@ -279,7 +381,16 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
     }
     if(!allowedServiceRequestTransition(r.status,status)) throw error(409,"Invalid service request transition.","INVALID_STATE");
     if(["declined","cancelled","disputed"].includes(status)&&String(note||"").trim().length<4) throw error(400,"Add a short explanation so the other participant understands this decision and the next step.","OUTCOME_NOTE_REQUIRED");
+    if(status==="in_progress"){
+      const agreement=(await db.query("select * from service_request_agreement where request_id=$1 order by terms_version desc limit 1 for update",[requestId])).rows[0];
+      if(!agreement || !agreement.provider_accepted_at || !agreement.requester_accepted_at) throw error(409,"Both parties must accept the same persisted service terms before delivery can start.","AGREEMENT_REQUIRED");
+    }
     const updated=(await db.query("update service_request set status=$1,provider_note=case when $2::uuid<>requester_user_id then $3 else provider_note end,requester_note=case when $2::uuid=requester_user_id then $3 else requester_note end,outcome_summary=case when $1 in ('declined','cancelled','disputed') then coalesce($3,outcome_summary) else outcome_summary end,accepted_at=case when $1='accepted' then now() else accepted_at end,started_at=case when $1='in_progress' then now() else started_at end,cancelled_at=case when $1='cancelled' then now() else cancelled_at end,updated_at=now() where id=$4 returning *",[status,userId,note||null,requestId])).rows[0];
+    if(status==="accepted"){
+      const terms={scope:r.scope||null,agreedPrice:r.agreed_price===null?null:Number(r.agreed_price),currency:r.agreed_currency||null,completionDueAt:r.completion_due_at||null,requestedStartAt:r.requested_start_at||null,requestedEndAt:r.requested_end_at||null};
+      const termsHash=hashPayload(terms);
+      await db.query("insert into service_request_agreement(request_id,terms_version,terms,terms_hash,provider_accepted_by,provider_accepted_at) values($1,1,$2,$3,$4,now()) on conflict(request_id,terms_version) do nothing",[requestId,terms,termsHash,userId]);
+    }
     await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$4,$5)",[requestId,userId,r.status,status,note||null]);
     await audit(db,userId,"service.request_status_changed","service_request",requestId,requestIdHeader,{from:r.status,to:status});
     const message=status==="accepted"?"Your service request was accepted. Agree the start date and delivery scope.":status==="declined"?"Your service request was declined. Review the explanation or choose another provider.":status==="in_progress"?"Service delivery has started. Track milestones and submitted work.":status==="disputed"?"A concern was raised. Review the note and agree the next step or contact Support Desk.":"The service request was cancelled. Review the explanation before creating a new request.";

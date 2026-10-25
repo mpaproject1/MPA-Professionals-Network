@@ -32,13 +32,15 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.doesNotMatch(pool, /contact_email|contact_phone|u\.email|p\.email/);
   assert.match(operations, /Only a participant can submit a report/);
   assert.match(operations, /Authorized Support Desk access is required/);
+  assert.match(operations, /setMentorshipRequestSharing/);
   assert.match(operations, /joined_count/);
-  assert.match(operations, /participant identities are not exposed/i);
+  assert.match(operations, /not participant identities/i);
 
   assert.match(service, /shareWithEligibleMentors=input\.shareWithEligibleMentors===true/);
   assert.match(service, /share_with_eligible_mentors/);
   assert.match(service, /coordination_status,proposed_by,proposal_note/);
   assert.match(service, /Both participants must confirm the session proposal/);
+  assert.match(service, /PRIVATE_CONTACT_NOT_ALLOWED/);
   assert.match(service, /matchId:row\.id/);
 
   for (const route of [
@@ -53,6 +55,7 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(server, /registerMentorshipInterest/);
 
   assert.match(page, /shareRequestWithMentors/);
+  assert.match(page, /Stop sharing summary/);
   assert.match(page, /Consented mentorship interests/);
   assert.match(page, /Mentorship operations/);
   assert.match(page, /Confirm session/);
@@ -63,7 +66,7 @@ test("mentorship operational workflows require explicit sharing and preserve par
 
   assert.match(email, /EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET/);
   assert.match(email, /delivery_status='delivered'/);
-  assert.match(email, /does not prove the person read the message/i);
+  assert.match(email, /does not prove the recipient read the message/i);
   assert.match(reportPage, /api\/v1\/admin\/mentorship-reports/);
   assert.match(reportPage, /no contact address is collected/i);
   assert.match(admin, /\/admin\/mentorship-reports/);

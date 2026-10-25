@@ -1,25 +1,6 @@
 "use client";
-import {
-  BookOpenCheck,
-  Building2,
-  ClipboardList,
-  Edit3,
-  FileBarChart,
-  Fingerprint,
-  FlaskConical,
-  HelpCircle,
-  Mail,
-  MessageSquareText,
-  PauseCircle,
-  PlayCircle,
-  RefreshCw,
-  Save,
-  Search,
-  ShieldCheck,
-  UserCog,
-  Users,
-} from "lucide-react";
-import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { BookOpenCheck, Building2, ClipboardList, FileBarChart, Fingerprint, HelpCircle, Mail, MessageSquareText, RefreshCw, Search, ShieldCheck, UserCog, Users } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
@@ -28,28 +9,6 @@ import styles from "./admin-overview.module.css";
 import { AdminPageHeader } from "./admin-page-header";
 import { type ManagedRole, type ManagedUser, UsersTable } from "./users-table";
 
-type Demo = {
-  id: string;
-  case_key: string;
-  title: string;
-  business_area: string;
-  persona: string;
-  description: string;
-  start_path: string;
-  scenario: any;
-  active: boolean;
-};
-type Guide = {
-  id: string;
-  guide_key: string;
-  route_pattern: string;
-  title: string;
-  description: string;
-  steps: any[];
-  active: boolean;
-};
-type CurrentUser = { user_id: string; roles: string[] };
-type ManagedPermission = { permission_code: string; area: string; label: string; description: string; sensitive: boolean; system_only: boolean };
 type AuditEvent = { id: string; actor_user_id?: string | null; action: string; resource_type: string; resource_id?: string | null; request_id?: string | null; outcome: string; metadata?: Record<string, unknown>; created_at: string };
 type OperationalQueueRow = { Queue: string; Status: string; Requests: number; Unreviewed: number; "Average response hours": number | string | null };
 type OperationalQueueSnapshot = { rows: OperationalQueueRow[]; generatedAt: string };
@@ -73,7 +32,7 @@ export default function AdminPage() {
   const hydrated = useUiStore((s) => s.hydrated);
   const token = useUiStore((s) => s.token);
   const hydrateToken = useUiStore((s) => s.hydrateToken);
-  const [tab, setTab] = useState<"cases" | "guides" | "inquiries" | "users" | "audit">("inquiries");
+  const [tab, setTab] = useState<"inquiries" | "audit">("inquiries");
   const [cases, setCases] = useState<Demo[]>([]);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
@@ -122,9 +81,6 @@ export default function AdminPage() {
     ];
     tasks.push(settle("users", getList<ManagedUser>("/api/v1/admin/users?limit=200", "users"), setUsers));
     try {
-      const catalog = await api<any>("/api/v1/admin/roles", {}, token);
-      const normalizedCatalog = Array.isArray(catalog) ? catalog : (Array.isArray(catalog?.roles) ? catalog.roles : []);
-      setRoleCatalog(normalizedCatalog as ManagedRole[]);
       let claims: any = {};
       try { const segment = token.split(".")[1]; if (segment) claims = JSON.parse(atob(segment.replace(/-/g, "+").replace(/_/g, "/"))); } catch { /* Display hints only; server authorization remains authoritative. */ }
       const currentRoles = Array.isArray(claims?.roles) ? claims.roles.map((role: any) => typeof role === "string" ? role : role?.role_code).filter(Boolean) : [];
@@ -133,10 +89,8 @@ export default function AdminPage() {
       setIsPlatformAdmin(currentRoles.includes("system_admin") || currentRoles.includes("admin") || currentRoles.includes("platform_admin"));
       setCanReviewInquiries(currentRoles.includes("supporting_staff") || currentRoles.includes("system_admin") || currentRoles.includes("admin") || currentRoles.includes("platform_admin"));
       if (currentRoles.includes("system_admin")) {
-        try { const permissions = await api<ManagedPermission[]>("/api/v1/admin/permissions", {}, token); setPermissionCatalog(Array.isArray(permissions) ? permissions : []); }
-        catch { errors.push("permission catalog"); }
         tasks.push(settle("audit history", getList<AuditEvent>("/api/v1/admin/audit-log?limit=100", "items"), setAuditEvents));
-      } else { setPermissionCatalog([]); setAuditEvents([]); }
+      } else { setAuditEvents([]); }
       setScopeResolved(true);
     } catch (cause) {
       setScopeResolved(true);
@@ -179,7 +133,7 @@ export default function AdminPage() {
   const operationalQueueLinks: Record<string, string> = { "Membership application": "/admin/membership", "Professional verification": "/verification", "Organization verification": "/organizations", "Marketplace demand": "/admin/marketplace" };
   const workspaces = [
     {title:"Organizations",desc:"Search organizations, inspect linked accounts and open verification review workflows.",href:"/admin/organizations",Icon:Building2,group:"Review & service",access:"org"},
-    {title:"Accounts & roles",desc:"Search platform accounts, review status and manage roles with audit reasons.",href:"#account-governance",Icon:Users,group:"People & access",access:"admin"},
+    {title:"Account and Team",desc:"Search platform accounts, review status and manage roles with audit reasons.",href:"/admin/accounts",Icon:Users,group:"People & access",access:"admin"},
     {title:"Member records",desc:"Import approved member registers, resolve conflicts and export records.",href:"/admin/members",Icon:Users,group:"People & access",access:"admin"},
     {title:"Member catalogue",desc:"Search individual membership records and linked account status.",href:"/admin/members/catalog",Icon:Users,group:"People & access",access:"admin"},
     {title:"Membership operations",desc:"Membership plans, payment review and membership lifecycle controls.",href:"/admin/membership",Icon:ShieldCheck,group:"People & access",access:"admin"},
@@ -188,22 +142,10 @@ export default function AdminPage() {
     {title:"Reports & exports",desc:"Generate scoped reports and audited exports.",href:"/admin/reports",Icon:FileBarChart,group:"Governance",access:"admin"},
     {title:"Reference data",desc:"Maintain governed professional options and staged imports.",href:"/admin/reference-portfolio",Icon:BookOpenCheck,group:"Governance",access:"admin"},
     {title:"Security",desc:"Manage administrator passkeys and recovery controls.",href:"/admin/security",Icon:Fingerprint,group:"Governance",access:"admin"},
-    {title:"Email operations",desc:"Review delivery queues, templates and retries.",href:"/admin/email",Icon:Mail,group:"Governance",access:"admin"},
+    {title:"Email operations",desc:"Review delivery queues, templates and retries.",href:"/admin/email",Icon:Mail,group:"Governance",access:"admin"},\n    {title:"Help, guides and demos",desc:"Manage contextual guides, launch training scenarios and find support resources.",href:"/admin/experience",Icon:HelpCircle,group:"Enablement",access:"admin"},
   ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "org" ? roles.some(role => ["system_admin","admin","reviewer"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin));
 
 
-  async function patchCase(item: Demo, active: boolean) {
-    try {
-      await api(`/api/v1/admin/experience/demo-cases/${item.id}`, { method: "PATCH", body: JSON.stringify({ active }) }, token);
-      await load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the demo case."); }
-  }
-  async function patchGuide(item: Guide, active: boolean) {
-    try {
-      await api(`/api/v1/admin/experience/guides/${item.id}`, { method: "PATCH", body: JSON.stringify({ active }) }, token);
-      await load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the guide."); }
-  }
   async function decideInquiry(item: Inquiry, status: string, considerNonMember: boolean) {
     try {
       await api(`/api/v1/opportunity-inquiries/${item.id}`, { method: "PATCH", body: JSON.stringify({ status, consider_non_member: considerNonMember }) }, token);
@@ -265,16 +207,14 @@ export default function AdminPage() {
     );
   return (
     <div className="grid">
-      <AdminPageHeader eyebrow="MPA · Platform operations" title="Admin overview" description="A single starting point for account governance, member records, organization review, community moderation and platform controls." actions={<div className={styles.roleChips}>{roles.map((role) => <Badge key={role} tone="slate">{role.replaceAll("_", " ")}</Badge>)}</div>} />
+      <AdminPageHeader eyebrow="MPA · Platform operations" title="Admin overview" description="A focused starting point for operational queues, assigned reviews and authorized platform workspaces." actions={<div className={styles.roleChips}>{roles.map((role) => <Badge key={role} tone="slate">{role.replaceAll("_", " ")}</Badge>)}</div>} />
       <section className={styles.welcome} aria-label="Operational overview">
         <div className={styles.welcomeCopy}><span className={styles.kicker}>OPERATIONS WORKSPACE</span><h2>Good administration starts with clear queues.</h2><p>Choose the workspace for the task at hand. Sensitive records stay within their existing permission boundaries and review flows.</p></div>
         <div className={styles.searchWrap}><label htmlFor="admin-workspace-search">Find a workspace</label><div className={styles.searchBox}><Search size={18} aria-hidden="true"/><input id="admin-workspace-search" value={moduleQuery} onChange={(event) => setModuleQuery(event.target.value)} placeholder="Search members, organizations, reports…" /></div></div>
       </section>
-      <section className={styles.metrics} aria-label="Loaded operational records">
-        <article className={styles.metric}><span>Account records loaded</span><strong>{!isPlatformAdmin ? "—" : loading ? "…" : sectionErrors.includes("users") ? "Unavailable" : users.length}</strong><small>{!isPlatformAdmin ? "Platform administrator access required" : loading ? "Retrieving current results" : sectionErrors.includes("users") ? "Could not verify this count · retry to check" : "Up to 200 accounts · current query"}</small></article>
-        <article className={styles.metric}><span>Experience scenarios</span><strong>{!isPlatformAdmin ? "—" : loading ? "…" : sectionErrors.includes("demo cases") ? "Unavailable" : cases.length}</strong><small>{loading ? "Retrieving current results" : sectionErrors.includes("demo cases") ? "Could not verify this count · retry to check" : "Configured walkthrough scenarios"}</small></article>
-        <article className={styles.metric}><span>Contextual guides</span><strong>{!isPlatformAdmin ? "—" : loading ? "…" : sectionErrors.includes("user guides") ? "Unavailable" : guides.length}</strong><small>{loading ? "Retrieving current results" : sectionErrors.includes("user guides") ? "Could not verify this count · retry to check" : "Configured user guides"}</small></article>
+      <section className={styles.metrics} aria-label="Overview summary">
         <article className={styles.metric}><span>Opportunity inquiries</span><strong>{!canReviewInquiries ? "—" : loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "Unavailable" : inquiries.length}</strong><small>{!canReviewInquiries ? "Review permission required" : loading ? "Retrieving current results" : sectionErrors.includes("opportunity inquiries") ? "Could not verify this count · retry to check" : "Records returned to this workspace"}</small></article>
+        <article className={styles.metric}><span>Available workspaces</span><strong>{workspaces.length}</strong><small>Filtered by your assigned platform role</small></article>
       </section>
       {canSeeOperationalQueues && (
         <section className={styles.section} aria-labelledby="admin-operational-queues-heading">

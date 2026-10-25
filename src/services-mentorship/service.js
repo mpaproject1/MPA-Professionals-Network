@@ -177,8 +177,12 @@ export async function changeServiceListingStatus(listingId,userId,status,request
     }
     if(status==="published" && row.organization_id && organization?.verification_status!=="verified") throw error(409,"The organization must be verified before it can publish a service listing.","ORGANIZATION_NOT_VERIFIED");
     if(status==="published" && !row.organization_id && !(await activeMember(db,userId))) throw error(403,"A current active membership is required to publish a service.","MEMBERSHIP_REQUIRED");
+    const currentLifecycleStatus=row.lifecycle_status||({published:"active",paused:"paused",closed:"archived"}[row.status]||"draft");
+    const lifecycleStatus=status==="published"?"active":status==="paused"?"paused":status==="closed"?"archived":status;
+    const allowedListingTransitions={draft:["draft","active","archived"],pending_review:["draft","active","archived"],active:["active","paused","fulfilled","archived"],paused:["paused","active","archived"],suspended:["suspended","archived"],fulfilled:["fulfilled","archived"],archived:["archived"],rejected:["rejected","archived"]};
+    if(!(allowedListingTransitions[currentLifecycleStatus]||[]).includes(lifecycleStatus)) throw error(409,"Invalid service listing lifecycle transition.","INVALID_STATE");
+    if(currentLifecycleStatus==="suspended"&&lifecycleStatus==="active") throw error(403,"Only an authorized moderator may clear a moderation suspension.","MODERATION_CLEARANCE_REQUIRED");
     const legacyStatus=status==="fulfilled"||status==="archived"?"closed":status;
-    const lifecycleStatus=status==="published"?"active":status==="paused"?"suspended":status==="closed"?"archived":status;
     const updated=(await db.query("update service_listing set status=$1,lifecycle_status=$2,updated_at=now() where id=$3 returning *",[legacyStatus,lifecycleStatus,listingId])).rows[0];
     if(row.lifecycle_status!==lifecycleStatus){
       await db.query("insert into service_listing_lifecycle_event(listing_id,actor_user_id,from_status,to_status,reason,request_id) values($1,$2,$3,$4,$5,$6)",[listingId,userId,row.lifecycle_status||null,lifecycleStatus,String(reason||`Legacy status transition ${row.status} -> ${status}`).trim(),requestId]);

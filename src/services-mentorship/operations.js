@@ -20,7 +20,7 @@ async function eligibleMentor(db,userId){
   fail(403,"Only an active, approved, verified mentor with current membership can use this workflow.","MENTOR_NOT_ELIGIBLE");
  const verified=(await db.query("select 1 from verification_claim vc join verification_case c on c.id=vc.case_id where c.subject_user_id=$1 and vc.status='verified' and lower(vc.claim_code_snapshot)=any($2::text[]) limit 1",[userId,["professional_certification","education","employment","experience","service_capability"]])).rowCount;
  if(!verified)fail(403,"A verified professional claim is required for this workflow.","PROFESSIONAL_VERIFICATION_REQUIRED");
- const activeCount=Number((await db.query("select count(*)::int count from mentorship where mentor_user_id=$1 and status='active'",[userId])).rows[0]?.count||0);
+ const activeCount=Number((await db.query("select count(*)::int count from mentorship where mentor_user_id=$1 and status in ('active','paused')",[userId])).rows[0]?.count||0);
  if(activeCount>=Number(profile.max_active_mentees||3))fail(409,"Your current active mentorship capacity is full. Update capacity through the governed profile workflow before expressing further interest.","MENTOR_CAPACITY_FULL");
  return profile;
 }

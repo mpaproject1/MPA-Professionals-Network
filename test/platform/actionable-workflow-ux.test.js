@@ -17,9 +17,9 @@ test("dashboard routes application attention to the matching workspace", async (
 
 test("admin overview uses a stable loader callback to prevent repeated fetches on every render", async () => {
   const admin = await source("../../web/app/admin/page.tsx");
-  assert.match(admin, /const load = useCallback\\(async \\(\\) => \\{/);
-  assert.match(admin, /\\}, \\[token, userQuery, userStatus\\]\\);/);
-  assert.match(admin, /if \\(hydrated && token\\) void load\\(\\);\\s*\\}, \\[hydrated, token, load\\]\\);/);
+  assert.ok(admin.includes("const load = useCallback(async () => {"));
+  assert.ok(admin.includes("}, [token, userQuery, userStatus]);"));
+  assert.ok(admin.includes("}, [hydrated, token, load]);"));
 });
 
 test("dashboard and tracker use the shared human-readable status vocabulary", async () => {

@@ -307,3 +307,36 @@ test("member and organization catalogues do not expose unsupported lifecycle mut
   assert.ok(reportTest.includes("the unique marker should match only the seeded audit event"));
   assert.ok(reportTest.includes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
 });
+
+
+test("organization membership administration uses explicit authority, reasoned audited actions and owner protection", async () => {
+  const [page, service, server] = await Promise.all([
+    source("../../web/app/admin/organizations/page.tsx"),
+    source("../../src/organization-jobs/service.js"),
+    source("../../server.js"),
+  ]);
+  assert.ok(page.includes("/api/v1/admin/organizations/"+ "PLACEHOLDER") === false, "admin membership URLs are built from the selected organization and account IDs");
+  assert.ok(page.includes("/members/"));
+  assert.ok(page.includes("window.confirm"));
+  assert.ok(page.includes("Audit reason (required)"));
+  assert.ok(page.includes("Add member with audit trail"));
+  assert.ok(page.includes("Save membership change"));
+  assert.ok(service.includes("function assertOrganizationAdminMutation"));
+  assert.ok(service.includes("requireAdminMembershipReason"));
+  assert.ok(service.includes("organization.membership.admin_added"));
+  assert.ok(service.includes("organization.membership.admin_updated"));
+  assert.ok(service.includes("OWNER_PROTECTED"));
+  assert.ok(server.includes("organizationJobs.adminAddOrganizationUser"));
+  assert.ok(server.includes("organizationJobs.adminUpdateOrganizationUser"));
+});
+
+test("reference-data publication is reasoned and confirmed, with searchable paginated working-copy items", async () => {
+  const page = await source("../../web/app/admin/reference-portfolio/page.tsx");
+  assert.ok(page.includes("const visibleItems=useMemo"));
+  assert.ok(page.includes("const paginatedItems=useMemo"));
+  assert.ok(page.includes("Showing {visibleItems.length"));
+  assert.ok(page.includes("Publication reason (required)"));
+  assert.ok(page.includes("window.confirm"));
+  assert.ok(page.includes("body:JSON.stringify({reason})"));
+  assert.ok(page.includes("Publication confirmed by the server"));
+});

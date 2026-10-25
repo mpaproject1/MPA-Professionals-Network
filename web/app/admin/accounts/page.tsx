@@ -33,6 +33,7 @@ export default function AdminAccountsPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const identity = token ? claimsFromToken(token) : { roles: [], userId: "" };
+  const roleKey = identity.roles.join("|");
   const isPlatformAdmin = identity.roles.some((role) => ["system_admin", "admin", "platform_admin"].includes(role));
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
@@ -49,7 +50,7 @@ export default function AdminAccountsPage() {
       if (!rows) throw new Error("The account service returned an unexpected response. No account count is being inferred.");
       const roles = Array.isArray(rolePayload) ? rolePayload : Array.isArray(rolePayload?.roles) ? rolePayload.roles : [];
       setUsers(rows as ManagedUser[]); setRoleCatalog(roles as ManagedRole[]);
-      if (identity.roles.includes("system_admin")) {
+      if (roleKey.split("|").includes("system_admin")) {
         const settled = await Promise.allSettled([
           api<ManagedPermission[]>("/api/v1/admin/permissions", {}, token),
           api<any>("/api/v1/admin/audit-log?limit=100", {}, token),
@@ -65,7 +66,7 @@ export default function AdminAccountsPage() {
       setLoadFailed(true);
       setError(cause instanceof Error ? cause.message : "Account and team data could not be loaded.");
     } finally { setLoading(false); }
-  }, [token, identity.roles.join("|")]);
+  }, [token, roleKey]);
 
   useEffect(() => { if (hydrated && token) void load(); }, [hydrated, token, load]);
 

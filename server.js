@@ -19,6 +19,7 @@ import {authorizePrivateUpload, confirmPrivateUpload, MAX_PRIVATE_UPLOAD_BYTES, 
 import * as publicOpportunity from "./src/platform/public-opportunity.js";
 import * as referencePortfolio from "./src/platform/reference-portfolio.js";
 import * as reports from "./src/platform/reports.js";
+import * as serveCommunityImpactReports from "./src/platform/serve-community-impact-reports.js";
 import * as savedDiscoveryItems from "./src/platform/saved-discovery-items.js";
 import {enforcePersistentRateLimit, issueHumanChallenge, verifyHumanChallenge} from "./src/platform/security-controls.js";
 import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
@@ -222,6 +223,28 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/me/report-saved-views") { const identity=await auth(req); return ok(res,await reports.listSavedViews(identity),requestId); }
     if(req.method==="POST" && p==="api/v1/me/report-saved-views") { const identity=await auth(req); return ok(res,await reports.saveSavedView(identity,await body(req),requestId),requestId,201); }
     if(req.method==="DELETE" && parts.length===5 && p.startsWith("api/v1/me/report-saved-views/")) { const identity=await auth(req); return ok(res,await reports.deleteSavedView(identity,parts[4],requestId),requestId); }
+    if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/services/listings/") && parts[5]==="impact-report") {
+      const identity=await auth(req),q=query(req.url);
+      const result=await serveCommunityImpactReports.runImpactReport(identity,parts[4],{from:q.get("from"),to:q.get("to")},requestId,q.get("view")||"owner");
+      return ok(res,result,requestId);
+    }
+    if(req.method==="GET" && parts.length===7 && p.startsWith("api/v1/services/listings/") && parts[5]==="impact-report" && parts[6]==="export") {
+      const identity=await auth(req),q=query(req.url),view=q.get("view")||"owner";
+      const result=await serveCommunityImpactReports.runImpactReport(identity,parts[4],{from:q.get("from"),to:q.get("to")},requestId,view);
+      const rows=[];
+      for(const [key,value] of Object.entries(result.metrics)) rows.push({Section:"Impact metrics",Measure:key,Period:"Selected period",Value:value.value===null?"Suppressed":value.value,Suppressed:value.suppressed?"Yes":"No"});
+      for(const item of result.monthlySummary) rows.push({Section:"Time summary",Measure:"Activity records",Period:item.month,Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
+      for(const item of result.feedbackCompletionByCategory) rows.push({Section:"Feedback completion",Measure:item.category,Period:"Selected period",Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
+      for(const item of result.milestoneActivity) rows.push({Section:"Milestone activity",Measure:item.milestoneType,Period:"Selected period",Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
+      for(const item of result.decisionAudit||[]) rows.push({Section:"Governance decisions",Measure:item.decision,Period:item.latestAt?new Date(item.latestAt).toISOString():"Selected period",Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
+      const exportData={report:{title:result.title,scope:view==="governance"?"Restricted governance aggregates":"Listing-owner privacy-safe aggregates",definition:result.suppressionPolicy,columns:["Section","Measure","Period","Value","Suppressed"]},generatedAt:result.generatedAt,filters:{...result.filters,listingId:parts[4],view},totals:{rows:rows.length,minimumGroupSize:result.minimumGroupSize},rows};
+      const format=q.get("format")||"pdf";
+      if(!["pdf","xlsx"].includes(format)) throw Object.assign(new Error("Choose PDF or XLSX export format."),{statusCode:400,code:"INVALID_EXPORT_FORMAT"});
+      const buffer=format==="pdf"?reports.makePdf(exportData):reports.makeXlsx(exportData);
+      await getPool().query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'service_listing',$3,$4,'success',$5)",[identity.sub,view==="governance"?"serve_community.impact_governance_report_exported":"serve_community.impact_report_exported",parts[4],requestId,JSON.stringify({format,view,rows:rows.length,minimumGroupSize:result.minimumGroupSize})]);
+      res.writeHead(200,{"content-type":format==="pdf"?"application/pdf":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":`attachment; filename=serve-community-impact-${new Date().toISOString().slice(0,10)}.${format}`,"content-length":String(buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId});
+      return res.end(buffer);
+    }
     if(req.method==="GET" && p==="api/v1/admin/reports") { const identity=await auth(req); return ok(res,reports.listReportCatalogue(identity),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/admin/reports/") && parts[5]==="run") { const identity=await auth(req); return ok(res,await reports.runReport(identity,parts[4],await body(req),requestId),requestId); }
     if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/admin/reports/") && parts[5]==="export") { const identity=await auth(req),q=query(req.url),out=await reports.exportReport(identity,parts[4],{from:q.get("from"),to:q.get("to"),status:q.get("status"),q:q.get("q"),groupBy:q.get("groupBy")},q.get("format")||"pdf",requestId); res.writeHead(200,{"content-type":out.contentType,"content-disposition":`attachment; filename=${out.filename}`,"content-length":String(out.buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId}); return res.end(out.buffer); }

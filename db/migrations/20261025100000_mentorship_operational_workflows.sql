@@ -86,7 +86,7 @@ ALTER TABLE notification_outbox
   ADD COLUMN IF NOT EXISTS delivery_event_type text;
 ALTER TABLE notification_outbox DROP CONSTRAINT IF EXISTS notification_outbox_delivery_status_check;
 ALTER TABLE notification_outbox ADD CONSTRAINT notification_outbox_delivery_status_check
-  CHECK (delivery_status IN ('unknown','queued','sent','delivered','failed'));
+  CHECK (delivery_status IN ('unknown','queued','sent','delivered','failed','cancelled'));
 CREATE INDEX IF NOT EXISTS ix_notification_outbox_delivery_status
   ON notification_outbox(delivery_status, updated_at DESC);
 COMMENT ON COLUMN notification_outbox.delivery_status IS

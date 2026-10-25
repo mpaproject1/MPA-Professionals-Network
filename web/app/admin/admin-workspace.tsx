@@ -53,7 +53,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const navDestinations = useMemo(() => {
     const platformAdmin = Boolean(roles?.some((role) => ["system_admin", "admin", "platform_admin"].includes(role)));
     const organizationWorkspaceAllowed = Boolean(roles?.some((role) => ["system_admin", "reviewer"].includes(role)));
-    const available = destinations.filter((item) => item.href !== "/organizations" || organizationWorkspaceAllowed);
+    const available = destinations.filter((item) => (item.href !== "/organizations" || organizationWorkspaceAllowed) && (!["/admin/accounts", "/admin/experience"].includes(item.href) || platformAdmin));
     if (platformAdmin || !roles?.includes("supporting_staff")) return available;
     const priority: Record<string, number> = { "/admin": 0, "/admin/marketplace": 1, "/organizations": 2, "/admin/support": 3 };
     return [...available].sort((a, b) => (priority[a.href] ?? 10) - (priority[b.href] ?? 10));

@@ -45,11 +45,6 @@ BEGIN
       CHECK ((requester_outcome_decision IS NULL AND requester_outcome_decision_by IS NULL AND requester_outcome_decision_at IS NULL)
           OR (requester_outcome_decision IS NOT NULL AND requester_outcome_decision_by IS NOT NULL AND requester_outcome_decision_at IS NOT NULL));
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='service_request_completion_submitter_check') THEN
-    ALTER TABLE service_request ADD CONSTRAINT service_request_completion_submitter_check
-      CHECK ((provider_completed_at IS NULL AND provider_completion_submitted_by IS NULL)
-          OR (provider_completed_at IS NOT NULL AND provider_completion_submitted_by IS NOT NULL));
-  END IF;
 END $$;
 
 CREATE TABLE IF NOT EXISTS service_request_completion_event (

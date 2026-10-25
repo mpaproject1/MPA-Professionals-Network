@@ -255,3 +255,54 @@ test("professional directory inquiries use server-backed idempotency and clear r
   assert.ok(page.includes("Check submission again"));
   assert.ok(page.includes("Inquiry status:"));
 });
+
+
+test("admin queues use authoritative report counts and moderation/support lists implement search and pagination", async () => {
+  const [admin, moderation, supportPage, supportService, server] = await Promise.all([
+    source("../../web/app/admin/page.tsx"),
+    source("../../web/app/admin/marketplace/page.tsx"),
+    source("../../web/app/admin/support/page.tsx"),
+    source("../../src/platform/support-bot.js"),
+    source("../../server.js"),
+  ]);
+  assert.ok(admin.includes("/api/v1/admin/reports/support-demand-response/run"));
+  assert.ok(admin.includes('report.id === "support-demand-response"'));
+  assert.ok(admin.includes("will not substitute zero or a partial page count"));
+  assert.ok(admin.includes("Unreviewed work items"));
+  assert.ok(moderation.includes("const visibleDemands=useMemo"));
+  assert.ok(moderation.includes("const visibleListings=useMemo"));
+  assert.ok(moderation.includes("paginatedDemands.map"));
+  assert.ok(moderation.includes("paginatedListings.map"));
+  assert.ok(moderation.includes("Showing {visibleDemands.length"));
+  assert.ok(moderation.includes("Showing {visibleListings.length"));
+  assert.ok(supportPage.includes("offset=${inquiryPage*25}"));
+  assert.ok(supportPage.includes("q=${encodeURIComponent(inquirySearch.trim())}"));
+  assert.ok(supportPage.includes("hasMoreInquiries"));
+  assert.ok(supportService.includes("limit $4 offset $6"));
+  assert.ok(supportService.includes("const search=String(filters.q||\"\")"));
+  assert.ok(supportService.includes("case when c.consent_to_contact then coalesce(c.contact_name"));
+  assert.ok(server.includes('offset:q.get("offset")||"0",q:q.get("q")||""'));
+});
+
+test("member and organization catalogues do not expose unsupported lifecycle mutations", async () => {
+  const [members, organizations, server, reports, reportTest] = await Promise.all([
+    source("../../web/app/admin/members/catalog/page.tsx"),
+    source("../../web/app/admin/organizations/page.tsx"),
+    source("../../server.js"),
+    source("../../src/platform/reports.js"),
+    source("../../test/platform/reports-acceptance.test.js"),
+  ]);
+  assert.ok(members.includes("This directory is read-only"));
+  assert.ok(members.includes('href="/admin/membership"') === false, "catalogue must not imply a deep-linked member mutation contract");
+  assert.ok(!members.includes("method:"));
+  assert.ok(organizations.includes("This catalogue is read-only"));
+  assert.ok(!organizations.includes("method:"));
+  assert.ok(server.includes('p==="api/v1/admin/members/catalog"'));
+  assert.ok(server.includes('p==="api/v1/admin/organizations"'));
+  assert.ok(server.includes('p==="api/v1/organizations/") && parts[4]==="users"'), "existing organization-member mutations are organization-scoped, not platform-admin endpoints");
+  assert.ok(reports.includes('id:"support-demand-response"'));
+  assert.ok(reports.includes('id:"audit-activity"'));
+  assert.ok(reports.includes("'report.exported'"));
+  assert.ok(reportTest.includes("the unique marker should match only the seeded audit event"));
+  assert.ok(reportTest.includes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+});

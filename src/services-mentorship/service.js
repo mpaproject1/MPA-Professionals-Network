@@ -728,6 +728,7 @@ export async function createServiceRequestUpdate(requestId,userId,input,requestI
  return withTransaction(async db=>{
   const request=(await db.query("select * from service_request where id=$1 for update",[requestId])).rows[0];
   if(!request)throw error(404,"Service request not found.","NOT_FOUND");
+  if(!["requested","accepted","in_progress","disputed"].includes(request.status))throw error(409,"Operational updates are available only while the service request is open.","SERVICE_REQUEST_NOT_OPEN");
   const providerActor=await isServiceProviderActor(db,requestId,userId);
   if(request.requester_user_id!==userId&&!providerActor)throw error(403,"Only the requester or authorized provider-side participant can add an operational update.","FORBIDDEN");
   const existing=(await db.query("select * from service_request_update where request_idempotency_hash=$1 for update",[keyHash])).rows[0];

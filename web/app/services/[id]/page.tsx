@@ -1,27 +1,48 @@
 "use client";
-import {ArrowLeft,Bookmark,RefreshCw} from "lucide-react";
+import {ArrowLeft,Bookmark} from "lucide-react";
 import Link from "next/link";
 import {useParams} from "next/navigation";
 import {useCallback,useEffect,useState} from "react";
-import { OperationStatus } from "../../../components/operation-status";
-import {Badge, Card} from "../../../components/ui";
-import {ApiError, api} from "../../../lib/api";
+import {OperationStatus} from "../../../components/operation-status";
+import {Badge,Card} from "../../../components/ui";
+import {ApiError,api} from "../../../lib/api";
+import {useUiStore} from "../../../lib/store";
 import {useSavedDiscoveryItems} from "../../../lib/use-saved-discovery-items";
 
-type Service={id:string;title:string;description:string;service_category:string;delivery_mode?:string;location_label?:string;pricing_model:string;price_amount?:number|string|null;currency?:string|null;provider_name?:string|null;display_name?:string|null};
+type Service={id:string;title:string;description:string;service_category:string;delivery_mode?:string;location_label?:string;pricing_model:string;price_amount?:number|string|null;reference_price_amount?:number|string|null;impact_model?:string;lifecycle_status?:string;expires_at?:string|null;currency?:string|null;provider_name?:string|null;display_name?:string|null;organizations_interested?:number;users_interested?:number;users_pledged?:number;organizations_pledged?:number;agreed_services?:number;active_deliveries?:number;verified_outcomes?:number};
+function impactLabel(model?:string):string{return model==="pro_bono"?"100% Pro-Bono / Impact":model==="community_discount"?"Community Discounted Rate":model==="capacity_grant"?"Capacity Grant":"Community service";}
+function lifecycleLabel(item:Service):string{const status=item.lifecycle_status||"active";if(status==="active")return item.expires_at?"Active until "+new Date(item.expires_at).toLocaleDateString():"Ongoing · no expiry";if(status==="fulfilled")return "Fulfilled";if(status==="archived")return "Archived";if(status==="pending_review")return "Under review";if(status==="paused")return "Paused";if(status==="suspended")return "Temporarily suspended";return status.replaceAll("_"," ");}
+function priceLabel(item:Service):string{if(item.pricing_model==="quote")return "Request a quote";if(item.pricing_model==="free")return "Free";return item.price_amount!=null?(item.currency||"")+" "+Number(item.price_amount).toLocaleString()+" · "+item.pricing_model:item.pricing_model;}
+function createSubmissionKey():string{if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function")throw new Error("Secure submission is unavailable. Reload and try again.");return crypto.randomUUID()+crypto.randomUUID();}
 export default function PublicServiceProfile(){
- const params=useParams<{id:string}>();const id=String(params.id||"");const saved=useSavedDiscoveryItems();
- const [item,setItem]=useState<Service|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
- const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Service>(`/api/v1/services/${encodeURIComponent(id)}`));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This service listing is unavailable to your account.");}finally{setLoading(false);}},[id]);
+ const params=useParams<{id:string}>();const id=String(params.id||"");const saved=useSavedDiscoveryItems();const token=useUiStore(s=>s.token);
+ const [item,setItem]=useState<Service|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");const [notice,setNotice]=useState("");
+ const [interestBusy,setInterestBusy]=useState(false),[pledgeBusy,setPledgeBusy]=useState(false),[pledgeDescription,setPledgeDescription]=useState(""),[pledgeKey,setPledgeKey]=useState("");
+ const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Service>("/api/v1/services/"+encodeURIComponent(id)));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This service listing is unavailable to your account.");}finally{setLoading(false);}},[id]);
  useEffect(()=>{void load();},[load]);
+ async function expressInterest(){if(!token){setError("Sign in to express interest in this service.");return;}setInterestBusy(true);setError("");setNotice("");try{await api("/api/v1/services/"+encodeURIComponent(id)+"/interest",{method:"POST",body:JSON.stringify({})},token);setNotice("Your interest has been recorded. This is not a pledge or a service request.");await load();}catch(e){setError(e instanceof ApiError?e.message:"Your interest could not be confirmed. Retry to check whether it was recorded.");}finally{setInterestBusy(false);}}
+ async function submitPledge(e:React.FormEvent){e.preventDefault();if(!token){setError("Sign in to pledge support.");return;}if(pledgeDescription.trim().length<4){setError("Describe your pledge in at least four characters.");return;}setPledgeBusy(true);setError("");setNotice("");try{const key=pledgeKey||createSubmissionKey();setPledgeKey(key);await api("/api/v1/services/"+encodeURIComponent(id)+"/pledges",{method:"POST",headers:{"X-Idempotency-Key":key},body:JSON.stringify({description:pledgeDescription.trim()})},token);setNotice("Your pledge was submitted for provider review. It is not yet an agreed service.");setPledgeDescription("");setPledgeKey("");await load();}catch(e){setError(e instanceof ApiError?e.message:"Your pledge could not be confirmed. Retry without changing the pledge to safely retrieve the result.");}finally{setPledgeBusy(false);}}
  return <main className="grid" style={{gap:18}}><Link href="/services" className="btn btn-ghost"><ArrowLeft size={16}/> Back to services</Link>
- {loading?<Card><OperationStatus state="loading" title="Loading service details" detail="We’re retrieving the selected published service, its provider and pricing details. No request is being submitted." /></Card>
- :error?<Card><h1 className="h2">Service unavailable</h1><p role="alert" className="form-error">{error}</p><button className="btn btn-primary" type="button" onClick={()=>void load()}>Retry</button></Card>
- :item&&<Card><div className="row"><div style={{flex:1,minWidth:0}}><Badge>{item.service_category}</Badge><h1 className="h1" style={{marginTop:10}}>{item.title}</h1><p className="tagline">Provider: {item.display_name||item.provider_name||"Verified provider"}</p></div><button className="btn btn-ghost" type="button" disabled={!saved.signedIn||saved.isSaving("service",item.id)} aria-pressed={saved.isSaved("service",item.id)} onClick={()=>void saved.toggle("service",item.id)}><Bookmark size={16}/>{saved.isSaved("service",item.id)?"Saved":"Save service"}</button></div>
+ {loading?<Card><OperationStatus state="loading" title="Loading service details" detail="We’re retrieving the published service, verified provider and persisted impact records. No request is being submitted."/></Card>
+ :error&&!item?<Card><h1 className="h2">Service unavailable</h1><p role="alert" className="form-error">{error}</p><button className="btn btn-primary" type="button" onClick={()=>void load()}>Retry</button></Card>
+ :item&&<Card><div className="row" style={{alignItems:"flex-start"}}><div style={{flex:1,minWidth:0}}><div className="row" style={{gap:8,flexWrap:"wrap"}}><Badge>{item.service_category}</Badge><Badge>{impactLabel(item.impact_model)}</Badge></div><h1 className="h1" style={{marginTop:10}}>{item.title}</h1><p className="tagline">Provider: {item.display_name||item.provider_name||"Verified provider"}</p></div><button className="btn btn-ghost" type="button" disabled={!saved.signedIn||saved.isSaving("service",item.id)} aria-pressed={saved.isSaved("service",item.id)} onClick={()=>void saved.toggle("service",item.id)}><Bookmark size={16}/>{saved.isSaved("service",item.id)?"Saved":"Save service"}</button></div>
  <p className="muted" style={{whiteSpace:"pre-wrap",marginTop:16}}>{item.description}</p>
- <p className="tagline">{(item.delivery_mode||"remote").replaceAll("_"," ")}{item.location_label?` · ${item.location_label}`:""}</p>
- <p className="tagline">Pricing: {item.pricing_model==="quote"?"Request a quote":item.pricing_model==="free"?"Free":item.price_amount!=null?`${String(item.currency||"")} ${Number(item.price_amount).toLocaleString()} · ${item.pricing_model}`:item.pricing_model}</p>
- <p className="muted">To send a request, return to the services workspace and select this listing. The provider must accept the request before delivery begins.</p>
- <Link className="btn btn-primary" href="/services">Open services workspace</Link>{saved.savedError&&<p role="status" className="form-error">{saved.savedError}</p>}</Card>}
+ <p className="tagline">{(item.delivery_mode||"remote").replaceAll("_"," ")}{item.location_label?" · "+item.location_label:""}</p>
+ <p className="tagline">Pricing: {priceLabel(item)}{item.impact_model==="community_discount"&&Number(item.reference_price_amount)>Number(item.price_amount)&&<span> · Standard {item.currency||""} {Number(item.reference_price_amount).toLocaleString()} · {Math.round((1-Number(item.price_amount)/Number(item.reference_price_amount))*100)}% community discount</span>}</p>
+ <p className="tagline">Program status: {lifecycleLabel(item)}</p>
+ <div className="grid grid-2" style={{gap:8,marginTop:16}}>
+ <div className="case-row"><b>{Number(item.organizations_interested||0).toLocaleString()}</b><small className="muted">Organizations interested</small></div>
+ <div className="case-row"><b>{Number(item.users_interested||0).toLocaleString()}</b><small className="muted">Users interested</small></div>
+ <div className="case-row"><b>{Number(item.users_pledged||0).toLocaleString()} users · {Number(item.organizations_pledged||0).toLocaleString()} organizations</b><small className="muted">Pledged support</small></div>
+ <div className="case-row"><b>{Number(item.agreed_services||0).toLocaleString()}</b><small className="muted">Agreed services</small></div>
+ <div className="case-row"><b>{Number(item.active_deliveries||0).toLocaleString()}</b><small className="muted">Active deliveries</small></div>
+ {Number(item.verified_outcomes||0)>0&&<div className="case-row"><b>{Number(item.verified_outcomes).toLocaleString()}</b><small className="muted">Verified outcomes</small></div>}
+ </div>
+ {notice&&<p role="status" className="form-success">{notice}</p>}{error&&<p role="alert" className="form-error">{error}</p>}{saved.savedError&&<p role="status" className="form-error">{saved.savedError}</p>}
+ <div className="row" style={{gap:8,marginTop:16,flexWrap:"wrap"}}><button className="btn btn-ghost" type="button" disabled={interestBusy} onClick={()=>void expressInterest()}>{interestBusy?"Recording…":"Express Interest"}</button><Link className="btn btn-primary" href={"/services?serviceId="+encodeURIComponent(item.id)+"#service-request"}>Request Service</Link></div>
+ {!token&&<p className="muted">Sign in to express interest or pledge support. A request, a pledge and an expression of interest are recorded separately.</p>}
+ <details style={{marginTop:12}}><summary className="btn btn-ghost" style={{display:"inline-flex",cursor:"pointer"}}>Pledge Support</summary><form className="form-stack" style={{marginTop:12}} onSubmit={submitPledge}><label>What support can you contribute?<textarea rows={3} minLength={4} maxLength={2000} required value={pledgeDescription} onChange={e=>{setPledgeKey("");setPledgeDescription(e.target.value);}} placeholder="Describe resources, expertise or capacity you can offer."/></label><button className="btn btn-primary" type="submit" disabled={pledgeBusy}>{pledgeBusy?"Submitting…":"Submit pledge"}</button></form></details>
+ <p className="muted" style={{marginTop:12}}>Interest, pledges, agreed services and active deliveries are separate measures. Only persisted eligible records contribute to the counts; anonymous page views do not.</p>
+ </Card>}
  </main>;
 }

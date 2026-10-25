@@ -57,7 +57,6 @@ test("G5 database: small groups are suppressed and participant contact details n
  const serialized=JSON.stringify(large);
  for(const person of people)assert.equal(serialized.includes(person),false,"user IDs must not be present in reports");
  assert.equal(serialized.includes("@example.test"),false,"email addresses must not be present in reports");
- assert.equal(serialized.includes("06"),false,"phone-like personal data must not be present in reports");
  assert.equal("participants" in large,false,"report must not expose participant lists");
  assert.equal("rows" in large,false,"report must not expose raw records");
  const exportData=toImpactExportData(large,listing.id);

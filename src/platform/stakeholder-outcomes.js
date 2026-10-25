@@ -29,11 +29,11 @@ export async function getOrganizationOutcomeWorkspace(orgId,userId){
   const membership=(await db.query("select role_code from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[orgId,userId])).rows[0];
   if(!membership || !["owner","administrator","recruiter","read_only","finance","project_manager","event_manager"].includes(membership.role_code)) throw fail(403,"You do not have access to this organization outcome workspace.","FORBIDDEN");
   const jobs=(await db.query(`select j.id,j.title,j.status,j.posting_scope,j.positions_count,j.published_at,j.closed_at,
-    count(a.id)::int applications,
-    count(a.id) filter(where a.status in ('screening','shortlisted','interview'))::int active_pipeline,
-    count(a.id) filter(where a.status='offer')::int offers,
-    count(a.id) filter(where a.status='accepted')::int accepted_offers,
-    count(a.id) filter(where a.status='hired')::int hires,
+    count(distinct a.id)::int applications,
+    count(distinct a.id) filter(where a.status in ('screening','shortlisted','interview'))::int active_pipeline,
+    count(distinct a.id) filter(where a.status='offer')::int offers,
+    count(distinct a.id) filter(where a.status='accepted')::int accepted_offers,
+    count(distinct a.id) filter(where a.status='hired')::int hires,
     count(distinct ji.id) filter(where ji.status in ('scheduled','confirmed'))::int scheduled_interviews
     from job j left join job_application a on a.job_id=j.id left join job_interview ji on ji.application_id=a.id
     where j.organization_id=$1 group by j.id order by j.created_at desc`,[orgId])).rows;

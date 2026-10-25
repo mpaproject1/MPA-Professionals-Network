@@ -161,6 +161,9 @@ export async function changeServiceListingStatus(listingId,userId,status,request
     const row=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row) throw error(404,"Service listing not found.","NOT_FOUND");
     const organization=await assertServiceListingAccess(db,row,userId);
+    const currentLifecycleStatus=row.lifecycle_status||({published:"active",paused:"paused",closed:"archived"}[row.status]||"draft");
+    const requestedLifecycleStatus=status==="published"?"active":status==="paused"?"paused":status==="closed"?"archived":status;
+    if(currentLifecycleStatus===requestedLifecycleStatus && (status!=="published"||row.moderation_status==="approved")) return {...row,idempotent:true};
     if(row.status==="closed" && !["closed","archived"].includes(status)) throw error(409,"Closed service listings cannot be reopened.","INVALID_STATE");
     if(["fulfilled","archived","closed"].includes(status) && String(reason||"").trim().length<4) throw error(400,"A reason of at least four characters is required to fulfil or archive a listing.","LIFECYCLE_REASON_REQUIRED");
     if(status==="published" && row.moderation_status!=="approved"){
@@ -177,8 +180,7 @@ export async function changeServiceListingStatus(listingId,userId,status,request
     }
     if(status==="published" && row.organization_id && organization?.verification_status!=="verified") throw error(409,"The organization must be verified before it can publish a service listing.","ORGANIZATION_NOT_VERIFIED");
     if(status==="published" && !row.organization_id && !(await activeMember(db,userId))) throw error(403,"A current active membership is required to publish a service.","MEMBERSHIP_REQUIRED");
-    const currentLifecycleStatus=row.lifecycle_status||({published:"active",paused:"paused",closed:"archived"}[row.status]||"draft");
-    const lifecycleStatus=status==="published"?"active":status==="paused"?"paused":status==="closed"?"archived":status;
+    const lifecycleStatus=requestedLifecycleStatus;
     const allowedListingTransitions={draft:["draft","active","archived"],pending_review:["draft","active","archived"],active:["active","paused","fulfilled","archived"],paused:["paused","active","archived"],suspended:["suspended","archived"],fulfilled:["fulfilled","archived"],archived:["archived"],rejected:["rejected","archived"]};
     if(!(allowedListingTransitions[currentLifecycleStatus]||[]).includes(lifecycleStatus)) throw error(409,"Invalid service listing lifecycle transition.","INVALID_STATE");
     if(currentLifecycleStatus==="suspended"&&lifecycleStatus==="active") throw error(403,"Only an authorized moderator may clear a moderation suspension.","MODERATION_CLEARANCE_REQUIRED");

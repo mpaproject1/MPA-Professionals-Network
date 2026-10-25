@@ -571,6 +571,57 @@ export async function listOrganizationUsers(orgId,actorUserId){
  return (await db.query("select om.user_id,om.role_code,om.status,om.joined_at,p.display_name,u.email from organization_membership om join app_user u on u.id=om.user_id left join person p on p.user_id=u.id where om.organization_id=$1 order by om.created_at",[orgId])).rows;
 }
 
+function assertOrganizationAdminMutation(identity){
+ const roles=Array.isArray(identity?.roles)?identity.roles:[];
+ const permissions=Array.isArray(identity?.permissions)?identity.permissions:[];
+ if(!roles.some(role=>["system_admin","admin"].includes(role))&&!permissions.includes("organizations.manage"))throw error(403,"Organization membership administration requires explicit platform organization-management authority.","FORBIDDEN");
+ if(!identity?.sub)throw error(403,"A signed-in administrator is required.","FORBIDDEN");
+}
+const ADMIN_ORG_ROLES=["administrator","recruiter","project_manager","event_manager","finance","read_only"];
+function requireAdminMembershipReason(input){const reason=String(input?.reason||"").trim();if(reason.length<8)throw error(400,"Provide an audit reason of at least 8 characters for this organization membership change.","AUDIT_REASON_REQUIRED");return reason.slice(0,1000);}
+export async function adminAddOrganizationUser(identity,orgId,input,requestId){
+ assertOrganizationAdminMutation(identity);
+ const reason=requireAdminMembershipReason(input),email=String(input?.email||"").trim().toLowerCase(),roleCode=String(input?.roleCode||"").trim();
+ if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))throw error(400,"Enter a valid account email address.","VALIDATION_ERROR");
+ if(!ADMIN_ORG_ROLES.includes(roleCode))throw error(400,"Choose a supported organization role. Ownership transfer uses a separate controlled workflow.","VALIDATION_ERROR");
+ return withTransaction(async db=>{
+  const org=(await db.query("select id,display_name from organization where id=$1 for update",[orgId])).rows[0];
+  if(!org)throw error(404,"Organization not found.","NOT_FOUND");
+  const target=(await db.query("select id,email from app_user where lower(email)=lower($1) and status='active'",[email])).rows[0];
+  if(!target)throw error(404,"No active account matches that email. Ask the person to register first; no membership was created.","ACCOUNT_NOT_FOUND");
+  const current=(await db.query("select * from organization_membership where organization_id=$1 and user_id=$2 for update",[orgId,target.id])).rows[0];
+  let row;
+  if(current){
+   if(current.role_code==="owner")throw error(409,"The organization owner cannot be changed here. Use a dedicated ownership-transfer workflow.","OWNER_PROTECTED");
+   if(current.status==="active")throw error(409,"This account already has active organization membership. Edit the existing membership instead.","MEMBERSHIP_EXISTS");
+   row=(await db.query("update organization_membership set role_code=$1,status='active',invited_by=$2,joined_at=coalesce(joined_at,now()),updated_at=now() where id=$3 returning *",[roleCode,identity.sub,current.id])).rows[0];
+   await audit(db,identity.sub,"organization.membership.admin_reactivated","organization_membership",row.id,requestId,{organizationId:orgId,userId:target.id,email:target.email,reason,previousRole:current.role_code,previousStatus:current.status,roleCode,status:"active"});
+  }else{
+   row=(await db.query("insert into organization_membership(organization_id,user_id,role_code,status,invited_by,joined_at) values($1,$2,$3,'active',$4,now()) returning *",[orgId,target.id,roleCode,identity.sub])).rows[0];
+   await audit(db,identity.sub,"organization.membership.admin_added","organization_membership",row.id,requestId,{organizationId:orgId,userId:target.id,email:target.email,reason,roleCode,status:"active"});
+  }
+  await queueWorkflowEmail(db,target.id,"organization.membership_added",{category:"organizations",title:"Organization workspace access granted",message:`An administrator granted you the ${roleCode.replace(/_/g," ")} role in ${org.display_name||"an organization"}.`,nextAction:"Open the organization workspace to review your access and assigned responsibilities.",actionUrl:"/organizations",eventVersion:row.id},"organization_membership",row.id);
+  return {organizationId:orgId,userId:target.id,email:target.email,roleCode:row.role_code,status:row.status,membershipId:row.id,audited:true};
+ });
+}
+export async function adminUpdateOrganizationUser(identity,orgId,userId,input,requestId){
+ assertOrganizationAdminMutation(identity);
+ const reason=requireAdminMembershipReason(input),roleCode=String(input?.roleCode||"").trim(),status=String(input?.status||"").trim();
+ if(!ADMIN_ORG_ROLES.includes(roleCode))throw error(400,"Choose a supported organization role. Ownership transfer uses a separate controlled workflow.","VALIDATION_ERROR");
+ if(!["active","suspended","removed"].includes(status))throw error(400,"Choose active, suspended or removed membership status.","VALIDATION_ERROR");
+ return withTransaction(async db=>{
+  const org=(await db.query("select id,display_name from organization where id=$1 for update",[orgId])).rows[0];
+  if(!org)throw error(404,"Organization not found.","NOT_FOUND");
+  const current=(await db.query("select om.*,u.email from organization_membership om join app_user u on u.id=om.user_id where om.organization_id=$1 and om.user_id=$2 for update of om",[orgId,userId])).rows[0];
+  if(!current)throw error(404,"Organization membership not found.","NOT_FOUND");
+  if(current.role_code==="owner")throw error(403,"The organization owner cannot be changed here. Use a dedicated ownership-transfer workflow.","OWNER_PROTECTED");
+  const updated=(await db.query("update organization_membership set role_code=$1,status=$2,updated_at=now() where id=$3 returning *",[roleCode,status,current.id])).rows[0];
+  await audit(db,identity.sub,"organization.membership.admin_updated","organization_membership",current.id,requestId,{organizationId:orgId,userId, email:current.email,reason,previousRole:current.role_code,previousStatus:current.status,roleCode,status});
+  if(current.status!==status||current.role_code!==roleCode)await queueWorkflowEmail(db,userId,"organization.membership_updated",{category:"organizations",title:"Organization workspace access updated",message:"An administrator updated your organization workspace role or access status.",nextAction:status==="active"?"Review your organization workspace access and responsibilities.":"Contact an organization owner if you believe your access was changed in error.",actionUrl:"/organizations",actionRequired:status!=="active",priority:status==="active"?"normal":"high",eventVersion:`${current.id}:${status}:${roleCode}`},"organization_membership",current.id);
+  return {organizationId:orgId,userId,email:current.email,roleCode:updated.role_code,status:updated.status,membershipId:updated.id,audited:true};
+ });
+}
+
 async function assertSystemAdmin(db,userId){
  const r=(await db.query("select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code='system_admin' limit 1",[userId])).rows[0];
  if(!r) throw error(403,"System administrator role required.","FORBIDDEN");

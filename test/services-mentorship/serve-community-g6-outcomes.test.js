@@ -96,6 +96,17 @@ test("G6 database: revision and dispute require fresh evidence and never silentl
  assert.deepEqual(history,["submitted","revision_requested","resubmitted","disputed","reopened","resubmitted","accepted"]);
 });
 
+test("G6 database: discounted paid completion remains separate from finance settlement",async()=>{
+ const f=await setupListing({impactModel:"community_discount",pricingModel:"fixed",priceAmount:50,referencePriceAmount:100});
+ const e=await startEngagement(f);
+ await submitAndAcceptDelivery(e);
+ await services.changeServiceRequestStatus(e.request.id,e.owner,"completed","The discounted service deliverables and outcome evidence are ready for requester review.","serve-g6-paid-submit-"+e.suffix);
+ await assert.rejects(services.acceptServiceCompletion(e.request.id,e.requester,"The delivered service meets the agreed success criteria and final outcome is accepted.","serve-g6-paid-unsettled-"+e.suffix),x=>x.code==="PAYMENT_NOT_SETTLED");
+ const state=(await f.db.query("select status,requester_accepted_at from service_request where id=$1",[e.request.id])).rows[0];
+ assert.equal(state.status,"in_progress");
+ assert.equal(state.requester_accepted_at,null,"outcome acceptance remains separate from finance verification");
+});
+
 test("G6 database: configured single-engagement fulfilment occurs only after requester acceptance",async()=>{
  const f=await setupListing();
  await services.configureServiceCompletionPolicy(f.listing.id,f.owner,{evidencePolicy:"accepted_delivery",fulfilmentRule:"single_engagement",fulfilmentTargetCount:1},"serve-g6-single-policy-"+f.suffix);

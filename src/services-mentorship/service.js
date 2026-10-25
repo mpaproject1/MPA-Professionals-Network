@@ -6,6 +6,17 @@ import { createInAppNotification } from "../platform/notifications.js";
 
 function hashValue(value){return createHash("sha256").update(value).digest("hex");}
 function hashPayload(value){return hashValue(JSON.stringify(value));}
+function validateImpactPricing({impactModel="standard",pricingModel,priceAmount,referencePriceAmount}) {
+ if(!["standard","pro_bono","community_discount","capacity_grant"].includes(impactModel)) throw error(400,"Unsupported impact model.","VALIDATION_ERROR");
+ const price=priceAmount===null||priceAmount===undefined||priceAmount===""?null:Number(priceAmount);
+ const reference=referencePriceAmount===null||referencePriceAmount===undefined||referencePriceAmount===""?null:Number(referencePriceAmount);
+ if(price!==null&&(!Number.isFinite(price)||price<0)) throw error(400,"Price must be a non-negative amount.","VALIDATION_ERROR");
+ if(reference!==null&&(!Number.isFinite(reference)||reference<0)) throw error(400,"Reference price must be a non-negative amount.","VALIDATION_ERROR");
+ if(impactModel==="pro_bono"&&(pricingModel!=="free"||(price!==null&&price!==0)||reference!==null)) throw error(400,"100% Pro-Bono / Impact requires a free offer and no reference-price claim.","INVALID_IMPACT_PRICING");
+ if(impactModel==="community_discount"&&(!["fixed","hourly"].includes(pricingModel)||price===null||price<=0||reference===null||reference<=price)) throw error(400,"Community Discounted Rate requires a positive listed price and a higher documented comparable reference price.","INVALID_IMPACT_PRICING");
+ if(impactModel==="capacity_grant"&&reference!==null) throw error(400,"Capacity Grant cannot claim a cash discount without a separately supported pricing model.","INVALID_IMPACT_PRICING");
+ return {impactModel,priceAmount:price,referencePriceAmount:reference};
+}
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
 const PROFESSIONAL_CLAIMS=["professional_certification","education","employment","experience","service_capability"];
 
@@ -112,9 +123,11 @@ export async function createServiceListing(userId,input,requestId,idempotencyKey
  const organizationId=input.organizationId||null;
  const expiryInput=input.expiresAt===undefined||input.expiresAt===null||input.expiresAt===""?null:new Date(input.expiresAt);
  if(expiryInput && (!Number.isFinite(expiryInput.getTime())||expiryInput.getTime()<=Date.now())) throw error(400,"Expiry must be a valid future date/time or left empty for no expiry.","INVALID_EXPIRY");
- const normalized={userId,organizationId,title:String(input.title||"").trim(),description:String(input.description||"").trim(),serviceCategory:String(input.serviceCategory||"").trim(),deliveryMode:input.deliveryMode||"remote",locationLabel:input.locationLabel||null,pricingModel:input.pricingModel||"quote",priceAmount:input.priceAmount??null,currency:input.currency||null,visibility:input.visibility||"members",maxActiveRequests:input.maxActiveRequests??null,expiresAt:expiryInput?expiryInput.toISOString():null};
+ const normalized={userId,organizationId,title:String(input.title||"").trim(),description:String(input.description||"").trim(),serviceCategory:String(input.serviceCategory||"").trim(),deliveryMode:input.deliveryMode||"remote",locationLabel:input.locationLabel||null,pricingModel:input.pricingModel||"quote",priceAmount:input.priceAmount??null,currency:input.currency||null,visibility:input.visibility||"members",maxActiveRequests:input.maxActiveRequests??null,expiresAt:expiryInput?expiryInput.toISOString():null,impactModel:input.impactModel||"standard",referencePriceAmount:input.referencePriceAmount??null};
  if(!normalized.title||!normalized.description||!normalized.serviceCategory) throw error(400,"title, description and serviceCategory are required.","VALIDATION_ERROR");
  if(!["free","fixed","hourly","quote"].includes(normalized.pricingModel)) throw error(400,"Unsupported pricing model.","VALIDATION_ERROR");
+ const impact=validateImpactPricing(normalized);
+ normalized.priceAmount=impact.priceAmount;normalized.referencePriceAmount=impact.referencePriceAmount;normalized.impactModel=impact.impactModel;
  const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
  return withTransaction(async db=>{
   const existing=(await db.query("select * from service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
@@ -130,7 +143,7 @@ export async function createServiceListing(userId,input,requestId,idempotencyKey
   } else {
    await requirePersonalProfessionalCapability(db,userId);
   }
-  const row=(await db.query("insert into service_listing(provider_user_id,organization_id,title,description,service_category,delivery_mode,location_label,pricing_model,price_amount,currency,visibility,max_active_requests,expires_at,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) on conflict do nothing returning *",[userId,organizationId,normalized.title,normalized.description,normalized.serviceCategory,normalized.deliveryMode,normalized.locationLabel,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.visibility,normalized.maxActiveRequests,normalized.expiresAt,keyHash,fingerprint])).rows[0];
+  const row=(await db.query("insert into service_listing(provider_user_id,organization_id,title,description,service_category,delivery_mode,location_label,pricing_model,price_amount,currency,visibility,max_active_requests,expires_at,impact_model,reference_price_amount,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) on conflict do nothing returning *",[userId,organizationId,normalized.title,normalized.description,normalized.serviceCategory,normalized.deliveryMode,normalized.locationLabel,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.visibility,normalized.maxActiveRequests,normalized.expiresAt,normalized.impactModel,normalized.referencePriceAmount,keyHash,fingerprint])).rows[0];
   if(!row){
    const raced=(await db.query("select * from service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
    if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different listing details. Start a new listing before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
@@ -148,7 +161,12 @@ export async function updateServiceListing(listingId,userId,input,requestId){
     if(row.status==="closed" || ["fulfilled","archived"].includes(row.lifecycle_status)) throw error(409,"Fulfilled or archived service listings cannot be edited or silently reopened.","INVALID_STATE");
     const expiryInput=input.expiresAt===undefined||input.expiresAt===null||input.expiresAt===""?null:new Date(input.expiresAt);
     if(expiryInput && (!Number.isFinite(expiryInput.getTime())||expiryInput.getTime()<=Date.now())) throw error(400,"Expiry must be a valid future date/time or left empty for no expiry.","INVALID_EXPIRY");
-    const updated=(await db.query("update service_listing set status='draft',lifecycle_status='draft',moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,title=coalesce($1,title),description=coalesce($2,description),service_category=coalesce($3,service_category),delivery_mode=coalesce($4,delivery_mode),location_label=coalesce($5,location_label),pricing_model=coalesce($6,pricing_model),price_amount=coalesce($7,price_amount),currency=coalesce($8,currency),visibility=coalesce($9,visibility),max_active_requests=coalesce($10,max_active_requests),expires_at=case when $11::boolean then null else coalesce($12,expires_at) end,updated_at=now() where id=$13 returning *",[input.title||null,input.description||null,input.serviceCategory||null,input.deliveryMode||null,input.locationLabel||null,input.pricingModel||null,input.priceAmount??null,input.currency||null,input.visibility||null,input.maxActiveRequests??null,input.clearExpiry===true,expiryInput?expiryInput.toISOString():null,listingId])).rows[0];
+    const impactModel=input.impactModel===undefined?row.impact_model||"standard":String(input.impactModel);
+    const pricingModel=input.pricingModel===undefined?row.pricing_model:input.pricingModel;
+    const priceAmount=input.priceAmount===undefined?row.price_amount:input.priceAmount;
+    const referencePriceAmount=input.referencePriceAmount===undefined?row.reference_price_amount:input.referencePriceAmount;
+    const impact=validateImpactPricing({impactModel,pricingModel,priceAmount,referencePriceAmount});
+    const updated=(await db.query("update service_listing set status='draft',lifecycle_status='draft',moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,title=coalesce($1,title),description=coalesce($2,description),service_category=coalesce($3,service_category),delivery_mode=coalesce($4,delivery_mode),location_label=coalesce($5,location_label),pricing_model=coalesce($6,pricing_model),price_amount=coalesce($7,price_amount),currency=coalesce($8,currency),visibility=coalesce($9,visibility),max_active_requests=coalesce($10,max_active_requests),expires_at=case when $11::boolean then null else coalesce($12,expires_at) end,impact_model=$14,reference_price_amount=$15,updated_at=now() where id=$13 returning *",[input.title||null,input.description||null,input.serviceCategory||null,input.deliveryMode||null,input.locationLabel||null,input.pricingModel||null,impact.priceAmount,input.currency||null,input.visibility||null,input.maxActiveRequests??null,input.clearExpiry===true,expiryInput?expiryInput.toISOString():null,listingId,impact.impactModel,impact.referencePriceAmount])).rows[0];
     if((row.lifecycle_status||"draft")!=="draft") await db.query("insert into service_listing_lifecycle_event(listing_id,actor_user_id,from_status,to_status,reason,request_id) values($1,$2,$3,'draft',$4,$5)",[listingId,userId,row.lifecycle_status||row.status,"Listing terms edited; moderation review required.",requestId]);
     await audit(db,userId,"service.listing_updated","service_listing",listingId,requestId,{from:row.lifecycle_status||row.status,to:"draft",requiresModeration:true});
     return updated;

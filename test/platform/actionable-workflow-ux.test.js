@@ -430,3 +430,28 @@ test("organization impact report reads scoped outcomes and does not invent unsup
   assert.ok(service.includes("count(distinct a.id) filter(where a.status='hired')::int hires"), "multiple interviews must not inflate hire totals");
   assert.doesNotMatch(page, /120 Volunteer Hours Engaged|\$[0-9,]+ funded|Download Q1 2026 Audit Report/);
 });
+
+test("mentorship entry uses dual-track wizard while preserving governed matching and mentor eligibility", async () => {
+  const [page, service] = await Promise.all([
+    source("../../web/app/mentorship/page.tsx"),
+    source("../../src/services-mentorship/service.js"),
+  ]);
+  assert.ok(page.includes("Seek Executive Mentorship"));
+  assert.ok(page.includes("Become an MPA Mentor"));
+  assert.ok(page.includes("Step 1 of 2") && page.includes("Step 2 of 2"));
+  assert.ok(page.includes("Focus sector"));
+  assert.ok(page.includes("Confidentiality and ethical boundaries"));
+  assert.ok(page.includes('if(portalMode==="mentee")void load('), "mentor discovery must load only after the mentee path is opened");
+  assert.ok(page.includes('api<RequestResult>("/api/v1/mentorship/requests"'));
+  assert.ok(page.includes('headers:{"X-Idempotency-Key":key}'), "request submission must retain idempotency protection");
+  assert.ok(page.includes('api<MatchOffer[]>("/api/v1/me/mentorship-matches"'));
+  assert.ok(page.includes("formal match consent is captured in the separate match-review step"));
+  assert.ok(page.includes("Your live mentorship workspace"));
+  assert.ok(page.includes("setMentorProfile") === false, "the redesign must not invent a replacement mentor-profile mutation");
+  assert.ok(service.includes("if(!(await activeMember(db,menteeId)))"));
+  assert.ok(service.includes("moderation_status='approved'"));
+  assert.ok(service.includes("requirePersonalProfessionalCapability(db,userId)"));
+  assert.ok(service.includes("professionalVerified(db,userId)"));
+  assert.ok(service.includes("Both"), "this guard is only descriptive; server-side match acceptance remains authoritative");
+  assert.doesNotMatch(page, /42 Vetted Mentors|68 Vetted Mentors|35 Vetted Mentors|MNT-2026-0482|alert\("Redirecting to Senior Mentor/);
+});

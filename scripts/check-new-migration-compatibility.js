@@ -237,7 +237,7 @@ try {
   }
 
   const referencePriceConstraint = (await client.query("select pg_get_constraintdef(oid) as definition from pg_constraint where conrelid='public.service_listing'::regclass and conname='service_listing_reference_price_check' and contype='c'")).rows[0];
-  if (!referencePriceConstraint || !referencePriceConstraint.definition.includes("reference_price_amount")) throw new Error("G3 reference price check constraint is missing or incomplete.");
+  if (!referencePriceConstraint || !referencePriceConstraint.definition.includes("reference_price_amount") || !referencePriceConstraint.definition.includes("impact_model")) throw new Error("G3 reference price check constraint is missing or incomplete.");
 
   const impactColumns = (await client.query("select column_name,udt_name from information_schema.columns where table_schema='public' and table_name='service_listing' and column_name in ('impact_model','reference_price_amount')")).rows;
   if (impactColumns.length!==2 || !impactColumns.some(row=>row.column_name==="impact_model"&&row.udt_name==="text") || !impactColumns.some(row=>row.column_name==="reference_price_amount"&&row.udt_name==="numeric")) throw new Error("G3 impact columns are missing or have unexpected types.");

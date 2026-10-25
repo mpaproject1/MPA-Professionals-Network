@@ -231,13 +231,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && parts.length===7 && p.startsWith("api/v1/services/listings/") && parts[5]==="impact-report" && parts[6]==="export") {
       const identity=await auth(req),q=query(req.url),view=q.get("view")||"owner";
       const result=await serveCommunityImpactReports.runImpactReport(identity,parts[4],{from:q.get("from"),to:q.get("to")},requestId,view);
-      const rows=[];
-      for(const [key,value] of Object.entries(result.metrics)) rows.push({Section:"Impact metrics",Measure:key,Period:"Selected period",Value:value.value===null?"Suppressed":value.value,Suppressed:value.suppressed?"Yes":"No"});
-      for(const item of result.monthlySummary) rows.push({Section:"Time summary",Measure:"Activity records",Period:item.month,Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
-      for(const item of result.feedbackCompletionByCategory) rows.push({Section:"Feedback completion",Measure:item.category,Period:"Selected period",Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
-      for(const item of result.milestoneActivity) rows.push({Section:"Milestone activity",Measure:item.milestoneType,Period:"Selected period",Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
-      for(const item of result.decisionAudit||[]) rows.push({Section:"Governance decisions",Measure:item.decision,Period:item.latestAt?new Date(item.latestAt).toISOString():"Selected period",Value:item.value===null?"Suppressed":item.value,Suppressed:item.suppressed?"Yes":"No"});
-      const exportData={report:{title:result.title,scope:view==="governance"?"Restricted governance aggregates":"Listing-owner privacy-safe aggregates",definition:result.suppressionPolicy,columns:["Section","Measure","Period","Value","Suppressed"]},generatedAt:result.generatedAt,filters:{...result.filters,listingId:parts[4],view},totals:{rows:rows.length,minimumGroupSize:result.minimumGroupSize},rows};
+      const exportData=serveCommunityImpactReports.toImpactExportData(result,parts[4]);
       const format=q.get("format")||"pdf";
       if(!["pdf","xlsx"].includes(format)) throw Object.assign(new Error("Choose PDF or XLSX export format."),{statusCode:400,code:"INVALID_EXPORT_FORMAT"});
       const buffer=format==="pdf"?reports.makePdf(exportData):reports.makeXlsx(exportData);

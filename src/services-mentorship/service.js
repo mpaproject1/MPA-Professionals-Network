@@ -663,6 +663,7 @@ export async function reviewServiceCompletion(requestId,userId,input,requestIdHe
     if(decision==="accepted"){
       const policy=r.listing_completion_evidence_policy||"accepted_delivery";
       const latest=(await db.query("select id,status,file_object_id from service_request_delivery where request_id=$1 order by created_at desc,id desc limit 1",[requestId])).rows[0];
+      const evidenceDeliveryId=latest?.status==="accepted"?latest.id:null;
       if(policy==="accepted_delivery"&&(!latest||latest.status!=="accepted"))throw error(409,"The latest delivery must be accepted before the engagement outcome can be accepted.","DELIVERY_EVIDENCE_REQUIRED");
       if(policy==="private_file"&&(!latest||latest.status!=="accepted"||!latest.file_object_id))throw error(409,"The listing requires an accepted delivery backed by a private evidence file.","PRIVATE_FILE_EVIDENCE_REQUIRED");
       if(policy==="description_only"&&String(r.provider_note||"").trim().length<10)throw error(409,"The provider must submit the required written service evidence before acceptance.","COMPLETION_SUMMARY_REQUIRED");
@@ -674,10 +675,10 @@ export async function reviewServiceCompletion(requestId,userId,input,requestIdHe
         const settled=(await db.query("select 1 from service_payment where request_id=$1 and status='succeeded' and amount=$2::numeric and upper(currency)=upper($3::text) and verified_at is not null limit 1",[requestId,expectedAmount,currency])).rows[0];
         if(!settled)throw error(409,"The paid service requires finance-verified settlement for the agreed amount and currency. This check is separate from outcome acceptance.","PAYMENT_NOT_SETTLED");
       }
-      const updated=(await db.query("update service_request set requester_accepted_at=now(),requester_outcome_decision='accepted',requester_outcome_decision_by=$1,requester_outcome_decision_at=now(),requester_outcome_note=$2,final_outcome_summary=$2,status='completed',outcome_summary=$2,completed_at=now(),completion_evidence_delivery_id=coalesce($3,completion_evidence_delivery_id),updated_at=now() where id=$4 returning *",[userId,note,latest?.id||null,requestId])).rows[0];
-      await db.query("insert into service_request_completion_event(request_id,actor_user_id,event_type,outcome_summary,evidence_delivery_id,note) values($1,$2,'accepted',$3,$4,$5)",[requestId,userId,note,latest?.id||null,note]);
+      const updated=(await db.query("update service_request set requester_accepted_at=now(),requester_outcome_decision='accepted',requester_outcome_decision_by=$1,requester_outcome_decision_at=now(),requester_outcome_note=$2,final_outcome_summary=$2,status='completed',outcome_summary=$2,completed_at=now(),completion_evidence_delivery_id=coalesce($3,completion_evidence_delivery_id),updated_at=now() where id=$4 returning *",[userId,note,evidenceDeliveryId,requestId])).rows[0];
+      await db.query("insert into service_request_completion_event(request_id,actor_user_id,event_type,outcome_summary,evidence_delivery_id,note) values($1,$2,'accepted',$3,$4,$5)",[requestId,userId,note,evidenceDeliveryId,note]);
       await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,'in_progress','completed',$3)",[requestId,userId,note]);
-      await audit(db,userId,"service.request_completion_accepted","service_request",requestId,requestIdHeader,{evidenceDeliveryId:latest?.id||null,paid:requiresPayment});
+      await audit(db,userId,"service.request_completion_accepted","service_request",requestId,requestIdHeader,{evidenceDeliveryId:evidenceDeliveryId,paid:requiresPayment});
       const listing=(await db.query("select id,lifecycle_status,fulfilment_rule,fulfilment_target_count from service_listing where id=$1 for update",[r.service_listing_id])).rows[0];
       if(listing&&listing.lifecycle_status!=="fulfilled"&&listing.fulfilment_rule!=="manual"){
         const completed=Number((await db.query("select count(*)::int count from service_request where service_listing_id=$1 and status='completed' and requester_accepted_at is not null",[listing.id])).rows[0].count);

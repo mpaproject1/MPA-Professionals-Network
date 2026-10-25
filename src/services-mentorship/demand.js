@@ -147,9 +147,8 @@ export async function listReviewQueue(userId,filters={}){
  const db=getPool();await staff(db,userId);
  const status=filters.status||"submitted";
  if(!["submitted","under_review","clarification_needed","matched","topic_published","converted","closed","declined","all"].includes(status))throw fail(400,"Unsupported demand queue status.","VALIDATION_ERROR");
- const where=status==="all"?"true":"d.status=$1";
- const args=status==="all"?[]:[status];
- return (await db.query(`select d.*,o.display_name organization_name,p.display_name requester_name,(select count(*)::int from marketplace_demand_topic t where t.source_demand_id=d.id) topic_count from marketplace_demand d join person p on p.user_id=d.requester_user_id left join organization o on o.id=d.organization_id where ${where} order by d.created_at asc limit 200`,args)).rows;
+ const q=String(filters.q||"").trim().slice(0,100),limit=Math.max(1,Math.min(100,Number.parseInt(filters.limit||"50",10)||50)),offset=Math.max(0,Math.min(100000,Number.parseInt(filters.offset||"0",10)||0));
+ return (await db.query("select d.*,o.display_name organization_name,p.display_name requester_name,(select count(*)::int from marketplace_demand_topic t where t.source_demand_id=d.id) topic_count from marketplace_demand d join person p on p.user_id=d.requester_user_id left join organization o on o.id=d.organization_id where ($1::text is null or d.status=$1) and ($2='' or lower(d.title||' '||coalesce(d.description,'')||' '||coalesce(d.category,'')||' '||coalesce(d.demand_type,'')||' '||d.status||' '||coalesce(p.display_name,'')||' '||coalesce(o.display_name,'')) like lower('%'||$2||'%')) order by d.created_at asc limit $3 offset $4",[status==="all"?null:status,q,limit,offset])).rows;
 }
 export async function mergeDemand(duplicateDemandId,targetDemandId,actorId,requestId){
  if(!targetDemandId||duplicateDemandId===targetDemandId)throw fail(400,"Choose a different existing request as the merge target.","MERGE_TARGET_INVALID");
@@ -229,14 +228,13 @@ export async function reviewDemand(demandId,actorId,input,requestId){
   return {...updated,topic,nextAction:next==="topic_published"?"Your topic is published and can receive interest.":next==="matched"?"Coordinate with the accepted provider.":"Review the updated status and outcome note."};
  });
 }
-export async function listAdminListings(userId){
+export async function listAdminListings(userId,filters={}){
  const db=getPool();await staff(db,userId);
- const [services,mentors,organizationOffers]=await Promise.all([
-   db.query("select s.id,'service' listing_type,s.title,s.description,s.service_category category,s.status,s.moderation_status,s.moderation_note,s.provider_user_id,coalesce(o.display_name,p.display_name) owner_name,s.created_at from service_listing s left join person p on p.user_id=s.provider_user_id left join organization o on o.id=s.organization_id where s.moderation_status in ('pending','needs_correction') and s.status<>'closed' order by s.created_at asc limit 200"),
-   db.query("select m.id,'mentorship' listing_type,m.headline title,coalesce(m.bio,'') description,'mentorship' category,m.status,m.moderation_status,m.moderation_note,m.user_id provider_user_id,p.display_name owner_name,m.created_at from mentor_profile m join person p on p.user_id=m.user_id where m.moderation_status in ('pending','needs_correction') and m.status<>'closed' order by m.created_at asc limit 200"),
-   db.query("select x.id,'organization_mentorship' listing_type,x.title,x.description,'organization mentorship' category,x.status,x.moderation_status,x.moderation_note,x.created_by provider_user_id,o.display_name owner_name,x.created_at from organization_mentorship_offer x join organization o on o.id=x.organization_id where x.moderation_status in ('pending','needs_correction') and x.status<>'closed' order by x.created_at asc limit 200")
-  ]);
-  return [...services.rows,...mentors.rows,...organizationOffers.rows].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+ const q=String(filters.q||"").trim().slice(0,100),status=String(filters.moderationStatus||"all");
+ if(!["all","pending","needs_correction"].includes(status))throw fail(400,"Unsupported listing moderation status.","VALIDATION_ERROR");
+ const limit=Math.max(1,Math.min(100,Number.parseInt(filters.limit||"50",10)||50)),offset=Math.max(0,Math.min(100000,Number.parseInt(filters.offset||"0",10)||0));
+ const base="select s.id,'service' listing_type,s.title,s.description,s.service_category category,s.status,s.moderation_status,s.moderation_note,s.provider_user_id,coalesce(o.display_name,p.display_name) owner_name,s.created_at from service_listing s left join person p on p.user_id=s.provider_user_id left join organization o on o.id=s.organization_id where s.moderation_status in ('pending','needs_correction') and s.status<>'closed' union all select m.id,'mentorship' listing_type,m.headline title,coalesce(m.bio,'') description,'mentorship' category,m.status,m.moderation_status,m.moderation_note,m.user_id provider_user_id,p.display_name owner_name,m.created_at from mentor_profile m join person p on p.user_id=m.user_id where m.moderation_status in ('pending','needs_correction') and m.status<>'closed' union all select x.id,'organization_mentorship' listing_type,x.title,x.description,'organization mentorship' category,x.status,x.moderation_status,x.moderation_note,x.created_by provider_user_id,o.display_name owner_name,x.created_at from organization_mentorship_offer x join organization o on o.id=x.organization_id where x.moderation_status in ('pending','needs_correction') and x.status<>'closed'";
+ return (await db.query("select * from ("+base+") as listings where ($1='' or lower(title||' '||coalesce(description,'')||' '||coalesce(category,'')||' '||coalesce(owner_name,'')||' '||status||' '||moderation_status||' '||listing_type) like lower('%'||$1||'%')) and ($2='all' or moderation_status=$2) order by created_at asc limit $3 offset $4",[q,status,limit,offset])).rows;
 }
 export async function moderateListing(listingType,listingId,actorId,input,requestId){
  await staff(getPool(),actorId);

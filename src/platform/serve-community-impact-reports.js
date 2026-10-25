@@ -9,13 +9,14 @@ function safeCount(value){const n=Number(value||0);return Number.isFinite(n)&&n>
 function suppress(value){const n=safeCount(value);return n<MIN_GROUP_SIZE?{value:null,suppressed:true,minimumGroupSize:MIN_GROUP_SIZE}:{value:n,suppressed:false,minimumGroupSize:MIN_GROUP_SIZE};}
 function cleanFilters(input={}){const from=String(input.from||"").trim(),to=String(input.to||"").trim();const valid=v=>!v||(/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v+"T00:00:00Z")));if(!valid(from)||!valid(to)||(from&&to&&from>to))throw fail(400,"Dates must use YYYY-MM-DD and the start date must not follow the end date.","INVALID_DATE_RANGE");return {from,to};}
 async function authorizeListing(db,identity,listingId,view){
+ if(!["owner","governance"].includes(view))throw fail(400,"Choose the owner or governance report view.","INVALID_REPORT_VIEW");
  if(typeof listingId!=="string"||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(listingId))throw fail(400,"A valid listing ID is required.","LISTING_ID_REQUIRED");
  const listing=(await db.query("select id,provider_user_id,organization_id,title,service_category,lifecycle_status from service_listing where id=$1",[listingId])).rows[0];
  if(!listing)throw fail(404,"Service listing not found.","NOT_FOUND");
  const governance=isGovernanceReviewer(identity);
  if(view==="governance"&&!governance)throw fail(403,"The governance report is restricted to authorized administrators and reviewers.","GOVERNANCE_REPORT_FORBIDDEN");
- if(governance)return {...listing,view:"governance"};
- if(view==="governance")throw fail(403,"The governance report is restricted to authorized administrators and reviewers.","GOVERNANCE_REPORT_FORBIDDEN");
+ if(view==="governance")return {...listing,view:"governance"};
+ if(governance)return {...listing,view:"owner"};
  if(listing.provider_user_id===identity?.sub)return {...listing,view:"owner"};
  if(listing.organization_id){
   const allowed=(await db.query("select 1 from organization_membership om join app_user u on u.id=om.user_id where om.organization_id=$1 and om.user_id=$2 and om.status='active' and u.status='active' and om.role_code=any($3::text[]) limit 1",[listing.organization_id,identity?.sub,ORG_REPORT_ROLES])).rowCount>0;

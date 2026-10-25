@@ -1,5 +1,5 @@
 "use client";
-import {ArrowRight,CheckCircle2,ClipboardCheck,CreditCard,LockKeyhole,RefreshCw,ShieldCheck,X} from "lucide-react";
+import {ArrowRight,ClipboardCheck,CreditCard,LockKeyhole,RefreshCw,ShieldCheck,X} from "lucide-react";
 import {type FormEvent,useCallback,useEffect,useRef,useState} from "react";
 import {FormFeedback} from "../../components/form-feedback";
 import { OperationStatus } from "../../components/operation-status";

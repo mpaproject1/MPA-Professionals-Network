@@ -8,14 +8,15 @@ import { getPool } from "../../src/platform/db.js";
 async function account(label) {
   const suffix = randomUUID();
   const digits = suffix.replace(/[^0-9]/g, "").slice(0, 8).padEnd(8, "7");
+  const email = "org-membership-" + label + "-" + suffix + "@example.test";
   const created = await membership.register({
-    email: "org-membership-" + label + "-" + suffix + "@example.test",
+    email,
     password: "OrgMembershipP1Password!2026",
     firstName: "Organization",
     lastName: "AdminTest",
     phone: "07" + digits,
   }, "org-membership-test-" + suffix);
-  return created.user;
+  return { ...created.user, email };
 }
 
 test("platform organization membership changes validate authority, reasons, role/status and write audit records", async t => {

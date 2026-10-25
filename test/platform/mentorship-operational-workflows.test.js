@@ -7,7 +7,7 @@ async function source(path) {
 }
 
 test("mentorship operational workflows require explicit sharing and preserve participant privacy", async () => {
-  const [migration, operations, service, server, page, email, reportPage, admin] = await Promise.all([
+  const [migration, operations, service, server, page, email, reportPage, admin, adminEmail] = await Promise.all([
     source("../../db/migrations/20261025100000_mentorship_operational_workflows.sql"),
     source("../../src/services-mentorship/operations.js"),
     source("../../src/services-mentorship/service.js"),
@@ -16,6 +16,7 @@ test("mentorship operational workflows require explicit sharing and preserve par
     source("../../src/platform/email-operations.js"),
     source("../../web/app/admin/mentorship-reports/page.tsx"),
     source("../../web/app/admin/page.tsx"),
+    source("../../web/app/admin/email/page.tsx"),
   ]);
 
   assert.match(migration, /share_with_eligible_mentors boolean NOT NULL DEFAULT false/);
@@ -73,4 +74,6 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(reportPage, /api\/v1\/admin\/mentorship-reports/);
   assert.match(reportPage, /no contact address is collected/i);
   assert.match(admin, /\/admin\/mentorship-reports/);
+  assert.match(adminEmail, /delivery_status/);
+  assert.match(page, /Notification evidence/);
 });

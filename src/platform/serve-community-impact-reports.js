@@ -16,7 +16,6 @@ async function authorizeListing(db,identity,listingId,view){
  const governance=isGovernanceReviewer(identity);
  if(view==="governance"&&!governance)throw fail(403,"The governance report is restricted to authorized administrators and reviewers.","GOVERNANCE_REPORT_FORBIDDEN");
  if(view==="governance")return {...listing,view:"governance"};
- if(governance)return {...listing,view:"owner"};
  if(listing.provider_user_id===identity?.sub)return {...listing,view:"owner"};
  if(listing.organization_id){
   const allowed=(await db.query("select 1 from organization_membership om join app_user u on u.id=om.user_id where om.organization_id=$1 and om.user_id=$2 and om.status='active' and u.status='active' and om.role_code=any($3::text[]) limit 1",[listing.organization_id,identity?.sub,ORG_REPORT_ROLES])).rowCount>0;

@@ -378,3 +378,32 @@ test("reference-data publication is reasoned and confirmed, with searchable pagi
   assert.ok(page.includes("body:JSON.stringify({reason})"));
   assert.ok(page.includes("Publication confirmed by the server"));
 });
+
+test("organization workspace uses state-aware onboarding and exposes only supported organization workflows", async () => {
+  const [page, service, server, outcomes] = await Promise.all([
+    source("../../web/app/organizations/page.tsx"),
+    source("../../src/organization-jobs/service.js"),
+    source("../../server.js"),
+    source("../../src/platform/stakeholder-outcomes.js"),
+  ]);
+  assert.ok(page.includes("Step 1 — Entity profile"));
+  assert.ok(page.includes("Step 2 — Institutional contact"));
+  assert.ok(page.includes("Step 3 — Upload evidence for Tabayyun review"));
+  assert.ok(page.includes("setEvidenceOrg(created.id)"), "new registrations must carry their own organization into the evidence step");
+  assert.ok(page.includes("verification_status === \"verified\""), "publishing links must depend on returned verification state");
+  assert.ok(page.includes("/recruitment"));
+  assert.ok(page.includes("/service-demand"));
+  assert.ok(page.includes("/mentorship"));
+  assert.ok(page.includes("Volunteer drives and skill dispatch are not implemented"));
+  assert.ok(page.includes("a scoped downloadable organization PDF is not implemented"));
+  assert.ok(page.includes("does not persist a structured TIN, representative name/position, or verification-fee payment/receipt"));
+  assert.doesNotMatch(page, /Zepko Enterprise Solutions|22 Total Applicants|120 Volunteer Hours Engaged|Download Q1 2026 Audit Report/);
+  assert.ok(service.includes("input.legalName") && service.includes("input.displayName"));
+  assert.ok(service.includes("organization_verification_case"));
+  assert.ok(server.includes('p==="api/v1/organizations"'));
+  assert.ok(server.includes('parts[4]==="submit-verification"'));
+  assert.ok(server.includes('parts[4]==="outcomes"'));
+  assert.ok(outcomes.includes("getOrganizationOutcomeWorkspace"));
+  assert.ok(outcomes.includes("organization_membership"));
+  assert.ok(outcomes.includes('["owner","administrator","recruiter","read_only","finance","project_manager","event_manager"]'));
+});

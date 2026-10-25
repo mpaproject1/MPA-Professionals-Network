@@ -41,7 +41,7 @@ All endpoints require authenticated access. Date filters are validated server-si
 ## Acceptance still required
 
 1. Run `test/services-mentorship/serve-community-g5-reports.test.js` against a verified disposable database with the G2–G4 migrations applied.
-2. Verify the existing organization-membership fixtures support the manager role test and add a real organization-manager report test.
+2. Execute the included organization-manager report test against the disposable database and confirm the fixture's active membership constraints.
 3. Exercise the API and both export formats for owner, organization manager, unrelated user, reviewer and administrator identities.
 4. Inspect PDF and XLSX contents to confirm there are no participant lists or contact fields and suppressed values remain suppressed.
 5. Run the existing G2/G3/G4 service tests, reports acceptance/export tests, migration compatibility checks, lint/type/build checks and the final CI gate.

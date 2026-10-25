@@ -24,13 +24,13 @@ function validateCommunityText(value,{field="Text",min=10,max=2000}={}){
  const text=String(value??"").trim();
  if(text.length<min||text.length>max)throw error(400,`${field} must be ${min}–${max} characters.`,"VALIDATION_ERROR");
  const contactPatterns=[
-  /\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/i,
-  /(?:https?:\\/\\/|www\\.)\\S+/i,
-  /(?:telegram|whatsapp|signal|instagram|facebook|tiktok)\\s*(?:handle|username|me|us|at)?\\s*[:@]\\s*[\\w.]{3,}/i,
-  /\\b(?:passport number|national id|national identification|medical record|patient record|bank account|account number|diagnosis|medical condition|private address)\\b/i
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+  /(?:https?:\/\/|www\.)\S+/i,
+  /(?:telegram|whatsapp|signal|instagram|facebook|tiktok)\s*(?:handle|username|me|us|at)?\s*[:@]\s*[\w.]{3,}/i,
+  /\b(?:passport number|national id|national identification|medical record|patient record|bank account|account number|diagnosis|medical condition|private address)\b/i
  ];
- const digitMatches=text.match(/(?:\\+?\\d[\\d\\s().-]{7,}\\d)/g)||[];
- if(contactPatterns.some(pattern=>pattern.test(text))||digitMatches.some(match=>match.replace(/\\D/g,"").length>=9))
+ const digitMatches=text.match(/(?:\+?\d[\d\s().-]{7,}\d)/g)||[];
+ if(contactPatterns.some(pattern=>pattern.test(text))||digitMatches.some(match=>match.replace(/\D/g,"").length>=9))
   throw error(400,"Remove personal contact details, external contact links and sensitive participant information. Use the authorized service/request workflow instead.","SENSITIVE_CONTENT");
  return text;
 }

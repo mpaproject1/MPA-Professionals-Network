@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS ix_service_request_update_request_created
 UPDATE service_listing_announcement
    SET status='archived', moderation_reason=coalesce(moderation_reason,'Archived by G4 audience-boundary migration'),
        updated_at=now()
- WHERE audience='participants' AND status='published';
+ WHERE audience='participants' AND status<>'archived';
 
 DO $$
 BEGIN

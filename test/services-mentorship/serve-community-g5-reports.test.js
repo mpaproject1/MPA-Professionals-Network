@@ -28,13 +28,13 @@ async function setup(){
 }
 
 test("G5 database: listing owners can run aggregate reports; unrelated users cannot",async()=>{
- const {owner,listing,suffix}=await setup(),outsider=await account();
+ const {owner,listing,suffix,org,db}=await setup(),outsider=await account();
  const ownerIdentity={sub:owner,roles:[],permissions:[]};
  const report=await runImpactReport(ownerIdentity,listing.id,{},`serve-g5-report-${suffix}`);
  assert.equal(report.view,"owner");
  assert.equal(report.minimumGroupSize,MIN_GROUP_SIZE);
  const manager=await account();
- await (await import("../../src/platform/db.js")).getPool().query("insert into organization_membership(organization_id,user_id,role_code,status) values($1,$2,'project_manager','active')",[ (await (await import("../../src/services-mentorship/service.js")).getServiceListing(listing.id,owner)).organization_id, manager ]);
+ await db.query("insert into organization_membership(organization_id,user_id,role_code,status) values($1,$2,'project_manager','active')",[org.id,manager]);
  const managed=await runImpactReport({sub:manager,roles:[],permissions:[]},listing.id,{},`serve-g5-manager-${suffix}`);
  assert.equal(managed.view,"owner","permitted organization managers can access their organization's listing report");
  await assert.rejects(runImpactReport({sub:outsider,roles:[],permissions:[]},listing.id,{},`serve-g5-denied-${suffix}`),e=>e.statusCode===403&&e.code==="IMPACT_REPORT_FORBIDDEN");

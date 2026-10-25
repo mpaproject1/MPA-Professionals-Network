@@ -259,8 +259,9 @@ export async function createServiceListingPledge(listingId,userId,input={},reque
   const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
   if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
   if(listing.lifecycle_status!=="active"||listing.status!=="published"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date()))throw error(409,"This listing is not accepting pledges.","LISTING_NOT_ACTIVE");
+  if(listing.visibility!=="public" && !(await activeMember(db,userId)))throw error(403,"An active membership is required to pledge support to this listing.","MEMBERSHIP_REQUIRED");
   if(organizationId){
-   if(listing.organization_id===organizationId)throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
+   if(listing.organization_id===organizationId||listing.provider_user_id===userId)throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
    try{await assertOrganizationCapability(db,organizationId,userId);}catch(cause){throw error(cause.statusCode||403,cause.message||"Authorized active organization membership is required.",cause.code||"ORGANIZATION_FORBIDDEN");}
   }else if(listing.organization_id===null&&listing.provider_user_id===userId)throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
   const row=(await db.query("insert into service_listing_pledge(listing_id,individual_user_id,organization_id,actor_user_id,description,status,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,'submitted',$6,$7) on conflict do nothing returning *",[listingId,organizationId?null:userId,organizationId,userId,description,keyHash,fingerprint])).rows[0];

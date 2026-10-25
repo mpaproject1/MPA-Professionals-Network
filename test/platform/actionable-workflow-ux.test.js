@@ -441,7 +441,7 @@ test("mentorship entry uses dual-track wizard while preserving governed matching
   assert.ok(page.includes("Step 1 of 2") && page.includes("Step 2 of 2"));
   assert.ok(page.includes("Focus sector"));
   assert.ok(page.includes("Confidentiality and ethical boundaries"));
-  assert.ok(page.includes('if(portalMode==="mentee")void load('), "mentor discovery must load only after the mentee path is opened");
+  assert.ok(page.includes('if(portalMode==="mentee"&&!showRequestForm)void load('), "mentor discovery must load only after the mentee discovery path is opened, not behind the request modal");
   assert.ok(page.includes('api<RequestResult>("/api/v1/mentorship/requests"'));
   assert.ok(page.includes('headers:{"X-Idempotency-Key":key}'), "request submission must retain idempotency protection");
   assert.ok(page.includes('api<MatchOffer[]>("/api/v1/me/mentorship-matches"'));

@@ -576,7 +576,9 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
       const pending=(await db.query("select count(*)::int count from service_request_milestone where request_id=$1 and status not in ('accepted','completed','cancelled')",[requestId])).rows[0].count;
       if(Number(pending)>0) throw error(409,"All active delivery milestones must be accepted or completed before completion.","OUTCOMES_INCOMPLETE");
       const policy=r.listing_completion_evidence_policy||"accepted_delivery";
-      const latest=(await db.query("select id,status,file_object_id from service_request_delivery where request_id=$1 order by created_at desc,id desc limit 1",[requestId])).rows[0];
+      const latest=(await db.query("select id,status,file_object_id,created_at from service_request_delivery where request_id=$1 order by created_at desc,id desc limit 1",[requestId])).rows[0];
+      const reopened=(await db.query("select created_at from service_request_completion_event where request_id=$1 and event_type='reopened' order by created_at desc limit 1",[requestId])).rows[0];
+      if(reopened&&(!latest||new Date(latest.created_at)<=new Date(reopened.created_at)))throw error(409,"A new delivery evidence record is required after dispute resolution before completion can be resubmitted.","DELIVERY_EVIDENCE_REQUIRED");
       if(policy==="accepted_delivery"&&(!latest||latest.status!=="accepted")) throw error(409,"Submit delivery evidence and wait for the requester to accept the latest delivery before submitting completion.","DELIVERY_EVIDENCE_REQUIRED");
       if(policy==="private_file"&&(!latest||latest.status!=="accepted"||!latest.file_object_id)) throw error(409,"This service requires an accepted delivery backed by a private evidence file.","PRIVATE_FILE_EVIDENCE_REQUIRED");
       if(policy==="description_only"&&String(note||"").trim().length<10) throw error(400,"This service requires a meaningful written outcome summary.","COMPLETION_SUMMARY_REQUIRED");

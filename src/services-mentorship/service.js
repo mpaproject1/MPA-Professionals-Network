@@ -181,7 +181,7 @@ export async function changeServiceListingStatus(listingId,userId,status,request
     if(status==="published" && row.organization_id && organization?.verification_status!=="verified") throw error(409,"The organization must be verified before it can publish a service listing.","ORGANIZATION_NOT_VERIFIED");
     if(status==="published" && !row.organization_id && !(await activeMember(db,userId))) throw error(403,"A current active membership is required to publish a service.","MEMBERSHIP_REQUIRED");
     const lifecycleStatus=requestedLifecycleStatus;
-    const allowedListingTransitions={draft:["draft","active","archived"],pending_review:["draft","active","archived"],active:["active","paused","fulfilled","archived"],paused:["paused","active","archived"],suspended:["suspended","archived"],fulfilled:["fulfilled","archived"],archived:["archived"],rejected:["rejected","archived"]};
+    const allowedListingTransitions={draft:["draft","active","archived"],pending_review:["draft","active","archived"],active:["active","paused","fulfilled","archived"],paused:["paused","active","archived"],suspended:["suspended","active","archived"],fulfilled:["fulfilled","archived"],archived:["archived"],rejected:["rejected","archived"]};
     if(!(allowedListingTransitions[currentLifecycleStatus]||[]).includes(lifecycleStatus)) throw error(409,"Invalid service listing lifecycle transition.","INVALID_STATE");
     if(currentLifecycleStatus==="suspended"&&lifecycleStatus==="active") throw error(403,"Only an authorized moderator may clear a moderation suspension.","MODERATION_CLEARANCE_REQUIRED");
     const legacyStatus=status==="fulfilled"||status==="archived"?"closed":status;

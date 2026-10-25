@@ -268,7 +268,11 @@ export async function createServiceListingInterest(listingId,userId,input={},req
    : await db.query("insert into service_listing_interest(listing_id,individual_user_id,actor_user_id,status) values($1,$2,$2,'interested') on conflict do nothing returning *",[listingId,userId]);
   const row=q.rows[0]|| (organizationId?(await db.query("select * from service_listing_interest where listing_id=$1 and organization_id=$2 and status='interested'",[listingId,organizationId])).rows[0]:(await db.query("select * from service_listing_interest where listing_id=$1 and individual_user_id=$2 and status='interested'",[listingId,userId])).rows[0]);
   if(!row)throw error(409,"Interest changed concurrently. Reload and try again.","INTEREST_CONFLICT");
-  if(q.rows[0])await audit(db,userId,"service.listing_interest_created","service_listing_interest",row.id,requestId,{listingId,organizationId:organizationId||null});
+  if(q.rows[0]){
+   await audit(db,userId,"service.listing_interest_created","service_listing_interest",row.id,requestId,{listingId,organizationId:organizationId||null});
+   const recipients=listing.organization_id?(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code=any($2::text[])",[listing.organization_id,["owner","administrator","recruiter","project_manager"]])).rows.map(x=>x.user_id):[listing.provider_user_id];
+   for(const recipient of new Set(recipients))if(recipient&&recipient!==userId)await notify(db,recipient,"service.listing_interest_created","service_listing_interest",row.id,{message:"A member or organization expressed interest in your community service.",nextAction:"Review the program's aggregate interest and decide whether to follow up through the formal service workflow.",actionUrl:"/services/"+listingId,actionRequired:false});
+  }
   return {...row,idempotent:!q.rows[0]};
  });
 }

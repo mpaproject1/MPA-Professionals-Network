@@ -1,7 +1,7 @@
 import {getPool} from "./db.js";
 
 const MIN_GROUP_SIZE=5;
-const GOVERNANCE_ROLES=new Set(["system_admin","admin","reviewer","supporting_staff"]);
+const GOVERNANCE_ROLES=new Set(["system_admin","admin","reviewer"]);
 const ORG_REPORT_ROLES=["owner","administrator","project_manager"];
 function fail(status,message,code="IMPACT_REPORT_ERROR"){const e=new Error(message);e.statusCode=status;e.code=code;return e;}
 function isGovernanceReviewer(identity){return (identity?.roles||[]).some(role=>GOVERNANCE_ROLES.has(role))||(identity?.permissions||[]).some(permission=>["serve_community.governance_reports","reports.governance"].includes(permission));}

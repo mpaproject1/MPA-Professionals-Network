@@ -13,11 +13,21 @@ type Demo = { id: string; case_key: string; title: string; business_area: string
 type Guide = { id: string; guide_key: string; route_pattern: string; title: string; description: string; steps: any[]; active: boolean };
 type Tab = "guides" | "demos" | "help";
 
+function tokenRoles(token: string) {
+  try {
+    const part = token.split(".")[1];
+    const claims = part ? JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/"))) : {};
+    return Array.isArray(claims.roles) ? claims.roles.map((role: any) => typeof role === "string" ? role : role?.role_code).filter(Boolean) as string[] : [];
+  } catch { return []; }
+}
+
 export default function AdminExperiencePage() {
   const token = useUiStore((state) => state.token);
   const hydrated = useUiStore((state) => state.hydrated);
   const hydrateToken = useUiStore((state) => state.hydrateToken);
   const [tab, setTab] = useState<Tab>("guides");
+  const roles = token ? tokenRoles(token) : [];
+  const isPlatformAdmin = roles.some((role) => ["system_admin", "admin", "platform_admin"].includes(role));
   const [demos, setDemos] = useState<Demo[]>([]);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,7 +38,7 @@ export default function AdminExperiencePage() {
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!token || !isPlatformAdmin) return;
     setLoading(true); setError(""); setFailed({ demos: false, guides: false });
     const [demoResult, guideResult] = await Promise.allSettled([
       api<any>("/api/v1/experience/demo-cases", {}, token),
@@ -44,9 +54,9 @@ export default function AdminExperiencePage() {
       if (rows) setGuides(rows); else { setFailed(s => ({ ...s, guides: true })); setError(s => s ? s + " Guides returned an unexpected list response." : "Guides returned an unexpected list response."); }
     } else { setFailed(s => ({ ...s, guides: true })); setError(s => s ? s + " Guides could not be loaded." : guideResult.reason instanceof Error ? guideResult.reason.message : "Guides could not be loaded."); }
     setLoading(false);
-  }, [token]);
+  }, [token, isPlatformAdmin]);
 
-  useEffect(() => { if (hydrated && token) void load(); }, [hydrated, token, load]);
+  useEffect(() => { if (hydrated && token && isPlatformAdmin) void load(); }, [hydrated, token, isPlatformAdmin, load]);
 
   async function updateDemo(demo: Demo, patch: Record<string, unknown>, success: string) {
     setError(""); setNotice("");
@@ -62,6 +72,7 @@ export default function AdminExperiencePage() {
 
   if (!hydrated) return <div className="grid"><Card><OperationStatus state="loading" title="Preparing help and learning tools" detail="Restoring your session before loading guide and demo configuration." /></Card></div>;
   if (!token) return <div className="grid"><AdminPageHeader eyebrow="Administration · Enablement" title="Help, Guides & Demos" description="Manage contextual guidance, training walkthroughs and help resources."/><Card><p className="muted">Sign in with an authorized administrator account to continue.</p><a className="btn btn-primary" href="/login?next=/admin/experience">Sign in</a></Card></div>;
+  if (!isPlatformAdmin) return <div className="grid"><AdminPageHeader eyebrow="Administration · Enablement" title="Help, Guides & Demos" description="Manage contextual guidance, training walkthroughs and help resources."/><Card><OperationStatus state="error" title="Platform administrator access required" detail="Only authorized platform administrators can manage guide and demo configuration."/><a className="btn btn-ghost" href="/admin">Return to admin overview</a></Card></div>;
 
   return <div className="grid" style={{ gap: 18, minWidth: 0 }}>
     <AdminPageHeader eyebrow="Administration · Enablement" title="Help, Guides & Demos" description="A single place to maintain contextual user guides, launch demonstration scenarios and find support resources. Public guidance stays separate from administrative configuration." actions={<><a className="btn btn-ghost" href="/admin">Admin overview</a><a className="btn btn-ghost" href="/admin/support">Support knowledge base</a></>} />

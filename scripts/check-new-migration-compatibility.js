@@ -190,6 +190,7 @@ try {
   if (columnErrors.length) throw new Error("Post-migration column checks failed:\\n- " + columnErrors.join("\\n- "));
 
   const requiredNotNull = [
+    ["service_listing","lifecycle_status"],
     ["verification_reference_request","updated_at"],
     ["mentorship_match","mentee_consent_status"],
     ["support_conversation_workflow","conversation_id"],
@@ -211,6 +212,7 @@ try {
   }
 
   const requiredDefaults = [
+    ["service_listing","lifecycle_status","draft"],
     ["verification_reference_request","updated_at","now"],
     ["mentorship_match","mentee_consent_status","pending"],
     ["support_conversation_workflow","priority","normal"],
@@ -232,6 +234,9 @@ try {
       throw new Error(`Expected default ${expected} for ${table}.${column}.`);
     }
   }
+
+  const expiryDefinition = (await client.query("select a.attnotnull, pg_get_expr(d.adbin,d.adrelid) as expression from pg_attribute a join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace left join pg_attrdef d on d.adrelid=c.oid and d.adnum=a.attnum where n.nspname='public' and c.relname='service_listing' and a.attname='expires_at' and not a.attisdropped")).rows[0];
+  if (!expiryDefinition || expiryDefinition.attnotnull || expiryDefinition.expression) throw new Error("service_listing.expires_at must remain nullable with no expiry default.");
 
   const requiredForeignKeys = [
     ["service_listing_lifecycle_event","listing_id","service_listing","id"],

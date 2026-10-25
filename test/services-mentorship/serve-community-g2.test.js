@@ -55,6 +55,23 @@ test("G2 database: concurrent duplicate interest creates one active record; with
  assert.equal(rows.filter(x=>x.status==="interested").length,1);
 });
 
+
+test("G2 database: organization interest is persisted against the organization, not collapsed into the acting user",async()=>{
+ const {listing,db,suffix}=await setupListing(), actor=await account(), orgOwner=await account();
+ const org=await organizationJobs.registerOrganization(orgOwner,{legalName:`Interest Organization ${suffix}`,displayName:`Interest Organization ${suffix}`},`serve-g2-interest-org-${suffix}`);
+ await db.query("update organization set verification_status='verified',verified_at=now(),verified_by=$2,public_visible=true where id=$1",[org.id,orgOwner]);
+ const results=await Promise.all([
+  services.createServiceListingInterest(listing.id,actor,{organizationId:org.id},`serve-g2-org-interest-a-${suffix}`),
+  services.createServiceListingInterest(listing.id,actor,{organizationId:org.id},`serve-g2-org-interest-b-${suffix}`)
+ ]);
+ assert.equal(results.filter(x=>x.idempotent).length,1);
+ const stored=(await db.query("select individual_user_id,organization_id,actor_user_id,status from service_listing_interest where listing_id=$1 and organization_id=$2 and status='interested'",[listing.id,org.id])).rows;
+ assert.equal(stored.length,1);
+ assert.equal(stored[0].individual_user_id,null);
+ assert.equal(stored[0].organization_id,org.id);
+ assert.equal(stored[0].actor_user_id,actor);
+});
+
 test("G2 database: pledge is separate from interest/request and only the listing owner can decide it",async()=>{
  const {owner,listing,db,suffix}=await setupListing(), pledger=await account(), outsider=await account();
  const pledge=await services.createServiceListingPledge(listing.id,pledger,{description:"Offer ten volunteer hours"},`serve-g2-pledge-${suffix}`);

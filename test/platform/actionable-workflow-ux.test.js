@@ -447,6 +447,9 @@ test("mentorship entry uses dual-track wizard while preserving governed matching
   assert.ok(page.includes('api<MatchOffer[]>("/api/v1/me/mentorship-matches"'));
   assert.ok(page.includes("formal match consent is captured in the separate match-review step"));
   assert.ok(page.includes("Your live mentorship workspace"));
+  assert.ok(page.includes("Loading your mentorship status"), "returning users must wait for account-backed status before the promotional landing");
+  assert.ok(page.includes("Upcoming session") && page.includes("scheduled_start_at"), "the status hub must surface an actual upcoming session when returned by the API");
+  assert.ok(page.includes('role="dialog" aria-modal="true"'), "the guided request must be presented as an accessible modal");
   assert.ok(page.includes('/api/v1/me/mentor-profile') && page.includes('/api/v1/mentor-profiles/'), "existing mentor-profile create/update workflows must remain wired");
   assert.ok(service.includes("if(!(await activeMember(db,menteeId)))"));
   assert.ok(service.includes("moderation_status='approved'"));

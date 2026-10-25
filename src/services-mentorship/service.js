@@ -408,7 +408,7 @@ export async function listServiceListingAnnouncements(listingId,viewerId=null){
  from service_listing_announcement a join service_listing s on s.id=a.listing_id
  where a.listing_id=$1 and (
   (a.status='published' and s.status='published' and s.lifecycle_status='active' and (s.expires_at is null or s.expires_at>now()) and (
-   a.audience='public'
+   (a.audience='public' and (s.visibility='public' or ($2::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$2 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date)))))
    or (a.audience='members' and $2::uuid is not null and exists(select 1 from membership_record m where m.user_id=$2 and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)))
    or (a.audience='participants' and $2::uuid is not null and (exists(select 1 from service_request r where r.service_listing_id=s.id and (r.requester_user_id=$2 or r.provider_user_id=$2)) or exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$2 and om.status='active')))
   ))

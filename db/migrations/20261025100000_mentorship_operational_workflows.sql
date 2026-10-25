@@ -77,3 +77,17 @@ CREATE INDEX IF NOT EXISTS ix_mentorship_participant_report_queue
 
 COMMENT ON TABLE mentorship_participant_report IS
   'Participant-submitted confidential report. Reporter identity is derived from authentication; no contact-address fields are collected.';
+
+-- Keep provider-delivery evidence separate from the dispatch queue status.
+ALTER TABLE notification_outbox
+  ADD COLUMN IF NOT EXISTS delivery_status text NOT NULL DEFAULT 'unknown',
+  ADD COLUMN IF NOT EXISTS delivered_at timestamptz,
+  ADD COLUMN IF NOT EXISTS delivery_event_at timestamptz,
+  ADD COLUMN IF NOT EXISTS delivery_event_type text;
+ALTER TABLE notification_outbox DROP CONSTRAINT IF EXISTS notification_outbox_delivery_status_check;
+ALTER TABLE notification_outbox ADD CONSTRAINT notification_outbox_delivery_status_check
+  CHECK (delivery_status IN ('unknown','queued','sent','delivered','failed'));
+CREATE INDEX IF NOT EXISTS ix_notification_outbox_delivery_status
+  ON notification_outbox(delivery_status, updated_at DESC);
+COMMENT ON COLUMN notification_outbox.delivery_status IS
+  'Provider evidence: queued, sent, delivered or failed. sent is not delivery confirmation; delivered requires a trusted provider webhook.';

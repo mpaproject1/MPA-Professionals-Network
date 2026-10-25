@@ -1,6 +1,6 @@
 # Serve-Community G6 — completion proof and outcome-based feedback
 
-**Branch:** feat/serve-community-g6-outcome-proof  
+**Branch:** feat/serve-community-g6-reconciled  
 **Base:** feat/serve-community-g5-privacy-safe-reports  
 **Gate:** G6 — evidence-backed completion, requester outcome decisions and program fulfilment  
 **Status:** Implementation and database-backed acceptance tests are authored. Run the disposable-database suite and final CI before claiming the gate passes.
@@ -16,6 +16,8 @@
 - Listing fulfilment follows the persisted per-listing rule. Manual is the safe default for ongoing programs; single_engagement and engagement_count only auto-fulfil after the target number of requester-accepted engagements. Provider submission alone never fulfils a listing.
 
 ## Listing policy API
+
+The Services provider form now exposes the evidence policy and fulfilment rule, with a numeric target when engagement-count fulfilment is selected. Saving a listing also saves this policy through the authorized API. If the listing save succeeds but policy save fails, the UI explicitly reports the partial outcome, retains the entered values and lets the user retry without creating a duplicate listing.
 
 PATCH /api/v1/services/listings/:listingId/completion-policy
 

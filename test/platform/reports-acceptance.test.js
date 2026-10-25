@@ -3,7 +3,22 @@ import { randomUUID } from "node:crypto";
 import { inflateRawSync } from "node:zlib";
 import test from "node:test";
 import { getPool } from "../../src/platform/db.js";
+import * as membership from "../../src/membership/service.js";
+import * as marketplaceDemand from "../../src/services-mentorship/demand.js";
 import { exportReport, runReport } from "../../src/platform/reports.js";
+
+async function createRequester() {
+  const suffix = randomUUID();
+  const digits = suffix.replace(/[^0-9]/g, "").slice(0, 8).padEnd(8, "7");
+  const created = await membership.register({
+    email: "report-demand-" + suffix + "@example.test",
+    password: "ReportDemandP1Password!2026",
+    firstName: "Report",
+    lastName: "Fixture",
+    phone: "07" + digits,
+  }, "report-demand-test-" + suffix);
+  return created.user.id;
+}
 
 function readZipEntry(buffer, wanted) {
   let offset = 0;
@@ -82,6 +97,23 @@ test("administrative audit report applies date, outcome and search filters to kn
     );
     assert.ok(audit.rows.some(row => row.action === "report.generated"));
     assert.equal(audit.rows.filter(row => row.action === "report.exported").length, 2);
+
+    const requesterId = await createRequester();
+    const demandTitle = "report-support-demand-" + randomUUID();
+    await marketplaceDemand.createDemand(requesterId, {
+      demandType: "service",
+      title: demandTitle,
+      description: "A test fixture requesting monthly bookkeeping support.",
+      category: "Finance",
+      deliveryMode: "remote",
+    }, randomUUID(), randomUUID());
+    const queueReport = await runReport(identity, "support-demand-response", {
+      from: today, to: today, status: "submitted", q: demandTitle
+    }, randomUUID());
+    assert.equal(queueReport.rows.length, 1, "the unique demand fixture should produce one matching queue group");
+    assert.equal(queueReport.rows[0].Queue, "Marketplace demand");
+    assert.equal(Number(queueReport.rows[0].Requests), 1);
+    assert.equal(Number(queueReport.rows[0].Unreviewed), 1, "unreviewed count should come from the persisted review timestamp/status");
   } finally {
     await db.query(
       "delete from audit_log where request_id = any($1::text[])",

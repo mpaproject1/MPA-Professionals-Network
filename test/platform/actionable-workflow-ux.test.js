@@ -271,6 +271,8 @@ test("admin queues use authoritative report counts and moderation/support lists 
   assert.ok(admin.includes("Unreviewed work items"));
   assert.ok(moderation.includes("const visibleDemands=useMemo"));
   assert.ok(moderation.includes("const visibleListings=useMemo"));
+  assert.ok(moderation.includes("const listingStatuses=useMemo"));
+  assert.ok(moderation.includes("Moderation status<select"));
   assert.ok(moderation.includes("paginatedDemands.map"));
   assert.ok(moderation.includes("paginatedListings.map"));
   assert.ok(moderation.includes("Showing {visibleDemands.length"));
@@ -284,7 +286,7 @@ test("admin queues use authoritative report counts and moderation/support lists 
   assert.ok(server.includes('offset:q.get("offset")||"0",q:q.get("q")||""'));
 });
 
-test("member and organization catalogues do not expose unsupported lifecycle mutations", async () => {
+test("member catalogue stays read-only while organization membership uses dedicated audited mutations", async () => {
   const [members, organizations, server, reports, reportTest] = await Promise.all([
     source("../../web/app/admin/members/catalog/page.tsx"),
     source("../../web/app/admin/organizations/page.tsx"),
@@ -294,10 +296,10 @@ test("member and organization catalogues do not expose unsupported lifecycle mut
   ]);
   assert.ok(members.includes("This directory is read-only"));
   assert.ok(members.includes('href="/admin/membership"'), "membership decisions and payment review stay in their supported workflow");
-  assert.ok(members.includes("This directory is read-only"));
   assert.ok(!members.includes("method:"));
-  assert.ok(organizations.includes("This catalogue is read-only"));
-  assert.ok(!organizations.includes("method:"));
+  assert.ok(organizations.includes("Organization membership updated and audit reason recorded"));
+  assert.ok(organizations.includes('method:"POST"'));
+  assert.ok(organizations.includes('method:"PATCH"'));
   assert.ok(server.includes('p==="api/v1/admin/members/catalog"'));
   assert.ok(server.includes('p==="api/v1/admin/organizations"'));
   assert.ok(server.includes('p==="api/v1/organizations/") && parts[4]==="users"'), "existing organization-member mutations are organization-scoped, not platform-admin endpoints");

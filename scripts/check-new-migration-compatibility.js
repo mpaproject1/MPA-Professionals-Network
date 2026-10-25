@@ -236,6 +236,9 @@ try {
     }
   }
 
+  const impactColumns = (await client.query("select column_name,udt_name from information_schema.columns where table_schema='public' and table_name='service_listing' and column_name in ('impact_model','reference_price_amount')")).rows;
+  if (impactColumns.length!==2 || !impactColumns.some(row=>row.column_name==="impact_model"&&row.udt_name==="text") || !impactColumns.some(row=>row.column_name==="reference_price_amount"&&row.udt_name==="numeric")) throw new Error("G3 impact columns are missing or have unexpected types.");
+
   const expiryDefinition = (await client.query("select a.attnotnull, pg_get_expr(d.adbin,d.adrelid) as expression from pg_attribute a join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace left join pg_attrdef d on d.adrelid=c.oid and d.adnum=a.attnum where n.nspname='public' and c.relname='service_listing' and a.attname='expires_at' and not a.attisdropped")).rows[0];
   if (!expiryDefinition || expiryDefinition.attnotnull || expiryDefinition.expression) throw new Error("service_listing.expires_at must remain nullable with no expiry default.");
 
@@ -360,6 +363,8 @@ try {
   const requiredChecks = [
     ["service_listing","service_listing_lifecycle_status_check",["draft","pending_review","active","paused","fulfilled","archived","suspended","rejected"]],
     ["service_listing","service_listing_impact_model_check",["standard","pro_bono","community_discount","capacity_grant"]],
+    ["service_listing","service_listing_reference_price_check",["reference_price_amount","0"]],
+    ["service_listing","service_listing_impact_pricing_check",["standard","pro_bono","community_discount","capacity_grant"]],
     ["service_listing_lifecycle_event","service_listing_lifecycle_event_to_status_check",["draft","pending_review","active","paused","fulfilled","archived","suspended","rejected"]],
     ["verification_reference_request","verification_reference_request_consent_status_check",["pending","accepted","consented","declined","withdrawn"]],
     ["verification_reference_request","verification_reference_request_verification_status_check",["pending","received","verified","insufficient","disputed","not_verified","needs_clarification"]],

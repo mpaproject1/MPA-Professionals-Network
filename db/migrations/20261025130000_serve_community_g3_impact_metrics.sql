@@ -12,7 +12,7 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='service_listing_reference_price_check') THEN
     ALTER TABLE service_listing ADD CONSTRAINT service_listing_reference_price_check
-      CHECK (reference_price_amount IS NULL OR reference_price_amount >= 0);
+      CHECK (reference_price_amount IS NULL OR (impact_model='community_discount' AND reference_price_amount > 0));
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='service_listing_impact_pricing_check') THEN
     ALTER TABLE service_listing ADD CONSTRAINT service_listing_impact_pricing_check CHECK (

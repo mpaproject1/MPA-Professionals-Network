@@ -776,6 +776,7 @@ export async function changeMentorshipSession(sessionId,userId,status,notes,requ
     const s=(await db.query("select s.*,m.mentor_user_id,m.mentee_user_id,m.status mentorship_status from mentorship_session s join mentorship m on m.id=s.mentorship_id where s.id=$1 for update",[sessionId])).rows[0];
     if(!s) throw error(404,"Mentorship session not found.","NOT_FOUND");
     if(s.mentor_user_id!==userId&&s.mentee_user_id!==userId) throw error(403,"You are not a session participant.","FORBIDDEN");
+    if(s.coordination_status!=="accepted") throw error(409,"Both participants must confirm the session proposal before recording completion, cancellation or no-show.","SESSION_NOT_CONFIRMED");
     if(s.status===status)return {...s,idempotent:true,nextAction:status==="completed"?"You can submit session feedback.":"Review the session record or schedule another session."};
     if(!allowedSessionTransition(s.status,status)) throw error(409,"Invalid session transition.","INVALID_STATE");
     const row=(await db.query("update mentorship_session set status=$1,notes=coalesce($2,notes),completed_at=case when $1='completed' then now() else completed_at end,updated_at=now() where id=$3 returning *",[status,notes||null,sessionId])).rows[0];

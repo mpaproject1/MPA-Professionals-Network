@@ -121,8 +121,13 @@ export async function createMentorshipParticipantReport(mentorshipId,userId,inpu
   await audit(db,userId,"mentorship.participant_report_created","mentorship_participant_report",row.id,requestId,{category});
   const staff=(await db.query("select distinct ur.user_id from app_user_role ur join app_role ar on ar.id=ur.role_id join app_user u on u.id=ur.user_id where u.status='active' and ar.role_code=any($1::text[])",[["supporting_staff","system_admin"]])).rows;
   for(const item of staff)await notify(db,item.user_id,"mentorship.participant_report_received","mentorship_participant_report",row.id,{message:"A confidential participant report requires review.",nextAction:"Review the report in the authorized Support Desk queue.",actionUrl:"/admin/mentorship-reports",actionRequired:true,priority:"high"});
-  return {...row,nextAction:"Your confidential report was recorded. Your signed-in account identifies the reporter; no contact address is requested."};
+  return {...row,nextAction:staff.length?"Your confidential report was recorded. Your signed-in account identifies the reporter; no contact address is requested. Authorized Support Desk recipients were notified.":"Your confidential report was recorded without a contact address, but no active Support Desk recipient was found. The report remains in the authorized queue and requires staff assignment."};
  });
+}
+export async function listMyMentorshipParticipantReports(userId,filters={}){
+ const db=getPool();
+ const limit=Math.min(Math.max(Number(filters.limit)||50,1),100);
+ return (await db.query("select id,mentorship_id,session_id,category,status,created_at,reviewed_at,resolution_note from mentorship_participant_report where reporter_user_id=$1 order by created_at desc limit $2",[userId,limit])).rows;
 }
 export async function listMentorshipParticipantReports(actorId,filters={}){
  const db=getPool();if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized Support Desk access is required.","FORBIDDEN");

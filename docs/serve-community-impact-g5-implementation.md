@@ -16,7 +16,7 @@
 ## Privacy controls
 
 - Participant-level rows are never returned. No participant IDs, names, email addresses, phone numbers, private addresses, contact links, pledge descriptions, free-text outcome summaries, decision reasons or decision actor IDs are selected into report output.
-- Participant-sensitive counts are suppressed below five. Monthly, feedback-category, milestone-category and governance-decision groups are suppressed independently to reduce differencing and indirect re-identification.
+- Participant-sensitive counts are suppressed when fewer than five distinct participants are represented. Monthly, feedback-category, milestone-category and governance-decision event totals are shown only when their group contains at least five distinct participants; groups are suppressed independently to reduce differencing and indirect re-identification.
 - The minimum group size is returned as report metadata; suppressed values are represented as `value: null` with an explicit suppression flag.
 - Governance audit reporting exposes only decision-status aggregates and the latest decision timestamp for each group, not actor or reason details.
 - Exports are built only from the already-filtered report result, carry suppression labels, and are sent with private/no-store headers. Export events are audited.

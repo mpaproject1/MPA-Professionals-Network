@@ -14,7 +14,7 @@ async function createRequester() {
     email: "report-demand-" + suffix + "@example.test",
     password: "ReportDemandP1Password!2026",
     firstName: "Report",
-    lastName: "Fixture",
+    lastName: "Fixture" + suffix.slice(0, 8),
     phone: "07" + digits,
   }, "report-demand-test-" + suffix);
   return created.user.id;

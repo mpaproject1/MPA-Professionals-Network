@@ -20,6 +20,8 @@ type InterestItem = {
   mentee_name: string;
   mentor_name: string;
   mentor_headline?: string | null;
+  max_active_mentees: number;
+  active_relationship_count: number;
 };
 
 function displayList(value: unknown): string {
@@ -85,9 +87,9 @@ export default function MentorshipInterestReviewPage() {
           <p><b>Participant:</b> {item.mentee_name} · <b>Interested mentor:</b> {item.mentor_name}{item.mentor_headline ? " — " + item.mentor_headline : ""}</p>
           <p><b>Goal:</b> {item.goals}</p>
           <p className="muted">Topics: {displayList(item.topics)} · Modes: {displayList(item.preferred_modes)} · Languages: {displayList(item.preferred_languages)}</p>
-          <p className="muted">Interest recorded {new Date(item.interest_created_at).toLocaleString()} · Request reference {item.request_id}</p>
+          <p className="muted">Interest recorded {new Date(item.interest_created_at).toLocaleString()} · Request reference {item.request_id}</p><p className="muted">Mentor capacity: {item.active_relationship_count}/{item.max_active_mentees} active or paused relationships{item.active_relationship_count>=item.max_active_mentees?" · At capacity; review without proposing":" · Capacity available"}</p>
           <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-            <button className="btn btn-primary" type="button" disabled={busyId === item.interest_id} onClick={() => void act(item, "propose")}>Propose this mentor</button>
+            <button className="btn btn-primary" type="button" disabled={busyId === item.interest_id || item.active_relationship_count>=item.max_active_mentees} onClick={() => void act(item, "propose")}>Propose this mentor</button>
             <button className="btn btn-ghost" type="button" disabled={busyId === item.interest_id} onClick={() => void act(item, "review")}>Review without proposing</button>
           </div>
         </section>)}

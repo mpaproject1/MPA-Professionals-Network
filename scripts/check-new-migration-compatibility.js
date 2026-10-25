@@ -119,7 +119,7 @@ try {
   if (baselineIndex < 0) throw new Error(`Expected baseline marker ${lastPreGateMigration} is missing from this revision.`);
   const missingBaselineFiles = repositoryMigrationFiles.slice(0,baselineIndex+1).filter(filename=>!recorded.has(filename));
   if (missingBaselineFiles.length) {
-    throw new Error("Migration history is not confirmed through the last pre-gate migration. Reconcile the test database baseline before applying the ten new migrations:\\n- " + missingBaselineFiles.join("\\n- "));
+    throw new Error("Migration history is not confirmed through the last pre-gate migration. Reconcile the test database baseline before applying the gate migrations:\\n- " + missingBaselineFiles.join("\\n- "));
   }
   const migrations = migrationNames.map(filename => {
     const migration = repositoryMigrations.get(filename);
@@ -269,6 +269,8 @@ try {
     ["service_request_agreement","request_id","service_request","id"],
     ["service_request_agreement","provider_accepted_by","app_user","id"],
     ["service_request_agreement","requester_accepted_by","app_user","id"],
+    ["service_request_update","request_id","service_request","id"],
+    ["service_request_update","author_user_id","app_user","id"],
     ["service_listing_announcement","listing_id","service_listing","id"],
     ["service_listing_announcement","author_user_id","app_user","id"],
     ["service_listing_announcement","moderated_by","app_user","id"],
@@ -337,6 +339,7 @@ try {
     "ux_service_listing_interest_active_organization",
     "ux_service_listing_pledge_idempotency_hash",
     "ux_service_listing_announcement_idempotency_hash",
+    "ux_service_request_update_idempotency_hash",
     "ux_talent_inquiry_idempotency_hash",
     "ux_mentorship_match_one_open_request"
   ];
@@ -348,7 +351,7 @@ try {
     if (!row || !row.indexdef.toUpperCase().includes("CREATE UNIQUE INDEX")) {
       throw new Error(`Required unique index ${name} is missing or not unique.`);
     }
-    if (["ux_marketplace_demand_idempotency_hash","ux_mentorship_request_idempotency_hash","ux_service_request_idempotency_hash","ux_service_listing_idempotency_hash","ux_service_listing_pledge_idempotency_hash","ux_talent_inquiry_idempotency_hash"].includes(name) &&
+    if (["ux_marketplace_demand_idempotency_hash","ux_mentorship_request_idempotency_hash","ux_service_request_idempotency_hash","ux_service_listing_idempotency_hash","ux_service_listing_pledge_idempotency_hash","ux_service_request_update_idempotency_hash","ux_talent_inquiry_idempotency_hash"].includes(name) &&
         (!row.indexdef.includes("request_idempotency_hash") || !row.indexdef.toLowerCase().includes("where"))) {
       throw new Error(`Idempotency index ${name} must uniquely index the request hash and exclude null keys.`);
     }
@@ -379,6 +382,9 @@ try {
     ["service_listing","service_listing_impact_model_check",["standard","pro_bono","community_discount","capacity_grant"]],
     ["service_listing","service_listing_impact_pricing_check",["standard","pro_bono","community_discount","capacity_grant"]],
     ["service_listing_lifecycle_event","service_listing_lifecycle_event_to_status_check",["draft","pending_review","active","paused","fulfilled","archived","suspended","rejected"]],
+    ["service_request_feedback","service_request_feedback_category_check",["service_quality","communication","timeliness","outcome","accessibility","other"]],
+    ["service_request_update","service_request_update_category_check",["progress","schedule_change","delivery_note","blocker","handover"]],
+    ["service_listing_announcement","service_listing_announcement_participant_audience_archived_check",["participants","archived"]],
     ["verification_reference_request","verification_reference_request_consent_status_check",["pending","accepted","consented","declined","withdrawn"]],
     ["verification_reference_request","verification_reference_request_verification_status_check",["pending","received","verified","insufficient","disputed","not_verified","needs_clarification"]],
     ["support_conversation_workflow","support_conversation_workflow_priority_check",["low","normal","high","urgent"]],
@@ -425,7 +431,7 @@ try {
 
   await client.query("rollback");
   transactionOpen = false;
-  console.log("PASS: all ten migrations and post-migration schema assertions succeeded; all DDL was rolled back.");
+  console.log("PASS: all listed migrations and post-migration schema assertions succeeded; all DDL was rolled back.");
   console.log("NOTE: this validates migration execution and existing column types/FK targets; it does not replace application-level integration tests.");
 } catch (error) {
   if (transactionOpen) {

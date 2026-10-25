@@ -778,6 +778,13 @@ export async function changeMentorshipSession(sessionId,userId,status,notes,requ
     const s=(await db.query("select s.*,m.mentor_user_id,m.mentee_user_id,m.status mentorship_status from mentorship_session s join mentorship m on m.id=s.mentorship_id where s.id=$1 for update",[sessionId])).rows[0];
     if(!s) throw error(404,"Mentorship session not found.","NOT_FOUND");
     if(s.mentor_user_id!==userId&&s.mentee_user_id!==userId) throw error(403,"You are not a session participant.","FORBIDDEN");
+    if(s.coordination_status==="proposed"&&status==="cancelled"&&s.proposed_by===userId){
+      const withdrawn=(await db.query("update mentorship_session set coordination_status='declined',status='cancelled',responded_by=$1,responded_at=now(),proposal_note=coalesce($2,proposal_note),updated_at=now() where id=$3 returning *",[userId,String(notes||"").trim().slice(0,1000)||null,sessionId])).rows[0];
+      await audit(db,userId,"mentorship.session_proposal_withdrawn","mentorship_session",sessionId,requestId);
+      const other=s.mentor_user_id===userId?s.mentee_user_id:s.mentor_user_id;
+      if(other)await notify(db,other,"mentorship.session_proposal_withdrawn","mentorship_session",sessionId,{message:"The other participant withdrew their first-session proposal.",nextAction:"Review the mentorship workspace if a new session time is needed.",actionUrl:"/mentorship",coordinationStatus:"declined"});
+      return {...withdrawn,nextAction:"Session proposal withdrawn. The other participant was notified in the platform."};
+    }
     if(s.coordination_status!=="accepted") throw error(409,"Both participants must confirm the session proposal before recording completion, cancellation or no-show.","SESSION_NOT_CONFIRMED");
     if(s.status===status)return {...s,idempotent:true,nextAction:status==="completed"?"You can submit session feedback.":"Review the session record or schedule another session."};
     if(!allowedSessionTransition(s.status,status)) throw error(409,"Invalid session transition.","INVALID_STATE");

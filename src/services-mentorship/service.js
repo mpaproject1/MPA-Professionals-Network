@@ -789,7 +789,7 @@ export async function changeMentorshipSession(sessionId,userId,status,notes,requ
 
 export async function listMentorshipSessions(mentorshipId,userId){
   const db=getPool(); await mentorshipParticipant(db,mentorshipId,userId);
-  return (await db.query("select * from mentorship_session where mentorship_id=$1 order by scheduled_start_at",[mentorshipId])).rows;
+  return (await db.query("select id,mentorship_id,scheduled_start_at,scheduled_end_at,mode,case when coordination_status='accepted' then location_label else null end location_label,case when coordination_status='accepted' then meeting_reference else null end meeting_reference,agenda,status,notes,completed_at,created_by,created_at,updated_at,coordination_status,proposed_by,responded_by,responded_at,proposal_note from mentorship_session where mentorship_id=$1 order by scheduled_start_at",[mentorshipId])).rows;
 }
 
 export async function submitMentorshipFeedback(mentorshipId,userId,input,requestId){

@@ -30,3 +30,15 @@ UPDATE service_listing SET lifecycle_status='paused'
 
 COMMENT ON COLUMN service_listing.impact_model IS 'Explicit service impact classification. Badge claims are derived from this persisted classification and validated pricing evidence.';
 COMMENT ON COLUMN service_listing.reference_price_amount IS 'Documented comparable standard price for a discounted listing; must exceed the actual listing price.';
+
+-- Announcement creation is also retry-safe; moderation/publication remains a separate transition.
+ALTER TABLE service_listing_announcement
+  ADD COLUMN IF NOT EXISTS request_idempotency_hash text,
+  ADD COLUMN IF NOT EXISTS request_fingerprint text;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_service_listing_announcement_idempotency_hash
+  ON service_listing_announcement(request_idempotency_hash)
+  WHERE request_idempotency_hash IS NOT NULL;
+COMMENT ON COLUMN service_listing_announcement.request_idempotency_hash IS
+  'Hash of the one-time client submission key used to replay announcement creation safely.';
+COMMENT ON COLUMN service_listing_announcement.request_fingerprint IS
+  'Hash of normalized announcement content and author bound to the submission key.';

@@ -42,7 +42,7 @@ export async function queueWorkflowEmail(db,userId,templateCode,variables={},res
  const inApp=await createInAppNotification(db,userId,eventCode,resourceType,resourceId,vars);
  let queued=Boolean(inApp);
  if(user.email&&user.email_enabled){
-  await db.query("insert into notification_outbox(channel,recipient,template_code,payload,status,updated_at) values('email',$1,$2,$3,'pending',now())",[user.email,templateCode,{...vars,variables:vars}]);
+  await db.query("insert into notification_outbox(channel,recipient,template_code,payload,status,delivery_status,updated_at) values('email',$1,$2,$3,'pending','queued',now())",[user.email,templateCode,{...vars,variables:vars}]);
   queued=true;
  }
  return queued;
@@ -125,7 +125,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
  if(!providerConfig().ready)fail(503,"Email provider is not configured. Set server-side email credentials first.","EMAIL_DELIVERY_NOT_CONFIGURED");
  const batch=Math.min(Math.max(Number(limit)||20,1),50);
  const claimed=await withTransaction(async tx=>{
-  await tx.query("update notification_outbox set status='pending',next_attempt_at=now(),locked_at=null,updated_at=now() where channel='email' and status='processing' and locked_at<now()-interval '5 minutes'");
+  await tx.query("update notification_outbox set status='pending',delivery_status='queued',next_attempt_at=now(),locked_at=null,updated_at=now() where channel='email' and status='processing' and locked_at<now()-interval '5 minutes'");
   const rows=(await tx.query(`select id,recipient,template_code,payload,subject,text_body,html_body,attempts
    from notification_outbox where channel='email' and (status='pending' or (status='failed' and next_attempt_at is not null and next_attempt_at<=now()))
    and ($1::uuid is null or id=$1::uuid) and coalesce(next_attempt_at,created_at)<=now()
@@ -146,7 +146,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
    if(!htmlBody)htmlBody=`<p>There is a new update to your MPA Professionals Network account.</p>${row.payload?.status?`<p>Status: ${String(row.payload.status).replace(/[&<>]/g,"")} </p>`:""}${row.payload?.nextAction?`<p>Next action: ${String(row.payload.nextAction).replace(/[&<>]/g,"")}</p>`:""}${row.payload?.registrationReference?`<p>Reference: <strong>${String(row.payload.registrationReference).replace(/[&<>]/g,"")}</strong></p>`:""}<p>Sign in to the platform to review the latest details.</p>`;
    if(!subject)subject="Notification from MPA Professionals Network";
    const sent=await sendMessage({recipient:row.recipient,subject,textBody,htmlBody,templateCode:row.template_code,payload:row.payload,idempotencyKey:row.id});
-   await db.query("update notification_outbox set status='sent',sent_at=now(),provider_message_id=$1,last_error=null,delivery_error_code=null,next_attempt_at=null,locked_at=null,updated_at=now() where id=$2",[sent.providerMessageId,row.id]);
+   await db.query("update notification_outbox set status='sent',delivery_status='sent',sent_at=now(),provider_message_id=$1,last_error=null,delivery_error_code=null,next_attempt_at=null,locked_at=null,updated_at=now() where id=$2",[sent.providerMessageId,row.id]);
    results.push({id:row.id,status:"sent"});
   }catch(e){
    const attempt=Number(row.attempts||0)+1;
@@ -156,7 +156,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
    const failed=!classification.retryable||exhausted;
    const delay=emailRetryDelaySeconds(attempt);
    try{
-    await db.query("update notification_outbox set status=$1,last_error=$2,delivery_error_code=$3,next_attempt_at=$4,locked_at=null,updated_at=now() where id=$5",[failed?"failed":"pending",clean(e.message,500),code,failed?null:new Date(Date.now()+delay*1000),row.id]);
+    await db.query("update notification_outbox set status=$1,delivery_status=case when $1='failed' then 'failed' else 'queued' end,last_error=$2,delivery_error_code=$3,next_attempt_at=$4,locked_at=null,updated_at=now() where id=$5",[failed?"failed":"pending",clean(e.message,500),code,failed?null:new Date(Date.now()+delay*1000),row.id]);
     results.push({id:row.id,status:failed?"failed":"pending",error:clean(e.message,250),retryable:classification.retryable&&!exhausted});
    }catch(persistError){
     console.error("[email-outbox] failed to persist delivery failure", {outboxId:row.id,code,reason:clean(persistError?.message||"database error",180)});
@@ -195,6 +195,24 @@ export async function receiveInboundEmail(input,providedSecret){
  const providerMessageId=clean(input.messageId||input.id,300)||randomUUID(),sender=clean(input.from||input.sender,320);
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender))fail(400,"Inbound sender address is invalid.","VALIDATION_ERROR");
  return (await getPool().query("insert into email_inbox_message(provider_message_id,sender,recipients,subject,text_body,html_body,metadata) values($1,$2,$3,$4,$5,$6,$7) on conflict(provider_message_id) do nothing returning id,received_at",[providerMessageId,sender,Array.isArray(input.to)?input.to.map(v=>clean(v,320)).slice(0,20):[],clean(input.subject,500),String(input.text||"").slice(0,50000),String(input.html||"").slice(0,100000),{provider:"configured-inbound-webhook"}])).rows[0]||{duplicate:true};
+}
+
+export async function receiveDeliveryWebhook(input,providedSecret){
+ const expected=clean(process.env.EMAIL_DELIVERY_WEBHOOK_SECRET,500);
+ if(!expected||!providedSecret||Buffer.byteLength(expected)!==Buffer.byteLength(providedSecret)||!timingSafeEqual(Buffer.from(expected),Buffer.from(providedSecret)))fail(401,"Email delivery webhook is not authorized.","UNAUTHENTICATED");
+ const providerMessageId=clean(input.providerMessageId||input.messageId,300);
+ const eventType=clean(input.eventType||input.type,80).toLowerCase();
+ if(!providerMessageId)fail(400,"providerMessageId is required.","VALIDATION_ERROR");
+ if(!["delivered","bounced","complained","failed"].includes(eventType))fail(400,"Unsupported delivery event type.","VALIDATION_ERROR");
+ const deliveryStatus=eventType==="delivered"?"delivered":"failed";
+ const result=await getPool().query("update notification_outbox set delivery_status=$1,delivered_at=case when $1='delivered' then now() else delivered_at end,delivery_event_at=now(),delivery_event_type=$2,delivery_error_code=case when $1='failed' then $2 else null end,updated_at=now() where provider_message_id=$3 returning id,payload,template_code,delivery_status,delivered_at",[deliveryStatus,eventType,providerMessageId]);
+ const row=result.rows[0];
+ if(!row)return {matched:false,providerMessageId,nextAction:"No outbox row matched this provider message ID; no delivery status was changed."};
+ const matchId=row.payload?.matchId||row.payload?.variables?.matchId;
+ if(row.template_code==="mentor.mentorship_update"&&matchId){
+  await getPool().query("update mentorship_match set mentor_notification_status=$1,mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$3",[deliveryStatus,eventType==="delivered"?"Trusted provider delivery event received.":"Trusted provider failure event: "+eventType,matchId]);
+ }
+ return {matched:true,deliveryStatus,deliveredAt:row.delivered_at||null,nextAction:deliveryStatus==="delivered"?"Provider reported delivery. This does not prove the recipient read the message.":"Provider reported a delivery failure; check the outbox and use an authorized retry workflow."};
 }
 
 // Server worker entry point: only queued platform messages are processed; no caller identity is accepted from HTTP.

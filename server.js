@@ -325,6 +325,8 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-listing-interests/") && parts[4]==="withdraw") { const b=await body(req); return ok(res,await servicesMentorship.withdrawServiceListingInterest(parts[3],identity.sub,b.reason,requestId),requestId); }
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-listing-pledges/") && parts[4]==="status") { const b=await body(req); return ok(res,await servicesMentorship.changeServiceListingPledgeStatus(parts[3],identity.sub,b.status,b.reason,requestId),requestId); }
     if(req.method==="GET" && p==="api/v1/me/service-listings") return ok(res,await servicesMentorship.listMyServiceListings(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/me/service-listing-interest-summary") return ok(res,await servicesMentorship.listMyServiceListingInterestSummary(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/me/service-listing-pledges") return ok(res,await servicesMentorship.listMyServiceListingPledges(identity.sub),requestId);
      if(req.method==="GET" && p==="api/v1/me/organization-mentorship-offers") return ok(res,await organizationMentorshipOffers.listMyOrganizationMentorshipOffers(identity.sub),requestId);
      if(req.method==="POST" && p==="api/v1/organization-mentorship-offers") return ok(res,await organizationMentorshipOffers.createOrganizationMentorshipOffer(identity.sub,await body(req),requestId),requestId,201);
      if(req.method==="PATCH" && parts.length===4 && p.startsWith("api/v1/organization-mentorship-offers/")) return ok(res,await organizationMentorshipOffers.updateOrganizationMentorshipOffer(parts[3],identity.sub,await body(req),requestId),requestId);

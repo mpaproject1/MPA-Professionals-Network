@@ -28,8 +28,8 @@ Interest, pledges, agreed services, deliveries and verified outcomes are separat
 
 ## UI behavior
 
-- `/services` and `/services/[id]` show the impact classification, supported price/discount, ongoing/no-expiry or expiry state, and server-calculated metrics.
-- Commitment choices are distinct: **Express Interest**, **Pledge Support**, and **Request Service**.
+- `/services` and `/services/[id]` show the impact classification, supported price/discount, ongoing/no-expiry or expiry state, and server-calculated metrics. Fulfilled and archived public programs remain visible as history with commitment actions closed; owners can inspect under-review state in their workspace/detail view.
+- Commitment choices are distinct: **Express Interest**, **Pledge Support**, and **Request Service**. Requesters see the persisted terms snapshot and must explicitly confirm consent before the API records their agreement; delivery remains blocked until both parties accept.
 - Pledges require a description and preserve the idempotency key across uncertain retries.
 - The provider workspace shows lifecycle and moderation status so under-review, fulfilled, archived and paused states are not confused.
 - Loading, empty, error, retry, busy and success states are retained.

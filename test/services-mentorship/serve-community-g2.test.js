@@ -53,6 +53,11 @@ test("G3 database: impact badges require persisted pricing evidence and metrics 
  assert.equal(Number(discounted.listing.price_amount),75);
  await assert.rejects(services.createServiceListing(discounted.owner,{organizationId:discounted.org.id,title:"Invalid discount evidence",description:"This offer deliberately has an invalid reference price.",serviceCategory:"legal",visibility:"public",pricingModel:"fixed",priceAmount:75,currency:"ETB",impactModel:"community_discount",referencePriceAmount:50},`serve-g3-invalid-${discounted.suffix}`,`serve-g3-invalid-key-${discounted.suffix}-0123456789`),e=>e.code==="INVALID_IMPACT_PRICING");
  const read=await services.getServiceListing(discounted.listing.id,null);
+ const listingResult=await services.listServices(null,{q:"Community legal support",limit:100});
+ const listed=listingResult.items.find(row=>row.id===discounted.listing.id);
+ assert.ok(listed,"public discovery should return the listing with server metrics");
+ assert.equal(listed.impact_model,"community_discount");
+ assert.equal(listed.users_interested,0);
  assert.equal(read.organizations_interested,0);
  assert.equal(read.users_interested,0);
  assert.equal(read.users_pledged,0);

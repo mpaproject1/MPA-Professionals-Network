@@ -211,7 +211,7 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
  const auditActions=(await getPool().query("select action from audit_log where resource_type='service_request' and resource_id=$1",[request.id])).rows.map(row=>row.action);
  assert.ok(auditActions.includes("service.request_completion_submitted"));
  assert.ok(auditActions.includes("service.request_completion_accepted"));
- const feedback=await journeys.submitServiceFeedback(request.id,requester,{targetRole:"provider",rating:5,comments:"Clear communication and useful outcome."},"gate2-service-feedback");
+ const feedback=await journeys.submitServiceFeedback(request.id,requester,{targetRole:"provider",category:"service_quality",rating:5,comments:"Clear communication and useful outcome."},"gate2-service-feedback");
  assert.equal(Number(feedback.rating),5);
 });
 
@@ -256,7 +256,7 @@ test("Gate 2: verified organization publishes under its own identity and can ful
  await journeys.changeServiceRequestStatus(request.id,owner,"completed","Organization submitted the agreed deliverables for requester acceptance.","gate2-org-service-completion");
  const acceptedOutcome=await journeys.acceptServiceCompletion(request.id,requester,"The training outcome and materials are accepted.","gate2-org-service-outcome");
  assert.equal(acceptedOutcome.status,"completed");
- const feedback=await journeys.submitServiceFeedback(request.id,requester,{targetRole:"provider",rating:5,comments:"The organization delivered the agreed training outcome."},"gate2-org-service-feedback");
+ const feedback=await journeys.submitServiceFeedback(request.id,requester,{targetRole:"provider",category:"outcome",rating:5,comments:"The organization delivered the agreed training outcome."},"gate2-org-service-feedback");
  assert.equal(Number(feedback.rating),5);
 });
 

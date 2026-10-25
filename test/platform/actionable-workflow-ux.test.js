@@ -315,8 +315,7 @@ test("organization membership administration uses explicit authority, reasoned a
     source("../../src/organization-jobs/service.js"),
     source("../../server.js"),
   ]);
-  assert.ok(page.includes("/api/v1/admin/organizations/"+ "PLACEHOLDER") === false, "admin membership URLs are built from the selected organization and account IDs");
-  assert.ok(page.includes("/members/"));
+  assert.ok(page.includes('"/api/v1/admin/organizations/"+encodeURIComponent(org.id)+"/members/"'));
   assert.ok(page.includes("window.confirm"));
   assert.ok(page.includes("Audit reason (required)"));
   assert.ok(page.includes("Add member with audit trail"));

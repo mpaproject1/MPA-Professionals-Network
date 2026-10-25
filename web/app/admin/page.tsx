@@ -545,6 +545,7 @@ export default function AdminPage() {
             users={users}
             roleCatalog={roleCatalog}
             permissionCatalog={permissionCatalog}
+            auditEvents={auditEvents}
             currentRoles={roles}
             currentUserId={currentUserId}
             token={token}

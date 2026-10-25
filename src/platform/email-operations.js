@@ -62,7 +62,7 @@ export async function listEmailOutbox(actorId,{folder="outbox",limit=100}={}){
  if(folder==="inbox")return (await db.query("select id,provider_message_id,sender,recipients,subject,text_body,received_at,read_at,archived_at from email_inbox_message where archived_at is null order by received_at desc limit $1",[n])).rows;
  if(folder==="verification-failed")return (await db.query("select t.id,u.email recipient,'Email verification delivery failed' subject,coalesce(t.delivery_error_code,'Delivery failed') last_error,t.delivery_attempted_at created_at,'failed' status from email_verification_token t join app_user u on u.id=t.user_id where t.delivery_status='failed' and t.consumed_at is null order by t.delivery_attempted_at desc nulls last limit $1",[n])).rows;
  const status=folder==="sent"?"sent":folder==="failed"?"failed":folder==="queued"?"pending":null;
- return (await db.query(`select id,recipient,template_code,coalesce(subject,'') subject,coalesce(text_body,payload->>'text','') text_body,status,attempts,next_attempt_at,provider_message_id,last_error,delivery_error_code,created_at,updated_at,sent_at
+ return (await db.query(`select id,recipient,template_code,coalesce(subject,'') subject,coalesce(text_body,payload->>'text','') text_body,status,delivery_status,delivered_at,delivery_event_at,delivery_event_type,attempts,next_attempt_at,provider_message_id,last_error,delivery_error_code,created_at,updated_at,sent_at
  from notification_outbox where channel='email' and ($1::text is null or status=$1) order by created_at desc limit $2`,[status,n])).rows;
 }
 export async function listEmailTemplates(actorId){

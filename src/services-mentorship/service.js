@@ -413,10 +413,6 @@ export async function changeServiceListingAnnouncementStatus(announcementId,user
   const updated=(await db.query("update service_listing_announcement set status=$1,moderation_reason=$2,moderated_by=case when $3 then $4 else moderated_by end,moderated_at=case when $3 then now() else moderated_at end,updated_at=now() where id=$5 returning *",[status,note,["published","rejected"].includes(status),userId,announcementId])).rows[0];
   await audit(db,userId,"service.listing_announcement_status_changed","service_listing_announcement",announcementId,requestId,{listingId:listing.id,from:announcement.status,to:status,reason:note,audience:announcement.audience});
   if(["published","rejected"].includes(status))await notify(db,announcement.author_user_id,status==="published"?"service.listing_announcement_published":"service.listing_announcement_rejected","service_listing_announcement",announcementId,{message:status==="published"?"Your announcement was published.":"Your announcement was not approved.",nextAction:status==="published"?"Review the published announcement.":"Review the moderator reason and revise if permitted.",actionUrl:"/services/"+listing.id,reason:note});
-  if(status==="published"&&announcement.audience==="participants"){
-   const participants=(await db.query("select requester_user_id user_id from service_request where service_listing_id=$1 union select provider_user_id from service_request where service_listing_id=$1",[listing.id])).rows;
-   for(const participantId of new Set(participants.map(x=>x.user_id)))if(participantId&&participantId!==userId)await notify(db,participantId,"service.listing_announcement_published","service_listing_announcement",announcementId,{message:"A service program you participate in has a new announcement.",nextAction:"Review the program update.",actionUrl:"/services/"+listing.id});
-  }
   return updated;
  });
 }

@@ -692,6 +692,7 @@ export async function reviewServiceCompletion(requestId,userId,input,requestIdHe
       return {...updated,nextAction:"The engagement is complete. Payment verification was evaluated separately where the listing requires payment."};
     }
     const nextStatus=decision==="disputed"?"disputed":"in_progress";
+    if(decision==="revision_requested"&&r.completion_evidence_delivery_id)await db.query("update service_request_delivery set status='revision_requested',reviewer_note=$1,reviewed_by=$2,reviewed_at=now() where id=$3 and request_id=$4",[note,userId,r.completion_evidence_delivery_id,requestId]);
     const updated=(await db.query("update service_request set status=$1,requester_outcome_decision=$2,requester_outcome_decision_by=$3,requester_outcome_decision_at=now(),requester_outcome_note=$4,provider_completed_at=case when $2='revision_requested' then null else provider_completed_at end,provider_completion_submitted_by=case when $2='revision_requested' then null else provider_completion_submitted_by end,completion_evidence_delivery_id=case when $2='revision_requested' then null else completion_evidence_delivery_id end,updated_at=now() where id=$5 returning *",[nextStatus,decision,userId,note,requestId])).rows[0];
     await db.query("insert into service_request_completion_event(request_id,actor_user_id,event_type,evidence_delivery_id,note) values($1,$2,$3,$4,$5)",[requestId,userId,decision,r.completion_evidence_delivery_id||null,note]);
     await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,'in_progress',$3,$4)",[requestId,userId,nextStatus,note]);
@@ -711,6 +712,7 @@ export async function createServiceMilestone(requestId,userId,input,requestIdHea
     if(!r) throw error(404,"Service request not found.","NOT_FOUND");
     if(!(await isServiceProviderActor(db,requestId,userId))) throw error(403,"Only the provider or authorized organization team can define delivery milestones.","FORBIDDEN");
     if(!["accepted","in_progress"].includes(r.status)) throw error(409,"Milestones can only be added to an accepted or active engagement.","INVALID_STATE");
+    if(r.provider_completed_at)throw error(409,"Milestones cannot be added while provider completion is awaiting requester review.","COMPLETION_REVIEW_PENDING");
     if(!input.title) throw error(400,"Milestone title is required.","VALIDATION_ERROR");
     const row=(await db.query("insert into service_request_milestone(request_id,title,description,due_at,created_by) values($1,$2,$3,$4,$5) returning *",[requestId,input.title,input.description||null,input.dueAt||null,userId])).rows[0];
     await audit(db,userId,"service.milestone_created","service_request_milestone",row.id,requestIdHeader);

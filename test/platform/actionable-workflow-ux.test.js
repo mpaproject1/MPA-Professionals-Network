@@ -447,11 +447,11 @@ test("mentorship entry uses dual-track wizard while preserving governed matching
   assert.ok(page.includes('api<MatchOffer[]>("/api/v1/me/mentorship-matches"'));
   assert.ok(page.includes("formal match consent is captured in the separate match-review step"));
   assert.ok(page.includes("Your live mentorship workspace"));
-  assert.ok(page.includes("setMentorProfile") === false, "the redesign must not invent a replacement mentor-profile mutation");
+  assert.ok(page.includes('/api/v1/me/mentor-profile') && page.includes('/api/v1/mentor-profiles/'), "existing mentor-profile create/update workflows must remain wired");
   assert.ok(service.includes("if(!(await activeMember(db,menteeId)))"));
   assert.ok(service.includes("moderation_status='approved'"));
   assert.ok(service.includes("requirePersonalProfessionalCapability(db,userId)"));
   assert.ok(service.includes("professionalVerified(db,userId)"));
-  assert.ok(service.includes("Both"), "this guard is only descriptive; server-side match acceptance remains authoritative");
+  assert.ok(service.includes("mentee_consent_status") && service.includes("status in ('proposed','accepted')"), "server match lifecycle and mentee consent fields must remain in place");
   assert.doesNotMatch(page, /42 Vetted Mentors|68 Vetted Mentors|35 Vetted Mentors|MNT-2026-0482|alert\("Redirecting to Senior Mentor/);
 });

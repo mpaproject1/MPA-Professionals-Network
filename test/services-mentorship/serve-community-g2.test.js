@@ -13,17 +13,35 @@ function identity(suffix){
  return {email:`serve-g2-${suffix}@example.test`,password:"ServeCommunityG2Password!2026",firstName:"Serve",lastName:`Gate${suffix.slice(0,8)}`,phone:`06${digits}`};
 }
 async function account(){const suffix=randomUUID().replaceAll("-","").slice(0,16);return (await membership.register(identity(suffix),`serve-community-g2-${suffix}`)).user.id;}
-async function setupListing({approved=true}={}){
+async function setupListing({approved=true,impactModel="standard",pricingModel="free",priceAmount=0,referencePriceAmount=null}={}){
  const owner=await account(), suffix=randomUUID().replaceAll("-","").slice(0,12);
  const org=await organizationJobs.registerOrganization(owner,{legalName:`Serve Community G2 ${suffix}`,displayName:`Serve Community G2 ${suffix}`},`serve-g2-org-${suffix}`);
  const db=getPool();
  await db.query("update organization set verification_status='verified',verified_at=now(),verified_by=$2,public_visible=true where id=$1",[org.id,owner]);
- const listing=await services.createServiceListing(owner,{organizationId:org.id,title:"Community legal support",description:"Pro-bono guidance for local community members.",serviceCategory:"legal",visibility:"public",pricingModel:"free"},`serve-g2-listing-${suffix}`,`serve-g2-listing-key-${suffix}-0123456789`);
+ const listing=await services.createServiceListing(owner,{organizationId:org.id,title:"Community legal support",description:"Pro-bono guidance for local community members.",serviceCategory:"legal",visibility:"public",pricingModel,priceAmount,currency:"ETB",impactModel,referencePriceAmount},`serve-g2-listing-${suffix}`,`serve-g2-listing-key-${suffix}-0123456789`);
  if(approved) await db.query("update service_listing set moderation_status='approved',moderated_by=$2,moderated_at=now() where id=$1",[listing.id,owner]);
  const active=approved?await services.changeServiceListingStatus(listing.id,owner,"published",`serve-g2-publish-${suffix}`):listing;
  return {owner,org,listing:active,db,suffix};
 }
 
+test("G3 database: impact badges require persisted pricing evidence and metrics use eligible records",async()=>{
+ const proBono=await setupListing({impactModel:"pro_bono"});
+ assert.equal(proBono.listing.impact_model,"pro_bono");
+ assert.equal(Number(proBono.listing.price_amount),0);
+ const discounted=await setupListing({impactModel:"community_discount",pricingModel:"fixed",priceAmount:75,referencePriceAmount:100});
+ assert.equal(discounted.listing.impact_model,"community_discount");
+ assert.equal(Number(discounted.listing.reference_price_amount),100);
+ assert.equal(Number(discounted.listing.price_amount),75);
+ await assert.rejects(services.createServiceListing(discounted.owner,{organizationId:discounted.org.id,title:"Invalid discount evidence",description:"This offer deliberately has an invalid reference price.",serviceCategory:"legal",visibility:"public",pricingModel:"fixed",priceAmount:75,currency:"ETB",impactModel:"community_discount",referencePriceAmount:50},`serve-g3-invalid-${discounted.suffix}`,`serve-g3-invalid-key-${discounted.suffix}-0123456789`),e=>e.code==="INVALID_IMPACT_PRICING");
+ const read=await services.getServiceListing(discounted.listing.id,null);
+ assert.equal(read.organizations_interested,0);
+ assert.equal(read.users_interested,0);
+ assert.equal(read.users_pledged,0);
+ assert.equal(read.agreed_services,0);
+ assert.equal(read.active_deliveries,0);
+ assert.equal(read.verified_outcomes,0);
+});
+ 
 test("G2 database: moderation submission retries do not duplicate lifecycle events",async()=>{
  const {owner,listing,db,suffix}=await setupListing({approved:false});
  const submitted=await services.changeServiceListingStatus(listing.id,owner,"published",`serve-g2-submit-${suffix}`);
@@ -71,6 +89,12 @@ test("G2 database: concurrent duplicate interest creates one active record; with
  const listingOwner=(await db.query("select provider_user_id from service_listing where id=$1",[listing.id])).rows[0].provider_user_id;
  const summary=await services.listMyServiceListingInterestSummary(listingOwner);
  assert.equal(summary.find(x=>x.listing_id===listing.id).individual_interest_count,1);
+ const metrics=await services.getServiceListing(listing.id,null);
+ assert.equal(metrics.users_interested,1);
+ assert.equal(metrics.agreed_services,0);
+ assert.equal(metrics.active_deliveries,0);
+ await services.getServiceListing(listing.id,null);
+ assert.equal((await services.getServiceListing(listing.id,null)).users_interested,1,"anonymous/public reads do not increment interest");
 });
 
 
@@ -92,6 +116,7 @@ test("G2 database: organization interest is persisted against the organization, 
  const listingOwner=(await db.query("select provider_user_id from service_listing where id=$1",[listing.id])).rows[0].provider_user_id;
  const summary=await services.listMyServiceListingInterestSummary(listingOwner);
  assert.equal(summary.find(x=>x.listing_id===listing.id).organization_interest_count,1);
+ assert.equal((await services.getServiceListing(listing.id,null)).organizations_interested,1);
 });
 
 test("G2 database: pledge is separate from interest/request and only the listing owner can decide it",async()=>{
@@ -112,6 +137,7 @@ test("G2 database: pledge is separate from interest/request and only the listing
  assert.equal(stored.organization_id,null);
  const queue=await services.listMyServiceListingPledges(owner);
  assert.ok(queue.some(x=>x.id===pledge.id),"authorized listing owner can retrieve the pledge for review");
+ assert.equal((await services.getServiceListing(listing.id,null)).users_pledged,1,"pledges count separately from interest and requests");
 });
 
 test("G2 database: provider acceptance is not enough to start delivery; requester must accept the same terms version",async()=>{
@@ -133,4 +159,7 @@ test("G2 database: provider acceptance is not enough to start delivery; requeste
  assert.equal(agreement.requester_accepted_by,requester);
  assert.ok(agreement.provider_accepted_at);
  assert.ok(agreement.requester_accepted_at);
+ const metrics=await services.getServiceListing(listing.id,null);
+ assert.equal(metrics.agreed_services,1);
+ assert.equal(metrics.active_deliveries,1);
 });

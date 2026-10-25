@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { inflateRawSync } from "node:zlib";
 import test from "node:test";
+import { inflateRawSync } from "node:zlib";
 import * as membership from "../../src/membership/service.js";
 import { getPool } from "../../src/platform/db.js";
 import { exportReport, runReport } from "../../src/platform/reports.js";

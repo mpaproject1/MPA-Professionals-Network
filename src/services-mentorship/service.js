@@ -583,7 +583,8 @@ export async function createMentorshipRequest(menteeId,input,requestId,idempoten
  if(typeof input.goals!=="string"||!input.goals.trim()) throw error(400,"A non-empty mentorship goal is required.","VALIDATION_ERROR");
  const goals=String(input.goals).trim(),preferredMentor=input.preferredMentorUserId||null,topics=JSON.stringify(normalizeArray(input.topics)),modes=JSON.stringify(normalizeArray(input.preferredModes||["remote"])),languages=JSON.stringify(normalizeArray(input.preferredLanguages)),days=JSON.stringify((input.preferredDays||[]).map(Number).filter(n=>n>=0&&n<=6));
  if(preferredMentor===menteeId) throw error(400,"You cannot mentor yourself.","VALIDATION_ERROR");
- const normalized={menteeId,goals,preferredMentor,topics:JSON.parse(topics),modes:JSON.parse(modes),languages:JSON.parse(languages),days:JSON.parse(days)};
+ const shareWithEligibleMentors=input.shareWithEligibleMentors===true;
+ const normalized={menteeId,goals,preferredMentor,topics:JSON.parse(topics),modes:JSON.parse(modes),languages:JSON.parse(languages),days:JSON.parse(days),shareWithEligibleMentors};
  const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
  return withTransaction(async db=>{
   // Serialize submissions from the same mentee so different keys cannot race past duplicate-request detection.
@@ -597,7 +598,7 @@ export async function createMentorshipRequest(menteeId,input,requestId,idempoten
   if(!(await activeMember(db,menteeId))) throw error(403,"An active membership is required for mentorship.","MEMBERSHIP_REQUIRED");
   const prior=(await db.query("select * from mentorship_request where mentee_user_id=$1 and goals=$2 and preferred_mentor_user_id is not distinct from $3 and topics=$4::jsonb and preferred_modes=$5::jsonb and preferred_languages=$6::jsonb and preferred_days=$7::jsonb and status in ('requested','matching','matched') order by created_at desc limit 1 for update",[menteeId,goals,preferredMentor,topics,modes,languages,days])).rows[0];
   if(prior)return {...prior,idempotent:true,nextAction:prior.status==="matched"?"A mentor proposal is already active. Wait for the mentor to respond.":"Your mentorship request is already recorded. Review its status or wait for the matching team."};
-  const inserted=(await db.query("insert into mentorship_request(mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,'requested',$8,$9) on conflict do nothing returning *",[menteeId,preferredMentor,goals,topics,modes,languages,days,keyHash,fingerprint])).rows[0];
+  const inserted=(await db.query("insert into mentorship_request(mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,request_idempotency_hash,request_fingerprint,share_with_eligible_mentors) values($1,$2,$3,$4,$5,$6,$7,'requested',$8,$9,$10) on conflict do nothing returning *",[menteeId,preferredMentor,goals,topics,modes,languages,days,keyHash,fingerprint,shareWithEligibleMentors])).rows[0];
   if(!inserted){
    const raced=(await db.query("select * from mentorship_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
    if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
@@ -663,6 +664,7 @@ export async function proposeMentorMatch(requestId,mentorUserId,actorUserId,requ
     await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,matched_at=now(),updated_at=now() where id=$2",[mentorUserId,requestId]);
     await audit(db,actorUserId,"mentorship.match_proposed","mentorship_match",row.id,requestIdHeader,{mentorUserId,score:match.score});
     await queueWorkflowEmail(db,mentorUserId,"mentor.mentorship_update",{status:"match proposed",nextAction:"Review and accept or decline the mentorship match",actionUrl:"/mentorship",actionRequired:true,priority:"high",eventVersion:row.proposed_at||requestIdHeader},"mentorship_match",row.id);
+    await db.query("update mentorship_match set mentor_notification_status='queued',mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$1",[row.id,"Workflow email queued; provider delivery and reading are not confirmed."]);
     await queueWorkflowEmail(db,request.mentee_user_id,"professional.workflow_update",{status:"mentor match proposed",nextAction:"Wait for the proposed mentor to respond",actionUrl:"/mentorship",eventVersion:row.proposed_at||requestIdHeader},"mentorship_match",row.id);
     return row;
   });
@@ -759,10 +761,10 @@ export async function createMentorshipSession(mentorshipId,userId,input,requestI
     if(m.status!=="active") throw error(409,"Sessions can only be scheduled for an active mentorship.","MENTORSHIP_NOT_ACTIVE");
     if(!input.scheduledStartAt||!input.scheduledEndAt) throw error(400,"scheduledStartAt and scheduledEndAt are required.","VALIDATION_ERROR");
     await assertSessionFitsAvailability(db,m.mentor_user_id,input.scheduledStartAt,input.scheduledEndAt);
-    const row=(await db.query("insert into mentorship_session(mentorship_id,scheduled_start_at,scheduled_end_at,mode,location_label,meeting_reference,agenda,created_by) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[mentorshipId,input.scheduledStartAt,input.scheduledEndAt,input.mode||"remote",input.locationLabel||null,input.meetingReference||null,input.agenda||null,userId])).rows[0];
+    const row=(await db.query("insert into mentorship_session(mentorship_id,scheduled_start_at,scheduled_end_at,mode,location_label,meeting_reference,agenda,created_by,coordination_status,proposed_by,proposal_note) values($1,$2,$3,$4,$5,$6,$7,$8,'proposed',$8,$9) returning *",[mentorshipId,input.scheduledStartAt,input.scheduledEndAt,input.mode||"remote",input.locationLabel||null,input.meetingReference||null,input.agenda||null,userId,String(input.proposalNote||"").trim().slice(0,1000)||null])).rows[0];
     await audit(db,userId,"mentorship.session_created","mentorship_session",row.id,requestId);
     const other=m.mentor_user_id===userId?m.mentee_user_id:m.mentor_user_id;
-    await notify(db,other,"mentorship.session_scheduled","mentorship_session",row.id,{message:"A mentorship session has been scheduled.",nextAction:"Review the date, time, mode and agenda, then coordinate any change with the other participant.",actionUrl:"/mentorship",actionRequired:true,priority:"high",scheduledStartAt:row.scheduled_start_at,scheduledEndAt:row.scheduled_end_at});
+    await notify(db,other,"mentorship.session_scheduled","mentorship_session",row.id,{message:"A first-session proposal is waiting for your confirmation.",nextAction:"Review the proposed date, time, mode and agenda in the mentorship workspace. No private contact details are shared.",actionUrl:"/mentorship",actionRequired:true,priority:"high",scheduledStartAt:row.scheduled_start_at,scheduledEndAt:row.scheduled_end_at,coordinationStatus:"proposed"});
     return row;
   });
 }

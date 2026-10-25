@@ -53,8 +53,9 @@ The G6 database test suite covers:
 4. Requester acceptance records final outcome, evidence reference, actor and timestamps.
 5. Revision requests clear the current completion submission and require a new accepted delivery.
 6. Disputes pause completion; after resuming, new evidence is required.
-7. Pro-bono/free engagements do not require payment submission or finance settlement.
-8. A manual/ongoing program remains active after one completed engagement.
-9. A single-engagement listing is fulfilled only after requester acceptance.
+7. Pro-bono/free engagements do not require payment submission or finance settlement, while discounted paid services require verified settlement separately.
+8. Explicit description-only evidence is accepted only when configured; private-file policy rejects a delivery without a private file.
+9. A manual/ongoing program remains active after one completed engagement.
+10. A single-engagement listing is fulfilled only after requester acceptance, and cannot be fulfilled early.
 
 Run node --test test/services-mentorship/serve-community-g6-outcomes.test.js against a disposable PostgreSQL database with all prerequisite migrations applied. Then run the existing G2–G5 tests, migration compatibility checks, lint/type/build checks, API acceptance and final CI gate. Do not run migrations or tests against production data.

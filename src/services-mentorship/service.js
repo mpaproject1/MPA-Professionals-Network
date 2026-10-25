@@ -110,7 +110,9 @@ export async function createServiceListing(userId,input,requestId,idempotencyKey
  if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
   throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
  const organizationId=input.organizationId||null;
- const normalized={userId,organizationId,title:String(input.title||"").trim(),description:String(input.description||"").trim(),serviceCategory:String(input.serviceCategory||"").trim(),deliveryMode:input.deliveryMode||"remote",locationLabel:input.locationLabel||null,pricingModel:input.pricingModel||"quote",priceAmount:input.priceAmount??null,currency:input.currency||null,visibility:input.visibility||"members",maxActiveRequests:input.maxActiveRequests??null,expiresAt:input.expiresAt||null};
+ const expiryInput=input.expiresAt===undefined||input.expiresAt===null||input.expiresAt===""?null:new Date(input.expiresAt);
+ if(expiryInput && (!Number.isFinite(expiryInput.getTime())||expiryInput.getTime()<=Date.now())) throw error(400,"Expiry must be a valid future date/time or left empty for no expiry.","INVALID_EXPIRY");
+ const normalized={userId,organizationId,title:String(input.title||"").trim(),description:String(input.description||"").trim(),serviceCategory:String(input.serviceCategory||"").trim(),deliveryMode:input.deliveryMode||"remote",locationLabel:input.locationLabel||null,pricingModel:input.pricingModel||"quote",priceAmount:input.priceAmount??null,currency:input.currency||null,visibility:input.visibility||"members",maxActiveRequests:input.maxActiveRequests??null,expiresAt:expiryInput?expiryInput.toISOString():null};
  if(!normalized.title||!normalized.description||!normalized.serviceCategory) throw error(400,"title, description and serviceCategory are required.","VALIDATION_ERROR");
  if(!["free","fixed","hourly","quote"].includes(normalized.pricingModel)) throw error(400,"Unsupported pricing model.","VALIDATION_ERROR");
  const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);

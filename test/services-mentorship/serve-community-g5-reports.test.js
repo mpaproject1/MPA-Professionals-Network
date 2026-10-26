@@ -6,7 +6,7 @@ import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import {closePool,getPool} from "../../src/platform/db.js";
 import {makePdf,makeXlsx} from "../../src/platform/reports.js";
-import {runImpactReport,toImpactExportData,MIN_GROUP_SIZE} from "../../src/platform/serve-community-impact-reports.js";
+import {MIN_GROUP_SIZE, runImpactReport,toImpactExportData} from "../../src/platform/serve-community-impact-reports.js";
 import * as services from "../../src/services-mentorship/service.js";
 
 function unzipXlsxText(buffer){

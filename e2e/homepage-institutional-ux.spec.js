@@ -122,7 +122,7 @@ test.describe("institutional homepage responsive acceptance", () => {
     await page.goto("/");
     await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Network", exact: true })).toHaveCount(0);
-    await page.getByRole("link", { name: /Explore Serve-Community/i }).click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Serve-Community", exact: true }).click();
     await expect(page).toHaveURL(/\/serve-community$/);
     await expect(page.getByRole("heading", { name: /Serve-Community\. More ways to contribute/i })).toBeVisible();
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "/serve-community");

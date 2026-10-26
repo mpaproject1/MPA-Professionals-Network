@@ -206,7 +206,7 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
  assert.equal(completed.status,"completed");
  const persistedEvents=(await getPool().query("select from_status,to_status,note from service_request_event where request_id=$1 order by created_at",[request.id])).rows;
  assert.ok(persistedEvents.some(event=>event.to_status==="requested"),"request submission must be recorded in status history");
- assert.ok(persistedEvents.some(event=>event.from_status==="in_progress"&&event.to_status==="in_progress"&&String(event.note||"").includes("requester acceptance")),"provider completion submission must be distinct from requester acceptance");
+ assert.ok(persistedEvents.some(event=>event.from_status==="in_progress"&&event.to_status==="in_progress"&&String(event.note||"").includes("requester decision is required")),"provider completion submission must be distinct from requester acceptance");
  assert.ok(persistedEvents.some(event=>event.from_status==="in_progress"&&event.to_status==="completed"),"requester outcome acceptance must be persisted as a separate transition");
  const auditActions=(await getPool().query("select action from audit_log where resource_type='service_request' and resource_id=$1",[request.id])).rows.map(row=>row.action);
  assert.ok(auditActions.includes("service.request_completion_submitted"));
@@ -226,6 +226,8 @@ test("Gate 2: paid service completion cannot be accepted before finance verifies
  await journeys.changeServiceRequestStatus(request.id,provider,"accepted","Agreed fixed price: ETB 500.","gate2-paid-service-accept");
  await journeys.acceptServiceAgreement(request.id,requester,"gate2-paid-service-agreement-accept");
  await journeys.changeServiceRequestStatus(request.id,provider,"in_progress","Work started.","gate2-paid-service-start");
+ const delivery=await journeys.submitServiceDelivery(request.id,provider,{description:"The agreed operating procedure review and supporting recommendations are ready for requester review."},"gate2-paid-service-delivery");
+ assert.equal((await journeys.reviewServiceDelivery(delivery.id,requester,{status:"accepted",note:"Reviewed and accepted."},"gate2-paid-service-delivery-review")).status,"accepted");
  await journeys.changeServiceRequestStatus(request.id,provider,"completed","Deliverables are ready for requester review.","gate2-paid-service-submit-completion");
  await assert.rejects(journeys.acceptServiceCompletion(request.id,requester,"The work looks complete.","gate2-paid-service-premature-accept"),error=>error.code==="PAYMENT_NOT_SETTLED");
  const payment=await journeys.submitServicePayment(request.id,requester,{amount:500,currency:"ETB",channel:"bank_transfer",reference:`GATE2-${randomUUID()}`,idempotencyKey:`gate2-paid-service-${randomUUID()}`},"gate2-paid-service-payment");

@@ -195,6 +195,7 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
  const request=concurrentRequests[0];
  await assert.rejects(journeys.changeServiceRequestStatus(request.id,await account(),"accepted","unrelated user","gate2-outsider"),e=>e.code==="FORBIDDEN");
  assert.equal((await journeys.changeServiceRequestStatus(request.id,provider,"accepted","Scope confirmed.","gate2-service-accept")).status,"accepted");
+ await journeys.acceptServiceAgreement(request.id,requester,"gate2-service-agreement-accept");
  assert.equal((await journeys.changeServiceRequestStatus(request.id,provider,"in_progress","Work started.","gate2-service-start")).status,"in_progress");
  const milestone=await journeys.createServiceMilestone(request.id,provider,{title:"Quarterly reconciliation","description":"Reconcile records and deliver a summary."},"gate2-service-milestone");
  const delivery=await journeys.submitServiceDelivery(request.id,provider,{milestoneId:milestone.id,description:"Reconciliation completed; summary and exceptions are documented."},"gate2-service-delivery");
@@ -210,7 +211,7 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
  const auditActions=(await getPool().query("select action from audit_log where resource_type='service_request' and resource_id=$1",[request.id])).rows.map(row=>row.action);
  assert.ok(auditActions.includes("service.request_completion_submitted"));
  assert.ok(auditActions.includes("service.request_completion_accepted"));
- const feedback=await journeys.submitServiceFeedback(request.id,requester,{targetRole:"provider",rating:5,comments:"Clear communication and useful outcome."},"gate2-service-feedback");
+ const feedback=await journeys.submitServiceFeedback(request.id,requester,{targetRole:"provider",category:"service_quality",rating:5,comments:"Clear communication and useful outcome."},"gate2-service-feedback");
  assert.equal(Number(feedback.rating),5);
 });
 
@@ -223,6 +224,7 @@ test("Gate 2: paid service completion cannot be accepted before finance verifies
  await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Fixed-price scope and terms reviewed."},"gate2-paid-service-moderate");
  const request=await journeys.requestService(listing.id,requester,{message:"Please deliver the fixed-price operating procedure review.",proposedPrice:500,currency:"ETB"},"gate2-paid-service-request",randomUUID());
  await journeys.changeServiceRequestStatus(request.id,provider,"accepted","Agreed fixed price: ETB 500.","gate2-paid-service-accept");
+ await journeys.acceptServiceAgreement(request.id,requester,"gate2-paid-service-agreement-accept");
  await journeys.changeServiceRequestStatus(request.id,provider,"in_progress","Work started.","gate2-paid-service-start");
  await journeys.changeServiceRequestStatus(request.id,provider,"completed","Deliverables are ready for requester review.","gate2-paid-service-submit-completion");
  await assert.rejects(journeys.acceptServiceCompletion(request.id,requester,"The work looks complete.","gate2-paid-service-premature-accept"),error=>error.code==="PAYMENT_NOT_SETTLED");
@@ -246,6 +248,7 @@ test("Gate 2: verified organization publishes under its own identity and can ful
  assert.equal((await journeys.listMyServiceRequests(owner)).some(row=>row.id===request.id),true,"authorized organization owner can follow the request");
  assert.equal((await journeys.listMyServiceRequests(await account())).some(row=>row.id===request.id),false,"unrelated account cannot discover organization request details");
  assert.equal((await journeys.changeServiceRequestStatus(request.id,owner,"accepted","Organization accepted the request.","gate2-org-service-accept")).status,"accepted");
+ await journeys.acceptServiceAgreement(request.id,requester,"gate2-org-service-agreement-accept");
  assert.equal((await journeys.changeServiceRequestStatus(request.id,owner,"in_progress","The organization began the agreed work.","gate2-org-service-start")).status,"in_progress");
  const milestone=await journeys.createServiceMilestone(request.id,owner,{title:"Training delivery",description:"Deliver the agreed workshop, materials and learning outcomes."},"gate2-org-service-milestone");
  const delivery=await journeys.submitServiceDelivery(request.id,owner,{milestoneId:milestone.id,description:"Workshop delivered, materials shared and learning outcomes summarized."},"gate2-org-service-delivery");
@@ -253,7 +256,7 @@ test("Gate 2: verified organization publishes under its own identity and can ful
  await journeys.changeServiceRequestStatus(request.id,owner,"completed","Organization submitted the agreed deliverables for requester acceptance.","gate2-org-service-completion");
  const acceptedOutcome=await journeys.acceptServiceCompletion(request.id,requester,"The training outcome and materials are accepted.","gate2-org-service-outcome");
  assert.equal(acceptedOutcome.status,"completed");
- const feedback=await journeys.submitServiceFeedback(request.id,requester,{targetRole:"provider",rating:5,comments:"The organization delivered the agreed training outcome."},"gate2-org-service-feedback");
+ const feedback=await journeys.submitServiceFeedback(request.id,requester,{targetRole:"provider",category:"outcome",rating:5,comments:"The organization delivered the agreed training outcome."},"gate2-org-service-feedback");
  assert.equal(Number(feedback.rating),5);
 });
 

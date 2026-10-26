@@ -187,13 +187,14 @@ export default function Jobs(){
    <div className="split" style={{marginTop:20}}>
      <Card id="job-search" className="filter">
        <form onSubmit={submitFilters}>
-         <div className="row"><b>Search opportunities</b><SlidersHorizontal size={17}/></div>
-         <label style={{display:"grid",gap:6,marginTop:14,fontSize:13,fontWeight:700}}>Role, skill or sector<input value={filters.q} onChange={e=>setFilters({...filters,q:e.target.value})} placeholder="Search job title or description"/></label>
-         <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Location<input value={filters.location} onChange={e=>setFilters({...filters,location:e.target.value})} placeholder="City or region"/></label>
+         <fieldset className="form-category grid" style={{gap:10}}><legend>Find opportunities</legend>
+         <label style={{display:"grid",gap:6,marginTop:4,fontSize:13,fontWeight:700}}>Role, skill or sector<input value={filters.q} onChange={e=>setFilters({...filters,q:e.target.value})} placeholder="Search job title or description"/></label></fieldset>
+         <details className="form-category"><summary style={{cursor:"pointer",fontWeight:700}}>Refine results <span className="muted">· location, work type and visibility</span></summary><div className="grid" style={{gap:10,marginTop:12}}>
+         <label style={{display:"grid",gap:6,fontSize:13,fontWeight:700}}>Location<input value={filters.location} onChange={e=>setFilters({...filters,location:e.target.value})} placeholder="City or region"/></label>
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Employment type<input value={filters.employmentType} onChange={e=>setFilters({...filters,employmentType:e.target.value})} placeholder="e.g. full_time"/></label>
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Work mode<input value={filters.workMode} onChange={e=>setFilters({...filters,workMode:e.target.value})} placeholder="e.g. remote"/></label>
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Seniority<input value={filters.seniority} onChange={e=>setFilters({...filters,seniority:e.target.value})} placeholder="Seniority level"/></label>
-         <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Scope<select value={filters.postingScope} onChange={e=>setFilters({...filters,postingScope:e.target.value})}><option value="">All opportunities visible to me</option><option value="public">Public</option><option value="partner_network">Member network</option><option value="organization_internal">Organization internal</option></select></label>
+         <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Scope<select value={filters.postingScope} onChange={e=>setFilters({...filters,postingScope:e.target.value})}><option value="">All opportunities visible to me</option><option value="public">Public</option><option value="partner_network">Member network</option><option value="organization_internal">Organization internal</option></select></label></div></details>
          <button className="btn btn-primary" type="submit" disabled={loading} style={{width:"100%",marginTop:18}}>{loading?"Finding matching jobs…":"Apply filters"}</button>
          <button className="btn btn-ghost" type="button" onClick={()=>{setFilters(initialFilters);void loadJobs(initialFilters,0)}} disabled={loading} style={{width:"100%",marginTop:8}}>Clear filters</button>
          <button className="btn btn-ghost" type="button" onClick={()=>void createAlert()} disabled={creatingAlert||loading} style={{width:"100%",marginTop:8}}>{creatingAlert?"Saving alert…":"Save job alert"}</button>

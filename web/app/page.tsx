@@ -187,7 +187,7 @@ export default function Home() {
           <h2 id="platform-update-title">Professional participation, with community service in view.</h2>
           <p>Explore public opportunities and services. Where verification, review or sharing consent is required, those steps remain governed by the relevant workflow.</p>
         </div>
-        <Link href="/serve-community" className={styles.announcementAction}>Explore Serve-Community <ArrowRight size={17} aria-hidden="true" /></Link>
+        
       </section>
 
       <section className={styles.section} id="live-network" aria-labelledby="live-network-heading">

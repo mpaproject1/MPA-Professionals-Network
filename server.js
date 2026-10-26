@@ -19,9 +19,9 @@ import {authorizePrivateUpload, confirmPrivateUpload, MAX_PRIVATE_UPLOAD_BYTES, 
 import * as publicOpportunity from "./src/platform/public-opportunity.js";
 import * as referencePortfolio from "./src/platform/reference-portfolio.js";
 import * as reports from "./src/platform/reports.js";
-import * as serveCommunityImpactReports from "./src/platform/serve-community-impact-reports.js";
 import * as savedDiscoveryItems from "./src/platform/saved-discovery-items.js";
 import {enforcePersistentRateLimit, issueHumanChallenge, verifyHumanChallenge} from "./src/platform/security-controls.js";
+import * as serveCommunityImpactReports from "./src/platform/serve-community-impact-reports.js";
 import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
 import * as supportBot from "./src/platform/support-bot.js";
 import * as userAdmin from "./src/platform/user-admin.js";

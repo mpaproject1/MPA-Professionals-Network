@@ -462,7 +462,7 @@ body{background:radial-gradient(ellipse at 12% 8%,rgba(218,239,147,.22),transpar
  .topbar .top-actions .icon-btn{width:34px;height:34px}
  .topbar .top-actions select{padding:7px 4px;max-width:55px}
  .topbar .top-actions .btn{padding:8px 10px;font-size:12px}
- .mobile-nav{display:block;position:fixed;z-index:60;top:8px;right:8px;bottom:auto;left:auto;width:auto;padding:0;background:transparent;border:0;box-shadow:none}
+ .mobile-nav{display:none!important}
  .mobile-menu-trigger{width:38px;height:38px;border:1px solid var(--border);background:var(--surface);box-shadow:0 5px 16px rgba(6,24,42,.1)}
  .mobile-more-panel{position:absolute;top:46px;right:0;left:auto;bottom:auto;width:min(88vw,320px);max-height:calc(100dvh - 70px);overflow:auto;padding:8px;border:1px solid var(--border);border-radius:17px;background:var(--surface);box-shadow:0 18px 48px rgba(6,24,42,.2)}
  .shell-main{padding:22px 14px 70px}
@@ -487,3 +487,8 @@ body{background:radial-gradient(ellipse at 12% 8%,rgba(218,239,147,.22),transpar
 .mpa-auth-hint h2,.mpa-auth-hint h3{margin-top:0}
 @media(max-width:560px){.mpa-demand .demand-view-tabs{grid-template-columns:1fr}.mpa-demand .demand-view-tabs button{text-align:left}}
 @media(prefers-reduced-motion:reduce){.operation-status__icon--moving,.mpa-loading-indicator{animation:none}}
+
+
+button[aria-busy=true]::after,.btn[aria-busy=true]::after{content:"";display:inline-block;width:15px;height:15px;margin-left:8px;flex:0 0 15px;border:2px solid color-mix(in srgb,currentColor 25%,transparent);border-top-color:var(--gold);border-right-color:var(--primary);border-radius:50%;animation:mpa-brand-spin .75s linear infinite}
+button[aria-busy=true]{pointer-events:none}
+@media(max-width:760px){.topbar .desktop-nav{padding-right:43px}.topbar .desktop-more{position:absolute;right:8px;top:9px}.topbar .desktop-more-trigger{width:38px;height:38px}}

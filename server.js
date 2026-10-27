@@ -1,5 +1,12 @@
 import {randomUUID} from "node:crypto";
+import {existsSync} from "node:fs";
+import {fileURLToPath} from "node:url";
 import http from "node:http";
+
+// Load the repository-root .env for direct Node/cPanel starts. Existing process
+// environment variables take precedence, so hosting-panel secrets are not overwritten.
+const envFile=fileURLToPath(new URL("./.env",import.meta.url));
+if(existsSync(envFile)) process.loadEnvFile(envFile);
 import * as membershipAdminBulk from "./src/membership/admin-bulk.js";
 import * as membershipCard from "./src/membership/card.js";
 import * as membership from "./src/membership/service.js";
@@ -111,7 +118,7 @@ function anyRoleOrPermission(identity,allowed,permissionCodes=[]){
 function ok(res,data,requestId,status=200){ return json(res,status,{data},requestId); }
 const rateBuckets=new Map();
 function publicRateLimit(req,key,limit=30,windowMs=60000){ const now=Date.now(), k=`${key}:${clientIp(req)}`; const b=rateBuckets.get(k)||{start:now,count:0}; if(now-b.start>=windowMs){b.start=now;b.count=0} b.count++; rateBuckets.set(k,b); if(b.count>limit) throw Object.assign(new Error("Too many requests. Please try again later."),{statusCode:429,code:"RATE_LIMITED"}); }
-async function bootstrapAdmin(){ if(!config.bootstrapAdminEmail||!config.bootstrapAdminPassword) return; const m=await import("./src/membership/service.js"); return m.bootstrapAdmin({email:config.bootstrapAdminEmail,password:config.bootstrapAdminPassword,name:config.bootstrapAdminName}); }
+async function bootstrapAdmin(){ if(!config.bootstrapAdminEmail&&!config.bootstrapAdminPassword){logger.info("bootstrap.admin.skipped",{reason:"environment_credentials_not_configured"});return null;} if(!config.bootstrapAdminEmail||!config.bootstrapAdminPassword) throw Object.assign(new Error("Set both BOOTSTRAP_SUPER_ADMIN_EMAIL and BOOTSTRAP_SUPER_ADMIN_PASSWORD (or both BOOTSTRAP_ADMIN_* aliases)."),{code:"BOOTSTRAP_ENV_INCOMPLETE"}); const m=await import("./src/membership/service.js"); const result=await m.bootstrapAdmin({email:config.bootstrapAdminEmail,password:config.bootstrapAdminPassword,name:config.bootstrapAdminName}); logger.info("bootstrap.admin.ready",{email:result.email,userId:result.userId}); return result; }
 
 const server=http.createServer(async (req,res)=>{
   const requestId=req.headers["x-request-id"]||randomUUID();

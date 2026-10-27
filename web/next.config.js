@@ -14,5 +14,14 @@ module.exports = {
 	poweredByHeader: false,
 	async rewrites() {
 		return [{ source: "/api/:path*", destination: `${apiServerBase}/api/:path*` }];
+	},
+	async headers() {
+		return [{
+			source: "/verify-email",
+			headers: [
+				{ key: "Referrer-Policy", value: "no-referrer" },
+				{ key: "Cache-Control", value: "no-store, max-age=0" }
+			]
+		}];
 	}
 };

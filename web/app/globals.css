@@ -491,7 +491,7 @@ body{background:radial-gradient(ellipse at 12% 8%,rgba(218,239,147,.22),transpar
 
 button[aria-busy=true]::after,.btn[aria-busy=true]::after{content:"";display:inline-block;width:15px;height:15px;margin-left:8px;flex:0 0 15px;border:2px solid color-mix(in srgb,currentColor 25%,transparent);border-top-color:var(--gold);border-right-color:var(--primary);border-radius:50%;animation:mpa-brand-spin .75s linear infinite}
 button[aria-busy=true]{pointer-events:none}
-@media(max-width:760px){.topbar .desktop-nav{padding-right:43px}.topbar .desktop-more{position:absolute;right:8px;top:9px}.topbar .desktop-more-trigger{width:38px;height:38px}}
+@media(max-width:760px){.topbar .desktop-nav{padding-right:0;gap:2px}.topbar .desktop-more{position:relative;right:auto;top:auto;flex:0 0 auto}.topbar .desktop-more-trigger{width:36px;height:36px}}
 
 
 .mpa-collapsible-guide{border:1px solid var(--border);border-radius:17px;background:color-mix(in srgb,var(--surface) 90%,var(--bg));overflow:hidden}

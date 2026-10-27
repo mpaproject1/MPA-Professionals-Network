@@ -597,7 +597,7 @@ export async function expireDueMemberships(batchSize=500){
     from expired e
     returning resource_id
   )
-  select e.id,e.user_id,e.end_date from expired e join logged l on l.resource_id=e.id::text
+  select e.id,e.user_id,e.end_date from expired e
   order by e.end_date asc`,[size]);
   return {expiredCount:result.rowCount,items:result.rows};
  });

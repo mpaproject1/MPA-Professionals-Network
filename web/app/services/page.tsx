@@ -186,7 +186,7 @@ export default function Services(){
    }finally{releaseAction(lock);setSubmitting(false);}
  }
 
- return <div className="grid">
+ return <div className="grid mpa-experience mpa-services">
    <p className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm"><span>Looking for help that is not listed yet?</span> <a className="btn btn-secondary" href="/service-demand">Explore service requests and unmet needs →</a></p>
    <div><Link href="/serve-community" className="text-link">← Back to Serve-Community</Link><div className="eyebrow" style={{marginTop:8}}>Professional services</div><h1 className="h1">Find expertise. Agree the work clearly.</h1><p className="muted">Explore published professional services and compare the scope, delivery mode and pricing details provided. Sign in to request a public offer; member-only offers require active membership, and providers must accept before work begins.</p><div className="mt-3"><Badge><ShieldCheck size={13}/> Public listings are reviewed before publication</Badge></div></div>
    <div className="row" style={{gap:8,flexWrap:"wrap"}}>

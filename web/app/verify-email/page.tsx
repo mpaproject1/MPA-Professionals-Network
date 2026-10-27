@@ -38,6 +38,8 @@ export default function VerifyEmail(){
    }
   }catch{localStorage.removeItem(ORGANIZATION_DRAFT_KEY);}
   const value=new URLSearchParams(window.location.search).get("token")||"";
+  // Remove the one-time credential from the address bar/history before any further navigation.
+  if(value)window.history.replaceState({},document.title,"/verify-email");
   setToken(value);
   if(value)void verify(value);
   else setStatus("Enter the verification token from your email link.");

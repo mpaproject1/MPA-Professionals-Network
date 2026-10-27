@@ -7,7 +7,12 @@ let pool;
 export function getPool(){
   if(!pool) {
     const config=loadConfig();
-    if(!config.databaseUrl) throw new Error("DATABASE_URL is required for database operations.");
+    if(!config.databaseUrl) {
+      throw Object.assign(
+        new Error("DATABASE_URL is not configured. Copy .env.example to .env, set DATABASE_URL to a reachable PostgreSQL database, apply migrations, then restart the API."),
+        { code: "DATABASE_URL_REQUIRED", statusCode: 503 }
+      );
+    }
     pool=new Pool({connectionString:config.databaseUrl,max:Number(process.env.DB_POOL_MAX||10),idleTimeoutMillis:30000});
   }
   return pool;

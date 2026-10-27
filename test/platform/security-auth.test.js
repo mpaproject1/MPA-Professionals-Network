@@ -6,7 +6,7 @@ import { verifyToken } from "../../src/platform/auth.js";
 import { loadConfig } from "../../src/platform/config.js";
 import { closePool, getPool, withTransaction } from "../../src/platform/db.js";
 import { assertEmailDeliveryConfigured, createEmailVerification, verifyEmailToken } from "../../src/platform/email-verification.js";
-import { consumeHumanChallenge, enforcePersistentRateLimit, hashSecurityToken, issueHumanChallenge, verifyHumanChallenge } from "../../src/platform/security-controls.js";
+import { clientAddress, consumeHumanChallenge, enforcePersistentRateLimit, hashSecurityToken, issueHumanChallenge, verifyHumanChallenge } from "../../src/platform/security-controls.js";
 import { beginAdminPasskeyAuthentication, finishAdminPasskeyAuthentication, recoverAdminPasskey } from "../../src/platform/webauthn.js";
 
 const suffix=randomUUID().replace(/-/g,"").slice(0,12);
@@ -194,4 +194,18 @@ test.after(async()=>{
   const db=getPool();
   for(const userId of createdUsers){await db.query("delete from app_user_role where user_id=$1",[userId]);await db.query("update app_user set status='suspended',admin_passkey_enforced_at=null where id=$1",[userId]);}
   await closePool();
+});
+
+
+test("trusted proxy mode uses the forwarded visitor IP for per-IP security limits",()=>{
+  const previous=process.env.TRUST_PROXY;
+  const request={headers:{"x-forwarded-for":"203.0.113.8, 10.0.0.2"},socket:{remoteAddress:"10.0.0.5"}};
+  try {
+    delete process.env.TRUST_PROXY;
+    assert.equal(clientAddress(request),"10.0.0.5","forwarded headers must not be trusted by default");
+    process.env.TRUST_PROXY="true";
+    assert.equal(clientAddress(request),"203.0.113.8","trusted proxy mode must use the original visitor IP");
+  } finally {
+    if(previous===undefined)delete process.env.TRUST_PROXY;else process.env.TRUST_PROXY=previous;
+  }
 });

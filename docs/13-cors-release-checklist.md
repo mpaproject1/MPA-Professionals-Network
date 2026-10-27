@@ -85,3 +85,22 @@ Do not treat skipped smoke tests as production validation. Run the command expli
 ## Operational safety
 
 Do not paste `.env`, credentials, JWT secrets, database URLs or full environment dumps into issues or logs. When diagnosing environment propagation, report only whether the expected variable is present and whether the origin matches; never print unrelated environment values.
+
+
+## Registration human-check rate-limit diagnosis
+
+The registration page requests `GET /api/v1/auth/human-challenge`. The API applies a persistent limit of 10 requests per 60 seconds per detected client address. The API's `clientAddress()` intentionally ignores forwarded headers unless `TRUST_PROXY=true`.
+
+The portal's Next.js rewrite proxies `/api/:path*` to the API server. If the API sees only the portal/reverse-proxy address, legitimate visitors share one rate-limit bucket and can receive HTTP 429 even though they are different people. Repeated challenge requests can exhaust the same bucket faster.
+
+**Safe production configuration, only after confirming the proxy setup:**
+
+1. Confirm the trusted reverse proxy overwrites (does not merely append untrusted input to) `X-Forwarded-For`.
+2. Confirm direct access to the Node API cannot bypass that proxy.
+3. Set `TRUST_PROXY=true` in the API application's protected runtime environment, then restart the API process.
+4. Verify a request through the real portal and API logs that distinct clients produce distinct address buckets. Do not log full environment values or personal data.
+5. Test that the challenge endpoint succeeds for normal visitors, still rate-limits repeated requests from one client, and registration still rejects missing/invalid human-check tokens.
+
+Keep `TRUST_PROXY=false` unless steps 1 and 2 are verified. Do not solve this by removing the rate limit, increasing it blindly, allowing arbitrary forwarded headers, or bypassing server-side challenge verification.
+
+The repository cannot confirm the currently running production value of `TRUST_PROXY` or the actual forwarded headers. Those must be verified in the protected cPanel/Node runtime before the live issue can be declared resolved.

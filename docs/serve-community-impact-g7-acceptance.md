@@ -1,7 +1,7 @@
 # Serve-Community G7 — final pre-deployment acceptance gate
 
-**Branch:** `reconcile/serve-community-g7-unique-changes-20261027`  
-**Stack:** starts from exact G6 head `04bda6e82efa5613b7a5cca7d36dc008eb460eb6`; G7 acceptance checklist retained; this document is not evidence that acceptance has passed  
+**Branch:** `reconcile/serve-community-g7-current-g6-20261027`  
+**Stack:** starts from exact current G6 head `c0ddc1cf8924ff747097cc1bf6fb0af3e5584981`; G7 acceptance checklist retained; this document is not evidence that acceptance has passed  
 **Status:** Acceptance plan recorded; no G7 pass is claimed until every required check is executed on the exact combined head.
 
 ## Required execution evidence

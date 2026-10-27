@@ -519,6 +519,8 @@ export default function Organizations() {
           never assumed by the interface.
         </p>
       </div>
+      <details className="mpa-collapsible-guide">
+        <summary>Why partner with MPA · Explore benefits</summary>
       <Card>
         <div className="eyebrow">Why partner with MPA</div>
         <h2 className="h2">A more trusted way to connect with professionals</h2>
@@ -531,6 +533,7 @@ export default function Organizations() {
           <section className="membership-plan"><h3 className="h2">Support a shared professional ecosystem</h3><p className="muted">Participate in a nonprofit network that supports professional development, mentorship and clearer connections between institutions and talent, while retaining responsibility for fair recruitment and selection.</p></section>
         </div>
       </Card>
+      </details>
       <details className="mpa-collapsible-guide">
         <summary>How organization verification and hiring workflows work</summary>
       <JourneyGuide

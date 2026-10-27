@@ -245,12 +245,18 @@ export async function moderateListing(listingType,listingId,actorId,input,reques
   const table=listingType==="service"?"service_listing":listingType==="mentorship"?"mentor_profile":listingType==="organization_mentorship"?"organization_mentorship_offer":null;
   if(!table)throw fail(400,"Unsupported listing type.","VALIDATION_ERROR");
   const idColumn=listingType==="service"?"id":"id";
-  const row=(await db.query(`select id,status,moderation_status from ${table} where ${idColumn}=$1 for update`,[listingId])).rows[0];
+  const row=(await db.query(`select id,status,moderation_status,${listingType==="service"?"lifecycle_status":"null::text as lifecycle_status"} from ${table} where ${idColumn}=$1 for update`,[listingId])).rows[0];
   if(!row)throw fail(404,"Listing not found.","NOT_FOUND");
-  if(row.status==="closed"||row.status==="closed")throw fail(409,"Closed listings cannot be moderated back into circulation.","INVALID_STATE");
+  if(row.status==="closed")throw fail(409,"Closed listings cannot be moderated back into circulation.","INVALID_STATE");
   const publicStatus=decision==="approved"?(listingType==="mentorship"?"active":"published"):decision==="rejected"?"closed":"draft";
-  const updated=(await db.query(`update ${table} set moderation_status=$1,moderation_note=$2,moderated_by=$3,moderated_at=now(),status=case when $1='approved' then $4 when $1='rejected' then 'closed' else $5 end,updated_at=now() where id=$6 returning id,status,moderation_status,moderation_note,moderated_at`,[decision,note,actorId,publicStatus,"draft",listingId])).rows[0];
-  await audit(db,actorId,"marketplace.listing_moderated",listingType==="service"?"service_listing":listingType==="organization_mentorship"?"organization_mentorship_offer":"mentor_profile",listingId,requestId,{decision,note});
+  const lifecycleStatus=decision==="approved"?"active":decision==="rejected"?"archived":"draft";
+  const updated=listingType==="service"
+   ?(await db.query(`update service_listing set moderation_status=$1,moderation_note=$2,moderated_by=$3,moderated_at=now(),status=case when $1='approved' then $4 when $1='rejected' then 'closed' else $5 end,lifecycle_status=$6,updated_at=now() where id=$7 returning id,status,moderation_status,moderation_note,moderated_at,lifecycle_status`,[decision,note,actorId,publicStatus,"draft",lifecycleStatus,listingId])).rows[0]
+   :(await db.query(`update ${table} set moderation_status=$1,moderation_note=$2,moderated_by=$3,moderated_at=now(),status=case when $1='approved' then $4 when $1='rejected' then 'closed' else $5 end,updated_at=now() where id=$6 returning id,status,moderation_status,moderation_note,moderated_at`,[decision,note,actorId,publicStatus,"draft",listingId])).rows[0];
+  if(listingType==="service"&&row.lifecycle_status!==lifecycleStatus){
+   await db.query("insert into service_listing_lifecycle_event(listing_id,actor_user_id,from_status,to_status,reason,request_id) values($1,$2,$3,$4,$5,$6)",[listingId,actorId,row.lifecycle_status||null,lifecycleStatus,"Support Desk moderation decision: "+decision,requestId]);
+  }
+  await audit(db,actorId,"marketplace.listing_moderated",listingType==="service"?"service_listing":listingType==="organization_mentorship"?"organization_mentorship_offer":"mentor_profile",listingId,requestId,{decision,note,lifecycleStatus:listingType==="service"?lifecycleStatus:undefined});
   return updated;
  });
 }

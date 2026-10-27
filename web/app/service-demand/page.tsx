@@ -48,7 +48,7 @@ export default function ServiceDemand(){
     <form className="grid" style={{gap:14}} onSubmit={submit} aria-busy={saving||submissionUncertain}>
       <div className="field-banner" role="note"><span><b>Draft privacy:</b> Your request is not sent until you submit it. You can optionally keep this draft in this browser tab for up to 24 hours; do not enable this on a shared device.</span></div>
       <label className="row" style={{justifyContent:"flex-start",gap:10,flexWrap:"wrap"}}><input type="checkbox" checked={keepDraft} disabled={saving||submissionUncertain} onChange={e=>setKeepDraft(e.target.checked)} style={{width:18,height:18}}/>Keep this private request as a draft in this tab</label>
-      <div className="grid grid-2">
+      <fieldset className="form-category grid" style={{gap:12}}><legend>1. Describe the need</legend><div className="grid grid-2">
         <label>What do you need?
           <select value={form.demandType} disabled={saving||submissionUncertain} onChange={e=>{setIdempotencyKey("");setSubmissionUncertain(false);setForm(v=>({...v,demandType:e.target.value}));}}>
             <option value="service">Professional service</option><option value="mentorship">Mentorship</option>
@@ -63,8 +63,8 @@ export default function ServiceDemand(){
       </label>
       <label>Details
         <textarea required minLength={10} maxLength={5000} rows={4} value={form.description} disabled={saving||submissionUncertain} onChange={e=>{setIdempotencyKey("");setSubmissionUncertain(false);setForm(v=>({...v,description:e.target.value}));}} placeholder="What outcome would help? Include only information needed to understand the request."/>
-      </label>
-      <div className="grid grid-2">
+      </label></fieldset>
+      <fieldset className="form-category grid" style={{gap:12}}><legend>2. Delivery and scope</legend><div className="grid grid-2">
         <label>Preferred delivery
           <select value={form.deliveryMode} disabled={saving||submissionUncertain} onChange={e=>{setIdempotencyKey("");setSubmissionUncertain(false);setForm(v=>({...v,deliveryMode:e.target.value}));}}>
             <option value="flexible">Flexible / not sure</option><option value="remote">Remote</option><option value="onsite">On-site</option><option value="hybrid">Hybrid</option>
@@ -82,7 +82,7 @@ export default function ServiceDemand(){
           <option value="">Personal request</option>{orgs.map(o=><option key={o.id} value={o.id}>{o.display_name}</option>)}
         </select>
         <span className="tagline">Only active organization owners and administrators can submit organization-scoped demand.</span>
-      </label>}
+      </label>}</fieldset>
       <div className="row" style={{justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
         <p className="muted">Submitting does not publish your details or create a service contract.</p>
         {token?<button className="btn btn-primary" type="submit" disabled={saving}>{saving?"Submitting private request…":submissionUncertain?"Check previous submission":"Send private request"} <Send size={16}/></button>:<a className="btn btn-primary" href="/login?next=/service-demand">Sign in to submit <ArrowRight size={16}/></a>}

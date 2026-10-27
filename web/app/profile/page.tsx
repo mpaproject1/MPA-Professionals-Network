@@ -519,7 +519,7 @@ export default function Profile() {
                 Fields marked <b>*</b> are required to save your identity. Other
                 details are optional and can be added later.
               </p>
-              <div className="grid grid-2">
+              <fieldset className="form-category grid" style={{gap:12}}><legend>1. Identity and contact</legend><div className="grid grid-2">
                 {(
                   [
                     ["firstName", "First name *"],
@@ -557,8 +557,8 @@ export default function Profile() {
                     )}
                   </div>
                 ))}
-              </div>
-              <div>
+              </div></fieldset>
+              <fieldset className="form-category grid" style={{gap:12}}><legend>2. Professional summary and visibility</legend><div>
                 <label htmlFor={`${profileId}-headline`}>Professional headline</label>
                 <input
                   id={`${profileId}-headline`}
@@ -608,6 +608,7 @@ export default function Profile() {
                   <a className="btn btn-ghost" href="/membership">Review membership options</a>
                 </div>
               )}
+              </fieldset>
               <div className="row" style={{ justifyContent: "space-between" }}>
                 <span className="muted">
                   Profile completion: {profile?.completion_percent ?? 0}%
@@ -641,7 +642,7 @@ export default function Profile() {
               style={{ gap: 12 }}
               onSubmit={saveTalentProfile}
             >
-              <div className="grid grid-2">
+              <fieldset className="form-category grid" style={{gap:12}}><legend>1. Professional snapshot</legend><div className="grid grid-2">
                 <label>
                   Professional title
                   <input
@@ -700,8 +701,7 @@ export default function Profile() {
                     placeholder="City or region"
                   />
                 </label>
-              </div>
-              <label>
+              </div></fieldset><fieldset className="form-category grid" style={{gap:12}}><legend>2. Public-safe profile</legend><label>
                 Directory summary
                 <textarea
                   rows={3}
@@ -733,7 +733,7 @@ export default function Profile() {
                   }
                 />
               </label>
-              <div className="grid" style={{ gap: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
+              </fieldset><fieldset className="form-category grid" style={{gap:12}}><legend>3. Evidence and experience</legend><div className="grid" style={{ gap: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
                 <h3 className="h2">Guided education, classifications and portfolio</h3>
                 <p className="muted">Structured education records, managed classifications, languages, and traceable portfolio items are edited in the guided section below. This replaces the previous comma-separated and free-text credential fields.</p>
               </div>
@@ -761,6 +761,7 @@ export default function Profile() {
                   <option value="private">Private / hidden</option>
                 </select>
               </label>
+              </fieldset>
               <button
                 className="btn btn-primary"
                 type="submit"

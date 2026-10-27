@@ -13,7 +13,7 @@ const otherPathways=[
  {href:"/organizations",title:"Organization workspace",description:"If you manage an organization, open its workspace to manage approved profile details and recruitment tasks.",action:"Open workspace"},
  {href:"/saved",title:"Saved items",description:"Return to services, mentors and opportunities you have saved.",action:"View saved items"}
 ];
-export default function ServeCommunityPage(){return <main className="mx-auto grid w-full max-w-7xl px-4 py-6 sm:px-6" style={{gap:28}}>
+export default function ServeCommunityPage(){return <main className="mx-auto grid w-full max-w-7xl px-4 py-6 sm:px-6 mpa-experience mpa-serve-community" style={{gap:28}}>
  <section className="marketplace-hero grid" style={{gap:12}}>
   <div className="eyebrow">MPA professional network · Serve-Community</div>
   <h1 className="h1">Serve-Community. More ways to contribute.</h1>

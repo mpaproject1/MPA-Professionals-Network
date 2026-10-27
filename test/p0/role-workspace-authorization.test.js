@@ -296,7 +296,7 @@ test("Reviewer checklist and claim assessment actions are case-scoped and eviden
   assert.match(ui, /Evidence linked to this checklist item/);
 });
 
-test("Serve-Community routes discovery into existing private workflows without replacing them", () => {
+test("Serve-Community routes discovery into existing private workflows with compact navigation", () => {
   const marketplace = read("web/app/serve-community/page.tsx");
   const shell = read("web/components/shell.tsx");
   const services = read("web/app/services/page.tsx");
@@ -309,8 +309,8 @@ test("Serve-Community routes discovery into existing private workflows without r
   assert.match(marketplace, /href:"\/jobs"/);
   assert.match(marketplace, /A public listing is not a private agreement/);
   assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);
-  assert.match(shell, /const desktopPrimary=visibleNav\.filter\(\(\[href\]\)=>\["\\/serve-community","\\/jobs"\]\.includes\(href\)\)/);
-  assert.match(shell, /const mobilePrimary=visibleNav\.filter\(\(\[href\]\)=>\["\\/serve-community","\\/jobs"\]\.includes\(href\)\)/);
+  assert.ok(shell.includes('const desktopPrimary=visibleNav.filter(([href])=>["/serve-community","/jobs"].includes(href))'));
+  assert.ok(shell.includes('const mobilePrimary=visibleNav.filter(([href])=>["/serve-community","/jobs"].includes(href))'));
   assert.doesNotMatch(shell, /\["\/marketplace","Marketplace",Search\]/);
   assert.match(services, /Back to Serve-Community/);
   assert.match(mentorship, /Back to Serve-Community/);

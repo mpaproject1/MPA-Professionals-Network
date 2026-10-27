@@ -309,7 +309,8 @@ test("Serve-Community routes discovery into existing private workflows without r
   assert.match(marketplace, /href:"\/jobs"/);
   assert.match(marketplace, /A public listing is not a private agreement/);
   assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);
-  assert.match(shell, /\["\/serve-community","\/services","\/jobs"\]/);
+  assert.match(shell, /const desktopPrimary=visibleNav\.filter\(\(\[href\]\)=>\["\\/serve-community","\\/jobs"\]\.includes\(href\)\)/);
+  assert.match(shell, /const mobilePrimary=visibleNav\.filter\(\(\[href\]\)=>\["\\/serve-community","\\/jobs"\]\.includes\(href\)\)/);
   assert.doesNotMatch(shell, /\["\/marketplace","Marketplace",Search\]/);
   assert.match(services, /Back to Serve-Community/);
   assert.match(mentorship, /Back to Serve-Community/);

@@ -27,7 +27,10 @@ const migrationNames = [
   "20261023110000_verification_reference_and_assignment_history.sql",
   "20261023111000_member_cv_vault.sql",
   "20261023120000_mentorship_explicit_mentee_consent.sql",
-  "20261023_support_inquiry_workflow.sql"
+  "20261023_support_inquiry_workflow.sql",
+  "20261025120000_serve_community_g2_lifecycle.sql",
+  "20261025130000_serve_community_g3_impact_metrics.sql",
+  "20261025140000_serve_community_g4_announcement_commitment_experience.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -51,6 +54,8 @@ const requiredColumns = [
   ["mentorship", "status", "text"],
   ["service_listing", "id", "uuid"],
   ["service_request", "id", "uuid"],
+  ["service_request_feedback", "request_id", "uuid"],
+  ["service_request_feedback", "reviewer_user_id", "uuid"],
   ["talent_inquiry", "id", "uuid"],
   ["verification_reference_request", "id", "uuid"],
   ["verification_reference_request", "case_id", "uuid"],
@@ -114,7 +119,7 @@ try {
   if (baselineIndex < 0) throw new Error(`Expected baseline marker ${lastPreGateMigration} is missing from this revision.`);
   const missingBaselineFiles = repositoryMigrationFiles.slice(0,baselineIndex+1).filter(filename=>!recorded.has(filename));
   if (missingBaselineFiles.length) {
-    throw new Error("Migration history is not confirmed through the last pre-gate migration. Reconcile the test database baseline before applying the ten new migrations:\\n- " + missingBaselineFiles.join("\\n- "));
+    throw new Error("Migration history is not confirmed through the last pre-gate migration. Reconcile the test database baseline before applying the gate migrations:\\n- " + missingBaselineFiles.join("\\n- "));
   }
   const migrations = migrationNames.map(filename => {
     const migration = repositoryMigrations.get(filename);
@@ -131,6 +136,31 @@ try {
     console.log(`PASS: ${migration.filename} applied inside rollback-only transaction`);
   }
   const postMigrationColumns = [
+    ["service_listing","lifecycle_status","text"],
+    ["service_listing","expires_at","timestamptz"],
+    ["service_listing_lifecycle_event","listing_id","uuid"],
+    ["service_listing_lifecycle_event","actor_user_id","uuid"],
+    ["service_listing_interest","listing_id","uuid"],
+    ["service_listing_interest","individual_user_id","uuid"],
+    ["service_listing_interest","organization_id","uuid"],
+    ["service_listing_interest","actor_user_id","uuid"],
+    ["service_listing_pledge","listing_id","uuid"],
+    ["service_listing_pledge","individual_user_id","uuid"],
+    ["service_listing_pledge","organization_id","uuid"],
+    ["service_listing_pledge","actor_user_id","uuid"],
+    ["service_listing_pledge","request_idempotency_hash","text"],
+    ["service_listing_pledge","request_fingerprint","text"],
+    ["service_request_agreement","request_id","uuid"],
+    ["service_request_agreement","terms_version","int4"],
+    ["service_request_agreement","terms_hash","text"],
+    ["service_listing_announcement","listing_id","uuid"],
+    ["service_listing_announcement","author_user_id","uuid"],
+    ["service_request_feedback","category","text"],
+    ["service_request_update","request_id","uuid"],
+    ["service_request_update","author_user_id","uuid"],
+    ["service_request_update","category","text"],
+    ["service_request_update","request_idempotency_hash","text"],
+    ["service_request_update","request_fingerprint","text"],
     ["public_opportunity_inquiry","idempotency_request_hash","text"],
     ...["marketplace_demand","mentorship_request","service_request","service_listing","talent_inquiry"].flatMap(table=>[[table,"request_idempotency_hash","text"],[table,"request_fingerprint","text"]]),
     ["verification_reference_request","requester_user_id","uuid"],
@@ -170,6 +200,7 @@ try {
   if (columnErrors.length) throw new Error("Post-migration column checks failed:\\n- " + columnErrors.join("\\n- "));
 
   const requiredNotNull = [
+    ["service_listing","lifecycle_status"],
     ["verification_reference_request","updated_at"],
     ["mentorship_match","mentee_consent_status"],
     ["support_conversation_workflow","conversation_id"],
@@ -191,6 +222,7 @@ try {
   }
 
   const requiredDefaults = [
+    ["service_listing","lifecycle_status","draft"],
     ["verification_reference_request","updated_at","now"],
     ["mentorship_match","mentee_consent_status","pending"],
     ["support_conversation_workflow","priority","normal"],
@@ -213,7 +245,35 @@ try {
     }
   }
 
+  const referencePriceConstraint = (await client.query("select pg_get_constraintdef(oid) as definition from pg_constraint where conrelid='public.service_listing'::regclass and conname='service_listing_reference_price_check' and contype='c'")).rows[0];
+  if (!referencePriceConstraint || !referencePriceConstraint.definition.includes("reference_price_amount") || !referencePriceConstraint.definition.includes("impact_model")) throw new Error("G3 reference price check constraint is missing or incomplete.");
+
+  const impactColumns = (await client.query("select column_name,udt_name,is_nullable,column_default from information_schema.columns where table_schema='public' and table_name='service_listing' and column_name in ('impact_model','reference_price_amount')")).rows;
+  const impactModelColumn=impactColumns.find(row=>row.column_name==="impact_model");
+  if (impactColumns.length!==2 || !impactModelColumn || impactModelColumn.udt_name!=="text" || impactModelColumn.is_nullable!=="NO" || !String(impactModelColumn.column_default||"").includes("standard") || !impactColumns.some(row=>row.column_name==="reference_price_amount"&&row.udt_name==="numeric")) throw new Error("G3 impact columns are missing or have unexpected types/default/nullability.");
+
+  const expiryDefinition = (await client.query("select a.attnotnull, pg_get_expr(d.adbin,d.adrelid) as expression from pg_attribute a join pg_class c on c.oid=a.attrelid join pg_namespace n on n.oid=c.relnamespace left join pg_attrdef d on d.adrelid=c.oid and d.adnum=a.attnum where n.nspname='public' and c.relname='service_listing' and a.attname='expires_at' and not a.attisdropped")).rows[0];
+  if (!expiryDefinition || expiryDefinition.attnotnull || expiryDefinition.expression) throw new Error("service_listing.expires_at must remain nullable with no expiry default.");
+
   const requiredForeignKeys = [
+    ["service_listing_lifecycle_event","listing_id","service_listing","id"],
+    ["service_listing_lifecycle_event","actor_user_id","app_user","id"],
+    ["service_listing_interest","listing_id","service_listing","id"],
+    ["service_listing_interest","individual_user_id","app_user","id"],
+    ["service_listing_interest","organization_id","organization","id"],
+    ["service_listing_interest","actor_user_id","app_user","id"],
+    ["service_listing_pledge","listing_id","service_listing","id"],
+    ["service_listing_pledge","individual_user_id","app_user","id"],
+    ["service_listing_pledge","organization_id","organization","id"],
+    ["service_listing_pledge","actor_user_id","app_user","id"],
+    ["service_request_agreement","request_id","service_request","id"],
+    ["service_request_agreement","provider_accepted_by","app_user","id"],
+    ["service_request_agreement","requester_accepted_by","app_user","id"],
+    ["service_request_update","request_id","service_request","id"],
+    ["service_request_update","author_user_id","app_user","id"],
+    ["service_listing_announcement","listing_id","service_listing","id"],
+    ["service_listing_announcement","author_user_id","app_user","id"],
+    ["service_listing_announcement","moderated_by","app_user","id"],
     ["public_opportunity_inquiry","app_user_id","app_user","id"],
     ["marketplace_demand","requester_user_id","app_user","id"],
     ["mentorship_request","mentee_user_id","app_user","id"],
@@ -275,6 +335,11 @@ try {
     "ux_mentorship_request_idempotency_hash",
     "ux_service_request_idempotency_hash",
     "ux_service_listing_idempotency_hash",
+    "ux_service_listing_interest_active_individual",
+    "ux_service_listing_interest_active_organization",
+    "ux_service_listing_pledge_idempotency_hash",
+    "ux_service_listing_announcement_idempotency_hash",
+    "ux_service_request_update_idempotency_hash",
     "ux_talent_inquiry_idempotency_hash",
     "ux_mentorship_match_one_open_request"
   ];
@@ -286,7 +351,7 @@ try {
     if (!row || !row.indexdef.toUpperCase().includes("CREATE UNIQUE INDEX")) {
       throw new Error(`Required unique index ${name} is missing or not unique.`);
     }
-    if (name !== "ux_mentorship_match_one_open_request" &&
+    if (["ux_marketplace_demand_idempotency_hash","ux_mentorship_request_idempotency_hash","ux_service_request_idempotency_hash","ux_service_listing_idempotency_hash","ux_service_listing_pledge_idempotency_hash","ux_service_request_update_idempotency_hash","ux_talent_inquiry_idempotency_hash"].includes(name) &&
         (!row.indexdef.includes("request_idempotency_hash") || !row.indexdef.toLowerCase().includes("where"))) {
       throw new Error(`Idempotency index ${name} must uniquely index the request hash and exclude null keys.`);
     }
@@ -313,6 +378,13 @@ try {
   }
 
   const requiredChecks = [
+    ["service_listing","service_listing_lifecycle_status_check",["draft","pending_review","active","paused","fulfilled","archived","suspended","rejected"]],
+    ["service_listing","service_listing_impact_model_check",["standard","pro_bono","community_discount","capacity_grant"]],
+    ["service_listing","service_listing_impact_pricing_check",["standard","pro_bono","community_discount","capacity_grant"]],
+    ["service_listing_lifecycle_event","service_listing_lifecycle_event_to_status_check",["draft","pending_review","active","paused","fulfilled","archived","suspended","rejected"]],
+    ["service_request_feedback","service_request_feedback_category_check",["service_quality","communication","timeliness","outcome","accessibility","other"]],
+    ["service_request_update","service_request_update_category_check",["progress","schedule_change","delivery_note","blocker","handover"]],
+    ["service_listing_announcement","service_listing_announcement_participant_audience_archived_check",["participants","archived"]],
     ["verification_reference_request","verification_reference_request_consent_status_check",["pending","accepted","consented","declined","withdrawn"]],
     ["verification_reference_request","verification_reference_request_verification_status_check",["pending","received","verified","insufficient","disputed","not_verified","needs_clarification"]],
     ["support_conversation_workflow","support_conversation_workflow_priority_check",["low","normal","high","urgent"]],
@@ -359,7 +431,7 @@ try {
 
   await client.query("rollback");
   transactionOpen = false;
-  console.log("PASS: all ten migrations and post-migration schema assertions succeeded; all DDL was rolled back.");
+  console.log("PASS: all listed migrations and post-migration schema assertions succeeded; all DDL was rolled back.");
   console.log("NOTE: this validates migration execution and existing column types/FK targets; it does not replace application-level integration tests.");
 } catch (error) {
   if (transactionOpen) {

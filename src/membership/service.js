@@ -314,6 +314,24 @@ async function product(db,code){
   return r.rows[0];
 }
 
+function validateMembershipProfessionalDetails(value){
+  if(value===undefined||value===null)return null;
+  if(typeof value!=="object"||Array.isArray(value))throw httpError(400,"Professional details must be an object.","APPLICATION_DETAILS_INVALID");
+  const field=(name,max)=>String(value[name]||"").trim().slice(0,max);
+  const fullName=field("fullName",160);
+  const sector=field("sector",120);
+  const institutionalAffiliation=field("institutionalAffiliation",180);
+  const linkedinOrCvUrl=field("linkedinOrCvUrl",500);
+  if(!fullName||!sector)throw httpError(400,"Full name and professional sector are required.","APPLICATION_DETAILS_REQUIRED");
+  if(value.fullName&&String(value.fullName).trim().length>160||value.sector&&String(value.sector).trim().length>120||value.institutionalAffiliation&&String(value.institutionalAffiliation).trim().length>180||value.linkedinOrCvUrl&&String(value.linkedinOrCvUrl).trim().length>500)throw httpError(400,"One or more professional details exceed the allowed length.","APPLICATION_DETAILS_INVALID");
+  if(linkedinOrCvUrl){
+    let parsed;
+    try{parsed=new URL(linkedinOrCvUrl);}catch{throw httpError(400,"Enter a valid HTTPS LinkedIn or CV link.","APPLICATION_LINK_INVALID");}
+    if(parsed.protocol!=="https:"||!parsed.hostname||parsed.username||parsed.password)throw httpError(400,"Enter a valid HTTPS LinkedIn or CV link.","APPLICATION_LINK_INVALID");
+  }
+  return {fullName,sector,institutionalAffiliation:institutionalAffiliation||null,linkedinOrCvUrl:linkedinOrCvUrl||null};
+}
+
 export async function createApplication(userId,input,requestId){
   return withTransaction(async db=>{
     // Serialize applications for one account so concurrent submits cannot both
@@ -341,7 +359,8 @@ export async function createApplication(userId,input,requestId){
     const pending=await db.query("select id from membership_application where user_id=$1 and status in ('submitted','in_review','correction_required','approved','payment_pending','paid') limit 1",[userId]);
     if(pending.rows[0]) throw httpError(409,"You already have an active membership application.","APPLICATION_EXISTS");
     const me=await getMe(userId);
-    const snapshot={person:{firstName:me.first_name,middleName:me.middle_name,lastName:me.last_name,displayName:me.display_name,phone:me.phone,dateOfBirth:me.date_of_birth,sex:me.sex,gender:me.sex,nationality:me.nationality},profile:{headline:me.headline,bio:me.bio}};
+    const professionalDetails=validateMembershipProfessionalDetails(input.professionalDetails);
+    const snapshot={person:{firstName:me.first_name,middleName:me.middle_name,lastName:me.last_name,displayName:me.display_name,phone:me.phone,dateOfBirth:me.date_of_birth,sex:me.sex,gender:me.sex,nationality:me.nationality},profile:{headline:me.headline,bio:me.bio},...(professionalDetails?{professionalDetails}: {})};
     const feeAmount=activeFeeRule
       ? Number(activeFeeRule.base_amount)+Number(activeFeeRule.tax_amount||0)+Number(activeFeeRule.service_fee||0)
       : amountFromProduct(prod);

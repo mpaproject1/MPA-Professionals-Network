@@ -6,7 +6,37 @@ import { createInAppNotification } from "../platform/notifications.js";
 
 function hashValue(value){return createHash("sha256").update(value).digest("hex");}
 function hashPayload(value){return hashValue(JSON.stringify(value));}
+function validateImpactPricing({impactModel="standard",pricingModel,priceAmount,referencePriceAmount}) {
+ if(!["standard","pro_bono","community_discount","capacity_grant"].includes(impactModel)) throw error(400,"Unsupported impact model.","VALIDATION_ERROR");
+ const price=priceAmount===null||priceAmount===undefined||priceAmount===""?null:Number(priceAmount);
+ const reference=referencePriceAmount===null||referencePriceAmount===undefined||referencePriceAmount===""?null:Number(referencePriceAmount);
+ if(price!==null&&(!Number.isFinite(price)||price<0)) throw error(400,"Price must be a non-negative amount.","VALIDATION_ERROR");
+ if(reference!==null&&(!Number.isFinite(reference)||reference<0)) throw error(400,"Reference price must be a non-negative amount.","VALIDATION_ERROR");
+ if(impactModel==="pro_bono"&&(pricingModel!=="free"||(price!==null&&price!==0)||reference!==null)) throw error(400,"100% Pro-Bono / Impact requires a free offer and no reference-price claim.","INVALID_IMPACT_PRICING");
+ if(impactModel==="community_discount"&&(!["fixed","hourly"].includes(pricingModel)||price===null||price<=0||reference===null||reference<=price)) throw error(400,"Community Discounted Rate requires a positive listed price and a higher documented comparable reference price.","INVALID_IMPACT_PRICING");
+ if(impactModel==="capacity_grant"&&reference!==null) throw error(400,"Capacity Grant cannot claim a cash discount without a separately supported pricing model.","INVALID_IMPACT_PRICING");
+ return {impactModel,priceAmount:price,referencePriceAmount:reference};
+}
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
+const ENGAGEMENT_UPDATE_CATEGORIES=new Set(["progress","schedule_change","delivery_note","blocker","handover"]);
+const FEEDBACK_CATEGORIES=new Set(["service_quality","communication","timeliness","outcome","accessibility","other"]);
+function validateCommunityText(value,{field="Text",min=10,max=2000}={}){
+ const text=String(value??"").trim();
+ if(text.length<min||text.length>max)throw error(400,`${field} must be ${min}–${max} characters.`,"VALIDATION_ERROR");
+ const contactPatterns=[
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+  /(?:https?:\/\/|www\.)\S+/i,
+  /(?:telegram|whatsapp|signal|instagram|facebook|tiktok)\s*(?:handle|username|me|us|at)?\s*[:@]\s*[\w.]{3,}/i,
+  /(?:^|\s)@[A-Z0-9_.]{3,}\b/i,
+  /\b(?:[a-z0-9-]+\.)+(?:com|org|net|io|et|info|co|me|app)\b/i,
+  /\b(?:id|passport|account)\s*(?:no\.?|number|#|:)\s*[A-Z0-9-]{5,}\b/i,
+  /\b(?:passport number|national id|national identification|medical record|patient record|bank account|account number|diagnosis|medical condition|private address)\b/i
+ ];
+ const digitMatches=text.match(/(?:\+?\d[\d\s().-]{7,}\d)/g)||[];
+ if(contactPatterns.some(pattern=>pattern.test(text))||digitMatches.some(match=>match.replace(/\D/g,"").length>=9))
+  throw error(400,"Remove personal contact details, external contact links and sensitive participant information. Use the authorized service/request workflow instead.","SENSITIVE_CONTENT");
+ return text;
+}
 const PROFESSIONAL_CLAIMS=["professional_certification","education","employment","experience","service_capability"];
 
 async function audit(db,actor,action,type,id,requestId,metadata={}) {
@@ -110,9 +140,13 @@ export async function createServiceListing(userId,input,requestId,idempotencyKey
  if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
   throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
  const organizationId=input.organizationId||null;
- const normalized={userId,organizationId,title:String(input.title||"").trim(),description:String(input.description||"").trim(),serviceCategory:String(input.serviceCategory||"").trim(),deliveryMode:input.deliveryMode||"remote",locationLabel:input.locationLabel||null,pricingModel:input.pricingModel||"quote",priceAmount:input.priceAmount??null,currency:input.currency||null,visibility:input.visibility||"members",maxActiveRequests:input.maxActiveRequests??null};
+ const expiryInput=input.expiresAt===undefined||input.expiresAt===null||input.expiresAt===""?null:new Date(input.expiresAt);
+ if(expiryInput && (!Number.isFinite(expiryInput.getTime())||expiryInput.getTime()<=Date.now())) throw error(400,"Expiry must be a valid future date/time or left empty for no expiry.","INVALID_EXPIRY");
+ const normalized={userId,organizationId,title:String(input.title||"").trim(),description:String(input.description||"").trim(),serviceCategory:String(input.serviceCategory||"").trim(),deliveryMode:input.deliveryMode||"remote",locationLabel:input.locationLabel||null,pricingModel:input.pricingModel||"quote",priceAmount:input.priceAmount??null,currency:input.currency||null,visibility:input.visibility||"members",maxActiveRequests:input.maxActiveRequests??null,expiresAt:expiryInput?expiryInput.toISOString():null,impactModel:input.impactModel||"standard",referencePriceAmount:input.referencePriceAmount??null};
  if(!normalized.title||!normalized.description||!normalized.serviceCategory) throw error(400,"title, description and serviceCategory are required.","VALIDATION_ERROR");
  if(!["free","fixed","hourly","quote"].includes(normalized.pricingModel)) throw error(400,"Unsupported pricing model.","VALIDATION_ERROR");
+ const impact=validateImpactPricing(normalized);
+ normalized.priceAmount=impact.priceAmount;normalized.referencePriceAmount=impact.referencePriceAmount;normalized.impactModel=impact.impactModel;
  const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
  return withTransaction(async db=>{
   const existing=(await db.query("select * from service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
@@ -128,7 +162,7 @@ export async function createServiceListing(userId,input,requestId,idempotencyKey
   } else {
    await requirePersonalProfessionalCapability(db,userId);
   }
-  const row=(await db.query("insert into service_listing(provider_user_id,organization_id,title,description,service_category,delivery_mode,location_label,pricing_model,price_amount,currency,visibility,max_active_requests,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) on conflict do nothing returning *",[userId,organizationId,normalized.title,normalized.description,normalized.serviceCategory,normalized.deliveryMode,normalized.locationLabel,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.visibility,normalized.maxActiveRequests,keyHash,fingerprint])).rows[0];
+  const row=(await db.query("insert into service_listing(provider_user_id,organization_id,title,description,service_category,delivery_mode,location_label,pricing_model,price_amount,currency,visibility,max_active_requests,expires_at,impact_model,reference_price_amount,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) on conflict do nothing returning *",[userId,organizationId,normalized.title,normalized.description,normalized.serviceCategory,normalized.deliveryMode,normalized.locationLabel,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.visibility,normalized.maxActiveRequests,normalized.expiresAt,normalized.impactModel,normalized.referencePriceAmount,keyHash,fingerprint])).rows[0];
   if(!row){
    const raced=(await db.query("select * from service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
    if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different listing details. Start a new listing before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
@@ -143,51 +177,302 @@ export async function updateServiceListing(listingId,userId,input,requestId){
     const row=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row) throw error(404,"Service listing not found.","NOT_FOUND");
     await assertServiceListingAccess(db,row,userId);
-    if(row.status==="closed") throw error(409,"Closed service listings cannot be edited.","INVALID_STATE");
-    const updated=(await db.query("update service_listing set status='draft',moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,title=coalesce($1,title),description=coalesce($2,description),service_category=coalesce($3,service_category),delivery_mode=coalesce($4,delivery_mode),location_label=coalesce($5,location_label),pricing_model=coalesce($6,pricing_model),price_amount=coalesce($7,price_amount),currency=coalesce($8,currency),visibility=coalesce($9,visibility),max_active_requests=coalesce($10,max_active_requests),updated_at=now() where id=$11 returning *",[input.title||null,input.description||null,input.serviceCategory||null,input.deliveryMode||null,input.locationLabel||null,input.pricingModel||null,input.priceAmount??null,input.currency||null,input.visibility||null,input.maxActiveRequests??null,listingId])).rows[0];
-    await audit(db,userId,"service.listing_updated","service_listing",listingId,requestId);
+    if(row.status==="closed" || ["fulfilled","archived"].includes(row.lifecycle_status)) throw error(409,"Fulfilled or archived service listings cannot be edited or silently reopened.","INVALID_STATE");
+    const expiryInput=input.expiresAt===undefined||input.expiresAt===null||input.expiresAt===""?null:new Date(input.expiresAt);
+    if(expiryInput && (!Number.isFinite(expiryInput.getTime())||expiryInput.getTime()<=Date.now())) throw error(400,"Expiry must be a valid future date/time or left empty for no expiry.","INVALID_EXPIRY");
+    const impactModel=input.impactModel===undefined?row.impact_model||"standard":String(input.impactModel);
+    const pricingModel=input.pricingModel===undefined?row.pricing_model:input.pricingModel;
+    const priceAmount=input.priceAmount===undefined?row.price_amount:input.priceAmount;
+    const referencePriceAmount=input.referencePriceAmount===undefined?row.reference_price_amount:input.referencePriceAmount;
+    const impact=validateImpactPricing({impactModel,pricingModel,priceAmount,referencePriceAmount});
+    const updated=(await db.query("update service_listing set status='draft',lifecycle_status='draft',moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,title=coalesce($1,title),description=coalesce($2,description),service_category=coalesce($3,service_category),delivery_mode=coalesce($4,delivery_mode),location_label=coalesce($5,location_label),pricing_model=coalesce($6,pricing_model),price_amount=$7,currency=coalesce($8,currency),visibility=coalesce($9,visibility),max_active_requests=coalesce($10,max_active_requests),expires_at=case when $11::boolean then null else coalesce($12,expires_at) end,impact_model=$14,reference_price_amount=$15,updated_at=now() where id=$13 returning *",[input.title||null,input.description||null,input.serviceCategory||null,input.deliveryMode||null,input.locationLabel||null,input.pricingModel||null,impact.priceAmount,input.currency||null,input.visibility||null,input.maxActiveRequests??null,input.clearExpiry===true,expiryInput?expiryInput.toISOString():null,listingId,impact.impactModel,impact.referencePriceAmount])).rows[0];
+    if((row.lifecycle_status||"draft")!=="draft") await db.query("insert into service_listing_lifecycle_event(listing_id,actor_user_id,from_status,to_status,reason,request_id) values($1,$2,$3,'draft',$4,$5)",[listingId,userId,row.lifecycle_status||row.status,"Listing terms edited; moderation review required.",requestId]);
+    await audit(db,userId,"service.listing_updated","service_listing",listingId,requestId,{from:row.lifecycle_status||row.status,to:"draft",requiresModeration:true});
     return updated;
   });
 }
 
-export async function changeServiceListingStatus(listingId,userId,status,requestId){
-  if(!["draft","published","paused","closed"].includes(status)) throw error(400,"Unsupported service listing status.","VALIDATION_ERROR");
+export async function changeServiceListingStatus(listingId,userId,status,requestId,reason=""){
+  if(!["draft","published","paused","closed","fulfilled","archived"].includes(status)) throw error(400,"Unsupported service listing status.","VALIDATION_ERROR");
   return withTransaction(async db=>{
     const row=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row) throw error(404,"Service listing not found.","NOT_FOUND");
     const organization=await assertServiceListingAccess(db,row,userId);
-    if(row.status==="closed" && status!=="closed") throw error(409,"Closed service listings cannot be reopened.","INVALID_STATE");
+    const currentLifecycleStatus=row.lifecycle_status||({published:"active",paused:"paused",closed:"archived"}[row.status]||"draft");
+    const requestedLifecycleStatus=status==="published"?"active":status==="paused"?"paused":status==="closed"?"archived":status;
+    if(currentLifecycleStatus===requestedLifecycleStatus && (status!=="published"||row.moderation_status==="approved")) return {...row,idempotent:true};
+    if(status==="published" && currentLifecycleStatus==="pending_review" && !["approved","rejected"].includes(row.moderation_status)) return {...row,idempotent:true};
+    if(row.status==="closed" && !["closed","archived"].includes(status)) throw error(409,"Closed service listings cannot be reopened.","INVALID_STATE");
+    if(["fulfilled","archived","closed"].includes(status) && String(reason||"").trim().length<4) throw error(400,"A reason of at least four characters is required to fulfil or archive a listing.","LIFECYCLE_REASON_REQUIRED");
     if(status==="published" && row.moderation_status!=="approved"){
       if(row.moderation_status==="rejected") throw error(409,"This listing was rejected and cannot be resubmitted. Create a new listing if the offer has materially changed.","LISTING_REJECTED");
       if(row.organization_id && organization?.verification_status!=="verified") throw error(409,"The organization must be verified before it can submit a service listing.","ORGANIZATION_NOT_VERIFIED");
       if(!row.organization_id && !(await activeMember(db,userId))) throw error(403,"A current active membership is required to submit a service listing.","MEMBERSHIP_REQUIRED");
-      const submitted=(await db.query("update service_listing set status='draft',moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
-      await audit(db,userId,"service.listing_submitted_for_review","service_listing",listingId,requestId,{from:row.status,to:"draft"});
-      await notify(db,userId,"service.listing_submitted_for_review","service_listing",listingId,{message:"Your service listing was submitted for moderation.",nextAction:"Monitor the listing for the moderator's decision or requested changes.",actionUrl:"/services",eventVersion:submitted.updated_at||requestId||listingId});
+      const submitted=(await db.query("update service_listing set status='draft',lifecycle_status='pending_review',moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
+      await db.query("insert into service_listing_lifecycle_event(listing_id,actor_user_id,from_status,to_status,reason,request_id) values($1,$2,$3,'pending_review',$4,$5)",[listingId,userId,row.lifecycle_status||null,"Submitted for moderation.",requestId]);
+      await audit(db,userId,"service.listing_submitted_for_review","service_listing",listingId,requestId,{from:row.lifecycle_status||row.status,to:"pending_review"});
+      await notify(db,userId,"service.listing_submitted_for_review","service_listing",listingId,{message:"Your service listing was submitted for moderation.",nextAction:"Monitor the listing for the moderator's decision or requested changes.",actionUrl:"/services/"+listingId,eventVersion:submitted.updated_at||requestId||listingId});
       const moderators=(await db.query("select distinct u.id user_id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('supporting_staff','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='marketplace.moderate'))")).rows;
       for(const moderator of moderators)await notify(db,moderator.user_id,"service.listing_review_required","service_listing",listingId,{message:"A professional service listing is awaiting moderation.",nextAction:"Review the listing in the existing marketplace moderation queue and approve or reject it with a reason.",actionUrl:"/admin/marketplace",reviewerQueue:true,actionRequired:true,priority:"high",from:row.status,to:"draft",eventVersion:submitted.updated_at||requestId||listingId});
       return submitted;
     }
     if(status==="published" && row.organization_id && organization?.verification_status!=="verified") throw error(409,"The organization must be verified before it can publish a service listing.","ORGANIZATION_NOT_VERIFIED");
     if(status==="published" && !row.organization_id && !(await activeMember(db,userId))) throw error(403,"A current active membership is required to publish a service.","MEMBERSHIP_REQUIRED");
-    const updated=(await db.query("update service_listing set status=$1,updated_at=now() where id=$2 returning *",[status,listingId])).rows[0];
-    await audit(db,userId,"service.listing_status_changed","service_listing",listingId,requestId,{from:row.status,to:status});
+    const lifecycleStatus=requestedLifecycleStatus;
+    const allowedListingTransitions={draft:["draft","active","archived"],pending_review:["draft","active","archived"],active:["active","paused","fulfilled","archived"],paused:["paused","active","archived"],suspended:["suspended","active","archived"],fulfilled:["fulfilled","archived"],archived:["archived"],rejected:["rejected","archived"]};
+    if(!(allowedListingTransitions[currentLifecycleStatus]||[]).includes(lifecycleStatus)) throw error(409,"Invalid service listing lifecycle transition.","INVALID_STATE");
+    if(currentLifecycleStatus==="suspended"&&lifecycleStatus==="active") throw error(403,"Only an authorized moderator may clear a moderation suspension.","MODERATION_CLEARANCE_REQUIRED");
+    const legacyStatus=status==="fulfilled"||status==="archived"?"closed":status;
+    const updated=(await db.query("update service_listing set status=$1,lifecycle_status=$2,updated_at=now() where id=$3 returning *",[legacyStatus,lifecycleStatus,listingId])).rows[0];
+    if(row.lifecycle_status!==lifecycleStatus){
+      await db.query("insert into service_listing_lifecycle_event(listing_id,actor_user_id,from_status,to_status,reason,request_id) values($1,$2,$3,$4,$5,$6)",[listingId,userId,row.lifecycle_status||null,lifecycleStatus,String(reason||`Legacy status transition ${row.status} -> ${status}`).trim(),requestId]);
+    }
+    await audit(db,userId,"service.listing_status_changed","service_listing",listingId,requestId,{from:row.lifecycle_status||row.status,to:lifecycleStatus,reason:String(reason||"").trim()||null});
     return updated;
   });
 }
 
+
+export async function acceptServiceAgreement(requestId,userId,requestIdHeader){
+ return withTransaction(async db=>{
+  const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
+  if(!r)throw error(404,"Service request not found.","NOT_FOUND");
+  if(r.requester_user_id!==userId)throw error(403,"Only the requester can confirm agreement to the provider's terms.","FORBIDDEN");
+  if(r.status!=="accepted")throw error(409,"The provider must accept the request before the requester can confirm the agreement.","INVALID_STATE");
+  const agreement=(await db.query("select * from service_request_agreement where request_id=$1 order by terms_version desc limit 1 for update",[requestId])).rows[0];
+  if(!agreement||!agreement.provider_accepted_at)throw error(409,"Provider acceptance and a persisted terms version are required.","AGREEMENT_REQUIRED");
+  if(agreement.requester_accepted_at){
+   if(agreement.requester_accepted_by!==userId)throw error(409,"The current terms acceptance belongs to another actor.","AGREEMENT_CONFLICT");
+   return {...agreement,idempotent:true,nextAction:"Both parties have accepted these terms. The provider may start delivery."};
+  }
+  const accepted=(await db.query("update service_request_agreement set requester_accepted_by=$1,requester_accepted_at=now() where id=$2 and requester_accepted_at is null returning *",[userId,agreement.id])).rows[0];
+  if(!accepted)throw error(409,"The agreement changed concurrently. Reload and review the current terms.","AGREEMENT_CONFLICT");
+  await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$3,$4)",[requestId,userId,r.status,"Requester accepted persisted terms version "+agreement.terms_version]);
+  await audit(db,userId,"service.request_agreement_accepted","service_request",requestId,requestIdHeader,{termsVersion:agreement.terms_version,termsHash:agreement.terms_hash});
+  await notify(db,r.provider_user_id,"service.request_agreement_accepted","service_request",requestId,{message:"The requester accepted the same persisted service terms.",nextAction:"Start delivery when ready."});
+  return {...accepted,idempotent:false,nextAction:"Both parties have accepted these terms. The provider may start delivery."};
+ });
+}
+
+export async function createServiceListingInterest(listingId,userId,input={},requestId){
+ return withTransaction(async db=>{
+  const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
+  if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
+  if(listing.lifecycle_status!=="active"||listing.status!=="published"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date()))throw error(409,"This listing is not accepting new interest.","LISTING_NOT_ACTIVE");
+  const organizationId=input.organizationId||null;
+  if(listing.visibility!=="public" && !(await activeMember(db,userId)))throw error(403,"An active membership is required to express interest in this listing.","MEMBERSHIP_REQUIRED");
+  if(listing.provider_user_id===userId || (listing.organization_id && (await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code=any($3::text[]) limit 1",[listing.organization_id,userId,["owner","administrator","recruiter","project_manager"]])).rowCount))throw error(400,"A listing owner cannot express interest in their own program.","SELF_INTEREST");
+  if(organizationId){
+   if(listing.organization_id===organizationId||listing.provider_user_id===userId)throw error(400,"A listing owner cannot express interest in their own program.","SELF_INTEREST");
+   try{await assertOrganizationCapability(db,organizationId,userId);}catch(cause){throw error(cause.statusCode||403,cause.message||"Authorized active organization membership is required.",cause.code||"ORGANIZATION_FORBIDDEN");}
+  }else if(listing.organization_id===null&&listing.provider_user_id===userId)throw error(400,"A listing owner cannot express interest in their own program.","SELF_INTEREST");
+  const q=organizationId
+   ? await db.query("insert into service_listing_interest(listing_id,organization_id,actor_user_id,status) values($1,$2,$3,'interested') on conflict do nothing returning *",[listingId,organizationId,userId])
+   : await db.query("insert into service_listing_interest(listing_id,individual_user_id,actor_user_id,status) values($1,$2,$2,'interested') on conflict do nothing returning *",[listingId,userId]);
+  const row=q.rows[0]|| (organizationId?(await db.query("select * from service_listing_interest where listing_id=$1 and organization_id=$2 and status='interested'",[listingId,organizationId])).rows[0]:(await db.query("select * from service_listing_interest where listing_id=$1 and individual_user_id=$2 and status='interested'",[listingId,userId])).rows[0]);
+  if(!row)throw error(409,"Interest changed concurrently. Reload and try again.","INTEREST_CONFLICT");
+  if(q.rows[0]){
+   await audit(db,userId,"service.listing_interest_created","service_listing_interest",row.id,requestId,{listingId,organizationId:organizationId||null});
+   const recipients=listing.organization_id?(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code=any($2::text[])",[listing.organization_id,["owner","administrator","recruiter","project_manager"]])).rows.map(x=>x.user_id):[listing.provider_user_id];
+   for(const recipient of new Set(recipients))if(recipient&&recipient!==userId)await notify(db,recipient,"service.listing_interest_created","service_listing_interest",row.id,{message:"A member or organization expressed interest in your community service.",nextAction:"Review the program's aggregate interest and decide whether to follow up through the formal service workflow.",actionUrl:"/services/"+listingId,actionRequired:false});
+  }
+  return {...row,idempotent:!q.rows[0]};
+ });
+}
+
+export async function withdrawServiceListingInterest(interestId,userId,reason,requestId){
+ return withTransaction(async db=>{
+  const row=(await db.query("select * from service_listing_interest where id=$1 for update",[interestId])).rows[0];
+  if(!row)throw error(404,"Interest record not found.","NOT_FOUND");
+  let authorized=row.actor_user_id===userId;
+  if(row.organization_id){try{await assertOrganizationCapability(db,row.organization_id,userId);authorized=true;}catch{authorized=false;}}
+  if(!authorized)throw error(403,"Only the original actor or an authorized organization manager may withdraw this interest.","FORBIDDEN");
+  if(row.status==="withdrawn")return {...row,idempotent:true};
+  if(row.status!=="interested")throw error(409,"Only active interest can be withdrawn.","INVALID_STATE");
+  const updated=(await db.query("update service_listing_interest set status='withdrawn',updated_at=now() where id=$1 and status='interested' returning *",[interestId])).rows[0];
+  if(!updated)throw error(409,"Interest changed concurrently. Reload and try again.","INTEREST_CONFLICT");
+  await audit(db,userId,"service.listing_interest_withdrawn","service_listing_interest",interestId,requestId,{reason:String(reason||"").trim()||null});
+  return updated;
+ });
+}
+
+export async function createServiceListingPledge(listingId,userId,input={},requestId,idempotencyKey=null){
+ const description=String(input.description||"").trim();
+ if(description.length<4)throw error(400,"A pledge description of at least four characters is required.","VALIDATION_ERROR");
+ if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
+ const organizationId=input.organizationId||null;
+ const fingerprint=hashPayload({listingId,userId,organizationId,description}),keyHash=hashValue(idempotencyKey);
+ return withTransaction(async db=>{
+  const existing=(await db.query("select * from service_listing_pledge where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different pledge details.","IDEMPOTENCY_KEY_CONFLICT");return {...existing,idempotent:true,replayed:true};}
+  const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
+  if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
+  if(listing.lifecycle_status!=="active"||listing.status!=="published"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date()))throw error(409,"This listing is not accepting pledges.","LISTING_NOT_ACTIVE");
+  if(listing.visibility!=="public" && !(await activeMember(db,userId)))throw error(403,"An active membership is required to pledge support to this listing.","MEMBERSHIP_REQUIRED");
+  if(listing.provider_user_id===userId || (listing.organization_id && (await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code=any($3::text[]) limit 1",[listing.organization_id,userId,["owner","administrator","recruiter","project_manager"]])).rowCount))throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
+  if(organizationId){
+   if(listing.organization_id===organizationId||listing.provider_user_id===userId)throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
+   try{await assertOrganizationCapability(db,organizationId,userId);}catch(cause){throw error(cause.statusCode||403,cause.message||"Authorized active organization membership is required.",cause.code||"ORGANIZATION_FORBIDDEN");}
+  }else if(listing.organization_id===null&&listing.provider_user_id===userId)throw error(400,"A listing owner cannot pledge support to their own program.","SELF_PLEDGE");
+  const row=(await db.query("insert into service_listing_pledge(listing_id,individual_user_id,organization_id,actor_user_id,description,status,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,'submitted',$6,$7) on conflict do nothing returning *",[listingId,organizationId?null:userId,organizationId,userId,description,keyHash,fingerprint])).rows[0];
+  if(!row){const raced=(await db.query("select * from service_listing_pledge where request_idempotency_hash=$1 for update",[keyHash])).rows[0];if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different pledge details.","IDEMPOTENCY_KEY_CONFLICT");return {...raced,idempotent:true,replayed:true};}
+  await audit(db,userId,"service.listing_pledge_submitted","service_listing_pledge",row.id,requestId,{listingId,organizationId:organizationId||null});
+  const recipients=listing.organization_id?(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code=any($2::text[])",[listing.organization_id,["owner","administrator","recruiter","project_manager"]])).rows.map(x=>x.user_id):[listing.provider_user_id];
+  for(const recipient of new Set(recipients))if(recipient&&recipient!==userId)await notify(db,recipient,"service.listing_pledge_submitted","service_listing_pledge",row.id,{message:"A new pledge of support was submitted for your program.",nextAction:"Review the pledge and accept or decline it with a reason.",actionUrl:"/services/"+row.listing_id,actionRequired:true,priority:"normal"});
+  return {...row,idempotent:false,replayed:false};
+ });
+}
+
+export async function changeServiceListingPledgeStatus(pledgeId,userId,status,reason,requestId){
+ if(!["accepted","declined","withdrawn","fulfilled","cancelled"].includes(status))throw error(400,"Unsupported pledge status.","VALIDATION_ERROR");
+ return withTransaction(async db=>{
+  const row=(await db.query("select p.*,l.provider_user_id,l.organization_id listing_organization_id from service_listing_pledge p join service_listing l on l.id=p.listing_id where p.id=$1 for update of p",[pledgeId])).rows[0];
+  if(!row)throw error(404,"Pledge not found.","NOT_FOUND");
+  const isPledger=row.actor_user_id===userId;
+  let isOwner=row.listing_organization_id?false:row.provider_user_id===userId;
+  if(row.listing_organization_id){try{await assertOrganizationCapability(db,row.listing_organization_id,userId);isOwner=true;}catch{isOwner=false;}}
+  if(status==="withdrawn"){
+   if(!isPledger)throw error(403,"Only the pledge author can withdraw a pledge.","FORBIDDEN");
+   if(row.status!=="submitted")throw error(409,"Only a submitted pledge may be withdrawn; accepted pledges require an authorized cancellation decision.","INVALID_STATE");
+  }else{
+   if(!isOwner)throw error(403,"Only the listing owner or authorized organization manager can decide a pledge.","FORBIDDEN");
+   if(!["submitted","accepted"].includes(row.status))throw error(409,"This pledge is no longer awaiting an owner decision or fulfilment.","INVALID_STATE");
+   if(["declined","cancelled","fulfilled"].includes(status)&&String(reason||"").trim().length<4)throw error(400,"A reason or evidence summary of at least four characters is required for this pledge decision.","REASON_REQUIRED");
+   if(status==="accepted"&&row.status!=="submitted")throw error(409,"Only a submitted pledge can be accepted.","INVALID_STATE");
+   if(status==="declined"&&row.status!=="submitted")throw error(409,"Only a submitted pledge can be declined.","INVALID_STATE");
+   if(status==="fulfilled"&&row.status!=="accepted")throw error(409,"Only an accepted pledge can be fulfilled.","INVALID_STATE");
+   if(status==="cancelled"&&row.status!=="accepted")throw error(409,"Only an accepted pledge can be cancelled.","INVALID_STATE");
+  }
+  const updated=(await db.query("update service_listing_pledge set status=$1,decision_reason=$2,updated_at=now() where id=$3 returning *",[status,String(reason||"").trim()||null,pledgeId])).rows[0];
+  await audit(db,userId,"service.listing_pledge_status_changed","service_listing_pledge",pledgeId,requestId,{from:row.status,to:status,reason:String(reason||"").trim()||null});
+  return updated;
+ });
+}
+
+
+export async function listMyServiceListingInterestSummary(userId){
+ const db=getPool(),roles=["owner","administrator","recruiter","project_manager"];
+ return (await db.query(`select s.id listing_id,s.title,
+   count(i.id) filter(where i.status='interested' and i.individual_user_id is not null)::int individual_interest_count,
+   count(i.id) filter(where i.status='interested' and i.organization_id is not null)::int organization_interest_count,
+   count(i.id) filter(where i.status='withdrawn')::int withdrawn_history_count
+  from service_listing s left join service_listing_interest i on i.listing_id=s.id
+  where (s.organization_id is null and s.provider_user_id=$1)
+     or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[])))
+  group by s.id,s.title order by s.updated_at desc`,[userId,roles])).rows;
+}
+
+export async function listMyServiceListingPledges(userId){
+ const db=getPool(),roles=["owner","administrator","recruiter","project_manager"];
+ return (await db.query(`select p.*,s.title service_title,coalesce(pledged_org.display_name,actor_person.display_name) pledged_by_display_name,pledged_org.display_name pledged_organization_name
+  from service_listing_pledge p join service_listing s on s.id=p.listing_id
+  left join person actor_person on actor_person.user_id=p.actor_user_id
+  left join organization pledged_org on pledged_org.id=p.organization_id
+  where (s.organization_id is null and s.provider_user_id=$1)
+     or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[])))
+  order by p.created_at desc`,[userId,roles])).rows;
+}
+
+export async function createServiceListingAnnouncement(listingId,userId,input,requestId,idempotencyKey=null){
+ if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))throw error(400,"This announcement needs a secure submission key. Reload and retry.","IDEMPOTENCY_KEY_REQUIRED");
+ const title=validateCommunityText(input.title,{field:"Announcement title",min:4,max:180}),body=validateCommunityText(input.body,{field:"Announcement body",min:10,max:8000}),audience=String(input.audience||"");
+ if(!["public","members"].includes(audience))throw error(400,"Listing announcements must target public or active members. Engagement-only updates belong on the specific service request.","INVALID_ANNOUNCEMENT_AUDIENCE");
+ const keyHash=hashValue(idempotencyKey),fingerprint=hashPayload({listingId,userId,title,body,audience});
+ return withTransaction(async db=>{
+  const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
+  if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
+  await assertServiceListingAccess(db,listing,userId);
+  const existing=(await db.query("select * from service_listing_announcement where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){if(existing.listing_id!==listingId||existing.author_user_id!==userId||existing.request_fingerprint!==fingerprint)throw error(409,"This announcement key was already used for different content.","IDEMPOTENCY_KEY_CONFLICT");return {...existing,idempotent:true,replayed:true};}
+  if(!["active","paused"].includes(listing.lifecycle_status)||listing.moderation_status!=="approved"||!["published","paused"].includes(listing.status))throw error(409,"Announcements can only be created for approved active or paused programs.","LISTING_NOT_ACTIVE");
+  const row=(await db.query("insert into service_listing_announcement(listing_id,author_user_id,audience,status,title,body,request_idempotency_hash,request_fingerprint) values($1,$2,$3,'draft',$4,$5,$6,$7) returning *",[listingId,userId,audience,title,body,keyHash,fingerprint])).rows[0];
+  await audit(db,userId,"service.listing_announcement_created","service_listing_announcement",row.id,requestId,{listingId,audience,status:"draft"});
+  return {...row,idempotent:false,replayed:false,nextAction:"Submit the announcement for review before it is published."};
+ });
+}
+
+export async function changeServiceListingAnnouncementStatus(announcementId,userId,status,reason,requestId){
+ if(!["pending_review","published","rejected","archived"].includes(status))throw error(400,"Unsupported announcement transition.","VALIDATION_ERROR");
+ const note=String(reason||"").trim();
+ if(note.length<4)throw error(400,"Provide a reason of at least four characters for this announcement action.","REASON_REQUIRED");
+ return withTransaction(async db=>{
+  const announcement=(await db.query("select * from service_listing_announcement where id=$1 for update",[announcementId])).rows[0];
+  if(!announcement)throw error(404,"Announcement not found.","NOT_FOUND");
+  const listing=(await db.query("select * from service_listing where id=$1 for update",[announcement.listing_id])).rows[0];
+  if(!listing)throw error(404,"Service listing not found.","NOT_FOUND");
+  const owner=listing.provider_user_id===userId || Boolean(listing.organization_id && (await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code=any($3::text[]) limit 1",[listing.organization_id,userId,["owner","administrator","recruiter","project_manager"]])).rowCount);
+  const moderator=Boolean((await db.query("select 1 where exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code in ('supporting_staff','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=$1 and up.permission_code='marketplace.moderate')",[userId])).rows[0]);
+  if(["published","rejected"].includes(status)){
+   if(!moderator)throw error(403,"Only an authorized moderator can publish or reject an announcement.","FORBIDDEN");
+   if(status==="published"&&(!["active","paused"].includes(listing.lifecycle_status)||listing.status!=="published"||listing.moderation_status!=="approved"))throw error(409,"Announcements can only be published for a currently approved active or paused program.","LISTING_NOT_ACTIVE");
+   if(announcement.status!=="pending_review")throw error(409,"Only announcements pending review can be published or rejected.","INVALID_STATE");
+  }else{
+   if(!owner)throw error(403,"Only the listing owner or authorized organization manager can submit or archive this announcement.","FORBIDDEN");
+   const allowed= status==="pending_review"?["draft"]:["draft","pending_review","published","rejected"];
+   if(!allowed.includes(announcement.status))throw error(409,"Invalid announcement lifecycle transition.","INVALID_STATE");
+   if(status==="archived"&&["published","rejected"].includes(announcement.status)===false&&announcement.status!=="draft"&&announcement.status!=="pending_review")throw error(409,"Invalid announcement archive transition.","INVALID_STATE");
+  }
+  if(announcement.status===status)return {...announcement,idempotent:true};
+  const updated=(await db.query("update service_listing_announcement set status=$1,moderation_reason=$2,moderated_by=case when $3 then $4 else moderated_by end,moderated_at=case when $3 then now() else moderated_at end,updated_at=now() where id=$5 returning *",[status,note,["published","rejected"].includes(status),userId,announcementId])).rows[0];
+  await audit(db,userId,"service.listing_announcement_status_changed","service_listing_announcement",announcementId,requestId,{listingId:listing.id,from:announcement.status,to:status,reason:note,audience:announcement.audience});
+  if(["published","rejected"].includes(status))await notify(db,announcement.author_user_id,status==="published"?"service.listing_announcement_published":"service.listing_announcement_rejected","service_listing_announcement",announcementId,{message:status==="published"?"Your announcement was published.":"Your announcement was not approved.",nextAction:status==="published"?"Review the published announcement.":"Review the moderator reason and revise if permitted.",actionUrl:"/services/"+listing.id,reason:note});
+  return updated;
+ });
+}
+
+export async function listPublicServiceAnnouncements(viewerId=null,{limit=30}={}){
+ const db=getPool(),n=Math.min(Math.max(Number.parseInt(limit,10)||30,1),100);
+ return (await db.query(`select a.id,a.listing_id,s.title listing_title,a.author_user_id,a.audience,a.status,a.title,a.body,a.created_at,a.updated_at
+ from service_listing_announcement a join service_listing s on s.id=a.listing_id
+ where a.status='published' and s.status='published' and s.moderation_status='approved' and s.lifecycle_status='active'
+   and (s.expires_at is null or s.expires_at>now())
+   and (
+    (a.audience='public' and (s.visibility='public' or ($1::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$1 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date)))))
+    or (a.audience='members' and $1::uuid is not null and exists(select 1 from membership_record m where m.user_id=$1 and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)))
+   )
+ order by a.created_at desc,a.id desc limit $2`,[viewerId||null,n])).rows;
+}
+
+export async function listServiceListingAnnouncements(listingId,viewerId=null){
+ const db=getPool();
+ const rows=(await db.query(`select a.id,a.listing_id,a.author_user_id,a.audience,a.status,a.title,a.body,a.moderation_reason,a.moderated_by,a.moderated_at,a.created_at,a.updated_at
+ from service_listing_announcement a join service_listing s on s.id=a.listing_id
+ where a.listing_id=$1 and (
+  (a.status='published' and s.status='published' and s.lifecycle_status='active' and (s.expires_at is null or s.expires_at>now()) and (
+   (a.audience='public' and (s.visibility='public' or ($2::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$2 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date)))))
+   or (a.audience='members' and $2::uuid is not null and exists(select 1 from membership_record m where m.user_id=$2 and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)))
+  ))
+  or ($2::uuid is not null and (a.author_user_id=$2 or s.provider_user_id=$2 or exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$2 and om.status='active' and om.role_code=any(array['owner','administrator','recruiter','project_manager']::text[]))))
+ ) order by a.created_at desc`,[listingId,viewerId||null])).rows;
+ return rows;
+}
+
 export async function listServices(viewerId=null,filters={}){
-  const db=getPool(); const args=[viewerId||null]; const where=["s.status='published'","s.moderation_status='approved'","((s.organization_id is not null and exists (select 1 from organization o where o.id=s.organization_id and o.verification_status='verified')) or (s.organization_id is null and exists (select 1 from membership_record m where m.user_id=s.provider_user_id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date))))","(s.visibility='public' or ($1::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$1 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date))))"];
+  const db=getPool(); const args=[viewerId||null]; const where=["s.moderation_status='approved'","((s.lifecycle_status='active' and s.status='published' and (s.expires_at is null or s.expires_at>now())) or (s.lifecycle_status in ('fulfilled','archived') and s.status='closed'))","((s.organization_id is not null and exists (select 1 from organization o where o.id=s.organization_id and o.verification_status='verified')) or (s.organization_id is null and exists (select 1 from membership_record m where m.user_id=s.provider_user_id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date))))","(s.visibility='public' or ($1::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$1 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date))))"];
   if(filters.category){ args.push(String(filters.category)); where.push(`s.service_category=$${args.length}`); }
   if(filters.q){ args.push(`%${String(filters.q).trim()}%`); where.push(`(s.title ilike $${args.length} or s.description ilike $${args.length} or s.service_category ilike $${args.length})`); }
   const limit=Math.min(Math.max(Number(filters.limit)||25,1),100),offset=Math.max(Number(filters.offset)||0,0);
-  const rows=(await db.query(`select s.id,s.provider_user_id,s.organization_id,s.title,s.description,s.service_category,s.delivery_mode,s.location_label,s.pricing_model,s.price_amount,s.currency,s.visibility,s.created_at,coalesce(o.display_name,p.display_name) display_name from service_listing s left join person p on p.user_id=s.provider_user_id left join organization o on o.id=s.organization_id where ${where.join(" and ")} order by s.created_at desc limit ${limit} offset ${offset}`,args)).rows;
+  const rows=(await db.query(`select s.id,s.provider_user_id,s.organization_id,s.title,s.description,s.service_category,s.delivery_mode,s.location_label,s.pricing_model,s.price_amount,s.currency,s.visibility,s.created_at,s.lifecycle_status,s.expires_at,s.impact_model,s.reference_price_amount,coalesce(o.display_name,p.display_name) display_name,
+ (select count(distinct i.organization_id)::int from service_listing_interest i where i.listing_id=s.id and i.status='interested' and i.organization_id is not null) organizations_interested,
+ (select count(distinct i.individual_user_id)::int from service_listing_interest i where i.listing_id=s.id and i.status='interested' and i.individual_user_id is not null) users_interested,
+ (select count(distinct p.actor_user_id)::int from service_listing_pledge p where p.listing_id=s.id and p.organization_id is null and p.status in ('submitted','accepted')) users_pledged,
+ (select count(distinct p.organization_id)::int from service_listing_pledge p where p.listing_id=s.id and p.organization_id is not null and p.status in ('submitted','accepted')) organizations_pledged,
+ (select count(distinct r.id)::int from service_request r join lateral (select a.provider_accepted_at,a.requester_accepted_at from service_request_agreement a where a.request_id=r.id order by a.terms_version desc limit 1) ag on true where r.service_listing_id=s.id and r.status in ('accepted','in_progress','completed') and ag.provider_accepted_at is not null and ag.requester_accepted_at is not null) agreed_services,
+ (select count(distinct r.id)::int from service_request r join lateral (select a.provider_accepted_at,a.requester_accepted_at from service_request_agreement a where a.request_id=r.id order by a.terms_version desc limit 1) ag on true where r.service_listing_id=s.id and r.status='in_progress' and ag.provider_accepted_at is not null and ag.requester_accepted_at is not null) active_deliveries,
+ (select count(distinct r.id)::int from service_request r where r.service_listing_id=s.id and r.status='completed' and r.provider_completed_at is not null and r.requester_accepted_at is not null and length(trim(coalesce(r.outcome_summary,'')))>0 and (s.pricing_model='free' or exists(select 1 from service_payment sp join payment_transaction pt on pt.id=sp.payment_transaction_id where sp.request_id=r.id and sp.status='succeeded' and pt.status='succeeded'))) verified_outcomes from service_listing s left join person p on p.user_id=s.provider_user_id left join organization o on o.id=s.organization_id where ${where.join(" and ")} order by s.created_at desc limit ${limit} offset ${offset}`,args)).rows;
   return {items:rows,limit,offset};
 }
 
 export async function getServiceListing(listingId,viewerId=null){
   const db=getPool();
-  const row=(await db.query("select s.*,coalesce(o.display_name,p.display_name) provider_name from service_listing s left join person p on p.user_id=s.provider_user_id left join organization o on o.id=s.organization_id where s.id=$1 and s.status='published' and s.moderation_status='approved' and ((s.organization_id is not null and exists (select 1 from organization org where org.id=s.organization_id and org.verification_status='verified')) or (s.organization_id is null and exists (select 1 from membership_record m where m.user_id=s.provider_user_id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)))) and (s.visibility='public' or ($2::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$2 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date))))",[listingId,viewerId||null])).rows[0];
+  const row=(await db.query(`select s.*,coalesce(o.display_name,p.display_name) provider_name,
+ (select count(distinct i.organization_id)::int from service_listing_interest i where i.listing_id=s.id and i.status='interested' and i.organization_id is not null) organizations_interested,
+ (select count(distinct i.individual_user_id)::int from service_listing_interest i where i.listing_id=s.id and i.status='interested' and i.individual_user_id is not null) users_interested,
+ (select count(distinct p.actor_user_id)::int from service_listing_pledge p where p.listing_id=s.id and p.organization_id is null and p.status in ('submitted','accepted')) users_pledged,
+ (select count(distinct p.organization_id)::int from service_listing_pledge p where p.listing_id=s.id and p.organization_id is not null and p.status in ('submitted','accepted')) organizations_pledged,
+ (select count(distinct r.id)::int from service_request r join lateral (select a.provider_accepted_at,a.requester_accepted_at from service_request_agreement a where a.request_id=r.id order by a.terms_version desc limit 1) ag on true where r.service_listing_id=s.id and r.status in ('accepted','in_progress','completed') and ag.provider_accepted_at is not null and ag.requester_accepted_at is not null) agreed_services,
+ (select count(distinct r.id)::int from service_request r join lateral (select a.provider_accepted_at,a.requester_accepted_at from service_request_agreement a where a.request_id=r.id order by a.terms_version desc limit 1) ag on true where r.service_listing_id=s.id and r.status='in_progress' and ag.provider_accepted_at is not null and ag.requester_accepted_at is not null) active_deliveries,
+ (select count(distinct r.id)::int from service_request r where r.service_listing_id=s.id and r.status='completed' and r.provider_completed_at is not null and r.requester_accepted_at is not null and length(trim(coalesce(r.outcome_summary,'')))>0 and (s.pricing_model='free' or exists(select 1 from service_payment sp join payment_transaction pt on pt.id=sp.payment_transaction_id where sp.request_id=r.id and sp.status='succeeded' and pt.status='succeeded'))) verified_outcomes from service_listing s left join person p on p.user_id=s.provider_user_id left join organization o on o.id=s.organization_id where s.id=$1 and ((s.status='published' and s.lifecycle_status='active' and (s.expires_at is null or s.expires_at>now()) and s.moderation_status='approved') or (s.status='closed' and s.lifecycle_status in ('fulfilled','archived') and s.moderation_status='approved') or ($2::uuid is not null and (s.provider_user_id=$2 or exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$2 and om.status='active' and om.role_code=any(array['owner','administrator','recruiter','project_manager']::text[]))))) and ((s.organization_id is not null and exists (select 1 from organization org where org.id=s.organization_id and org.verification_status='verified')) or (s.organization_id is null and exists (select 1 from membership_record m where m.user_id=s.provider_user_id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)))) and (s.visibility='public' or ($2::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$2 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date))))`,[listingId,viewerId||null])).rows[0];
   if(!row) throw error(404,"Service listing not found or not visible.","NOT_FOUND");
   return row;
 }
@@ -212,7 +497,7 @@ export async function requestService(listingId,requesterId,input,requestId,idemp
    if(racedExisting.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
    return {...racedExisting,idempotent:true,replayed:true,nextAction:racedExisting.status==="requested"?"Wait for the provider to respond.":racedExisting.status==="accepted"?"Confirm scope, timing and milestones.":racedExisting.status==="in_progress"?"Track delivery and review the provider's submitted outcome.":"Review the recorded request outcome; do not submit the same request again."};
   }
-  if(!listing||listing.status!=="published"||listing.moderation_status!=="approved"||listing.visibility==="private") throw error(404,"Service listing is not available.","NOT_FOUND");
+  if(!listing||listing.status!=="published"||listing.lifecycle_status!=="active"||listing.moderation_status!=="approved"||(listing.expires_at&&new Date(listing.expires_at)<=new Date())||listing.visibility==="private") throw error(404,"Service listing is not available.","NOT_FOUND");
   if(listing.organization_id){const org=(await db.query("select verification_status from organization where id=$1",[listing.organization_id])).rows[0];if(!org||org.verification_status!=="verified")throw error(404,"Service listing is not available.","NOT_FOUND");}
   else if(!(await activeMember(db,listing.provider_user_id))) throw error(404,"Service listing is not available.","NOT_FOUND");
   if(listing.visibility!=="public"&&!(await activeMember(db,requesterId))) throw error(403,"An active membership is required to request a member-only service.","MEMBERSHIP_REQUIRED");
@@ -228,8 +513,8 @@ export async function requestService(listingId,requesterId,input,requestId,idemp
   await db.query("insert into service_request_event(request_id,actor_user_id,to_status,note) values($1,$2,'requested',$3)",[row.id,requesterId,normalized.message]);
   await audit(db,requesterId,"service.request_created","service_request",row.id,requestId,{listingId,organizationId:listing.organization_id||null});
   const recipients=listing.organization_id?(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code=any($2::text[])",[listing.organization_id,["owner","administrator","recruiter","project_manager"]])).rows.map(x=>x.user_id):[listing.provider_user_id];
-  for(const recipient of new Set(recipients))if(recipient&&recipient!==requesterId)await queueWorkflowEmail(db,recipient,"professional.workflow_update",{notificationEventCode:"service.request_received",category:"services",title:"New service request",status:"requested",message:"A new service request needs a response.",nextAction:"Review the requested scope and accept, decline or ask for clarification.",actionUrl:"/services",actionRequired:true,priority:"high"},"service_request",row.id);
-  await queueWorkflowEmail(db,requesterId,"professional.workflow_update",{notificationEventCode:"service.request_submitted",category:"services",title:"Service request submitted",status:"requested",message:"Your service request has been recorded.",nextAction:"Track the provider response in your service requests.",actionUrl:"/services"},"service_request",row.id);
+  for(const recipient of new Set(recipients))if(recipient&&recipient!==requesterId)await queueWorkflowEmail(db,recipient,"professional.workflow_update",{notificationEventCode:"service.request_received",category:"services",title:"New service request",status:"requested",message:"A new service request needs a response.",nextAction:"Review the requested scope and accept, decline or ask for clarification.",actionUrl:"/services?requestId="+ row.id +"#service-request-"+row.id,actionRequired:true,priority:"high"},"service_request",row.id);
+  await queueWorkflowEmail(db,requesterId,"professional.workflow_update",{notificationEventCode:"service.request_submitted",category:"services",title:"Service request submitted",status:"requested",message:"Your service request has been recorded.",nextAction:"Track the provider response in your service requests.",actionUrl:"/services?requestId="+ row.id +"#service-request-"+row.id},"service_request",row.id);
   return {...row,idempotent:false,replayed:false,nextAction:"Your request is recorded. The provider or authorized organization team must respond before delivery begins."};
  });
 }
@@ -242,12 +527,12 @@ export async function listMyServiceListings(userId){
 export async function listMyServiceRequests(userId){
   const db=getPool();
   const orgRoles=["owner","administrator","recruiter","project_manager"];
-  return (await db.query("select r.*,s.title service_title,s.service_category,p.display_name requester_name,coalesce((select jsonb_agg(jsonb_build_object('fromStatus',e.from_status,'toStatus',e.to_status,'note',e.note,'createdAt',e.created_at) order by e.created_at) from service_request_event e where e.request_id=r.id),'[]'::jsonb) status_history,((s.organization_id is null and r.provider_user_id=$1) or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[])))) is_provider from service_request r join service_listing s on s.id=r.service_listing_id join person p on p.user_id=r.requester_user_id where r.requester_user_id=$1 or (s.organization_id is null and r.provider_user_id=$1) or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[]))) order by r.created_at desc",[userId,orgRoles])).rows;
+  return (await db.query("select r.*,s.title service_title,s.service_category,p.display_name requester_name,agreement.terms_version agreement_terms_version,agreement.terms agreement_terms,agreement.provider_accepted_at agreement_provider_accepted_at,agreement.requester_accepted_at agreement_requester_accepted_at,coalesce((select jsonb_agg(jsonb_build_object('fromStatus',e.from_status,'toStatus',e.to_status,'note',e.note,'createdAt',e.created_at) order by e.created_at) from service_request_event e where e.request_id=r.id),'[]'::jsonb) status_history,((s.organization_id is null and r.provider_user_id=$1) or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[])))) is_provider from service_request r join service_listing s on s.id=r.service_listing_id join person p on p.user_id=r.requester_user_id left join lateral (select a.terms_version,a.terms,a.provider_accepted_at,a.requester_accepted_at from service_request_agreement a where a.request_id=r.id order by a.terms_version desc limit 1) agreement on true where r.requester_user_id=$1 or (s.organization_id is null and r.provider_user_id=$1) or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[]))) order by r.created_at desc",[userId,orgRoles])).rows;
 }
 
 export async function changeServiceRequestStatus(requestId,userId,status,note,requestIdHeader){
   return withTransaction(async db=>{
-    const r=(await db.query("select sr.*,sl.organization_id from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
+    const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
     if(!r) throw error(404,"Service request not found.","NOT_FOUND");
     const providerActor=await isServiceProviderActor(db,requestId,userId);
     if(!providerActor && r.requester_user_id!==userId) throw error(403,"You are not a participant in this service request.","FORBIDDEN");
@@ -268,17 +553,26 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
       const updated=(await db.query("update service_request set provider_completed_at=now(),provider_note=coalesce($1,provider_note),updated_at=now() where id=$2 returning *",[note||null,requestId])).rows[0];
       await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$4,$5)",[requestId,userId,r.status,r.status,note||"Provider submitted completion; requester acceptance is still required."]);
       await audit(db,userId,"service.request_completion_submitted","service_request",requestId,requestIdHeader,{status:r.status});
-      await notify(db,r.requester_user_id,"service.completion_submitted","service_request",requestId,{message:"The provider says the work is complete. Review the delivery and accept it or raise a concern.",nextAction:"Review submitted delivery and accept completion when satisfied."});
+      await notify(db,r.requester_user_id,"service.completion_submitted","service_request",requestId,{message:"The provider says the work is complete. Review the delivery and accept it or raise a concern.",nextAction:"Review submitted delivery and accept completion when satisfied.",actionUrl:"/services?requestId="+ requestId +"#service-request-"+requestId,actionRequired:true});
       return {...updated,nextAction:"The requester must review the outcome and accept completion. Paid work also requires verified settlement."};
     }
     if(!allowedServiceRequestTransition(r.status,status)) throw error(409,"Invalid service request transition.","INVALID_STATE");
     if(["declined","cancelled","disputed"].includes(status)&&String(note||"").trim().length<4) throw error(400,"Add a short explanation so the other participant understands this decision and the next step.","OUTCOME_NOTE_REQUIRED");
+    if(status==="in_progress"){
+      const agreement=(await db.query("select * from service_request_agreement where request_id=$1 order by terms_version desc limit 1 for update",[requestId])).rows[0];
+      if(!agreement || !agreement.provider_accepted_at || !agreement.requester_accepted_at) throw error(409,"Both parties must accept the same persisted service terms before delivery can start.","AGREEMENT_REQUIRED");
+    }
     const updated=(await db.query("update service_request set status=$1,provider_note=case when $2::uuid<>requester_user_id then $3 else provider_note end,requester_note=case when $2::uuid=requester_user_id then $3 else requester_note end,outcome_summary=case when $1 in ('declined','cancelled','disputed') then coalesce($3,outcome_summary) else outcome_summary end,accepted_at=case when $1='accepted' then now() else accepted_at end,started_at=case when $1='in_progress' then now() else started_at end,cancelled_at=case when $1='cancelled' then now() else cancelled_at end,updated_at=now() where id=$4 returning *",[status,userId,note||null,requestId])).rows[0];
+    if(status==="accepted"){
+      const terms={scope:r.scope||null,listingPricingModel:r.listing_pricing_model||null,listingPriceAmount:r.listing_price_amount===null?null:Number(r.listing_price_amount),listingCurrency:r.listing_currency||null,agreedPrice:r.agreed_price===null?null:Number(r.agreed_price),currency:r.agreed_currency||null,completionDueAt:r.completion_due_at||null,requestedStartAt:r.requested_start_at||null,requestedEndAt:r.requested_end_at||null};
+      const termsHash=hashPayload(terms);
+      await db.query("insert into service_request_agreement(request_id,terms_version,terms,terms_hash,provider_accepted_by,provider_accepted_at) values($1,1,$2,$3,$4,now()) on conflict(request_id,terms_version) do nothing",[requestId,terms,termsHash,userId]);
+    }
     await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$4,$5)",[requestId,userId,r.status,status,note||null]);
     await audit(db,userId,"service.request_status_changed","service_request",requestId,requestIdHeader,{from:r.status,to:status});
     const message=status==="accepted"?"Your service request was accepted. Agree the start date and delivery scope.":status==="declined"?"Your service request was declined. Review the explanation or choose another provider.":status==="in_progress"?"Service delivery has started. Track milestones and submitted work.":status==="disputed"?"A concern was raised. Review the note and agree the next step or contact Support Desk.":"The service request was cancelled. Review the explanation before creating a new request.";
     const nextAction=status==="accepted"?"Confirm scope, timing and milestones.":status==="in_progress"?"Track delivery and submit/review milestones.":status==="disputed"?"Respond to the concern and document the resolution.":status==="declined"?"Choose another provider or submit a revised request.":"Create a new request only if the need remains."; 
-    for(const recipient of new Set([r.requester_user_id,...await serviceProviderRecipients(db,requestId)])) if(recipient&&recipient!==userId) await notify(db,recipient,"service.request_status_changed","service_request",requestId,{from:r.status,to:status,message,nextAction,actionRequired:["accepted","disputed"].includes(status),priority:status==="disputed"?"high":"normal"});
+    for(const recipient of new Set([r.requester_user_id,...await serviceProviderRecipients(db,requestId)])) if(recipient&&recipient!==userId) await notify(db,recipient,"service.request_status_changed","service_request",requestId,{from:r.status,to:status,message,nextAction,actionUrl:"/services?requestId="+ requestId +"#service-request-"+requestId,actionRequired:["accepted","disputed"].includes(status),priority:status==="disputed"?"high":"normal"});
     return {...updated,nextAction};
   });
 }
@@ -307,7 +601,7 @@ export async function submitServicePayment(requestId,userId,input,requestIdHeade
     }
     const row=(await db.query("insert into service_payment(request_id,payment_transaction_id,payer_user_id,provider_user_id,amount,currency,channel,evidence_file_id,submitted_by) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *",[requestId,p.id,userId,r.provider_user_id,amount,currency,channel,input.evidenceFileId||null,userId])).rows[0];
     await audit(db,userId,"service.payment_submitted","service_payment",row.id,requestIdHeader,{requestId,channel});
-    for(const providerUserId of await serviceProviderRecipients(db,requestId))if(providerUserId&&providerUserId!==userId)await notify(db,providerUserId,"service.payment_review_required","service_payment",row.id,{message:"A requester submitted payment for your service engagement.",nextAction:"Track finance verification before treating the payment as settled.",actionUrl:"/services",actionRequired:false});
+    for(const providerUserId of await serviceProviderRecipients(db,requestId))if(providerUserId&&providerUserId!==userId)await notify(db,providerUserId,"service.payment_review_required","service_payment",row.id,{message:"A requester submitted payment for your service engagement.",nextAction:"Track finance verification before treating the payment as settled.",actionUrl:"/services?requestId="+ requestId +"#service-request-"+requestId,actionRequired:false});
     const financeUsers=(await db.query("select distinct u.id user_id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role ar on ar.id=ur.role_id where ur.user_id=u.id and ar.role_code in ('finance_officer','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='finance.manage'))")).rows;
     for(const finance of financeUsers)await notify(db,finance.user_id,"service.payment_review_required","service_payment",row.id,{message:"A service payment is awaiting finance verification.",nextAction:"Review payment evidence and record a reasoned decision in the existing finance queue.",actionUrl:"/dashboard",reviewerQueue:true,actionRequired:true,priority:"high"});
     return row;
@@ -331,7 +625,7 @@ export async function acceptServiceCompletion(requestId,userId,note,requestIdHea
     const row=(await db.query("update service_request set requester_accepted_at=now(),status='completed',outcome_summary=$1,completed_at=now(),updated_at=now() where id=$2 returning *",[outcome,requestId])).rows[0];
     await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,'in_progress','completed',$3)",[requestId,userId,outcome]);
     await audit(db,userId,"service.request_completion_accepted","service_request",requestId,requestIdHeader);
-    for(const recipient of await serviceProviderRecipients(db,requestId))if(recipient&&recipient!==userId)await notify(db,recipient,"service.completion_accepted","service_request",requestId,{message:"The requester accepted the delivered outcome.",nextAction:"The engagement is complete. You may request feedback or review the final record.",actionUrl:"/services"});
+    for(const recipient of await serviceProviderRecipients(db,requestId))if(recipient&&recipient!==userId)await notify(db,recipient,"service.completion_accepted","service_request",requestId,{message:"The requester accepted the delivered outcome.",nextAction:"The engagement is complete. You may request feedback or review the final record.",actionUrl:"/services?requestId="+ requestId +"#service-request-"+requestId});
     return {...row,nextAction:"The engagement is complete. You can now leave feedback or view the outcome record."};
   });
 }
@@ -385,7 +679,7 @@ export async function submitServiceDelivery(requestId,userId,input,requestIdHead
     }
     const row=(await db.query("insert into service_request_delivery(request_id,milestone_id,submitted_by,description,file_object_id) values($1,$2,$3,$4,$5) returning *",[requestId,input.milestoneId||null,userId,input.description,input.fileObjectId||null])).rows[0];
     await audit(db,userId,"service.delivery_submitted","service_request_delivery",row.id,requestIdHeader,{requestId});
-    await notify(db,r.requester_user_id,"service.delivery_submitted","service_request_delivery",row.id,{message:"The provider submitted a delivery for your service engagement.",nextAction:"Review the delivery and accept it or request a revision with a clear explanation.",actionUrl:"/services",actionRequired:true,priority:"high"});
+    await notify(db,r.requester_user_id,"service.delivery_submitted","service_request_delivery",row.id,{message:"The provider submitted a delivery for your service engagement.",nextAction:"Review the delivery and accept it or request a revision with a clear explanation.",actionUrl:"/services?requestId="+ requestId +"#service-request-"+requestId,actionRequired:true,priority:"high"});
     return row;
   });
 }
@@ -401,7 +695,7 @@ export async function reviewServiceDelivery(deliveryId,userId,input,requestIdHea
     const row=(await db.query("update service_request_delivery set status=$1,reviewer_note=$2,reviewed_by=$3,reviewed_at=now() where id=$4 returning *",[input.status,input.note||null,userId,deliveryId])).rows[0];
     if(d.milestone_id) await db.query("update service_request_milestone set status=$1,completed_at=case when $1='completed' then now() else completed_at end,updated_at=now() where id=$2",[input.status==="accepted"?"completed":"revision_requested",d.milestone_id]);
     await audit(db,userId,"service.delivery_reviewed","service_request_delivery",deliveryId,requestIdHeader,{status:input.status});
-    for(const recipient of await serviceProviderRecipients(db,d.request_id))if(recipient&&recipient!==userId)await notify(db,recipient,input.status==="accepted"?"service.delivery_accepted":"service.delivery_revision_requested","service_request_delivery",deliveryId,{message:input.status==="accepted"?"The requester accepted your delivery.":"The requester requested a revision.",note:input.note||null,nextAction:input.status==="accepted"?"Continue with the next milestone or submit completion when all work is ready.":"Review the requester's note and submit a revised delivery.",actionUrl:"/services",actionRequired:input.status==="revision_requested",priority:input.status==="revision_requested"?"high":"normal"});
+    for(const recipient of await serviceProviderRecipients(db,d.request_id))if(recipient&&recipient!==userId)await notify(db,recipient,input.status==="accepted"?"service.delivery_accepted":"service.delivery_revision_requested","service_request_delivery",deliveryId,{message:input.status==="accepted"?"The requester accepted your delivery.":"The requester requested a revision.",note:input.note||null,nextAction:input.status==="accepted"?"Continue with the next milestone or submit completion when all work is ready.":"Review the requester's note and submit a revised delivery.",actionUrl:"/services?requestId="+ d.request_id +"#service-request-"+d.request_id,actionRequired:input.status==="revision_requested",priority:input.status==="revision_requested"?"high":"normal"});
     return {...row,nextAction:input.status==="accepted"?"Continue with the next milestone or submit completion when all work is ready.":"Review the note and submit a revised delivery."};
   });
 }
@@ -435,10 +729,46 @@ export async function verifyServicePayment(servicePaymentId,verifierId,input,req
   await db.query("update payment_transaction set status=$1,verified_by=$2,verified_at=now(),verification_note=$3,completed_at=case when $1 in ('succeeded','failed') then now() else completed_at end,updated_at=now() where id=$4",[next,verifierId,input.note||null,row.payment_transaction_id]);
   await audit(db,verifierId,"service.payment_verified","service_payment",servicePaymentId,requestIdHeader,{decision:input.decision,requestId:row.request_id});
   const approved=input.decision==="approved", correction=input.decision==="needs_correction";
-  await notify(db,row.payer_user_id,"service.payment_decision","service_payment",servicePaymentId,{message:approved?"Your service payment was verified.":correction?"Finance needs additional information about your service payment.":"Your service payment was not approved.",nextAction:approved?"Continue with the service workflow; paid completion still requires the matching verified amount and currency.":correction?"Review the finance note and provide corrected payment evidence.":"Review the finance note and contact support if you believe the decision is incorrect.",actionUrl:"/services",actionRequired:!approved,priority:correction?"high":"normal"});
-  for(const providerUserId of await serviceProviderRecipients(db,row.request_id))if(providerUserId&&providerUserId!==row.payer_user_id)await notify(db,providerUserId,"service.payment_decision","service_payment",servicePaymentId,{decision:input.decision,eventVersion:requestIdHeader,message:approved?"The service payment was verified by finance.":correction?"Finance requested additional information for the service payment.":"The service payment was not approved.",nextAction:approved?"Continue the engagement according to the agreed delivery terms.":"Coordinate with the requester and finance to resolve the payment status.",actionUrl:"/services",actionRequired:correction,priority:correction?"high":"normal"});
+  await notify(db,row.payer_user_id,"service.payment_decision","service_payment",servicePaymentId,{message:approved?"Your service payment was verified.":correction?"Finance needs additional information about your service payment.":"Your service payment was not approved.",nextAction:approved?"Continue with the service workflow; paid completion still requires the matching verified amount and currency.":correction?"Review the finance note and provide corrected payment evidence.":"Review the finance note and contact support if you believe the decision is incorrect.",actionUrl:"/services?requestId="+ row.request_id +"#service-request-"+row.request_id,actionRequired:!approved,priority:correction?"high":"normal"});
+  for(const providerUserId of await serviceProviderRecipients(db,row.request_id))if(providerUserId&&providerUserId!==row.payer_user_id)await notify(db,providerUserId,"service.payment_decision","service_payment",servicePaymentId,{decision:input.decision,eventVersion:requestIdHeader,message:approved?"The service payment was verified by finance.":correction?"Finance requested additional information for the service payment.":"The service payment was not approved.",nextAction:approved?"Continue the engagement according to the agreed delivery terms.":"Coordinate with the requester and finance to resolve the payment status.",actionUrl:"/services?requestId="+ row.request_id +"#service-request-"+row.request_id,actionRequired:correction,priority:correction?"high":"normal"});
   return updated;
  });
+}
+
+export async function createServiceRequestUpdate(requestId,userId,input,requestIdHeader,idempotencyKey=null){
+ if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))throw error(400,"This update needs a secure submission key. Reload and retry.","IDEMPOTENCY_KEY_REQUIRED");
+ const category=String(input.category||"");
+ if(!ENGAGEMENT_UPDATE_CATEGORIES.has(category))throw error(400,"Choose a supported service-request update category.","VALIDATION_ERROR");
+ const body=validateCommunityText(input.body,{field:"Update",min:10,max:2000});
+ const keyHash=hashValue(idempotencyKey),fingerprint=hashPayload({requestId,userId,category,body});
+ return withTransaction(async db=>{
+  const request=(await db.query("select * from service_request where id=$1 for update",[requestId])).rows[0];
+  if(!request)throw error(404,"Service request not found.","NOT_FOUND");
+  const providerActor=await isServiceProviderActor(db,requestId,userId);
+  if(request.requester_user_id!==userId&&!providerActor)throw error(403,"Only the requester or authorized provider-side participant can add an operational update.","FORBIDDEN");
+  const existing=(await db.query("select * from service_request_update where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){
+   if(existing.request_id!==requestId||existing.author_user_id!==userId||existing.request_fingerprint!==fingerprint)throw error(409,"This update key was already used for different content.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,idempotent:true,replayed:true};
+  }
+  if(!["requested","accepted","in_progress","disputed"].includes(request.status))throw error(409,"Operational updates are available only while the service request is open.","SERVICE_REQUEST_NOT_OPEN");
+  const row=(await db.query("insert into service_request_update(request_id,author_user_id,category,body,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6) returning id,request_id,author_user_id,category,body,created_at",[requestId,userId,category,body,keyHash,fingerprint])).rows[0];
+  await audit(db,userId,"service.request_update_created","service_request_update",row.id,requestIdHeader,{requestId,category,audience:"participants"});
+  const actionUrl="/services?requestId="+ requestId +"#service-request-"+requestId;
+  const payload={message:"A participant added an operational update to your service request.",nextAction:"Review the update on the service request.",actionUrl,actionRequired:true};
+  if(providerActor)await notify(db,request.requester_user_id,"service.request_update_created","service_request_update",row.id,payload);
+  else for(const recipient of await serviceProviderRecipients(db,requestId))if(recipient!==userId)await notify(db,recipient,"service.request_update_created","service_request_update",row.id,payload);
+  return {...row,audience:"participants",idempotent:false,replayed:false};
+ });
+}
+
+export async function listServiceRequestUpdates(requestId,userId){
+ const db=getPool();
+ const request=(await db.query("select id,requester_user_id from service_request where id=$1",[requestId])).rows[0];
+ if(!request)throw error(404,"Service request not found.","NOT_FOUND");
+ const providerActor=await isServiceProviderActor(db,requestId,userId);
+ if(request.requester_user_id!==userId&&!providerActor)throw error(403,"Operational updates are available only to the authorized participants of this service request.","FORBIDDEN");
+ return (await db.query("select u.id,u.request_id,u.author_user_id,u.category,u.body,u.created_at from service_request_update u where u.request_id=$1 order by u.created_at asc,u.id asc",[requestId])).rows;
 }
 
 export async function submitServiceFeedback(requestId,userId,input,requestIdHeader){
@@ -447,13 +777,24 @@ export async function submitServiceFeedback(requestId,userId,input,requestIdHead
     if(!r) throw error(404,"Service request not found.","NOT_FOUND");
     if(r.requester_user_id!==userId&&!(await isServiceProviderActor(db,requestId,userId))) throw error(403,"You are not a participant in this service request.","FORBIDDEN");
     if(r.status!=="completed") throw error(409,"Service feedback requires a completed engagement.","SERVICE_NOT_COMPLETED");
-    const target=input.targetRole||"service";
+    const target=input.targetRole||"service",category=String(input.category||"");
+    if(!FEEDBACK_CATEGORIES.has(category))throw error(400,"Choose a structured feedback category.","FEEDBACK_CATEGORY_REQUIRED");
     if(target==="provider"&&r.provider_user_id===userId) throw error(400,"A provider cannot rate themselves.","SELF_RATING");
     if(target==="requester"&&r.requester_user_id===userId) throw error(400,"A requester cannot rate themselves.","SELF_RATING");
     if(!["provider","requester","service"].includes(target)) throw error(400,"Unsupported feedback target.","VALIDATION_ERROR");
-    const row=(await db.query("insert into service_request_feedback(request_id,reviewer_user_id,target_role,rating,comments) values($1,$2,$3,$4,$5) on conflict(request_id,reviewer_user_id,target_role) do update set rating=excluded.rating,comments=excluded.comments returning *",[requestId,userId,target,input.rating??null,input.comments||null])).rows[0];
-    await audit(db,userId,"service.feedback_submitted","service_request_feedback",row.id,requestIdHeader);
-    return row;
+    const rating=input.rating===undefined||input.rating===null||input.rating===""?null:Number(input.rating);
+    if(rating!==null&&(!Number.isInteger(rating)||rating<1||rating>5))throw error(400,"Rating must be a whole number from 1 to 5.","VALIDATION_ERROR");
+    const comments=String(input.comments||"").trim();
+    if(comments.length>1000)throw error(400,"Feedback comments must be 1,000 characters or fewer.","VALIDATION_ERROR");
+    if(comments)validateCommunityText(comments,{field:"Feedback comments",min:1,max:1000});
+    if(rating===null&&!comments)throw error(400,"Provide a rating or concise feedback with a category.","VALIDATION_ERROR");
+    const row=(await db.query("insert into service_request_feedback(request_id,reviewer_user_id,target_role,category,rating,comments) values($1,$2,$3,$4,$5,$6) on conflict(request_id,reviewer_user_id,target_role) do update set category=excluded.category,rating=excluded.rating,comments=excluded.comments returning *",[requestId,userId,target,category,rating,comments||null])).rows[0];
+    await audit(db,userId,"service.feedback_submitted","service_request_feedback",row.id,requestIdHeader,{category,target,audience:"participants"});
+    const actionUrl="/services?requestId="+ requestId +"#service-request-"+requestId;
+    const payload={message:"Feedback was submitted for a completed service engagement.",nextAction:"Review the completed service record.",actionUrl,actionRequired:true};
+    if(r.requester_user_id===userId)for(const recipient of await serviceProviderRecipients(db,requestId))await notify(db,recipient,"service.feedback_submitted","service_request_feedback",row.id,payload);
+    else await notify(db,r.requester_user_id,"service.feedback_submitted","service_request_feedback",row.id,payload);
+    return {...row,audience:"participants"};
   });
 }
 

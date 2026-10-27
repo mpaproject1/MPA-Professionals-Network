@@ -21,6 +21,7 @@ import * as referencePortfolio from "./src/platform/reference-portfolio.js";
 import * as reports from "./src/platform/reports.js";
 import * as savedDiscoveryItems from "./src/platform/saved-discovery-items.js";
 import {enforcePersistentRateLimit, issueHumanChallenge, verifyHumanChallenge} from "./src/platform/security-controls.js";
+import * as serveCommunityImpactReports from "./src/platform/serve-community-impact-reports.js";
 import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
 import * as supportBot from "./src/platform/support-bot.js";
 import * as userAdmin from "./src/platform/user-admin.js";
@@ -166,8 +167,10 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/jobs/")) { const v=optionalIdentity(req); return ok(res,await organizationJobs.getJob(parts[3],v?.sub||null),requestId); }
     if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/jobs/") && parts[4]==="applications") { const identity=await auth(req); return ok(res,await organizationJobs.listJobApplications(parts[3],identity.sub),requestId); }
 
+    if(req.method==="GET" && p==="api/v1/service-announcements") { const q=query(req.url); const viewer=optionalIdentity(req); return ok(res,await servicesMentorship.listPublicServiceAnnouncements(viewer?.sub||null,{limit:q.get("limit")}),requestId); }
     if(req.method==="GET" && p==="api/v1/services") { const q=query(req.url); const viewer=req.headers.authorization?.startsWith("Bearer ")?await auth(req):null; return ok(res,await servicesMentorship.listServices(viewer?.sub||null,{category:q.get("category"),q:q.get("q"),limit:q.get("limit"),offset:q.get("offset")}),requestId); }
     if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/services/")) { const viewer=optionalIdentity(req); return ok(res,await servicesMentorship.getServiceListing(parts[3],viewer?.sub||null),requestId); }
+    if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/services/") && parts[4]==="announcements") { const viewer=optionalIdentity(req); return ok(res,await servicesMentorship.listServiceListingAnnouncements(parts[3],viewer?.sub||null),requestId); }
     if(req.method==="GET" && p==="api/v1/mentors") { const q=query(req.url); const viewer=req.headers.authorization?.startsWith("Bearer ")?await auth(req):null; return ok(res,await servicesMentorship.listMentors(viewer?.sub||null,{q:q.get("q"),topic:q.get("topic"),limit:q.get("limit"),offset:q.get("offset")}),requestId); }
     if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/mentors/")) { const viewer=optionalIdentity(req); return ok(res,await servicesMentorship.getMentorProfile(parts[3],viewer?.sub||null),requestId); }
     if(req.method==="POST" && p==="api/v1/files/uploads") { const identity=await auth(req); return ok(res,await authorizePrivateUpload(identity.sub,await body(req)),requestId,201); }
@@ -220,6 +223,22 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/me/report-saved-views") { const identity=await auth(req); return ok(res,await reports.listSavedViews(identity),requestId); }
     if(req.method==="POST" && p==="api/v1/me/report-saved-views") { const identity=await auth(req); return ok(res,await reports.saveSavedView(identity,await body(req),requestId),requestId,201); }
     if(req.method==="DELETE" && parts.length===5 && p.startsWith("api/v1/me/report-saved-views/")) { const identity=await auth(req); return ok(res,await reports.deleteSavedView(identity,parts[4],requestId),requestId); }
+    if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/services/listings/") && parts[5]==="impact-report") {
+      const identity=await auth(req),q=query(req.url);
+      const result=await serveCommunityImpactReports.runImpactReport(identity,parts[4],{from:q.get("from"),to:q.get("to")},requestId,q.get("view")||"owner");
+      return ok(res,result,requestId);
+    }
+    if(req.method==="GET" && parts.length===7 && p.startsWith("api/v1/services/listings/") && parts[5]==="impact-report" && parts[6]==="export") {
+      const identity=await auth(req),q=query(req.url),view=q.get("view")||"owner";
+      const result=await serveCommunityImpactReports.runImpactReport(identity,parts[4],{from:q.get("from"),to:q.get("to")},requestId,view);
+      const exportData=serveCommunityImpactReports.toImpactExportData(result,parts[4]);
+      const format=q.get("format")||"pdf";
+      if(!["pdf","xlsx"].includes(format)) throw Object.assign(new Error("Choose PDF or XLSX export format."),{statusCode:400,code:"INVALID_EXPORT_FORMAT"});
+      const buffer=format==="pdf"?reports.makePdf(exportData):reports.makeXlsx(exportData);
+      await getPool().query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'service_listing',$3,$4,'success',$5)",[identity.sub,view==="governance"?"serve_community.impact_governance_report_exported":"serve_community.impact_report_exported",parts[4],requestId,JSON.stringify({format,view,rows:exportData.rows.length,minimumGroupSize:result.minimumGroupSize})]);
+      res.writeHead(200,{"content-type":format==="pdf"?"application/pdf":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":`attachment; filename=serve-community-impact-${new Date().toISOString().slice(0,10)}.${format}`,"content-length":String(buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId});
+      return res.end(buffer);
+    }
     if(req.method==="GET" && p==="api/v1/admin/reports") { const identity=await auth(req); return ok(res,reports.listReportCatalogue(identity),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/admin/reports/") && parts[5]==="run") { const identity=await auth(req); return ok(res,await reports.runReport(identity,parts[4],await body(req),requestId),requestId); }
     if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/admin/reports/") && parts[5]==="export") { const identity=await auth(req),q=query(req.url),out=await reports.exportReport(identity,parts[4],{from:q.get("from"),to:q.get("to"),status:q.get("status"),q:q.get("q"),groupBy:q.get("groupBy")},q.get("format")||"pdf",requestId); res.writeHead(200,{"content-type":out.contentType,"content-disposition":`attachment; filename=${out.filename}`,"content-length":String(out.buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId}); return res.end(out.buffer); }
@@ -319,8 +338,16 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/admin/marketplace-demand-topics/") && parts[5]==="summary") return ok(res,await marketplaceDemand.getDemandSummary(identity.sub,parts[4]),requestId);
     if(req.method==="POST" && p==="api/v1/services") return ok(res,await servicesMentorship.createServiceListing(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
     if(req.method==="PATCH" && parts.length===4 && p.startsWith("api/v1/services/")) return ok(res,await servicesMentorship.updateServiceListing(parts[3],identity.sub,await body(req),requestId),requestId);
-    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/services/") && parts[4]==="status") { const b=await body(req); return ok(res,await servicesMentorship.changeServiceListingStatus(parts[3],identity.sub,b.status,requestId),requestId); }
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/services/") && parts[4]==="status") { const b=await body(req); return ok(res,await servicesMentorship.changeServiceListingStatus(parts[3],identity.sub,b.status,requestId,b.reason),requestId); }
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/services/") && parts[4]==="announcements") return ok(res,await servicesMentorship.createServiceListingAnnouncement(parts[3],identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-listing-announcements/") && parts[4]==="status") { const b=await body(req); return ok(res,await servicesMentorship.changeServiceListingAnnouncementStatus(parts[3],identity.sub,b.status,b.reason,requestId),requestId); }
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/services/") && parts[4]==="interest") return ok(res,await servicesMentorship.createServiceListingInterest(parts[3],identity.sub,await body(req),requestId),requestId,201);
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/services/") && parts[4]==="pledges") return ok(res,await servicesMentorship.createServiceListingPledge(parts[3],identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-listing-interests/") && parts[4]==="withdraw") { const b=await body(req); return ok(res,await servicesMentorship.withdrawServiceListingInterest(parts[3],identity.sub,b.reason,requestId),requestId); }
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-listing-pledges/") && parts[4]==="status") { const b=await body(req); return ok(res,await servicesMentorship.changeServiceListingPledgeStatus(parts[3],identity.sub,b.status,b.reason,requestId),requestId); }
     if(req.method==="GET" && p==="api/v1/me/service-listings") return ok(res,await servicesMentorship.listMyServiceListings(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/me/service-listing-interest-summary") return ok(res,await servicesMentorship.listMyServiceListingInterestSummary(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/me/service-listing-pledges") return ok(res,await servicesMentorship.listMyServiceListingPledges(identity.sub),requestId);
      if(req.method==="GET" && p==="api/v1/me/organization-mentorship-offers") return ok(res,await organizationMentorshipOffers.listMyOrganizationMentorshipOffers(identity.sub),requestId);
      if(req.method==="POST" && p==="api/v1/organization-mentorship-offers") return ok(res,await organizationMentorshipOffers.createOrganizationMentorshipOffer(identity.sub,await body(req),requestId),requestId,201);
      if(req.method==="PATCH" && parts.length===4 && p.startsWith("api/v1/organization-mentorship-offers/")) return ok(res,await organizationMentorshipOffers.updateOrganizationMentorshipOffer(parts[3],identity.sub,await body(req),requestId),requestId);
@@ -330,7 +357,10 @@ const server=http.createServer(async (req,res)=>{
      if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/organization-mentorship-requests/") && parts[4]==="status") { const b=await body(req); return ok(res,await organizationMentorshipOffers.respondOrganizationMentorshipRequest(parts[3],identity.sub,b.status,b.note,requestId),requestId); }
     if(req.method==="GET" && p==="api/v1/me/service-requests") return ok(res,await servicesMentorship.listMyServiceRequests(identity.sub),requestId);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/services/") && parts[4]==="requests") return ok(res,await servicesMentorship.requestService(parts[3],identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
+    if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="updates") return ok(res,await servicesMentorship.listServiceRequestUpdates(parts[3],identity.sub),requestId);
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="updates") return ok(res,await servicesMentorship.createServiceRequestUpdate(parts[3],identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="status") { const b=await body(req); return ok(res,await servicesMentorship.changeServiceRequestStatus(parts[3],identity.sub,b.status,b.note,requestId),requestId); }
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="agreement") return ok(res,await servicesMentorship.acceptServiceAgreement(parts[3],identity.sub,requestId),requestId);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="accept-completion") { const b=await body(req); return ok(res,await servicesMentorship.acceptServiceCompletion(parts[3],identity.sub,b.note,requestId),requestId); }
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-requests/") && parts[4]==="payment") return ok(res,await servicesMentorship.submitServicePayment(parts[3],identity.sub,await body(req),requestId),requestId,201);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/service-payments/") && parts[4]==="verify") { anyRoleOrPermission(identity,["finance_officer","reviewer","system_admin"],["finance.manage"]); return ok(res,await servicesMentorship.verifyServicePayment(parts[3],identity.sub,await body(req),requestId),requestId); }

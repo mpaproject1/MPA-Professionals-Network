@@ -1,12 +1,6 @@
+import "./src/platform/load-env.js";
 import {randomUUID} from "node:crypto";
-import {existsSync} from "node:fs";
-import {fileURLToPath} from "node:url";
 import http from "node:http";
-
-// Load the repository-root .env for direct Node/cPanel starts. Existing process
-// environment variables take precedence, so hosting-panel secrets are not overwritten.
-const envFile=fileURLToPath(new URL("./.env",import.meta.url));
-if(existsSync(envFile)) process.loadEnvFile(envFile);
 import * as membershipAdminBulk from "./src/membership/admin-bulk.js";
 import * as membershipCard from "./src/membership/card.js";
 import * as membership from "./src/membership/service.js";

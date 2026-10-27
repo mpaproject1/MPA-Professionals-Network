@@ -1,33 +1,26 @@
-name: cPanel backend source staging (manual)
+name: Pre-deployment backend source package (manual)
 
 on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: "Exact Git branch, tag, or commit to package"
+        description: "Exact Git branch, tag, or commit to package for review"
         required: true
-        default: "e4cb723b72ece4792086c045ce9e290c6101afce"
+        default: "ux/p0-navigation-and-org-privacy"
         type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: mpa-cpanel-backend-staging
+  group: mpa-predeployment-backend-package
   cancel-in-progress: false
 
 jobs:
-  package-and-upload-staging:
+  package-and-validate:
+    name: Package backend source only (no deployment)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
-      CPANEL_SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}
-      CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
-      CPANEL_USER: muslimjq
-      CPANEL_PORT: "22"
-      REMOTE_DIR: /home/muslimjq/mpa-deploy-staging
-
     steps:
       - name: Check out requested source revision
         uses: actions/checkout@v4
@@ -46,29 +39,21 @@ jobs:
           selected = []
           allowed_roots = (b"src/", b"scripts/", b"db/migrations/", b"tests/", b"test/", b"config/")
           allowed_files = {b"server.js", b"package.json", b"package-lock.json", b"npm-shrinkwrap.json"}
-          for raw in paths:
-              if not raw:
+          for path in paths:
+              if not path:
                   continue
-              path = raw
               base = os.path.basename(path).lower()
               if path in allowed_files or any(path.startswith(root) for root in allowed_roots):
                   if any(token in base for token in (b".env", b"secret", b"credential", b"private_key", b"id_rsa")):
                       continue
-                  selected.append(raw)
+                  selected.append(path)
           if b"server.js" not in selected or b"package.json" not in selected:
-              raise SystemExit("Required backend entrypoint/package manifest not found in selected source revision")
+              raise SystemExit("Required backend entrypoint/package manifest not found")
           if not any(p.startswith(b"db/migrations/") and p.endswith(b".sql") for p in selected):
-              raise SystemExit("No tracked SQL migrations selected; refusing to create incomplete backend package")
+              raise SystemExit("No tracked SQL migrations found; refusing incomplete package")
           sys.stdout.buffer.write(b"\0".join(selected) + b"\0")
           ' > "$RUNNER_TEMP/backend-files.list"
 
-          python3 - "$RUNNER_TEMP/backend-files.list" <<'PY'
-          import sys
-          paths = [p for p in open(sys.argv[1], "rb").read().split(b"\0") if p]
-          migrations = [p for p in paths if p.startswith(b"db/migrations/") and p.endswith(b".sql")]
-          print(f"Selected tracked backend files: {len(paths)}")
-          print(f"Selected tracked SQL migrations: {len(migrations)}")
-          PY
           grep -zqx 'server.js' "$RUNNER_TEMP/backend-files.list"
           grep -zqx 'package.json' "$RUNNER_TEMP/backend-files.list"
 
@@ -80,10 +65,9 @@ jobs:
         run: |
           set -euo pipefail
           SOURCE_COMMIT="$(cat "$RUNNER_TEMP/source-commit.txt")"
-          archive="$RUNNER_TEMP/mpa-backend-source-${SOURCE_COMMIT}-${GITHUB_RUN_ID}.tar.gz"
-          manifest="$RUNNER_TEMP/mpa-backend-source-${SOURCE_COMMIT}-${GITHUB_RUN_ID}.manifest.txt"
+          archive="$RUNNER_TEMP/mpa-backend-predeployment-\${SOURCE_COMMIT}-\${GITHUB_RUN_ID}.tar.gz"
+          manifest="$RUNNER_TEMP/mpa-backend-predeployment-\${SOURCE_COMMIT}-\${GITHUB_RUN_ID}.manifest.txt"
           checksum="$archive.sha256"
-
           tar --null -T "$RUNNER_TEMP/backend-files.list" -czf "$archive"
           python3 - "$RUNNER_TEMP/backend-files.list" "$manifest" "$SOURCE_COMMIT" "$SOURCE_REF" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$archive" <<'PY'
           import hashlib, sys
@@ -96,22 +80,18 @@ jobs:
               out.write(f"tracked_backend_file_count={len(paths)}\nsql_migration_count={len(migrations)}\narchive_sha256={digest}\n")
           PY
           (cd "$(dirname "$archive")" && sha256sum "$(basename "$archive")" > "$(basename "$checksum")")
-
           if tar -tzf "$archive" | grep -E '(^|/)(\.env([^/]*)?|node_modules)(/|$)|(^|/)web/|(^|/)\.git/' ; then
-            echo "Unsafe or out-of-scope content found in archive; refusing upload."
+            echo "Unsafe or out-of-scope content found in archive."
             exit 1
           fi
-
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
           echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
           echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
-          echo "archive_name=$(basename "$archive")" >> "$GITHUB_OUTPUT"
-          echo "manifest_name=$(basename "$manifest")" >> "$GITHUB_OUTPUT"
 
-      - name: Store source package as private Actions artifact
+      - name: Store package as GitHub Actions artifact only
         uses: actions/upload-artifact@v4
         with:
-          name: mpa-backend-source-${{ github.run_id }}
+          name: mpa-backend-predeployment-${{ github.run_id }}
           path: |
             ${{ steps.package.outputs.archive }}
             ${{ steps.package.outputs.checksum }}
@@ -119,55 +99,8 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-      - name: Configure verified SSH connection
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$CPANEL_HOST"
-          test -n "$CPANEL_SSH_KEY"
-          test -n "$CPANEL_KNOWN_HOSTS"
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$CPANEL_SSH_KEY" > "$HOME/.ssh/cpanel_deploy_key"
-          chmod 600 "$HOME/.ssh/cpanel_deploy_key"
-          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/known_hosts"
-          ssh-keygen -y -f "$HOME/.ssh/cpanel_deploy_key" > /dev/null
-          ssh-keygen -F "$CPANEL_HOST" -f "$HOME/.ssh/known_hosts" > /dev/null
-          echo "SSH key format and known-host entry verified; strict host verification enabled."
-
-      - name: Verify staging-only destination
-        shell: bash
-        run: |
-          set -euo pipefail
-          ssh -i "$HOME/.ssh/cpanel_deploy_key" \
-            -p "$CPANEL_PORT" -o IdentitiesOnly=yes -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            "$CPANEL_USER@$CPANEL_HOST" \
-            'set -eu; test -d /home/muslimjq/mpa-deploy-staging; test -w /home/muslimjq/mpa-deploy-staging; printf "STAGING_ACCESS_OK\n"; whoami'
-
-      - name: Upload backend archive to staging directory only
-        shell: bash
-        env:
-          ARCHIVE: ${{ steps.package.outputs.archive }}
-          CHECKSUM: ${{ steps.package.outputs.checksum }}
-          MANIFEST: ${{ steps.package.outputs.manifest }}
-          ARCHIVE_NAME: ${{ steps.package.outputs.archive_name }}
-          MANIFEST_NAME: ${{ steps.package.outputs.manifest_name }}
-        run: |
-          set -euo pipefail
-          scp -i "$HOME/.ssh/cpanel_deploy_key" \
-            -P "$CPANEL_PORT" -o IdentitiesOnly=yes -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            "$ARCHIVE" "$CHECKSUM" "$MANIFEST" \
-            "$CPANEL_USER@$CPANEL_HOST:$REMOTE_DIR/"
-          ssh -i "$HOME/.ssh/cpanel_deploy_key" \
-            -p "$CPANEL_PORT" -o IdentitiesOnly=yes -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            "$CPANEL_USER@$CPANEL_HOST" \
-            "set -eu; cd '$REMOTE_DIR'; sha256sum -c '$(basename "$CHECKSUM")'; test -s '$ARCHIVE_NAME'; test -s '$MANIFEST_NAME'; echo BACKEND_SOURCE_STAGING_UPLOAD_VERIFIED; cat '$MANIFEST_NAME'"
-
-      - name: State deployment boundary
+      - name: Confirm pre-deployment boundary
         if: success()
         run: |
-          echo "Backend source staged at /home/muslimjq/mpa-deploy-staging only."
-          echo "No API files replaced, no application restarted, and no database migrations run."
+          echo "Backend source package and manifest stored in GitHub Actions only."
+          echo "No cPanel/SSH credentials are read; no remote upload, application restart, database migration, or deployment occurs."

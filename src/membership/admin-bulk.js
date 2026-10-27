@@ -156,3 +156,20 @@ export async function claimMemberInvitation({token,password}){
   return {claimed:true,message:"Your account is ready. Sign in with your email and new password."};
  });
 }
+
+export async function listMemberCatalog(identity,{q="",status="",limit=25,offset=0}={}) {
+ assertImportAuthority(identity);
+ const db=getPool();
+ const search=String(q||"").trim().slice(0,120), state=String(status||"").trim().slice(0,30);
+ const pageSize=Math.min(Math.max(Number(limit)||25,1),100), start=Math.max(Number(offset)||0,0);
+ const where=`($1='' or lower(coalesce(p.display_name,'')) like lower('%'||$1||'%') or lower(coalesce(u.email,'')) like lower('%'||$1||'%') or lower(mr.membership_number) like lower('%'||$1||'%') or lower(coalesce(membership_product.product_code,'')) like lower('%'||$1||'%')) and ($2='' or mr.status=$2)`;
+ const args=[search,state];
+ const total=Number((await db.query(`select count(*)::int count from membership_record mr left join app_user u on u.id=mr.user_id left join person p on p.user_id=u.id left join membership_product on membership_product.id=mr.membership_product_id where ${where}`,args)).rows[0]?.count||0);
+ const items=(await db.query(`
+  select mr.id,mr.user_id,mr.membership_number,membership_product.product_code,membership_product.name product_name,mr.status,mr.start_date,mr.end_date,mr.source,mr.created_at,
+   u.email,u.status account_status,p.phone,p.display_name full_name
+  from membership_record mr left join app_user u on u.id=mr.user_id left join person p on p.user_id=mr.user_id left join membership_product on membership_product.id=mr.membership_product_id
+  where ${where} order by mr.created_at desc limit ${pageSize} offset ${start}
+ `,args)).rows;
+ return {items,total,limit:pageSize,offset:start,hasMore:start+items.length<total};
+}

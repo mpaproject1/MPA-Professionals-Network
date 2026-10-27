@@ -12,7 +12,7 @@ test("service request lifecycle is controlled",()=>{
   assert.equal(allowedServiceRequestTransition("requested","accepted"),true);
   assert.equal(allowedServiceRequestTransition("requested","declined"),true);
   assert.equal(allowedServiceRequestTransition("accepted","in_progress"),true);
-  assert.equal(allowedServiceRequestTransition("in_progress","completed"),true);
+  assert.equal(allowedServiceRequestTransition("in_progress","completed"),false,"provider completion submission is not a state transition; requester acceptance performs the completed transition");
   assert.equal(allowedServiceRequestTransition("completed","in_progress"),false);
   assert.equal(allowedServiceRequestTransition("declined","accepted"),false);
 });

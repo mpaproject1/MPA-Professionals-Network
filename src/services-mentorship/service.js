@@ -1,8 +1,11 @@
+import { createHash } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
 import { assertCurrentActiveMembership, assertOrganizationCapability, assertProfessionalIdentity, hasCurrentActiveMembership, hasProfessionalIdentity } from "../platform/identity-policy.js";
 import { createInAppNotification } from "../platform/notifications.js";
 
+function hashValue(value){return createHash("sha256").update(value).digest("hex");}
+function hashPayload(value){return hashValue(JSON.stringify(value));}
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
 const PROFESSIONAL_CLAIMS=["professional_certification","education","employment","experience","service_capability"];
 
@@ -78,8 +81,8 @@ async function assertSessionFitsAvailability(db,mentorUserId,startAt,endAt){
 const SERVICE_TRANSITIONS={
  requested:["accepted","declined","cancelled"],
  accepted:["in_progress","cancelled"],
- in_progress:["completed","disputed","cancelled"],
- disputed:["in_progress","completed","cancelled"],
+ in_progress:["disputed","cancelled"],
+ disputed:["in_progress","cancelled"],
  completed:[],
  declined:[],
  cancelled:[]
@@ -103,26 +106,38 @@ export function allowedMatchTransition(from,to){ return (MATCH_TRANSITIONS[from]
 const SESSION_TRANSITIONS={scheduled:["completed","cancelled","no_show"],completed:[],cancelled:[],no_show:[]};
 export function allowedSessionTransition(from,to){ return (SESSION_TRANSITIONS[from]||[]).includes(to); }
 
-export async function createServiceListing(userId,input,requestId){
-  return withTransaction(async db=>{
-    const organizationId=input.organizationId||null;
-    if(organizationId){
-      let membership;
-      try { membership=await assertOrganizationCapability(db,organizationId,userId); }
-      catch(cause) { throw error(cause.statusCode||403,cause.message||"An active organization owner or authorized manager is required to create this listing.",cause.code||"ORGANIZATION_FORBIDDEN"); }
-      if(membership.verification_status!=="verified") throw error(409,"The organization must be verified before it can publish a service listing.","ORGANIZATION_NOT_VERIFIED");
-    } else {
-      await requirePersonalProfessionalCapability(db,userId);
-    }
-    if(!input.title||!input.description||!input.serviceCategory) throw error(400,"title, description and serviceCategory are required.","VALIDATION_ERROR");
-    const pricing=input.pricingModel||"quote";
-    if(!["free","fixed","hourly","quote"].includes(pricing)) throw error(400,"Unsupported pricing model.","VALIDATION_ERROR");
-    const row=(await db.query("insert into service_listing(provider_user_id,organization_id,title,description,service_category,delivery_mode,location_label,pricing_model,price_amount,currency,visibility,max_active_requests) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *",[userId,organizationId,input.title,input.description,input.serviceCategory,input.deliveryMode||"remote",input.locationLabel||null,pricing,input.priceAmount??null,input.currency||null,input.visibility||"members",input.maxActiveRequests??null])).rows[0];
-    await audit(db,userId,"service.listing_created","service_listing",row.id,requestId);
-    return row;
-  });
+export async function createServiceListing(userId,input,requestId,idempotencyKey=null){
+ if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
+  throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
+ const organizationId=input.organizationId||null;
+ const normalized={userId,organizationId,title:String(input.title||"").trim(),description:String(input.description||"").trim(),serviceCategory:String(input.serviceCategory||"").trim(),deliveryMode:input.deliveryMode||"remote",locationLabel:input.locationLabel||null,pricingModel:input.pricingModel||"quote",priceAmount:input.priceAmount??null,currency:input.currency||null,visibility:input.visibility||"members",maxActiveRequests:input.maxActiveRequests??null};
+ if(!normalized.title||!normalized.description||!normalized.serviceCategory) throw error(400,"title, description and serviceCategory are required.","VALIDATION_ERROR");
+ if(!["free","fixed","hourly","quote"].includes(normalized.pricingModel)) throw error(400,"Unsupported pricing model.","VALIDATION_ERROR");
+ const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
+ return withTransaction(async db=>{
+  const existing=(await db.query("select * from service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){
+   if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different listing details. Start a new listing before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,idempotent:true,replayed:true,nextAction:existing.status==="published"?"Review the moderation decision before sharing this listing.":"Review the saved draft, then submit it for moderation."};
+  }
+  if(organizationId){
+   let membership;
+   try { membership=await assertOrganizationCapability(db,organizationId,userId); }
+   catch(cause) { throw error(cause.statusCode||403,cause.message||"An active organization owner or authorized manager is required to create this listing.",cause.code||"ORGANIZATION_FORBIDDEN"); }
+   if(membership.verification_status!=="verified") throw error(409,"The organization must be verified before it can publish a service listing.","ORGANIZATION_NOT_VERIFIED");
+  } else {
+   await requirePersonalProfessionalCapability(db,userId);
+  }
+  const row=(await db.query("insert into service_listing(provider_user_id,organization_id,title,description,service_category,delivery_mode,location_label,pricing_model,price_amount,currency,visibility,max_active_requests,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) on conflict do nothing returning *",[userId,organizationId,normalized.title,normalized.description,normalized.serviceCategory,normalized.deliveryMode,normalized.locationLabel,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.visibility,normalized.maxActiveRequests,keyHash,fingerprint])).rows[0];
+  if(!row){
+   const raced=(await db.query("select * from service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+   if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different listing details. Start a new listing before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...raced,idempotent:true,replayed:true,nextAction:"Review the saved draft, then submit it for moderation."};
+  }
+  await audit(db,userId,"service.listing_created","service_listing",row.id,requestId);
+  return {...row,idempotent:false,replayed:false,nextAction:"Review the saved draft, then submit it for moderation."};
+ });
 }
-
 export async function updateServiceListing(listingId,userId,input,requestId){
   return withTransaction(async db=>{
     const row=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
@@ -177,32 +192,47 @@ export async function getServiceListing(listingId,viewerId=null){
   return row;
 }
 
-export async function requestService(listingId,requesterId,input,requestId){
-  return withTransaction(async db=>{
-    const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
-    if(!listing||listing.status!=="published"||listing.moderation_status!=="approved"||listing.visibility==="private") throw error(404,"Service listing is not available.","NOT_FOUND");
-    if(listing.organization_id){const org=(await db.query("select verification_status from organization where id=$1",[listing.organization_id])).rows[0];if(!org||org.verification_status!=="verified")throw error(404,"Service listing is not available.","NOT_FOUND");}
-    else if(!(await activeMember(db,listing.provider_user_id))) throw error(404,"Service listing is not available.","NOT_FOUND");
-    if(listing.visibility!=="public"&&!(await activeMember(db,requesterId))) throw error(403,"An active membership is required to request a member-only service.","MEMBERSHIP_REQUIRED");
-    if(listing.provider_user_id===requesterId) throw error(409,"You cannot request your own service.","SELF_REQUEST");
-    const duplicate=(await db.query("select * from service_request where service_listing_id=$1 and requester_user_id=$2 and status in ('requested','accepted','in_progress') order by created_at desc limit 1 for update",[listingId,requesterId])).rows[0];
-    if(duplicate) return {...duplicate,idempotent:true,nextAction:duplicate.status==="requested"?"Wait for the provider to respond.":duplicate.status==="accepted"?"Confirm scope, timing and milestones.":"Track delivery and review the provider's submitted outcome."};
-    if(listing.max_active_requests){
-      const count=(await db.query("select count(*)::int count from service_request where service_listing_id=$1 and status in ('requested','accepted','in_progress')",[listingId])).rows[0].count;
-      if(count>=listing.max_active_requests) throw error(409,"This service has reached its active request limit.","CAPACITY_REACHED");
-    }
-    const proposedPrice=input.proposedPrice===undefined||input.proposedPrice===null?null:Number(input.proposedPrice);
-    if(proposedPrice!==null&&(!Number.isFinite(proposedPrice)||proposedPrice<0)) throw error(400,"proposedPrice must be a non-negative number.","VALIDATION_ERROR");
-    const row=(await db.query("insert into service_request(service_listing_id,requester_user_id,provider_user_id,status,message,scope,agreed_price,agreed_currency,completion_due_at,requested_start_at,requested_end_at) values($1,$2,$3,'requested',$4,$5,$6,$7,$8,$9,$10) returning *",[listingId,requesterId,listing.provider_user_id,input.message||null,input.scope||null,proposedPrice,input.currency?String(input.currency).toUpperCase():listing.currency,input.completionDueAt||null,input.requestedStartAt||null,input.requestedEndAt||null])).rows[0];
-    await db.query("insert into service_request_event(request_id,actor_user_id,to_status,note) values($1,$2,'requested',$3)",[row.id,requesterId,input.message||null]);
-    await audit(db,requesterId,"service.request_created","service_request",row.id,requestId,{listingId,organizationId:listing.organization_id||null});
-    const recipients=listing.organization_id?(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code=any($2::text[])",[listing.organization_id,["owner","administrator","recruiter","project_manager"]])).rows.map(x=>x.user_id):[listing.provider_user_id];
-    for(const recipient of new Set(recipients))if(recipient&&recipient!==requesterId)await queueWorkflowEmail(db,recipient,"professional.workflow_update",{notificationEventCode:"service.request_received",category:"services",title:"New service request",status:"requested",message:"A new service request needs a response.",nextAction:"Review the requested scope and accept, decline or ask for clarification.",actionUrl:"/services",actionRequired:true,priority:"high"},"service_request",row.id);
-    await queueWorkflowEmail(db,requesterId,"professional.workflow_update",{notificationEventCode:"service.request_submitted",category:"services",title:"Service request submitted",status:"requested",message:"Your service request has been recorded.",nextAction:"Track the provider response in your service requests.",actionUrl:"/services"},"service_request",row.id);
-    return {...row,nextAction:"Your request is recorded. The provider or authorized organization team must respond before delivery begins."};
-  });
+export async function requestService(listingId,requesterId,input,requestId,idempotencyKey=null){
+ if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
+  throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
+ const proposedPrice=input.proposedPrice===undefined||input.proposedPrice===null?null:Number(input.proposedPrice);
+ if(proposedPrice!==null&&(!Number.isFinite(proposedPrice)||proposedPrice<0)) throw error(400,"proposedPrice must be a non-negative number.","VALIDATION_ERROR");
+ const normalized={listingId,requesterId,message:String(input.message||"").trim()||null,scope:input.scope||null,proposedPrice,currency:input.currency?String(input.currency).toUpperCase():null,completionDueAt:input.completionDueAt||null,requestedStartAt:input.requestedStartAt||null,requestedEndAt:input.requestedEndAt||null};
+ const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
+ return withTransaction(async db=>{
+  const existing=(await db.query("select * from service_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){
+   if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,idempotent:true,replayed:true,nextAction:existing.status==="requested"?"Wait for the provider to respond.":existing.status==="accepted"?"Confirm scope, timing and milestones.":existing.status==="in_progress"?"Track delivery and review the provider's submitted outcome.":"Review the recorded request outcome; do not submit the same request again."};
+  }
+  const listing=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
+  // Re-check the key after acquiring the listing lock: another request may have committed while this transaction waited.
+  const racedExisting=(await db.query("select * from service_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(racedExisting){
+   if(racedExisting.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...racedExisting,idempotent:true,replayed:true,nextAction:racedExisting.status==="requested"?"Wait for the provider to respond.":racedExisting.status==="accepted"?"Confirm scope, timing and milestones.":racedExisting.status==="in_progress"?"Track delivery and review the provider's submitted outcome.":"Review the recorded request outcome; do not submit the same request again."};
+  }
+  if(!listing||listing.status!=="published"||listing.moderation_status!=="approved"||listing.visibility==="private") throw error(404,"Service listing is not available.","NOT_FOUND");
+  if(listing.organization_id){const org=(await db.query("select verification_status from organization where id=$1",[listing.organization_id])).rows[0];if(!org||org.verification_status!=="verified")throw error(404,"Service listing is not available.","NOT_FOUND");}
+  else if(!(await activeMember(db,listing.provider_user_id))) throw error(404,"Service listing is not available.","NOT_FOUND");
+  if(listing.visibility!=="public"&&!(await activeMember(db,requesterId))) throw error(403,"An active membership is required to request a member-only service.","MEMBERSHIP_REQUIRED");
+  if(listing.provider_user_id===requesterId) throw error(409,"You cannot request your own service.","SELF_REQUEST");
+  const duplicate=(await db.query("select * from service_request where service_listing_id=$1 and requester_user_id=$2 and status in ('requested','accepted','in_progress') order by created_at desc limit 1 for update",[listingId,requesterId])).rows[0];
+  if(duplicate) return {...duplicate,idempotent:true,nextAction:duplicate.status==="requested"?"Wait for the provider to respond.":duplicate.status==="accepted"?"Confirm scope, timing and milestones.":"Track delivery and review the provider's submitted outcome."};
+  const row=(await db.query("insert into service_request(service_listing_id,requester_user_id,provider_user_id,status,message,scope,agreed_price,agreed_currency,completion_due_at,requested_start_at,requested_end_at,request_idempotency_hash,request_fingerprint) values($1,$2,$3,'requested',$4,$5,$6,$7,$8,$9,$10,$11,$12) on conflict do nothing returning *",[listingId,requesterId,listing.provider_user_id,normalized.message,normalized.scope,proposedPrice,normalized.currency||listing.currency,normalized.completionDueAt,normalized.requestedStartAt,normalized.requestedEndAt,keyHash,fingerprint])).rows[0];
+  if(!row){
+   const raced=(await db.query("select * from service_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+   if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...raced,idempotent:true,replayed:true,nextAction:"This service request was already recorded. Follow its current status; you do not need to submit it again."};
+  }
+  await db.query("insert into service_request_event(request_id,actor_user_id,to_status,note) values($1,$2,'requested',$3)",[row.id,requesterId,normalized.message]);
+  await audit(db,requesterId,"service.request_created","service_request",row.id,requestId,{listingId,organizationId:listing.organization_id||null});
+  const recipients=listing.organization_id?(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code=any($2::text[])",[listing.organization_id,["owner","administrator","recruiter","project_manager"]])).rows.map(x=>x.user_id):[listing.provider_user_id];
+  for(const recipient of new Set(recipients))if(recipient&&recipient!==requesterId)await queueWorkflowEmail(db,recipient,"professional.workflow_update",{notificationEventCode:"service.request_received",category:"services",title:"New service request",status:"requested",message:"A new service request needs a response.",nextAction:"Review the requested scope and accept, decline or ask for clarification.",actionUrl:"/services",actionRequired:true,priority:"high"},"service_request",row.id);
+  await queueWorkflowEmail(db,requesterId,"professional.workflow_update",{notificationEventCode:"service.request_submitted",category:"services",title:"Service request submitted",status:"requested",message:"Your service request has been recorded.",nextAction:"Track the provider response in your service requests.",actionUrl:"/services"},"service_request",row.id);
+  return {...row,idempotent:false,replayed:false,nextAction:"Your request is recorded. The provider or authorized organization team must respond before delivery begins."};
+ });
 }
-
 export async function listMyServiceListings(userId){
  const db=getPool();
  const roles=["owner","administrator","recruiter","project_manager"];
@@ -222,18 +252,17 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
     const providerActor=await isServiceProviderActor(db,requestId,userId);
     if(!providerActor && r.requester_user_id!==userId) throw error(403,"You are not a participant in this service request.","FORBIDDEN");
     if(r.status===status && status!=="completed") return {...r,idempotent:true,nextAction:status==="requested"?"Wait for the provider to respond.":status==="accepted"?"Agree the start date and delivery milestones.":status==="in_progress"?"Review delivery updates; the requester accepts completion after the provider submits it.":status==="disputed"?"Work with the other participant or Support Desk to resolve the issue.":"This request is resolved; create a new request if needed."};
-    if(status==="completed"&&r.status==="in_progress"&&r.provider_completed_at)return {...r,idempotent:true,nextAction:"The requester must review the submitted outcome and accept completion."};
+    if(status==="completed"&&r.status==="in_progress"&&r.provider_completed_at&&providerActor)return {...r,idempotent:true,nextAction:"The requester must review the submitted outcome and accept completion."};
     if(r.status==="requested" && !providerActor) throw error(403,"Only the provider can accept or decline a service request.","FORBIDDEN");
     if(r.status==="accepted" && status==="in_progress" && !providerActor) throw error(403,"Only the provider can start service delivery.","FORBIDDEN");
+    if(r.status==="disputed" && status==="in_progress" && !providerActor) throw error(403,"Only the provider can resume delivery after the concern is addressed.","FORBIDDEN");
     if(r.status==="in_progress" && status==="completed" && !providerActor) throw error(403,"Only the provider can mark delivery complete; the requester must accept the outcome separately.","FORBIDDEN");
     if(r.status==="accepted" && status==="cancelled" && !providerActor) {
       // requester cancellation is allowed before delivery starts
     } else if(r.status==="accepted" && status==="cancelled" && providerActor) {
       throw error(409,"The provider cannot cancel an accepted engagement; use the dispute path if delivery is blocked.","INVALID_STATE");
     }
-    if(!allowedServiceRequestTransition(r.status,status)) throw error(409,"Invalid service request transition.","INVALID_STATE");
-    if(["declined","cancelled","disputed"].includes(status)&&String(note||"").trim().length<4) throw error(400,"Add a short explanation so the other participant understands this decision and the next step.","OUTCOME_NOTE_REQUIRED");
-    if(status==="completed"){
+    if(status==="completed"&&r.status==="in_progress"){
       const pending=(await db.query("select count(*)::int count from service_request_milestone where request_id=$1 and status not in ('accepted','completed','cancelled')",[requestId])).rows[0].count;
       if(Number(pending)>0) throw error(409,"All active delivery milestones must be accepted or completed before completion.","OUTCOMES_INCOMPLETE");
       const updated=(await db.query("update service_request set provider_completed_at=now(),provider_note=coalesce($1,provider_note),updated_at=now() where id=$2 returning *",[note||null,requestId])).rows[0];
@@ -242,6 +271,8 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
       await notify(db,r.requester_user_id,"service.completion_submitted","service_request",requestId,{message:"The provider says the work is complete. Review the delivery and accept it or raise a concern.",nextAction:"Review submitted delivery and accept completion when satisfied."});
       return {...updated,nextAction:"The requester must review the outcome and accept completion. Paid work also requires verified settlement."};
     }
+    if(!allowedServiceRequestTransition(r.status,status)) throw error(409,"Invalid service request transition.","INVALID_STATE");
+    if(["declined","cancelled","disputed"].includes(status)&&String(note||"").trim().length<4) throw error(400,"Add a short explanation so the other participant understands this decision and the next step.","OUTCOME_NOTE_REQUIRED");
     const updated=(await db.query("update service_request set status=$1,provider_note=case when $2::uuid<>requester_user_id then $3 else provider_note end,requester_note=case when $2::uuid=requester_user_id then $3 else requester_note end,outcome_summary=case when $1 in ('declined','cancelled','disputed') then coalesce($3,outcome_summary) else outcome_summary end,accepted_at=case when $1='accepted' then now() else accepted_at end,started_at=case when $1='in_progress' then now() else started_at end,cancelled_at=case when $1='cancelled' then now() else cancelled_at end,updated_at=now() where id=$4 returning *",[status,userId,note||null,requestId])).rows[0];
     await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$4,$5)",[requestId,userId,r.status,status,note||null]);
     await audit(db,userId,"service.request_status_changed","service_request",requestId,requestIdHeader,{from:r.status,to:status});
@@ -546,22 +577,38 @@ export async function listMentors(viewerId,filters={}){
   return rows;
 }
 
-export async function createMentorshipRequest(menteeId,input,requestId){
-  return withTransaction(async db=>{
-    if(!(await activeMember(db,menteeId))) throw error(403,"An active membership is required for mentorship.","MEMBERSHIP_REQUIRED");
-    if(typeof input.goals!=="string"||!input.goals.trim()) throw error(400,"A non-empty mentorship goal is required.","VALIDATION_ERROR");
-    if(input.preferredMentorUserId===menteeId) throw error(400,"You cannot mentor yourself.","VALIDATION_ERROR");
-    const goals=String(input.goals).trim(),preferredMentor=input.preferredMentorUserId||null,topics=JSON.stringify(normalizeArray(input.topics)),modes=JSON.stringify(normalizeArray(input.preferredModes||["remote"])),languages=JSON.stringify(normalizeArray(input.preferredLanguages)),days=JSON.stringify((input.preferredDays||[]).map(Number).filter(n=>n>=0&&n<=6));
-    const prior=(await db.query("select * from mentorship_request where mentee_user_id=$1 and goals=$2 and preferred_mentor_user_id is not distinct from $3 and topics=$4::jsonb and preferred_modes=$5::jsonb and preferred_languages=$6::jsonb and preferred_days=$7::jsonb and status in ('requested','matching','matched') order by created_at desc limit 1 for update",[menteeId,goals,preferredMentor,topics,modes,languages,days])).rows[0];
-    if(prior)return {...prior,idempotent:true,nextAction:prior.status==="matched"?"A mentor proposal is already active. Wait for the mentor to respond.":"Your mentorship request is already recorded. Review its status or wait for the matching team."};
-    const row=(await db.query("insert into mentorship_request(mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status) values($1,$2,$3,$4,$5,$6,$7,'requested') returning *",[menteeId,preferredMentor,goals,topics,modes,languages,days])).rows[0];
-    await audit(db,menteeId,"mentorship.request_created","mentorship_request",row.id,requestId);
-    const supportUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role ar on ar.id=ur.role_id join app_user u on u.id=ur.user_id where u.status='active' and ar.role_code=any($1::text[])",[["supporting_staff","system_admin"]])).rows;
-    for(const member of supportUsers)await notify(db,member.user_id,"mentorship.request_received","mentorship_request",row.id,{message:"A new mentorship goal is waiting for matching review.",nextAction:"Review eligible mentors and propose a match; the relationship starts only after acceptance.",actionUrl:"/mentorship",reviewerQueue:true,actionRequired:true,priority:"high"});
-    return {...row,nextAction:"Your goal is recorded. A mentor must be proposed and accept before a relationship is active."};
-  });
+export async function createMentorshipRequest(menteeId,input,requestId,idempotencyKey=null){
+ if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
+  throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
+ if(typeof input.goals!=="string"||!input.goals.trim()) throw error(400,"A non-empty mentorship goal is required.","VALIDATION_ERROR");
+ const goals=String(input.goals).trim(),preferredMentor=input.preferredMentorUserId||null,topics=JSON.stringify(normalizeArray(input.topics)),modes=JSON.stringify(normalizeArray(input.preferredModes||["remote"])),languages=JSON.stringify(normalizeArray(input.preferredLanguages)),days=JSON.stringify((input.preferredDays||[]).map(Number).filter(n=>n>=0&&n<=6));
+ if(preferredMentor===menteeId) throw error(400,"You cannot mentor yourself.","VALIDATION_ERROR");
+ const normalized={menteeId,goals,preferredMentor,topics:JSON.parse(topics),modes:JSON.parse(modes),languages:JSON.parse(languages),days:JSON.parse(days)};
+ const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
+ return withTransaction(async db=>{
+  // Serialize submissions from the same mentee so different keys cannot race past duplicate-request detection.
+  const lockedMentee=(await db.query("select id from app_user where id=$1 for update",[menteeId])).rows[0];
+  if(!lockedMentee)throw error(404,"Mentee account not found.","NOT_FOUND");
+  const existing=(await db.query("select * from mentorship_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){
+   if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,idempotent:true,replayed:true,nextAction:existing.status==="matched"?"A mentor proposal is already active. Wait for the mentor to respond.":"This mentorship request was already recorded. Review its current status or wait for the matching team."};
+  }
+  if(!(await activeMember(db,menteeId))) throw error(403,"An active membership is required for mentorship.","MEMBERSHIP_REQUIRED");
+  const prior=(await db.query("select * from mentorship_request where mentee_user_id=$1 and goals=$2 and preferred_mentor_user_id is not distinct from $3 and topics=$4::jsonb and preferred_modes=$5::jsonb and preferred_languages=$6::jsonb and preferred_days=$7::jsonb and status in ('requested','matching','matched') order by created_at desc limit 1 for update",[menteeId,goals,preferredMentor,topics,modes,languages,days])).rows[0];
+  if(prior)return {...prior,idempotent:true,nextAction:prior.status==="matched"?"A mentor proposal is already active. Wait for the mentor to respond.":"Your mentorship request is already recorded. Review its status or wait for the matching team."};
+  const inserted=(await db.query("insert into mentorship_request(mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,'requested',$8,$9) on conflict do nothing returning *",[menteeId,preferredMentor,goals,topics,modes,languages,days,keyHash,fingerprint])).rows[0];
+  if(!inserted){
+   const raced=(await db.query("select * from mentorship_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+   if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...raced,idempotent:true,replayed:true,nextAction:"This mentorship request was already recorded. Review its current status or wait for the matching team."};
+  }
+  await audit(db,menteeId,"mentorship.request_created","mentorship_request",inserted.id,requestId);
+  const supportUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role ar on ar.id=ur.role_id join app_user u on u.id=ur.user_id where u.status='active' and ar.role_code=any($1::text[])",[["supporting_staff","system_admin"]])).rows;
+  for(const member of supportUsers)await notify(db,member.user_id,"mentorship.request_received","mentorship_request",inserted.id,{message:"A new mentorship goal is waiting for matching review.",nextAction:"Review eligible mentors and propose a match; the relationship starts only after acceptance.",actionUrl:"/mentorship",reviewerQueue:true,actionRequired:true,priority:"high"});
+  return {...inserted,idempotent:false,replayed:false,nextAction:"Your goal is recorded. A mentor must be proposed and accept before a relationship is active."};
+ });
 }
-
 async function mentorCandidates(db,request){
   const mentors=(await db.query("select mp.*,p.display_name from mentor_profile mp join person p on p.user_id=mp.user_id where mp.status='active' and mp.moderation_status='approved' and mp.visibility in ('members','public') and exists (select 1 from membership_record m where m.user_id=mp.user_id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)) and exists (select 1 from verification_claim vc join verification_case c on c.id=vc.case_id where c.subject_user_id=mp.user_id and vc.status='verified' and lower(vc.claim_code_snapshot)=any($1::text[])) and mp.user_id<>$2",[PROFESSIONAL_CLAIMS,request.mentee_user_id])).rows;
   const results=[];
@@ -607,12 +654,12 @@ export async function proposeMentorMatch(requestId,mentorUserId,actorUserId,requ
     if(["cancelled","completed"].includes(request.status)) throw error(409,"This mentorship request is closed.","INVALID_STATE");
     const existingRelationship=(await db.query("select id,status from mentorship where request_id=$1 for update",[requestId])).rows[0];
     if(existingRelationship)throw error(409,"This request already became a mentorship relationship. Manage goals, sessions and completion from the active relationship instead of proposing another match.","RELATIONSHIP_ALREADY_CREATED");
-    const existingMatch=(await db.query("select * from mentorship_match where request_id=$1 for update",[requestId])).rows[0];
-    if(existingMatch?.status==="accepted")throw error(409,"The mentor already accepted this match. Continue in the active mentorship relationship.","MATCH_ALREADY_ACCEPTED");
-    if(existingMatch?.status==="proposed"){if(existingMatch.mentor_user_id===mentorUserId)return {...existingMatch,idempotent:true,nextAction:"The mentor has already been invited. Wait for their response."};throw error(409,"A mentor proposal is already awaiting a response. Wait for the answer before proposing another match.","MATCH_RESPONSE_PENDING");}
+    const existingMatch=(await db.query("select * from mentorship_match where request_id=$1 and status in ('proposed','accepted') and mentee_consent_status<>'declined' limit 1 for update",[requestId])).rows[0];
+    if(existingMatch?.status==="accepted"&&existingMatch.mentee_consent_status!=="declined")throw error(409,"The mentor already accepted this match. Wait for the mentee to approve or decline this specific match.","MATCH_ALREADY_ACCEPTED");
+    if(existingMatch?.status==="proposed"&&existingMatch.mentee_consent_status!=="declined"){if(existingMatch.mentor_user_id===mentorUserId)return {...existingMatch,idempotent:true,nextAction:"The mentor has already been invited. Wait for their response."};throw error(409,"A mentor proposal is already awaiting a response. Wait for the answer before proposing another match.","MATCH_RESPONSE_PENDING");}
     const candidates=await mentorCandidates(db,request); const match=candidates.find(x=>x.mentorUserId===mentorUserId);
     if(!match) throw error(409,"Selected mentor is not currently eligible or available.","MENTOR_UNAVAILABLE");
-    const row=(await db.query("insert into mentorship_match(request_id,mentor_user_id,mentee_user_id,score,match_reasons,status) values($1,$2,$3,$4,$5,'proposed') on conflict(request_id) do update set mentor_user_id=excluded.mentor_user_id,score=excluded.score,match_reasons=excluded.match_reasons,status='proposed',proposed_at=now(),responded_at=null returning *",[requestId,mentorUserId,request.mentee_user_id,match.score,JSON.stringify(match.reasons)])).rows[0];
+    const row=(await db.query("insert into mentorship_match(request_id,mentor_user_id,mentee_user_id,score,match_reasons,status,mentee_consent_status,proposed_at) values($1,$2,$3,$4,$5,'proposed','pending',now()) returning *",[requestId,mentorUserId,request.mentee_user_id,match.score,JSON.stringify(match.reasons)])).rows[0];
     await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,matched_at=now(),updated_at=now() where id=$2",[mentorUserId,requestId]);
     await audit(db,actorUserId,"mentorship.match_proposed","mentorship_match",row.id,requestIdHeader,{mentorUserId,score:match.score});
     await queueWorkflowEmail(db,mentorUserId,"mentor.mentorship_update",{status:"match proposed",nextAction:"Review and accept or decline the mentorship match",actionUrl:"/mentorship",actionRequired:true,priority:"high",eventVersion:row.proposed_at||requestIdHeader},"mentorship_match",row.id);
@@ -627,22 +674,59 @@ export async function respondToMatch(matchId,mentorUserId,status,requestIdHeader
     const match=(await db.query("select * from mentorship_match where id=$1 for update",[matchId])).rows[0];
     if(!match) throw error(404,"Mentorship match not found.","NOT_FOUND");
     if(match.mentor_user_id!==mentorUserId) throw error(403,"Only the proposed mentor can respond.","FORBIDDEN");
-    if(match.status===status)return {...match,idempotent:true,nextAction:status==="accepted"?"Review the new mentorship relationship and agree the first session.":"The mentee or Support Desk can propose another mentor."};
-    if(match.status!=="proposed") throw error(409,"This match is no longer awaiting a response.","INVALID_STATE");
+    if(match.status===status && (status==="declined"||match.mentee_consent_status!=="declined"))return {...match,idempotent:true,nextAction:status==="accepted"?(match.mentee_consent_status==="accepted"?"Both participants have accepted. Open the active mentorship to agree goals and sessions.":"The mentor has accepted. The mentee must also approve this specific match before the relationship starts."):"The mentee or Support Desk can propose another mentor."};
+    if(match.status!=="proposed"||match.mentee_consent_status==="declined") throw error(409,"This match is no longer awaiting a mentor response.","INVALID_STATE");
     const updated=(await db.query("update mentorship_match set status=$1,responded_at=now() where id=$2 returning *",[status,matchId])).rows[0];
     if(status==="accepted"){
-      const existing=(await db.query("select id from mentorship where request_id=$1",[match.request_id])).rows[0];
-      if(!existing){
-        await db.query("insert into mentorship(request_id,mentor_user_id,mentee_user_id,goals,status) select mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mr.goals,'active' from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id where mm.id=$1",[matchId]);
+      if(match.mentee_consent_status==="accepted"){
+        const existing=(await db.query("select id from mentorship where request_id=$1 for update",[match.request_id])).rows[0];
+        if(!existing)await db.query("insert into mentorship(request_id,mentor_user_id,mentee_user_id,goals,status) select mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mr.goals,'active' from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id where mm.id=$1 and mm.status='accepted' and mm.mentee_consent_status='accepted'",[matchId]);
         await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,updated_at=now() where id=$2",[mentorUserId,match.request_id]);
+        await notify(db,match.mentee_user_id,"mentorship.match_fully_accepted","mentorship_match",matchId,{message:"Both you and the proposed mentor accepted this match. The mentorship is active.",nextAction:"Open the active mentorship to agree goals and schedule the first session.",actionRequired:true,priority:"normal",actionUrl:"/mentorship"});
+      }else{
+        await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,updated_at=now() where id=$2",[mentorUserId,match.request_id]);
+        await notify(db,match.mentee_user_id,"mentorship.match_mentor_accepted","mentorship_match",matchId,{message:"The proposed mentor has accepted. The relationship will not start until you approve this specific match.",nextAction:"Review the mentor and accept or decline this match.",actionRequired:true,priority:"high",actionUrl:"/mentorship"});
       }
     } else {
       await db.query("update mentorship_request set status='matching',matched_mentor_user_id=null,matched_at=null,updated_at=now() where id=$1",[match.request_id]);
+      const supportUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role ar on ar.id=ur.role_id join app_user u on u.id=ur.user_id where u.status='active' and ar.role_code=any($1::text[])",[["supporting_staff","system_admin"]])).rows;
+      for(const member of supportUsers)await notify(db,member.user_id,"mentorship.match_declined","mentorship_request",match.request_id,{message:"A proposed mentor declined a match and the request returned to matching.",nextAction:"Review the request and propose another currently eligible mentor.",actionUrl:"/mentorship",reviewerQueue:true,actionRequired:true,priority:"high"});
     }
-    await audit(db,mentorUserId,"mentorship.match_responded","mentorship_match",matchId,requestIdHeader,{status});
-    await notify(db,match.mentee_user_id,status==="accepted"?"mentorship.match_accepted":"mentorship.match_declined","mentorship_match",matchId,{message:status==="accepted"?"The mentor accepted your proposal. A mentorship relationship is now active.":"The mentor declined this proposal. You can ask the Support Desk to find another mentor.",nextAction:status==="accepted"?"Open the active relationship, agree goals and schedule the first session.":"Review other matches or request another mentor match.",actionRequired:status==="declined",priority:status==="declined"?"high":"normal"});
-    if(status==="declined"){const supportUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role ar on ar.id=ur.role_id join app_user u on u.id=ur.user_id where u.status='active' and ar.role_code=any($1::text[])",[["supporting_staff","system_admin"]])).rows;for(const member of supportUsers)await notify(db,member.user_id,"mentorship.match_declined","mentorship_request",match.request_id,{message:"A proposed mentor declined a match and the request returned to matching.",nextAction:"Review the request and propose another currently eligible mentor.",actionUrl:"/mentorship",reviewerQueue:true,actionRequired:true,priority:"high"});}
-    return {...updated,nextAction:status==="accepted"?"The relationship is active. Agree goals and schedule the first session.":"The request is back in matching. Choose another eligible mentor."};
+    await audit(db,mentorUserId,"mentorship.match_responded","mentorship_match",matchId,requestIdHeader,{status,menteeConsentStatus:updated.mentee_consent_status});
+    return {...updated,nextAction:status==="accepted"?(updated.mentee_consent_status==="accepted"?"Both participants accepted. The mentorship is active; agree goals and schedule the first session.":"The mentee must approve this specific match before the relationship becomes active."):"The request is back in matching. Choose another eligible mentor."};
+  });
+}
+
+export async function respondToMenteeMatch(matchId,menteeUserId,status,note,requestIdHeader){
+  if(!["accepted","declined"].includes(status))throw error(400,"Choose accept or decline for this proposed mentor.","VALIDATION_ERROR");
+  if(status==="declined"&&String(note||"").trim().length<4)throw error(400,"Please add a short reason so the coordinator knows how to help with another match.","MATCH_DECLINE_REASON_REQUIRED");
+  return withTransaction(async db=>{
+    const match=(await db.query("select * from mentorship_match where id=$1 for update",[matchId])).rows[0];
+    if(!match)throw error(404,"Mentorship match not found.","NOT_FOUND");
+    if(match.mentee_user_id!==menteeUserId)throw error(403,"Only the mentee who requested this match can respond.","FORBIDDEN");
+    if(match.mentee_consent_status===status){
+      const nextAction=status==="declined"?"Your decline is already recorded. The request is back in matching.":match.status==="accepted"?"Both participants have accepted. Open the active mentorship to agree goals and sessions.":match.status==="declined"?"Your consent was recorded, but the mentor declined. The request is back in matching.":"Your consent is recorded. The mentor must also accept before the relationship starts.";
+      return {...match,idempotent:true,nextAction};
+    }
+    if(!["proposed","accepted"].includes(match.status))throw error(409,"This match is no longer awaiting a response.","INVALID_STATE");
+    if(match.mentee_consent_status!=="pending")throw error(409,"This match has already received your final response.","INVALID_STATE");
+    const updated=(await db.query("update mentorship_match set mentee_consent_status=$1,mentee_responded_at=now(),mentee_response_note=$2,status=case when $1='declined' then 'declined' else status end,responded_at=case when $1='declined' then now() else responded_at end where id=$3 returning *",[status,String(note||"").trim()||null,matchId])).rows[0];
+    if(status==="accepted"){
+      if(match.status==="accepted"){
+        const existing=(await db.query("select id from mentorship where request_id=$1 for update",[match.request_id])).rows[0];
+        if(!existing)await db.query("insert into mentorship(request_id,mentor_user_id,mentee_user_id,goals,status) select mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mr.goals,'active' from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id where mm.id=$1 and mm.status='accepted' and mm.mentee_consent_status='accepted'",[matchId]);
+        await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,updated_at=now() where id=$2",[match.mentor_user_id,match.request_id]);
+        await notify(db,match.mentor_user_id,"mentorship.match_fully_accepted","mentorship_match",matchId,{message:"The mentee approved this specific match. You can now agree goals and schedule the first session.",nextAction:"Open the active mentorship and agree goals and a first session.",actionRequired:true,priority:"normal",actionUrl:"/mentorship"});
+      }else{
+        await notify(db,match.mentor_user_id,"mentorship.match_mentee_accepted_first","mentorship_match",matchId,{message:"The mentee has approved this proposed match first. Your separate acceptance is still required before the mentorship starts.",nextAction:"Review the proposed match and accept or decline it.",actionRequired:true,priority:"high",actionUrl:"/mentorship"});
+      }
+    }else{
+      await db.query("update mentorship_request set status='matching',matched_mentor_user_id=null,matched_at=null,updated_at=now() where id=$1",[match.request_id]);
+      const supportUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role ar on ar.id=ur.role_id join app_user u on u.id=ur.user_id where u.status='active' and ar.role_code=any($1::text[])",[["supporting_staff","system_admin"]])).rows;
+      for(const member of supportUsers)await notify(db,member.user_id,"mentorship.match_mentee_declined","mentorship_request",match.request_id,{message:"The mentee declined the proposed mentor. The request has returned to matching.",nextAction:"Review the mentee's reason and propose another eligible mentor.",actionUrl:"/mentorship",reviewerQueue:true,actionRequired:true,priority:"high"});
+    }
+    await audit(db,menteeUserId,"mentorship.match_mentee_response","mentorship_match",matchId,requestIdHeader,{status,note:note?.trim()||null,mentorStatus:match.status});
+    return {...updated,nextAction:status==="accepted"?(match.status==="accepted"?"Both participants accepted. The mentorship is active; agree goals and schedule the first session.":"Your consent is recorded. Wait for the mentor to respond; the relationship is not active yet."):"Your response is recorded and the request returned to matching."};
   });
 }
 
@@ -767,9 +851,13 @@ export async function listMyMentorshipRequests(userId){
 
 export async function listMyMentorshipMatches(userId){
  const db=getPool();
- return (await db.query(`select mm.id,mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mm.score,mm.match_reasons,mm.status,mm.proposed_at,mr.goals,p.display_name mentee_name
- from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id join person p on p.user_id=mr.mentee_user_id
- where mm.mentor_user_id=$1 and mm.status='proposed' order by mm.proposed_at desc`,[userId])).rows;
+ return (await db.query(`select mm.id,mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mm.score,mm.match_reasons,mm.status,mm.mentee_consent_status,mm.mentee_response_note,mm.proposed_at,mr.goals,pm.display_name mentor_name,pe.display_name mentee_name,
+ case when mm.mentor_user_id=$1 then 'mentor' else 'mentee' end match_role
+ from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id
+ join person pm on pm.user_id=mm.mentor_user_id join person pe on pe.user_id=mm.mentee_user_id
+ where (mm.mentor_user_id=$1 and (mm.status='proposed' or (mm.status='accepted' and mm.mentee_consent_status='pending')))
+    or (mm.mentee_user_id=$1 and mm.status='accepted' and mm.mentee_consent_status='pending')
+ order by mm.proposed_at desc`,[userId])).rows;
 }
 export async function listMyMentorships(userId){
  const db=getPool();

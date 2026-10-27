@@ -8,6 +8,9 @@ const apiServerBase = (process.env.API_SERVER_BASE_URL || defaultApiServerBase).
 
 module.exports = {
 	reactStrictMode: true,
+	async redirects() {
+		return [{ source: "/marketplace", destination: "/serve-community", permanent: true }];
+	},
 	poweredByHeader: false,
 	async rewrites() {
 		return [{ source: "/api/:path*", destination: `${apiServerBase}/api/:path*` }];

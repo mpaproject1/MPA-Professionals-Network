@@ -3,6 +3,7 @@ import {ArrowLeft,Bookmark,HeartHandshake,Languages,RefreshCw} from "lucide-reac
 import Link from "next/link";
 import {useParams} from "next/navigation";
 import {useCallback,useEffect,useState} from "react";
+import { OperationStatus } from "../../../../components/operation-status";
 import {Badge, Card} from "../../../../components/ui";
 import {ApiError, api} from "../../../../lib/api";
 import {useSavedDiscoveryItems} from "../../../../lib/use-saved-discovery-items";
@@ -15,7 +16,7 @@ export default function PublicMentorProfile(){
  const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Mentor>(`/api/v1/mentors/${encodeURIComponent(id)}`));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This mentor profile is unavailable to your account.");}finally{setLoading(false);}},[id]);
  useEffect(()=>{void load();},[load]);
  return <main className="grid" style={{gap:18}}><Link href="/mentorship" className="btn btn-ghost"><ArrowLeft size={16}/> Back to mentorship</Link>
- {loading?<Card><div className="row"><RefreshCw size={18}/><p className="muted">Loading mentor profile…</p></div></Card>
+ {loading?<Card><OperationStatus state="loading" title="Loading mentor profile" detail="We’re retrieving the approved mentor’s published expertise, languages and mentoring modes. No match or mentorship request is being created." /></Card>
  :error?<Card><h1 className="h2">Mentor unavailable</h1><p role="alert" className="form-error">{error}</p><button className="btn btn-primary" type="button" onClick={()=>void load()}>Retry</button></Card>
  :item&&<Card><div className="row"><div className="avatar"><HeartHandshake size={23}/></div><div style={{flex:1,minWidth:0}}><div className="eyebrow">Approved mentor profile</div><h1 className="h1">{item.display_name}</h1><p className="tagline">{item.headline||"Mentor"}</p></div><button className="btn btn-ghost" type="button" disabled={!saved.signedIn||saved.isSaving("mentor",item.user_id)} aria-pressed={saved.isSaved("mentor",item.user_id)} onClick={()=>void saved.toggle("mentor",item.user_id)}><Bookmark size={16}/>{saved.isSaved("mentor",item.user_id)?"Saved":"Save mentor"}</button></div>
  {item.bio&&<p className="muted" style={{whiteSpace:"pre-wrap",marginTop:16}}>{item.bio}</p>}

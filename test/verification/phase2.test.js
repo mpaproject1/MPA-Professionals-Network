@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { allowedTalentInquiryTransition, ELIGIBLE_VERIFICATION_CLAIMS,isEligibleVerifiedClaim} from "../../src/talent/service.js";
 import { allowedTransition } from "../../src/verification/service.js";
@@ -43,4 +44,19 @@ test("talent inquiry creates a controlled consent-based bridge",()=>{
   assert.equal(allowedTalentInquiryTransition("accepted","closed"),true);
   assert.equal(allowedTalentInquiryTransition("declined","accepted"),false);
   assert.equal(allowedTalentInquiryTransition("closed","accepted"),false);
+});
+
+test("reference workflow migration permits the persisted consent and assessment states used by the service",async()=>{
+  const migration=await readFile(new URL("../../db/migrations/20261023110000_verification_reference_and_assignment_history.sql",import.meta.url),"utf8");
+  const service=await readFile(new URL("../../src/verification/service.js",import.meta.url),"utf8");
+  for(const value of ["pending","accepted","consented","declined","withdrawn"]) {
+    assert.ok(migration.includes(`'${value}'`),`reference consent constraint must include ${value}`);
+  }
+  for(const value of ["pending","received","verified","insufficient","disputed","not_verified","needs_clarification"]) {
+    assert.ok(migration.includes(`'${value}'`),`reference assessment constraint must include ${value}`);
+  }
+  assert.ok(service.includes('consent_status in (\'pending\',\'accepted\',\'consented\')'));
+  assert.ok(service.includes('consent?"consented":"declined"'));
+  assert.ok(service.includes('!["accepted","consented"].includes(r.consent_status)'));
+  assert.ok(service.includes('["verified","not_verified","needs_clarification"]'));
 });

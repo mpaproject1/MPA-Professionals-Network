@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
@@ -77,10 +78,10 @@ export default function JobSeekerDemandSupportPage() {
     </div>
     <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
       <Badge>{items.length} no-vacancy requests</Badge>
-      <button className="btn btn-ghost" type="button" onClick={() => void load()} disabled={loading}>{loading ? "Refreshing…" : "Refresh queue"}</button>
+      <button className="btn btn-ghost" type="button" onClick={() => void load()} disabled={loading}>{loading ? "Checking private requests…" : "Check latest private requests"}</button>
     </div>
     {error ? <Card><p role="alert">{error}</p><button className="btn btn-ghost" type="button" onClick={() => void load()}>Retry</button></Card> : null}
-    {notice ? <Card><p aria-live="polite" aria-atomic="true">{notice}</p></Card> : null}
+    {notice ? <Card><p aria-live="polite" aria-atomic="true">{notice}</p></Card> : null}{loading&&<OperationStatus state="loading" title="Loading private job-interest requests" detail="We’re retrieving private requests and their sharing history. This refresh does not grant an employer access to any information." />}
     {!loading && !items.length && !error ? <Card><h2 className="h2">No no-vacancy requests in the queue</h2><p className="muted">New requests will appear here after applicants submit a job-interest request.</p></Card> : null}
     {items.map(item => {
       const raw = item.employer_sharing_fields;
@@ -97,14 +98,14 @@ export default function JobSeekerDemandSupportPage() {
         <p className="muted">Received {item.employer_sharing_consented_at ? `with sharing consent on ${new Date(item.employer_sharing_consented_at).toLocaleString()}` : "without employer-sharing consent"}.</p>
         {canShare ? <div style={{ display: "grid", gap: 12 }}>
           <label>Verified organization
-            <select value={choice.organizationId} onChange={e => updateChoice(item.id,{organizationId:e.target.value})} required>
+            <select value={choice.organizationId} disabled={busyId===item.id} onChange={e => updateChoice(item.id,{organizationId:e.target.value})} required>
               <option value="">Select one organization</option>
               {organizations.map(org => <option key={org.id} value={org.id}>{org.display_name || org.legal_name}</option>)}
             </select>
           </label>
           <div><b>Fields allowed by the applicant</b><div className="grid grid-2" style={{ marginTop: 8 }}>
             {consented.filter((field:string) => labels[field]).map((field:string) => <label key={field} style={{ display:"flex", gap:8, alignItems:"center" }}>
-              <input type="checkbox" checked={choice.fields.includes(field)} onChange={e => updateChoice(item.id,{fields:e.target.checked?[...new Set([...choice.fields,field])]:choice.fields.filter(x=>x!==field)})} />{labels[field]}
+              <input type="checkbox" disabled={busyId===item.id} checked={choice.fields.includes(field)} onChange={e => updateChoice(item.id,{fields:e.target.checked?[...new Set([...choice.fields,field])]:choice.fields.filter(x=>x!==field)})} />{labels[field]}
             </label>)}
           </div></div>
           <button className="btn btn-primary" type="button" disabled={busyId===item.id || !choice.organizationId || !choice.fields.length} onClick={() => void share(item)}>{busyId===item.id ? "Sharing…" : "Share selected fields with this organization"}</button>

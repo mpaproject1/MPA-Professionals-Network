@@ -3,8 +3,10 @@
 import {Bookmark,Building2,Clock3,MapPin,RefreshCw, SlidersHorizontal,Users} from "lucide-react";
 import {type FormEvent,useCallback,useEffect,useId,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
+import { OperationStatus } from "../../components/operation-status";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
+import { humanStatus } from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 
 type Job={
@@ -15,6 +17,7 @@ type Job={
 };
 type Eligibility={eligible:boolean;summary:string;results:{code:string;eligible:boolean;reason:string}[]};
 type EligibilityResult=Eligibility|{error:string};
+type ExistingApplication={id:string;job_id:string;status:string;cover_letter?:string|null};
 type Filters={q:string;location:string;employmentType:string;workMode:string;seniority:string;postingScope:string};
 const initialFilters:Filters={q:"",location:"",employmentType:"",workMode:"",seniority:"",postingScope:""};
 
@@ -47,7 +50,7 @@ export default function Jobs(){
  const [notice,setNotice]=useState("");
  const [coverLetters,setCoverLetters]=useState<Record<string,string>>({});
  const [draftIds,setDraftIds]=useState<Record<string,string>>({});
- const [applyingId,setApplyingId]=useState("");
+ const [applyingIds,setApplyingIds]=useState<Record<string,boolean>>({});
  const [eligibilityByJob,setEligibilityByJob]=useState<Record<string,EligibilityResult>>({});
  const [eligibilityLoading,setEligibilityLoading]=useState<Record<string,boolean>>({});
 
@@ -68,9 +71,15 @@ export default function Jobs(){
 
  useEffect(()=>{void loadJobs(initialFilters)},[loadJobs]);
  useEffect(()=>{
-   if(!token){setSaved([]);return;}
+   if(!token){setSaved([]);setDraftIds({});setCoverLetters({});return;}
    let active=true;
    api<Job[]>("/api/v1/me/saved-jobs",{},token).then(rows=>{if(active)setSaved(Array.isArray(rows)?rows.map(row=>row.id):[])}).catch(e=>{if(active)setError(e instanceof ApiError?e.message:"We couldn't load saved opportunities.")});
+   api<ExistingApplication[]>("/api/v1/me/job-applications",{},token).then(rows=>{
+     if(!active)return;
+     const drafts=Array.isArray(rows)?rows.filter(row=>row.status==="draft"&&typeof row.job_id==="string"):[];
+     setDraftIds(Object.fromEntries(drafts.map(row=>[row.job_id,row.id])));
+     setCoverLetters(Object.fromEntries(drafts.map(row=>[row.job_id,row.cover_letter||""])));
+   }).catch(e=>{if(active)setError(e instanceof ApiError?e.message:"Saved application drafts could not be restored. Retry loading your applications before submitting.")});
    return ()=>{active=false};
  },[token]);
 
@@ -97,21 +106,43 @@ export default function Jobs(){
    }catch(e){setError(e instanceof ApiError?e.message:"We couldn't update your saved jobs.");}
    finally{setSavingId("");}
  }
- async function submitFormalApplication(job:Job){
-   if(!token){setNotice("Sign in to start a formal application. Public interest intake remains available separately.");return;}
-   setApplyingId(job.id);setError("");setNotice("");
+ async function saveFormalApplicationDraft(job:Job){
+   if(!token){setNotice("Sign in to save an application draft to your account.");return;}
+   if(applyingIds[job.id])return;setApplyingIds(current=>({...current,[job.id]:true}));setError("");setNotice("");
    try{
      let draftId=draftIds[job.id];
      if(!draftId){
-       const draft=await api<{id:string}>(`/api/v1/jobs/${encodeURIComponent(job.id)}/application-drafts`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+       const draft=await api<{id:string}>("/api/v1/jobs/"+encodeURIComponent(job.id)+"/application-drafts",{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
        draftId=draft.id;setDraftIds(current=>({...current,[job.id]:draftId!}));
+     }else{
+       await api("/api/v1/job-applications/"+encodeURIComponent(draftId),{method:"PATCH",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
      }
-     await api(`/api/v1/job-applications/${encodeURIComponent(draftId)}/submit`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
-     setNotice("Formal application submitted. Its status is available in application tracking.");
-     setDraftIds(current=>{const next={...current};delete next[job.id];return next;});
-   }catch(e){setError(e instanceof ApiError?e.message:"We couldn't submit the formal application. If eligibility needs review, the draft remains available in this session.");}
-   finally{setApplyingId("");}
+     setNotice("Your application draft is saved to your account. You can return to it before submitting.");
+   }catch(e){setError(e instanceof ApiError?e.message:"We couldn't save this draft. Your text is still on this page; retry before leaving.");}
+   finally{setApplyingIds(current=>({...current,[job.id]:false}));}
  }
+
+  async function submitFormalApplication(job:Job){
+    if(!token){setNotice("Sign in to start a formal application. Public interest intake remains available separately.");return;}
+    if(applyingIds[job.id])return;
+    setApplyingIds(current=>({...current,[job.id]:true}));setError("");setNotice("");
+    try{
+      let draftId=draftIds[job.id];
+      if(!draftId){
+        const draft=await api<{id:string}>(`/api/v1/jobs/${encodeURIComponent(job.id)}/application-drafts`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+        draftId=draft.id;setDraftIds(current=>({...current,[job.id]:draftId!}));
+      }
+      const submitted=await api<{status?:string;tracking_reference?:string|null}>(`/api/v1/job-applications/${encodeURIComponent(draftId)}/submit`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+      setNotice(`Formal application status: ${humanStatus(submitted.status||"submitted")}.${submitted.tracking_reference?` Reference ${submitted.tracking_reference}.`:""} Open application tracking for the next steps.`);
+      setDraftIds(current=>{const next={...current};delete next[job.id];return next;});
+    }catch(e){
+      if(e instanceof ApiError&&e.code==="INVALID_STATE"){
+        setDraftIds(current=>{const next={...current};delete next[job.id];return next;});
+        setNotice("This application is no longer a draft. It may already have been submitted. Check application tracking before trying again.");
+      }else setError(e instanceof ApiError?e.message:"We couldn't confirm the formal application outcome. Check application tracking before retrying so you do not duplicate the application.");
+    }finally{setApplyingIds(current=>({...current,[job.id]:false}));}
+  }
+
  async function toggleDetails(job:Job){
    const isOpen=Boolean(expanded[job.id]);
    if(isOpen){setExpanded(current=>({...current,[job.id]:false}));return;}
@@ -141,13 +172,20 @@ export default function Jobs(){
    finally{setEligibilityLoading(current=>({...current,[job.id]:false}));}
  }
 
- return <div>
-   <div className="eyebrow">Employment & opportunity hub</div>
-   <h1 className="h1">Opportunities, without the maze.</h1>
-   <p className="muted">Browse current opportunities published by verified organizations. Eligibility and formal application steps are checked by the platform; sample or invented vacancies are not shown.</p>
-   <p><a className="btn btn-ghost" href="/jobs/interest">No matching vacancy? Register your job interest</a></p>
+ return <div className="mpa-jobs-page">
+   <section className="mpa-signature-intro" aria-labelledby="jobs-page-title">
+     <div className="eyebrow">Careers and opportunities</div>
+     <h1 id="jobs-page-title" className="h1">Find your next professional opportunity.</h1>
+     <p>Explore published vacancies from eligible organizations. Review each role’s requirements, check your eligibility and track any formal application from your account.</p>
+   </section>
+   <div className="job-journey grid grid-3" aria-label="Your opportunity journey" style={{gap:10,marginTop:14}}>
+    <Card><div className="eyebrow">Step 1</div><b>Prepare your profile</b><p className="muted">Keep your experience and visibility settings up to date.</p><a className="text-link" href="/profile">Review profile →</a></Card>
+    <Card><div className="eyebrow">Step 2</div><b>Discover and apply</b><p className="muted">Check requirements and submit the information requested for each role.</p><a className="text-link" href="#job-search">Search opportunities →</a></Card>
+    <Card><div className="eyebrow">Step 3</div><b>Track your progress</b><p className="muted">Follow recorded application updates and next actions.</p><a className="text-link" href="/track">Track applications →</a></Card>
+   </div>
+   <p><a className="btn btn-ghost" href="/jobs/interest">No matching vacancy? Register your job interest</a> <a className="btn btn-ghost" href="/saved">Review saved items</a></p>
    <div className="split" style={{marginTop:20}}>
-     <Card id={`${jobsId}-filters`} className="filter">
+     <Card id="job-search" className="filter">
        <form onSubmit={submitFilters}>
          <div className="row"><b>Search opportunities</b><SlidersHorizontal size={17}/></div>
          <label style={{display:"grid",gap:6,marginTop:14,fontSize:13,fontWeight:700}}>Role, skill or sector<input value={filters.q} onChange={e=>setFilters({...filters,q:e.target.value})} placeholder="Search job title or description"/></label>
@@ -156,16 +194,16 @@ export default function Jobs(){
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Work mode<input value={filters.workMode} onChange={e=>setFilters({...filters,workMode:e.target.value})} placeholder="e.g. remote"/></label>
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Seniority<input value={filters.seniority} onChange={e=>setFilters({...filters,seniority:e.target.value})} placeholder="Seniority level"/></label>
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Scope<select value={filters.postingScope} onChange={e=>setFilters({...filters,postingScope:e.target.value})}><option value="">All opportunities visible to me</option><option value="public">Public</option><option value="partner_network">Member network</option><option value="organization_internal">Organization internal</option></select></label>
-         <button className="btn btn-primary" type="submit" disabled={loading} style={{width:"100%",marginTop:18}}>{loading?"Searching…":"Apply filters"}</button>
+         <button className="btn btn-primary" type="submit" disabled={loading} style={{width:"100%",marginTop:18}}>{loading?"Finding matching jobs…":"Apply filters"}</button>
          <button className="btn btn-ghost" type="button" onClick={()=>{setFilters(initialFilters);void loadJobs(initialFilters,0)}} disabled={loading} style={{width:"100%",marginTop:8}}>Clear filters</button>
          <button className="btn btn-ghost" type="button" onClick={()=>void createAlert()} disabled={creatingAlert||loading} style={{width:"100%",marginTop:8}}>{creatingAlert?"Saving alert…":"Save job alert"}</button>
        </form>
      </Card>
      <div id={`${jobsId}-cards`} className="grid">
-       {error&&<div className="form-error" role="alert">{error}<button className="btn btn-ghost" onClick={()=>void loadJobs(filters,page)} type="button" style={{marginLeft:8}}>Retry</button></div>}
-       {notice&&<p className="muted" aria-live="polite" aria-atomic="true">{notice}{!token&&<a href="/login?next=/jobs"> Sign in</a>}</p>}
-       {loading&&<Card><div className="row"><RefreshCw size={18}/><p className="muted">Loading current opportunities…</p></div></Card>}
-       {!loading&&!error&&jobs.length===0&&<Card><h2 className="h2">No matching opportunities</h2><p className="muted">There are no published opportunities matching these filters right now. Try clearing filters or check again later.</p><button type="button" className="btn btn-ghost" onClick={()=>{setFilters(initialFilters);void loadJobs(initialFilters)}}>Clear filters</button></Card>}
+       {error&&<div className="form-error" role="alert">{error}<button className="btn btn-ghost" onClick={()=>void loadJobs(filters,page)} type="button" disabled={loading} style={{marginLeft:8}}>{loading?"Checking opportunities…":"Retry loading opportunities"}</button></div>}
+       {notice&&<p className="muted" aria-live="polite" aria-atomic="true">{notice}{(notice.includes("application tracking")||notice.includes("Check application tracking"))&&token?<a className="btn btn-ghost" href="/track" style={{marginLeft:8}}>Open application tracking</a>:null}{!token&&<a href="/login?next=/jobs"> Sign in</a>}</p>}
+       {loading&&<Card><OperationStatus state="loading" title="Loading current opportunities" detail="We’re retrieving published jobs that match your search and account access. Your saved drafts and applications are not being changed." /></Card>}
+       {!loading&&!error&&jobs.length===0&&<Card><h2 className="h2">No roles match these filters yet</h2><p className="muted">Broaden your search or register your job interest to help the team understand what roles you are looking for. You can also review saved opportunities while new listings are published.</p><div className="row" style={{gap:8,flexWrap:"wrap"}}><button type="button" className="btn btn-ghost" onClick={()=>{setFilters(initialFilters);void loadJobs(initialFilters)}}>Clear filters</button><a className="btn btn-primary" href="/jobs/interest">Register job interest <span aria-hidden="true">→</span></a><a className="btn btn-ghost" href="/saved">View saved items</a></div></Card>}
        {jobs.map(job=><Card key={job.id}>
          <div className="row"><Badge>{scopeLabel(job.posting_scope)}</Badge><button className="icon-btn" type="button" aria-label={saved.includes(job.id)?"Remove saved opportunity":"Save opportunity"} title={saved.includes(job.id)?"Remove saved opportunity":"Save opportunity"} disabled={savingId===job.id} onClick={()=>void toggleSave(job)}><Bookmark size={18} fill={saved.includes(job.id)?"currentColor":"none"}/></button></div>
          <h2 style={{fontSize:20,margin:"12px 0 5px"}}>{job.title}</h2>
@@ -178,9 +216,9 @@ export default function Jobs(){
            {salary(job)&&<span className="tagline">{salary(job)}</span>}
          </div>
          {job.application_deadline&&<p className="muted">Application deadline: {new Date(job.application_deadline).toLocaleDateString()}</p>}
-         {expanded[job.id]&&<div style={{marginTop:14}}><p>{job.description||"No further description has been published."}</p>{token?<div className="case-row" style={{margin:"12px 0"}}><div style={{flex:1,minWidth:0}}><b>Are you eligible for this opportunity?</b>{eligibilityLoading[job.id]?<p className="muted">Checking the published requirements for your account…</p>:<EligibilityDetails result={eligibilityByJob[job.id]}/>}</div><div className="row" style={{gap:8,flexWrap:"wrap"}}>{eligibilityByJob[job.id]&&"error" in eligibilityByJob[job.id]&&<button className="btn btn-ghost" type="button" onClick={()=>void retryEligibility(job)} disabled={eligibilityLoading[job.id]}>Retry eligibility check</button>}</div></div>:<p className="muted">Sign in to check your eligibility against this vacancy's actual requirements.</p>}<p className="muted">A public inquiry is not a formal application. Formal submission is authenticated and checks eligibility, required screening answers and duplicate applications.</p>{token?<div className="grid" style={{gap:8,marginTop:10}}><label htmlFor={`cover-${job.id}`}>Cover letter (optional)<textarea id={`cover-${job.id}`} rows={3} value={coverLetters[job.id]||""} onChange={e=>setCoverLetters(current=>({...current,[job.id]:e.target.value}))} placeholder="Explain your interest and relevant experience."/></label><button className="btn btn-primary" type="button" disabled={applyingId===job.id} onClick={()=>void submitFormalApplication(job)}>{applyingId===job.id?"Submitting…":draftIds[job.id]?"Retry formal submission":"Submit formal application"}</button></div>:<p className="muted"><a href="/login?next=/jobs">Sign in to submit a formal application</a>; use public inquiry only if you want to ask questions first.</p>}</div>}
+         {expanded[job.id]&&<div style={{marginTop:14}}><p>{job.description||"No further description has been published."}</p>{token?<div className="case-row" style={{margin:"12px 0"}}><div style={{flex:1,minWidth:0}}><b>Are you eligible for this opportunity?</b>{eligibilityLoading[job.id]?<p className="muted">Checking the published requirements for your account…</p>:<EligibilityDetails result={eligibilityByJob[job.id]}/>}</div><div className="row" style={{gap:8,flexWrap:"wrap"}}>{eligibilityByJob[job.id]&&"error" in eligibilityByJob[job.id]&&<button className="btn btn-ghost" type="button" onClick={()=>void retryEligibility(job)} disabled={eligibilityLoading[job.id]}>Retry eligibility check</button>}</div></div>:<p className="muted">Sign in to check your eligibility against this vacancy's actual requirements.</p>}<p className="muted">A public inquiry is not a formal application. Formal submission is authenticated and checks eligibility, required screening answers and duplicate applications.</p>{token?<div className="grid" style={{gap:8,marginTop:10}}><label htmlFor={`cover-${job.id}`}>Cover letter (optional)<textarea id={`cover-${job.id}`} rows={3} disabled={applyingIds[job.id]} value={coverLetters[job.id]||""} onChange={e=>setCoverLetters(current=>({...current,[job.id]:e.target.value}))} placeholder="Explain your interest and relevant experience."/></label><div className="row" style={{gap:8,flexWrap:"wrap"}}><button className="btn btn-ghost" type="button" disabled={applyingIds[job.id]} onClick={()=>void saveFormalApplicationDraft(job)}>{applyingIds[job.id]?"Saving…":draftIds[job.id]?"Save draft changes":"Save draft"}</button><button className="btn btn-primary" type="button" disabled={applyingIds[job.id]} onClick={()=>void submitFormalApplication(job)}>{applyingIds[job.id]?"Submitting application…":draftIds[job.id]?"Submit saved draft":"Submit formal application"}</button></div></div>:<p className="muted"><a href="/login?next=/jobs">Sign in to submit a formal application</a>; use public inquiry only if you want to ask questions first.</p>}</div>}
          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
-           <button className="btn btn-ghost" type="button" onClick={()=>void toggleDetails(job)}>{expanded[job.id]?"Hide details":"View details"}</button>
+           <button className="btn btn-ghost" type="button" disabled={applyingIds[job.id]} onClick={()=>void toggleDetails(job)}>{expanded[job.id]?"Hide details":"View details"}</button>
            <a className="btn btn-primary" href={"/apply/job"}>Start public inquiry</a>
          </div>
        </Card>)}

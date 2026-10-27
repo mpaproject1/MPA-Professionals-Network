@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
+import { JourneyGuide } from "../../components/journey-guide";
+import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
@@ -90,6 +92,7 @@ export default function Organizations() {
   const [form, setForm] = useState<OrgForm>(blank);
   const [organizationTypeChoice,setOrganizationTypeChoice]=useState("");
   const [showForm, setShowForm] = useState(false);
+  const [registrationStep, setRegistrationStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -236,9 +239,9 @@ export default function Organizations() {
         ...current.filter((x) => x.id !== created.id),
       ]);
       localStorage.removeItem("mpa.organization-registration-draft");
-      setForm(blank);
-      setOrganizationTypeChoice("");
-      setShowForm(false);
+      setRegistrationStep(3);
+      setEvidenceOrg(created.id);
+      setShowForm(true);
       setNotice(
         "Organization registration recorded. Application reference: " +
           (created.tracking_reference || "Reference pending") +
@@ -516,6 +519,31 @@ export default function Organizations() {
           never assumed by the interface.
         </p>
       </div>
+      <Card>
+        <div className="eyebrow">Why partner with MPA</div>
+        <h2 className="h2">A more trusted way to connect with professionals</h2>
+        <p className="muted">MPA is a nonprofit professional network. Organization participation helps connect employers, institutions and professionals through clearer identity checks, permission-based information sharing and accountable opportunity workflows—not a promise of hiring results.</p>
+        <div className="grid grid-2" style={{gap:14,marginTop:14}}>
+          <section className="membership-plan"><h3 className="h2">A verified organization presence</h3><p className="muted">Submit legal identity and supporting evidence for review. Where verification is approved, your organization can present a more credible profile; approval is recorded and is never automatic.</p></section>
+          <section className="membership-plan"><h3 className="h2">Publish and manage opportunities</h3><p className="muted">Eligible organization roles can manage supported job and opportunity workflows, with publication and access governed by organization verification, permissions and posting scope.</p></section>
+          <section className="membership-plan"><h3 className="h2">Reach professionals responsibly</h3><p className="muted">Use the talent and inquiry workflows available to your role. Candidate details are limited by profile visibility and consent; private contact information is not a general directory download.</p></section>
+          <section className="membership-plan"><h3 className="h2">Keep decisions and next steps clear</h3><p className="muted">Review incoming inquiries, record supported decisions and follow the available status history. A public inquiry is not treated as a formal job application unless the relevant workflow records that transition.</p></section>
+          <section className="membership-plan"><h3 className="h2">Support a shared professional ecosystem</h3><p className="muted">Participate in a nonprofit network that supports professional development, mentorship and clearer connections between institutions and talent, while retaining responsibility for fair recruitment and selection.</p></section>
+        </div>
+      </Card>
+      <JourneyGuide
+        eyebrow="Employer / recruiter"
+        title="Verify → Publish → Review → Report"
+        description="Use the organization identity you are authorized to represent. Verification, moderation and hiring decisions remain explicit recorded steps."
+        primaryLabel={token ? "Continue organization setup" : "Sign in to begin"}
+        primaryHref={token ? "#org-registration" : "/login?next=/organizations"}
+        steps={[
+          { title: "Verify", description: "Register the legal identity and institutional contact, then upload the required private evidence. Structured TIN and representative identity fields are not yet supported by the current registration API.", href: token ? "#org-registration" : "/login?next=/organizations", action: "Register organization" },
+          { title: "Publish", description: "After verification, prepare a vacancy or paid project with clear eligibility and terms.", href: "/recruitment", action: "Open recruitment" },
+          { title: "Review", description: "Review applicants for your own opportunities and respond to moderation or correction requests.", href: "/recruitment", action: "Review applicants" },
+          { title: "Report", description: "Record interview decisions, hiring outcomes and follow-up feedback through the authorized workflow.", href: "/recruitment", action: "Track hiring" },
+        ]}
+      />
       {!token ? (
         <Card>
           <h2 className="h2">Sign in to manage an organization</h2>
@@ -529,23 +557,7 @@ export default function Organizations() {
         </Card>
       ) : (
         <>
-          <Card>
-            <div className="h2">Your organization journey</div>
-            <p className="muted">You do not need to learn platform terminology. Follow these steps in order; publishing controls unlock only when the server confirms your organization is verified.</p>
-            <ol className="form-stack" style={{paddingLeft:22}}>
-              <li><b>Establish trust:</b> register the legal identity and authorized contact, then upload the required private documents.</li>
-              <li><b>Resolve blockers:</b> review the missing-evidence checklist and the latest reviewer note shown on each organization below.</li>
-              <li><b>Wait for a decision:</b> submitted organizations remain private for publishing until approval. If corrections are requested, provide them and submit again.</li>
-              <li><b>Publish and hire:</b> after verification, use the organization’s own identity to manage jobs, approved services and mentorship offers.</li>
-              <li><b>Find relevant people:</b> use the professional directory and job-specific eligibility information; only view or contact people within their sharing permissions.</li>
-              <li><b>Manage hiring:</b> open Recruitment to review applicants, move candidates through the hiring stages, schedule interviews, record decisions and track outcomes.</li>
-            </ol>
-            <div className="row" style={{flexWrap:"wrap",gap:8}}>
-              <a className="btn btn-ghost" href="/recruitment">Open recruitment</a>
-              <a className="btn btn-ghost" href="/network">Search professional network</a>
-              <a className="btn btn-ghost" href="/jobs">View job opportunities</a>
-            </div>
-          </Card>
+          
           <Card id="org-registration">
             <div className="row">
               <div>
@@ -569,113 +581,130 @@ export default function Organizations() {
                 ? "Close registration form"
                 : "Register an organization"}
             </button>
-            {showForm && (
-              <form
-                className="form-stack"
-                onSubmit={register}
-                style={{ marginTop: 18 }}
-              >
-                <label>
-                  Legal name
-                  <input
-                    required
-                    value={form.legalName}
-                    onChange={(e) =>
-                      setForm({ ...form, legalName: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Display name
-                  <input
-                    required
-                    value={form.displayName}
-                    onChange={(e) =>
-                      setForm({ ...form, displayName: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Organization type
-                  <select value={organizationTypeChoice} onChange={e=>{setOrganizationTypeChoice(e.target.value);if(e.target.value!=="other")setForm(current=>({...current,organizationType:e.target.value}));else setForm(current=>({...current,organizationType:""}));}}>
-                    <option value="">Choose organization type</option>
-                    <option value="company">Company / business</option>
-                    <option value="nonprofit">Nonprofit / NGO</option>
-                    <option value="professional_association">Professional association</option>
-                    <option value="government">Government / public institution</option>
-                    <option value="educational_institution">Educational institution</option>
-                    <option value="cooperative">Cooperative</option>
-                    <option value="other">Other</option>
-                  </select>
-                </label>
-                {organizationTypeChoice==="other"&&<label>Describe organization type<input required maxLength={120} value={form.organizationType} onChange={e=>setForm(current=>({...current,organizationType:e.target.value}))} placeholder="Describe the organization type"/></label>}
-                <label>
-                  Description
-                  <textarea
-                    rows={3}
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm({ ...form, description: e.target.value })
-                    }
-                  />
-                </label>
-                <div className="form-grid">
-                  <label>
-                    Email
-                    <input
-                      type="email"
-                      value={form.email}
-                      onChange={(e) =>
-                        setForm({ ...form, email: e.target.value })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Phone
-                    <input
-                      value={form.phone}
-                      onChange={(e) =>
-                        setForm({ ...form, phone: e.target.value })
-                      }
-                    />
-                  </label>
-                </div>
-                <label>
-                  Website
-                  <input
-                    type="url"
-                    value={form.website}
-                    onChange={(e) =>
-                      setForm({ ...form, website: e.target.value })
-                    }
-                    placeholder="https://"
-                  />
-                </label>
-                <label>
-                  Address
-                  <input
-                    value={form.addressText}
-                    onChange={(e) =>
-                      setForm({ ...form, addressText: e.target.value })
-                    }
-                  />
-                </label>
-                <p className="muted">
-                  Registration creates a draft verification case. It does not
-                  automatically verify the organization or permit job
-                  publication.
-                </p>
-                <button
-                  className="btn btn-primary"
-                  type="submit"
-                  disabled={submitting}
+            {showForm && (registrationStep < 3 ? (
+                <form
+                  className="form-stack"
+                  onSubmit={register}
+                  style={{ marginTop: 18 }}
                 >
-                  {submitting
-                    ? "Registering…"
-                    : "Submit organization registration"}
-                </button>
-              </form>
-            )}
+                  <div className="row" aria-label="Organization registration steps" style={{ flexWrap: "wrap", gap: 8 }}>
+                    {[
+                      { step: 1, label: "Entity profile" },
+                      { step: 2, label: "Institutional contact" },
+                      { step: 3, label: "Evidence & review" },
+                    ].map(item => (
+                      <span key={item.step} className="badge" aria-current={registrationStep === item.step ? "step" : undefined}>
+                        {item.step}. {item.label}{registrationStep > item.step ? " · Complete" : ""}
+                      </span>
+                    ))}
+                  </div>
+                  {registrationStep === 1 ? (
+                    <>
+                      <h3 className="h2">Step 1 — Entity profile</h3>
+                      <label>Legal name<input required maxLength={200} value={form.legalName} onChange={e => setForm({ ...form, legalName: e.target.value })} /></label>
+                      <label>Display name<input required maxLength={160} value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} /></label>
+                      <label>Institution type
+                        <select required value={organizationTypeChoice} onChange={e => { setOrganizationTypeChoice(e.target.value); setForm(current => ({ ...current, organizationType: e.target.value === "other" ? "" : e.target.value })); }}>
+                          <option value="">Choose institution type</option>
+                          <option value="company">Company / business</option>
+                          <option value="nonprofit">Nonprofit / NGO</option>
+                          <option value="professional_association">Professional association</option>
+                          <option value="government">Government / public institution</option>
+                          <option value="educational_institution">Educational institution</option>
+                          <option value="cooperative">Cooperative</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </label>
+                      {organizationTypeChoice === "other" && <label>Describe institution type<input required maxLength={120} value={form.organizationType} onChange={e => setForm(current => ({ ...current, organizationType: e.target.value }))} /></label>}
+                      <label>Institution description<textarea rows={3} maxLength={2000} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
+                      <label>Official website<input type="url" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} placeholder="https://" /></label>
+                      <div className="row" style={{ justifyContent: "flex-end" }}>
+                        <button className="btn btn-primary" type="button" onClick={() => setRegistrationStep(2)} disabled={!form.legalName.trim() || !form.displayName.trim() || !organizationTypeChoice || (organizationTypeChoice === "other" && !form.organizationType.trim())}>Continue to contact details</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="h2">Step 2 — Institutional contact</h3>
+                      <p className="muted">Use an official institutional contact channel that you are authorized to represent. Registration creates a draft; it does not verify the institution or unlock publishing.</p>
+                      <label>Institutional email<input type="email" required maxLength={254} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>
+                      <label>Official contact phone<input type="tel" maxLength={40} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></label>
+                      <label>Institution address<input maxLength={300} value={form.addressText} onChange={e => setForm({ ...form, addressText: e.target.value })} /></label>
+                      <div className="form-error" role="note">
+                        <b>Evidence and data boundary:</b> the current registration API does not persist a structured TIN, representative name/position, or verification-fee payment/receipt. Do not treat those items as collected or paid. Use the private evidence workflow below for documents the server explicitly supports; fee collection is not enabled by this page.
+                      </div>
+                      <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                        <button className="btn btn-ghost" type="button" onClick={() => setRegistrationStep(1)} disabled={submitting}>Back to entity profile</button>
+                        <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? "Creating draft…" : "Create registration draft"}</button>
+                      </div>
+                    </>
+                  )}
+                </form>
+              ) : (
+                <div className="form-stack" style={{ marginTop: 18 }}>
+                  <div className="row" aria-label="Organization registration steps" style={{ flexWrap: "wrap", gap: 8 }}>
+                    <span className="badge">1. Entity profile · Complete</span>
+                    <span className="badge">2. Institutional contact · Complete</span>
+                    <span className="badge" aria-current="step">3. Evidence & review · Current step</span>
+                  </div>
+                  <h3 className="h2">Step 3 — Upload evidence for Tabayyun review</h3>
+                  <p className="muted">Your draft exists, but the institution is not verified. Upload the required private evidence for this organization, then submit the verification case. Reviewers must make an independent decision.</p>
+                  <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+                    <button className="btn btn-primary" type="button" onClick={() => document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Continue to private evidence upload</button>
+                    <button className="btn btn-ghost" type="button" onClick={() => { setRegistrationStep(1); setForm(blank); setOrganizationTypeChoice(""); setShowForm(false); }}>Close wizard</button>
+                  </div>
+                </div>
+              ))}
+          </Card>
+          <Card>
+            <div className="row">
+              <div>
+                <div className="h2">Organization workspace hub</div>
+                <p className="muted">Open the existing task-specific workspaces. Actions remain subject to the selected organization's server-side role, verification state, and record scope.</p>
+              </div>
+              <Building2 color="var(--primary)" />
+            </div>
+            {organizations.length === 0 ? <p className="muted">Register an organization to see its next steps here. No activity or impact figures are assumed.</p> : <div className="grid grid-2" style={{ gap: 12 }}>
+              {organizations.map(org => {
+                const verified = org.verification_status === "verified";
+                const waiting = org.verification_case_status === "submitted" || org.verification_case_status === "pending" || org.verification_status === "pending";
+                return <section className="membership-plan" key={org.id}>
+                  <div className="row" style={{ alignItems: "flex-start", gap: 10 }}>
+                    <Building2 size={20} color="var(--primary)" />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <h3 className="h2">{org.display_name}</h3>
+                      <p className="muted">{verified ? "Verified institution" : waiting ? "Verification under review" : "Verification not complete"} · {org.role_code || "Organization member"}</p>
+                    </div>
+                    <Badge>{verified ? "Verified" : waiting ? "Under review" : "Setup required"}</Badge>
+                  </div>
+                  <div className="grid" style={{ gap: 8, marginTop: 12 }}>
+                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <span><b>Recruitment & hiring</b><small className="muted" style={{ display: "block" }}>Organization-scoped jobs and candidate pipeline</small></span>
+                      {verified ? <a className="btn btn-ghost" href="/recruitment">Open recruitment</a> : <span className="muted">Available after verification</span>}
+                    </div>
+                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <span><b>Community needs</b><small className="muted" style={{ display: "block" }}>Submit and follow a community-service request</small></span>
+                      <a className="btn btn-ghost" href="/service-demand">Open Serve-Community</a>
+                    </div>
+                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <span><b>Mentorship programs</b><small className="muted" style={{ display: "block" }}>Organization offers and requests</small></span>
+                      {verified ? <a className="btn btn-ghost" href="/mentorship">Open mentorship</a> : <span className="muted">Available after verification</span>}
+                    </div>
+                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <span><b>Services directory</b><small className="muted" style={{ display: "block" }}>Discover services; organization-owned publishing is not represented as available here</small></span>
+                      <a className="btn btn-ghost" href="/services">Browse services</a>
+                    </div>
+                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <span><b>Volunteer desk</b><small className="muted" style={{ display: "block" }}>Organization-scoped volunteer drives and skill dispatch are not implemented as a verified workflow yet</small></span>
+                      <Badge>Not available</Badge>
+                    </div>
+                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <span><b>Impact & outcome reports</b><small className="muted" style={{ display: "block" }}>View server-returned recruitment and requisition outcomes; print or save the loaded report as PDF</small></span>
+                      <a className="btn btn-ghost" href="/organizations/reports">Open report</a>
+                    </div>
+                  </div>
+                </section>;
+              })}
+            </div>}
           </Card>
           <Card>
             <div className="row">
@@ -693,10 +722,10 @@ export default function Organizations() {
                 disabled={loading}
               >
                 <RefreshCw size={16} />
-                {loading ? "Loading…" : "Refresh"}
+                {loading ? "Checking organizations…" : "Check latest organizations"}
               </button>
             </div>
-            {loading && <p className="muted">Loading your organizations…</p>}
+            {loading && <OperationStatus state="loading" title="Checking your organizations" detail="We’re retrieving organizations linked to your signed-in account. This does not change your organization records." /> }
             {!loading && organizations.length === 0 && (
               <p className="muted">
                 No organization is linked to this account yet. Use registration

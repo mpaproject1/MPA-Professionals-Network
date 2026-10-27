@@ -86,14 +86,24 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
     allowed=membership.rowCount>0;
   }
   if(!allowed){
+    const applicationShare=await db.query(`select 1 from job_application_attachment aa join job_application a on a.id=aa.application_id join job j on j.id=a.job_id where aa.file_object_id=$1 and a.applicant_user_id<>$2 and a.status not in ('draft','withdrawn','rejected') and (exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator','recruiter','project_manager')) or exists(select 1 from job_team_member jt where jt.job_id=j.id and jt.user_id=$2 and jt.active=true and jt.role_code in ('hiring_manager','recruiter','interviewer'))) limit 1`,[fileId,userId]);
+    allowed=applicationShare.rowCount>0;
+  }
+  if(!allowed){
     const canReviewVetting=roles.some(role=>["verification_reviewer","ethics_reviewer","appeal_reviewer","system_admin"].includes(role))||permissions.includes("verification.manage");
+    const canReviewOrganization=roles.some(role=>["reviewer","system_admin"].includes(role))||permissions.includes("organizations.review");
     const canReviewMembership=roles.some(role=>["reviewer","finance_officer","system_admin"].includes(role))||permissions.some(permission=>["finance.view","finance.manage","members.view","members.manage"].includes(permission));
-    if(canReviewVetting){
-      const linked=await db.query("select 1 from organization_verification_evidence where file_object_id=$1 limit 1",[fileId]);
-      const reviewerRole=roles.some(role=>["verification_reviewer","ethics_reviewer","appeal_reviewer"].includes(role))||permissions.includes("verification.manage");
-      const professionalEvidence=await db.query(`select 1 from professional_portfolio_item pi join professional_profile pp on pp.id=pi.profile_id join person p on p.id=pp.person_id join verification_case vc on vc.subject_user_id=p.user_id where pi.evidence_file_id=$1 and p.user_id=$2 and (vc.assigned_reviewer_id=$3 or $4=true or $5=true) limit 1`,[fileId,f.created_by,userId,roles.includes("system_admin"),reviewerRole]);
-      const caseEvidence=await db.query(`select 1 from verification_evidence e join verification_case vc on vc.id=e.case_id where e.file_object_id=$1 and vc.subject_user_id=$2 and (vc.assigned_reviewer_id=$3 or $4=true or $5=true) limit 1`,[fileId,f.created_by,userId,roles.includes("system_admin"),reviewerRole]);
-      allowed=linked.rowCount>0||professionalEvidence.rowCount>0||caseEvidence.rowCount>0;
+    if(canReviewOrganization){
+      const organizationEvidence=await db.query("select 1 from organization_verification_evidence where file_object_id=$1 limit 1",[fileId]);
+      allowed=organizationEvidence.rowCount>0;
+    }
+    if(!allowed&&canReviewVetting){
+      const isVettingManager=roles.includes("system_admin")||permissions.includes("verification.manage");
+      const assignedCaseEvidence=await db.query("select 1 from verification_evidence e join verification_case vc on vc.id=e.case_id where e.file_object_id=$1 and (vc.assigned_reviewer_id=$2 or $3=true) limit 1",[fileId,userId,isVettingManager]);
+      const assignedPortfolioEvidence=await db.query("select 1 from professional_portfolio_item pi join professional_profile pp on pp.id=pi.profile_id join person p on p.id=pp.person_id join verification_case vc on vc.subject_user_id=p.user_id join verification_evidence ve on ve.file_object_id=pi.evidence_file_id and ve.case_id=vc.id where pi.evidence_file_id=$1 and (vc.assigned_reviewer_id=$2 or $3=true) limit 1",[fileId,userId,isVettingManager]);
+      const appealEvidence=roles.includes("appeal_reviewer")?await db.query("select 1 from verification_evidence e join verification_case vc on vc.id=e.case_id join verification_appeal a on a.case_id=vc.id join verification_decision d on d.id=a.decision_id where e.file_object_id=$1 and a.status in ('submitted','under_review') and vc.subject_user_id<>$2 and d.decided_by<>$2 limit 1",[fileId,userId]):{rowCount:0};
+      const appealPortfolioEvidence=roles.includes("appeal_reviewer")?await db.query("select 1 from professional_portfolio_item pi join professional_profile pp on pp.id=pi.profile_id join person p on p.id=pp.person_id join verification_case vc on vc.subject_user_id=p.user_id join verification_evidence ve on ve.file_object_id=pi.evidence_file_id and ve.case_id=vc.id join verification_appeal a on a.case_id=vc.id join verification_decision d on d.id=a.decision_id where pi.evidence_file_id=$1 and a.status in ('submitted','under_review') and vc.subject_user_id<>$2 and d.decided_by<>$2 limit 1",[fileId,userId]):{rowCount:0};
+      allowed=assignedCaseEvidence.rowCount>0||assignedPortfolioEvidence.rowCount>0||appealEvidence.rowCount>0||appealPortfolioEvidence.rowCount>0;
     }
     if(!allowed&&canReviewMembership){
       const membershipEvidence=await db.query("select 1 from membership_application_attachment aa join membership_application a on a.id=aa.application_id where aa.file_object_id=$1 and a.user_id=$2 limit 1",[fileId,f.created_by]);

@@ -1,45 +1,16 @@
 "use client";
-import {
-  Edit3,
-  FlaskConical,
-  HelpCircle,
-  Mail,
-  PauseCircle,
-  PlayCircle,
-  Save,
-  Search,
-  ShieldCheck,
-  UserCog,
-} from "lucide-react";
-import { type CSSProperties, useEffect, useState } from "react";
+import { BookOpenCheck, Building2, ClipboardList, FileBarChart, Fingerprint, HelpCircle, Mail, MessageSquareText, RefreshCw, Search, ShieldCheck, UserCog, Users } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
+import styles from "./admin-overview.module.css";
 import { AdminPageHeader } from "./admin-page-header";
-import { type ManagedRole, type ManagedUser, UsersTable } from "./users-table";
 
-type Demo = {
-  id: string;
-  case_key: string;
-  title: string;
-  business_area: string;
-  persona: string;
-  description: string;
-  start_path: string;
-  scenario: any;
-  active: boolean;
-};
-type Guide = {
-  id: string;
-  guide_key: string;
-  route_pattern: string;
-  title: string;
-  description: string;
-  steps: any[];
-  active: boolean;
-};
-type CurrentUser = { user_id: string; roles: string[] };
-type ManagedPermission = { permission_code: string; area: string; label: string; description: string; sensitive: boolean; system_only: boolean };
+type AuditEvent = { id: string; actor_user_id?: string | null; action: string; resource_type: string; resource_id?: string | null; request_id?: string | null; outcome: string; metadata?: Record<string, unknown>; created_at: string };
+type OperationalQueueRow = { Queue: string; Status: string; Requests: number; Unreviewed: number; "Average response hours": number | string | null };
+type OperationalQueueSnapshot = { rows: OperationalQueueRow[]; generatedAt: string };
 type Inquiry = {
   id: string;
   public_reference: string;
@@ -60,29 +31,28 @@ export default function AdminPage() {
   const hydrated = useUiStore((s) => s.hydrated);
   const token = useUiStore((s) => s.token);
   const hydrateToken = useUiStore((s) => s.hydrateToken);
-  const [tab, setTab] = useState<"cases" | "guides" | "inquiries" | "users">("cases");
-  const [cases, setCases] = useState<Demo[]>([]);
-  const [guides, setGuides] = useState<Guide[]>([]);
+  const [tab, setTab] = useState<"inquiries" | "audit">("inquiries");
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
-  const [users, setUsers] = useState<ManagedUser[]>([]);
-  const [roleCatalog, setRoleCatalog] = useState<ManagedRole[]>([]);
-  const [permissionCatalog, setPermissionCatalog] = useState<ManagedPermission[]>([]);
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
-  const [currentUserId, setCurrentUserId] = useState("");
   const [scopeResolved, setScopeResolved] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [canReviewInquiries, setCanReviewInquiries] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [sectionErrors, setSectionErrors] = useState<string[]>([]);
-  const [userQuery, setUserQuery] = useState("");
-  const [userStatus, setUserStatus] = useState("");
-  const [editing, setEditing] = useState<Demo | null>(null);
+  const [operationalQueues, setOperationalQueues] = useState<OperationalQueueSnapshot | null>(null);
+  const [operationalQueueLoading, setOperationalQueueLoading] = useState(false);
+  const [operationalQueueError, setOperationalQueueError] = useState("");
+  const [moduleQuery, setModuleQuery] = useState("");
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!token) return;
+    setLoading(true);
     setError("");
+    setSectionErrors([]);
     const errors: string[] = [];
     const getList = async <T,>(path: string, key?: string): Promise<T[]> => {
       const payload = await api<any>(path, {}, token);
@@ -93,38 +63,22 @@ export default function AdminPage() {
     const settle = async <T,>(name: string, request: Promise<T>, apply: (value: T) => void) => {
       try { apply(await request); } catch (cause) {
         errors.push(name);
-        if (cause instanceof Error && !error) setError(cause.message);
+        if (cause instanceof Error && errors.length === 1) setError(cause.message);
       }
     };
     const tasks: Promise<void>[] = [
-      settle("demo cases", getList<Demo>("/api/v1/experience/demo-cases", "cases"), setCases),
-      settle("user guides", getList<Guide>("/api/v1/experience/guides", "guides"), setGuides),
       settle("opportunity inquiries", getList<Inquiry>("/api/v1/opportunity-inquiries", "inquiries"), setInquiries),
     ];
-    if (userQuery.trim() || userStatus) {
-      const params = new URLSearchParams();
-      if (userQuery.trim()) params.set("q", userQuery.trim());
-      if (userStatus) params.set("status", userStatus);
-      params.set("limit", "200");
-      tasks.push(settle("users", getList<ManagedUser>(`/api/v1/admin/users?${params.toString()}`, "users"), setUsers));
-    } else {
-      tasks.push(settle("users", getList<ManagedUser>("/api/v1/admin/users?limit=200", "users"), setUsers));
-    }
     try {
-      const catalog = await api<any>("/api/v1/admin/roles", {}, token);
-      const normalizedCatalog = Array.isArray(catalog) ? catalog : (Array.isArray(catalog?.roles) ? catalog.roles : []);
-      setRoleCatalog(normalizedCatalog as ManagedRole[]);
       let claims: any = {};
       try { const segment = token.split(".")[1]; if (segment) claims = JSON.parse(atob(segment.replace(/-/g, "+").replace(/_/g, "/"))); } catch { /* Display hints only; server authorization remains authoritative. */ }
       const currentRoles = Array.isArray(claims?.roles) ? claims.roles.map((role: any) => typeof role === "string" ? role : role?.role_code).filter(Boolean) : [];
       setRoles(currentRoles);
-      setCurrentUserId(String(claims?.sub ?? claims?.user_id ?? ""));
       setIsPlatformAdmin(currentRoles.includes("system_admin") || currentRoles.includes("admin") || currentRoles.includes("platform_admin"));
       setCanReviewInquiries(currentRoles.includes("supporting_staff") || currentRoles.includes("system_admin") || currentRoles.includes("admin") || currentRoles.includes("platform_admin"));
       if (currentRoles.includes("system_admin")) {
-        try { const permissions = await api<ManagedPermission[]>("/api/v1/admin/permissions", {}, token); setPermissionCatalog(Array.isArray(permissions) ? permissions : []); }
-        catch { errors.push("permission catalog"); }
-      } else setPermissionCatalog([]);
+        tasks.push(settle("audit history", getList<AuditEvent>("/api/v1/admin/audit-log?limit=100", "items"), setAuditEvents));
+      } else { setAuditEvents([]); }
       setScopeResolved(true);
     } catch (cause) {
       setScopeResolved(true);
@@ -132,36 +86,62 @@ export default function AdminPage() {
     }
     await Promise.all(tasks);
     setSectionErrors(errors);
-  }
+    setLoading(false);
+  }, [token]);
 
   useEffect(() => {
     if (hydrated && token) void load();
   }, [hydrated, token, load]);
+  const canSeeOperationalQueues = roles.some((role) => ["system_admin", "admin", "platform_admin", "supporting_staff", "reviewer"].includes(role));
+  const loadOperationalQueues = useCallback(async () => {
+    if (!token) return;
+    setOperationalQueueLoading(true);
+    setOperationalQueueError("");
+    try {
+      const catalogue = await api<{ id: string }[]>("/api/v1/admin/reports", {}, token);
+      if (!Array.isArray(catalogue) || !catalogue.some((report) => report.id === "support-demand-response")) {
+        throw new Error("Your account cannot access the authoritative Support Desk queue report.");
+      }
+      const snapshot = await api<OperationalQueueSnapshot>("/api/v1/admin/reports/support-demand-response/run", { method: "POST", body: JSON.stringify({}) }, token);
+      if (!snapshot || !Array.isArray(snapshot.rows) || !snapshot.generatedAt) {
+        throw new Error("The queue report returned an incomplete response; counts cannot be confirmed.");
+      }
+      setOperationalQueues(snapshot);
+    } catch (cause) {
+      setOperationalQueues(null);
+      setOperationalQueueError(cause instanceof Error ? cause.message : "Operational queue counts could not be verified.");
+    } finally {
+      setOperationalQueueLoading(false);
+    }
+  }, [token]);
+  useEffect(() => {
+    if (hydrated && token && canSeeOperationalQueues) void loadOperationalQueues();
+  }, [hydrated, token, canSeeOperationalQueues, loadOperationalQueues]);
+  const totalUnreviewed = (operationalQueues?.rows || []).reduce((sum, row) => sum + Math.max(0, Number(row.Unreviewed) || 0), 0);
+  const operationalQueueLinks: Record<string, string> = { "Membership application": "/admin/membership", "Professional verification": "/verification", "Organization verification": "/organizations", "Marketplace demand": "/admin/marketplace" };
+  const workspaces = [
+    {title:"Organizations",desc:"Search organizations, inspect linked accounts and open verification review workflows.",href:"/admin/organizations",Icon:Building2,group:"Review & service",access:"org"},
+    {title:"Account and Team",desc:"Search platform accounts, review status and manage roles with audit reasons.",href:"/admin/accounts",Icon:Users,group:"People & access",access:"admin"},
+    {title:"Member records",desc:"Import approved member registers, resolve conflicts and export records.",href:"/admin/members",Icon:Users,group:"People & access",access:"admin"},
+    {title:"Member catalogue",desc:"Search individual membership records and linked account status.",href:"/admin/members/catalog",Icon:Users,group:"People & access",access:"admin"},
+    {title:"Membership operations",desc:"Membership plans, payment review and membership lifecycle controls.",href:"/admin/membership",Icon:ShieldCheck,group:"People & access",access:"admin"},
+    {title:"Serve-Community review",desc:"Moderate shared demand, listings and provider matching.",href:"/admin/marketplace",Icon:ClipboardList,group:"Review & service",access:"staff"},
+    {title:"Support desk",desc:"Manage inquiries, handoffs and the support knowledge base.",href:"/admin/support",Icon:MessageSquareText,group:"Review & service",access:"staff"},
+    {title:"Reports & exports",desc:"Generate scoped reports and audited exports.",href:"/admin/reports",Icon:FileBarChart,group:"Governance",access:"admin"},
+    {title:"Reference data",desc:"Maintain governed professional options and staged imports.",href:"/admin/reference-portfolio",Icon:BookOpenCheck,group:"Governance",access:"admin"},
+    {title:"Security",desc:"Manage administrator passkeys and recovery controls.",href:"/admin/security",Icon:Fingerprint,group:"Governance",access:"admin"},
+    {title:"Email operations",desc:"Review delivery queues, templates and retries.",href:"/admin/email",Icon:Mail,group:"Governance",access:"admin"},
+    {title:"Help, guides and demos",desc:"Manage contextual guides, launch training scenarios and find support resources.",href:"/admin/experience",Icon:HelpCircle,group:"Enablement",access:"admin"},
+  ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "org" ? roles.some(role => ["system_admin","admin","reviewer"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin));
 
-  async function patchCase(item: Demo, active: boolean) {
-    try {
-      await api(`/api/v1/admin/experience/demo-cases/${item.id}`, { method: "PATCH", body: JSON.stringify({ active }) }, token);
-      await load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the demo case."); }
-  }
-  async function patchGuide(item: Guide, active: boolean) {
-    try {
-      await api(`/api/v1/admin/experience/guides/${item.id}`, { method: "PATCH", body: JSON.stringify({ active }) }, token);
-      await load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the guide."); }
-  }
+
   async function decideInquiry(item: Inquiry, status: string, considerNonMember: boolean) {
     try {
       await api(`/api/v1/opportunity-inquiries/${item.id}`, { method: "PATCH", body: JSON.stringify({ status, consider_non_member: considerNonMember }) }, token);
       await load();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the inquiry."); }
   }
-  function launch(item: Demo) {
-    if (!item.active) return;
-    if (typeof window !== "undefined") window.location.assign(item.start_path || "/");
-  }
-
-  if (!hydrated) return <div className="auth-page"><Card><p className="muted">Loading administrator workspace…</p></Card></div>;
+  if (!hydrated) return <div className="auth-page"><Card><OperationStatus state="loading" title="Preparing the administrator workspace" detail="We’re checking your session and access before showing administrative tools." /></Card></div>;
   if (!token)
 
     return (
@@ -211,11 +191,57 @@ export default function AdminPage() {
     );
   return (
     <div className="grid">
-      <AdminPageHeader eyebrow="Platform administration" title="Operate the platform." description="Global account controls are separate from organization roles and business review decisions. Your authority comes from the current account roles shown below." actions={<div className="grid" style={{gap:8}}><div className="row" style={{flexWrap:"wrap"}}>{roles.map((role) => <Badge key={role} tone="slate">{role}</Badge>)}</div><div className="row" style={{flexWrap:"wrap"}}>{(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-ghost" href="/support/job-seeker-demands">Review job-seeker demand and consent</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/reference-portfolio">Manage professional reference lists and CSV imports</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/reports">Reports and PDF/XLSX exports</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/members">Bulk approved-member import/export</a>}{isPlatformAdmin && <a className="btn btn-ghost" href="/admin/email"><Mail size={16} /> Email operations</a>}{(isPlatformAdmin || roles.includes("supporting_staff")) && <a className="btn btn-primary" href="/admin/marketplace">Review marketplace listings and service/mentorship demand</a>}</div></div>}/>
+      <AdminPageHeader eyebrow="MPA · Platform operations" title="Admin overview" description="A focused starting point for operational queues, assigned reviews and authorized platform workspaces." actions={<div className={styles.roleChips}>{roles.map((role) => <Badge key={role} tone="slate">{role.replaceAll("_", " ")}</Badge>)}</div>} />
+      <section className={styles.welcome} aria-label="Operational overview">
+        <div className={styles.welcomeCopy}><span className={styles.kicker}>OPERATIONS WORKSPACE</span><h2>Good administration starts with clear queues.</h2><p>Choose the workspace for the task at hand. Sensitive records stay within their existing permission boundaries and review flows.</p></div>
+        <div className={styles.searchWrap}><label htmlFor="admin-workspace-search">Find a workspace</label><div className={styles.searchBox}><Search size={18} aria-hidden="true"/><input id="admin-workspace-search" value={moduleQuery} onChange={(event) => setModuleQuery(event.target.value)} placeholder="Search members, organizations, reports…" /></div></div>
+      </section>
+      <section className={styles.metrics} aria-label="Overview summary">
+        <article className={styles.metric}><span>Opportunity inquiries</span><strong>{!canReviewInquiries ? "—" : loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "Unavailable" : inquiries.length}</strong><small>{!canReviewInquiries ? "Review permission required" : loading ? "Retrieving current results" : sectionErrors.includes("opportunity inquiries") ? "Could not verify this count · retry to check" : "Records returned to this workspace"}</small></article>
+        <article className={styles.metric}><span>Available workspaces</span><strong>{workspaces.length}</strong><small>Filtered by your assigned platform role</small></article>
+      </section>
+      {canSeeOperationalQueues && (
+        <section className={styles.section} aria-labelledby="admin-operational-queues-heading">
+          <div className={styles.sectionHeader}>
+            <div><h2 id="admin-operational-queues-heading">Live operational queues</h2><p>Counts come from the existing audited Support Desk report, which groups authoritative membership, professional verification, organization verification and Serve-Community demand records. No counts are inferred from the first page of a catalogue.</p></div>
+            <button type="button" className="btn btn-ghost" onClick={() => void loadOperationalQueues()} disabled={operationalQueueLoading}><RefreshCw size={16} aria-hidden="true"/>{operationalQueueLoading ? "Checking queues…" : "Refresh queue counts"}</button>
+          </div>
+          {operationalQueueLoading && !operationalQueues ? <Card><OperationStatus state="loading" title="Checking authoritative queue counts" detail="Retrieving the latest grouped counts and stored review timing from the backend report." /></Card> : operationalQueueError ? <Card><div role="alert"><strong>Operational queue counts unavailable</strong><p className="muted">{operationalQueueError} The dashboard will not substitute zero or a partial page count.</p><button type="button" className="btn btn-ghost" onClick={() => void loadOperationalQueues()} disabled={operationalQueueLoading}>Retry queue report</button></div></Card> : operationalQueues ? <>
+            <div className={styles.metrics} aria-label="Authoritative review alerts">
+              <article className={styles.metric}><span>Unreviewed work items</span><strong>{totalUnreviewed}</strong><small>{totalUnreviewed ? "Backend-reported items awaiting review" : "No unreviewed items reported by this snapshot"}</small></article>
+              <article className={styles.metric}><span>Queue groups</span><strong>{new Set(operationalQueues.rows.map(row => row.Queue)).size}</strong><small>Across the report's supported work areas</small></article>
+              <article className={styles.metric}><span>Report snapshot</span><strong>{new Date(operationalQueues.generatedAt).toLocaleTimeString()}</strong><small>{new Date(operationalQueues.generatedAt).toLocaleDateString()} · backend generation time</small></article>
+            </div>
+            {totalUnreviewed > 0 && <div className="field-banner" role="status"><ShieldCheck size={18} aria-hidden="true"/><span>{totalUnreviewed} unreviewed item{totalUnreviewed === 1 ? "" : "s"} reported. Open the relevant workflow below to review the actual records; this alert does not change their status.</span></div>}
+            <div className={styles.moduleGrid}>
+              {[...new Set(operationalQueues.rows.map(row => row.Queue))].map(queue => {
+                const rows = operationalQueues.rows.filter(row => row.Queue === queue);
+                const unreviewed = rows.reduce((sum, row) => sum + Math.max(0, Number(row.Unreviewed) || 0), 0);
+                const requests = rows.reduce((sum, row) => sum + Math.max(0, Number(row.Requests) || 0), 0);
+                return <a className={styles.moduleCard} href={operationalQueueLinks[queue] || "/admin/reports"} key={queue}><span className={styles.moduleIcon}><ClipboardList size={20} aria-hidden="true"/></span><span className={styles.moduleCopy}><small>{unreviewed ? "Needs review" : "Queue snapshot"}</small><strong>{queue}</strong><span>{requests} requests in the report; {unreviewed} unreviewed. Counts are grouped by stored status.</span></span><span className={styles.moduleArrow} aria-hidden="true">↗</span></a>;
+              })}
+            </div>
+          </> : <Card><p className="muted">No queue report snapshot has been loaded yet.</p><button type="button" className="btn btn-ghost" onClick={() => void loadOperationalQueues()}>Load queue counts</button></Card>}
+        </section>
+      )}
+      <section className={styles.section} aria-labelledby="admin-workspaces-heading">
+        <div className={styles.sectionHeader}><div><h2 id="admin-workspaces-heading">Workspaces</h2><p>Open a focused workspace to search, review and take authorized action.</p></div><span className={styles.sectionCount}>Core administration</span></div>
+        <div className={styles.moduleGrid}>
+          {workspaces.map(({title,desc,href,Icon,group}) => (
+            <a className={styles.moduleCard} href={href} key={href}>
+              <span className={styles.moduleIcon}><Icon size={20} aria-hidden="true"/></span>
+              <span className={styles.moduleCopy}><small>{group}</small><strong>{title}</strong><span>{desc}</span></span>
+              <span className={styles.moduleArrow} aria-hidden="true">↗</span>
+            </a>
+          ))}
+        </div>
+        {moduleQuery.trim() && workspaces.length === 0 && <p className={styles.noResults} role="status">No available workspace matches “{moduleQuery}”. Try another search term or clear the search.</p>}
+      </section>
       {error && (
-        <div className="field-banner">
+        <div className="field-banner" role="alert">
           <ShieldCheck size={18} />
           <span>{error}</span>
+          <button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={loading}>{loading ? "Checking…" : "Retry overview"}</button>
         </div>
       )}
       {sectionErrors.length > 0 && (
@@ -227,121 +253,28 @@ export default function AdminPage() {
           </span>
         </div>
       )}
-      <div className="admin-tabs">
-        {(
-          [
-            ...(isPlatformAdmin
-              ? [
-                  ["cases", "Demo cases", cases.length],
-                  ["guides", "User guides", guides.length],
-                  ["users", "Users & roles", users.length],
-                ]
-              : []),
-            ...(canReviewInquiries
-              ? [["inquiries", "Opportunity inquiries", inquiries.length]]
-              : []),
-          ] as [typeof tab, string, number][]
-        ).map(([key, label, count]) => (
-          <button type="button"
-            key={key}
-            className={
-              `btn admin-tab ${tab === key ? "btn-primary" : "btn-ghost"}`
-            }
-            onClick={() => setTab(key)}
-          >
-            {key === "cases" ? (
-              <FlaskConical size={16} />
-            ) : key === "guides" ? (
-              <HelpCircle size={16} />
-            ) : key === "inquiries" ? (
-              <UserCog size={16} />
-            ) : (
-              <ShieldCheck size={16} />
-            )}{" "}
-            {label} ({count})
+      <div className="admin-tabs" aria-label="Admin review tabs">
+        {([
+          ...(canReviewInquiries ? [["inquiries", "Opportunity inquiries", loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "—" : inquiries.length] as [typeof tab, string, string | number]] : []),
+          ...(roles.includes("system_admin") ? [["audit", "Audit history", loading ? "…" : sectionErrors.includes("audit history") ? "—" : auditEvents.length] as [typeof tab, string, string | number]] : []),
+        ] as [typeof tab, string, string | number][]).map(([key, label, count]) => (
+          <button type="button" key={key} className={`btn admin-tab ${tab === key ? "btn-primary" : "btn-ghost"}`} onClick={() => setTab(key)}>
+            {key === "inquiries" ? <UserCog size={16} /> : <ShieldCheck size={16} />} {label} ({count})
           </button>
         ))}
       </div>
-      {tab === "cases" && (
+      {tab === "audit" && roles.includes("system_admin") && (
         <Card>
-          <div className="row">
-            <div>
-              <div className="h2">Business scenario catalogue</div>
-              <div className="muted">
-                Controlled experiences for training, UAT and stakeholder
-                walkthroughs.
+          <div className="h2">Administrative audit history</div>
+          <p className="muted">Read-only view of the latest 100 consequential platform events. Use the action, actor, time and resource details to investigate changes; access is restricted by the server.</p>
+          {sectionErrors.includes("audit history") ? <OperationStatus state="error" title="Audit history could not be loaded" detail="Retry after confirming your administrator session and audit permissions." /> : auditEvents.length === 0 ? <p className="muted">No audit events were returned in the latest 100 records.</p> : auditEvents.map((event) => (
+            <div className="case-row" key={event.id}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="row" style={{ gap: 8, flexWrap: "wrap" }}><b>{event.action.replaceAll("_", " ")}</b><Badge>{event.outcome}</Badge></div>
+                <p className="muted">{event.created_at ? new Date(event.created_at).toLocaleString() : "Time unavailable"} · {event.resource_type || "resource"} · {event.resource_id || "No resource ID"}</p>
+                <p className="muted">Actor: {event.actor_user_id || "System"}{event.request_id ? ` · Request: ${event.request_id}` : ""}</p>
+                {event.metadata && Object.keys(event.metadata).length > 0 ? <details><summary>Change details</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(event.metadata, null, 2)}</pre></details> : null}
               </div>
-            </div>
-          </div>
-          {cases.map((d) => (
-            <div className="case-row" key={d.id}>
-              <div>
-                <div className="row" style={{ justifyContent: "flex-start" }}>
-                  <b>{d.title}</b>
-                  <Badge tone={d.active ? "green" : "slate"}>
-                    {d.active ? "Active" : "Paused"}
-                  </Badge>
-                </div>
-                <div className="muted">
-                  {d.business_area} · {d.persona}
-                </div>
-                <p className="muted">{d.description}</p>
-              </div>
-              <div className="row" style={{ justifyContent: "flex-end" }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setEditing(d)}>
-                  <Edit3 size={15} /> Edit
-                </button>
-                <button type="button"
-                  className="btn btn-primary"
-                  onClick={() => launch(d)}
-                  disabled={!d.active}
-                >
-                  <PlayCircle size={15} /> Play
-                </button>
-                <button type="button"
-                  className="btn btn-ghost"
-                  onClick={() => patchCase(d, !d.active)}
-                >
-                  {d.active ? (
-                    <PauseCircle size={15} />
-                  ) : (
-                    <PlayCircle size={15} />
-                  )}{" "}
-                  {d.active ? "Pause" : "Activate"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </Card>
-      )}
-      {tab === "guides" && (
-        <Card>
-          <div className="h2">Contextual walkthroughs</div>
-          <p className="muted">
-            Guides spotlight real controls and explain each workspace
-            step-by-step.
-          </p>
-          {guides.map((g) => (
-            <div className="case-row" key={g.id}>
-              <div>
-                <div className="row" style={{ justifyContent: "flex-start" }}>
-                  <b>{g.title}</b>
-                  <Badge>{g.route_pattern}</Badge>
-                </div>
-                <div className="muted">{g.description}</div>
-                <small className="muted">{g.steps.length} guided steps</small>
-              </div>
-              <button type="button"
-                className="btn btn-ghost"
-                onClick={() => patchGuide(g, !g.active)}
-              >
-                {g.active ? (
-                  <PauseCircle size={15} />
-                ) : (
-                  <PlayCircle size={15} />
-                )}{" "}
-                {g.active ? "Disable" : "Enable"}
-              </button>
             </div>
           ))}
         </Card>
@@ -406,72 +339,6 @@ export default function AdminPage() {
           )}
         </Card>
       )}
-      {tab === "users" && isPlatformAdmin && (
-        <Card>
-          <div className="h2">Accounts and platform roles</div>
-          <p className="muted">
-            Account records are retained for audit and history. Suspend or
-            disable access rather than deleting an account. Each action needs a
-            reason in that account’s row. Invitations are not implemented yet.
-          </p>
-          <form
-            className="row"
-            style={{ flexWrap: "wrap", margin: "14px 0" }}
-            onSubmit={(event) => {
-              event.preventDefault();
-              void load();
-            }}
-          >
-            <label style={{ flex: "1 1 240px" }}>
-              Search accounts
-              <input
-                value={userQuery}
-                onChange={(event) => setUserQuery(event.target.value)}
-                placeholder="Email or username"
-              />
-            </label>
-            <label>
-              Status
-              <select
-                value={userStatus}
-                onChange={(event) => setUserStatus(event.target.value)}
-              >
-                <option value="">All statuses</option>
-                <option value="active">Active</option>
-                <option value="suspended">Suspended</option>
-                <option value="disabled">Disabled</option>
-              </select>
-            </label>
-            <button className="btn btn-primary" type="submit">
-              <Search size={15} /> Search
-            </button>
-          </form>
-          <p className="muted">
-            Showing up to 200 matching accounts. “Remove role” changes a
-            platform role only; organization/job roles remain in their own
-            scoped workspaces.
-          </p>
-          <UsersTable
-            users={users}
-            roleCatalog={roleCatalog}
-            permissionCatalog={permissionCatalog}
-            currentRoles={roles}
-            currentUserId={currentUserId}
-            token={token}
-            onChanged={load}
-            onError={setError}
-            usersLoadFailed={sectionErrors.includes('users')}
-          />
-        </Card>
-      )}
-      {editing && (
-        <CaseEditor
-          demo={editing}
-          token={token}
-          onClose={() => setEditing(null)}
-          onSaved={load}
-        />
-      )}
       <div className="footer-note">
         Amanah (Trust) · Tabayyun (Verification) · Satr (Confidentiality) ·
         Ihsan (Excellence)
@@ -479,84 +346,3 @@ export default function AdminPage() {
     </div>
   );
 }
-function CaseEditor({
-  demo,
-  token,
-  onClose,
-  onSaved,
-}: {
-  demo: Demo;
-  token: string;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const [title, setTitle] = useState(demo.title),
-    [description, setDescription] = useState(demo.description),
-    [persona, setPersona] = useState(demo.persona),
-    [saving, setSaving] = useState(false);
-  async function save() {
-    setSaving(true);
-    try {
-      await api(
-        `/api/v1/admin/experience/demo-cases/${demo.id}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ title, description, persona }),
-        },
-        token,
-      );
-      await onSaved();
-      onClose();
-    } finally {
-      setSaving(false);
-    }
-  }
-  return (
-    <div className="guide-overlay">
-      <button type="button" className="guide-dim" aria-label="Close guide overlay" onClick={onClose} />
-      <aside className="guide-card">
-        <div className="row">
-          <b>Edit demo case</b>
-          <button type="button" className="icon-btn" onClick={onClose}>
-            ×
-          </button>
-        </div>
-        <label>
-          Title
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={field}
-          />
-        </label>
-        <label>
-          Persona
-          <input
-            value={persona}
-            onChange={(e) => setPersona(e.target.value)}
-            style={field}
-          />
-        </label>
-        <label>
-          Description
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={5}
-            style={field}
-          />
-        </label>
-        <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
-          <Save size={15} /> {saving ? "Saving…" : "Save changes"}
-        </button>
-      </aside>
-    </div>
-  );
-}
-const field: CSSProperties = {
-  padding: 10,
-  border: "1px solid var(--border)",
-  borderRadius: 10,
-  background: "var(--bg)",
-  color: "var(--text)",
-};

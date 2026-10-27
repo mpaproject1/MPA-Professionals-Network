@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
+import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { hasProfessionalIdentity } from "../../lib/identity-capabilities";
@@ -39,7 +40,6 @@ type Profile = {
   has_active_membership?: boolean;
   profile_picture_file_id?: string | null;
 };
-type MembershipApplication={id:string;tracking_reference?:string|null;application_type:string;status:string;created_at:string;updated_at:string;fee_snapshot?:{productName?:string;productCode?:string;amount?:number|string;currency?:string}|null};
 type Preferences = {
   email_enabled: boolean;
   sms_enabled: boolean;
@@ -105,7 +105,6 @@ export default function Profile() {
     clearToken = useUiStore((s) => s.clearToken),
     language = useUiStore((s) => s.language);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [membershipApplications,setMembershipApplications]=useState<MembershipApplication[]>([]);
   const [form, setForm] = useState(blank);
   const [organizationOnly, setOrganizationOnly] = useState(false);
   const [profilePictureUrl, setProfilePictureUrl] = useState("");
@@ -147,7 +146,6 @@ export default function Profile() {
   const load = useCallback(async () => {
     if (!token) {
       setProfile(null);
-      setMembershipApplications([]);
       setOrganizationOnly(false);
       setError("");
       return;
@@ -167,23 +165,43 @@ export default function Profile() {
         return;
       }
       setOrganizationOnly(false);
-      const [prefs, tp, tv, membershipApps] = await Promise.all([
-        api<Preferences>("/api/v1/notifications/preferences", {}, token),
+      setProfile(me);
+      setForm({
+        firstName: me.first_name || "",
+        middleName: me.middle_name || "",
+        lastName: me.last_name || "",
+        displayName: me.display_name || "",
+        phone: me.phone || "",
+        dateOfBirth: me.date_of_birth ? String(me.date_of_birth).slice(0, 10) : "",
+        sex: me.sex || "",
+        nationality: me.nationality || "",
+        headline: me.headline || "",
+        bio: me.bio || "",
+        visibility: me.visibility || "public",
+      });
+      const prefs = await api<Preferences>("/api/v1/notifications/preferences", {}, token);
+      setPreferences(prefs);
+      if (!me.has_active_membership) {
+        setTalentProfile(null);
+        setTalentVisibility({ ...emptyTalentVisibility, user_id: me.user_id });
+        setExperienceDrafts([]);
+        setTalentForm({
+          professionalTitle: "", yearsExperience: "", availabilityStatus: "",
+          locationLabel: "", directorySummary: "", headline: "", bio: "",
+          visibility: "members", educationSummary: "", qualifications: "",
+          skills: "", languages: "", certifications: "", portfolioUrl: "",
+        });
+        return;
+      }
+      const [tp, tv] = await Promise.all([
         api<TalentProfile>("/api/v1/me/talent-profile", {}, token),
         api<TalentVisibility>("/api/v1/me/talent-visibility", {}, token),
-        api<MembershipApplication[]>("/api/v1/membership/applications/me", {}, token),
       ]);
-      setProfile(me);
-      setMembershipApplications(Array.isArray(membershipApps)?membershipApps:[]);
-      setPreferences(prefs);
       setTalentProfile(tp);
       setTalentVisibility({ ...emptyTalentVisibility, ...tv });
       setTalentForm({
         professionalTitle: tp.professional_title || "",
-        yearsExperience:
-          tp.years_experience === null || tp.years_experience === undefined
-            ? ""
-            : String(tp.years_experience),
+        yearsExperience: tp.years_experience === null || tp.years_experience === undefined ? "" : String(tp.years_experience),
         availabilityStatus: tp.availability_status || "",
         locationLabel: tp.location_label || "",
         directorySummary: tp.directory_summary || "",
@@ -198,21 +216,6 @@ export default function Profile() {
         portfolioUrl: tp.portfolio_url || "",
       });
       setExperienceDrafts((tp.experience || []).map((item) => ({ draftKey: crypto.randomUUID(), employerName: item.employer_name || "", roleTitle: item.role_title || "", startDate: item.start_date ? String(item.start_date).slice(0,10) : "", endDate: item.end_date ? String(item.end_date).slice(0,10) : "", currentRole: Boolean(item.is_current), description: item.description || "", visibility: item.visibility || "members" })));
-      setForm({
-        firstName: me.first_name || "",
-        middleName: me.middle_name || "",
-        lastName: me.last_name || "",
-        displayName: me.display_name || "",
-        phone: me.phone || "",
-        dateOfBirth: me.date_of_birth
-          ? String(me.date_of_birth).slice(0, 10)
-          : "",
-        sex: me.sex || "",
-        nationality: me.nationality || "",
-        headline: me.headline || "",
-        bio: me.bio || "",
-        visibility: me.visibility || "public",
-      });
     } catch (e) {
       setError(
         e instanceof ApiError
@@ -287,9 +290,23 @@ export default function Profile() {
     setError("");
     setNotice("");
     try {
+      const profilePayload = profile?.has_active_membership
+        ? form
+        : {
+            firstName: form.firstName,
+            middleName: form.middleName,
+            lastName: form.lastName,
+            displayName: form.displayName,
+            phone: form.phone,
+            dateOfBirth: form.dateOfBirth,
+            sex: form.sex,
+            nationality: form.nationality,
+            headline: form.headline,
+            bio: form.bio,
+          };
       const updated = await api<Profile>(
         "/api/v1/me/profile",
-        { method: "PATCH", body: JSON.stringify(form) },
+        { method: "PATCH", body: JSON.stringify(profilePayload) },
         token,
       );
       setProfile(updated);
@@ -427,46 +444,14 @@ export default function Profile() {
   }
   const update = (key: keyof typeof blank, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
-  const latestMembershipApplication=membershipApplications[0];
+  const isOrganizationAccount=Boolean(profile?.roles?.some(role=>["organization_representative","organization_owner","organization_admin","organization_member","organization"].includes(role)));
   if (organizationOnly) return (
     <div className={`grid ${styles.page}`} style={{ gap: 18, minWidth: 0, width: "100%" }}>
       <Card>
-        <div className="eyebrow">Organization workspace</div>
-        <h1 className="h1">This account uses an organization profile.</h1>
-        <p className="muted">Professional directory profiles are separate from organization profiles. This account cannot access or edit a professional profile. Open the organization workspace to manage organizations you are authorized to access.</p>
-        <p><a className="btn btn-primary" href="/organizations">Open organization workspace</a></p>
-      </Card>
-    </div>
-  );
-  if(profile&&profile.has_active_membership===false&&latestMembershipApplication)return (
-    <div className={`grid ${styles.page}`} style={{gap:18,minWidth:0,width:"100%"}}>
-      <Card>
-        <div className="eyebrow">Membership application</div>
-        <div className="row" style={{justifyContent:"space-between",flexWrap:"wrap"}}>
-          <h1 className="h1">Your application is already on file.</h1>
-          <Badge tone={["rejected","withdrawn"].includes(latestMembershipApplication.status)?"gold":"slate"}>{latestMembershipApplication.status.replaceAll("_"," ")}</Badge>
-        </div>
-        <p className="muted">Your professional profile stays read-only until membership review, payment verification and activation are complete. Continue the existing application instead of starting a duplicate.</p>
-        <div className="grid grid-2" style={{gap:12,padding:14,border:"1px solid var(--border)",borderRadius:10}}>
-          <div><span className="muted">Application reference</span><p><strong>{latestMembershipApplication.tracking_reference||latestMembershipApplication.id}</strong></p></div>
-          <div><span className="muted">Plan at submission</span><p><strong>{latestMembershipApplication.fee_snapshot?.productName||latestMembershipApplication.fee_snapshot?.productCode||"Membership plan"}</strong>{latestMembershipApplication.fee_snapshot?.amount!=null?` · ${latestMembershipApplication.fee_snapshot.currency||""} ${latestMembershipApplication.fee_snapshot.amount}`:""}</p></div>
-          <div><span className="muted">Last updated</span><p><strong>{new Date(latestMembershipApplication.updated_at||latestMembershipApplication.created_at).toLocaleString()}</strong></p></div>
-          <div><span className="muted">Next step</span><p><strong>{latestMembershipApplication.status==="correction_required"?"Respond to the requested correction":latestMembershipApplication.status==="payment_pending"?"Review payment instructions and submit evidence":latestMembershipApplication.status==="paid"?"Wait for activation after payment verification":"Track the existing application"}</strong></p></div>
-        </div>
-        <div className="row" style={{flexWrap:"wrap",marginTop:16}}>
-          <a className="btn btn-primary" href="/membership#my-applications">Continue application</a>
-          <a className="btn btn-ghost" href="/track">View application timeline</a>
-        </div>
-      </Card>
-    </div>
-  );
-  if (profile && profile.has_active_membership === false) return (
-    <div className={`grid ${styles.page}`} style={{ gap: 18, minWidth: 0, width: "100%" }}>
-      <Card>
-        <div className="eyebrow">Professional profile</div>
-        <h1 className="h1">Membership is required to edit your profile.</h1>
-        <p className="muted">Your current profile remains read-only until your membership fee is verified and your membership is activated. You can still browse public opportunities, request public services, and submit a job-interest request.</p>
-        <p><a className="btn btn-primary" href="/membership?next=%2Fprofile">Apply for or renew membership</a> <a className="btn btn-ghost" href="/dashboard">Return to dashboard</a></p>
+        <div className="eyebrow">{isOrganizationAccount ? "Organization workspace" : "Account access"}</div>
+        <h1 className="h1">{isOrganizationAccount ? "This account uses an organization profile." : "A professional profile isn't available for this account."}</h1>
+        <p className="muted">{isOrganizationAccount ? "Professional directory profiles are separate from organization profiles. This account cannot access or edit a professional profile. Open the organization workspace to manage organizations you are authorized to access." : "Your current account role does not include professional-profile access. No profile information was changed. If you need a professional profile, sign in with a member/professional account or contact MPA Support Desk."}</p>
+        <p>{isOrganizationAccount ? <a className="btn btn-primary" href="/organizations">Open organization workspace</a> : <a className="btn btn-ghost" href="/dashboard">Return to dashboard</a>}</p>
       </Card>
     </div>
   );
@@ -511,7 +496,7 @@ export default function Profile() {
               </div>
               <ShieldCheck color="var(--primary)" />
             </div>
-            {loading && <p aria-live="polite" aria-atomic="true">Loading profile from your account…</p>}
+            {loading && <OperationStatus state="loading" title="Loading your account profile" detail="We’re retrieving your saved profile, membership visibility and account preferences. Your profile is not being changed." />}
             <section aria-labelledby={`${profileId}-picture-heading`} className="grid" style={{ gridTemplateColumns: "auto minmax(0,1fr)", alignItems: "center", gap: 14, padding: 14, border: "1px solid var(--border)", borderRadius: 12 }}>
               <div style={{ width: 92, height: 92, borderRadius: 12, overflow: "hidden", display: "grid", placeItems: "center", background: "linear-gradient(145deg,#0A3258,#174A78)", color: "#fff", border: "2px solid #97C024", fontSize: 28, fontWeight: 800 }}>
                 {profilePictureUrl ? <img src={profilePictureUrl} alt="Your professional profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span>{(profile?.first_name?.[0] || "M").toUpperCase()}{(profile?.last_name?.[0] || "P").toUpperCase()}</span>}
@@ -552,6 +537,7 @@ export default function Profile() {
                       <select
                         id={`profile-${key}`}
                         value={form[key]}
+                        disabled={saving||loading}
                         onChange={(e) => update(key, e.target.value)}
                       >
                         <option value="">Choose gender</option>
@@ -565,6 +551,7 @@ export default function Profile() {
                         type={key === "dateOfBirth" ? "date" : "text"}
                         autoComplete={key === "phone" ? "tel" : undefined}
                         value={form[key]}
+                        disabled={saving||loading}
                         onChange={(e) => update(key, e.target.value)}
                       />
                     )}
@@ -576,6 +563,7 @@ export default function Profile() {
                 <input
                   id={`${profileId}-headline`}
                   value={form.headline}
+                  disabled={saving||loading}
                   onChange={(e) => update("headline", e.target.value)}
                   maxLength={180}
                 />
@@ -585,29 +573,41 @@ export default function Profile() {
                 <textarea
                   id={`${profileId}-bio`}
                   value={form.bio}
+                  disabled={saving||loading}
                   onChange={(e) => update("bio", e.target.value)}
                   rows={4}
                   maxLength={4000}
                 />
               </div>
-              <div>
-                <label htmlFor={`${profileId}-visibility`}>
-                  Professional directory visibility
-                </label>
-                <select
-                  id={`${profileId}-visibility`}
-                  value={form.visibility}
-                  onChange={(e) => update("visibility", e.target.value)}
-                >
-                  <option value="public">Public-safe profile</option>
-                  <option value="members">Members only</option>
-                  <option value="private">Private / hidden</option>
-                </select>
-                <p className="muted">
-                  This controls directory visibility, not access to private
-                  evidence or account records.
-                </p>
-              </div>
+              {profile?.has_active_membership ? (
+                <div>
+                  <label htmlFor={`${profileId}-visibility`}>
+                    Professional directory visibility
+                  </label>
+                  <select
+                    id={`${profileId}-visibility`}
+                    value={form.visibility}
+                    disabled={saving||loading}
+                    onChange={(e) => update("visibility", e.target.value)}
+                  >
+                    <option value="public">Public-safe profile</option>
+                    <option value="members">Members only</option>
+                    <option value="private">Private / hidden</option>
+                  </select>
+                  <p className="muted">
+                    This controls directory visibility, not access to private
+                    evidence or account records.
+                  </p>
+                </div>
+              ) : (
+                <div className="membership-progress" aria-label="Directory visibility eligibility">
+                  <b>Professional directory visibility</b>
+                  <p className="muted">
+                    You can prepare your basic profile now. Directory visibility controls become available after your membership is active. Publication also depends on the required verification and eligibility checks; saving this page does not publish your profile.
+                  </p>
+                  <a className="btn btn-ghost" href="/membership">Review membership options</a>
+                </div>
+              )}
               <div className="row" style={{ justifyContent: "space-between" }}>
                 <span className="muted">
                   Profile completion: {profile?.completion_percent ?? 0}%
@@ -622,6 +622,7 @@ export default function Profile() {
               </div>
             </form>
           </Card>
+          {profile?.has_active_membership ? <>
           <Card>
             <div className="row">
               <div>
@@ -644,7 +645,7 @@ export default function Profile() {
                 <label>
                   Professional title
                   <input
-                    value={talentForm.professionalTitle}
+                    value={talentForm.professionalTitle} disabled={savingTalent}
                     onChange={(e) =>
                       setTalentForm((f) => ({
                         ...f,
@@ -660,7 +661,7 @@ export default function Profile() {
                     type="number"
                     min="0"
                     step="1"
-                    value={talentForm.yearsExperience}
+                    value={talentForm.yearsExperience} disabled={savingTalent}
                     onChange={(e) =>
                       setTalentForm((f) => ({
                         ...f,
@@ -704,7 +705,7 @@ export default function Profile() {
                 Directory summary
                 <textarea
                   rows={3}
-                  value={talentForm.directorySummary}
+                  value={talentForm.directorySummary} disabled={savingTalent}
                   onChange={(e) =>
                     setTalentForm((f) => ({
                       ...f,
@@ -726,7 +727,7 @@ export default function Profile() {
                 Directory bio
                 <textarea
                   rows={3}
-                  value={talentForm.bio}
+                  value={talentForm.bio} disabled={savingTalent}
                   onChange={(e) =>
                     setTalentForm((f) => ({ ...f, bio: e.target.value }))
                   }
@@ -828,6 +829,15 @@ export default function Profile() {
               {savingVisibility ? "Saving…" : "Save directory privacy settings"}
             </button>
           </Card>
+          </> : <Card>
+            <div className="eyebrow">Membership unlocks professional review</div>
+            <h2 className="h2">Your profile can be prepared now</h2>
+            <p className="muted">You can save your basic identity and professional summary before membership. Member-only directory publication, credential review and verification requests become available after membership approval, payment verification where required, and confirmed activation. Saving profile details does not mark them as verified.</p>
+            <div className="row" style={{flexWrap:"wrap"}}>
+              <a className="btn btn-primary" href="/membership">Review membership options</a>
+              <a className="btn btn-ghost" href="/membership#my-applications">Track an existing application</a>
+            </div>
+          </Card>}
           <Card>
             <div className="row">
               <div>

@@ -34,24 +34,20 @@ test("opportunity paging applies viewer-specific scope predicates before count a
   assert.doesNotMatch(source, /for\(const row of rows\)/);
 });
 
-test("public detail routes exist and organization profile excludes private member/contact fields", async () => {
-  const orgService = await read("../../src/organization-jobs/service.js");
+test("public professional, service and mentor details remain while organization profiles are removed", async () => {
   const services = await read("../../src/services-mentorship/service.js");
   const server = await read("../../server.js");
-  const orgPage = await read("../../web/app/organizations/directory/[id]/page.tsx");
+  const orgPage = await read("../../web/app/organizations/directory/page.tsx");
+  const orgProfilePage = await read("../../web/app/organizations/directory/[id]/page.tsx");
   const professionalPage = await read("../../web/app/network/[id]/page.tsx");
   const servicePage = await read("../../web/app/services/[id]/page.tsx");
   const mentorPage = await read("../../web/app/mentorship/mentors/[id]/page.tsx");
-  const start = orgService.indexOf("export async function getPublicOrganizationProfile");
-  const end = orgService.indexOf("export async function getOrganization", start);
-  const orgQuery = orgService.slice(start, end);
-  assert.match(orgQuery, /public_visible=true/);
-  assert.match(orgQuery, /verification_status='verified'/);
-  assert.doesNotMatch(orgQuery, /o\.email|o\.phone|organization_membership/);
+  assert.doesNotMatch(server, /getPublicOrganizationProfile\(parts\[4\]\)/);
+  assert.doesNotMatch(server, /api\/v1\/public\/organizations/);
+  assert.match(orgPage, /redirect\("\/services"\)/);
+  assert.match(orgProfilePage, /redirect\("\/services"\)/);
   assert.match(services, /export async function getMentorProfile/);
-  assert.match(server, /getPublicOrganizationProfile\(parts\[4\]\)/);
   assert.match(server, /getMentorProfile\(parts\[3\]/);
-  assert.match(orgPage, /api\/v1\/public\/organizations/);
   assert.match(professionalPage, /api\/v1\/talent/);
   assert.match(servicePage, /api\/v1\/services/);
   assert.match(mentorPage, /api\/v1\/mentors/);
@@ -67,5 +63,6 @@ test("the unified saved-items page and discovery surfaces are wired to account p
   assert.match(savedPage, /api<SavedItem\[]>\("\/api\/v1\/me\/saved-items"/);
   assert.match(hook, /method: "POST"/);
   assert.match(hook, /method: "DELETE"/);
-  for (const page of [network, orgs, services, mentors]) assert.match(page, /useSavedDiscoveryItems/);
+  for (const page of [network, services, mentors]) assert.match(page, /useSavedDiscoveryItems/);
+  assert.match(orgs, /redirect\("\/services"\)/);
 });

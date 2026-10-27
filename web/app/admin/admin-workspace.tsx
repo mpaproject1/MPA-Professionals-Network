@@ -11,10 +11,16 @@ import styles from "./admin-workspace.module.css";
 type Destination = { href: string; label: string; description: string; icon: typeof Activity; exact?: boolean };
 const destinations: Destination[] = [
   { href: "/admin", label: "Overview", description: "Review and administration", icon: Activity, exact: true },
+  { href: "/admin/accounts", label: "Account and Team", description: "Account catalogue, roles and access actions", icon: Users },
+  { href: "/admin/experience", label: "Help, guides and demos", description: "Contextual guides, training scenarios and support resources", icon: BookOpenCheck },
+  { href: "/admin/organizations", label: "Organizations & accounts", description: "Organization register and account relationships", icon: Building2 },
   { href: "/admin/members", label: "Members", description: "Imports and member records", icon: Users },
+  { href: "/admin/members/catalog", label: "Member catalogue", description: "Search membership records and account links", icon: Users },
+  { href: "/admin/membership", label: "Membership administration", description: "Plan versions, reviews and payments", icon: ShieldCheck },
   { href: "/admin/membership-card", label: "Membership card", description: "Credential appearance", icon: ShieldCheck },
   { href: "/admin/reference-portfolio", label: "Reference data", description: "Governed profile options", icon: BookOpenCheck },
-  { href: "/admin/marketplace", label: "Marketplace", description: "Demand and listing review", icon: ClipboardList },
+  { href: "/admin/marketplace", label: "Serve-Community review", description: "Demand and listing review", icon: ClipboardList },
+  { href: "/organizations", label: "Organizations", description: "Verification, evidence and partner workspace", icon: Building2 },
   { href: "/admin/reports", label: "Reports", description: "Reporting and exports", icon: FileBarChart },
   { href: "/admin/email", label: "Email operations", description: "Queues, templates and delivery", icon: Mail },
   { href: "/admin/security", label: "Admin security", description: "Passkeys and recovery", icon: Fingerprint },
@@ -46,9 +52,11 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const roleSummary = roles === null ? "Resolving account access…" : roles.length ? roles.map((role) => role.replaceAll("_", " ")).join(" · ") : "No administrator role confirmed";
   const navDestinations = useMemo(() => {
     const platformAdmin = Boolean(roles?.some((role) => ["system_admin", "admin", "platform_admin"].includes(role)));
-    if (platformAdmin || !roles?.includes("supporting_staff")) return destinations;
-    const priority: Record<string, number> = { "/admin": 0, "/admin/marketplace": 1, "/admin/support": 2 };
-    return [...destinations].sort((a, b) => (priority[a.href] ?? 10) - (priority[b.href] ?? 10));
+    const organizationWorkspaceAllowed = Boolean(roles?.some((role) => ["system_admin", "reviewer"].includes(role)));
+    const available = destinations.filter((item) => (item.href !== "/organizations" || organizationWorkspaceAllowed) && (!["/admin/accounts", "/admin/experience"].includes(item.href) || platformAdmin));
+    if (platformAdmin || !roles?.includes("supporting_staff")) return available;
+    const priority: Record<string, number> = { "/admin": 0, "/admin/marketplace": 1, "/organizations": 2, "/admin/support": 3 };
+    return [...available].sort((a, b) => (priority[a.href] ?? 10) - (priority[b.href] ?? 10));
   }, [roles]);
 
   return <div className={styles.workspace}>
@@ -57,7 +65,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
       <nav className={styles.nav} aria-label="Admin workspaces">
         {navDestinations.map(({ href, label, description, icon: Icon, exact = false }) => {
           const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-          return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? styles.active : styles.link}>
+          return <Link key={href} href={href} title={description} aria-current={active ? "page" : undefined} className={active ? styles.active : styles.link}>
             <Icon size={18} aria-hidden="true" /><span className={styles.linkText}><strong>{label}</strong><small>{description}</small></span>
           </Link>;
         })}

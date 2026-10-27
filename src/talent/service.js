@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
 import { assertProfessionalProfileCapability } from "../platform/identity-policy.js";
 
+function hashValue(value){return createHash("sha256").update(value).digest("hex");}
+function hashPayload(value){return hashValue(JSON.stringify(value));}
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
 
 async function assertProfessionalProfileAccess(db,userId,options={}){
@@ -154,40 +157,51 @@ export async function saveSearch(userId,input,requestId){
 export async function listSavedSearches(userId){ return (await getPool().query("select * from talent_saved_search where user_id=$1 and active=true order by created_at desc",[userId])).rows; }
 
 
-export async function createTalentInquiry(requesterId,input,requestId){
-  return withTransaction(async db=>{
-    if(!input.professionalUserId||!input.subject||!input.message) throw error(400,"professionalUserId, subject and message are required.","VALIDATION_ERROR");
-    if(requesterId===input.professionalUserId) throw error(400,"You cannot inquire about your own professional profile.","SELF_INQUIRY");
-    const member=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[requesterId])).rows[0];
-    if(!member) throw error(403,"An active membership is required to contact a professional.","MEMBERSHIP_REQUIRED");
-    const target=(await db.query(`
-      select u.id
-      from app_user u
-      join membership_record m on m.user_id=u.id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)
-      join verification_visibility vv on vv.user_id=u.id and vv.directory_visible=true
-      join person p on p.user_id=u.id
-      join professional_profile pp on pp.person_id=p.id and pp.directory_visibility in ('members','public')
-      where u.id=$1
-        and exists (
-          select 1 from verification_claim vc
-          join verification_case c on c.id=vc.case_id
-          where c.subject_user_id=u.id and vc.status='verified'
-            and lower(vc.claim_code_snapshot) in ('professional_certification','education','employment','experience','service_capability')
-        )
-    `,[input.professionalUserId])).rows[0];
-    if(!target) throw error(404,"Verified professional not found or not accepting directory contact.","NOT_FOUND");
-    if(input.organizationId){
-      const orgMember=(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[input.organizationId,requesterId])).rows[0];
-      if(!orgMember) throw error(403,"You must be an active member of the supplied organization to send an organization inquiry.","ORGANIZATION_SCOPE");
-    }
-    const duplicate=(await db.query("select id from talent_inquiry where requester_user_id=$1 and professional_user_id=$2 and status='requested'",[requesterId,input.professionalUserId])).rows[0];
-    if(duplicate) throw error(409,"You already have a pending inquiry for this professional.","DUPLICATE_INQUIRY");
-    const row=(await db.query("insert into talent_inquiry(requester_user_id,professional_user_id,organization_id,subject,message) values($1,$2,$3,$4,$5) returning *",[requesterId,input.professionalUserId,input.organizationId||null,input.subject,input.message])).rows[0];
-    await audit(db,requesterId,"talent.inquiry_created","talent_inquiry",row.id,requestId,{professionalUserId:input.professionalUserId});
-    return row;
-  });
+export async function createTalentInquiry(requesterId,input,requestId,idempotencyKey=null){
+ if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
+  throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
+ const normalized={requesterId,professionalUserId:input.professionalUserId||null,organizationId:input.organizationId||null,subject:String(input.subject||"").trim(),message:String(input.message||"").trim()};
+ if(!normalized.professionalUserId||!normalized.subject||!normalized.message)throw error(400,"Choose a professional and enter a subject and message.","VALIDATION_ERROR");
+ if(requesterId===normalized.professionalUserId)throw error(400,"You cannot inquire about your own professional profile.","SELF_INQUIRY");
+ const keyHash=hashValue(idempotencyKey),fingerprint=hashPayload(normalized);
+ return withTransaction(async db=>{
+  // Serialize a requester's inquiry writes so distinct keys cannot create duplicate pending inquiries concurrently.
+  const lockedRequester=(await db.query("select id from app_user where id=$1 for update",[requesterId])).rows[0];
+  if(!lockedRequester)throw error(404,"Your account could not be found.","NOT_FOUND");
+  const existing=(await db.query("select * from talent_inquiry where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+  if(existing){
+   if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...existing,idempotent:true,replayed:true,nextAction:existing.status==="requested"?"Your inquiry is awaiting a response. Check your inquiries for updates.":"Review the recorded inquiry status; do not submit the same request again."};
+  }
+  const member=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[requesterId])).rows[0];
+  if(!member)throw error(403,"An active membership is required to contact a professional.","MEMBERSHIP_REQUIRED");
+  const target=(await db.query(`
+    select u.id
+    from app_user u
+    join membership_record m on m.user_id=u.id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)
+    join verification_visibility vv on vv.user_id=u.id and vv.directory_visible=true
+    join person p on p.user_id=u.id
+    join professional_profile pp on pp.person_id=p.id and pp.directory_visibility in ('members','public')
+    where u.id=$1
+      and exists (select 1 from verification_claim vc join verification_case c on c.id=vc.case_id where c.subject_user_id=u.id and vc.status='verified' and lower(vc.claim_code_snapshot)=any($2::text[]))
+  `,[normalized.professionalUserId,ELIGIBLE_VERIFICATION_CLAIMS])).rows[0];
+  if(!target)throw error(404,"Verified professional not found or not accepting directory contact.","NOT_FOUND");
+  if(normalized.organizationId){
+   const orgMember=(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[normalized.organizationId,requesterId])).rows[0];
+   if(!orgMember)throw error(403,"You must be an active member of the supplied organization to send an organization inquiry.","ORGANIZATION_SCOPE");
+  }
+  const duplicate=(await db.query("select id from talent_inquiry where requester_user_id=$1 and professional_user_id=$2 and status='requested'",[requesterId,normalized.professionalUserId])).rows[0];
+  if(duplicate)throw error(409,"You already have a pending inquiry for this professional. Open your existing inquiry instead of sending another.","DUPLICATE_INQUIRY");
+  const row=(await db.query("insert into talent_inquiry(requester_user_id,professional_user_id,organization_id,subject,message,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7) on conflict do nothing returning *",[requesterId,normalized.professionalUserId,normalized.organizationId,normalized.subject,normalized.message,keyHash,fingerprint])).rows[0];
+  if(!row){
+   const raced=(await db.query("select * from talent_inquiry where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+   if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...raced,idempotent:true,replayed:true,nextAction:"Your inquiry was already recorded. Check your inquiries for updates."};
+  }
+  await audit(db,requesterId,"talent.inquiry_created","talent_inquiry",row.id,requestId,{professionalUserId:normalized.professionalUserId});
+  return {...row,idempotent:false,replayed:false,nextAction:"Your inquiry is recorded and awaits a response. Check your inquiries for updates."};
+ });
 }
-
 export async function listTalentInquiries(userId){
   const db=getPool();
   return (await db.query(`
@@ -314,4 +328,67 @@ export async function saveProfessionalPortfolioItem(userId,input,requestId,itemI
 }
 export async function deleteProfessionalPortfolioItem(userId,itemId,requestId){
  return withTransaction(async db=>{const profileId=await profileIdFor(db,userId);const row=(await db.query("delete from professional_portfolio_item where id=$1 and profile_id=$2 returning id",[itemId,profileId])).rows[0];if(!row)throw error(404,"Portfolio item was not found.","NOT_FOUND");await audit(db,userId,"talent.portfolio_item_deleted","professional_portfolio_item",itemId,requestId);return {id:itemId,deleted:true};});
+}
+
+export async function getMyCv(userId){
+ const db=getPool();
+ await assertProfessionalProfileAccess(db,userId);
+ const row=(await db.query("select pp.cv_file_id,pp.cv_updated_at,f.original_name cv_file_name,f.content_type cv_content_type,f.byte_size cv_byte_size,f.created_at cv_file_created_at from professional_profile pp join person p on p.id=pp.person_id left join file_object f on f.id=pp.cv_file_id and f.created_by=$1 and f.visibility='private' where p.user_id=$1",[userId])).rows[0];
+ if(!row)throw error(404,"Create your professional profile before adding a CV.","PROFILE_REQUIRED");
+ return row;
+}
+export async function saveMyCv(userId,fileObjectId,requestId){
+ return withTransaction(async db=>{
+  await assertProfessionalProfileAccess(db,userId);
+  const profile=(await db.query("select pp.id,pp.cv_file_id from professional_profile pp join person p on p.id=pp.person_id where p.user_id=$1 for update",[userId])).rows[0];
+  if(!profile)throw error(404,"Create your professional profile before adding a CV.","PROFILE_REQUIRED");
+  const nextId=fileObjectId?String(fileObjectId):null;
+  if(nextId){
+   const file=(await db.query("select f.id from file_object f join private_upload_session s on s.file_object_id=f.id and s.status='confirmed' where f.id=$1 and f.created_by=$2 and f.visibility='private'",[nextId,userId])).rows[0];
+   if(!file)throw error(400,"Your CV must be an uploaded, confirmed private file owned by your account.","INVALID_CV_FILE");
+  }
+  if(profile.cv_file_id&&profile.cv_file_id!==nextId){
+   const revoked=(await db.query("delete from job_application_attachment aa using job_application a where aa.application_id=a.id and a.applicant_user_id=$1 and aa.file_object_id=$2 and aa.attachment_type='application_document' returning aa.application_id,aa.id",[userId,profile.cv_file_id])).rows;
+   for(const row of revoked)await audit(db,userId,"talent.cv_sharing_revoked","job_application",row.application_id,requestId,{fileObjectId:profile.cv_file_id,attachmentId:row.id,reason:"CV replaced or removed"});
+  }
+  const updated=(await db.query("update professional_profile set cv_file_id=$1,cv_updated_at=case when $1 is null then null else now() end where id=$2 returning cv_file_id,cv_updated_at",[nextId,profile.id])).rows[0];
+  await audit(db,userId,nextId?"talent.cv_saved":"talent.cv_removed","professional_profile",profile.id,requestId,{fileObjectId:nextId});
+  return updated;
+ });
+}
+export async function listMyCvShares(userId){
+ const db=getPool();
+ const profile=(await db.query("select pp.cv_file_id from professional_profile pp join person p on p.id=pp.person_id where p.user_id=$1",[userId])).rows[0];
+ if(!profile)throw error(404,"Create your professional profile before managing CV sharing.","PROFILE_REQUIRED");
+ if(!profile.cv_file_id)return [];
+ return (await db.query("select a.id application_id,j.title job_title,o.display_name organization_name,a.status application_status from job_application_attachment aa join job_application a on a.id=aa.application_id join job j on j.id=a.job_id join organization o on o.id=j.organization_id where a.applicant_user_id=$1 and aa.file_object_id=$2 and aa.attachment_type='application_document' order by a.created_at desc",[userId,profile.cv_file_id])).rows;
+}
+export async function shareMyCvWithApplication(userId,applicationId,requestId){
+ return withTransaction(async db=>{
+  const profile=(await db.query("select pp.cv_file_id,pp.id profile_id from professional_profile pp join person p on p.id=pp.person_id where p.user_id=$1 for update",[userId])).rows[0];
+  if(!profile)throw error(404,"Create your professional profile before managing CV sharing.","PROFILE_REQUIRED");
+  if(!profile.cv_file_id)throw error(409,"Upload and save your private CV before sharing it with an application.","CV_REQUIRED");
+  const application=(await db.query("select a.id,a.job_id,a.status,j.title from job_application a join job j on j.id=a.job_id where a.id=$1 and a.applicant_user_id=$2 for update",[applicationId,userId])).rows[0];
+  if(!application)throw error(404,"Your application was not found. Only your own applications can receive your CV.","APPLICATION_NOT_FOUND");
+  if(["withdrawn","rejected"].includes(application.status))throw error(409,"A withdrawn or rejected application cannot receive a new CV attachment.","APPLICATION_CLOSED");
+  const file=(await db.query("select id from file_object where id=$1 and created_by=$2 and visibility='private'",[profile.cv_file_id,userId])).rows[0];
+  if(!file)throw error(409,"Your saved CV file is no longer available. Upload it again before sharing.","CV_FILE_UNAVAILABLE");
+  const existing=(await db.query("select id from job_application_attachment where application_id=$1 and file_object_id=$2 and attachment_type='application_document' limit 1",[applicationId,profile.cv_file_id])).rows[0];
+  if(existing)return {shared:true,alreadyShared:true,applicationId,jobTitle:application.title};
+  const attachment=(await db.query("insert into job_application_attachment(application_id,file_object_id,attachment_type) values($1,$2,'cv') returning id,application_id,file_object_id,attachment_type",[applicationId,profile.cv_file_id])).rows[0];
+  await audit(db,userId,"talent.cv_shared_with_application","job_application",applicationId,requestId,{fileObjectId:profile.cv_file_id,attachmentId:attachment.id});
+  return {shared:true,alreadyShared:false,applicationId,jobTitle:application.title};
+ });
+}
+export async function revokeMyCvShare(userId,applicationId,requestId){
+ return withTransaction(async db=>{
+  const profile=(await db.query("select pp.cv_file_id from professional_profile pp join person p on p.id=pp.person_id where p.user_id=$1 for update",[userId])).rows[0];
+  if(!profile?.cv_file_id)throw error(404,"No saved CV is available to revoke.","CV_NOT_FOUND");
+  const application=(await db.query("select id from job_application where id=$1 and applicant_user_id=$2 for update",[applicationId,userId])).rows[0];
+  if(!application)throw error(404,"Your application was not found.","APPLICATION_NOT_FOUND");
+  const removed=await db.query("delete from job_application_attachment where application_id=$1 and file_object_id=$2 and attachment_type='application_document' returning id",[applicationId,profile.cv_file_id]);
+  if(!removed.rows[0])throw error(404,"This CV is not currently attached to that application.","CV_SHARE_NOT_FOUND");
+  await audit(db,userId,"talent.cv_sharing_revoked","job_application",applicationId,requestId,{fileObjectId:profile.cv_file_id,attachmentId:removed.rows[0].id});
+  return {shared:false,applicationId};
+ });
 }

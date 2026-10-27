@@ -7,6 +7,8 @@ import { closePool, getPool } from "../../src/platform/db.js";
 import * as marketplace from "../../src/services-mentorship/demand.js";
 import * as organizationOffers from "../../src/services-mentorship/organization-offers.js";
 import * as journeys from "../../src/services-mentorship/service.js";
+import * as talent from "../../src/talent/service.js";
+import * as verification from "../../src/verification/service.js";
 
 function identity(suffix){
  const digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
@@ -51,10 +53,127 @@ async function approvedOrg(ownerId){
  return org;
 }
 
+test("Gate 2: reference consent and reviewer assessment persist values allowed by the migration",async()=>{
+ const subject=await account(),referee=await account(),reviewer=await account(),unassignedReviewer=await account(),manager=await account();
+ await activeMember(subject);
+ const db=getPool();
+ await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='verification_reviewer' on conflict do nothing",[reviewer]);
+ await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='verification_reviewer' on conflict do nothing",[unassignedReviewer]);
+ await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='system_admin' on conflict do nothing",[manager]);
+ const code=`gate2-reference-${randomUUID().replaceAll("-","").slice(0,12)}`;
+ const program=(await db.query("insert into verification_program(program_code,name,purpose,subject_type) values($1,$2,$3,'person') returning id",[code,"Reference workflow compatibility","Test the reference consent and review states against persisted database constraints."])).rows[0];
+ const caseRow=(await db.query("insert into verification_case(program_id,subject_user_id,status,purpose_snapshot,opened_by) values($1,$2,'review',$3,$2) returning id",[program.id,subject,"Reference compatibility test"])).rows[0];
+ await verification.assignCase(caseRow.id,reviewer,manager,"gate2-reference-assign","Assign the reference case to the designated reviewer.");
+ const assignmentHistory=(await db.query("select previous_reviewer_id,new_reviewer_id,changed_by,reason from verification_case_assignment_history where case_id=$1 order by created_at desc limit 1",[caseRow.id])).rows[0];
+ assert.equal(assignmentHistory.previous_reviewer_id,null);
+ assert.equal(assignmentHistory.new_reviewer_id,reviewer);
+ assert.equal(assignmentHistory.changed_by,manager);
+ assert.equal(assignmentHistory.reason,"Assign the reference case to the designated reviewer.");
+ const refereeEmail=(await db.query("select email from app_user where id=$1",[referee])).rows[0].email;
+ const requested=await verification.requestReference(caseRow.id,{refereeEmail,relationship:"Former colleague"},subject,"gate2-reference-request");
+ assert.equal(requested.consent_status,"pending");
+ const responded=await verification.respondReferenceRequest(requested.id,{consent:true,responseText:"I worked with this person and can confirm their professional contribution."},referee,"gate2-reference-consent");
+ assert.equal(responded.consent_status,"consented");
+ assert.equal(responded.verification_status,"pending");
+ await assert.rejects(
+  verification.reviewReferenceRequest(requested.id,{status:"verified",reason:"Unassigned reviewer must not be able to decide this reference."},unassignedReviewer,"gate2-reference-unassigned-review"),
+  error=>error.code==="FORBIDDEN",
+  "a reviewer without assignment must not assess another reviewer's reference"
+ );
+ const reviewed=await verification.reviewReferenceRequest(requested.id,{status:"needs_clarification",reason:"Please clarify the dates and responsibilities covered by this reference."},reviewer,"gate2-reference-review");
+ assert.equal(reviewed.verification_status,"needs_clarification");
+ const persisted=(await db.query("select referee_contact,consent_status,verification_status,requester_user_id,referee_user_id,responded_by,reviewed_by from verification_reference_request where id=$1",[requested.id])).rows[0];
+ assert.equal(persisted.referee_contact,refereeEmail,"the required legacy contact column must remain populated");
+ assert.equal(persisted.consent_status,"consented");
+ assert.equal(persisted.verification_status,"needs_clarification");
+ assert.equal(persisted.requester_user_id,subject);
+ assert.equal(persisted.referee_user_id,referee);
+ assert.equal(persisted.responded_by,referee);
+ assert.equal(persisted.reviewed_by,reviewer);
+});
+
+test("Gate 2: concurrent talent inquiries from one requester cannot create duplicate pending records",async()=>{
+ const requester=await account(),professional=await account();
+ await activeMember(requester);
+ await activeMember(professional);
+ await verifiedProfessionalClaim(professional);
+ const db=getPool();
+ await db.query("insert into verification_visibility(user_id,directory_visible) values($1,true) on conflict(user_id) do update set directory_visible=true",[professional]);
+ await db.query("update professional_profile set directory_visibility='members' where person_id=(select id from person where user_id=$1)",[professional]);
+ const input={professionalUserId:professional,subject:"Professional collaboration",message:"I would like to discuss a possible professional collaboration."};
+ const outcomes=await Promise.allSettled([
+  talent.createTalentInquiry(requester,input,"gate2-talent-concurrent-a",`gate2-talent-a-${randomUUID()}`),
+  talent.createTalentInquiry(requester,input,"gate2-talent-concurrent-b",`gate2-talent-b-${randomUUID()}`)
+ ]);
+ assert.equal(outcomes.filter(x=>x.status==="fulfilled").length,1,"only one concurrent pending inquiry should be created");
+ const rejected=outcomes.find(x=>x.status==="rejected");
+ assert.equal(rejected.reason.code,"DUPLICATE_INQUIRY","the second concurrent request must return the existing-request conflict");
+ const count=await db.query("select count(*)::int count from talent_inquiry where requester_user_id=$1 and professional_user_id=$2 and status='requested'",[requester,professional]);
+ assert.equal(count.rows[0].count,1,"duplicate concurrent inquiries must not both persist");
+});
+
+test("Gate 2: concurrent mentorship submissions cannot create duplicate requests or reuse a key for changed goals",async()=>{
+ const mentee=await account();
+ await activeMember(mentee);
+ const key=`gate2-mentorship-idempotency-${randomUUID()}`;
+ const input={goals:"Prepare a practical mentorship plan for product discovery and delivery.",topics:["product","strategy"],preferredModes:["remote"],preferredLanguages:["english"],preferredDays:[1,3]};
+ const results=await Promise.all([
+  journeys.createMentorshipRequest(mentee,input,"gate2-mentorship-idempotency-a",key),
+  journeys.createMentorshipRequest(mentee,input,"gate2-mentorship-idempotency-b",key)
+ ]);
+ assert.equal(results[0].id,results[1].id,"concurrent retries with the same key must resolve to one request");
+ const secondKeyResult=await journeys.createMentorshipRequest(mentee,input,"gate2-mentorship-distinct-key",`gate2-distinct-${randomUUID()}`);
+ assert.equal(secondKeyResult.id,results[0].id,"same pending goal must not be duplicated when a second tab uses a different key");
+ const persisted=await getPool().query("select count(*)::int count from mentorship_request where mentee_user_id=$1 and goals=$2 and status in ('requested','matching','matched')",[mentee,input.goals]);
+ assert.equal(persisted.rows[0].count,1,"only one active request for the same normalized goal should persist");
+ await assert.rejects(
+  journeys.createMentorshipRequest(mentee,{...input,goals:"Changed goal with the same key"},"gate2-mentorship-idempotency-conflict",key),
+  error=>error.code==="IDEMPOTENCY_KEY_CONFLICT"
+ );
+});
+
+test("Gate 2: concurrent service requests cannot reuse one idempotency key for different payloads",async()=>{
+ const provider=await account(),requester=await account(),staff=await supportStaff();
+ await activeMember(provider);
+ const listing=await journeys.createServiceListing(provider,{title:"Concurrent idempotency conflict test",description:"A public listing for conflicting submission-key requests.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-service-key-conflict-listing",randomUUID());
+ await journeys.changeServiceListingStatus(listing.id,provider,"published","gate2-service-key-conflict-publish");
+ await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Approved for idempotency conflict test."},"gate2-service-key-conflict-approve");
+ const key=`gate2-service-conflict-${randomUUID()}`;
+ const outcomes=await Promise.allSettled([
+  journeys.requestService(listing.id,requester,{message:"First request scope for the provider."},"gate2-service-key-conflict-a",key),
+  journeys.requestService(listing.id,requester,{message:"Different request scope using the same key."},"gate2-service-key-conflict-b",key)
+ ]);
+ assert.equal(outcomes.filter(x=>x.status==="fulfilled").length,1,"only one payload may claim an idempotency key");
+ const rejected=outcomes.find(x=>x.status==="rejected");
+ assert.equal(rejected.reason.code,"IDEMPOTENCY_KEY_CONFLICT","the conflicting concurrent payload must not silently replay another request");
+ const rows=await getPool().query("select count(*)::int count from service_request where service_listing_id=$1 and requester_user_id=$2",[listing.id,requester]);
+ assert.equal(rows.rows[0].count,1,"only one service request should persist");
+});
+
+test("Gate 2: conflicting concurrent provider responses persist only one decision",async()=>{
+ const provider=await account(),requester=await account(),staff=await supportStaff();
+ await activeMember(provider);
+ const listing=await journeys.createServiceListing(provider,{title:"Concurrent provider decision test",description:"A public listing for testing mutually exclusive provider decisions.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-service-conflict-listing",randomUUID());
+ await journeys.changeServiceListingStatus(listing.id,provider,"published","gate2-service-conflict-publish");
+ await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Approved for concurrency test."},"gate2-service-conflict-approve");
+ const request=await journeys.requestService(listing.id,requester,{message:"Please review this request."},"gate2-service-conflict-request",randomUUID());
+ const outcomes=await Promise.allSettled([
+  journeys.changeServiceRequestStatus(request.id,provider,"accepted","The provider accepts the request.","gate2-service-conflict-accept"),
+  journeys.changeServiceRequestStatus(request.id,provider,"declined","The provider declines the request.","gate2-service-conflict-decline")
+ ]);
+ assert.equal(outcomes.filter(x=>x.status==="fulfilled").length,1,"row locking must permit only one conflicting decision to win");
+ const rejected=outcomes.find(x=>x.status==="rejected");
+ assert.equal(rejected.reason.code,"INVALID_STATE","the losing concurrent action must receive a stale-state conflict");
+ const persisted=(await getPool().query("select status from service_request where id=$1",[request.id])).rows[0];
+ assert.ok(["accepted","declined"].includes(persisted.status));
+ const decisions=await getPool().query("select count(*)::int count from service_request_event where request_id=$1 and from_status='requested' and to_status in ('accepted','declined')",[request.id]);
+ assert.equal(decisions.rows[0].count,1,"only the winning response may appear in persisted status history");
+});
+
 test("Gate 2: public service journey reaches accepted delivery, requester outcome acceptance and feedback",async()=>{
  const provider=await account(),requester=await account(),staff=await supportStaff();
  await activeMember(provider);
- const listing=await journeys.createServiceListing(provider,{title:"Gate 2 bookkeeping support",description:"Monthly bookkeeping, reconciliation and clear management reporting for small teams.",serviceCategory:"Finance",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-service-create");
+ const listing=await journeys.createServiceListing(provider,{title:"Gate 2 bookkeeping support",description:"Monthly bookkeeping, reconciliation and clear management reporting for small teams.",serviceCategory:"Finance",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-service-create",randomUUID());
  const submitted=await journeys.changeServiceListingStatus(listing.id,provider,"published","gate2-service-submit");
  assert.equal(submitted.moderation_status,"pending");
  assert.equal((await journeys.listServices(null,{q:"Gate 2 bookkeeping support"})).items.some(x=>x.id===listing.id),false);
@@ -62,7 +181,18 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
  const approved=await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Scope and public description reviewed."},"gate2-service-approve");
  assert.equal(approved.status,"published");
  assert.ok((await journeys.listServices(null,{q:"Gate 2 bookkeeping support"})).items.some(x=>x.id===listing.id));
- const request=await journeys.requestService(listing.id,requester,{message:"Please help us reconcile the last quarter."},"gate2-service-request");
+ const serviceKey=`gate2-service-request-${randomUUID()}`;
+ const servicePayload={message:"Please help us reconcile the last quarter."};
+ const concurrentRequests=await Promise.all([
+  journeys.requestService(listing.id,requester,servicePayload,"gate2-service-request-a",serviceKey),
+  journeys.requestService(listing.id,requester,servicePayload,"gate2-service-request-b",serviceKey)
+ ]);
+ assert.equal(concurrentRequests[0].id,concurrentRequests[1].id,"concurrent retries must resolve to one service request");
+ await assert.rejects(
+  journeys.requestService(listing.id,requester,{message:"Changed request scope with the same key."},"gate2-service-request-conflict",serviceKey),
+  error=>error.code==="IDEMPOTENCY_KEY_CONFLICT"
+ );
+ const request=concurrentRequests[0];
  await assert.rejects(journeys.changeServiceRequestStatus(request.id,await account(),"accepted","unrelated user","gate2-outsider"),e=>e.code==="FORBIDDEN");
  assert.equal((await journeys.changeServiceRequestStatus(request.id,provider,"accepted","Scope confirmed.","gate2-service-accept")).status,"accepted");
  assert.equal((await journeys.changeServiceRequestStatus(request.id,provider,"in_progress","Work started.","gate2-service-start")).status,"in_progress");
@@ -73,6 +203,13 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
  await journeys.changeServiceRequestStatus(request.id,provider,"completed","Delivery submitted for requester acceptance.","gate2-service-completion");
  const completed=await journeys.acceptServiceCompletion(request.id,requester,"The agreed outcome is accepted.","gate2-service-outcome");
  assert.equal(completed.status,"completed");
+ const persistedEvents=(await getPool().query("select from_status,to_status,note from service_request_event where request_id=$1 order by created_at",[request.id])).rows;
+ assert.ok(persistedEvents.some(event=>event.to_status==="requested"),"request submission must be recorded in status history");
+ assert.ok(persistedEvents.some(event=>event.from_status==="in_progress"&&event.to_status==="in_progress"&&String(event.note||"").includes("requester acceptance")),"provider completion submission must be distinct from requester acceptance");
+ assert.ok(persistedEvents.some(event=>event.from_status==="in_progress"&&event.to_status==="completed"),"requester outcome acceptance must be persisted as a separate transition");
+ const auditActions=(await getPool().query("select action from audit_log where resource_type='service_request' and resource_id=$1",[request.id])).rows.map(row=>row.action);
+ assert.ok(auditActions.includes("service.request_completion_submitted"));
+ assert.ok(auditActions.includes("service.request_completion_accepted"));
  const feedback=await journeys.submitServiceFeedback(request.id,requester,{targetRole:"provider",rating:5,comments:"Clear communication and useful outcome."},"gate2-service-feedback");
  assert.equal(Number(feedback.rating),5);
 });
@@ -80,11 +217,11 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
 test("Gate 2: paid service completion cannot be accepted before finance verifies the agreed payment",async()=>{
  const provider=await account(),requester=await account(),finance=await financeStaff();
  await activeMember(provider);
- const listing=await journeys.createServiceListing(provider,{title:"Gate 2 paid service settlement",description:"A fixed-price engagement used to prove that completion acceptance follows finance-verified settlement.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"fixed",priceAmount:500,currency:"ETB",visibility:"public"},"gate2-paid-service-listing");
+ const listing=await journeys.createServiceListing(provider,{title:"Gate 2 paid service settlement",description:"A fixed-price engagement used to prove that completion acceptance follows finance-verified settlement.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"fixed",priceAmount:500,currency:"ETB",visibility:"public"},"gate2-paid-service-listing",randomUUID());
  await journeys.changeServiceListingStatus(listing.id,provider,"published","gate2-paid-service-publish");
  const staff=await supportStaff();
  await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Fixed-price scope and terms reviewed."},"gate2-paid-service-moderate");
- const request=await journeys.requestService(listing.id,requester,{message:"Please deliver the fixed-price operating procedure review.",proposedPrice:500,currency:"ETB"},"gate2-paid-service-request");
+ const request=await journeys.requestService(listing.id,requester,{message:"Please deliver the fixed-price operating procedure review.",proposedPrice:500,currency:"ETB"},"gate2-paid-service-request",randomUUID());
  await journeys.changeServiceRequestStatus(request.id,provider,"accepted","Agreed fixed price: ETB 500.","gate2-paid-service-accept");
  await journeys.changeServiceRequestStatus(request.id,provider,"in_progress","Work started.","gate2-paid-service-start");
  await journeys.changeServiceRequestStatus(request.id,provider,"completed","Deliverables are ready for requester review.","gate2-paid-service-submit-completion");
@@ -96,7 +233,7 @@ test("Gate 2: paid service completion cannot be accepted before finance verifies
 });
 test("Gate 2: verified organization publishes under its own identity and can fulfill a public service request",async()=>{
  const owner=await account(),requester=await account(),staff=await supportStaff(),org=await approvedOrg(owner);
- const listing=await journeys.createServiceListing(owner,{organizationId:org.id,title:"Gate 2 organization training",description:"Practical workplace training with a clear agenda, materials and measurable learning outcomes.",serviceCategory:"Training",deliveryMode:"hybrid",pricingModel:"quote",visibility:"public"},"gate2-org-service-create");
+ const listing=await journeys.createServiceListing(owner,{organizationId:org.id,title:"Gate 2 organization training",description:"Practical workplace training with a clear agenda, materials and measurable learning outcomes.",serviceCategory:"Training",deliveryMode:"hybrid",pricingModel:"quote",visibility:"public"},"gate2-org-service-create",randomUUID());
  assert.equal(listing.organization_id,org.id);
  const submitted=await journeys.changeServiceListingStatus(listing.id,owner,"published","gate2-org-service-submit");
  assert.equal(submitted.moderation_status,"pending");
@@ -104,7 +241,7 @@ test("Gate 2: verified organization publishes under its own identity and can ful
  assert.equal(approved.status,"published");
  const publicListing=(await journeys.listServices(null,{q:"Gate 2 organization training"})).items.find(x=>x.id===listing.id);
  assert.ok(publicListing);assert.equal(publicListing.organization_id,org.id);assert.equal(publicListing.display_name,org.display_name);
- const request=await journeys.requestService(listing.id,requester,{message:"Please share a training outline and available dates."},"gate2-org-service-request");
+ const request=await journeys.requestService(listing.id,requester,{message:"Please share a training outline and available dates."},"gate2-org-service-request",randomUUID());
  await assert.rejects(journeys.changeServiceRequestStatus(request.id,await account(),"accepted","Unrelated actor","gate2-org-service-outsider"),e=>e.code==="FORBIDDEN");
  assert.equal((await journeys.listMyServiceRequests(owner)).some(row=>row.id===request.id),true,"authorized organization owner can follow the request");
  assert.equal((await journeys.listMyServiceRequests(await account())).some(row=>row.id===request.id),false,"unrelated account cannot discover organization request details");
@@ -134,13 +271,22 @@ test("Gate 2: mentorship offer is reviewed, matched, accepted, scheduled, comple
  const weekdayNames={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
  const weekday=weekdayNames[new Intl.DateTimeFormat("en-US",{weekday:"short",timeZone:"Africa/Addis_Ababa"}).format(start)];
  await journeys.setMentorAvailability(profile.id,mentor,{slots:[{dayOfWeek:weekday,startTime:"09:00",endTime:"12:00",timezone:"Africa/Addis_Ababa"}]},"gate2-mentor-availability");
- const request=await journeys.createMentorshipRequest(mentee,{goals:"Build a realistic product discovery and delivery plan.",topics:["product","strategy"],preferredModes:["remote"],preferredLanguages:["english"],preferredDays:[weekday]},"gate2-mentorship-request");
+ const request=await journeys.createMentorshipRequest(mentee,{goals:"Build a realistic product discovery and delivery plan.",topics:["product","strategy"],preferredModes:["remote"],preferredLanguages:["english"],preferredDays:[weekday]},"gate2-mentorship-request",randomUUID());
  const matches=await journeys.findMentorMatches(request.id,mentee);
  assert.ok(matches.some(x=>x.mentorUserId===mentor));
  const proposed=await journeys.proposeMentorMatch(request.id,mentor,mentee,"gate2-mentorship-propose");
  assert.equal(proposed.status,"proposed");
- assert.equal((await journeys.respondToMatch(proposed.id,mentor,"accepted","gate2-mentorship-accept")).status,"accepted");
- const engagement=(await journeys.listMyMentorships(mentee)).find(x=>x.mentor_user_id===mentor);
+ const mentorResponse=await journeys.respondToMatch(proposed.id,mentor,"accepted","gate2-mentorship-accept");
+ assert.equal(mentorResponse.status,"accepted");
+ assert.equal((await getPool().query("select count(*)::int count from mentorship where request_id=$1",[request.id])).rows[0].count,0,"mentor acceptance alone must not activate the relationship");
+ await assert.rejects(
+  journeys.proposeMentorMatch(request.id,mentor,mentee,"gate2-duplicate-open-match"),
+  error=>error.code==="MATCH_ALREADY_ACCEPTED",
+  "a match accepted by the mentor must remain open for the mentee's decision rather than being replaced"
+ );
+ const menteeResponse=await journeys.respondToMenteeMatch(proposed.id,mentee,"accepted","","gate2-mentorship-mentee-accept");
+ assert.equal(menteeResponse.mentee_consent_status,"accepted");
+ const engagement=(await journeys.listMyMentorships(mentee)).find(x=>x.mentor_user_id===mentor&&x.request_id===request.id);
  assert.ok(engagement);assert.equal(engagement.status,"active");
  const sessionStart=start.toISOString(),sessionEnd=new Date(start.getTime()+60*60*1000).toISOString();
  const session=await journeys.createMentorshipSession(engagement.id,mentor,{scheduledStartAt:sessionStart,scheduledEndAt:sessionEnd,mode:"remote",agenda:"Review the discovery plan"},"gate2-mentorship-session");
@@ -153,6 +299,78 @@ test("Gate 2: mentorship offer is reviewed, matched, accepted, scheduled, comple
  assert.equal(Number(programFeedback.rating),5);
 });
 
+test("Gate 2: mentee can consent before the mentor and relationship starts only after both accept",async()=>{
+ const mentee=await account(),mentor=await account(),staff=await supportStaff();
+ await activeMember(mentee);
+ await activeMember(mentor);
+ await verifiedProfessionalClaim(mentor);
+ const profile=await journeys.createMentorProfile(mentor,{headline:"Mentee-first product mentor",bio:"Practical product discovery and delivery coaching.",expertise:["product","strategy"],languages:["english"],mentoringModes:["remote"],visibility:"public",maxActiveMentees:3},"gate2-mentee-first-profile");
+ await journeys.changeMentorStatus(profile.id,mentor,"active","gate2-mentee-first-submit");
+ await marketplace.moderateListing("mentorship",profile.id,staff,{decision:"approved",note:"Mentee-first test mentor approved."},"gate2-mentee-first-approve");
+ const start=new Date(Date.now()+14*24*60*60*1000);start.setUTCHours(7,0,0,0);
+ const weekdayNames={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+ const weekday=weekdayNames[new Intl.DateTimeFormat("en-US",{weekday:"short",timeZone:"Africa/Addis_Ababa"}).format(start)];
+ await journeys.setMentorAvailability(profile.id,mentor,{slots:[{dayOfWeek:weekday,startTime:"09:00",endTime:"12:00",timezone:"Africa/Addis_Ababa"}]},"gate2-mentee-first-availability");
+ const request=await journeys.createMentorshipRequest(mentee,{goals:"Build a practical product discovery and delivery plan.",topics:["product","strategy"],preferredModes:["remote"],preferredLanguages:["english"],preferredDays:[weekday]},"gate2-mentee-first-request",randomUUID());
+ const proposed=await journeys.proposeMentorMatch(request.id,mentor,mentee,"gate2-mentee-first-propose");
+ const menteeResponse=await journeys.respondToMenteeMatch(proposed.id,mentee,"accepted","","gate2-mentee-first-consent");
+ assert.equal(menteeResponse.mentee_consent_status,"accepted");
+ assert.equal((await getPool().query("select count(*)::int count from mentorship where request_id=$1",[request.id])).rows[0].count,0,"mentee consent alone must not activate the relationship");
+ const mentorResponse=await journeys.respondToMatch(proposed.id,mentor,"accepted","gate2-mentor-second-consent");
+ assert.equal(mentorResponse.mentee_consent_status,"accepted","mentor acceptance must preserve earlier mentee consent");
+ const active=(await journeys.listMyMentorships(mentee)).find(x=>x.mentor_user_id===mentor&&x.request_id===request.id);
+ assert.ok(active,"the relationship becomes active only after both separate acceptances");
+ assert.equal(active.status,"active");
+});
+test("Gate 2: declined mentorship match remains in history when a different mentor is proposed",async()=>{
+ const mentee=await account(),firstMentor=await account(),secondMentor=await account(),thirdMentor=await account(),staff=await supportStaff();
+ await activeMember(mentee);
+ for(const mentor of [firstMentor,secondMentor,thirdMentor]){
+  await activeMember(mentor);
+  await verifiedProfessionalClaim(mentor);
+ }
+ const firstProfile=await journeys.createMentorProfile(firstMentor,{headline:"Rematching product mentor A",bio:"Practical product discovery and delivery coaching.",expertise:["product","strategy"],languages:["english"],mentoringModes:["remote"],visibility:"public",maxActiveMentees:3},"gate2-rematch-profile-a");
+ const secondProfile=await journeys.createMentorProfile(secondMentor,{headline:"Rematching product mentor B",bio:"Practical product discovery and delivery coaching.",expertise:["product","strategy"],languages:["english"],mentoringModes:["remote"],visibility:"public",maxActiveMentees:3},"gate2-rematch-profile-b");
+ const thirdProfile=await journeys.createMentorProfile(thirdMentor,{headline:"Rematching product mentor C",bio:"Practical product discovery and delivery coaching.",expertise:["product","strategy"],languages:["english"],mentoringModes:["remote"],visibility:"public",maxActiveMentees:3},"gate2-rematch-profile-c");
+ await journeys.changeMentorStatus(firstProfile.id,firstMentor,"active","gate2-rematch-submit-a");
+ await journeys.changeMentorStatus(secondProfile.id,secondMentor,"active","gate2-rematch-submit-b");
+ await journeys.changeMentorStatus(thirdProfile.id,thirdMentor,"active","gate2-rematch-submit-c");
+ await marketplace.moderateListing("mentorship",firstProfile.id,staff,{decision:"approved",note:"Rematching test mentor A approved."},"gate2-rematch-approve-a");
+ await marketplace.moderateListing("mentorship",secondProfile.id,staff,{decision:"approved",note:"Rematching test mentor B approved."},"gate2-rematch-approve-b");
+ await marketplace.moderateListing("mentorship",thirdProfile.id,staff,{decision:"approved",note:"Rematching test mentor C approved."},"gate2-rematch-approve-c");
+ const start=new Date(Date.now()+14*24*60*60*1000);start.setUTCHours(7,0,0,0);
+ const weekdayNames={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+ const weekday=weekdayNames[new Intl.DateTimeFormat("en-US",{weekday:"short",timeZone:"Africa/Addis_Ababa"}).format(start)];
+ for(const mentor of [firstMentor,secondMentor,thirdMentor]){
+  const profile=mentor===firstMentor?firstProfile:mentor===secondMentor?secondProfile:thirdProfile;
+  await journeys.setMentorAvailability(profile.id,mentor,{slots:[{dayOfWeek:weekday,startTime:"09:00",endTime:"12:00",timezone:"Africa/Addis_Ababa"}]},"gate2-rematch-availability");
+ }
+ const request=await journeys.createMentorshipRequest(mentee,{goals:"Build a practical product discovery and delivery plan.",topics:["product","strategy"],preferredModes:["remote"],preferredLanguages:["english"],preferredDays:[weekday]},"gate2-rematch-request",randomUUID());
+ const candidates=await journeys.findMentorMatches(request.id,mentee);
+ assert.ok(candidates.some(x=>x.mentorUserId===firstMentor));
+ assert.ok(candidates.some(x=>x.mentorUserId===secondMentor));
+ assert.ok(candidates.some(x=>x.mentorUserId===thirdMentor));
+ const firstMatch=await journeys.proposeMentorMatch(request.id,firstMentor,mentee,"gate2-rematch-propose-a");
+ assert.equal(firstMatch.status,"proposed");
+ assert.equal((await journeys.respondToMatch(firstMatch.id,firstMentor,"declined","gate2-rematch-decline-a")).status,"declined");
+ const secondMatch=await journeys.proposeMentorMatch(request.id,secondMentor,mentee,"gate2-rematch-propose-b");
+ assert.notEqual(secondMatch.id,firstMatch.id,"rematching creates a new proposal rather than overwriting the declined match");
+ assert.equal(secondMatch.status,"proposed");
+ const menteeDeclined=await journeys.respondToMenteeMatch(secondMatch.id,mentee,"declined","This mentor's available focus does not fit my goal.","gate2-rematch-mentee-decline");
+ assert.equal(menteeDeclined.status,"declined");
+ assert.equal(menteeDeclined.mentee_consent_status,"declined");
+ const declineReplay=await journeys.respondToMenteeMatch(secondMatch.id,mentee,"declined","This mentor's available focus does not fit my goal.","gate2-rematch-mentee-decline-replay");
+ assert.equal(declineReplay.idempotent,true,"retrying the same final decline must replay safely");
+ const thirdMatch=await journeys.proposeMentorMatch(request.id,thirdMentor,mentee,"gate2-rematch-propose-c");
+ assert.notEqual(thirdMatch.id,secondMatch.id,"a mentee-declined match must remain in history when a third mentor is proposed");
+ assert.equal(thirdMatch.status,"proposed");
+ const history=(await getPool().query("select id,mentor_user_id,status,mentee_consent_status from mentorship_match where request_id=$1 order by proposed_at,id",[request.id])).rows;
+ assert.equal(history.length,3,"mentor-declined and mentee-declined proposals plus the new proposal must all remain persisted");
+ assert.equal(history.find(x=>x.id===firstMatch.id).status,"declined");
+ assert.equal(history.find(x=>x.id===secondMatch.id).status,"declined");
+ assert.equal(history.find(x=>x.id===secondMatch.id).mentee_consent_status,"declined");
+ assert.equal(history.find(x=>x.id===thirdMatch.id).status,"proposed");
+});
 test("Gate 2: verified organization mentorship offer is moderated, requested, accepted and completed",async()=>{
  const owner=await account(),requester=await account(),staff=await supportStaff(),org=await approvedOrg(owner);
  const offer=await organizationOffers.createOrganizationMentorshipOffer(owner,{organizationId:org.id,title:"Gate 2 leadership mentorship program",description:"A structured program for early-career professionals with guided goals, mentor check-ins and a clear completion outcome.",expertise:["leadership","career development"],languages:["English","Amharic"],deliveryMode:"hybrid",visibility:"public"},"gate2-org-mentorship-create");
@@ -184,10 +402,10 @@ test("Gate 2: verified organization mentorship offer is moderated, requested, ac
 test("Gate 2: Support Desk proposes a suitable provider and the provider responds before demand is matched",async()=>{
  const provider=await account(),requester=await account(),staff=await supportStaff();
  await activeMember(provider);
- const listing=await journeys.createServiceListing(provider,{title:"Gate 2 demand-matching service",description:"Practical business operations support with a defined scope and measurable outcomes.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-match-listing-create");
+ const listing=await journeys.createServiceListing(provider,{title:"Gate 2 demand-matching service",description:"Practical business operations support with a defined scope and measurable outcomes.",serviceCategory:"Operations",deliveryMode:"remote",pricingModel:"quote",visibility:"public"},"gate2-match-listing-create",randomUUID());
  await journeys.changeServiceListingStatus(listing.id,provider,"published","gate2-match-listing-submit");
  await marketplace.moderateListing("service",listing.id,staff,{decision:"approved",note:"Public provider offer reviewed."},"gate2-match-listing-approve");
- const demand=await marketplace.createDemand(requester,{demandType:"service",title:"Need operations support",description:"Our small team needs help improving weekly workflows and documenting reliable operating procedures.",category:"Operations",deliveryMode:"remote"},"gate2-match-demand-create");
+ const demand=await marketplace.createDemand(requester,{demandType:"service",title:"Need operations support",description:"Our small team needs help improving weekly workflows and documenting reliable operating procedures.",category:"Operations",deliveryMode:"remote"},"gate2-match-demand-create",randomUUID());
  await assert.rejects(marketplace.reviewDemand(demand.id,staff,{status:"matched",internalNote:"",outcomeCode:"provider_search"},"gate2-match-premature"),e=>e.code==="PROVIDER_MATCH_REQUIRED");
  const candidates=await marketplace.listDemandMatchCandidates(staff,"service");
  assert.ok(candidates.some(x=>x.id===listing.id&&x.listing_type==="service"));

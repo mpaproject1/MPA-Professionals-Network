@@ -199,6 +199,11 @@ export async function changeServiceListingStatus(listingId,userId,status,request
     if(!row) throw error(404,"Service listing not found.","NOT_FOUND");
     const organization=await assertServiceListingAccess(db,row,userId);
     const currentLifecycleStatus=row.lifecycle_status||({published:"active",paused:"paused",closed:"archived"}[row.status]||"draft");
+    if(status==="fulfilled"&&(row.fulfilment_rule||"manual")!=="manual"){
+      const completed=Number((await db.query("select count(*)::int count from service_request where service_listing_id=$1 and status='completed' and requester_accepted_at is not null",[listingId])).rows[0].count);
+      const target=row.fulfilment_rule==="single_engagement"?1:Number(row.fulfilment_target_count||1);
+      if(completed<target)throw error(409,"This listing can be fulfilled only after its configured number of requester-accepted engagements is reached.","FULFILMENT_RULE_NOT_MET");
+    }
     const requestedLifecycleStatus=status==="published"?"active":status==="paused"?"paused":status==="closed"?"archived":status;
     if(currentLifecycleStatus===requestedLifecycleStatus && (status!=="published"||row.moderation_status==="approved")) return {...row,idempotent:true};
     if(status==="published" && currentLifecycleStatus==="pending_review" && !["approved","rejected"].includes(row.moderation_status)) return {...row,idempotent:true};
@@ -233,9 +238,28 @@ export async function changeServiceListingStatus(listingId,userId,status,request
 }
 
 
+export async function configureServiceCompletionPolicy(listingId,userId,input,requestIdHeader){
+  const evidencePolicy=String(input.evidencePolicy||"");
+  const fulfilmentRule=String(input.fulfilmentRule||"");
+  const target=Number(input.fulfilmentTargetCount??1);
+  if(!["accepted_delivery","private_file","description_only"].includes(evidencePolicy))throw error(400,"Choose an allowed completion evidence policy.","VALIDATION_ERROR");
+  if(!["manual","single_engagement","engagement_count"].includes(fulfilmentRule))throw error(400,"Choose an allowed listing fulfilment rule.","VALIDATION_ERROR");
+  if(!Number.isInteger(target)||target<1||target>1000000)throw error(400,"Fulfilment target must be a whole number from 1 to 1,000,000.","VALIDATION_ERROR");
+  if(fulfilmentRule==="single_engagement"&&target!==1)throw error(400,"Single-engagement fulfilment must have a target of one.","VALIDATION_ERROR");
+  return withTransaction(async db=>{
+    const row=(await db.query("select * from service_listing where id=$1 for update",[listingId])).rows[0];
+    if(!row)throw error(404,"Service listing not found.","NOT_FOUND");
+    await assertServiceListingAccess(db,row,userId);
+    if(["fulfilled","archived","rejected"].includes(row.lifecycle_status))throw error(409,"Completion and fulfilment policy cannot be changed on a closed listing.","INVALID_STATE");
+    const updated=(await db.query("update service_listing set completion_evidence_policy=$1,fulfilment_rule=$2,fulfilment_target_count=$3,updated_at=now() where id=$4 returning id,completion_evidence_policy,fulfilment_rule,fulfilment_target_count",[evidencePolicy,fulfilmentRule,target,listingId])).rows[0];
+    await audit(db,userId,"service.listing_completion_policy_changed","service_listing",listingId,requestIdHeader,{evidencePolicy,fulfilmentRule,fulfilmentTargetCount:target});
+    return updated;
+  });
+}
+
 export async function acceptServiceAgreement(requestId,userId,requestIdHeader){
  return withTransaction(async db=>{
-  const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
+  const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency,sl.completion_evidence_policy listing_completion_evidence_policy,sl.impact_model listing_impact_model,sl.fulfilment_rule listing_fulfilment_rule,sl.fulfilment_target_count listing_fulfilment_target_count from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
   if(!r)throw error(404,"Service request not found.","NOT_FOUND");
   if(r.requester_user_id!==userId)throw error(403,"Only the requester can confirm agreement to the provider's terms.","FORBIDDEN");
   if(r.status!=="accepted")throw error(409,"The provider must accept the request before the requester can confirm the agreement.","INVALID_STATE");
@@ -527,20 +551,21 @@ export async function listMyServiceListings(userId){
 export async function listMyServiceRequests(userId){
   const db=getPool();
   const orgRoles=["owner","administrator","recruiter","project_manager"];
-  return (await db.query("select r.*,s.title service_title,s.service_category,p.display_name requester_name,agreement.terms_version agreement_terms_version,agreement.terms agreement_terms,agreement.provider_accepted_at agreement_provider_accepted_at,agreement.requester_accepted_at agreement_requester_accepted_at,coalesce((select jsonb_agg(jsonb_build_object('fromStatus',e.from_status,'toStatus',e.to_status,'note',e.note,'createdAt',e.created_at) order by e.created_at) from service_request_event e where e.request_id=r.id),'[]'::jsonb) status_history,((s.organization_id is null and r.provider_user_id=$1) or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[])))) is_provider from service_request r join service_listing s on s.id=r.service_listing_id join person p on p.user_id=r.requester_user_id left join lateral (select a.terms_version,a.terms,a.provider_accepted_at,a.requester_accepted_at from service_request_agreement a where a.request_id=r.id order by a.terms_version desc limit 1) agreement on true where r.requester_user_id=$1 or (s.organization_id is null and r.provider_user_id=$1) or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[]))) order by r.created_at desc",[userId,orgRoles])).rows;
+  return (await db.query("select r.*,s.title service_title,s.service_category,p.display_name requester_name,agreement.terms_version agreement_terms_version,agreement.terms agreement_terms,agreement.provider_accepted_at agreement_provider_accepted_at,agreement.requester_accepted_at agreement_requester_accepted_at,coalesce((select jsonb_agg(jsonb_build_object('fromStatus',e.from_status,'toStatus',e.to_status,'note',e.note,'createdAt',e.created_at) order by e.created_at) from service_request_event e where e.request_id=r.id),'[]'::jsonb) status_history,coalesce((select jsonb_agg(jsonb_build_object('eventType',ce.event_type,'actorUserId',ce.actor_user_id,'note',ce.note,'createdAt',ce.created_at,'outcomeSummary',ce.outcome_summary) order by ce.created_at) from service_request_completion_event ce where ce.request_id=r.id),'[]'::jsonb) completion_history,((s.organization_id is null and r.provider_user_id=$1) or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[])))) is_provider from service_request r join service_listing s on s.id=r.service_listing_id join person p on p.user_id=r.requester_user_id left join lateral (select a.terms_version,a.terms,a.provider_accepted_at,a.requester_accepted_at from service_request_agreement a where a.request_id=r.id order by a.terms_version desc limit 1) agreement on true where r.requester_user_id=$1 or (s.organization_id is null and r.provider_user_id=$1) or (s.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[]))) order by r.created_at desc",[userId,orgRoles])).rows;
 }
 
 export async function changeServiceRequestStatus(requestId,userId,status,note,requestIdHeader){
   return withTransaction(async db=>{
-    const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
+    const r=(await db.query("select sr.*,sl.organization_id,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency,sl.completion_evidence_policy listing_completion_evidence_policy,sl.impact_model listing_impact_model,sl.fulfilment_rule listing_fulfilment_rule,sl.fulfilment_target_count listing_fulfilment_target_count from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
     if(!r) throw error(404,"Service request not found.","NOT_FOUND");
     const providerActor=await isServiceProviderActor(db,requestId,userId);
     if(!providerActor && r.requester_user_id!==userId) throw error(403,"You are not a participant in this service request.","FORBIDDEN");
     if(r.status===status && status!=="completed") return {...r,idempotent:true,nextAction:status==="requested"?"Wait for the provider to respond.":status==="accepted"?"Agree the start date and delivery milestones.":status==="in_progress"?"Review delivery updates; the requester accepts completion after the provider submits it.":status==="disputed"?"Work with the other participant or Support Desk to resolve the issue.":"This request is resolved; create a new request if needed."};
-    if(status==="completed"&&r.status==="in_progress"&&r.provider_completed_at&&providerActor)return {...r,idempotent:true,nextAction:"The requester must review the submitted outcome and accept completion."};
+    if(status==="completed"&&r.status==="in_progress"&&r.provider_completed_at&&r.provider_completion_submitted_by&&providerActor)return {...r,idempotent:true,nextAction:"The requester must review the submitted outcome and accept completion."};
     if(r.status==="requested" && !providerActor) throw error(403,"Only the provider can accept or decline a service request.","FORBIDDEN");
     if(r.status==="accepted" && status==="in_progress" && !providerActor) throw error(403,"Only the provider can start service delivery.","FORBIDDEN");
     if(r.status==="disputed" && status==="in_progress" && !providerActor) throw error(403,"Only the provider can resume delivery after the concern is addressed.","FORBIDDEN");
+    if(r.status==="disputed"&&status==="in_progress")validateCommunityText(note,{field:"Dispute resolution note",min:4,max:1000});
     if(r.status==="in_progress" && status==="completed" && !providerActor) throw error(403,"Only the provider can mark delivery complete; the requester must accept the outcome separately.","FORBIDDEN");
     if(r.status==="accepted" && status==="cancelled" && !providerActor) {
       // requester cancellation is allowed before delivery starts
@@ -548,13 +573,24 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
       throw error(409,"The provider cannot cancel an accepted engagement; use the dispute path if delivery is blocked.","INVALID_STATE");
     }
     if(status==="completed"&&r.status==="in_progress"){
+      if(String(note||"").trim().length<10) throw error(400,"Provide a meaningful completion summary of at least 10 characters.","COMPLETION_SUMMARY_REQUIRED");
+      validateCommunityText(note,{field:"Completion summary",min:10,max:3000});
       const pending=(await db.query("select count(*)::int count from service_request_milestone where request_id=$1 and status not in ('accepted','completed','cancelled')",[requestId])).rows[0].count;
       if(Number(pending)>0) throw error(409,"All active delivery milestones must be accepted or completed before completion.","OUTCOMES_INCOMPLETE");
-      const updated=(await db.query("update service_request set provider_completed_at=now(),provider_note=coalesce($1,provider_note),updated_at=now() where id=$2 returning *",[note||null,requestId])).rows[0];
-      await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$4,$5)",[requestId,userId,r.status,r.status,note||"Provider submitted completion; requester acceptance is still required."]);
-      await audit(db,userId,"service.request_completion_submitted","service_request",requestId,requestIdHeader,{status:r.status});
-      await notify(db,r.requester_user_id,"service.completion_submitted","service_request",requestId,{message:"The provider says the work is complete. Review the delivery and accept it or raise a concern.",nextAction:"Review submitted delivery and accept completion when satisfied.",actionUrl:"/services?requestId="+ requestId +"#service-request-"+requestId,actionRequired:true});
-      return {...updated,nextAction:"The requester must review the outcome and accept completion. Paid work also requires verified settlement."};
+      const policy=r.listing_completion_evidence_policy||"accepted_delivery";
+      const latest=(await db.query("select id,status,file_object_id,created_at from service_request_delivery where request_id=$1 order by created_at desc,id desc limit 1",[requestId])).rows[0];
+      const reopened=(await db.query("select created_at from service_request_completion_event where request_id=$1 and event_type='reopened' order by created_at desc limit 1",[requestId])).rows[0];
+      if(reopened&&(!latest||new Date(latest.created_at)<=new Date(reopened.created_at)))throw error(409,"A new delivery evidence record is required after dispute resolution before completion can be resubmitted.","DELIVERY_EVIDENCE_REQUIRED");
+      if(policy==="accepted_delivery"&&(!latest||latest.status!=="accepted")) throw error(409,"Submit delivery evidence and wait for the requester to accept the latest delivery before submitting completion.","DELIVERY_EVIDENCE_REQUIRED");
+      if(policy==="private_file"&&(!latest||latest.status!=="accepted"||!latest.file_object_id)) throw error(409,"This service requires an accepted delivery backed by a private evidence file.","PRIVATE_FILE_EVIDENCE_REQUIRED");
+      if(policy==="description_only"&&String(note||"").trim().length<10) throw error(400,"This service requires a meaningful written outcome summary.","COMPLETION_SUMMARY_REQUIRED");
+      const previous=(await db.query("select 1 from service_request_completion_event where request_id=$1 and event_type in ('submitted','resubmitted') limit 1",[requestId])).rowCount>0;
+      const updated=(await db.query("update service_request set provider_completed_at=now(),provider_completion_submitted_by=$1,provider_note=$2,requester_outcome_decision=null,requester_outcome_decision_by=null,requester_outcome_decision_at=null,requester_outcome_note=null,completion_evidence_delivery_id=$3,updated_at=now() where id=$4 returning *",[userId,String(note).trim(),latest?.id||null,requestId])).rows[0];
+      await db.query("insert into service_request_completion_event(request_id,actor_user_id,event_type,outcome_summary,evidence_delivery_id,note) values($1,$2,$3,$4,$5,$6)",[requestId,userId,previous?"resubmitted":"submitted",String(note).trim(),latest?.id||null,String(note).trim()]);
+      await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$4,$5)",[requestId,userId,r.status,r.status,"Provider submitted completion; requester decision is required."]);
+      await audit(db,userId,"service.request_completion_submitted","service_request",requestId,requestIdHeader,{status:r.status,evidencePolicy:policy,evidenceDeliveryId:latest?.id||null});
+      await notify(db,r.requester_user_id,"service.completion_submitted","service_request",requestId,{message:"The provider submitted completion evidence. Review the outcome and accept it, request revision, or dispute it.",nextAction:"Review the completion evidence and record your outcome decision.",actionUrl:"/services?requestId="+ requestId +"#service-request-"+requestId,actionRequired:true});
+      return {...updated,nextAction:"The requester must accept the submitted outcome, request a revision or dispute it. Payment verification remains a separate finance step for paid engagements."};
     }
     if(!allowedServiceRequestTransition(r.status,status)) throw error(409,"Invalid service request transition.","INVALID_STATE");
     if(["declined","cancelled","disputed"].includes(status)&&String(note||"").trim().length<4) throw error(400,"Add a short explanation so the other participant understands this decision and the next step.","OUTCOME_NOTE_REQUIRED");
@@ -563,6 +599,11 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
       if(!agreement || !agreement.provider_accepted_at || !agreement.requester_accepted_at) throw error(409,"Both parties must accept the same persisted service terms before delivery can start.","AGREEMENT_REQUIRED");
     }
     const updated=(await db.query("update service_request set status=$1,provider_note=case when $2::uuid<>requester_user_id then $3 else provider_note end,requester_note=case when $2::uuid=requester_user_id then $3 else requester_note end,outcome_summary=case when $1 in ('declined','cancelled','disputed') then coalesce($3,outcome_summary) else outcome_summary end,accepted_at=case when $1='accepted' then now() else accepted_at end,started_at=case when $1='in_progress' then now() else started_at end,cancelled_at=case when $1='cancelled' then now() else cancelled_at end,updated_at=now() where id=$4 returning *",[status,userId,note||null,requestId])).rows[0];
+    if(r.status==="disputed"&&status==="in_progress"){
+      await db.query("update service_request set provider_completed_at=null,provider_completion_submitted_by=null,requester_outcome_decision=null,requester_outcome_decision_by=null,requester_outcome_decision_at=null,requester_outcome_note=null,completion_evidence_delivery_id=null where id=$1",[requestId]);
+      Object.assign(updated,{provider_completed_at:null,provider_completion_submitted_by:null,requester_outcome_decision:null,requester_outcome_decision_by:null,requester_outcome_decision_at:null,requester_outcome_note:null,completion_evidence_delivery_id:null});
+      await db.query("insert into service_request_completion_event(request_id,actor_user_id,event_type,note) values($1,$2,'reopened',$3)",[requestId,userId,String(note||"Delivery resumed after dispute resolution.").trim()]);
+    }
     if(status==="accepted"){
       const terms={scope:r.scope||null,listingPricingModel:r.listing_pricing_model||null,listingPriceAmount:r.listing_price_amount===null?null:Number(r.listing_price_amount),listingCurrency:r.listing_currency||null,agreedPrice:r.agreed_price===null?null:Number(r.agreed_price),currency:r.agreed_currency||null,completionDueAt:r.completion_due_at||null,requestedStartAt:r.requested_start_at||null,requestedEndAt:r.requested_end_at||null};
       const termsHash=hashPayload(terms);
@@ -579,9 +620,10 @@ export async function changeServiceRequestStatus(requestId,userId,status,note,re
 
 export async function submitServicePayment(requestId,userId,input,requestIdHeader){
   return withTransaction(async db=>{
-    const r=(await db.query("select * from service_request where id=$1 for update",[requestId])).rows[0];
+    const r=(await db.query("select sr.*,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.impact_model listing_impact_model from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
     if(!r) throw error(404,"Service request not found.","NOT_FOUND");
     if(r.requester_user_id!==userId) throw error(403,"Only the requester can submit service payment.","FORBIDDEN");
+    if(r.listing_impact_model==="pro_bono"||r.listing_pricing_model==="free"||Number(r.agreed_price||r.listing_price_amount||0)<=0)throw error(409,"This engagement does not require paid-payment submission; continue using its agreed service evidence and outcome workflow.","PAYMENT_NOT_REQUIRED");
     if(!["accepted","in_progress"].includes(r.status)) throw error(409,"Payment can only be submitted after the service request is accepted.","INVALID_STATE");
     const amount=input.amount===undefined||input.amount===null?r.agreed_price:Number(input.amount);
     if(!Number.isFinite(Number(amount))||Number(amount)<0) throw error(400,"A valid non-negative payment amount is required.","VALIDATION_ERROR");
@@ -608,26 +650,64 @@ export async function submitServicePayment(requestId,userId,input,requestIdHeade
   });
 }
 
-export async function acceptServiceCompletion(requestId,userId,note,requestIdHeader){
+export async function reviewServiceCompletion(requestId,userId,input,requestIdHeader){
   return withTransaction(async db=>{
-    const r=(await db.query("select * from service_request where id=$1 for update",[requestId])).rows[0];
-    if(!r) throw error(404,"Service request not found.","NOT_FOUND");
-    if(r.requester_user_id!==userId) throw error(403,"Only the requester can accept service delivery.","FORBIDDEN");
-    if(r.status==="completed"&&r.requester_accepted_at) return {...r,idempotent:true,nextAction:"This delivery is already accepted. You can leave feedback or review the engagement record."};
-    if(r.status!=="in_progress" || !r.provider_completed_at) throw error(409,"The provider has not submitted completion for this engagement.","COMPLETION_NOT_SUBMITTED");
-    const paid=(await db.query("select count(*)::int count from service_payment where request_id=$1 and amount>0",[requestId])).rows[0].count;
-    const expectedAmount=Number(r.agreed_price||0);
-    if(expectedAmount>0||Number(paid)>0){
-      const settled=(await db.query("select 1 from service_payment where request_id=$1 and status='succeeded' and amount>0 and ($2::numeric<=0 or amount=$2::numeric) and ($3::text is null or upper(currency)=upper($3::text)) order by verified_at desc nulls last,created_at desc limit 1",[requestId,expectedAmount,r.agreed_currency||null])).rows[0];
-      if(!settled) throw error(409,"The agreed paid service must have a finance-verified successful payment for the agreed amount and currency before the requester can accept completion.","PAYMENT_NOT_SETTLED");
+    const r=(await db.query("select sr.*,sl.pricing_model listing_pricing_model,sl.price_amount listing_price_amount,sl.currency listing_currency,sl.impact_model listing_impact_model,sl.completion_evidence_policy listing_completion_evidence_policy,sl.fulfilment_rule listing_fulfilment_rule,sl.fulfilment_target_count listing_fulfilment_target_count from service_request sr join service_listing sl on sl.id=sr.service_listing_id where sr.id=$1 for update of sr",[requestId])).rows[0];
+    if(!r)throw error(404,"Service request not found.","NOT_FOUND");
+    if(r.requester_user_id!==userId)throw error(403,"Only the requester can decide the submitted service outcome.","FORBIDDEN");
+    const decision=String(input.status||"");
+    if(!["accepted","revision_requested","disputed"].includes(decision))throw error(400,"Outcome decision must be accepted, revision_requested or disputed.","VALIDATION_ERROR");
+    if(r.status==="completed"&&r.requester_outcome_decision==="accepted"&&decision==="accepted")return {...r,idempotent:true,nextAction:"This engagement is already accepted and completed."};
+    if(r.status!=="in_progress"||!r.provider_completed_at||!r.provider_completion_submitted_by)throw error(409,"The provider has not submitted a valid completion for review.","COMPLETION_NOT_SUBMITTED");
+    const note=String(input.note||input.outcomeSummary||"").trim();
+    if(decision==="accepted"&&note.length<10)throw error(400,"Record the final outcome in at least 10 characters before accepting completion.","FINAL_OUTCOME_REQUIRED");
+    if(decision!=="accepted"&&note.length<4)throw error(400,"Explain the revision request or dispute in at least four characters.","OUTCOME_NOTE_REQUIRED");
+    validateCommunityText(note,{field:decision==="accepted"?"Final outcome":"Outcome decision note",min:decision==="accepted"?10:4,max:3000});
+    if(decision==="accepted"){
+      const policy=r.listing_completion_evidence_policy||"accepted_delivery";
+      const latest=(await db.query("select id,status,file_object_id from service_request_delivery where request_id=$1 order by created_at desc,id desc limit 1",[requestId])).rows[0];
+      const evidenceDeliveryId=latest?.status==="accepted"?latest.id:null;
+      if(policy==="accepted_delivery"&&(!latest||latest.status!=="accepted"))throw error(409,"The latest delivery must be accepted before the engagement outcome can be accepted.","DELIVERY_EVIDENCE_REQUIRED");
+      if(policy==="private_file"&&(!latest||latest.status!=="accepted"||!latest.file_object_id))throw error(409,"The listing requires an accepted delivery backed by a private evidence file.","PRIVATE_FILE_EVIDENCE_REQUIRED");
+      if(policy==="description_only"&&String(r.provider_note||"").trim().length<10)throw error(409,"The provider must submit the required written service evidence before acceptance.","COMPLETION_SUMMARY_REQUIRED");
+      const expectedAmount=Number(r.agreed_price===null?r.listing_price_amount:r.agreed_price||0);
+      const requiresPayment=r.listing_impact_model!=="pro_bono"&&r.listing_pricing_model!=="free"&&Number(r.listing_price_amount||0)>0;
+      if(requiresPayment){
+        if(expectedAmount<=0)throw error(409,"A paid service must have an agreed positive amount before completion can be accepted.","AGREED_PRICE_REQUIRED");
+        const currency=String(r.agreed_currency||r.listing_currency||"").toUpperCase();
+        const settled=(await db.query("select 1 from service_payment where request_id=$1 and status='succeeded' and amount=$2::numeric and upper(currency)=upper($3::text) and verified_at is not null limit 1",[requestId,expectedAmount,currency])).rows[0];
+        if(!settled)throw error(409,"The paid service requires finance-verified settlement for the agreed amount and currency. This check is separate from outcome acceptance.","PAYMENT_NOT_SETTLED");
+      }
+      const updated=(await db.query("update service_request set requester_accepted_at=now(),requester_outcome_decision='accepted',requester_outcome_decision_by=$1,requester_outcome_decision_at=now(),requester_outcome_note=$2,final_outcome_summary=$2,status='completed',outcome_summary=$2,completed_at=now(),completion_evidence_delivery_id=coalesce($3,completion_evidence_delivery_id),updated_at=now() where id=$4 returning *",[userId,note,evidenceDeliveryId,requestId])).rows[0];
+      await db.query("insert into service_request_completion_event(request_id,actor_user_id,event_type,outcome_summary,evidence_delivery_id,note) values($1,$2,'accepted',$3,$4,$5)",[requestId,userId,note,evidenceDeliveryId,note]);
+      await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,'in_progress','completed',$3)",[requestId,userId,note]);
+      await audit(db,userId,"service.request_completion_accepted","service_request",requestId,requestIdHeader,{evidenceDeliveryId:evidenceDeliveryId,paid:requiresPayment});
+      const listing=(await db.query("select id,lifecycle_status,fulfilment_rule,fulfilment_target_count from service_listing where id=$1 for update",[r.service_listing_id])).rows[0];
+      if(listing&&listing.lifecycle_status!=="fulfilled"&&listing.fulfilment_rule!=="manual"){
+        const completed=Number((await db.query("select count(*)::int count from service_request where service_listing_id=$1 and status='completed' and requester_accepted_at is not null",[listing.id])).rows[0].count);
+        const target=listing.fulfilment_rule==="single_engagement"?1:Number(listing.fulfilment_target_count||1);
+        if(completed>=target&&["active","paused"].includes(listing.lifecycle_status)){
+          await db.query("update service_listing set status='closed',lifecycle_status='fulfilled',updated_at=now() where id=$1",[listing.id]);
+          await db.query("insert into service_listing_lifecycle_event(listing_id,actor_user_id,from_status,to_status,reason,request_id) values($1,$2,$3,'fulfilled',$4,$5)",[listing.id,userId,listing.lifecycle_status,"Fulfilment rule "+listing.fulfilment_rule+" reached after "+completed+" requester-accepted engagements.",requestIdHeader]);
+          await audit(db,userId,"service.listing_auto_fulfilled","service_listing",listing.id,requestIdHeader,{rule:listing.fulfilment_rule,target,completed});
+        }
+      }
+      for(const recipient of await serviceProviderRecipients(db,requestId))if(recipient&&recipient!==userId)await notify(db,recipient,"service.completion_accepted","service_request",requestId,{message:"The requester accepted the delivered outcome.",nextAction:"The engagement is complete. Review the final outcome record.",actionUrl:"/services?requestId="+requestId+"#service-request-"+requestId});
+      return {...updated,nextAction:"The engagement is complete. Payment verification was evaluated separately where the listing requires payment."};
     }
-    const outcome=String(note||"The requester accepted the submitted service outcome.").trim().slice(0,3000);
-    const row=(await db.query("update service_request set requester_accepted_at=now(),status='completed',outcome_summary=$1,completed_at=now(),updated_at=now() where id=$2 returning *",[outcome,requestId])).rows[0];
-    await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,'in_progress','completed',$3)",[requestId,userId,outcome]);
-    await audit(db,userId,"service.request_completion_accepted","service_request",requestId,requestIdHeader);
-    for(const recipient of await serviceProviderRecipients(db,requestId))if(recipient&&recipient!==userId)await notify(db,recipient,"service.completion_accepted","service_request",requestId,{message:"The requester accepted the delivered outcome.",nextAction:"The engagement is complete. You may request feedback or review the final record.",actionUrl:"/services?requestId="+ requestId +"#service-request-"+requestId});
-    return {...row,nextAction:"The engagement is complete. You can now leave feedback or view the outcome record."};
+    const nextStatus=decision==="disputed"?"disputed":"in_progress";
+    if(decision==="revision_requested"&&r.completion_evidence_delivery_id)await db.query("update service_request_delivery set status='revision_requested',reviewer_note=$1,reviewed_by=$2,reviewed_at=now() where id=$3 and request_id=$4",[note,userId,r.completion_evidence_delivery_id,requestId]);
+    const updated=(await db.query("update service_request set status=$1,requester_outcome_decision=$2,requester_outcome_decision_by=$3,requester_outcome_decision_at=now(),requester_outcome_note=$4,provider_completed_at=case when $2='revision_requested' then null else provider_completed_at end,provider_completion_submitted_by=case when $2='revision_requested' then null else provider_completion_submitted_by end,completion_evidence_delivery_id=case when $2='revision_requested' then null else completion_evidence_delivery_id end,updated_at=now() where id=$5 returning *",[nextStatus,decision,userId,note,requestId])).rows[0];
+    await db.query("insert into service_request_completion_event(request_id,actor_user_id,event_type,evidence_delivery_id,note) values($1,$2,$3,$4,$5)",[requestId,userId,decision,r.completion_evidence_delivery_id||null,note]);
+    await db.query("insert into service_request_event(request_id,actor_user_id,from_status,to_status,note) values($1,$2,'in_progress',$3,$4)",[requestId,userId,nextStatus,note]);
+    await audit(db,userId,"service.request_completion_"+decision,"service_request",requestId,requestIdHeader,{decision});
+    for(const recipient of await serviceProviderRecipients(db,requestId))if(recipient&&recipient!==userId)await notify(db,recipient,decision==="disputed"?"service.completion_disputed":"service.completion_revision_requested","service_request",requestId,{message:decision==="disputed"?"The requester disputed the submitted outcome.":"The requester requested a revision to the submitted outcome.",nextAction:decision==="disputed"?"Review the dispute and agree a documented resolution before resuming delivery.":"Review the requested changes, submit revised delivery evidence and submit completion again.",note,actionUrl:"/services?requestId="+requestId+"#service-request-"+requestId,actionRequired:true,priority:"high"});
+    return {...updated,nextAction:decision==="disputed"?"Delivery is disputed and must be explicitly resolved before work resumes.":"Revision is required; submit revised delivery evidence before submitting completion again."};
   });
+}
+
+export async function acceptServiceCompletion(requestId,userId,note,requestIdHeader){
+  return reviewServiceCompletion(requestId,userId,{status:"accepted",note},requestIdHeader);
 }
 
 export async function createServiceMilestone(requestId,userId,input,requestIdHeader){
@@ -636,6 +716,7 @@ export async function createServiceMilestone(requestId,userId,input,requestIdHea
     if(!r) throw error(404,"Service request not found.","NOT_FOUND");
     if(!(await isServiceProviderActor(db,requestId,userId))) throw error(403,"Only the provider or authorized organization team can define delivery milestones.","FORBIDDEN");
     if(!["accepted","in_progress"].includes(r.status)) throw error(409,"Milestones can only be added to an accepted or active engagement.","INVALID_STATE");
+    if(r.provider_completed_at)throw error(409,"Milestones cannot be added while provider completion is awaiting requester review.","COMPLETION_REVIEW_PENDING");
     if(!input.title) throw error(400,"Milestone title is required.","VALIDATION_ERROR");
     const row=(await db.query("insert into service_request_milestone(request_id,title,description,due_at,created_by) values($1,$2,$3,$4,$5) returning *",[requestId,input.title,input.description||null,input.dueAt||null,userId])).rows[0];
     await audit(db,userId,"service.milestone_created","service_request_milestone",row.id,requestIdHeader);
@@ -811,10 +892,11 @@ export async function createMentorProfile(userId,input,requestId){
     if(!["members","public"].includes(visibility)) throw error(400,"visibility must be members or public.","VALIDATION_ERROR");
     const existing=(await db.query("select id,status from mentor_profile where user_id=$1 for update",[userId])).rows[0];
     if(existing?.status==="closed") throw error(409,"Closed mentor profiles cannot be reopened.","INVALID_STATE");
-    const values=[headline,String(input.bio||"").trim()||null,JSON.stringify(normalizeArray(input.expertise)),JSON.stringify(normalizeArray(input.languages)),JSON.stringify(normalizeArray(input.mentoringModes||["remote"])),maxActiveMentees,visibility];
+    const circleEnabled=input.circleEnabled===true,circleName=String(input.circleName||"").trim().slice(0,120)||null;
+    const values=[headline,String(input.bio||"").trim()||null,JSON.stringify(normalizeArray(input.expertise)),JSON.stringify(normalizeArray(input.languages)),JSON.stringify(normalizeArray(input.mentoringModes||["remote"])),maxActiveMentees,visibility,circleEnabled,circleName];
     const row=existing
-      ? (await db.query("update mentor_profile set status=case when status='active' then 'draft' else status end,moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,headline=$1,bio=$2,expertise=$3,languages=$4,mentoring_modes=$5,max_active_mentees=$6,visibility=$7,updated_at=now() where id=$8 returning *",[...values,existing.id])).rows[0]
-      : (await db.query("insert into mentor_profile(user_id,headline,bio,expertise,languages,mentoring_modes,max_active_mentees,visibility) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[userId,...values])).rows[0];
+      ? (await db.query("update mentor_profile set status=case when status='active' then 'draft' else status end,moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,headline=$1,bio=$2,expertise=$3,languages=$4,mentoring_modes=$5,max_active_mentees=$6,visibility=$7,circle_enabled=$8,circle_name=$9,updated_at=now() where id=$10 returning *",[...values,existing.id])).rows[0]
+      : (await db.query("insert into mentor_profile(user_id,headline,bio,expertise,languages,mentoring_modes,max_active_mentees,visibility,circle_enabled,circle_name) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *",[userId,...values])).rows[0];
     await audit(db,userId,"mentorship.profile_updated","mentor_profile",row.id,requestId,{status:row.status});
     return row;
   });
@@ -826,7 +908,7 @@ export async function updateMentorProfile(profileId,userId,input,requestId){
     if(!row) throw error(404,"Mentor profile not found.","NOT_FOUND");
     if(row.user_id!==userId) throw error(403,"Only the mentor can edit this profile.","FORBIDDEN");
     await requirePersonalProfessionalCapability(db,userId);
-    const updated=(await db.query("update mentor_profile set status=case when status='active' then 'draft' else status end,moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,headline=coalesce($1,headline),bio=coalesce($2,bio),expertise=coalesce($3,expertise),languages=coalesce($4,languages),mentoring_modes=coalesce($5,mentoring_modes),max_active_mentees=coalesce($6,max_active_mentees),visibility=coalesce($7,visibility),updated_at=now() where id=$8 returning *",[input.headline||null,input.bio||null,input.expertise?JSON.stringify(normalizeArray(input.expertise)):null,input.languages?JSON.stringify(normalizeArray(input.languages)):null,input.mentoringModes?JSON.stringify(normalizeArray(input.mentoringModes)):null,input.maxActiveMentees||null,input.visibility||null,profileId])).rows[0];
+    const updated=(await db.query("update mentor_profile set status=case when status='active' then 'draft' else status end,moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,headline=coalesce($1,headline),bio=coalesce($2,bio),expertise=coalesce($3,expertise),languages=coalesce($4,languages),mentoring_modes=coalesce($5,mentoring_modes),max_active_mentees=coalesce($6,max_active_mentees),visibility=coalesce($7,visibility),circle_enabled=coalesce($8,circle_enabled),circle_name=coalesce($9,circle_name),updated_at=now() where id=$10 returning *",[input.headline||null,input.bio||null,input.expertise?JSON.stringify(normalizeArray(input.expertise)):null,input.languages?JSON.stringify(normalizeArray(input.languages)):null,input.mentoringModes?JSON.stringify(normalizeArray(input.mentoringModes)):null,input.maxActiveMentees||null,input.visibility||null,input.circleEnabled===undefined?null:Boolean(input.circleEnabled),input.circleName===undefined?null:(String(input.circleName||"").trim().slice(0,120)||null),profileId])).rows[0];
     await audit(db,userId,"mentorship.profile_updated","mentor_profile",profileId,requestId);
     return updated;
   });
@@ -914,7 +996,7 @@ export async function listMentors(viewerId,filters={}){
   if(filters.q){ args.push(`%${String(filters.q).trim()}%`); where.push(`(mp.headline ilike $${args.length} or mp.bio ilike $${args.length})`); }
   if(filters.topic){ args.push(`%${String(filters.topic).trim().toLowerCase()}%`); where.push(`mp.expertise::text ilike $${args.length}`); }
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
-  const rows=(await db.query(`select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees from mentor_profile mp join app_user u on u.id=mp.user_id join person p on p.user_id=u.id join membership_record m on m.user_id=u.id where ${where.join(" and ")} order by p.display_name limit ${limit+1} offset ${offset}`,args)).rows;
+  const rows=(await db.query(`select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees,mp.circle_enabled,mp.circle_name,(select count(*)::int from mentorship_circle_membership cm where cm.mentor_profile_id=mp.id and cm.left_at is null) circle_joined_count,exists(select 1 from mentorship_circle_membership cm where cm.mentor_profile_id=mp.id and cm.participant_user_id=$1 and cm.left_at is null) circle_joined_by_me from mentor_profile mp join app_user u on u.id=mp.user_id join person p on p.user_id=u.id join membership_record m on m.user_id=u.id where ${where.join(" and ")} order by p.display_name limit ${limit+1} offset ${offset}`,args)).rows;
   return rows;
 }
 
@@ -924,7 +1006,8 @@ export async function createMentorshipRequest(menteeId,input,requestId,idempoten
  if(typeof input.goals!=="string"||!input.goals.trim()) throw error(400,"A non-empty mentorship goal is required.","VALIDATION_ERROR");
  const goals=String(input.goals).trim(),preferredMentor=input.preferredMentorUserId||null,topics=JSON.stringify(normalizeArray(input.topics)),modes=JSON.stringify(normalizeArray(input.preferredModes||["remote"])),languages=JSON.stringify(normalizeArray(input.preferredLanguages)),days=JSON.stringify((input.preferredDays||[]).map(Number).filter(n=>n>=0&&n<=6));
  if(preferredMentor===menteeId) throw error(400,"You cannot mentor yourself.","VALIDATION_ERROR");
- const normalized={menteeId,goals,preferredMentor,topics:JSON.parse(topics),modes:JSON.parse(modes),languages:JSON.parse(languages),days:JSON.parse(days)};
+ const shareWithEligibleMentors=input.shareWithEligibleMentors===true;
+ const normalized={menteeId,goals,preferredMentor,topics:JSON.parse(topics),modes:JSON.parse(modes),languages:JSON.parse(languages),days:JSON.parse(days),shareWithEligibleMentors};
  const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
  return withTransaction(async db=>{
   // Serialize submissions from the same mentee so different keys cannot race past duplicate-request detection.
@@ -938,7 +1021,7 @@ export async function createMentorshipRequest(menteeId,input,requestId,idempoten
   if(!(await activeMember(db,menteeId))) throw error(403,"An active membership is required for mentorship.","MEMBERSHIP_REQUIRED");
   const prior=(await db.query("select * from mentorship_request where mentee_user_id=$1 and goals=$2 and preferred_mentor_user_id is not distinct from $3 and topics=$4::jsonb and preferred_modes=$5::jsonb and preferred_languages=$6::jsonb and preferred_days=$7::jsonb and status in ('requested','matching','matched') order by created_at desc limit 1 for update",[menteeId,goals,preferredMentor,topics,modes,languages,days])).rows[0];
   if(prior)return {...prior,idempotent:true,nextAction:prior.status==="matched"?"A mentor proposal is already active. Wait for the mentor to respond.":"Your mentorship request is already recorded. Review its status or wait for the matching team."};
-  const inserted=(await db.query("insert into mentorship_request(mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,'requested',$8,$9) on conflict do nothing returning *",[menteeId,preferredMentor,goals,topics,modes,languages,days,keyHash,fingerprint])).rows[0];
+  const inserted=(await db.query("insert into mentorship_request(mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,request_idempotency_hash,request_fingerprint,share_with_eligible_mentors) values($1,$2,$3,$4,$5,$6,$7,'requested',$8,$9,$10) on conflict do nothing returning *",[menteeId,preferredMentor,goals,topics,modes,languages,days,keyHash,fingerprint,shareWithEligibleMentors])).rows[0];
   if(!inserted){
    const raced=(await db.query("select * from mentorship_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
    if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
@@ -1003,7 +1086,9 @@ export async function proposeMentorMatch(requestId,mentorUserId,actorUserId,requ
     const row=(await db.query("insert into mentorship_match(request_id,mentor_user_id,mentee_user_id,score,match_reasons,status,mentee_consent_status,proposed_at) values($1,$2,$3,$4,$5,'proposed','pending',now()) returning *",[requestId,mentorUserId,request.mentee_user_id,match.score,JSON.stringify(match.reasons)])).rows[0];
     await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,matched_at=now(),updated_at=now() where id=$2",[mentorUserId,requestId]);
     await audit(db,actorUserId,"mentorship.match_proposed","mentorship_match",row.id,requestIdHeader,{mentorUserId,score:match.score});
-    await queueWorkflowEmail(db,mentorUserId,"mentor.mentorship_update",{status:"match proposed",nextAction:"Review and accept or decline the mentorship match",actionUrl:"/mentorship",actionRequired:true,priority:"high",eventVersion:row.proposed_at||requestIdHeader},"mentorship_match",row.id);
+    await queueWorkflowEmail(db,mentorUserId,"mentor.mentorship_update",{status:"match proposed",nextAction:"Review and accept or decline the mentorship match",actionUrl:"/mentorship",actionRequired:true,priority:"high",matchId:row.id,eventVersion:row.proposed_at||requestIdHeader},"mentorship_match",row.id);
+    const emailOutboxQueued=(await db.query("select 1 from notification_outbox where template_code='mentor.mentorship_update' and payload->>'matchId'=$1 limit 1",[row.id])).rowCount>0;
+    await db.query("update mentorship_match set mentor_notification_status=$2,mentor_notification_updated_at=now(),mentor_notification_detail=$3 where id=$1",[row.id,emailOutboxQueued?"queued":"unknown",emailOutboxQueued?"Email queued; provider delivery and reading are not confirmed.":"In-app workflow notification may be recorded, but no email outbox delivery attempt is available to verify."]);
     await queueWorkflowEmail(db,request.mentee_user_id,"professional.workflow_update",{status:"mentor match proposed",nextAction:"Wait for the proposed mentor to respond",actionUrl:"/mentorship",eventVersion:row.proposed_at||requestIdHeader},"mentorship_match",row.id);
     return row;
   });
@@ -1099,11 +1184,16 @@ export async function createMentorshipSession(mentorshipId,userId,input,requestI
     const m=await mentorshipParticipant(db,mentorshipId,userId);
     if(m.status!=="active") throw error(409,"Sessions can only be scheduled for an active mentorship.","MENTORSHIP_NOT_ACTIVE");
     if(!input.scheduledStartAt||!input.scheduledEndAt) throw error(400,"scheduledStartAt and scheduledEndAt are required.","VALIDATION_ERROR");
+    const meetingReference=String(input.meetingReference||"").trim(),locationLabel=String(input.locationLabel||"").trim(),agenda=String(input.agenda||"").trim(),proposalNote=String(input.proposalNote||"").trim();
+    if(meetingReference.length>1000||locationLabel.length>250||agenda.length>1000||proposalNote.length>1000)throw error(400,"Meeting details exceed the allowed length.","VALIDATION_ERROR");
+    let meetingUrl=null;try{if(meetingReference)meetingUrl=new URL(meetingReference);}catch{meetingUrl=null;}
+    const sharedText=locationLabel+" "+agenda+" "+proposalNote;
+    if((meetingReference&&(!meetingUrl||meetingUrl.protocol!=="https:"||meetingUrl.username||meetingUrl.password))||/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(meetingReference+" "+sharedText)||/(?:tel:|whatsapp:)/i.test(meetingReference+" "+sharedText)||/(?:\+\d{7,}|\(\d{2,4}\)\s*\d{3,}|\b\d{3,}[- ]\d{3,}[- ]\d{3,}\b)/.test(sharedText))throw error(400,"Use an HTTPS meeting link or public meeting location only; do not enter personal email addresses or phone contact details in the shared session details.","PRIVATE_CONTACT_NOT_ALLOWED");
     await assertSessionFitsAvailability(db,m.mentor_user_id,input.scheduledStartAt,input.scheduledEndAt);
-    const row=(await db.query("insert into mentorship_session(mentorship_id,scheduled_start_at,scheduled_end_at,mode,location_label,meeting_reference,agenda,created_by) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[mentorshipId,input.scheduledStartAt,input.scheduledEndAt,input.mode||"remote",input.locationLabel||null,input.meetingReference||null,input.agenda||null,userId])).rows[0];
+    const row=(await db.query("insert into mentorship_session(mentorship_id,scheduled_start_at,scheduled_end_at,mode,location_label,meeting_reference,agenda,created_by,coordination_status,proposed_by,proposal_note) values($1,$2,$3,$4,$5,$6,$7,$8,'proposed',$8,$9) returning *",[mentorshipId,input.scheduledStartAt,input.scheduledEndAt,input.mode||"remote",locationLabel||null,meetingReference||null,String(input.agenda||"").trim().slice(0,1000)||null,userId,String(input.proposalNote||"").trim().slice(0,1000)||null])).rows[0];
     await audit(db,userId,"mentorship.session_created","mentorship_session",row.id,requestId);
     const other=m.mentor_user_id===userId?m.mentee_user_id:m.mentor_user_id;
-    await notify(db,other,"mentorship.session_scheduled","mentorship_session",row.id,{message:"A mentorship session has been scheduled.",nextAction:"Review the date, time, mode and agenda, then coordinate any change with the other participant.",actionUrl:"/mentorship",actionRequired:true,priority:"high",scheduledStartAt:row.scheduled_start_at,scheduledEndAt:row.scheduled_end_at});
+    await notify(db,other,"mentorship.session_scheduled","mentorship_session",row.id,{message:"A first-session proposal is waiting for your confirmation.",nextAction:"Review the proposed date, time, mode and agenda in the mentorship workspace. No private contact details are shared.",actionUrl:"/mentorship",actionRequired:true,priority:"high",scheduledStartAt:row.scheduled_start_at,scheduledEndAt:row.scheduled_end_at,coordinationStatus:"proposed"});
     return row;
   });
 }
@@ -1114,6 +1204,14 @@ export async function changeMentorshipSession(sessionId,userId,status,notes,requ
     const s=(await db.query("select s.*,m.mentor_user_id,m.mentee_user_id,m.status mentorship_status from mentorship_session s join mentorship m on m.id=s.mentorship_id where s.id=$1 for update",[sessionId])).rows[0];
     if(!s) throw error(404,"Mentorship session not found.","NOT_FOUND");
     if(s.mentor_user_id!==userId&&s.mentee_user_id!==userId) throw error(403,"You are not a session participant.","FORBIDDEN");
+    if(s.coordination_status==="proposed"&&status==="cancelled"&&s.proposed_by===userId){
+      const withdrawn=(await db.query("update mentorship_session set coordination_status='declined',status='cancelled',responded_by=$1,responded_at=now(),proposal_note=coalesce($2,proposal_note),updated_at=now() where id=$3 returning *",[userId,String(notes||"").trim().slice(0,1000)||null,sessionId])).rows[0];
+      await audit(db,userId,"mentorship.session_proposal_withdrawn","mentorship_session",sessionId,requestId);
+      const other=s.mentor_user_id===userId?s.mentee_user_id:s.mentor_user_id;
+      if(other)await notify(db,other,"mentorship.session_proposal_withdrawn","mentorship_session",sessionId,{message:"The other participant withdrew their first-session proposal.",nextAction:"Review the mentorship workspace if a new session time is needed.",actionUrl:"/mentorship",coordinationStatus:"declined"});
+      return {...withdrawn,nextAction:"Session proposal withdrawn. The other participant was notified in the platform."};
+    }
+    if(s.coordination_status!=="accepted") throw error(409,"Both participants must confirm the session proposal before recording completion, cancellation or no-show.","SESSION_NOT_CONFIRMED");
     if(s.status===status)return {...s,idempotent:true,nextAction:status==="completed"?"You can submit session feedback.":"Review the session record or schedule another session."};
     if(!allowedSessionTransition(s.status,status)) throw error(409,"Invalid session transition.","INVALID_STATE");
     const row=(await db.query("update mentorship_session set status=$1,notes=coalesce($2,notes),completed_at=case when $1='completed' then now() else completed_at end,updated_at=now() where id=$3 returning *",[status,notes||null,sessionId])).rows[0];
@@ -1126,7 +1224,7 @@ export async function changeMentorshipSession(sessionId,userId,status,notes,requ
 
 export async function listMentorshipSessions(mentorshipId,userId){
   const db=getPool(); await mentorshipParticipant(db,mentorshipId,userId);
-  return (await db.query("select * from mentorship_session where mentorship_id=$1 order by scheduled_start_at",[mentorshipId])).rows;
+  return (await db.query("select id,mentorship_id,scheduled_start_at,scheduled_end_at,mode,case when coordination_status='accepted' then location_label else null end location_label,case when coordination_status='accepted' then meeting_reference else null end meeting_reference,agenda,status,notes,completed_at,created_by,created_at,updated_at,coordination_status,proposed_by,responded_by,responded_at,proposal_note from mentorship_session where mentorship_id=$1 order by scheduled_start_at",[mentorshipId])).rows;
 }
 
 export async function submitMentorshipFeedback(mentorshipId,userId,input,requestId){
@@ -1142,7 +1240,10 @@ export async function submitMentorshipFeedback(mentorshipId,userId,input,request
     } else if(m.status!=="completed") {
       throw error(409,"Program feedback requires a completed mentorship.","MENTORSHIP_NOT_COMPLETED");
     }
-    const row=(await db.query("insert into mentorship_feedback(mentorship_id,session_id,reviewer_user_id,target_role,rating,comments) values($1,$2,$3,$4,$5,$6) on conflict(session_id,reviewer_user_id,target_role) do update set rating=excluded.rating,comments=excluded.comments returning *",[mentorshipId,input.sessionId||null,userId,input.targetRole,input.rating??null,input.comments||null])).rows[0];
+    const rating=Number(input.rating),comments=String(input.comments||"").trim();
+    if(!Number.isInteger(rating)||rating<1||rating>5)throw error(400,"Feedback rating must be an integer from 1 to 5.","VALIDATION_ERROR");
+    if(comments.length<10||comments.length>2000)throw error(400,"Feedback comments must contain 10 to 2,000 characters.","VALIDATION_ERROR");
+    const row=(await db.query("insert into mentorship_feedback(mentorship_id,session_id,reviewer_user_id,target_role,rating,comments) values($1,$2,$3,$4,$5,$6) on conflict(session_id,reviewer_user_id,target_role) do update set rating=excluded.rating,comments=excluded.comments returning *",[mentorshipId,input.sessionId||null,userId,input.targetRole,rating,comments])).rows[0];
     await audit(db,userId,"mentorship.feedback_submitted","mentorship_feedback",row.id,requestId,{targetRole:input.targetRole,sessionId:input.sessionId||null});
     return row;
   });
@@ -1186,13 +1287,13 @@ export async function getMentorship(mentorshipId,userId){
 
 export async function listMyMentorshipRequests(userId){
  const db=getPool();
- return (await db.query("select id,mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,created_at,updated_at from mentorship_request where mentee_user_id=$1 order by created_at desc",[userId])).rows;
+ return (await db.query("select id,mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,share_with_eligible_mentors,created_at,updated_at from mentorship_request where mentee_user_id=$1 order by created_at desc",[userId])).rows;
 }
 
 
 export async function listMyMentorshipMatches(userId){
  const db=getPool();
- return (await db.query(`select mm.id,mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mm.score,mm.match_reasons,mm.status,mm.mentee_consent_status,mm.mentee_response_note,mm.proposed_at,mr.goals,pm.display_name mentor_name,pe.display_name mentee_name,
+ return (await db.query(`select mm.id,mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mm.score,mm.match_reasons,mm.status,mm.mentee_consent_status,mm.mentee_response_note,mm.proposed_at,mm.mentor_notification_status,mm.mentor_notification_updated_at,mm.mentor_notification_detail,mr.goals,pm.display_name mentor_name,pe.display_name mentee_name,
  case when mm.mentor_user_id=$1 then 'mentor' else 'mentee' end match_role
  from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id
  join person pm on pm.user_id=mm.mentor_user_id join person pe on pe.user_id=mm.mentee_user_id

@@ -5,6 +5,7 @@ import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import { closePool, getPool } from "../../src/platform/db.js";
 import * as marketplace from "../../src/services-mentorship/demand.js";
+import * as mentorshipOperations from "../../src/services-mentorship/operations.js";
 import * as organizationOffers from "../../src/services-mentorship/organization-offers.js";
 import * as journeys from "../../src/services-mentorship/service.js";
 import * as talent from "../../src/talent/service.js";
@@ -206,7 +207,7 @@ test("Gate 2: public service journey reaches accepted delivery, requester outcom
  assert.equal(completed.status,"completed");
  const persistedEvents=(await getPool().query("select from_status,to_status,note from service_request_event where request_id=$1 order by created_at",[request.id])).rows;
  assert.ok(persistedEvents.some(event=>event.to_status==="requested"),"request submission must be recorded in status history");
- assert.ok(persistedEvents.some(event=>event.from_status==="in_progress"&&event.to_status==="in_progress"&&String(event.note||"").includes("requester acceptance")),"provider completion submission must be distinct from requester acceptance");
+ assert.ok(persistedEvents.some(event=>event.from_status==="in_progress"&&event.to_status==="in_progress"&&String(event.note||"").includes("requester decision is required")),"provider completion submission must be distinct from requester acceptance");
  assert.ok(persistedEvents.some(event=>event.from_status==="in_progress"&&event.to_status==="completed"),"requester outcome acceptance must be persisted as a separate transition");
  const auditActions=(await getPool().query("select action from audit_log where resource_type='service_request' and resource_id=$1",[request.id])).rows.map(row=>row.action);
  assert.ok(auditActions.includes("service.request_completion_submitted"));
@@ -226,6 +227,8 @@ test("Gate 2: paid service completion cannot be accepted before finance verifies
  await journeys.changeServiceRequestStatus(request.id,provider,"accepted","Agreed fixed price: ETB 500.","gate2-paid-service-accept");
  await journeys.acceptServiceAgreement(request.id,requester,"gate2-paid-service-agreement-accept");
  await journeys.changeServiceRequestStatus(request.id,provider,"in_progress","Work started.","gate2-paid-service-start");
+ const delivery=await journeys.submitServiceDelivery(request.id,provider,{description:"The agreed operating procedure review and supporting recommendations are ready for requester review."},"gate2-paid-service-delivery");
+ assert.equal((await journeys.reviewServiceDelivery(delivery.id,requester,{status:"accepted",note:"Reviewed and accepted."},"gate2-paid-service-delivery-review")).status,"accepted");
  await journeys.changeServiceRequestStatus(request.id,provider,"completed","Deliverables are ready for requester review.","gate2-paid-service-submit-completion");
  await assert.rejects(journeys.acceptServiceCompletion(request.id,requester,"The work looks complete.","gate2-paid-service-premature-accept"),error=>error.code==="PAYMENT_NOT_SETTLED");
  const payment=await journeys.submitServicePayment(request.id,requester,{amount:500,currency:"ETB",channel:"bank_transfer",reference:`GATE2-${randomUUID()}`,idempotencyKey:`gate2-paid-service-${randomUUID()}`},"gate2-paid-service-payment");
@@ -294,6 +297,7 @@ test("Gate 2: mentorship offer is reviewed, matched, accepted, scheduled, comple
  const sessionStart=start.toISOString(),sessionEnd=new Date(start.getTime()+60*60*1000).toISOString();
  const session=await journeys.createMentorshipSession(engagement.id,mentor,{scheduledStartAt:sessionStart,scheduledEndAt:sessionEnd,mode:"remote",agenda:"Review the discovery plan"},"gate2-mentorship-session");
  assert.equal(session.status,"scheduled");
+ assert.equal((await mentorshipOperations.respondToSessionProposal(session.id,mentee,"accepted","I confirm the proposed session time.","gate2-session-confirm")).coordination_status,"accepted");
  assert.equal((await journeys.changeMentorshipSession(session.id,mentee,"completed","Session completed with agreed next steps.","gate2-session-complete")).status,"completed");
  const sessionFeedback=await journeys.submitMentorshipFeedback(engagement.id,mentee,{targetRole:"mentor",rating:5,comments:"Useful and practical.",sessionId:session.id},"gate2-session-feedback");
  assert.equal(Number(sessionFeedback.rating),5);

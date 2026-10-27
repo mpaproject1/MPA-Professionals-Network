@@ -30,7 +30,8 @@ const migrationNames = [
   "20261023_support_inquiry_workflow.sql",
   "20261025120000_serve_community_g2_lifecycle.sql",
   "20261025130000_serve_community_g3_impact_metrics.sql",
-  "20261025140000_serve_community_g4_announcement_commitment_experience.sql"
+  "20261025140000_serve_community_g4_announcement_commitment_experience.sql",
+  "20261025150000_serve_community_g6_outcome_proof.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -65,7 +66,23 @@ const requiredColumns = [
   ["verification_reference_request", "requested_at", "timestamptz"],
   ["verification_case", "id", "uuid"],
   ["professional_profile", "id", "uuid"],
-  ["support_conversation", "id", "uuid"]
+  ["support_conversation", "id", "uuid"],
+  ["service_listing", "completion_evidence_policy", "text"],
+  ["service_listing", "fulfilment_rule", "text"],
+  ["service_listing", "fulfilment_target_count", "int4"],
+  ["service_request", "provider_completion_submitted_by", "uuid"],
+  ["service_request", "requester_outcome_decision", "text"],
+  ["service_request", "requester_outcome_decision_by", "uuid"],
+  ["service_request", "requester_outcome_decision_at", "timestamptz"],
+  ["service_request", "requester_outcome_note", "text"],
+  ["service_request", "final_outcome_summary", "text"],
+  ["service_request", "completion_evidence_delivery_id", "uuid"],
+  ["service_request_completion_event", "id", "uuid"],
+  ["service_request_completion_event", "request_id", "uuid"],
+  ["service_request_completion_event", "actor_user_id", "uuid"],
+  ["service_request_completion_event", "event_type", "text"],
+  ["service_request_completion_event", "evidence_delivery_id", "uuid"],
+  ["service_request_completion_event", "created_at", "timestamptz"]
 ];
 
 const client = new Client({ connectionString, application_name: "mpa-migration-compatibility-check" });
@@ -138,6 +155,22 @@ try {
   const postMigrationColumns = [
     ["service_listing","lifecycle_status","text"],
     ["service_listing","expires_at","timestamptz"],
+    ["service_listing","completion_evidence_policy","text"],
+    ["service_listing","fulfilment_rule","text"],
+    ["service_listing","fulfilment_target_count","int4"],
+    ["service_request","provider_completion_submitted_by","uuid"],
+    ["service_request","requester_outcome_decision","text"],
+    ["service_request","requester_outcome_decision_by","uuid"],
+    ["service_request","requester_outcome_decision_at","timestamptz"],
+    ["service_request","requester_outcome_note","text"],
+    ["service_request","final_outcome_summary","text"],
+    ["service_request","completion_evidence_delivery_id","uuid"],
+    ["service_request_completion_event","id","uuid"],
+    ["service_request_completion_event","request_id","uuid"],
+    ["service_request_completion_event","actor_user_id","uuid"],
+    ["service_request_completion_event","event_type","text"],
+    ["service_request_completion_event","evidence_delivery_id","uuid"],
+    ["service_request_completion_event","created_at","timestamptz"],
     ["service_listing_lifecycle_event","listing_id","uuid"],
     ["service_listing_lifecycle_event","actor_user_id","uuid"],
     ["service_listing_interest","listing_id","uuid"],
@@ -381,6 +414,9 @@ try {
     ["service_listing","service_listing_lifecycle_status_check",["draft","pending_review","active","paused","fulfilled","archived","suspended","rejected"]],
     ["service_listing","service_listing_impact_model_check",["standard","pro_bono","community_discount","capacity_grant"]],
     ["service_listing","service_listing_impact_pricing_check",["standard","pro_bono","community_discount","capacity_grant"]],
+    ["service_listing","service_listing_completion_evidence_policy_check",["accepted_delivery","private_file","description_only"]],
+    ["service_listing","service_listing_fulfilment_rule_check",["manual","single_engagement","engagement_count"]],
+    ["service_request","service_request_requester_outcome_decision_check",["accepted","revision_requested","disputed"]],
     ["service_listing_lifecycle_event","service_listing_lifecycle_event_to_status_check",["draft","pending_review","active","paused","fulfilled","archived","suspended","rejected"]],
     ["service_request_feedback","service_request_feedback_category_check",["service_quality","communication","timeliness","outcome","accessibility","other"]],
     ["service_request_update","service_request_update_category_check",["progress","schedule_change","delivery_note","blocker","handover"]],

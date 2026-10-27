@@ -1,6 +1,6 @@
 "use client";
 import {ArrowRight,Building2,RefreshCw,UserRound} from "lucide-react";
-import {type FormEvent,useEffect,useState} from "react";
+import {type FormEvent,useCallback,useEffect,useRef,useState} from "react";
 import {EmailVerificationGate} from "../../components/email-verification-gate";
 import {Card} from "../../components/ui";
 import {api} from "../../lib/api";
@@ -44,6 +44,8 @@ export default function Register(){
  const [challenge,setChallenge]=useState<{id:string;question:string;expiresAt:string}|null>(null);
  const [challengeAnswer,setChallengeAnswer]=useState("");
  const [challengeBusy,setChallengeBusy]=useState(false);
+ const [challengeError,setChallengeError]=useState("");
+ const challengeRequestInFlight=useRef(false);
  const [verificationMessage,setVerificationMessage]=useState("");
  const [verificationUrl,setVerificationUrl]=useState("");
  const [draftWarning,setDraftWarning]=useState(false);
@@ -55,12 +57,24 @@ export default function Register(){
  const [draftStatus,setDraftStatus]=useState("");
  const set=(k:keyof RegistrationForm,v:string)=>{setForm(f=>({...f,[k]:v}));if(kind==="organization"&&k!=="password"&&k!=="passwordConfirm")setDraftPaused(false);};
 
- async function loadChallenge(){
-  setChallengeBusy(true);setChallengeAnswer("");setChallenge(null);
-  try{setChallenge(await api<{id:string;question:string;expiresAt:string}>("/api/v1/auth/human-challenge"));}
-  catch(err){setError(err instanceof Error?err.message:"Could not load the human check.");}
-  finally{setChallengeBusy(false);}
- }
+ const loadChallenge=useCallback(async()=>{
+  if(challengeRequestInFlight.current)return;
+  challengeRequestInFlight.current=true;
+  setChallengeBusy(true);setChallengeError("");setChallengeAnswer("");setChallenge(null);
+  try{
+   const next=await api<{id:string;question:string;expiresAt:string}>("/api/v1/auth/human-challenge");
+   setChallenge(next);
+  }catch(err){
+   const failure=err as {status?:number;requestId?:string};
+   const reference=failure.requestId ? " Reference: "+failure.requestId : "";
+   setChallengeError(failure.status===429
+    ?"The human check is temporarily rate-limited. Your details are still here. Please wait a moment, then select “Try again”."+reference
+    :"We couldn't load the human check. Your details are safe. Check your connection, then select “Try again”."+reference);
+  }finally{
+   challengeRequestInFlight.current=false;
+   setChallengeBusy(false);
+  }
+ },[]);
  useEffect(()=>{void loadChallenge();},[loadChallenge]);
 
  function organizationDraftForm(source:RegistrationForm=form):OrganizationDraftForm{
@@ -150,8 +164,15 @@ export default function Register(){
    setToken(r.token);
    setRegistered({email:String(r.user?.email||form.email),displayName:String(r.person?.display_name||payload.displayName)});
   }catch(err){
-   setError(err instanceof Error?err.message:"Registration failed.");
-   void loadChallenge();
+   const failure=err as {status?:number;requestId?:string};
+   if(failure.status===429){
+    setChallenge(null);setChallengeAnswer("");
+    setChallengeError("Too many requests were made in a short time. Your registration details are preserved. Please wait a moment before requesting a new human check."+(failure.requestId?" Reference: "+failure.requestId:""));
+    setError("");
+   }else{
+    setError(err instanceof Error?err.message:"Registration failed.");
+    void loadChallenge();
+   }
   }finally{setBusy(false);}
  }
 
@@ -168,6 +189,9 @@ export default function Register(){
   <fieldset className="form-category grid" style={{gap:12}}><legend>3. Secure your account</legend><div className="form-grid"><label>Password<input required minLength={10} type="password" autoComplete="new-password" value={form.password} onChange={e=>set("password",e.target.value)}/></label><label>Confirm password<input required minLength={10} type="password" autoComplete="new-password" value={form.passwordConfirm} onChange={e=>set("passwordConfirm",e.target.value)}/></label></div><p className="muted">Use at least 10 characters. If you already have an account, sign in instead of registering again.</p></fieldset>
   <fieldset className="form-category grid" style={{gap:12}}><legend>4. Terms and security check</legend><div className="form-stack" style={{border:"1px solid var(--border)",borderRadius:12,padding:14}}><label style={{display:"flex",alignItems:"flex-start",gap:10,fontWeight:500}}><input type="checkbox" required checked={termsAccepted} onChange={e=>setTermsAccepted(e.target.checked)} style={{width:18,height:18,marginTop:2,flex:"0 0 auto"}}/><span>I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{color:"var(--primary)",textDecoration:"underline"}}>Terms of Use</a> and acknowledge that I have read the <a href="/privacy" target="_blank" rel="noreferrer" style={{color:"var(--primary)",textDecoration:"underline"}}>Privacy Notice</a>. Optional cookies and analytics are controlled separately in Privacy Preferences.</span></label></div>
   <div className="form-stack" style={{border:"1px solid var(--border)",borderRadius:12,padding:14}}><b>Verify you are human</b>{challenge?<label>{challenge.question}<input required inputMode="numeric" value={challengeAnswer} onChange={e=>setChallengeAnswer(e.target.value)} autoComplete="off" placeholder="Enter your answer"/></label>:<p className="muted">Loading human check…</p>}<button type="button" className="btn btn-ghost" onClick={()=>void loadChallenge()} disabled={challengeBusy}><RefreshCw size={16}/>{challengeBusy?"Loading…":"Get a new question"}</button></div></fieldset>
+  <div className="form-grid"><label>Password<input required minLength={10} type="password" autoComplete="new-password" value={form.password} onChange={e=>set("password",e.target.value)}/></label><label>Confirm password<input required minLength={10} type="password" autoComplete="new-password" value={form.passwordConfirm} onChange={e=>set("passwordConfirm",e.target.value)}/></label></div><p className="muted">Use at least 10 characters. If you already have an account, sign in instead of registering again.</p>
+  <div className="form-stack" style={{border:"1px solid var(--border)",borderRadius:12,padding:14}}><label style={{display:"flex",alignItems:"flex-start",gap:10,fontWeight:500}}><input type="checkbox" required checked={termsAccepted} onChange={e=>setTermsAccepted(e.target.checked)} style={{width:18,height:18,marginTop:2,flex:"0 0 auto"}}/><span>I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{color:"var(--primary)",textDecoration:"underline"}}>Terms of Use</a> and acknowledge that I have read the <a href="/privacy" target="_blank" rel="noreferrer" style={{color:"var(--primary)",textDecoration:"underline"}}>Privacy Notice</a>. Optional cookies and analytics are controlled separately in Privacy Preferences.</span></label></div>
+  <section className="form-stack" aria-label="Human verification" style={{border:"1px solid var(--border)",borderRadius:12,padding:14}}><b>Verify you are human</b><p className="muted">This quick check helps protect accounts from automated sign-ups. Your registration details stay on this page if the check needs to be retried.</p>{challenge?<label>{challenge.question}<input required inputMode="numeric" value={challengeAnswer} onChange={e=>setChallengeAnswer(e.target.value)} autoComplete="off" placeholder="Enter your answer" aria-describedby={challengeError?"human-check-error":undefined}/></label>:<p className="muted" aria-live="polite" aria-atomic="true">{challengeBusy?"Loading a secure human check…":"The human check isn't ready yet. You can try again below."}</p>}{challengeError&&<div id="human-check-error" className="form-error" role="alert" aria-live="polite" aria-atomic="true">{challengeError}</div>}<button type="button" className="btn btn-ghost" onClick={()=>void loadChallenge()} disabled={challengeBusy||busy}><RefreshCw size={16}/>{challengeBusy?"Loading…":challenge?"Get a new question":"Try again"}</button></section>
   {draftWarning&&kind==="organization"&&<div className="form-error" aria-live="polite" aria-atomic="true">This browser could not save your organization details for the verification step. You can continue creating the representative account, but keep these details available to re-enter after verification.</div>}
   {error&&<div className="form-error" role="alert">{error}</div>}<button type="submit" className="btn btn-primary" disabled={busy||!challenge}>{busy?"Creating your account securely…":kind==="professional"?"Create professional account":"Create representative account and continue"} <ArrowRight size={16}/></button>
  </fieldset></form><div className="auth-links"><a href="/login">Already have an account? Login</a><a href="/cookies">Cookie Policy</a><a href="/community-guidelines">Community Guidelines</a></div></Card></div>;

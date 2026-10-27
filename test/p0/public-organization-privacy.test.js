@@ -31,7 +31,8 @@ test("Services is primary and organization workspace links require a signed-in o
   assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);
   assert.doesNotMatch(shell, /\["\/","Home",/);
   assert.doesNotMatch(shell, /\["\/network","Network",/);
-  assert.match(shell, /\["\/serve-community","\/services","\/jobs"\]/);
+  assert.match(shell, /const desktopPrimary=visibleNav\.filter\(\(\[href\]\)=>\["\\/serve-community","\\/jobs"\]\.includes\(href\)\)/);
+  assert.match(shell, /const mobilePrimary=visibleNav\.filter\(\(\[href\]\)=>\["\\/serve-community","\\/jobs"\]\.includes\(href\)\)/);
   assert.doesNotMatch(shell, /\/organizations\/directory/);
   assert.match(shell, /if\(token&&hasOrganizations\)[\s\S]*mobileMore\.push\(orgLink\)/);
 });

@@ -892,10 +892,11 @@ export async function createMentorProfile(userId,input,requestId){
     if(!["members","public"].includes(visibility)) throw error(400,"visibility must be members or public.","VALIDATION_ERROR");
     const existing=(await db.query("select id,status from mentor_profile where user_id=$1 for update",[userId])).rows[0];
     if(existing?.status==="closed") throw error(409,"Closed mentor profiles cannot be reopened.","INVALID_STATE");
-    const values=[headline,String(input.bio||"").trim()||null,JSON.stringify(normalizeArray(input.expertise)),JSON.stringify(normalizeArray(input.languages)),JSON.stringify(normalizeArray(input.mentoringModes||["remote"])),maxActiveMentees,visibility];
+    const circleEnabled=input.circleEnabled===true,circleName=String(input.circleName||"").trim().slice(0,120)||null;
+    const values=[headline,String(input.bio||"").trim()||null,JSON.stringify(normalizeArray(input.expertise)),JSON.stringify(normalizeArray(input.languages)),JSON.stringify(normalizeArray(input.mentoringModes||["remote"])),maxActiveMentees,visibility,circleEnabled,circleName];
     const row=existing
-      ? (await db.query("update mentor_profile set status=case when status='active' then 'draft' else status end,moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,headline=$1,bio=$2,expertise=$3,languages=$4,mentoring_modes=$5,max_active_mentees=$6,visibility=$7,updated_at=now() where id=$8 returning *",[...values,existing.id])).rows[0]
-      : (await db.query("insert into mentor_profile(user_id,headline,bio,expertise,languages,mentoring_modes,max_active_mentees,visibility) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[userId,...values])).rows[0];
+      ? (await db.query("update mentor_profile set status=case when status='active' then 'draft' else status end,moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,headline=$1,bio=$2,expertise=$3,languages=$4,mentoring_modes=$5,max_active_mentees=$6,visibility=$7,circle_enabled=$8,circle_name=$9,updated_at=now() where id=$10 returning *",[...values,existing.id])).rows[0]
+      : (await db.query("insert into mentor_profile(user_id,headline,bio,expertise,languages,mentoring_modes,max_active_mentees,visibility,circle_enabled,circle_name) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *",[userId,...values])).rows[0];
     await audit(db,userId,"mentorship.profile_updated","mentor_profile",row.id,requestId,{status:row.status});
     return row;
   });
@@ -907,7 +908,7 @@ export async function updateMentorProfile(profileId,userId,input,requestId){
     if(!row) throw error(404,"Mentor profile not found.","NOT_FOUND");
     if(row.user_id!==userId) throw error(403,"Only the mentor can edit this profile.","FORBIDDEN");
     await requirePersonalProfessionalCapability(db,userId);
-    const updated=(await db.query("update mentor_profile set status=case when status='active' then 'draft' else status end,moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,headline=coalesce($1,headline),bio=coalesce($2,bio),expertise=coalesce($3,expertise),languages=coalesce($4,languages),mentoring_modes=coalesce($5,mentoring_modes),max_active_mentees=coalesce($6,max_active_mentees),visibility=coalesce($7,visibility),updated_at=now() where id=$8 returning *",[input.headline||null,input.bio||null,input.expertise?JSON.stringify(normalizeArray(input.expertise)):null,input.languages?JSON.stringify(normalizeArray(input.languages)):null,input.mentoringModes?JSON.stringify(normalizeArray(input.mentoringModes)):null,input.maxActiveMentees||null,input.visibility||null,profileId])).rows[0];
+    const updated=(await db.query("update mentor_profile set status=case when status='active' then 'draft' else status end,moderation_status='pending',moderation_note=null,moderated_by=null,moderated_at=null,headline=coalesce($1,headline),bio=coalesce($2,bio),expertise=coalesce($3,expertise),languages=coalesce($4,languages),mentoring_modes=coalesce($5,mentoring_modes),max_active_mentees=coalesce($6,max_active_mentees),visibility=coalesce($7,visibility),circle_enabled=coalesce($8,circle_enabled),circle_name=coalesce($9,circle_name),updated_at=now() where id=$10 returning *",[input.headline||null,input.bio||null,input.expertise?JSON.stringify(normalizeArray(input.expertise)):null,input.languages?JSON.stringify(normalizeArray(input.languages)):null,input.mentoringModes?JSON.stringify(normalizeArray(input.mentoringModes)):null,input.maxActiveMentees||null,input.visibility||null,input.circleEnabled===undefined?null:Boolean(input.circleEnabled),input.circleName===undefined?null:(String(input.circleName||"").trim().slice(0,120)||null),profileId])).rows[0];
     await audit(db,userId,"mentorship.profile_updated","mentor_profile",profileId,requestId);
     return updated;
   });
@@ -995,7 +996,7 @@ export async function listMentors(viewerId,filters={}){
   if(filters.q){ args.push(`%${String(filters.q).trim()}%`); where.push(`(mp.headline ilike $${args.length} or mp.bio ilike $${args.length})`); }
   if(filters.topic){ args.push(`%${String(filters.topic).trim().toLowerCase()}%`); where.push(`mp.expertise::text ilike $${args.length}`); }
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
-  const rows=(await db.query(`select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees from mentor_profile mp join app_user u on u.id=mp.user_id join person p on p.user_id=u.id join membership_record m on m.user_id=u.id where ${where.join(" and ")} order by p.display_name limit ${limit+1} offset ${offset}`,args)).rows;
+  const rows=(await db.query(`select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees,mp.circle_enabled,mp.circle_name,(select count(*)::int from mentorship_circle_membership cm where cm.mentor_profile_id=mp.id and cm.left_at is null) circle_joined_count,exists(select 1 from mentorship_circle_membership cm where cm.mentor_profile_id=mp.id and cm.participant_user_id=$1 and cm.left_at is null) circle_joined_by_me from mentor_profile mp join app_user u on u.id=mp.user_id join person p on p.user_id=u.id join membership_record m on m.user_id=u.id where ${where.join(" and ")} order by p.display_name limit ${limit+1} offset ${offset}`,args)).rows;
   return rows;
 }
 
@@ -1005,7 +1006,8 @@ export async function createMentorshipRequest(menteeId,input,requestId,idempoten
  if(typeof input.goals!=="string"||!input.goals.trim()) throw error(400,"A non-empty mentorship goal is required.","VALIDATION_ERROR");
  const goals=String(input.goals).trim(),preferredMentor=input.preferredMentorUserId||null,topics=JSON.stringify(normalizeArray(input.topics)),modes=JSON.stringify(normalizeArray(input.preferredModes||["remote"])),languages=JSON.stringify(normalizeArray(input.preferredLanguages)),days=JSON.stringify((input.preferredDays||[]).map(Number).filter(n=>n>=0&&n<=6));
  if(preferredMentor===menteeId) throw error(400,"You cannot mentor yourself.","VALIDATION_ERROR");
- const normalized={menteeId,goals,preferredMentor,topics:JSON.parse(topics),modes:JSON.parse(modes),languages:JSON.parse(languages),days:JSON.parse(days)};
+ const shareWithEligibleMentors=input.shareWithEligibleMentors===true;
+ const normalized={menteeId,goals,preferredMentor,topics:JSON.parse(topics),modes:JSON.parse(modes),languages:JSON.parse(languages),days:JSON.parse(days),shareWithEligibleMentors};
  const fingerprint=hashPayload(normalized),keyHash=hashValue(idempotencyKey);
  return withTransaction(async db=>{
   // Serialize submissions from the same mentee so different keys cannot race past duplicate-request detection.
@@ -1019,7 +1021,7 @@ export async function createMentorshipRequest(menteeId,input,requestId,idempoten
   if(!(await activeMember(db,menteeId))) throw error(403,"An active membership is required for mentorship.","MEMBERSHIP_REQUIRED");
   const prior=(await db.query("select * from mentorship_request where mentee_user_id=$1 and goals=$2 and preferred_mentor_user_id is not distinct from $3 and topics=$4::jsonb and preferred_modes=$5::jsonb and preferred_languages=$6::jsonb and preferred_days=$7::jsonb and status in ('requested','matching','matched') order by created_at desc limit 1 for update",[menteeId,goals,preferredMentor,topics,modes,languages,days])).rows[0];
   if(prior)return {...prior,idempotent:true,nextAction:prior.status==="matched"?"A mentor proposal is already active. Wait for the mentor to respond.":"Your mentorship request is already recorded. Review its status or wait for the matching team."};
-  const inserted=(await db.query("insert into mentorship_request(mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,'requested',$8,$9) on conflict do nothing returning *",[menteeId,preferredMentor,goals,topics,modes,languages,days,keyHash,fingerprint])).rows[0];
+  const inserted=(await db.query("insert into mentorship_request(mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,request_idempotency_hash,request_fingerprint,share_with_eligible_mentors) values($1,$2,$3,$4,$5,$6,$7,'requested',$8,$9,$10) on conflict do nothing returning *",[menteeId,preferredMentor,goals,topics,modes,languages,days,keyHash,fingerprint,shareWithEligibleMentors])).rows[0];
   if(!inserted){
    const raced=(await db.query("select * from mentorship_request where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
    if(!raced||raced.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
@@ -1084,7 +1086,9 @@ export async function proposeMentorMatch(requestId,mentorUserId,actorUserId,requ
     const row=(await db.query("insert into mentorship_match(request_id,mentor_user_id,mentee_user_id,score,match_reasons,status,mentee_consent_status,proposed_at) values($1,$2,$3,$4,$5,'proposed','pending',now()) returning *",[requestId,mentorUserId,request.mentee_user_id,match.score,JSON.stringify(match.reasons)])).rows[0];
     await db.query("update mentorship_request set status='matched',matched_mentor_user_id=$1,matched_at=now(),updated_at=now() where id=$2",[mentorUserId,requestId]);
     await audit(db,actorUserId,"mentorship.match_proposed","mentorship_match",row.id,requestIdHeader,{mentorUserId,score:match.score});
-    await queueWorkflowEmail(db,mentorUserId,"mentor.mentorship_update",{status:"match proposed",nextAction:"Review and accept or decline the mentorship match",actionUrl:"/mentorship",actionRequired:true,priority:"high",eventVersion:row.proposed_at||requestIdHeader},"mentorship_match",row.id);
+    await queueWorkflowEmail(db,mentorUserId,"mentor.mentorship_update",{status:"match proposed",nextAction:"Review and accept or decline the mentorship match",actionUrl:"/mentorship",actionRequired:true,priority:"high",matchId:row.id,eventVersion:row.proposed_at||requestIdHeader},"mentorship_match",row.id);
+    const emailOutboxQueued=(await db.query("select 1 from notification_outbox where template_code='mentor.mentorship_update' and payload->>'matchId'=$1 limit 1",[row.id])).rowCount>0;
+    await db.query("update mentorship_match set mentor_notification_status=$2,mentor_notification_updated_at=now(),mentor_notification_detail=$3 where id=$1",[row.id,emailOutboxQueued?"queued":"unknown",emailOutboxQueued?"Email queued; provider delivery and reading are not confirmed.":"In-app workflow notification may be recorded, but no email outbox delivery attempt is available to verify."]);
     await queueWorkflowEmail(db,request.mentee_user_id,"professional.workflow_update",{status:"mentor match proposed",nextAction:"Wait for the proposed mentor to respond",actionUrl:"/mentorship",eventVersion:row.proposed_at||requestIdHeader},"mentorship_match",row.id);
     return row;
   });
@@ -1180,11 +1184,16 @@ export async function createMentorshipSession(mentorshipId,userId,input,requestI
     const m=await mentorshipParticipant(db,mentorshipId,userId);
     if(m.status!=="active") throw error(409,"Sessions can only be scheduled for an active mentorship.","MENTORSHIP_NOT_ACTIVE");
     if(!input.scheduledStartAt||!input.scheduledEndAt) throw error(400,"scheduledStartAt and scheduledEndAt are required.","VALIDATION_ERROR");
+    const meetingReference=String(input.meetingReference||"").trim(),locationLabel=String(input.locationLabel||"").trim(),agenda=String(input.agenda||"").trim(),proposalNote=String(input.proposalNote||"").trim();
+    if(meetingReference.length>1000||locationLabel.length>250||agenda.length>1000||proposalNote.length>1000)throw error(400,"Meeting details exceed the allowed length.","VALIDATION_ERROR");
+    let meetingUrl=null;try{if(meetingReference)meetingUrl=new URL(meetingReference);}catch{meetingUrl=null;}
+    const sharedText=locationLabel+" "+agenda+" "+proposalNote;
+    if((meetingReference&&(!meetingUrl||meetingUrl.protocol!=="https:"||meetingUrl.username||meetingUrl.password))||/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(meetingReference+" "+sharedText)||/(?:tel:|whatsapp:)/i.test(meetingReference+" "+sharedText)||/(?:\+\d{7,}|\(\d{2,4}\)\s*\d{3,}|\b\d{3,}[- ]\d{3,}[- ]\d{3,}\b)/.test(sharedText))throw error(400,"Use an HTTPS meeting link or public meeting location only; do not enter personal email addresses or phone contact details in the shared session details.","PRIVATE_CONTACT_NOT_ALLOWED");
     await assertSessionFitsAvailability(db,m.mentor_user_id,input.scheduledStartAt,input.scheduledEndAt);
-    const row=(await db.query("insert into mentorship_session(mentorship_id,scheduled_start_at,scheduled_end_at,mode,location_label,meeting_reference,agenda,created_by) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[mentorshipId,input.scheduledStartAt,input.scheduledEndAt,input.mode||"remote",input.locationLabel||null,input.meetingReference||null,input.agenda||null,userId])).rows[0];
+    const row=(await db.query("insert into mentorship_session(mentorship_id,scheduled_start_at,scheduled_end_at,mode,location_label,meeting_reference,agenda,created_by,coordination_status,proposed_by,proposal_note) values($1,$2,$3,$4,$5,$6,$7,$8,'proposed',$8,$9) returning *",[mentorshipId,input.scheduledStartAt,input.scheduledEndAt,input.mode||"remote",locationLabel||null,meetingReference||null,String(input.agenda||"").trim().slice(0,1000)||null,userId,String(input.proposalNote||"").trim().slice(0,1000)||null])).rows[0];
     await audit(db,userId,"mentorship.session_created","mentorship_session",row.id,requestId);
     const other=m.mentor_user_id===userId?m.mentee_user_id:m.mentor_user_id;
-    await notify(db,other,"mentorship.session_scheduled","mentorship_session",row.id,{message:"A mentorship session has been scheduled.",nextAction:"Review the date, time, mode and agenda, then coordinate any change with the other participant.",actionUrl:"/mentorship",actionRequired:true,priority:"high",scheduledStartAt:row.scheduled_start_at,scheduledEndAt:row.scheduled_end_at});
+    await notify(db,other,"mentorship.session_scheduled","mentorship_session",row.id,{message:"A first-session proposal is waiting for your confirmation.",nextAction:"Review the proposed date, time, mode and agenda in the mentorship workspace. No private contact details are shared.",actionUrl:"/mentorship",actionRequired:true,priority:"high",scheduledStartAt:row.scheduled_start_at,scheduledEndAt:row.scheduled_end_at,coordinationStatus:"proposed"});
     return row;
   });
 }
@@ -1195,6 +1204,14 @@ export async function changeMentorshipSession(sessionId,userId,status,notes,requ
     const s=(await db.query("select s.*,m.mentor_user_id,m.mentee_user_id,m.status mentorship_status from mentorship_session s join mentorship m on m.id=s.mentorship_id where s.id=$1 for update",[sessionId])).rows[0];
     if(!s) throw error(404,"Mentorship session not found.","NOT_FOUND");
     if(s.mentor_user_id!==userId&&s.mentee_user_id!==userId) throw error(403,"You are not a session participant.","FORBIDDEN");
+    if(s.coordination_status==="proposed"&&status==="cancelled"&&s.proposed_by===userId){
+      const withdrawn=(await db.query("update mentorship_session set coordination_status='declined',status='cancelled',responded_by=$1,responded_at=now(),proposal_note=coalesce($2,proposal_note),updated_at=now() where id=$3 returning *",[userId,String(notes||"").trim().slice(0,1000)||null,sessionId])).rows[0];
+      await audit(db,userId,"mentorship.session_proposal_withdrawn","mentorship_session",sessionId,requestId);
+      const other=s.mentor_user_id===userId?s.mentee_user_id:s.mentor_user_id;
+      if(other)await notify(db,other,"mentorship.session_proposal_withdrawn","mentorship_session",sessionId,{message:"The other participant withdrew their first-session proposal.",nextAction:"Review the mentorship workspace if a new session time is needed.",actionUrl:"/mentorship",coordinationStatus:"declined"});
+      return {...withdrawn,nextAction:"Session proposal withdrawn. The other participant was notified in the platform."};
+    }
+    if(s.coordination_status!=="accepted") throw error(409,"Both participants must confirm the session proposal before recording completion, cancellation or no-show.","SESSION_NOT_CONFIRMED");
     if(s.status===status)return {...s,idempotent:true,nextAction:status==="completed"?"You can submit session feedback.":"Review the session record or schedule another session."};
     if(!allowedSessionTransition(s.status,status)) throw error(409,"Invalid session transition.","INVALID_STATE");
     const row=(await db.query("update mentorship_session set status=$1,notes=coalesce($2,notes),completed_at=case when $1='completed' then now() else completed_at end,updated_at=now() where id=$3 returning *",[status,notes||null,sessionId])).rows[0];
@@ -1207,7 +1224,7 @@ export async function changeMentorshipSession(sessionId,userId,status,notes,requ
 
 export async function listMentorshipSessions(mentorshipId,userId){
   const db=getPool(); await mentorshipParticipant(db,mentorshipId,userId);
-  return (await db.query("select * from mentorship_session where mentorship_id=$1 order by scheduled_start_at",[mentorshipId])).rows;
+  return (await db.query("select id,mentorship_id,scheduled_start_at,scheduled_end_at,mode,case when coordination_status='accepted' then location_label else null end location_label,case when coordination_status='accepted' then meeting_reference else null end meeting_reference,agenda,status,notes,completed_at,created_by,created_at,updated_at,coordination_status,proposed_by,responded_by,responded_at,proposal_note from mentorship_session where mentorship_id=$1 order by scheduled_start_at",[mentorshipId])).rows;
 }
 
 export async function submitMentorshipFeedback(mentorshipId,userId,input,requestId){
@@ -1223,7 +1240,10 @@ export async function submitMentorshipFeedback(mentorshipId,userId,input,request
     } else if(m.status!=="completed") {
       throw error(409,"Program feedback requires a completed mentorship.","MENTORSHIP_NOT_COMPLETED");
     }
-    const row=(await db.query("insert into mentorship_feedback(mentorship_id,session_id,reviewer_user_id,target_role,rating,comments) values($1,$2,$3,$4,$5,$6) on conflict(session_id,reviewer_user_id,target_role) do update set rating=excluded.rating,comments=excluded.comments returning *",[mentorshipId,input.sessionId||null,userId,input.targetRole,input.rating??null,input.comments||null])).rows[0];
+    const rating=Number(input.rating),comments=String(input.comments||"").trim();
+    if(!Number.isInteger(rating)||rating<1||rating>5)throw error(400,"Feedback rating must be an integer from 1 to 5.","VALIDATION_ERROR");
+    if(comments.length<10||comments.length>2000)throw error(400,"Feedback comments must contain 10 to 2,000 characters.","VALIDATION_ERROR");
+    const row=(await db.query("insert into mentorship_feedback(mentorship_id,session_id,reviewer_user_id,target_role,rating,comments) values($1,$2,$3,$4,$5,$6) on conflict(session_id,reviewer_user_id,target_role) do update set rating=excluded.rating,comments=excluded.comments returning *",[mentorshipId,input.sessionId||null,userId,input.targetRole,rating,comments])).rows[0];
     await audit(db,userId,"mentorship.feedback_submitted","mentorship_feedback",row.id,requestId,{targetRole:input.targetRole,sessionId:input.sessionId||null});
     return row;
   });
@@ -1267,13 +1287,13 @@ export async function getMentorship(mentorshipId,userId){
 
 export async function listMyMentorshipRequests(userId){
  const db=getPool();
- return (await db.query("select id,mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,created_at,updated_at from mentorship_request where mentee_user_id=$1 order by created_at desc",[userId])).rows;
+ return (await db.query("select id,mentee_user_id,preferred_mentor_user_id,goals,topics,preferred_modes,preferred_languages,preferred_days,status,share_with_eligible_mentors,created_at,updated_at from mentorship_request where mentee_user_id=$1 order by created_at desc",[userId])).rows;
 }
 
 
 export async function listMyMentorshipMatches(userId){
  const db=getPool();
- return (await db.query(`select mm.id,mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mm.score,mm.match_reasons,mm.status,mm.mentee_consent_status,mm.mentee_response_note,mm.proposed_at,mr.goals,pm.display_name mentor_name,pe.display_name mentee_name,
+ return (await db.query(`select mm.id,mm.request_id,mm.mentor_user_id,mm.mentee_user_id,mm.score,mm.match_reasons,mm.status,mm.mentee_consent_status,mm.mentee_response_note,mm.proposed_at,mm.mentor_notification_status,mm.mentor_notification_updated_at,mm.mentor_notification_detail,mr.goals,pm.display_name mentor_name,pe.display_name mentee_name,
  case when mm.mentor_user_id=$1 then 'mentor' else 'mentee' end match_role
  from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id
  join person pm on pm.user_id=mm.mentor_user_id join person pe on pe.user_id=mm.mentee_user_id

@@ -64,3 +64,15 @@
 Keep all PRs draft until the exact intended tree is reviewed and all required checks have passed. Merge each increment only after its own review and validation, in the sequence above. Do not merge the stale standalone G7 branch or duplicate mentorship PR independently. Do not merge to `main` before the entire stack has passed the agreed acceptance gate.
 
 No production database operation, production-data test or deployment is authorized by this checklist.
+
+## Evidence record (complete before approval)
+
+For each required check above, record:
+- Exact workflow run URL and tested commit SHA.
+- Result: PASS, FAIL or BLOCKED (never mark an unexecuted/skipped check as PASS).
+- Test command or named acceptance suite and concise result summary.
+- For database checks, confirmation that the database was disposable and isolated from production.
+- For browser checks, device/viewport, role used, scenario, result and any unresolved issue.
+- For any exception, the reason, risk owner and explicit disposition.
+
+Final decision: **NOT ACCEPTED until every required check has a recorded passing result on the exact combined PR #9 head.**

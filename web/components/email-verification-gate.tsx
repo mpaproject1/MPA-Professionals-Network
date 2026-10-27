@@ -10,7 +10,6 @@ type Props={email:string;message:string;developmentVerificationUrl?:string};
 type ResendResult={accepted:boolean;developmentVerificationUrl?:string};
 
 export function EmailVerificationGate({email,message,developmentVerificationUrl}:Props){
- const [address,setAddress]=useState(email);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
@@ -18,7 +17,7 @@ export function EmailVerificationGate({email,message,developmentVerificationUrl}
  async function resend(event:FormEvent){
   event.preventDefault();setBusy(true);setError("");setNotice("");
   try{
-   const result=await api<ResendResult>("/api/v1/auth/email-verification/resend",{method:"POST",body:JSON.stringify({email:address.trim()})});
+   const result=await api<ResendResult>("/api/v1/auth/email-verification/resend",{method:"POST",body:JSON.stringify({email:email.trim()})});
    setLocalUrl(result.developmentVerificationUrl||"");
    setNotice("If this address needs verification, a fresh link has been requested. Check the inbox and spam folder. Previous links may no longer work.");
   }catch(cause){setError(cause instanceof ApiError?cause.message:"We could not request a verification email. Please try again.");}
@@ -34,8 +33,8 @@ export function EmailVerificationGate({email,message,developmentVerificationUrl}
    <li><b>Return to MPA</b><span>After verification, sign in to continue. Your membership application remains a separate review process.</span></li>
   </ol>
   <form className="form-stack" onSubmit={resend}>
-   <label>Email used to register<input type="email" required autoComplete="email" value={address} onChange={event=>setAddress(event.target.value)} placeholder="you@example.org"/></label>
-   <button className="btn btn-primary" type="submit" disabled={busy||!address.trim()}><RefreshCw size={16}/>{busy?"Requesting link…":"Resend verification link"}</button>
+   <label>Email used to register<input type="email" value={email} readOnly aria-readonly="true" autoComplete="email"/></label>
+   <button className="btn btn-primary" type="submit" disabled={busy||!email.trim()}><RefreshCw size={16}/>{busy?"Requesting link…":"Resend verification link"}</button>
   </form>
   {error?<p className="form-error" role="alert">{error}</p>:null}
   {notice?<p className="form-success" role="status" aria-live="polite">{notice}</p>:null}

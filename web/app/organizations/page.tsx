@@ -531,6 +531,8 @@ export default function Organizations() {
           <section className="membership-plan"><h3 className="h2">Support a shared professional ecosystem</h3><p className="muted">Participate in a nonprofit network that supports professional development, mentorship and clearer connections between institutions and talent, while retaining responsibility for fair recruitment and selection.</p></section>
         </div>
       </Card>
+      <details className="mpa-collapsible-guide">
+        <summary>How organization verification and hiring workflows work</summary>
       <JourneyGuide
         eyebrow="Employer / recruiter"
         title="Verify → Publish → Review → Report"
@@ -544,6 +546,7 @@ export default function Organizations() {
           { title: "Report", description: "Record interview decisions, hiring outcomes and follow-up feedback through the authorized workflow.", href: "/recruitment", action: "Track hiring" },
         ]}
       />
+      </details>
       {!token ? (
         <Card>
           <h2 className="h2">Sign in to manage an organization</h2>

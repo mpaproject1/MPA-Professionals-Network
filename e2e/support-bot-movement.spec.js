@@ -33,7 +33,7 @@ test.describe("MPA support assistant movement and viewport safety", () => {
     expect(saved).toEqual(expect.objectContaining({ left: expect.any(Number), top: expect.any(Number) }));
   });
 
-  test("touch drag keeps the launcher above mobile navigation and quick questions work", async ({ browser }) => {
+  test("touch drag keeps the launcher clear of the compact mobile header and quick questions work", async ({ browser }) => {
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
       isMobile: true,
@@ -42,8 +42,14 @@ test.describe("MPA support assistant movement and viewport safety", () => {
     const page = await context.newPage();
     try {
       await page.goto("/");
+      // The redesigned mobile-first shell intentionally removes the duplicate bottom
+      // navigation. Public links remain in the compact header; signed-in destinations
+      // are in the header menu. Do not regress by restoring the old five-item nav.
       const nav = page.locator(".mobile-nav");
-      await expect(nav).toBeVisible();
+      await expect(nav).toBeHidden();
+      await expect(page.locator(".topbar .brand")).toBeVisible();
+      await expect(page.getByRole("link", { name: /Serve-Community/ })).toBeVisible();
+      await expect(page.getByRole("link", { name: /Jobs/ })).toBeVisible();
 
       await page.getByRole("button", { name: "Open MPA support" }).tap();
       await expect(page.locator('section[aria-label="MPA support assistant"]')).toBeVisible();
@@ -72,10 +78,11 @@ test.describe("MPA support assistant movement and viewport safety", () => {
       await expect.poll(async () => (await root.boundingBox())?.x).not.toBe(before.x);
 
       const launcherBox = await page.getByRole("button", { name: "Close MPA support panel" }).boundingBox();
-      const navBox = await nav.boundingBox();
       expect(launcherBox).not.toBeNull();
-      expect(navBox).not.toBeNull();
-      expect(launcherBox.y + launcherBox.height).toBeLessThanOrEqual(navBox.y);
+      const viewport = page.viewportSize();
+      expect(viewport).not.toBeNull();
+      expect(launcherBox.y).toBeGreaterThanOrEqual(0);
+      expect(launcherBox.y + launcherBox.height).toBeLessThanOrEqual(viewport.height);
     } finally {
       await context.close();
     }

@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useCallback,useEffect,useState} from "react";
 import {Card} from "../../components/ui";
 import {api} from "../../lib/api";
 
@@ -13,6 +13,8 @@ export default function VerifyEmail(){
  const [busy,setBusy]=useState(false);
  const [organizationDraft,setOrganizationDraft]=useState(false);
  const [registrationReference,setRegistrationReference]=useState("");
+
+
  useEffect(()=>{
   try{
    const raw=localStorage.getItem(ORGANIZATION_DRAFT_KEY);
@@ -27,7 +29,7 @@ export default function VerifyEmail(){
   if(value)void verify(value);
   else setStatus("Enter the verification token from your email link.");
  },[verify]);
- async function verify(value:string){
+ const verify=useCallback(async(value:string)=>{
   setBusy(true);setError("");
   try{
    const result=await api<{verified:boolean;registrationReference?:string|null}>("/api/v1/auth/email-verification/verify",{method:"POST",body:JSON.stringify({token:value})});

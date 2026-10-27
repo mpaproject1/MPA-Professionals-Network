@@ -509,7 +509,7 @@ export default function Organizations() {
   }
 
   return (
-    <div className="grid">
+    <div className="grid mpa-experience mpa-organizations">
       <div>
         <div className="eyebrow">Partner workspace</div>
         <h1 className="h1">Build a trusted organization profile.</h1>

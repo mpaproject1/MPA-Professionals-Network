@@ -90,6 +90,12 @@ jobs:
     steps:
       - name: Check out exact revision
         uses: actions/checkout@v4
+      - name: Set up Python report-file readers
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install independent PDF and spreadsheet readers
+        run: python -m pip install --disable-pip-version-check openpyxl==3.1.5 pypdf==5.9.0
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -184,3 +190,4 @@ jobs:
 # repository has no isolated staging URL, seeded role accounts, or private-resource
 # fixtures configured. Keep e2e/p2-role-journeys.spec.js; re-enable this job after
 # those non-production fixtures are provisioned. Do not substitute production data.
+

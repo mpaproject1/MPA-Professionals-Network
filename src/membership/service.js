@@ -397,8 +397,9 @@ export async function createApplication(userId,input,requestId){
       durationPolicy:(planBillingModel==="recurring" && Number(planDurationDays)===365)?"calendar_year_inclusive":"fixed_days_inclusive"
     };
     const trackingReference=await nextTrackingReference(db,"membership");
-    const row=(await db.query(`insert into membership_application(user_id,tracking_reference,submission_idempotency_key,submission_payload_sha256,application_type,previous_membership_id,membership_product_id,status,submitted_at,data_snapshot,fee_snapshot)
-      values($1,$2,$3,$4,$5,$6,$7,'submitted',now(),$8,$9) returning *`,[userId,trackingReference,submissionKey||null,submissionKey?submissionPayloadHash:null,type,active.rows[0]?.id||null,prod.id,snapshot,fee])).rows[0];
+    const termsSnapshotHash=createHash("sha256").update(JSON.stringify({acknowledgement:"I have reviewed the plan fee, validity and eligibility terms.",feeSnapshot:fee})).digest("hex");
+    const row=(await db.query(`insert into membership_application(user_id,tracking_reference,submission_idempotency_key,submission_payload_sha256,terms_acknowledged_at,terms_snapshot_sha256,application_type,previous_membership_id,membership_product_id,status,submitted_at,data_snapshot,fee_snapshot)
+      values($1,$2,$3,$4,now(),$5,$6,$7,$8,'submitted',now(),$9,$10) returning *`,[userId,trackingReference,submissionKey||null,submissionKey?submissionPayloadHash:null,termsSnapshotHash,type,active.rows[0]?.id||null,prod.id,snapshot,fee])).rows[0];
     await audit(db,userId,"membership.application_submitted","membership_application",row.id,requestId,{applicationType:type,productCode:prod.product_code});
     await notify(db,userId,"membership_application_submitted","membership_application",row.id,{productCode:prod.product_code,eventVersion:row.submitted_at||row.updated_at||row.id});
     const reviewers=(await db.query("select distinct u.id user_id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='members.manage'))")).rows;

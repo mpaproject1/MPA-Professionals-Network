@@ -137,7 +137,7 @@ empty_text="\\n".join(page.extract_text() or "" for page in empty_pdf.pages)
 assert "Status | Members" in empty_text and "No records matched these filters." in empty_text,empty_text
 print(json.dumps({"xlsxRows":len(values)-9,"pdfPages":len(pdf.pages),"emptyState":"verified"}))
 `;
-  const output=execFileSync("python3",["-c",script,dir],{encoding:"utf8"});assert.match(output,/"xlsxRows":2/);assert.match(output,/"emptyState": "verified"/);
+  const output=execFileSync("python3",["-c",script,dir],{encoding:"utf8"});assert.match(output,/"xlsxRows"\s*:\s*2/);assert.match(output,/"emptyState": "verified"/);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
 test("approved-member CSV template includes required columns and no password field",()=>{

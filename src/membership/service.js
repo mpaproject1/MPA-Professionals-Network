@@ -193,7 +193,7 @@ export async function listMyApplications(userId){
       coalesce((select jsonb_agg(jsonb_build_object('id',aa.id,'fileObjectId',f.id,'fileName',f.original_name,'attachmentType',aa.attachment_type,'createdAt',aa.created_at) order by aa.created_at desc)
        from membership_application_attachment aa join file_object f on f.id=aa.file_object_id where aa.application_id=a.id),'[]'::jsonb) attachments,
       coalesce((select jsonb_agg(jsonb_build_object('decision',r.decision,'note',r.note,'createdAt',r.created_at) order by r.created_at desc)
-       from membership_application_review r where r.application_id=a.id),'[]'::jsonb) review_history
+       from membership_application_review r where r.application_id=a.id and r.decision in ('rejected','correction_required')),'[]'::jsonb) review_history
     from membership_application a where a.user_id=$1 order by a.created_at desc`,[userId])).rows;
   return rows.map(row=>({...row,tracking_reference:row.tracking_reference||displayReference({type:"membership",id:row.id,createdAt:row.created_at})}));
 }
@@ -467,7 +467,6 @@ export async function createManualPayment(applicationId,userId,input,requestId){
       if(!method) throw httpError(400,"This payment method is not currently available. Refresh the payment page and choose an enabled method.","PAYMENT_METHOD_UNAVAILABLE");
       if(method.method_type==="chapa") throw httpError(400,"Chapa payments must use the secure hosted checkout flow, not manual evidence submission.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
       if(String(method.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase()) throw httpError(400,"This payment method does not support the application fee currency.","PAYMENT_CURRENCY_UNSUPPORTED");
-      if(method.method_type==="chapa")throw httpError(400,"Online provider checkout must use the secure hosted checkout flow.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
       if(requiresMembershipPaymentEvidence(method.method_type,method.requires_evidence)&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
     }
     if(input.currency&&String(input.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase())throw httpError(400,"Payment currency must match the saved application fee currency.","PAYMENT_CURRENCY_MISMATCH");

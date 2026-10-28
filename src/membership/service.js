@@ -348,8 +348,10 @@ export async function createApplication(userId,input,requestId){
     const account=(await db.query("select id from app_user where id=$1 for update",[userId])).rows[0];
     if(!account) throw httpError(404,"Account not found.","NOT_FOUND");
     const type=input.applicationType||"new";
+    if(!["new","renewal"].includes(type))throw httpError(400,"Choose a valid application type.","VALIDATION_ERROR");
     const submissionKey=String(input.idempotencyKey||"").trim();
-    if(submissionKey&&!/^[A-Za-z0-9_-]{16,128}$/.test(submissionKey))throw httpError(400,"A valid application idempotency key is required.","VALIDATION_ERROR");
+    if(!submissionKey)throw httpError(400,"An application idempotency key is required so submission retries cannot create duplicate records.","IDEMPOTENCY_KEY_REQUIRED");
+    if(!/^[A-Za-z0-9_-]{16,128}$/.test(submissionKey))throw httpError(400,"A valid application idempotency key is required.","VALIDATION_ERROR");
     const submissionPayloadHash=createHash("sha256").update(JSON.stringify({productCode:String(input.productCode||""),applicationType:type,professionalDetails:input.professionalDetails||null,termsAcknowledged:input.termsAcknowledged===true})).digest("hex");
     if(submissionKey){
       const prior=(await db.query("select * from membership_application where user_id=$1 and submission_idempotency_key=$2 for update",[userId,submissionKey])).rows[0];
@@ -399,7 +401,7 @@ export async function createApplication(userId,input,requestId){
     const trackingReference=await nextTrackingReference(db,"membership");
     const termsSnapshotHash=createHash("sha256").update(JSON.stringify({acknowledgement:"I have reviewed the plan fee, validity and eligibility terms.",feeSnapshot:fee})).digest("hex");
     const row=(await db.query(`insert into membership_application(user_id,tracking_reference,submission_idempotency_key,submission_payload_sha256,terms_acknowledged_at,terms_snapshot_sha256,application_type,previous_membership_id,membership_product_id,status,submitted_at,data_snapshot,fee_snapshot)
-      values($1,$2,$3,$4,now(),$5,$6,$7,$8,'submitted',now(),$9,$10) returning *`,[userId,trackingReference,submissionKey||null,submissionKey?submissionPayloadHash:null,termsSnapshotHash,type,active.rows[0]?.id||null,prod.id,snapshot,fee])).rows[0];
+      values($1,$2,$3,$4,now(),$5,$6,$7,$8,'submitted',now(),$9,$10) returning *`,[userId,trackingReference,submissionKey,submissionPayloadHash,termsSnapshotHash,type,active.rows[0]?.id||null,prod.id,snapshot,fee])).rows[0];
     await audit(db,userId,"membership.application_submitted","membership_application",row.id,requestId,{applicationType:type,productCode:prod.product_code});
     await notify(db,userId,"membership_application_submitted","membership_application",row.id,{productCode:prod.product_code,eventVersion:row.submitted_at||row.updated_at||row.id});
     const reviewers=(await db.query("select distinct u.id user_id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='members.manage'))")).rows;

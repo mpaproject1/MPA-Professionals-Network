@@ -117,6 +117,8 @@ test("Phase 1 early payment verification cannot bypass approval or activation ga
   assert.equal(activated.status,"active");
   assert.ok(activated.membership_number);
   assert.equal((await membership.getMe(userId)).has_active_membership,true);
+  const applicationReplayAfterActivation=await membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:`phase1_app_${suffix}`},"phase1-application-after-activation-retry");
+  assert.equal(applicationReplayAfterActivation.id,applicationId,"same-key application retries return the original record after activation");
   const updated=await membership.updateProfile(userId,{firstName:"Phase",lastName:`Member${suffix}`,headline:"Updated Professional",visibility:"members"},"phase1-test-profile-after-membership");
   assert.equal(updated.headline,"Updated Professional");
   assert.equal(updated.visibility,"members","active members may choose a permitted directory visibility setting");

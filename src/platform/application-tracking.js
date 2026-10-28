@@ -1,4 +1,5 @@
 import { getPool } from "./db.js";
+import { displayReference } from "./display-reference.js";
 
 function statusLabel(status){
   const labels={submitted:"Submitted for review",in_review:"Under review",correction_required:"Correction required",payment_pending:"Payment required",paid:"Payment verified",activated:"Approved and active",rejected:"Rejected",draft:"Draft",pending:"Pending",verified:"Verified"};
@@ -56,7 +57,7 @@ export async function getApplicationTracking(userId,{limit=50,offset=0,reference
     from counts left join page on true order by page.updated_at desc nulls last,page.type,page.id`,[userId,pageSize,pageOffset,trackingReference]);
   const countRow=result.rows[0]||{};
   const toItem=row=>({
-    id:row.id,trackingReference:row.tracking_reference,type:row.type,title:row.title,subtitle:row.subtitle,status:row.status,statusLabel:row.type==="organization"&&["submitted","pending"].includes(row.status)?"Awaiting organization review":row.type==="organization"&&row.status==="correction_required"?"Correction required":row.type==="organization"&&row.status==="verified"?"Organization verified":statusLabel(row.status),
+    id:row.id,trackingReference:row.tracking_reference||displayReference({type:row.type,id:row.id,createdAt:row.created_at}),type:row.type,title:row.title,subtitle:row.subtitle,status:row.status,statusLabel:row.type==="organization"&&["submitted","pending"].includes(row.status)?"Awaiting organization review":row.type==="organization"&&row.status==="correction_required"?"Correction required":row.type==="organization"&&row.status==="verified"?"Organization verified":statusLabel(row.status),
     updatedAt:row.updated_at||row.created_at,submittedAt:row.submitted_at,nextAction:row.next_action,details:row.details
   });
   const items=result.rows.filter(row=>row.id).map(toItem);
@@ -64,3 +65,4 @@ export async function getApplicationTracking(userId,{limit=50,offset=0,reference
   const summary={total:Number(countRow.total||0),active:Number(countRow.active||0),nextSteps:Number(countRow.next_steps||0),memberships:Number(countRow.memberships||0),organizations:Number(countRow.organizations||0),jobApplications:Number(countRow.job_applications||0)};
   return {items,attentionItems,summary,limit:pageSize,offset:pageOffset,hasMore:pageOffset+items.length<summary.total};
 }
+

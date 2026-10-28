@@ -1,18 +1,18 @@
 import { createHash, randomUUID } from "node:crypto";
 import { hashSessionToken, newSessionToken, sessionTokenPayload, signToken } from "../platform/auth.js";
+import { toChapaMinorUnits } from "../platform/chapa-money.js";
+import { isValidChapaWebhookSignature } from "../platform/chapa-signature.js";
 import { loadConfig } from "../platform/config.js";
 import { getPool, withTransaction } from "../platform/db.js";
+import { displayReference } from "../platform/display-reference.js";
 import { assertEmailDeliveryConfigured, createEmailVerification, deliverEmailVerification } from "../platform/email-verification.js";
 import { assertProfessionalProfileCapability } from "../platform/identity-policy.js";
 import { membershipEndDate } from "../platform/membership-duration.js";
 import { createInAppNotification } from "../platform/notifications.js";
 import { consumeHumanChallenge } from "../platform/security-controls.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
-import { displayReference } from "../platform/display-reference.js";
 import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
 import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence } from "./payment-policy.js";
-import { isValidChapaWebhookSignature } from "../platform/chapa-signature.js";
-import { toChapaMinorUnits } from "../platform/chapa-money.js";
 
 export function generateMembershipNumber(date=new Date()) { return `MPA-${date.getUTCFullYear()}-${randomUUID().slice(0,8).toUpperCase()}`; }
 

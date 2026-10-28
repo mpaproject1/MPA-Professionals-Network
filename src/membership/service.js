@@ -459,27 +459,15 @@ export async function respondCorrection(applicationId,userId,input,requestId){
 export async function createManualPayment(applicationId,userId,input,requestId){
   return withTransaction(async db=>{
     const app=(await db.query("select a.*,p.product_code,p.currency from membership_application a join membership_product p on p.id=a.membership_product_id where a.id=$1 and a.user_id=$2 for update",[applicationId,userId])).rows[0];
-    if(!app || !canSubmitMembershipPayment(app.status)) throw httpError(409,"Payment evidence can be submitted only for an active, non-rejected membership application.","INVALID_STATE");
+    if(!app)throw httpError(404,"Membership application not found for this account.","NOT_FOUND");
     const fee=app.fee_snapshot;
     const paymentMethodCode=String(input.paymentMethodCode||"").trim();
-    if(!paymentMethodCode)throw httpError(400,"Choose an enabled configured payment method before submitting a manual payment.","PAYMENT_METHOD_REQUIRED");
-    const method=(await db.query("select * from membership_payment_method where method_code=$1 and enabled=true for share",[paymentMethodCode])).rows[0]||null;
-    if(!method) throw httpError(400,"This payment method is not currently available. Refresh the payment page and choose an enabled method.","PAYMENT_METHOD_UNAVAILABLE");
-    if(method.method_type==="chapa") throw httpError(400,"Chapa payments must use the secure hosted checkout flow, not manual evidence submission.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
-    if(String(method.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase()) throw httpError(400,"This payment method does not support the application fee currency.","PAYMENT_CURRENCY_UNSUPPORTED");
+    const amount=Number(input.amount);
+    if(!Number.isFinite(amount)||amount!==Number(fee.amount))throw httpError(400,"Payment amount must exactly match the fee snapshot shown on this application.","PAYMENT_AMOUNT_MISMATCH");
     if(input.currency&&String(input.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase())throw httpError(400,"Payment currency must match the saved application fee currency.","PAYMENT_CURRENCY_MISMATCH");
     if(input.purpose&&input.purpose!=="membership_fee")throw httpError(400,"Payment purpose must be the membership fee for this application.","PAYMENT_PURPOSE_INVALID");
-    const amount=Number(input.amount);
-    if(!Number.isFinite(amount) || amount!==Number(fee.amount)) throw httpError(400,"Payment amount must exactly match the fee snapshot shown on this application.","PAYMENT_AMOUNT_MISMATCH");
-    const methodType=method?.method_type;
-    const channel=methodType==="bank_transfer"?"bank_transfer":methodType==="cash"?"cash":methodType==="telebirr"?"other":methodType==="manual"?"manual":input.channel||"manual";
-    const methodReference=String(input.reference||"").trim();
-    if(methodType==="bank_transfer"&& !methodReference) throw httpError(400,"Enter the bank transfer or transaction reference.","PAYMENT_REFERENCE_REQUIRED");
-    if(methodType==="telebirr"&& !methodReference) throw httpError(400,"Enter the Telebirr transaction reference.","PAYMENT_REFERENCE_REQUIRED");
-    const payerBankName=String(input.payerBankName||"").trim();
-    if(methodType==="bank_transfer"&&(!payerBankName||payerBankName.length>100))throw httpError(400,"Enter the name of the bank you used to send the transfer (maximum 100 characters).","PAYER_BANK_REQUIRED");
     const idem=String(input.idempotencyKey||"").trim();
-    if(!/^[A-Za-z0-9_-]{16,128}$/.test(idem)) throw httpError(400,"idempotencyKey must be a unique token between 16 and 128 letters, digits, underscores or dashes.","VALIDATION_ERROR");
+    if(!/^[A-Za-z0-9_-]{16,128}$/.test(idem))throw httpError(400,"idempotencyKey must be a unique token between 16 and 128 letters, digits, underscores or dashes.","VALIDATION_ERROR");
     const existing=await db.query(`select pt.*,ap.application_id,a.user_id as application_user_id
       from payment_transaction pt
       left join membership_application_payment ap on ap.payment_transaction_id=pt.id
@@ -487,14 +475,32 @@ export async function createManualPayment(applicationId,userId,input,requestId){
       where pt.idempotency_key=$1 for update of pt`,[idem]);
     if(existing.rows[0]){
       const prior=existing.rows[0];
+      const priorPayload=typeof prior.request_payload==="string"?JSON.parse(prior.request_payload):prior.request_payload||{};
+      const requestedReference=String(input.reference||"").trim();
+      const requestedPayerBank=String(input.payerBankName||"").trim();
       if(prior.purpose!=="membership"||prior.application_id!==applicationId||prior.application_user_id!==userId||
          Number(prior.amount)!==amount||String(prior.currency).trim().toUpperCase()!==String(fee.currency).trim().toUpperCase()||
-         prior.submitted_by!==userId||(input.paymentMethodCode&&prior.payment_method_code!==input.paymentMethodCode)){
-        throw httpError(409,"This payment reference was already used for a different submission. Refresh the application and submit again with a new reference.","IDEMPOTENCY_CONFLICT");
+         prior.submitted_by!==userId||(paymentMethodCode&&prior.payment_method_code!==paymentMethodCode)||
+         (input.channel&&prior.channel!==input.channel)||String(priorPayload.reference||"")!==requestedReference||
+         String(priorPayload.payerBankName||"")!==requestedPayerBank){
+        throw httpError(409,"This payment retry key was already used for a different submission. Refresh the application and payment status before continuing.","IDEMPOTENCY_CONFLICT");
       }
       return prior;
     }
+    if(!canSubmitMembershipPayment(app.status))throw httpError(409,"Payment evidence can be submitted only for an active, non-rejected membership application.","INVALID_STATE");
+    if(!paymentMethodCode)throw httpError(400,"Choose an enabled configured payment method before submitting a manual payment.","PAYMENT_METHOD_REQUIRED");
+    const method=(await db.query("select * from membership_payment_method where method_code=$1 and enabled=true for share",[paymentMethodCode])).rows[0]||null;
+    if(!method)throw httpError(400,"This payment method is not currently available. Refresh the payment page and choose an enabled method.","PAYMENT_METHOD_UNAVAILABLE");
+    if(method.method_type==="chapa")throw httpError(400,"Chapa payments must use the secure hosted checkout flow, not manual evidence submission.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
+    if(String(method.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase())throw httpError(400,"This payment method does not support the application fee currency.","PAYMENT_CURRENCY_UNSUPPORTED");
     if(requiresMembershipPaymentEvidence(method.method_type,method.requires_evidence)&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
+    const methodType=method.method_type;
+    const channel=methodType==="bank_transfer"?"bank_transfer":methodType==="cash"?"cash":methodType==="telebirr"?"other":"manual";
+    const methodReference=String(input.reference||"").trim();
+    if(methodType==="bank_transfer"&&!methodReference)throw httpError(400,"Enter the bank transfer or transaction reference.","PAYMENT_REFERENCE_REQUIRED");
+    if(methodType==="telebirr"&&!methodReference)throw httpError(400,"Enter the Telebirr transaction reference.","PAYMENT_REFERENCE_REQUIRED");
+    const payerBankName=String(input.payerBankName||"").trim();
+    if(methodType==="bank_transfer"&&(!payerBankName||payerBankName.length>100))throw httpError(400,"Enter the name of the bank you used to send the transfer (maximum 100 characters).","PAYER_BANK_REQUIRED");
     const activePayment=(await db.query("select pt.id,pt.status from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id where ap.application_id=$1 and pt.status in ('initiated','pending','succeeded') and not (pt.status='pending' and pt.verification_note is not null) order by pt.created_at desc limit 1 for update of pt",[applicationId])).rows[0];
     if(activePayment)throw httpError(409,"A payment is already awaiting verification or has already succeeded for this application. Check its status before starting another payment.","PAYMENT_ALREADY_ACTIVE");
     await db.query("update payment_transaction pt set status='cancelled',completed_at=coalesce(completed_at,now()),updated_at=now(),verification_note=concat_ws(' | ',verification_note,'Superseded by a replacement payment submission.') from membership_application_payment ap where ap.payment_transaction_id=pt.id and ap.application_id=$1 and pt.status='pending' and pt.verification_note is not null",[applicationId]);

@@ -350,7 +350,7 @@ export async function createApplication(userId,input,requestId){
     const type=input.applicationType||"new";
     const submissionKey=String(input.idempotencyKey||"").trim();
     if(submissionKey&&!/^[A-Za-z0-9_-]{16,128}$/.test(submissionKey))throw httpError(400,"A valid application idempotency key is required.","VALIDATION_ERROR");
-    const submissionPayloadHash=createHash("sha256").update(JSON.stringify({productCode:String(input.productCode||""),applicationType:type,professionalDetails:input.professionalDetails||null})).digest("hex");
+    const submissionPayloadHash=createHash("sha256").update(JSON.stringify({productCode:String(input.productCode||""),applicationType:type,professionalDetails:input.professionalDetails||null,termsAcknowledged:input.termsAcknowledged===true})).digest("hex");
     if(submissionKey){
       const prior=(await db.query("select * from membership_application where user_id=$1 and submission_idempotency_key=$2 for update",[userId,submissionKey])).rows[0];
       if(prior){
@@ -358,6 +358,7 @@ export async function createApplication(userId,input,requestId){
         return prior;
       }
     }
+    if(input.termsAcknowledged!==true)throw httpError(400,"Review and acknowledge the current membership fee, validity and eligibility terms before submitting.","TERMS_ACKNOWLEDGEMENT_REQUIRED");
     const prod=await product(db,input.productCode);
     const activeFeeRule=(await db.query(`select * from membership_fee_rule
       where membership_product_id=$1 and effective_from<=current_date and (effective_to is null or effective_to>=current_date)

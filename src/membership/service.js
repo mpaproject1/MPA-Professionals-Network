@@ -510,10 +510,12 @@ export async function verifyPayment(paymentId,verifierId,input,requestId){
     const payment=(await db.query("select * from payment_transaction where id=$1 for update",[paymentId])).rows[0];
     if(!app||!payment) throw httpError(404,"Payment not found.","NOT_FOUND");
     const p={...payment,application_id:link.application_id,user_id:app.user_id,application_status:app.status,fee_snapshot:app.fee_snapshot,approved_at:app.approved_at};
-    if(!["approved","payment_pending"].includes(p.application_status)||!p.approved_at) throw httpError(409,"Payment verification is permitted only after membership application approval.","APPLICATION_NOT_APPROVED");
-    if(p.status!=="pending") throw httpError(409,"Only a pending payment can be verified. This payment has already been decided or reversed.","PAYMENT_NOT_PENDING");
-    if(p.application_status==="activated") throw httpError(409,"Payment evidence cannot be verified against an already activated application.","APPLICATION_NOT_PAYABLE");
+    // A reversal is the strongest terminal guard: report it explicitly even if
+    // the application lifecycle has since advanced or the payment status changed.
     if((await db.query("select 1 from membership_payment_reversal where payment_transaction_id=$1",[paymentId])).rowCount) throw httpError(409,"A reversed or refunded payment cannot be verified again. Submit a new payment for this application if needed.","PAYMENT_ALREADY_REVERSED");
+    if(p.status!=="pending") throw httpError(409,"Only a pending payment can be verified. This payment has already been decided or reversed.","PAYMENT_NOT_PENDING");
+    if(!["approved","payment_pending"].includes(p.application_status)||!p.approved_at) throw httpError(409,"Payment verification is permitted only after membership application approval.","APPLICATION_NOT_APPROVED");
+    if(p.application_status==="activated") throw httpError(409,"Payment evidence cannot be verified against an already activated application.","APPLICATION_NOT_PAYABLE");
     const fee=typeof p.fee_snapshot==="string"?JSON.parse(p.fee_snapshot):p.fee_snapshot;
     if(!fee||Number(p.amount)!==Number(fee.amount)||String(p.currency||"").toUpperCase()!==String(fee.currency||"").toUpperCase()) throw httpError(409,"Payment amount or currency does not match the application fee snapshot.","PAYMENT_AMOUNT_MISMATCH");
     if(!["manual","bank_transfer","cash","other"].includes(p.channel) || p.source==="provider_webhook") throw httpError(400,"This payment is not eligible for manual verification.","INVALID_PAYMENT_CHANNEL");

@@ -257,7 +257,7 @@ test("P0: membership activation requires approval and confirmed payment; reversa
   assert.equal(membershipRow.status, "suspended", "refund/reversal must remove active membership privileges");
   await assert.rejects(
     membership.verifyPayment(pending.id, reviewer.user.id, { decision: "approved" }, "p0-membership-reverify-reversed"),
-    error => error.code === "PAYMENT_NOT_PENDING",
+    error => error.code === "PAYMENT_ALREADY_REVERSED",
     "a reversed payment cannot be verified again"
   );
   const repeatedReversal = await membership.reverseMembershipPayment(pending.id, reviewer.user.id, {

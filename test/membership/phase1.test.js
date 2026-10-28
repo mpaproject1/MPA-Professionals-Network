@@ -35,9 +35,13 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.equal(beforeMembership.headline,"Updated Professional");
   assert.equal(beforeMembership.has_active_membership,false,"editing a basic profile must not activate membership");
 
-  const app=await membership.createApplication(userId,{productCode:"BASIC"},"phase1-test-application");
+  const applicationKey=`phase1_app_${suffix}`;
+  const app=await membership.createApplication(userId,{productCode:"BASIC",idempotencyKey:applicationKey},"phase1-test-application");
   applicationId=app.id;
   assert.equal(app.status,"submitted");
+  const replay=await membership.createApplication(userId,{productCode:"BASIC",idempotencyKey:applicationKey},"phase1-test-application-retry");
+  assert.equal(replay.id,app.id,"a retry with the same account, key and payload returns the original application");
+  await assert.rejects(membership.createApplication(userId,{productCode:"BASIC",applicationType:"renewal",idempotencyKey:applicationKey},"phase1-test-key-conflict"),e=>e.code==="IDEMPOTENCY_CONFLICT");
   const reviewQueueRow=(await membership.listApplicationsForReview()).find(row=>row.id===applicationId);
   assert.ok(reviewQueueRow,"submitted application should appear in the administrator queue");
   assert.ok(Array.isArray(reviewQueueRow.review_history),"administrator queue should include prior review decisions");

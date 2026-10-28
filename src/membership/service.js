@@ -12,7 +12,7 @@ import { createInAppNotification } from "../platform/notifications.js";
 import { consumeHumanChallenge } from "../platform/security-controls.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
 import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
-import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence } from "./payment-policy.js";
+import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence, requiresMembershipPaymentEvidence } from "./payment-policy.js";
 
 export function generateMembershipNumber(date=new Date()) { return `MPA-${date.getUTCFullYear()}-${randomUUID().slice(0,8).toUpperCase()}`; }
 
@@ -468,7 +468,7 @@ export async function createManualPayment(applicationId,userId,input,requestId){
       if(method.method_type==="chapa") throw httpError(400,"Chapa payments must use the secure hosted checkout flow, not manual evidence submission.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
       if(String(method.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase()) throw httpError(400,"This payment method does not support the application fee currency.","PAYMENT_CURRENCY_UNSUPPORTED");
       if(method.method_type==="chapa")throw httpError(400,"Online provider checkout must use the secure hosted checkout flow.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
-      if(method.requires_evidence===true&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
+      if(requiresMembershipPaymentEvidence(method.method_type,method.requires_evidence)&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
     }
     if(input.currency&&String(input.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase())throw httpError(400,"Payment currency must match the saved application fee currency.","PAYMENT_CURRENCY_MISMATCH");
     if(input.purpose&&input.purpose!=="membership_fee")throw httpError(400,"Payment purpose must be the membership fee for this application.","PAYMENT_PURPOSE_INVALID");

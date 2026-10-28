@@ -56,7 +56,7 @@ test("P1 marketplace: private demand is reviewed before a privacy-safe public to
  const reviewed=await marketplaceDemand.reviewDemand(demand.id,staff,{status:"topic_published",publishTopic:true,publicTitle:"Bookkeeping support for small teams",publicSummary:"Small teams are seeking qualified help with monthly bookkeeping and clear financial reporting.",publicCategory:"Finance",interestGoal:5},"marketplace-demand-review");
  assert.equal(reviewed.status,"topic_published");
  assert.ok(reviewed.topic?.id);
- const feed=await marketplaceDemand.listPublishedTopics({type:"service",q:"Public bookkeeping help"});
+ const feed=await marketplaceDemand.listPublishedTopics({type:"service",q:"Bookkeeping support for small teams"});
  const topic=feed.items.find(item=>item.id===reviewed.topic.id);
  assert.ok(topic);
  assert.equal("requester_user_id" in topic,false);
@@ -146,7 +146,7 @@ test.after(async()=>{await closePool();});
 
 test("P1 marketplace: public topic preference is recorded for review without publishing private intake",async()=>{
  const requester=await account(randomUUID()),staff=await supportStaff();
- const demand=await marketplaceDemand.createDemand(requester,{demandType:"mentorship",title:"Need career mentorship",description:"I am seeking career guidance from an experienced professional in project management.",category:"Career development",deliveryMode:"remote",publicTopicRequested:true},"marketplace-public-topic-preference");
+ const demand=await marketplaceDemand.createDemand(requester,{demandType:"mentorship",title:"Need career mentorship",description:"I am seeking career guidance from an experienced professional in project management.",category:"Career development",deliveryMode:"remote",publicTopicRequested:true},"marketplace-public-topic-preference",randomUUID());
  assert.match(demand.tracking_reference,/^MPA-MEN-\d{2}-[A-F0-9]{12}$/);
  assert.equal(demand.public_topic_requested,true);
  assert.equal(demand.public_topic_status,"pending_review");

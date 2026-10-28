@@ -489,7 +489,7 @@ const server=http.createServer(async (req,res)=>{
       anyRoleOrPermission(identity,["reviewer","finance_officer","system_admin"],["members.manage"]); return ok(res,await membership.activateApplication(parts[4],identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && p==="api/v1/membership/renew") {
-      requireRole(identity,"member"); const b=await body(req); return ok(res,await membership.renew(identity.sub,b.productCode,requestId),requestId,201);
+      requireRole(identity,"member"); const b=await body(req); return ok(res,await membership.renew(identity.sub,b.productCode,requestId,b.termsAcknowledged===true),requestId,201);
     }
     if(req.method==="POST" && parts.length===5 && parts[0]==="api" && parts[1]==="v1" && parts[2]==="payments" && parts[4]==="verify") {
       anyRoleOrPermission(identity,["reviewer","finance_officer","system_admin"],["finance.manage"]); return ok(res,await membership.verifyPayment(parts[3],identity.sub,await body(req),requestId),requestId);

@@ -384,3 +384,10 @@ The repository baseline and contract audit is recorded in [Workstream 0 — Base
 **CI policy:** Do not run CI for Workstream 0 or intermediate workstreams. Keep and extend relevant test files as needed, then run the complete required CI/test suite against the exact final Workstream 9 commit. Workstream 0 has not changed application code or schema and has not triggered CI.
 
 **Current gate:** Workstream 0 is partially open: repository mapping is documented, but the environment-dependent browser reproductions and several server-handler/authorization traces must be completed before treating the baseline as fully reproduced.
+
+
+## Workstream 0 source-trace update (2026-10-28)
+
+The baseline audit now includes a supplemental source-to-handler trace in [Workstream 0 — Baseline and Contract Audit](25-workstream-0-baseline-contract-audit.md), committed as `cda59c12dff9eaad785201f734fe5d9fa70c6db9`. The trace confirms the payment-method API/service and admin configuration UI exist (with a discoverability problem), identifies inconsistent evidence handling between the dedicated payment page and embedded workspace form, confirms that the admin user-list API omits membership/organization/profile fields, and confirms that public job-interest inquiry creation does not enforce active membership.
+
+**Gate remains open for a specific reason, not as a status label:** the required development-environment reproduction has not occurred. The membership-card error reference still needs request/log correlation, and route redirects, guide targets, actual deployed response payloads, and the members-only job-interest rule must be validated against the merged development commit. Do not start Workstream 1 or claim Workstream 0 complete until those evidence items are captured. CI remains deferred to Workstream 9; no application code or schema was changed.

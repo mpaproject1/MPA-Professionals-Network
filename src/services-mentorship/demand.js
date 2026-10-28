@@ -48,23 +48,23 @@ export async function createDemand(userId,input,requestId,idempotencyKey=null){
   const existing=(await db.query("select id,demand_type,title,category,delivery_mode,status,created_at,request_fingerprint from marketplace_demand where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
   if(existing){
    if(existing.request_fingerprint!==fingerprint)throw fail(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
-   return {...existing,idempotent:true,replayed:true,nextAction:"This private request was already received. Follow its current status below; you do not need to submit it again."};
+   return {...existing,tracking_reference:displayReference({type:existing.demand_type,id:existing.id,createdAt:existing.created_at}),idempotent:true,replayed:true,nextAction:"This private request was already received. Follow its current status below; you do not need to submit it again."};
   }
   if(organizationId) await orgAccess(db,organizationId,userId);
   const inserted=(await db.query("insert into marketplace_demand(demand_type,requester_user_id,organization_id,title,description,category,delivery_mode,location_label,desired_timing,audience,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) on conflict do nothing returning id,demand_type,title,category,delivery_mode,status,created_at",[type,userId,organizationId,title,description,category,mode,normalized.locationLabel,normalized.desiredTiming,audience,keyHash,fingerprint])).rows[0];
   if(!inserted){
    const raced=(await db.query("select id,demand_type,title,category,delivery_mode,status,created_at,request_fingerprint from marketplace_demand where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
    if(!raced||raced.request_fingerprint!==fingerprint)throw fail(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
-   return {...raced,idempotent:true,replayed:true,nextAction:"This private request was already received. Follow its current status below; you do not need to submit it again."};
+   return {...raced,tracking_reference:displayReference({type:raced.demand_type,id:raced.id,createdAt:raced.created_at}),idempotent:true,replayed:true,nextAction:"This private request was already received. Follow its current status below; you do not need to submit it again."};
   }
   await db.query("insert into marketplace_demand_event(demand_id,actor_user_id,action,to_status,note,metadata) values($1,$2,'demand.submitted','submitted',$3,$4)",[inserted.id,userId,"Private intake submitted.",{audience,organizationId:organizationId||null}]);
   await audit(db,userId,"marketplace.demand_submitted","marketplace_demand",inserted.id,requestId,{demandType:type,audience});
-  return {...inserted,idempotent:false,replayed:false,nextAction:"Your private request is recorded and awaits Support Desk review. Check its status in Your activity."};
+  return {...inserted,tracking_reference:displayReference({type:inserted.demand_type,id:inserted.id,createdAt:inserted.created_at}),idempotent:false,replayed:false,nextAction:"Your private request is recorded and awaits Support Desk review. Check its status in Your activity."};
  });
 }
 export async function listMyDemand(userId){
  const db=getPool();
- return (await db.query("select d.id,d.demand_type,d.title,d.category,d.delivery_mode,d.location_label,d.desired_timing,d.status,d.outcome_code,d.outcome_note,(d.merged_into_demand_id is not null) merged_into_existing,d.created_at,d.updated_at,o.display_name organization_name from marketplace_demand d left join organization o on o.id=d.organization_id where d.requester_user_id=$1 or (d.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=d.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[]))) order by d.created_at desc",[userId,ORG_ROLES])).rows;
+ return (await db.query("select d.id,d.demand_type,d.title,d.category,d.delivery_mode,d.location_label,d.desired_timing,d.status,d.outcome_code,d.outcome_note,(d.merged_into_demand_id is not null) merged_into_existing,d.created_at,d.updated_at,o.display_name organization_name from marketplace_demand d left join organization o on o.id=d.organization_id where d.requester_user_id=$1 or (d.organization_id is not null and exists(select 1 from organization_membership om where om.organization_id=d.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[]))) order by d.created_at desc",[userId,ORG_ROLES])).rows.map(row=>({...row,tracking_reference:displayReference({type:row.demand_type,id:row.id,createdAt:row.created_at})}));
 }
 export async function listPublishedTopics(filters={}){
  const args=[],where=["t.status='published'","(t.closes_at is null or t.closes_at>now())"];

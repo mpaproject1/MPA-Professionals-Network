@@ -464,7 +464,7 @@ const server=http.createServer(async (req,res)=>{
      if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/notifications/") && parts[4]==="archive") return ok(res,await notifications.archiveNotification(identity.sub,parts[3],requestId),requestId);
      if(req.method==="GET" && p==="api/v1/notifications/preferences") return ok(res,await membership.notificationPreferences(identity.sub),requestId);
     if(req.method==="PATCH" && p==="api/v1/notifications/preferences") return ok(res,await membership.notificationPreferences(identity.sub,await body(req)),requestId);
-    if(req.method==="POST" && p==="api/v1/payments/chapa/verify") { const identity=await auth(req); requireRole(identity,"member"); const b=await body(req); return ok(res,await membership.verifyChapaMembershipPayment(b.merchantReference,requestId),requestId); }
+    if(req.method==="POST" && p==="api/v1/payments/chapa/verify") { const identity=await auth(req); requireRole(identity,"member"); const b=await body(req); return ok(res,await membership.verifyChapaMembershipPayment(b.merchantReference,requestId,identity.sub),requestId); }
      if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/membership/applications/") && parts[5]==="chapa-checkout") { const identity=await auth(req); requireRole(identity,"member"); return ok(res,await membership.initiateChapaMembershipPayment(parts[4],identity.sub,await body(req),requestId),requestId,201); }
      if(req.method==="POST" && p==="api/v1/membership/applications") {
       requireRole(identity,"member"); return ok(res,await membership.createApplication(identity.sub,await body(req),requestId),requestId,201);

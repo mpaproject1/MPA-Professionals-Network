@@ -12,7 +12,7 @@
 - The plan stage displays current fee and breakdown, currency, term/renewal policy, benefits, eligibility requirements, and configured required evidence types.
 - The terms acknowledgement has a visibly bordered, padded panel and a large checkbox with explicit required language. The server rejects application and renewal submissions without the explicit acknowledgement, records `terms_acknowledged_at`, and stores a SHA-256 digest bound to the saved fee/validity/eligibility snapshot. The same acknowledgement is part of the idempotency payload contract.
 - The result stage is shown only after the API returns a saved application ID and canonical status. The submission reference is taken from the server response.
-- Application retries reuse a session-stored idempotency key bound to the submitted payload. On an uncertain response, the page reloads the user's server-backed application list before presenting the error.
+- Application creation requires a session-stored idempotency key bound to the submitted payload. On an uncertain response, the page reloads and re-queries the server-backed application list; if an active application exists, it closes the form and presents that existing record rather than offering another submission.
 - The page restores existing in-progress applications and shows an eight-stage progress summary. Rejected applications display the permitted rejection explanation and do not reuse the rejected record as a new submission.
 
 ### Payment and evidence contract
@@ -23,7 +23,7 @@
 - The service requires an enabled configured payment method; direct API callers cannot bypass the method-specific evidence requirement by omitting a method code.
 - Application and renewal endpoints reject missing terms acknowledgement; renewal requests pass the same idempotency key through to the application service.
 - Hosted Chapa checkout is server-verified and never requires a receipt upload. Chapa cannot be submitted through the manual-payment endpoint.
-- Manual payment submissions include explicit membership-fee purpose and currency. Server validation enforces the saved fee amount/currency, method currency, bank/Telebirr references and bank sender details.
+- Manual payment submissions include explicit membership-fee purpose and currency. Server validation enforces the saved fee amount/currency, method currency, bank/Telebirr references and bank sender details. A checksum-confirmed upload is cached for a retry of the same selected file so a transient payment API failure does not require uploading it again.
 - Payment submission retries reuse an application/method-scoped idempotency key. The service checks for an existing matching transaction before checking the application's current state or reapplying upload requirements, so retries return the original payment after a timeout or later status transition. Reusing the key with a different payload is rejected.
 
 ### Schema and service changes
@@ -32,6 +32,7 @@ Migration `db/migrations/20261028110000_guided_membership_application_payment.sq
 
 - Adds nullable `submission_idempotency_key` and `submission_payload_sha256` to `membership_application`.
 - Adds `terms_acknowledged_at` and `terms_snapshot_sha256` to persist the applicant acknowledgement and bind it to the saved fee/validity/eligibility snapshot.
+- Application and renewal creation require an idempotency key; new submissions without one are rejected rather than relying only on a UI duplicate guard.
 - Adds a partial unique index scoped by account and non-null application submission key.
 - Adds `requires_evidence` to `membership_payment_method`, defaulting to required for manual methods; hosted Chapa records are explicitly set not to require an upload.
 - Does not delete, rewrite, or reclassify existing applications or payments.

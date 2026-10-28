@@ -78,3 +78,34 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.sectionNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.sectionNav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.sectionNav a:hover,
+.sectionNav a:focus-visible {
+  border-color: var(--primary);
+  text-decoration: underline;
+  outline-offset: 3px;
+}
+
+.page [id] {
+  scroll-margin-top: 96px;
+}

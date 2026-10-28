@@ -37,6 +37,7 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.equal(beforeMembership.headline,"Updated Professional");
   assert.equal(beforeMembership.has_active_membership,false,"editing a basic profile must not activate membership");
 
+  await assert.rejects(membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true},"phase1-no-idempotency"),e=>e.code==="IDEMPOTENCY_KEY_REQUIRED");
   await assert.rejects(membership.createApplication(userId,{productCode:"BASIC",idempotencyKey:"phase1_no_terms_"+suffix},"phase1-terms-not-acknowledged"),e=>e.code==="TERMS_ACKNOWLEDGEMENT_REQUIRED");
   const applicationKey=`phase1_app_${suffix}`;
   const app=await membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:applicationKey},"phase1-test-application");

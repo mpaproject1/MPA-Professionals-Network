@@ -28,6 +28,12 @@ test("private upload enforces bounded size and allowlisted content type",()=>{
   assert.throws(()=>validatePrivateUploadBytes("text/plain",Buffer.from([65,0,66])),{code:"FILE_TYPE_MISMATCH"});
 });
 
+test("failed private evidence upload validation can be retried with a fresh valid payload",()=>{
+  assert.throws(()=>validatePrivateUploadBytes("application/pdf",Buffer.from("not a pdf")),{code:"FILE_TYPE_MISMATCH"});
+  const retryPayload=Buffer.from("%PDF-1.7\\nretryable private membership receipt");
+  assert.doesNotThrow(()=>validatePrivateUploadBytes("application/pdf",retryPayload));
+});
+
 test("private upload validates signatures for PDF and images",()=>{
   assert.doesNotThrow(()=>validatePrivateUploadBytes("application/pdf",Buffer.from("%PDF-1.7\\nprivate evidence")));
   assert.doesNotThrow(()=>validatePrivateUploadBytes("image/png",Buffer.from([137,80,78,71,13,10,26,10,0])));

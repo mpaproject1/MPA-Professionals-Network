@@ -8,6 +8,8 @@ import test from "node:test";
 import { inflateRawSync } from "node:zlib";
 import { memberImportTemplate } from "../../src/membership/admin-bulk.js";
 import { register } from "../../src/membership/service.js";
+import { closePool, getPool } from "../../src/platform/db.js";
+import { listReportCatalogue, makePdf, makeXlsx, runReport } from "../../src/platform/reports.js";
 
 const admin={sub:"admin",roles:["system_admin"],permissions:[]};
 const readersAvailable=spawnSync("python3",["-c","import openpyxl,pypdf"],{encoding:"utf8"}).status===0;

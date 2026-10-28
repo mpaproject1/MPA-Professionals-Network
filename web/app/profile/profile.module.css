@@ -43,6 +43,29 @@
   margin: 0;
 }
 
+
+.fieldHint {
+  margin: -2px 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.page fieldset > .muted {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.page button:disabled,
+.page input:disabled,
+.page select:disabled,
+.page textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .formHint {
   margin: 0;
   color: var(--muted);

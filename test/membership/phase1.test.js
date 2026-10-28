@@ -11,6 +11,7 @@ let applicationId;
 let paymentId;
 let membershipId;
 let renewalApplicationId;
+let paymentMethodCode;
 
 test("Phase 1 completes registration, profile and application identity flow",async()=>{
   const phone=`09${String(Date.now()).slice(-8)}`;
@@ -47,13 +48,15 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.ok(reviewQueueRow,"submitted application should appear in the administrator queue");
   assert.ok(Array.isArray(reviewQueueRow.review_history),"administrator queue should include prior review decisions");
   assert.equal(app.fee_snapshot.amount,1200);
+  paymentMethodCode="bank_test_"+suffix;
+  await getPool().query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'bank_transfer','Test bank transfer',true,'ETB','Test-only payment method',false) on conflict(method_code) do update set enabled=true,requires_evidence=false",[paymentMethodCode]);
   const prematurePayment=await membership.createManualPayment(applicationId,userId,{
-    amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,
+    amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,
     idempotencyKey:`phase1_early_${suffix}`
   },"phase1-early-payment");
   paymentId=prematurePayment.id;
   assert.equal(prematurePayment.status,"pending");
-  const paymentReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,idempotencyKey:`phase1_early_${suffix}`},"phase1-early-payment-retry");
+  const paymentReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:`phase1_early_${suffix}`},"phase1-early-payment-retry");
   assert.equal(paymentReplay.id,prematurePayment.id,"repeated payment requests with the same idempotency key return the original transaction");
   const earlyVerified=await membership.verifyPayment(prematurePayment.id,userId,{
     decision:"approved",evidenceChecked:[{type:"bank_reference",valid:true}],note:"Early payment verified independently of application review."
@@ -131,7 +134,7 @@ test("Phase 1 rejection after verified payment retains the transaction for recon
   assert.equal(app.status,"submitted");
   const fee=typeof app.fee_snapshot==="string"?JSON.parse(app.fee_snapshot):app.fee_snapshot;
   const payment=await membership.createManualPayment(renewalApplicationId,userId,{
-    amount:Number(fee.amount),currency:fee.currency,channel:"cash",reference:`RECONCILE-${suffix}`,idempotencyKey:`phase1_reconcile_${suffix}`
+    amount:Number(fee.amount),currency:fee.currency,channel:"bank_transfer",reference:`RECONCILE-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:`phase1_reconcile_${suffix}`
   },"phase1-rejected-after-payment");
   const verified=await membership.verifyPayment(payment.id,userId,{decision:"approved",evidenceChecked:[{type:"cash_receipt",valid:true}],note:"Verified before application decision."},"phase1-rejected-payment-verification");
   assert.equal(verified.status,"succeeded");

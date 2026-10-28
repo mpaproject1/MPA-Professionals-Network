@@ -37,10 +37,14 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.equal(beforeMembership.headline,"Updated Professional");
   assert.equal(beforeMembership.has_active_membership,false,"editing a basic profile must not activate membership");
 
+  await assert.rejects(membership.createApplication(userId,{productCode:"BASIC"},"phase1-terms-not-acknowledged"),e=>e.code==="TERMS_ACKNOWLEDGEMENT_REQUIRED");
   const applicationKey=`phase1_app_${suffix}`;
   const app=await membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:applicationKey},"phase1-test-application");
   applicationId=app.id;
   assert.equal(app.status,"submitted");
+  const termsRecord=(await getPool().query("select terms_acknowledged_at,terms_snapshot_sha256 from membership_application where id=$1",[app.id])).rows[0];
+  assert.ok(termsRecord.terms_acknowledged_at,"server records when the applicant accepted the saved terms");
+  assert.match(termsRecord.terms_snapshot_sha256,/^[a-f0-9]{64}$/,"the acknowledged fee/terms snapshot is auditable");
   const replay=await membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:applicationKey},"phase1-test-application-retry");
   assert.equal(replay.id,app.id,"a retry with the same account, key and payload returns the original application");
   await assert.rejects(membership.createApplication(userId,{productCode:"BASIC",applicationType:"renewal",termsAcknowledged:true,idempotencyKey:applicationKey},"phase1-test-key-conflict"),e=>e.code==="IDEMPOTENCY_CONFLICT");

@@ -459,11 +459,9 @@ export default function Profile() {
     <div className={`grid ${styles.page}`} style={{ gap: 18, minWidth: 0, width: "100%" }}>
       <div>
         <div className="eyebrow">Profile & preferences</div>
-        <h1 className="h1">Your controls, your trust boundary.</h1>
+        <h1 className="h1">Your professional profile</h1>
         <p className="muted">
-          Account details and communication preferences are read from and saved
-          to the service. Private verification evidence remains separate from
-          your public profile.
+          Build your professional identity, manage your membership, and choose how MPA contacts you. Your private verification evidence is kept separate from information shown in the professional directory.
         </p>
       </div>
       {!token ? (
@@ -487,11 +485,11 @@ export default function Profile() {
               <div>
                 <div className="eyebrow">Account</div>
                 <div className="h2">
-                  {profile?.display_name || "Your profile"}
+                  {profile?.display_name || "Your professional profile"}
                 </div>
                 <p className="muted">
                   {profile?.email} ·{" "}
-                  {profile?.status || "Loading account status"}
+                  {loading ? "Loading your account…" : profile?.status || "Account status unavailable"}
                 </p>
               </div>
               <ShieldCheck color="var(--primary)" />
@@ -516,23 +514,30 @@ export default function Profile() {
             </section>
             <form className="grid" style={{ gap: 12 }} onSubmit={saveProfile}>
               <p className={styles.formHint}>
-                Fields marked <b>*</b> are required to save your identity. Other
-                details are optional and can be added later.
+                Start with your name. The other details are optional and can be added later. Changes are saved only when you select Save profile.
               </p>
-              <fieldset className="form-category grid" style={{gap:12}}><legend>1. Identity and contact</legend><div className="grid grid-2">
+              <fieldset className="form-category grid" style={{gap:12}}><legend>1. Personal information</legend>
+              <p className="muted">Use the name you want associated with your MPA account. Contact details and sensitive personal information are not automatically made public.</p><div className="grid grid-2">
                 {(
                   [
                     ["firstName", "First name *"],
                     ["middleName", "Middle name (optional)"],
                     ["lastName", "Last name *"],
-                    ["displayName", "Display name (optional)"],
-                    ["phone", "Phone (optional)"],
+                    ["displayName", "Name shown on your profile (optional)"],
+                    ["phone", "Phone number (optional)"],
                     ["dateOfBirth", "Date of birth (optional)"],
                     ["sex", "Gender (optional)"],
                   ] as const
                 ).map(([key, label]) => (
                   <div key={key}>
                     <label htmlFor={`profile-${key}`}>{label}</label>
+                    {key === "firstName" ? <p className={styles.fieldHint}>Your given name as it should appear on your membership record.</p> : null}
+                    {key === "middleName" ? <p className={styles.fieldHint}>Add a middle name if you use one.</p> : null}
+                    {key === "lastName" ? <p className={styles.fieldHint}>Your family name.</p> : null}
+                    {key === "displayName" ? <p className={styles.fieldHint}>Choose how you would like to be addressed. Directory visibility is controlled separately.</p> : null}
+                    {key === "phone" ? <p className={styles.fieldHint}>Include your country code if possible, for example +251…</p> : null}
+                    {key === "dateOfBirth" ? <p className={styles.fieldHint}>Optional. Provide this only when needed for an MPA service or eligibility check.</p> : null}
+                    {key === "sex" ? <p className={styles.fieldHint}>Optional. This is not shown publicly by default.</p> : null}
                     {key === "sex" ? (
                       <select
                         id={`profile-${key}`}
@@ -558,8 +563,10 @@ export default function Profile() {
                   </div>
                 ))}
               </div></fieldset>
-              <fieldset className="form-category grid" style={{gap:12}}><legend>2. Professional summary and visibility</legend><div>
+              <fieldset className="form-category grid" style={{gap:12}}><legend>2. Professional summary</legend>
+              <p className="muted">Introduce your work and expertise in your own words. These details are separate from verified credentials; adding them does not mean MPA has verified them.</p><div>
                 <label htmlFor={`${profileId}-headline`}>Professional headline</label>
+                <p className={styles.fieldHint}>Summarize your role and expertise in one sentence. Example: “Public Health Specialist | Program Management”.</p>
                 <input
                   id={`${profileId}-headline`}
                   value={form.headline}
@@ -569,7 +576,8 @@ export default function Profile() {
                 />
               </div>
               <div>
-                <label htmlFor={`${profileId}-bio`}>Professional bio</label>
+                <label htmlFor={`${profileId}-bio`}>About you</label>
+                <p className={styles.fieldHint}>Describe your experience, areas of expertise, and the contribution you hope to make to the professional community.</p>
                 <textarea
                   id={`${profileId}-bio`}
                   value={form.bio}
@@ -582,8 +590,9 @@ export default function Profile() {
               {profile?.has_active_membership ? (
                 <div>
                   <label htmlFor={`${profileId}-visibility`}>
-                    Professional directory visibility
+                    Show your profile in the professional directory
                   </label>
+                  <p className={styles.fieldHint}>Choose who can discover your profile. This setting does not grant access to private records or verification evidence.</p>
                   <select
                     id={`${profileId}-visibility`}
                     value={form.visibility}
@@ -627,8 +636,8 @@ export default function Profile() {
           <Card>
             <div className="row">
               <div>
-                <div className="eyebrow">Professional directory</div>
-                <h2 className="h2">Your professional profile</h2>
+                <div className="eyebrow">Professional profile</div>
+                <h2 className="h2">Experience and expertise</h2>
                 <p className="muted">
                   Only opted-in profiles with an eligible verified professional
                   claim appear in the directory. Private evidence and reviewer
@@ -735,7 +744,7 @@ export default function Profile() {
               </label>
               </fieldset><fieldset className="form-category grid" style={{gap:12}}><legend>3. Evidence and experience</legend><div className="grid" style={{ gap: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
                 <h3 className="h2">Guided education, classifications and portfolio</h3>
-                <p className="muted">Structured education records, managed classifications, languages, and traceable portfolio items are edited in the guided section below. This replaces the previous comma-separated and free-text credential fields.</p>
+                <p className="muted">Add education, qualifications, languages, skills, and portfolio items in the guided editor. These are self-reported details until the relevant verification workflow confirms them.</p>
               </div>
               <div className="grid" style={{ gap: 12, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
                 <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><div><h3 className="h2">Work experience</h3><p className="muted">Describe relevant roles, dates, responsibilities, and outcomes. You can keep entries member-only or make them part of your public-safe profile.</p></div><button className="btn btn-ghost" type="button" onClick={() => setExperienceDrafts((rows) => [...rows, { draftKey: crypto.randomUUID(), employerName: "", roleTitle: "", startDate: "", endDate: "", currentRole: false, description: "", visibility: "members" }])}>Add experience</button></div>
@@ -775,8 +784,9 @@ export default function Profile() {
           <Card>
             <div className="row">
               <div>
-                <div className="eyebrow">Consent and disclosure</div>
-                <div className="h2">Choose what the directory may show</div>
+                <div className="eyebrow">Privacy and visibility</div>
+                <div className="h2">Choose what other members can see</div>
+                <p className="muted">These controls apply to your eligible directory profile only. Private evidence and reviewer notes remain protected by server-side access rules.</p>
               </div>
               <Eye color="var(--primary)" />
             </div>
@@ -843,13 +853,12 @@ export default function Profile() {
             <div className="row">
               <div>
                 <div className="eyebrow">Communication</div>
-                <div className="h2">Notification preferences</div>
+                <div className="h2">How MPA contacts you</div>
               </div>
               <RefreshCw color="var(--primary)" />
             </div>
             <p className="muted">
-              Select supported channels. Delivery still depends on channel
-              configuration.
+              Choose the channels you prefer for eligible notifications. Saving a preference does not guarantee delivery; each channel must be configured and available.
             </p>
             <div className="grid grid-2">
               {(
@@ -893,26 +902,23 @@ export default function Profile() {
               <div>
                 <div className="h2">Language</div>
                 <p className="muted">
-                  Current interface language: {language}. Amharic, Afaan Oromoo
-                  and Somali remain localization targets.
+                  Current interface language: {language}. Use the language control in the site header to change the interface language when available.
                 </p>
               </div>
             </div>
             <div className="row">
               <CreditCard color="var(--gold)" />
               <div>
-                <div className="h2">Membership dues</div>
+                <div className="h2">Membership and payments</div>
                 <p className="muted">
-                  Membership payment and manual review follow the membership
-                  workflow; provider callbacks are not represented as connected
-                  unless configured.
+                  Check your application, review, and payment status in the membership workspace. Membership is not active until the required review, payment verification, and activation steps are confirmed.
                 </p>
               </div>
             </div>
             <div className="row">
               <WifiOff color="var(--gold)" />
               <div>
-                <div className="h2">Field mode</div>
+                <div className="h2">Field workspace</div>
                 <p className="muted">
                   Offline field evidence is not reported as synchronized until
                   the server confirms it.
@@ -925,7 +931,7 @@ export default function Profile() {
             <div className="row">
               <FileCheck2 color="var(--primary)" />
               <div>
-                <div className="h2">Verification evidence</div>
+                <div className="h2">Verification and credentials</div>
                 <p className="muted">
                   Private by default; accessible only to authorized participants
                   and reviewers under server-side policy.

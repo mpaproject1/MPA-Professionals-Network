@@ -467,7 +467,6 @@ export async function createManualPayment(applicationId,userId,input,requestId){
     if(!method) throw httpError(400,"This payment method is not currently available. Refresh the payment page and choose an enabled method.","PAYMENT_METHOD_UNAVAILABLE");
     if(method.method_type==="chapa") throw httpError(400,"Chapa payments must use the secure hosted checkout flow, not manual evidence submission.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
     if(String(method.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase()) throw httpError(400,"This payment method does not support the application fee currency.","PAYMENT_CURRENCY_UNSUPPORTED");
-    if(requiresMembershipPaymentEvidence(method.method_type,method.requires_evidence)&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
     if(input.currency&&String(input.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase())throw httpError(400,"Payment currency must match the saved application fee currency.","PAYMENT_CURRENCY_MISMATCH");
     if(input.purpose&&input.purpose!=="membership_fee")throw httpError(400,"Payment purpose must be the membership fee for this application.","PAYMENT_PURPOSE_INVALID");
     const amount=Number(input.amount);
@@ -495,6 +494,7 @@ export async function createManualPayment(applicationId,userId,input,requestId){
       }
       return prior;
     }
+    if(requiresMembershipPaymentEvidence(method.method_type,method.requires_evidence)&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
     const activePayment=(await db.query("select pt.id,pt.status from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id where ap.application_id=$1 and pt.status in ('initiated','pending','succeeded') and not (pt.status='pending' and pt.verification_note is not null) order by pt.created_at desc limit 1 for update of pt",[applicationId])).rows[0];
     if(activePayment)throw httpError(409,"A payment is already awaiting verification or has already succeeded for this application. Check its status before starting another payment.","PAYMENT_ALREADY_ACTIVE");
     await db.query("update payment_transaction pt set status='cancelled',completed_at=coalesce(completed_at,now()),updated_at=now(),verification_note=concat_ws(' | ',verification_note,'Superseded by a replacement payment submission.') from membership_application_payment ap where ap.payment_transaction_id=pt.id and ap.application_id=$1 and pt.status='pending' and pt.verification_note is not null",[applicationId]);

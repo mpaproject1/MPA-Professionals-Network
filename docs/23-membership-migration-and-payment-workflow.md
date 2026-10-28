@@ -113,3 +113,32 @@ The only runtime dependency that remains mandatory is the configured database an
 ## Phase exit implication
 
 Membership migration and manual payment verification are now part of the foundation contract and must be preserved when the membership module is implemented.
+
+## Independent application and payment stages
+
+Application review and payment collection are independent records and decisions.
+
+- A member may submit payment evidence while the application is `submitted`, `in_review`, `correction_required`, or `payment_pending`.
+- Early payment submission does not change the application status. Finance can verify the amount, currency, reference and private evidence while a reviewer separately evaluates eligibility.
+- If finance verifies payment before approval, the application remains in its review state. A later approval moves it to `paid`; activation still requires the existing server-side activation gate.
+- If the application is rejected after an early payment has succeeded, the payment remains visible in the authorized review queue for reconciliation/refund handling. Rejection never silently erases a received payment.
+- Duplicate pending payment submissions are blocked. Rejected, failed, refunded or cancelled payment records remain auditable.
+
+The separate member workspace is `/membership/payment`. The membership application workspace is `/membership`. Receipt uploads use the existing private upload service and checksum confirmation; they are attached to the payment transaction and are never public.
+
+## Configured payment methods
+
+Authorized membership/finance administrators configure methods from the payment workspace. Supported manual evidence methods include local bank transfer, Telebirr, cash/in-person and other manual payments. Bank/account details, currency, instructions and an HTTPS QR image URL are configured in the database; the application never hardcodes actual account numbers. Telebirr and bank references are required for those methods.
+
+### Chapa hosted checkout
+
+Chapa is implemented as a server-side hosted checkout adapter. Keep the private key and webhook secret only in the API environment; never enter them in the browser or payment-method form. Configure these environment variables before enabling a Chapa method:
+
+- `CHAPA_SECRET_KEY`: Chapa private key (use a test key during acceptance).
+- `CHAPA_WEBHOOK_SECRET`: secret used to authenticate the raw-body HMAC-SHA256 webhook signature.
+- `CHAPA_CALLBACK_URL`: public HTTPS URL ending in `/api/v1/payments/chapa/webhook`.
+- `CHAPA_RETURN_URL`: public HTTPS member payment page URL.
+
+The API initializes hosted checkout with a unique merchant reference (20 characters or fewer) and idempotency key. Membership fees are converted to Chapa integer minor units; this adapter currently permits ETB and USD only until other currency precision is explicitly validated. The return URL is not trusted as proof of payment. The webhook signature is checked against the exact raw request bytes using constant-time comparison, then the API independently calls Chapa's verification endpoint and checks final status, merchant reference, amount and currency. Authenticated final webhook payloads are deduplicated by raw-body SHA-256 scoped to the test/live environment. Only a server-verified success updates the payment transaction. Application approval and membership activation remain separate.
+
+Do not enable live payments until a Chapa merchant account has confirmed which payment methods are enabled, HTTPS callback/return URLs are reachable, test-mode success/failure/pending/replay cases pass, and finance has reviewed reconciliation and refund operations. No live credentials or bank/Telebirr account details are included in this repository.

@@ -375,3 +375,12 @@ These details should be resolved against the current policy and data model befor
 - The actual cause of the reported missing payment-method screen and membership-card lookup failure.
 
 **Review instruction:** Review this plan first. Do not start implementation or claim these gaps are fixed until the plan is revised/accepted and each work package is mapped to the current code and tests.
+
+
+## Workstream 0 audit record
+
+The repository baseline and contract audit is recorded in [Workstream 0 — Baseline and Contract Audit](25-workstream-0-baseline-contract-audit.md). It documents route/component/API/schema owners, existing test suites to retain, authorization/privacy contracts, and which findings are confirmed from source versus still requiring authenticated development-environment reproduction.
+
+**CI policy:** Do not run CI for Workstream 0 or intermediate workstreams. Keep and extend relevant test files as needed, then run the complete required CI/test suite against the exact final Workstream 9 commit. Workstream 0 has not changed application code or schema and has not triggered CI.
+
+**Current gate:** Workstream 0 is partially open: repository mapping is documented, but the environment-dependent browser reproductions and several server-handler/authorization traces must be completed before treating the baseline as fully reproduced.

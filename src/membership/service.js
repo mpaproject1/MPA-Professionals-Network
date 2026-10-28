@@ -461,14 +461,13 @@ export async function createManualPayment(applicationId,userId,input,requestId){
     const app=(await db.query("select a.*,p.product_code,p.currency from membership_application a join membership_product p on p.id=a.membership_product_id where a.id=$1 and a.user_id=$2 for update",[applicationId,userId])).rows[0];
     if(!app || !canSubmitMembershipPayment(app.status)) throw httpError(409,"Payment evidence can be submitted only for an active, non-rejected membership application.","INVALID_STATE");
     const fee=app.fee_snapshot;
-    let method=null;
-    if(input.paymentMethodCode){
-      method=(await db.query("select * from membership_payment_method where method_code=$1 and enabled=true for share",[String(input.paymentMethodCode)])).rows[0]||null;
-      if(!method) throw httpError(400,"This payment method is not currently available. Refresh the payment page and choose an enabled method.","PAYMENT_METHOD_UNAVAILABLE");
-      if(method.method_type==="chapa") throw httpError(400,"Chapa payments must use the secure hosted checkout flow, not manual evidence submission.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
-      if(String(method.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase()) throw httpError(400,"This payment method does not support the application fee currency.","PAYMENT_CURRENCY_UNSUPPORTED");
-      if(requiresMembershipPaymentEvidence(method.method_type,method.requires_evidence)&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
-    }
+    const paymentMethodCode=String(input.paymentMethodCode||"").trim();
+    if(!paymentMethodCode)throw httpError(400,"Choose an enabled configured payment method before submitting a manual payment.","PAYMENT_METHOD_REQUIRED");
+    const method=(await db.query("select * from membership_payment_method where method_code=$1 and enabled=true for share",[paymentMethodCode])).rows[0]||null;
+    if(!method) throw httpError(400,"This payment method is not currently available. Refresh the payment page and choose an enabled method.","PAYMENT_METHOD_UNAVAILABLE");
+    if(method.method_type==="chapa") throw httpError(400,"Chapa payments must use the secure hosted checkout flow, not manual evidence submission.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
+    if(String(method.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase()) throw httpError(400,"This payment method does not support the application fee currency.","PAYMENT_CURRENCY_UNSUPPORTED");
+    if(requiresMembershipPaymentEvidence(method.method_type,method.requires_evidence)&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
     if(input.currency&&String(input.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase())throw httpError(400,"Payment currency must match the saved application fee currency.","PAYMENT_CURRENCY_MISMATCH");
     if(input.purpose&&input.purpose!=="membership_fee")throw httpError(400,"Payment purpose must be the membership fee for this application.","PAYMENT_PURPOSE_INVALID");
     const amount=Number(input.amount);

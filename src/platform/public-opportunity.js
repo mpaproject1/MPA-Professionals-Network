@@ -114,7 +114,7 @@ export async function updatePublicInquiryDetails(reference,token,input,requestId
  return withTransaction(async db=>{const r=await getByToken(db,reference,token);return saveInquiryDetails(db,r,input,requestId,r.app_user_id||null);});
 }
 export async function listMyLinkedInquiries(userId){
- return (await getPool().query("select i.public_reference reference,i.inquiry_type,status,i.created_at,i.updated_at,i.employer_sharing_consent,i.employer_sharing_organization_id,i.employer_sharing_revoked_at,case when i.status in ('converted','declined','closed') then 'Review the recorded outcome.' when i.employer_sharing_consent=true and i.employer_sharing_revoked_at is null then 'Review sharing history or revoke consent.' else 'Review your saved details or choose whether to share selected fields with one named organization.' end next_action from public_opportunity_inquiry i where i.app_user_id=$1 order by i.updated_at desc limit 100",[userId])).rows;
+ return (await getPool().query("select i.public_reference reference,i.inquiry_type,i.job_id is not null has_linked_job,j.title job_title,i.status,i.created_at,i.updated_at,i.employer_sharing_consent,i.employer_sharing_organization_id,i.employer_sharing_revoked_at,case when i.status in ('converted','declined','closed') then 'Review the recorded outcome.' when i.employer_sharing_consent=true and i.employer_sharing_revoked_at is null then 'Review sharing history or revoke consent.' else 'Review your saved details or choose whether to share selected fields with one named organization.' end next_action from public_opportunity_inquiry i left join job j on j.id=i.job_id where i.app_user_id=$1 order by i.updated_at desc limit 100",[userId])).rows;
 }
 export async function getLinkedInquiryDetails(reference,userId){
  const r=(await getPool().query("select i.*,j.title job_title from public_opportunity_inquiry i left join job j on j.id=i.job_id where i.public_reference=$1 and i.app_user_id=$2",[reference,userId])).rows[0];
@@ -263,3 +263,4 @@ export async function linkInquiryToAccount(reference,token,userId,requestId){
   return row;
  });
 }
+

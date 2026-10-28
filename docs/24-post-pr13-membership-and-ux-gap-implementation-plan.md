@@ -404,3 +404,6 @@ The guided membership application/payment source and additive schema changes are
 
 
 **Payment-method and retry contract hardening:** the manual-payment service now requires an enabled configured method, enforces that method's currency and evidence policy, and checks an existing idempotency record before current application state or upload-required validation. Replays return the original transaction only when account, application, amount, currency, method, channel, reference and sender-bank fields match; conflicting reuse is rejected. The hosted Chapa record also retains the explicit `membership_fee` purpose.
+
+
+**Final Workstream 1 source sweep:** application and renewal creation now require a valid idempotency key as well as explicit terms acknowledgement; the service records the acknowledgement timestamp and a digest of the saved fee/validity/eligibility snapshot. Regression coverage includes replay after activation, payment replay after paid/rejected status transitions, changed-payload key conflict, missing configured method/evidence, and rejection-after-payment reconciliation. See the updated [Workstream 1 implementation record](26-workstream-1-guided-membership-application-payment.md). Full CI and disposable PostgreSQL rollback verification remain deliberately deferred to Workstream 9; no claim of runtime acceptance is made before those checks run.

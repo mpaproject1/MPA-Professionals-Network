@@ -401,3 +401,6 @@ The guided membership application/payment source and additive schema changes are
 
 
 **Terms-acceptance hardening:** the application/renewal API now requires `termsAcknowledged: true`; the database records `terms_acknowledged_at` and a SHA-256 digest bound to the saved fee/validity/eligibility fee snapshot. Renewal requests also pass through an idempotency key. The lifecycle regression test asserts missing acknowledgement is rejected and the timestamp/hash are persisted.
+
+
+**Payment-method and retry contract hardening:** the manual-payment service now requires an enabled configured method, enforces that method's currency and evidence policy, and checks an existing idempotency record before current application state or upload-required validation. Replays return the original transaction only when account, application, amount, currency, method, channel, reference and sender-bank fields match; conflicting reuse is rejected. The hosted Chapa record also retains the explicit `membership_fee` purpose.

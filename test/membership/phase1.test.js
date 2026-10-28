@@ -41,7 +41,7 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   const app=await membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:applicationKey},"phase1-test-application");
   applicationId=app.id;
   assert.equal(app.status,"submitted");
-  const replay=await membership.createApplication(userId,{productCode:"BASIC",idempotencyKey:applicationKey},"phase1-test-application-retry");
+  const replay=await membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:applicationKey},"phase1-test-application-retry");
   assert.equal(replay.id,app.id,"a retry with the same account, key and payload returns the original application");
   await assert.rejects(membership.createApplication(userId,{productCode:"BASIC",applicationType:"renewal",termsAcknowledged:true,idempotencyKey:applicationKey},"phase1-test-key-conflict"),e=>e.code==="IDEMPOTENCY_CONFLICT");
   const reviewQueueRow=(await membership.listApplicationsForReview()).find(row=>row.id===applicationId);

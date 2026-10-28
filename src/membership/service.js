@@ -188,10 +188,12 @@ export async function listMyApplications(userId){
       (select jsonb_build_object('id',p.id,'status',p.status,'amount',p.amount,'currency',p.currency,'channel',p.channel,'reference',coalesce(p.request_payload->>'reference',p.purpose_reference),'payment_method_code',p.payment_method_code,'payer_bank_name',p.request_payload->>'payerBankName','checkout_url',p.request_payload->>'checkoutUrl','created_at',p.created_at,'verified_at',p.verified_at,'verification_note',p.verification_note)
        from membership_application_payment ap join payment_transaction p on p.id=ap.payment_transaction_id
        where ap.application_id=a.id order by p.created_at desc limit 1) as payment,
-      (select jsonb_build_object('id',c.id,'requested_fields',c.requested_fields,'reviewer_note',c.reviewer_note,'status',c.status,'applicant_response',c.applicant_response)
+      (select jsonb_build_object('id',c.id,'requested_fields',c.requested_fields,'reviewer_note',c.reviewer_note,'status',c.status,'applicant_response',c.applicant_response,'created_at',c.created_at)
        from membership_correction c where c.application_id=a.id order by c.created_at desc limit 1) as latest_correction,
       coalesce((select jsonb_agg(jsonb_build_object('id',aa.id,'fileObjectId',f.id,'fileName',f.original_name,'attachmentType',aa.attachment_type,'createdAt',aa.created_at) order by aa.created_at desc)
-       from membership_application_attachment aa join file_object f on f.id=aa.file_object_id where aa.application_id=a.id),'[]'::jsonb) attachments
+       from membership_application_attachment aa join file_object f on f.id=aa.file_object_id where aa.application_id=a.id),'[]'::jsonb) attachments,
+      coalesce((select jsonb_agg(jsonb_build_object('decision',r.decision,'note',r.note,'createdAt',r.created_at) order by r.created_at desc)
+       from membership_application_review r where r.application_id=a.id),'[]'::jsonb) review_history
     from membership_application a where a.user_id=$1 order by a.created_at desc`,[userId])).rows;
   return rows.map(row=>({...row,tracking_reference:row.tracking_reference||displayReference({type:"membership",id:row.id,createdAt:row.created_at})}));
 }

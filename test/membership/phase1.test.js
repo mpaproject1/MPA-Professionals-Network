@@ -10,6 +10,7 @@ let userId;
 let applicationId;
 let paymentId;
 let membershipId;
+let renewalApplicationId;
 
 test("Phase 1 completes registration, profile and application identity flow",async()=>{
   const phone=`09${String(Date.now()).slice(-8)}`;
@@ -52,6 +53,8 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   },"phase1-early-payment");
   paymentId=prematurePayment.id;
   assert.equal(prematurePayment.status,"pending");
+  const paymentReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,idempotencyKey:`phase1_early_${suffix}`},"phase1-early-payment-retry");
+  assert.equal(paymentReplay.id,prematurePayment.id,"repeated payment requests with the same idempotency key return the original transaction");
   const earlyVerified=await membership.verifyPayment(prematurePayment.id,userId,{
     decision:"approved",evidenceChecked:[{type:"bank_reference",valid:true}],note:"Early payment verified independently of application review."
   },"phase1-early-payment-verification");
@@ -113,11 +116,31 @@ test("Phase 1 early payment verification cannot bypass approval or activation ga
 
 test("Phase 1 renewal creates a linked renewal application without losing history",async()=>{
   const renewal=await membership.renew(userId,"BASIC","phase1-test-renewal");
+  renewalApplicationId=renewal.id;
   assert.equal(renewal.application_type,"renewal");
   assert.equal(renewal.previous_membership_id,membershipId);
   const history=await membership.history(userId);
   assert.equal(history.memberships.length,1);
   assert.equal(history.applications.length,2);
+});
+
+test("Phase 1 rejection after verified payment retains the transaction for reconciliation",async()=>{
+  const db=getPool();
+  assert.ok(renewalApplicationId,"renewal application should be available for the rejection-after-payment scenario");
+  const app=(await db.query("select fee_snapshot,status from membership_application where id=$1 and user_id=$2",[renewalApplicationId,userId])).rows[0];
+  assert.equal(app.status,"submitted");
+  const fee=typeof app.fee_snapshot==="string"?JSON.parse(app.fee_snapshot):app.fee_snapshot;
+  const payment=await membership.createManualPayment(renewalApplicationId,userId,{
+    amount:Number(fee.amount),currency:fee.currency,channel:"cash",reference:`RECONCILE-${suffix}`,idempotencyKey:`phase1_reconcile_${suffix}`
+  },"phase1-rejected-after-payment");
+  const verified=await membership.verifyPayment(payment.id,userId,{decision:"approved",evidenceChecked:[{type:"cash_receipt",valid:true}],note:"Verified before application decision."},"phase1-rejected-payment-verification");
+  assert.equal(verified.status,"succeeded");
+  const rejected=await membership.reviewApplication(renewalApplicationId,userId,{decision:"rejected",note:"Eligibility requirements were not met."},"phase1-reject-after-payment");
+  assert.equal(rejected.decision,"rejected");
+  const after=(await db.query("select a.status application_status,p.status payment_status,pr.reconciliation_status from membership_application a join membership_application_payment ap on ap.application_id=a.id join payment_transaction p on p.id=ap.payment_transaction_id left join payment_reconciliation pr on pr.payment_transaction_id=p.id where a.id=$1 and p.id=$2",[renewalApplicationId,payment.id])).rows[0];
+  assert.equal(after.application_status,"rejected");
+  assert.equal(after.payment_status,"succeeded","rejection must not erase or silently reclassify verified funds");
+  assert.ok(after.reconciliation_status,"verified payment remains in reconciliation history after application rejection");
 });
 
 test("Phase 1 notification preferences are persisted",async()=>{

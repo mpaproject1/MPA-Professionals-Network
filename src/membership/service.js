@@ -670,8 +670,8 @@ export async function expireDueMemberships(batchSize=500){
  });
 }
 
-export async function renew(userId,productCode,requestId,termsAcknowledged=false){
-  return createApplication(userId,{productCode,applicationType:"renewal",termsAcknowledged},requestId);
+export async function renew(userId,productCode,requestId,termsAcknowledged=false,idempotencyKey=null){
+  return createApplication(userId,{productCode,applicationType:"renewal",termsAcknowledged,idempotencyKey},requestId);
 }
 
 export async function history(userId){

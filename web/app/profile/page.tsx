@@ -1,5 +1,6 @@
 "use client";
 import {
+  ClipboardCopy,
   CreditCard,
   Eye,
   FileCheck2,
@@ -40,6 +41,7 @@ type Profile = {
   has_active_membership?: boolean;
   profile_picture_file_id?: string | null;
 };
+type ProfileMembershipApplication={id:string;tracking_reference?:string|null;application_type?:string;status:string;created_at?:string};
 type Preferences = {
   email_enabled: boolean;
   sms_enabled: boolean;
@@ -105,6 +107,9 @@ export default function Profile() {
     clearToken = useUiStore((s) => s.clearToken),
     language = useUiStore((s) => s.language);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [membershipApplications,setMembershipApplications]=useState<ProfileMembershipApplication[]>([]);
+  const [membershipReferencesError,setMembershipReferencesError]=useState("");
+  const [copyNotice,setCopyNotice]=useState("");
   const [form, setForm] = useState(blank);
   const [organizationOnly, setOrganizationOnly] = useState(false);
   const [profilePictureUrl, setProfilePictureUrl] = useState("");
@@ -442,6 +447,8 @@ export default function Profile() {
       setSavingPreferences(false);
     }
   }
+  useEffect(()=>{let active=true;if(!token){setMembershipApplications([]);setMembershipReferencesError("");return;}void api<ProfileMembershipApplication[]>("/api/v1/membership/applications/me",{},token).then(rows=>{if(active){setMembershipApplications(Array.isArray(rows)?rows:[]);setMembershipReferencesError("");}}).catch(()=>{if(active)setMembershipReferencesError("Membership references could not be loaded. Refresh or open Membership to retry; no internal record IDs are displayed.");});return()=>{active=false;}},[token]);
+  async function copyDisplayReference(value:string){const ref=String(value||"").trim();if(!ref){setCopyNotice("A display reference has not been assigned yet.");return;}try{await navigator.clipboard.writeText(ref);setCopyNotice("Reference copied to clipboard.");}catch{setCopyNotice("Clipboard access is unavailable. Select the displayed reference and copy it manually.");}}
   const update = (key: keyof typeof blank, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
   const isOrganizationAccount=Boolean(profile?.roles?.some(role=>["organization_representative","organization_owner","organization_admin","organization_member","organization"].includes(role)));
@@ -487,6 +494,9 @@ export default function Profile() {
             <a href="#notification-preferences">Notifications</a>
             <a href="#account-preferences">Account preferences</a>
           </nav>
+          <Card>
+            <div className="eyebrow">Membership application references</div><p className="muted">Use these display references when contacting MPA Support Desk. Internal record IDs are never shown as a fallback.</p>{membershipReferencesError&&<p className="muted" role="status">{membershipReferencesError}</p>}{membershipApplications.length===0&&!membershipReferencesError?<p className="muted">No membership applications are currently available for this account.</p>:membershipApplications.map(app=><div className="row" key={app.id} style={{justifyContent:"space-between",flexWrap:"wrap",padding:"8px 0",borderBottom:"1px solid var(--border)"}}><div><b>{app.tracking_reference||"Reference not assigned yet"}</b><div className="muted">{(app.application_type||"membership").replaceAll("_"," ")} · {app.status.replaceAll("_"," ")}</div></div>{app.tracking_reference&&<button type="button" className="btn btn-ghost" onClick={()=>void copyDisplayReference(app.tracking_reference||"")}><ClipboardCopy size={15}/> Copy reference</button>}</div>)}{copyNotice&&<p className="muted" role="status" aria-live="polite">{copyNotice}</p>}
+          </Card>
           <Card>
             <div className="row">
               <div>

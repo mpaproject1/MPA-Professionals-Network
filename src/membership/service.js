@@ -1,7 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { hashSessionToken, newSessionToken, sessionTokenPayload, signToken } from "../platform/auth.js";
+import { toChapaMinorUnits } from "../platform/chapa-money.js";
+import { isValidChapaWebhookSignature } from "../platform/chapa-signature.js";
 import { loadConfig } from "../platform/config.js";
 import { getPool, withTransaction } from "../platform/db.js";
+import { displayReference } from "../platform/display-reference.js";
 import { assertEmailDeliveryConfigured, createEmailVerification, deliverEmailVerification } from "../platform/email-verification.js";
 import { assertProfessionalProfileCapability } from "../platform/identity-policy.js";
 import { membershipEndDate } from "../platform/membership-duration.js";
@@ -9,6 +12,7 @@ import { createInAppNotification } from "../platform/notifications.js";
 import { consumeHumanChallenge } from "../platform/security-controls.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
 import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
+import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence } from "./payment-policy.js";
 
 export function generateMembershipNumber(date=new Date()) { return `MPA-${date.getUTCFullYear()}-${randomUUID().slice(0,8).toUpperCase()}`; }
 
@@ -179,9 +183,9 @@ export async function updateProfile(userId,input,requestId){
 
 export async function listMyApplications(userId){
   const db=getPool();
-  return (await db.query(`select a.id,a.tracking_reference,a.application_type,a.status,a.submitted_at,a.reviewed_at,a.approved_at,a.created_at,a.updated_at,
+  const rows=(await db.query(`select a.id,a.tracking_reference,a.application_type,a.status,a.submitted_at,a.reviewed_at,a.approved_at,a.created_at,a.updated_at,
       a.data_snapshot,a.fee_snapshot,
-      (select jsonb_build_object('id',p.id,'status',p.status,'amount',p.amount,'currency',p.currency,'channel',p.channel,'created_at',p.created_at,'verified_at',p.verified_at,'verification_note',p.verification_note)
+      (select jsonb_build_object('id',p.id,'status',p.status,'amount',p.amount,'currency',p.currency,'channel',p.channel,'reference',coalesce(p.request_payload->>'reference',p.purpose_reference),'payment_method_code',p.payment_method_code,'payer_bank_name',p.request_payload->>'payerBankName','checkout_url',p.request_payload->>'checkoutUrl','created_at',p.created_at,'verified_at',p.verified_at,'verification_note',p.verification_note)
        from membership_application_payment ap join payment_transaction p on p.id=ap.payment_transaction_id
        where ap.application_id=a.id order by p.created_at desc limit 1) as payment,
       (select jsonb_build_object('id',c.id,'requested_fields',c.requested_fields,'reviewer_note',c.reviewer_note,'status',c.status,'applicant_response',c.applicant_response)
@@ -189,6 +193,7 @@ export async function listMyApplications(userId){
       coalesce((select jsonb_agg(jsonb_build_object('id',aa.id,'fileObjectId',f.id,'fileName',f.original_name,'attachmentType',aa.attachment_type,'createdAt',aa.created_at) order by aa.created_at desc)
        from membership_application_attachment aa join file_object f on f.id=aa.file_object_id where aa.application_id=a.id),'[]'::jsonb) attachments
     from membership_application a where a.user_id=$1 order by a.created_at desc`,[userId])).rows;
+  return rows.map(row=>({...row,tracking_reference:row.tracking_reference||displayReference({type:"membership",id:row.id,createdAt:row.created_at})}));
 }
 
 export async function listMembershipProducts(){
@@ -261,6 +266,8 @@ export async function saveMembershipProduct(actorId,productCode,input,requestId)
     if(!Number.isFinite(taxAmount)||taxAmount<0||!Number.isFinite(serviceFee)||serviceFee<0) throw httpError(400,"Tax and service fees must be valid non-negative amounts.","VALIDATION_ERROR");
     const benefits=Array.isArray(input.benefits)?input.benefits.map(x=>String(x).trim()).filter(Boolean).slice(0,40):[];
     const eligibility=input.eligibility&&typeof input.eligibility==="object"&&!Array.isArray(input.eligibility)?input.eligibility:{};
+    if(eligibility.requiredEvidence!==undefined&&!Array.isArray(eligibility.requiredEvidence))throw httpError(400,"Required evidence must be a list of supported evidence type codes.","VALIDATION_ERROR");
+    try{missingRequiredMembershipEvidence(eligibility.requiredEvidence||[],[]);}catch(error){throw httpError(400,error.message||"Invalid required evidence configuration.","VALIDATION_ERROR");}
     const existing=(await db.query("select * from membership_product where product_code=$1 for update",[code])).rows[0];
     if(!existing&&productCode) throw httpError(404,"Membership plan not found.","NOT_FOUND");
     if(existing&&!productCode) throw httpError(409,"A plan with this code already exists. Choose a different code or edit the existing plan.","PLAN_CODE_EXISTS");
@@ -395,12 +402,28 @@ export async function reviewApplication(applicationId,reviewerId,input,requestId
     await db.query("update membership_application set status='in_review',reviewed_at=now(),updated_at=now() where id=$1",[applicationId]);
     const decision=input.decision;
     if(!["approved","rejected","correction_required"].includes(decision)) throw httpError(400,"Invalid review decision.","VALIDATION_ERROR");
+    if(decision==="approved"){
+      const fee=typeof row.fee_snapshot==="string"?JSON.parse(row.fee_snapshot):row.fee_snapshot;
+      const submitted=(await db.query("select attachment_type from membership_application_attachment where application_id=$1 union select 'membership_evidence' where exists(select 1 from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id where ap.application_id=$1 and pt.evidence_file_id is not null)",[applicationId])).rows.map(item=>item.attachment_type);
+      let missing=[];
+      try{missing=missingRequiredMembershipEvidence(fee?.eligibility?.requiredEvidence||[],submitted);}
+      catch(error){throw httpError(409,error.message||"Required membership evidence configuration is invalid.","REQUIRED_EVIDENCE_CONFIGURATION_INVALID");}
+      if(missing.length)throw httpError(409,"Cannot approve this application until the required private evidence is attached: "+missing.join(", ").replaceAll("_"," ")+".","REQUIRED_EVIDENCE_MISSING");
+    }
     const review=(await db.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,$3,$4,$5) returning *",[applicationId,reviewerId,decision,input.note||null,JSON.stringify(input.checklist||[])])).rows[0];
-    const next=decision==="approved"?"payment_pending":decision==="rejected"?"rejected":"correction_required";
-    await db.query("update membership_application set status=$1,approved_at=case when $1='payment_pending' then now() else approved_at end,updated_at=now() where id=$2",[next,applicationId]);
+    const verifiedPayment=(decision==="approved"?(await db.query(`select 1 from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id where ap.application_id=$1 and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id) limit 1`,[applicationId])).rowCount>0:false);
+    const next=applicationStatusAfterReview(decision,verifiedPayment);
+    await db.query("update membership_application set status=$1,approved_at=case when $2 then coalesce(approved_at,now()) else approved_at end,updated_at=now() where id=$3",[next,decision==="approved",applicationId]);
     if(decision==="correction_required") await db.query("insert into membership_correction(application_id,requested_by,requested_fields,reviewer_note) values($1,$2,$3,$4)",[applicationId,reviewerId,JSON.stringify(input.requestedFields||[]),input.note||"Correction required."]);
     await audit(db,reviewerId,"membership.application_reviewed","membership_application",applicationId,requestId,{decision});
     await notify(db,row.user_id,`membership_application_${decision}`,"membership_application",applicationId,{note:input.note||null,eventVersion:review.id});
+    if(decision==="rejected"){
+      const outstanding=(await db.query("select pt.id,pt.status from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id where ap.application_id=$1 and pt.status in ('initiated','pending','succeeded') limit 1",[applicationId])).rows[0];
+      if(outstanding){
+        const financeUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role r on r.id=ur.role_id where r.role_code in ('finance_officer','system_admin') union select distinct up.user_id from app_user_permission up where up.permission_code='finance.manage'")).rows;
+        for(const finance of financeUsers)await notify(db,finance.user_id,"membership_payment_reconciliation_required","payment_transaction",outstanding.id,{category:"membership",message:"The membership application was rejected while a payment remains unverified or succeeded.",nextAction:"Verify any outstanding payment and reconcile/refund confirmed funds according to policy.",actionUrl:"/membership",reviewerQueue:true,actionRequired:true,priority:"high"});
+      }
+    }
     return review;
   });
 }
@@ -424,12 +447,26 @@ export async function respondCorrection(applicationId,userId,input,requestId){
 export async function createManualPayment(applicationId,userId,input,requestId){
   return withTransaction(async db=>{
     const app=(await db.query("select a.*,p.product_code,p.currency from membership_application a join membership_product p on p.id=a.membership_product_id where a.id=$1 and a.user_id=$2 for update",[applicationId,userId])).rows[0];
-    if(!app || app.status!=="payment_pending") throw httpError(409,"Application is not ready for payment.","INVALID_STATE");
+    if(!app || !canSubmitMembershipPayment(app.status)) throw httpError(409,"Payment evidence can be submitted only for an active, non-rejected membership application.","INVALID_STATE");
     const fee=app.fee_snapshot;
+    let method=null;
+    if(input.paymentMethodCode){
+      method=(await db.query("select * from membership_payment_method where method_code=$1 and enabled=true for share",[String(input.paymentMethodCode)])).rows[0]||null;
+      if(!method) throw httpError(400,"This payment method is not currently available. Refresh the payment page and choose an enabled method.","PAYMENT_METHOD_UNAVAILABLE");
+      if(method.method_type==="chapa") throw httpError(400,"Chapa payments must use the secure hosted checkout flow, not manual evidence submission.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
+      if(String(method.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase()) throw httpError(400,"This payment method does not support the application fee currency.","PAYMENT_CURRENCY_UNSUPPORTED");
+    }
     const amount=Number(input.amount);
-    if(!Number.isFinite(amount) || amount!==Number(fee.amount)) throw httpError(400,"Payment amount must exactly match the approved application fee.","PAYMENT_AMOUNT_MISMATCH");
+    if(!Number.isFinite(amount) || amount!==Number(fee.amount)) throw httpError(400,"Payment amount must exactly match the fee snapshot shown on this application.","PAYMENT_AMOUNT_MISMATCH");
+    const methodType=method?.method_type;
+    const channel=methodType==="bank_transfer"?"bank_transfer":methodType==="cash"?"cash":methodType==="telebirr"?"other":methodType==="manual"?"manual":input.channel||"manual";
+    const methodReference=String(input.reference||"").trim();
+    if(methodType==="bank_transfer"&& !methodReference) throw httpError(400,"Enter the bank transfer or transaction reference.","PAYMENT_REFERENCE_REQUIRED");
+    if(methodType==="telebirr"&& !methodReference) throw httpError(400,"Enter the Telebirr transaction reference.","PAYMENT_REFERENCE_REQUIRED");
+    const payerBankName=String(input.payerBankName||"").trim();
+    if(methodType==="bank_transfer"&&(!payerBankName||payerBankName.length>100))throw httpError(400,"Enter the name of the bank you used to send the transfer (maximum 100 characters).","PAYER_BANK_REQUIRED");
     const idem=String(input.idempotencyKey||"").trim();
-    if(!idem) throw httpError(400,"idempotencyKey is required.","VALIDATION_ERROR");
+    if(!/^[A-Za-z0-9_-]{16,128}$/.test(idem)) throw httpError(400,"idempotencyKey must be a unique token between 16 and 128 letters, digits, underscores or dashes.","VALIDATION_ERROR");
     const existing=await db.query(`select pt.*,ap.application_id,a.user_id as application_user_id
       from payment_transaction pt
       left join membership_application_payment ap on ap.payment_transaction_id=pt.id
@@ -439,24 +476,27 @@ export async function createManualPayment(applicationId,userId,input,requestId){
       const prior=existing.rows[0];
       if(prior.purpose!=="membership"||prior.application_id!==applicationId||prior.application_user_id!==userId||
          Number(prior.amount)!==amount||String(prior.currency).trim().toUpperCase()!==String(fee.currency).trim().toUpperCase()||
-         prior.submitted_by!==userId){
+         prior.submitted_by!==userId||(input.paymentMethodCode&&prior.payment_method_code!==input.paymentMethodCode)){
         throw httpError(409,"This payment reference was already used for a different submission. Refresh the application and submit again with a new reference.","IDEMPOTENCY_CONFLICT");
       }
       return prior;
     }
-    const p=(await db.query(`insert into payment_transaction(provider,provider_transaction_id,idempotency_key,purpose,amount,currency,status,request_payload,channel,submitted_by,purpose_reference,source)
-      values('manual',null,$1,'membership', $2,$3,'pending',$4::jsonb,$5,$6,$7,'manual_entry') returning *`,
-      [idem,amount,fee.currency,JSON.stringify({channel:input.channel||"manual",reference:input.reference||null}),input.channel||"manual",userId,input.reference||applicationId])).rows[0];
+    const activePayment=(await db.query("select pt.id,pt.status from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id where ap.application_id=$1 and pt.status in ('initiated','pending','succeeded') and not (pt.status='pending' and pt.verification_note is not null) order by pt.created_at desc limit 1 for update of pt",[applicationId])).rows[0];
+    if(activePayment)throw httpError(409,"A payment is already awaiting verification or has already succeeded for this application. Check its status before starting another payment.","PAYMENT_ALREADY_ACTIVE");
+    await db.query("update payment_transaction pt set status='cancelled',completed_at=coalesce(completed_at,now()),updated_at=now(),verification_note=concat_ws(' | ',verification_note,'Superseded by a replacement payment submission.') from membership_application_payment ap where ap.payment_transaction_id=pt.id and ap.application_id=$1 and pt.status='pending' and pt.verification_note is not null",[applicationId]);
+    const p=(await db.query(`insert into payment_transaction(provider,provider_transaction_id,idempotency_key,purpose,amount,currency,status,request_payload,channel,submitted_by,purpose_reference,source,payment_method_code)
+      values('manual',null,$1,'membership', $2,$3,'pending',$4::jsonb,$5,$6,$7,'manual_entry',$8) returning *`,
+      [idem,amount,fee.currency,JSON.stringify({channel,reference:methodReference||null,paymentMethodCode:method?.method_code||null,payerBankName:payerBankName||null,methodSnapshot:method?{displayName:method.display_name,methodType:method.method_type,currency:method.currency,bankName:method.bank_name,accountName:method.account_name,accountNumber:method.account_number,providerCode:method.provider_code}:null}),channel,userId,methodReference||applicationId,method?.method_code||null])).rows[0];
     await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[applicationId,p.id]);
     if(input.evidenceFileId){
       const file=await db.query("select id from file_object where id=$1 and (created_by=$2 or created_by is null)",[input.evidenceFileId,userId]);
       if(!file.rows[0]) throw httpError(400,"Payment evidence file is not available to this account.","INVALID_EVIDENCE");
       await db.query("update payment_transaction set evidence_file_id=$1 where id=$2",[input.evidenceFileId,p.id]);
     }
-    await audit(db,userId,"membership.payment_submitted","payment_transaction",p.id,requestId,{applicationId,channel:input.channel||"manual"});
+    await audit(db,userId,"membership.payment_submitted","payment_transaction",p.id,requestId,{applicationId,channel,paymentMethodCode:method?.method_code||null});
     await notify(db,userId,"membership_payment_submitted","membership_application",applicationId,{paymentId:p.id,eventVersion:p.id});
     const financeUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role r on r.id=ur.role_id where r.role_code in ('finance_officer','system_admin') union select distinct up.user_id from app_user_permission up where up.permission_code='finance.manage'")).rows;
-    for(const finance of financeUsers)await notify(db,finance.user_id,"membership_payment_review_required","payment_transaction",p.id,{category:"membership",message:"A membership payment is awaiting finance verification.",nextAction:"Review the payment evidence and reconcile the payment against the approved application fee.",actionUrl:"/membership",reviewerQueue:true,actionRequired:true,priority:"high"});
+    for(const finance of financeUsers)await notify(db,finance.user_id,"membership_payment_review_required","payment_transaction",p.id,{category:"membership",message:"A membership payment is awaiting finance verification.",nextAction:"Review the payment evidence and reconcile it against the application fee snapshot; application approval is a separate decision.",actionUrl:"/membership",reviewerQueue:true,actionRequired:true,priority:"high"});
     return p;
   });
 }
@@ -470,19 +510,24 @@ export async function verifyPayment(paymentId,verifierId,input,requestId){
     const payment=(await db.query("select * from payment_transaction where id=$1 for update",[paymentId])).rows[0];
     if(!app||!payment) throw httpError(404,"Payment not found.","NOT_FOUND");
     const p={...payment,application_id:link.application_id,user_id:app.user_id,application_status:app.status,fee_snapshot:app.fee_snapshot,approved_at:app.approved_at};
-    if(p.status!=="pending") throw httpError(409,"Only a pending payment can be verified. This payment has already been decided or reversed.","PAYMENT_NOT_PENDING");
-    if(p.application_status!=="payment_pending"||!p.approved_at) throw httpError(409,"Payment can only be verified after the membership application has been approved and moved to payment review.","APPLICATION_NOT_APPROVED");
+    // A reversal is the strongest terminal guard: report it explicitly even if
+    // the application lifecycle has since advanced or the payment status changed.
     if((await db.query("select 1 from membership_payment_reversal where payment_transaction_id=$1",[paymentId])).rowCount) throw httpError(409,"A reversed or refunded payment cannot be verified again. Submit a new payment for this application if needed.","PAYMENT_ALREADY_REVERSED");
+    if(p.status!=="pending") throw httpError(409,"Only a pending payment can be verified. This payment has already been decided or reversed.","PAYMENT_NOT_PENDING");
+    if(!canSubmitMembershipPayment(p.application_status)) throw httpError(409,"Payment verification is permitted only for an eligible, non-rejected membership application.","APPLICATION_NOT_PAYABLE");
     const fee=typeof p.fee_snapshot==="string"?JSON.parse(p.fee_snapshot):p.fee_snapshot;
-    if(!fee||Number(p.amount)!==Number(fee.amount)||String(p.currency||"").toUpperCase()!==String(fee.currency||"").toUpperCase()) throw httpError(409,"Payment amount or currency does not match the approved application fee.","PAYMENT_AMOUNT_MISMATCH");
-    if(!["manual","bank_transfer","cash"].includes(p.channel) || p.source==="provider_webhook") throw httpError(400,"This payment is not eligible for manual verification.","INVALID_PAYMENT_CHANNEL");
+    if(!fee||Number(p.amount)!==Number(fee.amount)||String(p.currency||"").toUpperCase()!==String(fee.currency||"").toUpperCase()) throw httpError(409,"Payment amount or currency does not match the application fee snapshot.","PAYMENT_AMOUNT_MISMATCH");
+    if(!["manual","bank_transfer","cash","other"].includes(p.channel) || p.source==="provider_webhook") throw httpError(400,"This payment is not eligible for manual verification.","INVALID_PAYMENT_CHANNEL");
     const decision=input.decision;
     if(!["approved","rejected","needs_correction"].includes(decision)) throw httpError(400,"Invalid payment verification decision.","VALIDATION_ERROR");
     const next=decision==="approved"?"succeeded":decision==="rejected"?"failed":"pending";
     await db.query("insert into payment_verification(payment_transaction_id,verifier_user_id,decision,evidence_checked,note) values($1,$2,$3,$4,$5)",[paymentId,verifierId,decision,JSON.stringify(input.evidenceChecked||[]),input.note||null]);
     await db.query("update payment_transaction set status=$1,verified_by=$2,verified_at=now(),verification_note=$3,completed_at=case when $1 in ('succeeded','failed') then now() else completed_at end,updated_at=now() where id=$4",[next,verifierId,input.note||null,paymentId]);
-    const appStatus=decision==="approved"?"paid":"payment_pending";
-    await db.query("update membership_application set status=$1,updated_at=now() where id=$2",[appStatus,p.application_id]);
+    // A verified early payment is independent of application approval. Preserve the
+    // application lifecycle until a reviewer approves it; only an already-approved
+    // application can advance to paid after finance verification.
+    const appStatus=applicationStatusAfterPaymentVerification(p.application_status,p.approved_at,decision);
+    if(appStatus!==p.application_status) await db.query("update membership_application set status=$1,updated_at=now() where id=$2",[appStatus,p.application_id]);
     if(decision==="approved") await db.query("insert into payment_reconciliation(payment_transaction_id,membership_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,null,'matched',$2,now(),$3)",[paymentId,verifierId,`Matched to membership application ${p.application_id}`]);
     await audit(db,verifierId,"membership.payment_verified","payment_transaction",paymentId,requestId,{decision,applicationId:p.application_id});
     await notify(db,p.user_id,`membership_payment_${decision}`,"payment_transaction",paymentId,{applicationId:p.application_id,eventVersion:requestId||paymentId});
@@ -623,13 +668,14 @@ export async function listApplicationsForReview(){
   const db=getPool();
   const r=await db.query(`select a.id,a.user_id,a.tracking_reference,a.application_type,a.status,a.submitted_at,a.created_at,a.updated_at,a.data_snapshot,a.fee_snapshot,p.product_code,p.name,u.email,pe.display_name,
       (select mr.end_date from membership_record mr where mr.id=a.previous_membership_id) previous_membership_end_date,
-      (select jsonb_build_object('id',pt.id,'status',pt.status,'amount',pt.amount,'currency',pt.currency,'channel',pt.channel,'reference',coalesce(pt.request_payload->>'reference',pt.purpose_reference),'created_at',pt.created_at,'verified_at',pt.verified_at,'verification_note',pt.verification_note,'reconciliation_status',pr.reconciliation_status,'reconciliation_note',pr.note,'reversal',(select jsonb_build_object('type',rev.reversal_type,'reason',rev.reason,'evidence_reference',rev.evidence_reference,'created_at',rev.created_at) from membership_payment_reversal rev where rev.payment_transaction_id=pt.id))
+      (select jsonb_build_object('id',pt.id,'status',pt.status,'amount',pt.amount,'currency',pt.currency,'channel',pt.channel,'reference',coalesce(pt.request_payload->>'reference',pt.purpose_reference),'payment_method_code',pt.payment_method_code,'payer_bank_name',pt.request_payload->>'payerBankName','evidence_file_id',pt.evidence_file_id,'created_at',pt.created_at,'verified_at',pt.verified_at,'verification_note',pt.verification_note,'reconciliation_status',pr.reconciliation_status,'reconciliation_note',pr.note,'reversal',(select jsonb_build_object('type',rev.reversal_type,'reason',rev.reason,'evidence_reference',rev.evidence_reference,'created_at',rev.created_at) from membership_payment_reversal rev where rev.payment_transaction_id=pt.id))
        from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id left join payment_reconciliation pr on pr.payment_transaction_id=pt.id
        where ap.application_id=a.id order by pt.created_at desc limit 1) payment,
       coalesce((select jsonb_agg(jsonb_build_object('decision',rv.decision,'note',rv.note,'createdAt',rv.created_at) order by rv.created_at desc) from membership_application_review rv where rv.application_id=a.id),'[]'::jsonb) review_history,
       coalesce((select jsonb_agg(jsonb_build_object('id',aa.id,'fileObjectId',f.id,'fileName',f.original_name,'attachmentType',aa.attachment_type,'createdAt',aa.created_at) order by aa.created_at desc) from membership_application_attachment aa join file_object f on f.id=aa.file_object_id where aa.application_id=a.id),'[]'::jsonb) attachments
     from membership_application a join membership_product p on p.id=a.membership_product_id join app_user u on u.id=a.user_id left join person pe on pe.user_id=a.user_id
-    where a.status in ('submitted','in_review','correction_required','payment_pending','paid')
+    where a.status in ('submitted','in_review','correction_required','approved','payment_pending','paid')
+      or (a.status='rejected' and exists(select 1 from membership_application_payment apr join payment_transaction ptr on ptr.id=apr.payment_transaction_id where apr.application_id=a.id and ptr.status in ('initiated','pending','succeeded') and not exists(select 1 from membership_payment_reversal rpr where rpr.payment_transaction_id=ptr.id)))
       or (a.status='activated' and exists(select 1 from membership_application_payment apx join payment_transaction ptx on ptx.id=apx.payment_transaction_id where apx.application_id=a.id and ptx.status='succeeded' and not exists(select 1 from membership_payment_reversal rtx where rtx.payment_transaction_id=ptx.id)))
     order by a.created_at asc`);
   return r.rows;
@@ -647,6 +693,79 @@ export async function attachApplicationFile(applicationId,userId,input,requestId
   });
 }
 
+function chapaConfig(){
+  const mode=String(process.env.CHAPA_EXPECTED_MODE||"test").trim().toLowerCase(),secret=String(process.env.CHAPA_SECRET_KEY||"").trim(),webhookSecret=String(process.env.CHAPA_WEBHOOK_SECRET||"").trim();
+  if(!["test","live"].includes(mode))throw httpError(503,"CHAPA_EXPECTED_MODE must be test or live.","CHAPA_CONFIGURATION_INVALID");
+  if(!secret)throw httpError(503,"Chapa checkout is not configured.","CHAPA_NOT_CONFIGURED");
+  return {mode,secret,webhookSecret,callbackUrl:String(process.env.CHAPA_CALLBACK_URL||"").trim(),returnUrl:String(process.env.CHAPA_RETURN_URL||"").trim()};
+}
+async function chapaPayload(response){try{return await response.json();}catch{return {};}}
+async function chapaVerifyAtProvider(ref,secret){
+  const response=await fetch("https://api.chapa.co/v1/transaction/verify/"+encodeURIComponent(ref),{headers:{Authorization:"Bearer "+secret,Accept:"application/json"},signal:AbortSignal.timeout(12000)});
+  const payload=await chapaPayload(response),data=payload&&payload.data;
+  if(!response.ok||String(payload.status||"").toLowerCase()!=="success"||!data)throw httpError(502,"Chapa could not confirm this transaction; it remains unverified.","CHAPA_VERIFICATION_UNAVAILABLE");
+  return {status:String(data.status||"").toLowerCase(),reference:String(data.tx_ref||data.reference||""),currency:String(data.currency||"").toUpperCase(),amount:Number(data.amount),providerId:String(data.id||data.reference||ref)};
+}
+export async function listMembershipPaymentMethods({admin=false}={}){
+  const sql="select method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,updated_at from membership_payment_method "+(admin?"":"where enabled=true ")+"order by method_type,display_name,method_code";
+  return (await getPool().query(sql)).rows;
+}
+export async function saveMembershipPaymentMethod(actorId,input,requestId){
+  const code=String(input.methodCode||"").trim().toLowerCase(),type=String(input.methodType||"").trim().toLowerCase(),name=String(input.displayName||"").trim(),currency=String(input.currency||"ETB").trim().toUpperCase(),instructions=String(input.instructions||"").trim(),enabled=input.enabled===true;
+  if(!/^[a-z][a-z0-9_]{1,39}$/.test(code)||!["chapa","telebirr","bank_transfer","cash","manual"].includes(type)||!name||name.length>120||!/^[A-Z]{3}$/.test(currency)||instructions.length>2000)throw httpError(400,"Enter a valid payment method code, type, display name, currency and instructions.","VALIDATION_ERROR");
+  if(type==="chapa"&&enabled){try{chapaConfig();}catch{throw httpError(409,"Chapa cannot be enabled until server-side credentials and mode are configured.","CHAPA_NOT_CONFIGURED");}}
+  const field=(v,n)=>{const s=String(v||"").trim();if(s.length>n)throw httpError(400,"A payment method field is too long.","VALIDATION_ERROR");return s||null;};
+  const qr=field(input.qrImageUrl,500);if(qr){let u;try{u=new URL(qr);}catch{throw httpError(400,"QR image URL must be HTTPS.","VALIDATION_ERROR");}if(u.protocol!=="https:")throw httpError(400,"QR image URL must be HTTPS.","VALIDATION_ERROR");}
+  return withTransaction(async db=>{
+    const row=(await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,updated_by,updated_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now()) on conflict(method_code) do update set method_type=excluded.method_type,display_name=excluded.display_name,enabled=excluded.enabled,currency=excluded.currency,instructions=excluded.instructions,bank_name=excluded.bank_name,account_name=excluded.account_name,account_number=excluded.account_number,provider_code=excluded.provider_code,qr_image_url=excluded.qr_image_url,updated_by=excluded.updated_by,updated_at=now() returning method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,updated_at",[code,type,name,enabled,currency,instructions,field(input.bankName,120),field(input.accountName,120),field(input.accountNumber,120),field(input.providerCode,120),qr,actorId])).rows[0];
+    await audit(db,actorId,"membership.payment_method_saved","membership_payment_method",null,requestId,{methodCode:code,methodType:type,enabled,currency});return row;
+  });
+}
+export async function initiateChapaMembershipPayment(applicationId,userId,input,requestId){
+  const cfg=chapaConfig();if(!cfg.callbackUrl||!cfg.returnUrl)throw httpError(503,"Chapa callback and return URLs must be configured.","CHAPA_CONFIGURATION_INVALID");
+  for(const value of [cfg.callbackUrl,cfg.returnUrl]){try{if(new URL(value).protocol!=="https:")throw new Error();}catch{throw httpError(503,"Chapa callback and return URLs must be valid HTTPS URLs.","CHAPA_CONFIGURATION_INVALID");}}
+  const idem=String(input.idempotencyKey||"").trim();if(!/^[A-Za-z0-9_-]{16,128}$/.test(idem))throw httpError(400,"A valid checkout idempotency key is required.","VALIDATION_ERROR");
+  const prepared=await withTransaction(async db=>{
+    const app=(await db.query("select a.*,p.name product_name from membership_application a join membership_product p on p.id=a.membership_product_id where a.id=$1 and a.user_id=$2 for update of a",[applicationId,userId])).rows[0];
+    if(!app||!canSubmitMembershipPayment(app.status))throw httpError(404,"Eligible membership application not found for this account.","APPLICATION_NOT_PAYABLE");
+    const fee=typeof app.fee_snapshot==="string"?JSON.parse(app.fee_snapshot):app.fee_snapshot,method=(await db.query("select * from membership_payment_method where method_code=$1 and method_type='chapa' and enabled=true for share",[String(input.paymentMethodCode||"")])).rows[0];
+    if(!method||String(method.currency).toUpperCase()!==String(fee.currency||"").toUpperCase())throw httpError(400,"Selected Chapa method is unavailable for this application currency.","PAYMENT_METHOD_UNAVAILABLE");
+    toChapaMinorUnits(fee.amount,fee.currency);
+    const prior=(await db.query("select pt.*,ap.application_id,a.user_id application_user_id from payment_transaction pt left join membership_application_payment ap on ap.payment_transaction_id=pt.id left join membership_application a on a.id=ap.application_id where pt.idempotency_key=$1 for update of pt",[idem])).rows[0];
+    if(prior){if(prior.provider!=="chapa"||prior.application_id!==applicationId||prior.application_user_id!==userId)throw httpError(409,"Checkout key belongs to another payment.","IDEMPOTENCY_CONFLICT");if(prior.request_payload&&prior.request_payload.checkoutUrl&&["initiated","pending"].includes(prior.status))return {replay:true,checkoutUrl:prior.request_payload.checkoutUrl,ref:prior.request_payload.merchantReference,status:prior.status};throw httpError(409,"This checkout key has already been used; refresh payment status before retrying.","PAYMENT_ALREADY_DECIDED");}
+    const active=(await db.query("select pt.id from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id where ap.application_id=$1 and pt.provider='chapa' and pt.status in ('initiated','pending','succeeded') limit 1 for update of pt",[applicationId])).rows[0];if(active)throw httpError(409,"A hosted payment is already in progress or succeeded for this application.","PAYMENT_ALREADY_ACTIVE");
+    const ref="MPA-MEM-"+randomUUID().replaceAll("-","").toUpperCase();
+    const payment=(await db.query("insert into payment_transaction(provider,provider_transaction_id,idempotency_key,purpose,amount,currency,status,request_payload,channel,submitted_by,purpose_reference,source,payment_method_code) values('chapa',null,$1,'membership',$2,$3,'initiated',$4::jsonb,'other',$5,$6,'hosted_checkout',$7) returning *",[idem,Number(fee.amount),fee.currency,JSON.stringify({merchantReference:ref,mode:cfg.mode,methodCode:method.method_code}),userId,ref,method.method_code])).rows[0];
+    await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[applicationId,payment.id]);await audit(db,userId,"membership.chapa_checkout_started","payment_transaction",payment.id,requestId,{applicationId,merchantReference:ref,mode:cfg.mode});return {payment,ref,fee,app};
+  });
+  if(prepared.replay)return {checkoutUrl:prepared.checkoutUrl,merchantReference:prepared.ref,status:prepared.status,replayed:true};
+  const payment=prepared.payment,ref=prepared.ref;
+  try{
+    const person=(await getPool().query("select p.first_name,p.last_name,u.email from person p join app_user u on u.id=p.user_id where p.user_id=$1",[userId])).rows[0];if(!person||!person.email)throw httpError(409,"A valid account email is required for hosted checkout.","CHECKOUT_EMAIL_REQUIRED");
+    const response=await fetch("https://api.chapa.co/v1/transaction/initialize",{method:"POST",headers:{Authorization:"Bearer "+cfg.secret,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({amount:String(prepared.fee.amount),currency:String(prepared.fee.currency).toUpperCase(),email:person.email,first_name:person.first_name||"MPA",last_name:person.last_name||"Member",tx_ref:ref,callback_url:cfg.callbackUrl,return_url:cfg.returnUrl+"?merchant_reference="+encodeURIComponent(ref),customization:{title:"MPA membership",description:"Membership application payment"},meta:{application_id:applicationId,payment_id:payment.id,mode:cfg.mode}}),signal:AbortSignal.timeout(15000)});
+    const payload=await chapaPayload(response),url=String(payload&&payload.data&&payload.data.checkout_url||"");if(!response.ok||String(payload.status||"").toLowerCase()!=="success"||!/^https:\/\/checkout\.chapa\.co\//i.test(url))throw httpError(502,"Chapa did not return a valid hosted checkout URL.","CHAPA_CHECKOUT_FAILED");
+    await withTransaction(async db=>{await db.query("update payment_transaction set status='pending',request_payload=request_payload || $1::jsonb,updated_at=now() where id=$2 and status='initiated'",[JSON.stringify({checkoutUrl:url}),payment.id]);await audit(db,userId,"membership.chapa_checkout_initialized","payment_transaction",payment.id,requestId,{merchantReference:ref,mode:cfg.mode});});return {checkoutUrl:url,merchantReference:ref,status:"pending",replayed:false};
+  }catch(error){await withTransaction(async db=>{await db.query("update payment_transaction set status='failed',completed_at=now(),verification_note=$1,updated_at=now() where id=$2 and status='initiated'",[String(error.message||"Checkout initialization failed").slice(0,500),payment.id]);await audit(db,userId,"membership.chapa_checkout_failed","payment_transaction",payment.id,requestId,{merchantReference:ref,code:error.code||"CHAPA_CHECKOUT_FAILED"});}).catch(()=>{});throw error;}
+}
+export async function verifyChapaMembershipPayment(merchantReference,requestId,userId=null){
+  const ref=String(merchantReference||"").trim();if(!/^[A-Za-z0-9_-]{8,128}$/.test(ref))throw httpError(400,"A valid merchant reference is required.","VALIDATION_ERROR");const cfg=chapaConfig();
+  const found=(await getPool().query("select pt.*,ap.application_id,a.user_id application_user_id,a.status application_status,a.approved_at,a.fee_snapshot from payment_transaction pt join membership_application_payment ap on ap.payment_transaction_id=pt.id join membership_application a on a.id=ap.application_id where pt.provider='chapa' and (pt.purpose_reference=$1 or pt.request_payload->>'merchantReference'=$1) limit 1",[ref])).rows[0];
+  if(!found||(userId&&found.application_user_id!==userId))throw httpError(404,"No hosted membership payment was found for this reference on this account.","NOT_FOUND");if(found.status==="succeeded")return {status:"succeeded",verified:true,applicationStatus:found.application_status};if(!["initiated","pending"].includes(found.status))throw httpError(409,"Hosted payment is not eligible for verification.","PAYMENT_NOT_PENDING");
+  const provider=await chapaVerifyAtProvider(ref,cfg.secret);if(provider.status!=="success"||provider.reference!==ref||provider.currency!==String(found.currency).toUpperCase()||provider.amount!==Number(found.amount)){await withTransaction(async db=>{await db.query("update payment_transaction set verification_note='Provider verification mismatch; payment remains unverified',updated_at=now() where id=$1 and status in ('initiated','pending')",[found.id]);await audit(db,userId||null,"membership.chapa_verification_mismatch","payment_transaction",found.id,requestId,{merchantReference:ref});});throw httpError(409,"Chapa verification did not match reference, amount and currency. Payment remains unverified.","CHAPA_VERIFICATION_MISMATCH");}
+  return withTransaction(async db=>{const app=(await db.query("select * from membership_application where id=$1 for update",[found.application_id])).rows[0],p=(await db.query("select * from payment_transaction where id=$1 for update",[found.id])).rows[0];if(!app||!p)throw httpError(404,"Hosted payment not found.","NOT_FOUND");if(p.status==="succeeded")return {status:"succeeded",verified:true,applicationStatus:app.status};if(!["initiated","pending"].includes(p.status))throw httpError(409,"Payment status changed during verification.","PAYMENT_NOT_PENDING");
+    const fee=typeof app.fee_snapshot==="string"?JSON.parse(app.fee_snapshot):app.fee_snapshot;if(Number(fee.amount)!==Number(p.amount)||String(fee.currency).toUpperCase()!==String(p.currency).toUpperCase())throw httpError(409,"Payment does not match the saved application fee.","PAYMENT_AMOUNT_MISMATCH");
+    await db.query("update payment_transaction set status='succeeded',provider_transaction_id=$1,verified_at=now(),completed_at=now(),verification_note='Verified directly with Chapa API',updated_at=now() where id=$2",[provider.providerId,p.id]);const next=applicationStatusAfterPaymentVerification(app.status,app.approved_at,"approved");if(next!==app.status)await db.query("update membership_application set status=$1,updated_at=now() where id=$2",[next,app.id]);
+    await db.query("insert into payment_reconciliation(payment_transaction_id,membership_id,reconciliation_status,reconciled_at,note) values($1,null,'matched',now(),$2) on conflict do nothing",[p.id,"Chapa verified transaction "+ref]);await audit(db,userId||null,"membership.chapa_payment_verified","payment_transaction",p.id,requestId,{applicationId:app.id,merchantReference:ref,mode:cfg.mode});await notify(db,app.user_id,"membership_payment_approved","payment_transaction",p.id,{applicationId:app.id,provider:"chapa",eventVersion:ref});return {status:"succeeded",verified:true,applicationStatus:next};
+  });
+}
+export async function handleChapaMembershipWebhook(rawBody,receivedSignature,requestId){
+  const cfg=chapaConfig();if(!cfg.webhookSecret)throw httpError(503,"Chapa webhook verification is not configured.","CHAPA_WEBHOOK_NOT_CONFIGURED");const raw=Buffer.isBuffer(rawBody)?rawBody:Buffer.from(rawBody||"");if(!isValidChapaWebhookSignature(raw,receivedSignature,cfg.webhookSecret))throw httpError(401,"Chapa webhook signature is invalid.","INVALID_WEBHOOK_SIGNATURE");
+  let event;try{event=JSON.parse(raw.toString("utf8"));}catch{throw httpError(400,"Chapa webhook payload is invalid JSON.","INVALID_WEBHOOK_PAYLOAD");}const ref=String(event.tx_ref||event.data&&event.data.tx_ref||event.reference||event.data&&event.data.reference||"").trim();if(!ref)throw httpError(400,"Chapa webhook did not include a merchant reference.","INVALID_WEBHOOK_PAYLOAD");const digest=createHash("sha256").update(raw).digest("hex");
+  const exists=(await getPool().query("select id from payment_transaction where provider='chapa' and (purpose_reference=$1 or request_payload->>'merchantReference'=$1) limit 1",[ref])).rows[0];if(!exists)return {accepted:true,processed:false,reason:"unknown_reference"};
+  const first=await withTransaction(async db=>{const r=await db.query("insert into membership_payment_webhook_event(payload_sha256,environment_mode,event_type,merchant_reference,result_status) values($1,$2,$3,$4,'pending') on conflict(environment_mode,payload_sha256) do nothing returning payload_sha256",[digest,cfg.mode,String(event.event||event.type||"transaction.update").slice(0,100),ref]);return r.rowCount>0;});if(!first)return {accepted:true,processed:true,replayed:true};
+  try{const result=await verifyChapaMembershipPayment(ref,requestId,null);await withTransaction(async db=>{await db.query("update membership_payment_webhook_event set result_status='processed',processed_at=now() where environment_mode=$1 and payload_sha256=$2",[cfg.mode,digest]);await audit(db,null,"membership.chapa_webhook_processed","membership_payment_webhook_event",null,requestId,{payloadSha256:digest,merchantReference:ref,verified:result.verified===true});});return {accepted:true,processed:true,verified:result.verified===true};}
+  catch(error){await withTransaction(async db=>{await db.query("update membership_payment_webhook_event set result_status='pending',processed_at=null where environment_mode=$1 and payload_sha256=$2",[cfg.mode,digest]);await audit(db,null,"membership.chapa_webhook_verification_deferred","membership_payment_webhook_event",null,requestId,{payloadSha256:digest,merchantReference:ref,code:error.code||"VERIFICATION_DEFERRED"});});return {accepted:true,processed:false,reason:"verification_pending"};}
+}
 export async function notificationPreferences(userId,input=null){
   const db=getPool();
   if(input){
@@ -668,3 +787,4 @@ export async function notificationPreferences(userId,input=null){
   return (await db.query("select * from notification_preference where user_id=$1",[userId])).rows[0] ||
     (await db.query("insert into notification_preference(user_id) values($1) returning *",[userId])).rows[0];
 }
+

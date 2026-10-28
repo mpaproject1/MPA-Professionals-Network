@@ -11,7 +11,8 @@ test("private demand draft persistence is opt-in, tab-scoped, expiring and clear
   assert.match(source, /expiresAt>Date\.now\(\)/);
   assert.match(source, /24\*60\*60\*1000/);
   assert.match(source, /setKeepDraft\(false\)/);
-  assert.match(source, /created\.tracking_reference\|\|created\.id/);
+  assert.doesNotMatch(source, /created\.tracking_reference\|\|created\.id/);
+  assert.match(source, /internal record ID is not shown/);
   assert.match(source, /do not enable this on a shared device/);
 });
 
@@ -21,7 +22,7 @@ test("membership payment retry reuses a persisted idempotency key and official a
   assert.match(page, /mpa-membership-payment-key:/);
   assert.match(page, /idempotencyKey/);
   assert.match(page, /tracking_reference/);
-  assert.match(service, /idempotencyKey is required/);
+  assert.match(service, /idempotencyKey must be a unique token/);
   assert.match(service, /where pt\.idempotency_key=\$1/);
 });
 

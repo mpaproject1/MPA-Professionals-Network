@@ -307,7 +307,7 @@ test("admin queues use authoritative report counts and moderation/support lists 
   assert.ok(moderation.includes("setHasMoreDemands(d.length>10)"));
   assert.ok(moderation.includes("setHasMoreListings(l.length>10)"));
   assert.ok(moderation.includes("Moderation status<select"));
-  assert.equal(moderation.split("window.confirm").length - 1, 3, "demand decisions, duplicate merges and listing moderation require confirmation");
+  assert.equal(moderation.split("window.confirm").length - 1, 4, "demand decisions, duplicate merges, listing moderation and public-topic moderation require confirmation");
   assert.ok(moderation.includes("paginatedDemands.map"));
   assert.ok(moderation.includes("paginatedListings.map"));
   assert.ok(moderation.includes("Showing {visibleDemands.length"));

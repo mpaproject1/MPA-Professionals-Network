@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, RefreshCw, ShieldCheck } from "lucide-react";
+import { ArrowRight, ClipboardCopy, RefreshCw, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
@@ -63,7 +63,10 @@ export default function Track() {
   const [publicToken, setPublicToken] = useState("");
   const [publicLookupFinished, setPublicLookupFinished] = useState(false);
   const [error, setError] = useState("");
+  const [copyNotice, setCopyNotice] = useState("");
   const [loading, setLoading] = useState(true);
+
+  async function copyReference(value: string) { const ref=String(value||"").trim(); if(!ref){setCopyNotice("No display reference is available yet.");return;} try { await navigator.clipboard.writeText(ref); setCopyNotice("Reference copied to clipboard."); } catch { setCopyNotice("Clipboard access is unavailable. Select the displayed reference and copy it manually."); } }
 
   const load = useCallback(async (append = false) => {
     if (!token) {
@@ -123,7 +126,7 @@ export default function Track() {
         <Card>
           <div className="eyebrow">Private inquiry tracking</div>
           <h1 className="h1">{publicInquiry.jobTitle || "Mentorship"} · {humanStatus(publicInquiry.status)}</h1>
-          <p className="muted">Reference <b>{publicInquiry.reference}</b>. {publicInquiry.nextStep}</p>
+          <p className="muted">Reference <b>{publicInquiry.reference}</b>. {publicInquiry.nextStep}</p><button type="button" className="btn btn-ghost" onClick={()=>void copyReference(publicInquiry.reference)}><ClipboardCopy size={15}/> Copy reference</button>{copyNotice&&<p className="muted" role="status">{copyNotice}</p>}
           <div className="tracker-line">
             <span className="timeline-dot" />
             <div><b>{publicInquiry.status}</b><p className="muted">Only someone with this private continuation link and authorized reviewers can view this inquiry.</p></div>
@@ -193,7 +196,7 @@ export default function Track() {
                   <Badge>{item.type.replaceAll("_", " ")}</Badge>
                   <h2 className="h2" style={{ margin: "8px 0 4px" }}>{item.title}</h2>
                   <p className="muted" style={{ margin: 0 }}>{item.subtitle}</p>
-                  <p className="muted" style={{ margin: "4px 0 0" }}>Reference: {item.trackingReference || "Not assigned yet"}</p>
+                  <p className="muted" style={{ margin: "4px 0 0" }}>Reference: {item.trackingReference || "Not assigned yet"}</p>{item.trackingReference&&<button type="button" className="btn btn-ghost" onClick={()=>void copyReference(item.trackingReference||"")}><ClipboardCopy size={15}/> Copy reference</button>}{copyNotice&&<p className="muted" role="status">{copyNotice}</p>}
                 </div>
                 <span className="badge">{item.statusLabel || humanStatus(item.status)}</span>
               </div>

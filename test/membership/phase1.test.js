@@ -42,15 +42,20 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.ok(reviewQueueRow,"submitted application should appear in the administrator queue");
   assert.ok(Array.isArray(reviewQueueRow.review_history),"administrator queue should include prior review decisions");
   assert.equal(app.fee_snapshot.amount,1200);
-  const prematurePayment=(await getPool().query(`insert into payment_transaction(provider,idempotency_key,purpose,amount,currency,status,request_payload,channel,submitted_by,purpose_reference,source)
-    values('manual',$1,'membership',1200,'ETB','pending','{}'::jsonb,'bank_transfer',$2,$3,'manual_entry') returning id`,[`phase1-premature:${suffix}`,userId,applicationId])).rows[0];
-  await getPool().query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[applicationId,prematurePayment.id]);
-  await assert.rejects(
-    membership.verifyPayment(prematurePayment.id,userId,{decision:"approved",evidenceChecked:[],note:"Must not bypass membership review."},"phase1-premature-payment"),
-    error=>error.code==="APPLICATION_NOT_APPROVED"
-  );
-  await getPool().query("delete from membership_application_payment where payment_transaction_id=$1",[prematurePayment.id]);
-  await getPool().query("delete from payment_transaction where id=$1",[prematurePayment.id]);
+  const prematurePayment=await membership.createManualPayment(applicationId,userId,{
+    amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,
+    idempotencyKey:`phase1_early_${suffix}`
+  },"phase1-early-payment");
+  paymentId=prematurePayment.id;
+  assert.equal(prematurePayment.status,"pending");
+  const earlyVerified=await membership.verifyPayment(prematurePayment.id,userId,{
+    decision:"approved",evidenceChecked:[{type:"bank_reference",valid:true}],note:"Early payment verified independently of application review."
+  },"phase1-early-payment-verification");
+  assert.equal(earlyVerified.status,"succeeded");
+  const stillPending=(await getPool().query("select status from membership_application where id=$1",[applicationId])).rows[0];
+  assert.equal(stillPending.status,"submitted","payment verification must not approve or advance the application");
+  const verifiedPayment=(await getPool().query("select status from payment_transaction where id=$1",[prematurePayment.id])).rows[0];
+  assert.equal(verifiedPayment.status,"succeeded","finance verification is recorded separately from application approval");
 
   const duplicate=membership.createApplication(userId,{productCode:"BASIC"},"phase1-test-duplicate");
   await assert.rejects(duplicate,e=>e.code==="APPLICATION_EXISTS");
@@ -74,27 +79,17 @@ test("Phase 1 correction and review workflow is auditable",async()=>{
   assert.equal(approved.decision,"approved");
 
   const appRow=(await db.query("select status from membership_application where id=$1",[applicationId])).rows[0];
-  assert.equal(appRow.status,"payment_pending");
+  assert.equal(appRow.status,"paid","application approval recognizes the previously verified payment, but remains a separate decision");
 });
 
-test("Phase 1 manual payment verification controls activation",async()=>{
+test("Phase 1 early payment verification cannot bypass approval or activation gates",async()=>{
   const db=getPool();
-  const file=(await db.query(`insert into file_object(storage_provider,object_key,original_name,content_type,byte_size,visibility,created_by)
-    values('test','phase1/${suffix}/receipt.jpg','receipt.jpg','image/jpeg',10,'private',$1) returning id`,[userId])).rows[0];
-  await membership.attachApplicationFile(applicationId,userId,{fileObjectId:file.id,attachmentType:"identity_support"},"phase1-test-attachment");
-
-  const payment=await membership.createManualPayment(applicationId,userId,{
-    amount:1200,currency:"ETB",channel:"bank_transfer",reference:`BANK-${suffix}`,
-    evidenceFileId:file.id,idempotencyKey:`phase1:${suffix}`
-  },"phase1-test-payment");
-  paymentId=payment.id;
-  assert.equal(payment.status,"pending");
-  assert.equal(payment.channel,"bank_transfer");
-
-  const verified=await membership.verifyPayment(paymentId,userId,{
-    decision:"approved",evidenceChecked:[{type:"receipt",valid:true}],note:"Receipt and bank reference checked."
-  },"phase1-test-payment-verification");
+  assert.ok(paymentId,"the early payment should remain linked to the application across the workflow");
+  const verified=(await db.query("select status from payment_transaction where id=$1",[paymentId])).rows[0];
   assert.equal(verified.status,"succeeded");
+  const approvedApp=(await db.query("select status,approved_at from membership_application where id=$1",[applicationId])).rows[0];
+  assert.equal(approvedApp.status,"paid");
+  assert.ok(approvedApp.approved_at,"application approval must be recorded separately before activation");
 
   const activated=await membership.activateApplication(applicationId,userId,"phase1-test-activation");
   membershipId=activated.id;

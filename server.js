@@ -130,7 +130,8 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && req.url==="/readyz") return ok(res,{status:"ready",databaseConfigured:Boolean(config.databaseUrl)},requestId);
     const parts=pathParts(req.url);
     const p=parts.join("/");
-    if(req.method==="GET" && p==="api/v1/public/membership-verification") { await enforcePersistentRateLimit(req,"membership-card-verify",60,60000); const q=query(req.url); return ok(res,await membershipCard.verifyMembershipCard(q.get("record"),q.get("token")),requestId); }
+    if(req.method==="POST" && p==="api/v1/payments/chapa/webhook") { const raw=await rawBody(req,1024*1024); return ok(res,await membership.handleChapaMembershipWebhook(raw,String(req.headers["x-chapa-signature"]||""),requestId),requestId); }
+     if(req.method==="GET" && p==="api/v1/public/membership-verification") { await enforcePersistentRateLimit(req,"membership-card-verify",60,60000); const q=query(req.url); return ok(res,await membershipCard.verifyMembershipCard(q.get("record"),q.get("token")),requestId); }
     if(req.method==="POST" && p==="api/v1/public/support-bot/message") { await enforcePersistentRateLimit(req,"public-support-bot",20,60000); const b=await body(req); let userId=null; if(req.headers.authorization?.startsWith("Bearer ")) { try { userId=(await auth(req)).sub; } catch {} } return ok(res,await supportBot.answerPublicQuestion(b,{visitorKey:b.visitorKey,pagePath:b.pagePath||"/",userId}),requestId,201); }
     if(req.method==="GET" && p==="api/v1/auth/human-challenge") { await enforcePersistentRateLimit(req,"human-challenge",10,60000); return ok(res,await issueHumanChallenge(),requestId); }
     if(req.method==="POST" && p==="api/v1/auth/human-challenge/verify") { const b=await body(req); await enforcePersistentRateLimit(req,"human-challenge-verify",10,60000); return ok(res,await verifyHumanChallenge(b.id,b.answer),requestId); }
@@ -183,7 +184,16 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && p==="api/v1/auth/member-invitation/claim") return ok(res,await membershipAdminBulk.claimMemberInvitation(await body(req)),requestId);
     if(req.method==="POST" && p==="api/v1/auth/register") { const b=await body(req); await enforcePersistentRateLimit(req,"register",5,60000,String(b.email||"").trim().toLowerCase()); return ok(res,await membership.register(b,requestId),requestId,201); }
     if(req.method==="GET" && p==="api/v1/membership/products") return ok(res,await membership.listMembershipProducts(),requestId);
-    if(req.method==="GET" && p==="api/v1/admin/membership/products") {
+    if(req.method==="GET" && p==="api/v1/membership/payment-methods") return ok(res,await membership.listMembershipPaymentMethods(),requestId);
+     if(req.method==="GET" && p==="api/v1/admin/membership/payment-methods") {
+       const identity=await auth(req); anyRoleOrPermission(identity,["system_admin"],["members.manage","finance.manage"]);
+       return ok(res,await membership.listMembershipPaymentMethods({admin:true}),requestId);
+     }
+     if(req.method==="PUT" && p==="api/v1/admin/membership/payment-methods") {
+       const identity=await auth(req); anyRoleOrPermission(identity,["system_admin"],["members.manage","finance.manage"]);
+       return ok(res,await membership.saveMembershipPaymentMethod(identity.sub,await body(req),requestId),requestId);
+     }
+     if(req.method==="GET" && p==="api/v1/admin/membership/products") {
      const identity=await auth(req);
       anyRoleOrPermission(identity,["system_admin","reviewer"],["members.view","members.manage"]);
       return ok(res,await membership.listMembershipProductsForAdmin(),requestId);
@@ -325,6 +335,10 @@ const server=http.createServer(async (req,res)=>{
 
 
     if(req.method==="POST" && p==="api/v1/marketplace-demand") return ok(res,await marketplaceDemand.createDemand(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
+    if(req.method==="POST" && p==="api/v1/marketplace-demand/public-topics") return ok(res,await marketplaceDemand.createPublicTopicSubmission(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
+    if(req.method==="GET" && p==="api/v1/me/marketplace-demand-public-topics") return ok(res,await marketplaceDemand.listMyPublicTopicSubmissions(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/admin/marketplace-demand-public-topics") { const q=query(req.url); return ok(res,await marketplaceDemand.listPublicTopicSubmissionsForReview(identity.sub,{status:q.get("status")||"pending_review",q:q.get("q")||"",limit:q.get("limit")||"50",offset:q.get("offset")||"0"}),requestId); }
+    if(req.method==="PATCH" && parts.length===6 && p.startsWith("api/v1/admin/marketplace-demand-public-topics/") && parts[5]==="review") return ok(res,await marketplaceDemand.reviewPublicTopicSubmission(parts[4],identity.sub,await body(req),requestId),requestId);
     if(req.method==="GET" && p==="api/v1/me/marketplace-demand") return ok(res,await marketplaceDemand.listMyDemand(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/me/marketplace-demand-interests") return ok(res,await marketplaceDemand.listMyInterests(identity.sub),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/marketplace-demand/topics/") && parts[5]==="interest") return ok(res,await marketplaceDemand.joinDemandTopic(parts[4],identity.sub,await body(req),requestId),requestId,201);
@@ -454,7 +468,9 @@ const server=http.createServer(async (req,res)=>{
      if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/notifications/") && parts[4]==="archive") return ok(res,await notifications.archiveNotification(identity.sub,parts[3],requestId),requestId);
      if(req.method==="GET" && p==="api/v1/notifications/preferences") return ok(res,await membership.notificationPreferences(identity.sub),requestId);
     if(req.method==="PATCH" && p==="api/v1/notifications/preferences") return ok(res,await membership.notificationPreferences(identity.sub,await body(req)),requestId);
-    if(req.method==="POST" && p==="api/v1/membership/applications") {
+    if(req.method==="POST" && p==="api/v1/payments/chapa/verify") { const identity=await auth(req); requireRole(identity,"member"); const b=await body(req); return ok(res,await membership.verifyChapaMembershipPayment(b.merchantReference,requestId,identity.sub),requestId); }
+     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/membership/applications/") && parts[5]==="chapa-checkout") { const identity=await auth(req); requireRole(identity,"member"); return ok(res,await membership.initiateChapaMembershipPayment(parts[4],identity.sub,await body(req),requestId),requestId,201); }
+     if(req.method==="POST" && p==="api/v1/membership/applications") {
       requireRole(identity,"member"); return ok(res,await membership.createApplication(identity.sub,await body(req),requestId),requestId,201);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/membership/applications/") && parts[5]==="review") {
@@ -621,3 +637,4 @@ const emailWorkerTimer=setInterval(async()=>{
 emailWorkerTimer.unref();
 server.listen(config.port,config.host,async()=>{ try { await bootstrapAdmin(); void runMembershipExpiry(); logger.info("server.started",{host:config.host,port:config.port,environment:config.nodeEnv,bootstrapAdmin:Boolean(config.bootstrapAdminEmail)}); } catch(error){ logger.error("bootstrap.admin.failed",{error:error.message}); if(config.nodeEnv==="production") process.exitCode=1; } });
 export { server };
+

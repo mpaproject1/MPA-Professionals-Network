@@ -56,7 +56,7 @@ test("P1 marketplace: private demand is reviewed before a privacy-safe public to
  const reviewed=await marketplaceDemand.reviewDemand(demand.id,staff,{status:"topic_published",publishTopic:true,publicTitle:"Bookkeeping support for small teams",publicSummary:"Small teams are seeking qualified help with monthly bookkeeping and clear financial reporting.",publicCategory:"Finance",interestGoal:5},"marketplace-demand-review");
  assert.equal(reviewed.status,"topic_published");
  assert.ok(reviewed.topic?.id);
- const feed=await marketplaceDemand.listPublishedTopics({type:"service"});
+ const feed=await marketplaceDemand.listPublishedTopics({type:"service",q:"Bookkeeping support for small teams"});
  const topic=feed.items.find(item=>item.id===reviewed.topic.id);
  assert.ok(topic);
  assert.equal("requester_user_id" in topic,false);
@@ -143,3 +143,60 @@ test("P1 marketplace: Support Desk merges duplicate demand into a canonical requ
  assert.ok(firstActivity.some(row=>row.id===duplicate.id&&row.merged_into_existing===true),"requester retains the original record and receives a privacy-safe merge indicator without the canonical private ID");
 });
 test.after(async()=>{await closePool();});
+
+test("P1 marketplace: public topic preference is recorded for review without publishing private intake",async()=>{
+ const requester=await account(randomUUID()),staff=await supportStaff();
+ const demand=await marketplaceDemand.createDemand(requester,{demandType:"mentorship",title:"Need career mentorship",description:"I am seeking career guidance from an experienced professional in project management.",category:"Career development",deliveryMode:"remote",publicTopicRequested:true},"marketplace-public-topic-preference",randomUUID());
+ assert.match(demand.tracking_reference,/^MPA-MEN-\d{2}-[A-F0-9]{12}$/);
+ assert.equal(demand.public_topic_requested,true);
+ assert.equal(demand.public_topic_status,"pending_review");
+ const privateRows=await marketplaceDemand.listMyDemand(requester);
+ const own=privateRows.find(row=>row.id===demand.id);
+ assert.ok(own);
+ assert.equal(own.public_topic_requested,true);
+ assert.match(own.tracking_reference,/^MPA-MEN-\d{2}-[A-F0-9]{12}$/);
+ const db=getPool();
+ const topic=(await db.query("select id from marketplace_demand_topic where source_demand_id=$1",[demand.id])).rows[0];
+ assert.equal(topic,undefined,"a preference must not publish private text without a Support Desk review");
+ const event=(await db.query("select metadata from marketplace_demand_event where demand_id=$1 and action='demand.submitted' order by created_at desc limit 1",[demand.id])).rows[0];
+ assert.equal(event.metadata.publicTopicRequested,true);
+ const notice=(await db.query("select id from notification_event where resource_type='marketplace_demand' and resource_id=$1 and event_code='marketplace.public_topic_requested' limit 1",[demand.id])).rows[0];
+ assert.ok(notice,"Support Desk should be notified to review the generalized public topic");
+ const matches=await marketplaceDemand.listMyDemandProviderMatches(requester);
+ assert.ok(Array.isArray(matches));
+ await db.query("delete from marketplace_demand_event where demand_id=$1",[demand.id]);
+ await db.query("delete from notification_event where resource_type='marketplace_demand' and resource_id=$1",[demand.id]);
+ await db.query("delete from marketplace_demand where id=$1",[demand.id]);
+});
+
+test("P1 marketplace: public topic submissions bypass private intake but remain hidden until Support Desk approval",async()=>{
+ const requester=await account(randomUUID()),staff=await supportStaff(),outsider=await account(randomUUID());
+ const topic=await marketplaceDemand.createPublicDemandTopic(requester,{demandType:"service",title:"Public bookkeeping help",summary:"A small community group seeks professional guidance on monthly bookkeeping and financial reporting.",category:"Finance",deliveryMode:"remote"},"marketplace-public-topic-submit");
+ assert.equal(topic.status,"pending_review");
+ assert.equal(topic.public_topic_mode,true);
+ assert.match(topic.tracking_reference,/^MPA-SRV-\d{2}-[A-F0-9]{12}$/);
+ const duplicate=await marketplaceDemand.createPublicDemandTopic(requester,{demandType:"service",title:"Public bookkeeping help",summary:"A small community group seeks professional guidance on monthly bookkeeping and financial reporting.",category:"Finance",deliveryMode:"remote"},"marketplace-public-topic-submit-retry");
+ assert.equal(duplicate.id,topic.id,"a repeated matching submission within the short retry window should reuse the original record");
+ assert.equal(duplicate.idempotent,true);
+ const own=await marketplaceDemand.listMyPublicDemandTopics(requester);
+ const ownTopic=own.find(row=>row.id===topic.id&&row.status==="pending_review");assert.ok(ownTopic);
+ const queue=await marketplaceDemand.listPublicDemandTopicReviewQueue(staff);
+ assert.ok(queue.some(row=>row.id===topic.id));
+ await assert.rejects(()=>marketplaceDemand.listPublicDemandTopicReviewQueue(outsider),error=>error.statusCode===403);
+ const before=(await marketplaceDemand.listPublishedTopics({type:"service"})).items;
+ assert.equal(before.some(row=>row.id===topic.id),false,"paused public submissions must not be visible in the member feed");
+ const reviewed=await marketplaceDemand.reviewPublicDemandTopic(topic.id,staff,{decision:"publish"},"marketplace-public-topic-approve");
+ assert.equal(reviewed.status,"published");
+ assert.equal(reviewed.tracking_reference,ownTopic.tracking_reference,"display reference must not change when a topic is approved");
+ const after=(await marketplaceDemand.listPublishedTopics({type:"service"})).items;
+ assert.ok(after.some(row=>row.id===topic.id));
+ assert.equal("requester_user_id" in after.find(row=>row.id===topic.id),false);
+ assert.equal("private_description" in after.find(row=>row.id===topic.id),false);
+ assert.ok((await marketplaceDemand.listMyPublicDemandTopics(requester)).some(row=>row.id===topic.id&&row.status==="published"));
+ await assert.rejects(()=>marketplaceDemand.createPublicDemandTopic(requester,{demandType:"service",title:"Public contact details",summary:"Please call me at +251 911 234 567 for this service request.",category:"Finance"},"marketplace-public-topic-private-data"),error=>error.code==="PUBLIC_CONTACT_DETAILS");
+ const db=getPool();
+ await db.query("delete from marketplace_demand_event where topic_id=$1",[topic.id]);
+ await db.query("delete from notification_event where resource_type='marketplace_demand_topic' and resource_id=$1",[topic.id]);
+ await db.query("delete from marketplace_demand_topic where id=$1",[topic.id]);
+});
+

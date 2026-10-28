@@ -1,5 +1,5 @@
 "use client";
-import {ArrowRight, ArrowUpRight, BriefcaseBusiness, Building2, CheckCircle2, ClipboardList, Clock3, FileCheck2, LayoutDashboard, LogOut, RefreshCw, ShieldCheck, UserRound, UsersRound, WalletCards} from "lucide-react";
+import {ArrowRight, ArrowUpRight, BriefcaseBusiness, Building2, CheckCircle2, ClipboardCopy, ClipboardList, Clock3, FileCheck2, LayoutDashboard, LogOut, RefreshCw, ShieldCheck, UserRound, UsersRound, WalletCards} from "lucide-react";
 import {useRouter} from "next/navigation";
 import {useEffect, useId, useState} from "react";
 import {OperationStatus} from "../../components/operation-status";
@@ -13,7 +13,7 @@ type Profile={user_id:string;email:string;display_name?:string;first_name?:strin
 type MembershipApplication={id:string;tracking_reference?:string;application_type?:string;status:string;updated_at?:string;fee_snapshot?:{amount?:number|string;currency?:string;productName?:string;productCode?:string};payment?:{status?:string;amount?:number|string;currency?:string;verified_at?:string}|null;latest_correction?:{status?:string;reviewer_note?:string;requested_fields?:unknown}|null};
 type VerificationSummary={id:string;status:string;program_name?:string;program_code?:string;claims?:{claim_code?:string;claim_type_name?:string;status:string}[];decisions?:{decision?:string;reason?:string;decided_at?:string;member_response_due_at?:string|null}[];checklist_version_snapshot?:{items?:{itemCode?:string;label?:string;required?:boolean}[]}[];checkResults?:{item_code?:string;label?:string;required?:boolean;outcome?:string}[]};
 type MemberClarity={applications:MembershipApplication[];cases:VerificationSummary[];profileVisibility:string;profileLoaded:boolean;verifiedClaims:string[];missingRequirements:string[]};
-type TrackingItem={id:string;type:string;title:string;subtitle?:string;status:string;statusLabel?:string;updatedAt?:string;nextAction?:string};
+type TrackingItem={id:string;trackingReference?:string;type:string;title:string;subtitle?:string;status:string;statusLabel?:string;updatedAt?:string;nextAction?:string};
 type Tracking={summary?:{total?:number;active?:number;nextSteps?:number;memberships?:number;organizations?:number;jobApplications?:number};items?:TrackingItem[];attentionItems?:TrackingItem[];hasMore?:boolean;limit?:number;offset?:number};
 type Outcomes={jobs?:unknown[];services?:{id:string;status:string;service_title?:string;participant_role?:string}[];mentorships?:{id:string;status:string;participant_role?:string}[];inquiries?:{id:string;status:string;subject?:string;participant_role?:string}[]};
 type Organization={id:string;legal_name:string;display_name:string;verification_status?:string;role_code:string};
@@ -36,12 +36,15 @@ export default function Dashboard(){
   const token=useUiStore(state=>state.token),hydrated=useUiStore(state=>state.hydrated),clearToken=useUiStore(state=>state.clearToken);
   const [data,setData]=useState<DashboardData|null>(null);
   const [error,setError]=useState("");
+  const [copyNotice,setCopyNotice]=useState("");
   const [loading,setLoading]=useState(false);
   const [reviewPage,setReviewPage]=useState(0);
   const [selectedOrganizationId,setSelectedOrganizationId]=useState("");
   const [organizationPulse,setOrganizationPulse]=useState<OrganizationPulse|null>(null);
   const [organizationLoading,setOrganizationLoading]=useState(false);
   const [organizationError,setOrganizationError]=useState("");
+
+  async function copyReference(value:string){const ref=String(value||"").trim();if(!ref){setCopyNotice("A display reference has not been assigned yet.");return;}try{await navigator.clipboard.writeText(ref);setCopyNotice("Reference copied to clipboard.");}catch{setCopyNotice("Clipboard access is unavailable. Select the reference and copy it manually.");}}
 
   async function load(){
     if(!token)return;
@@ -272,8 +275,8 @@ export default function Dashboard(){
           <p className={styles.muted}>The information above is based on records returned for your account. If a section failed to load, use its link and retry; a missing result is not proof that a claim or payment was rejected.</p>
         </section>}
         <section className={styles.section}>
-          <div className={styles.sectionHeading}><div><div className={styles.kicker}>Your activity</div><h2>Recent applications</h2></div><a className="btn btn-ghost" href="/track">View all <ArrowRight size={15}/></a></div>
-          {trackingItems.length? <div className={styles.rows}>{trackingItems.slice(0,5).map(item=><a className={styles.activity} href={trackingHref(item.type)} key={item.type+item.id}><span className={styles.activityIcon}>{item.type==="organization"?<Building2 size={17}/>:item.type==="job"?<BriefcaseBusiness size={17}/>:<ClipboardList size={17}/>}</span><span className={styles.activityBody}><b>{item.title}</b><small>{item.subtitle||roleName(item.type)}{item.updatedAt?` · Updated ${new Date(item.updatedAt).toLocaleDateString()}`:""}</small></span><Badge tone="slate">{item.statusLabel||item.status}</Badge><ArrowUpRight size={16}/></a>)}</div>:data?.tracking?<div className={styles.emptyInline}><ClipboardList size={19}/><div><b>No applications yet</b><p>Start with a membership application or explore open opportunities.</p><div className={styles.inlineLinks}><a href="/apply">Membership <ArrowRight size={14}/></a><a href="/jobs">Browse jobs <ArrowRight size={14}/></a></div></div></div>:<p className={styles.muted}>Application activity is not available until tracking loads.</p>}
+          <div className={styles.sectionHeading}><div><div className={styles.kicker}>Your activity</div><h2>Recent applications</h2></div><a className="btn btn-ghost" href="/track">View all <ArrowRight size={15}/></a></div>{copyNotice&&<p className={styles.muted} role="status" aria-live="polite">{copyNotice}</p>}
+          {trackingItems.length? <div className={styles.rows}>{trackingItems.slice(0,5).map(item=><div className={styles.activity} key={item.type+item.id}><span className={styles.activityIcon}>{item.type==="organization"?<Building2 size={17}/>:item.type==="job"?<BriefcaseBusiness size={17}/>:<ClipboardList size={17}/>}</span><span className={styles.activityBody}><a href={trackingHref(item.type)}><b>{item.title}</b></a><small>{item.subtitle||roleName(item.type)}{item.updatedAt?` · Updated ${new Date(item.updatedAt).toLocaleDateString()}`:""}</small><small>Reference: {item.trackingReference||"Not assigned yet"}</small></span><button type="button" className="btn btn-ghost" disabled={!item.trackingReference} onClick={()=>void copyReference(item.trackingReference||"")} aria-label={"Copy reference for "+item.title}><ClipboardCopy size={15}/> Copy</button><Badge tone="slate">{item.statusLabel||item.status}</Badge><a href={trackingHref(item.type)} aria-label={"Open "+item.title}><ArrowUpRight size={16}/></a></div>)}</div>:data?.tracking?<div className={styles.emptyInline}><ClipboardList size={19}/><div><b>No applications yet</b><p>Start with a membership application or explore open opportunities.</p><div className={styles.inlineLinks}><a href="/apply">Membership <ArrowRight size={14}/></a><a href="/jobs">Browse jobs <ArrowRight size={14}/></a></div></div></div>:<p className={styles.muted}>Application activity is not available until tracking loads.</p>}
         </section>
 
         {data?.organizations.length? <section className={styles.section}>

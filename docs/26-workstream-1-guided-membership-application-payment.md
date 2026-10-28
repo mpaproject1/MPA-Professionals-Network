@@ -10,7 +10,7 @@
 
 - `web/app/membership/workspace.tsx` now guides applicants through four keyboard-operable modal stages: account/profile identity, plan/terms, professional details, and submission result.
 - The plan stage displays current fee and breakdown, currency, term/renewal policy, benefits, eligibility requirements, and configured required evidence types.
-- The terms acknowledgement has a visibly bordered, padded panel and a large checkbox with explicit required language.
+- The terms acknowledgement has a visibly bordered, padded panel and a large checkbox with explicit required language. The server rejects application and renewal submissions without the explicit acknowledgement, records `terms_acknowledged_at`, and stores a SHA-256 digest bound to the saved fee/validity/eligibility snapshot. The same acknowledgement is part of the idempotency payload contract.
 - The result stage is shown only after the API returns a saved application ID and canonical status. The submission reference is taken from the server response.
 - Application retries reuse a session-stored idempotency key bound to the submitted payload. On an uncertain response, the page reloads the user's server-backed application list before presenting the error.
 - The page restores existing in-progress applications and shows an eight-stage progress summary. Rejected applications display the permitted rejection explanation and do not reuse the rejected record as a new submission.

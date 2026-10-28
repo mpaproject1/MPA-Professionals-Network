@@ -85,7 +85,7 @@ test("Phase 1 manual payment verification controls activation",async()=>{
 
   const payment=await membership.createManualPayment(applicationId,userId,{
     amount:1200,currency:"ETB",channel:"bank_transfer",reference:`BANK-${suffix}`,
-    evidenceFileId:file.id,idempotencyKey:`phase1:${suffix}`
+    evidenceFileId:file.id,idempotencyKey:`phase1_test_${suffix}`
   },"phase1-test-payment");
   paymentId=payment.id;
   assert.equal(payment.status,"pending");

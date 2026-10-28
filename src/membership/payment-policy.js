@@ -2,6 +2,11 @@ export const MEMBERSHIP_PAYMENT_SUBMISSION_STATUSES = Object.freeze(["submitted"
 export function canSubmitMembershipPayment(applicationStatus) {
   return MEMBERSHIP_PAYMENT_SUBMISSION_STATUSES.includes(applicationStatus);
 }
+
+export function requiresMembershipPaymentEvidence(methodType, configuredRequiresEvidence) {
+  if (methodType === "chapa") return false;
+  return configuredRequiresEvidence === true;
+}
 export function applicationStatusAfterReview(decision, hasVerifiedPayment=false) {
   if(decision==="approved") return hasVerifiedPayment?"paid":"payment_pending";
   if(decision==="rejected") return "rejected";

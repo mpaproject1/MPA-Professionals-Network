@@ -345,6 +345,17 @@ export async function createApplication(userId,input,requestId){
     // pass the pending-application check.
     const account=(await db.query("select id from app_user where id=$1 for update",[userId])).rows[0];
     if(!account) throw httpError(404,"Account not found.","NOT_FOUND");
+    const type=input.applicationType||"new";
+    const submissionKey=String(input.idempotencyKey||"").trim();
+    if(submissionKey&&!/^[A-Za-z0-9_-]{16,128}$/.test(submissionKey))throw httpError(400,"A valid application idempotency key is required.","VALIDATION_ERROR");
+    const submissionPayloadHash=createHash("sha256").update(JSON.stringify({productCode:String(input.productCode||""),applicationType:type,professionalDetails:input.professionalDetails||null})).digest("hex");
+    if(submissionKey){
+      const prior=(await db.query("select * from membership_application where user_id=$1 and submission_idempotency_key=$2 for update",[userId,submissionKey])).rows[0];
+      if(prior){
+        if(prior.submission_payload_sha256!==submissionPayloadHash)throw httpError(409,"This application retry key was already used with different application details. Refresh the current application before continuing.","IDEMPOTENCY_CONFLICT");
+        return prior;
+      }
+    }
     const prod=await product(db,input.productCode);
     const activeFeeRule=(await db.query(`select * from membership_fee_rule
       where membership_product_id=$1 and effective_from<=current_date and (effective_to is null or effective_to>=current_date)
@@ -356,7 +367,6 @@ export async function createApplication(userId,input,requestId){
     if(planBillingModel==="recurring"&&(!Number.isInteger(Number(planDurationDays))||Number(planDurationDays)<1||Number(planDurationDays)>3650)) throw httpError(409,"This membership plan has no valid expiry duration configured. Contact membership support before applying.","PLAN_DURATION_INVALID");
     if(planBillingModel==="lifetime"&&planDurationDays!==null) throw httpError(409,"This lifetime plan has conflicting expiry settings. Contact membership support before applying.","PLAN_DURATION_INVALID");
     const active=await db.query("select mr.*,mp.billing_model current_billing_model,mp.renewal_required current_renewal_required from membership_record mr left join membership_product mp on mp.id=mr.membership_product_id where mr.user_id=$1 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date) order by mr.end_date desc nulls last limit 1",[userId]);
-    const type=input.applicationType||"new";
     if(type==="new" && active.rows[0]) throw httpError(409,"An active membership already exists. Use renewal.","ACTIVE_MEMBERSHIP");
     if(type==="renewal"){
       if(!active.rows[0]) throw httpError(400,"Renewal requires an existing active membership.","RENEWAL_NOT_ELIGIBLE");
@@ -384,8 +394,8 @@ export async function createApplication(userId,input,requestId){
       durationPolicy:(planBillingModel==="recurring" && Number(planDurationDays)===365)?"calendar_year_inclusive":"fixed_days_inclusive"
     };
     const trackingReference=await nextTrackingReference(db,"membership");
-    const row=(await db.query(`insert into membership_application(user_id,tracking_reference,application_type,previous_membership_id,membership_product_id,status,submitted_at,data_snapshot,fee_snapshot)
-      values($1,$2,$3,$4,$5,'submitted',now(),$6,$7) returning *`,[userId,trackingReference,type,active.rows[0]?.id||null,prod.id,snapshot,fee])).rows[0];
+    const row=(await db.query(`insert into membership_application(user_id,tracking_reference,submission_idempotency_key,submission_payload_sha256,application_type,previous_membership_id,membership_product_id,status,submitted_at,data_snapshot,fee_snapshot)
+      values($1,$2,$3,$4,$5,$6,$7,'submitted',now(),$8,$9) returning *`,[userId,trackingReference,submissionKey||null,submissionKey?submissionPayloadHash:null,type,active.rows[0]?.id||null,prod.id,snapshot,fee])).rows[0];
     await audit(db,userId,"membership.application_submitted","membership_application",row.id,requestId,{applicationType:type,productCode:prod.product_code});
     await notify(db,userId,"membership_application_submitted","membership_application",row.id,{productCode:prod.product_code,eventVersion:row.submitted_at||row.updated_at||row.id});
     const reviewers=(await db.query("select distinct u.id user_id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='members.manage'))")).rows;
@@ -455,7 +465,11 @@ export async function createManualPayment(applicationId,userId,input,requestId){
       if(!method) throw httpError(400,"This payment method is not currently available. Refresh the payment page and choose an enabled method.","PAYMENT_METHOD_UNAVAILABLE");
       if(method.method_type==="chapa") throw httpError(400,"Chapa payments must use the secure hosted checkout flow, not manual evidence submission.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
       if(String(method.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase()) throw httpError(400,"This payment method does not support the application fee currency.","PAYMENT_CURRENCY_UNSUPPORTED");
+      if(method.method_type==="chapa")throw httpError(400,"Online provider checkout must use the secure hosted checkout flow.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
+      if(method.requires_evidence===true&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
     }
+    if(input.currency&&String(input.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase())throw httpError(400,"Payment currency must match the saved application fee currency.","PAYMENT_CURRENCY_MISMATCH");
+    if(input.purpose&&input.purpose!=="membership_fee")throw httpError(400,"Payment purpose must be the membership fee for this application.","PAYMENT_PURPOSE_INVALID");
     const amount=Number(input.amount);
     if(!Number.isFinite(amount) || amount!==Number(fee.amount)) throw httpError(400,"Payment amount must exactly match the fee snapshot shown on this application.","PAYMENT_AMOUNT_MISMATCH");
     const methodType=method?.method_type;
@@ -486,7 +500,7 @@ export async function createManualPayment(applicationId,userId,input,requestId){
     await db.query("update payment_transaction pt set status='cancelled',completed_at=coalesce(completed_at,now()),updated_at=now(),verification_note=concat_ws(' | ',verification_note,'Superseded by a replacement payment submission.') from membership_application_payment ap where ap.payment_transaction_id=pt.id and ap.application_id=$1 and pt.status='pending' and pt.verification_note is not null",[applicationId]);
     const p=(await db.query(`insert into payment_transaction(provider,provider_transaction_id,idempotency_key,purpose,amount,currency,status,request_payload,channel,submitted_by,purpose_reference,source,payment_method_code)
       values('manual',null,$1,'membership', $2,$3,'pending',$4::jsonb,$5,$6,$7,'manual_entry',$8) returning *`,
-      [idem,amount,fee.currency,JSON.stringify({channel,reference:methodReference||null,paymentMethodCode:method?.method_code||null,payerBankName:payerBankName||null,methodSnapshot:method?{displayName:method.display_name,methodType:method.method_type,currency:method.currency,bankName:method.bank_name,accountName:method.account_name,accountNumber:method.account_number,providerCode:method.provider_code}:null}),channel,userId,methodReference||applicationId,method?.method_code||null])).rows[0];
+      [idem,amount,fee.currency,JSON.stringify({purpose:"membership_fee",channel,reference:methodReference||null,paymentMethodCode:method?.method_code||null,payerBankName:payerBankName||null,methodSnapshot:method?{displayName:method.display_name,methodType:method.method_type,currency:method.currency,bankName:method.bank_name,accountName:method.account_name,accountNumber:method.account_number,providerCode:method.provider_code,requiresEvidence:method.requires_evidence===true}:null}),channel,userId,methodReference||applicationId,method?.method_code||null])).rows[0];
     await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[applicationId,p.id]);
     if(input.evidenceFileId){
       const file=await db.query("select id from file_object where id=$1 and (created_by=$2 or created_by is null)",[input.evidenceFileId,userId]);
@@ -707,7 +721,7 @@ async function chapaVerifyAtProvider(ref,secret){
   return {status:String(data.status||"").toLowerCase(),reference:String(data.tx_ref||data.reference||""),currency:String(data.currency||"").toUpperCase(),amount:Number(data.amount),providerId:String(data.id||data.reference||ref)};
 }
 export async function listMembershipPaymentMethods({admin=false}={}){
-  const sql="select method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,updated_at from membership_payment_method "+(admin?"":"where enabled=true ")+"order by method_type,display_name,method_code";
+  const sql="select method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,requires_evidence,updated_at from membership_payment_method "+(admin?"":"where enabled=true ")+"order by method_type,display_name,method_code";
   return (await getPool().query(sql)).rows;
 }
 export async function saveMembershipPaymentMethod(actorId,input,requestId){
@@ -716,8 +730,9 @@ export async function saveMembershipPaymentMethod(actorId,input,requestId){
   if(type==="chapa"&&enabled){try{chapaConfig();}catch{throw httpError(409,"Chapa cannot be enabled until server-side credentials and mode are configured.","CHAPA_NOT_CONFIGURED");}}
   const field=(v,n)=>{const s=String(v||"").trim();if(s.length>n)throw httpError(400,"A payment method field is too long.","VALIDATION_ERROR");return s||null;};
   const qr=field(input.qrImageUrl,500);if(qr){let u;try{u=new URL(qr);}catch{throw httpError(400,"QR image URL must be HTTPS.","VALIDATION_ERROR");}if(u.protocol!=="https:")throw httpError(400,"QR image URL must be HTTPS.","VALIDATION_ERROR");}
+  const requiresEvidence=type==="chapa"?false:input.requiresEvidence!==false;
   return withTransaction(async db=>{
-    const row=(await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,updated_by,updated_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now()) on conflict(method_code) do update set method_type=excluded.method_type,display_name=excluded.display_name,enabled=excluded.enabled,currency=excluded.currency,instructions=excluded.instructions,bank_name=excluded.bank_name,account_name=excluded.account_name,account_number=excluded.account_number,provider_code=excluded.provider_code,qr_image_url=excluded.qr_image_url,updated_by=excluded.updated_by,updated_at=now() returning method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,updated_at",[code,type,name,enabled,currency,instructions,field(input.bankName,120),field(input.accountName,120),field(input.accountNumber,120),field(input.providerCode,120),qr,actorId])).rows[0];
+    const row=(await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,requires_evidence,updated_by,updated_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now()) on conflict(method_code) do update set method_type=excluded.method_type,display_name=excluded.display_name,enabled=excluded.enabled,currency=excluded.currency,instructions=excluded.instructions,bank_name=excluded.bank_name,account_name=excluded.account_name,account_number=excluded.account_number,provider_code=excluded.provider_code,qr_image_url=excluded.qr_image_url,requires_evidence=excluded.requires_evidence,updated_by=excluded.updated_by,updated_at=now() returning method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,requires_evidence,updated_at",[code,type,name,enabled,currency,instructions,field(input.bankName,120),field(input.accountName,120),field(input.accountNumber,120),field(input.providerCode,120),qr,requiresEvidence,actorId])).rows[0];
     await audit(db,actorId,"membership.payment_method_saved","membership_payment_method",null,requestId,{methodCode:code,methodType:type,enabled,currency});return row;
   });
 }

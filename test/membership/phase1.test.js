@@ -37,7 +37,7 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.equal(beforeMembership.headline,"Updated Professional");
   assert.equal(beforeMembership.has_active_membership,false,"editing a basic profile must not activate membership");
 
-  await assert.rejects(membership.createApplication(userId,{productCode:"BASIC"},"phase1-terms-not-acknowledged"),e=>e.code==="TERMS_ACKNOWLEDGEMENT_REQUIRED");
+  await assert.rejects(membership.createApplication(userId,{productCode:"BASIC",idempotencyKey:"phase1_no_terms_"+suffix},"phase1-terms-not-acknowledged"),e=>e.code==="TERMS_ACKNOWLEDGEMENT_REQUIRED");
   const applicationKey=`phase1_app_${suffix}`;
   const app=await membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:applicationKey},"phase1-test-application");
   applicationId=app.id;
@@ -74,7 +74,7 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   const verifiedPayment=(await getPool().query("select status from payment_transaction where id=$1",[prematurePayment.id])).rows[0];
   assert.equal(verifiedPayment.status,"succeeded","finance verification is recorded separately from application approval");
 
-  const duplicate=membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true},"phase1-test-duplicate");
+  const duplicate=membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:"phase1_duplicate_"+suffix},"phase1-test-duplicate");
   await assert.rejects(duplicate,e=>e.code==="APPLICATION_EXISTS");
 });
 
@@ -125,7 +125,7 @@ test("Phase 1 early payment verification cannot bypass approval or activation ga
 });
 
 test("Phase 1 renewal creates a linked renewal application without losing history",async()=>{
-  const renewal=await membership.renew(userId,"BASIC","phase1-test-renewal",true);
+  const renewal=await membership.renew(userId,"BASIC","phase1-test-renewal",true,"phase1_renewal_"+suffix);
   renewalApplicationId=renewal.id;
   assert.equal(renewal.application_type,"renewal");
   assert.equal(renewal.previous_membership_id,membershipId);

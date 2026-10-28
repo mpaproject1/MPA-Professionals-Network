@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence } from "../../src/membership/payment-policy.js";
+import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence, requiresMembershipPaymentEvidence } from "../../src/membership/payment-policy.js";
 
 test("payment evidence can be submitted before approval without changing application status",()=>{
   for(const status of ["submitted","in_review","correction_required","approved","payment_pending"]) assert.equal(canSubmitMembershipPayment(status),true,status);
@@ -35,4 +35,12 @@ test("required membership evidence blocks approval until each configured private
   assert.deepEqual(missingRequiredMembershipEvidence(["membership_evidence"],["membership_evidence"]),[]);
   assert.deepEqual(missingRequiredMembershipEvidence([],[]),[]);
   assert.throws(()=>missingRequiredMembershipEvidence(["passport_scan"],[]),/Unsupported required membership evidence type/);
+});
+
+test("manual evidence requirement is configuration-driven and hosted checkout never requires an upload",()=>{
+  assert.equal(requiresMembershipPaymentEvidence("bank_transfer",true),true);
+  assert.equal(requiresMembershipPaymentEvidence("telebirr",true),true);
+  assert.equal(requiresMembershipPaymentEvidence("cash",false),false);
+  assert.equal(requiresMembershipPaymentEvidence("manual",true),true);
+  assert.equal(requiresMembershipPaymentEvidence("chapa",true),false);
 });

@@ -335,6 +335,10 @@ const server=http.createServer(async (req,res)=>{
 
 
     if(req.method==="POST" && p==="api/v1/marketplace-demand") return ok(res,await marketplaceDemand.createDemand(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
+    if(req.method==="POST" && p==="api/v1/marketplace-demand/public-topics") return ok(res,await marketplaceDemand.createPublicTopicSubmission(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
+    if(req.method==="GET" && p==="api/v1/me/marketplace-demand-public-topics") return ok(res,await marketplaceDemand.listMyPublicTopicSubmissions(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/admin/marketplace-demand-public-topics") { const q=query(req.url); return ok(res,await marketplaceDemand.listPublicTopicSubmissionsForReview(identity.sub,{status:q.get("status")||"pending_review",q:q.get("q")||"",limit:q.get("limit")||"50",offset:q.get("offset")||"0"}),requestId); }
+    if(req.method==="PATCH" && parts.length===6 && p.startsWith("api/v1/admin/marketplace-demand-public-topics/") && parts[5]==="review") return ok(res,await marketplaceDemand.reviewPublicTopicSubmission(parts[4],identity.sub,await body(req),requestId),requestId);
     if(req.method==="GET" && p==="api/v1/me/marketplace-demand") return ok(res,await marketplaceDemand.listMyDemand(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/me/marketplace-demand-interests") return ok(res,await marketplaceDemand.listMyInterests(identity.sub),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/marketplace-demand/topics/") && parts[5]==="interest") return ok(res,await marketplaceDemand.joinDemandTopic(parts[4],identity.sub,await body(req),requestId),requestId,201);

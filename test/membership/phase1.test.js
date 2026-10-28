@@ -66,6 +66,7 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.equal(prematurePayment.status,"pending");
   const paymentReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:`phase1_early_${suffix}`},"phase1-early-payment-retry");
   assert.equal(paymentReplay.id,prematurePayment.id,"repeated payment requests with the same idempotency key return the original transaction");
+  await assert.rejects(membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:"CHANGED-"+suffix,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:`phase1_early_${suffix}`},"phase1-payment-key-conflict"),e=>e.code==="IDEMPOTENCY_CONFLICT");
   const earlyVerified=await membership.verifyPayment(prematurePayment.id,userId,{
     decision:"approved",evidenceChecked:[{type:"bank_reference",valid:true}],note:"Early payment verified independently of application review."
   },"phase1-early-payment-verification");
@@ -108,6 +109,8 @@ test("Phase 1 early payment verification cannot bypass approval or activation ga
   const approvedApp=(await db.query("select status,approved_at from membership_application where id=$1",[applicationId])).rows[0];
   assert.equal(approvedApp.status,"paid");
   assert.ok(approvedApp.approved_at,"application approval must be recorded separately before activation");
+  const paidReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:`phase1_early_${suffix}`},"phase1-paid-payment-retry");
+  assert.equal(paidReplay.id,paymentId,"same-key payment retry must return the original transaction even after the application advances to paid");
 
   const activated=await membership.activateApplication(applicationId,userId,"phase1-test-activation");
   membershipId=activated.id;

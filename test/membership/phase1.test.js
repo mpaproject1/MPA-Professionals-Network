@@ -49,7 +49,10 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.ok(Array.isArray(reviewQueueRow.review_history),"administrator queue should include prior review decisions");
   assert.equal(app.fee_snapshot.amount,1200);
   paymentMethodCode="bank_test_"+suffix;
-  await getPool().query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'bank_transfer','Test bank transfer',true,'ETB','Test-only payment method',false) on conflict(method_code) do update set enabled=true,requires_evidence=false",[paymentMethodCode]);
+  await getPool().query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'bank_transfer','Test bank transfer',true,'ETB','Test-only payment method',true) on conflict(method_code) do update set enabled=true,requires_evidence=true",[paymentMethodCode]);
+  await assert.rejects(membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:"NO-EVIDENCE-"+suffix,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:"phase1_evidence_required_"+suffix},"phase1-required-evidence"),e=>e.code==="PAYMENT_EVIDENCE_REQUIRED");
+  await assert.rejects(membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:"NO-METHOD-"+suffix,payerBankName:"Test Bank",idempotencyKey:"phase1_missing_method_"+suffix},"phase1-missing-method"),e=>e.code==="PAYMENT_METHOD_REQUIRED");
+  await getPool().query("update membership_payment_method set requires_evidence=false where method_code=$1",[paymentMethodCode]);
   const prematurePayment=await membership.createManualPayment(applicationId,userId,{
     amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,
     idempotencyKey:`phase1_early_${suffix}`

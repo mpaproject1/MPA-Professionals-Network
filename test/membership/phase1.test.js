@@ -155,6 +155,8 @@ test("Phase 1 rejection after verified payment retains the transaction for recon
   assert.equal(after.application_status,"rejected");
   assert.equal(after.payment_status,"succeeded","rejection must not erase or silently reclassify verified funds");
   assert.ok(after.reconciliation_status,"verified payment remains in reconciliation history after application rejection");
+  const rejectedReplay=await membership.createManualPayment(renewalApplicationId,userId,{amount:Number(fee.amount),currency:fee.currency,channel:"bank_transfer",reference:`RECONCILE-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:`phase1_reconcile_${suffix}`},"phase1-rejected-payment-retry");
+  assert.equal(rejectedReplay.id,payment.id,"retry after rejection returns the original payment and does not create another transaction");
 });
 
 test("Phase 1 notification preferences are persisted",async()=>{

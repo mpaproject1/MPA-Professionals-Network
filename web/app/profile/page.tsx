@@ -480,6 +480,13 @@ export default function Profile() {
         </Card>
       ) : (
         <>
+          <nav className={styles.sectionNav} aria-label="Profile sections">
+            <a href="#personal-information">Personal information</a>
+            <a href="#professional-summary">Professional profile</a>
+            <a href="#membership-and-verification">Membership &amp; verification</a>
+            <a href="#notification-preferences">Notifications</a>
+            <a href="#account-preferences">Account preferences</a>
+          </nav>
           <Card>
             <div className="row">
               <div>
@@ -516,7 +523,7 @@ export default function Profile() {
               <p className={styles.formHint}>
                 Start with your name. The other details are optional and can be added later. Changes are saved only when you select Save profile.
               </p>
-              <fieldset className="form-category grid" style={{gap:12}}><legend>1. Personal information</legend>
+              <fieldset className="form-category grid" style={{gap:12}}><legend id="personal-information">1. Personal information</legend>
               <p className="muted">Use the name you want associated with your MPA account. Contact details and sensitive personal information are not automatically made public.</p><div className="grid grid-2">
                 {(
                   [
@@ -563,7 +570,7 @@ export default function Profile() {
                   </div>
                 ))}
               </div></fieldset>
-              <fieldset className="form-category grid" style={{gap:12}}><legend>2. Professional summary</legend>
+              <fieldset className="form-category grid" style={{gap:12}}><legend id="professional-summary">2. Professional summary</legend>
               <p className="muted">Introduce your work and expertise in your own words. These details are separate from verified credentials; adding them does not mean MPA has verified them.</p><div>
                 <label htmlFor={`${profileId}-headline`}>Professional headline</label>
                 <p className={styles.fieldHint}>Summarize your role and expertise in one sentence. Example: “Public Health Specialist | Program Management”.</p>
@@ -784,7 +791,7 @@ export default function Profile() {
           <Card>
             <div className="row">
               <div>
-                <div className="eyebrow">Privacy and visibility</div>
+                <div id="membership-and-verification" className="eyebrow">Privacy and visibility</div>
                 <div className="h2">Choose what other members can see</div>
                 <p className="muted">These controls apply to your eligible directory profile only. Private evidence and reviewer notes remain protected by server-side access rules.</p>
               </div>
@@ -841,7 +848,7 @@ export default function Profile() {
             </button>
           </Card>
           </> : <Card>
-            <div className="eyebrow">Membership unlocks professional review</div>
+            <div id="membership-and-verification" className="eyebrow">Membership unlocks professional review</div>
             <h2 className="h2">Your profile can be prepared now</h2>
             <p className="muted">You can save your basic identity and professional summary before membership. Member-only directory publication, credential review and verification requests become available after membership approval, payment verification where required, and confirmed activation. Saving profile details does not mark them as verified.</p>
             <div className="row" style={{flexWrap:"wrap"}}>
@@ -853,7 +860,7 @@ export default function Profile() {
             <div className="row">
               <div>
                 <div className="eyebrow">Communication</div>
-                <div className="h2">How MPA contacts you</div>
+                <div id="notification-preferences" className="h2">How MPA contacts you</div>
               </div>
               <RefreshCw color="var(--primary)" />
             </div>
@@ -900,7 +907,7 @@ export default function Profile() {
             <div className="row">
               <Globe2 color="var(--primary)" />
               <div>
-                <div className="h2">Language</div>
+                <div id="account-preferences" className="h2">Language and account preferences</div>
                 <p className="muted">
                   Current interface language: {language}. Use the language control in the site header to change the interface language when available.
                 </p>

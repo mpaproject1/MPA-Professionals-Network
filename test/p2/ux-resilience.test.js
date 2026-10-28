@@ -22,7 +22,7 @@ test("membership payment retry reuses a persisted idempotency key and official a
   assert.match(page, /mpa-membership-payment-key:/);
   assert.match(page, /idempotencyKey/);
   assert.match(page, /tracking_reference/);
-  assert.match(service, /idempotency key is required/i);
+  assert.match(service, /idempotencyKey must be a unique token/);
   assert.match(service, /where pt\.idempotency_key=\$1/);
 });
 

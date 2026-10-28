@@ -131,3 +131,53 @@ These are the required manual evidence items still open because this audit envir
 - [ ] Confirm canonical routes and the final Account ID/reference policy before Workstream 1+ implementation.
 
 **Exit decision:** Repository inspection is sufficient to begin implementation planning, but not sufficient to claim all runtime issues reproduced. Workstream 0 remains **partially open** until the development-environment checklist and remaining server-handler/authorization trace are completed. No feature code, schema migration, production change or CI run was performed.
+
+
+## 9. Supplemental source-to-handler trace (main at b6d3abb76deb9842d3d4a0af3384f7f347e4c337)
+
+This section supersedes earlier wording where this later route/service inspection provides more specific evidence. It is source-level tracing, not live development reproduction.
+
+### 9.1 Payment-method configuration: API and UI exist; discoverability is the gap
+
+- server.js registers GET and PUT /api/v1/admin/membership/payment-methods. Both authenticate the caller and require system_admin or explicit members.manage / finance.manage authority.
+- src/membership/service.js implements listMembershipPaymentMethods and saveMembershipPaymentMethod against the existing membership_payment_method table, including bank name, account name/number, currency, instructions, enabled state and an audit event.
+- web/app/membership/payment/page.tsx includes an administrator configuration workflow, but is titled “Payment and receipt submission” and is not clearly discoverable as an admin settings destination. /admin/membership is the application/review workspace.
+- **Corrected classification:** no missing payment-method API or schema is established. The defect is route discoverability/workflow placement. No migration is justified.
+
+### 9.2 Payment evidence: two UI paths are inconsistent
+
+- The dedicated /membership/payment page uploads private evidence and sends evidenceFileId, paymentMethodCode and an idempotency key to the manual-payment endpoint.
+- The embedded payment form in web/app/membership/workspace.tsx submits amount/channel/reference/idempotency key without evidenceFileId or a selected payment method. The backend stores payment_transaction.evidence_file_id when supplied, and review validation considers either an application attachment of type membership_evidence or transaction-level evidence.
+- **Corrected classification:** evidence upload is not universally absent; the embedded and dedicated payment paths differ. Reproduce the actual guided path before deciding the implementation change.
+
+### 9.3 Admin account response: confirmed backend omission
+
+- src/platform/user-admin.js:listUsers returns account UUID, email, username, account status, timestamps, platform roles and direct permissions. It does not select or join membership status, organization names or profile fields.
+- web/app/admin/users-table.tsx expects optional membership_status, organization_names and profile fields. Its “not available” fallback exposes an API contract omission; it does not prove those values are absent from the database.
+- src/membership/admin-bulk.js:listMemberCatalog returns membership record data, linked account status, name, email and phone, but not the wider profile attributes requested. The export has a fixed 12-column allowlist, CSV formula-injection escaping and an audit event; no administrator column selector exists. Extensions need explicit role-based field allowlists and export tests.
+
+### 9.4 Job-interest eligibility: public endpoint does not require membership
+
+- server.js exposes unauthenticated POST /api/v1/public/opportunity-inquiries with optional identity and token-based public access/details/sharing routes.
+- src/platform/public-opportunity.js:createPublicInquiry validates consent, contact information, an idempotency key, and public job/mentor availability, but does not require active MPA membership. This is a **confirmed server policy mismatch** if the accepted requirement is members-only job interest; a UI-only restriction is insufficient.
+- continuationToken is the submission key itself and acts as a bearer secret for inquiry details/sharing consent. The UI displays it as “Private continuation token.” A readable reference must not authorize access. Define safe account-bound retrieval or one-time secret handling before changing this contract; preserve idempotency.
+
+### 9.5 Account security: reset endpoint exists but UI is absent
+
+- server.js registers POST /api/v1/admin/users/:id/reset-password and POST /api/v1/admin/users/:id/one-time-session-link, as well as session revocation. UsersTable exposes recovery-link and revoke-session actions, but no password reset or temporary credential generation/download.
+- Prefer the existing single-use recovery-link path over downloadable plaintext passwords. Inspect reset policy and forced-change behavior before exposing it. The requested recovery-email edit has no corresponding field in listUsers or visible UI in the inspected contract.
+
+### 9.6 Updated source findings and remaining evidence
+
+| Item | Source-level conclusion | Still needs development evidence |
+|---|---|---|
+| Payment method setup | API, service, schema and admin UI exist; placement is unclear | Confirm route discovery and rendered admin workflow |
+| Receipt/evidence | Dedicated page attaches evidence; embedded form omits it | Reproduce the actual guided path and response |
+| Account membership/org/profile data | Admin list API does not return these fields | Compare deployed payload with commit and database records |
+| Member catalogue/export | Limited fields and fixed export columns confirmed | Validate field-level authorization with test accounts |
+| Job-interest eligibility | Public inquiry service does not require active membership | Test anonymous, non-member, expired and active-member access |
+| Membership-card error | Route/service identified; error reference not traced | Correlate df974b25dc9c09f48405c6906897583d with request/logs and record state |
+| Canonical route/guide/anchor | /member nav and hardcoded account-governance link confirmed | Browser-check redirects, tour targets and anchor behavior |
+| Account ID | Admin API returns UUID only | Agree human reference format and check schema/uniqueness before changes |
+
+**Updated exit status:** The source-to-handler audit is materially deeper, and the earlier claims that payment-method endpoints/UI are absent and all payment UI lacks evidence upload are corrected above. Workstream 0 still cannot honestly be marked complete: its explicit acceptance criterion requires reproduction on the merged development commit, sanitized API evidence, and tracing the exact membership-card error. No authenticated development URL/session or test-account evidence is available in this work session. No application code, migration, production change or CI run was made.

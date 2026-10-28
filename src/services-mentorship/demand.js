@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
+import { displayReference } from "../platform/display-reference.js";
 
 function fail(status,message,code="BUSINESS_RULE"){return Object.assign(new Error(message),{statusCode:status,code});}
 const STAFF_ROLES=["admin","system_admin","platform_admin","supporting_staff","reviewer"];
@@ -93,7 +94,8 @@ export async function joinDemandTopic(topicId,userId,input,requestId){
  });
 }
 export async function listMyInterests(userId){
- return (await getPool().query("select i.id,i.topic_id,i.interest_level,i.comment,i.status,i.withdrawn_at,i.withdrawal_reason,i.created_at,i.updated_at,t.title,t.demand_type,t.status topic_status,case when i.status='withdrawn' then 'You withdrew your interest. You can rejoin while the topic remains open.' when t.status<>'published' then 'This topic is no longer accepting interest.' else 'Your interest is recorded. You can update or withdraw it while the topic is open.' end next_action from marketplace_demand_interest i join marketplace_demand_topic t on t.id=i.topic_id where i.user_id=$1 order by i.updated_at desc",[userId])).rows;
+ const rows=(await getPool().query("select i.id,i.topic_id,i.interest_level,i.comment,i.status,i.withdrawn_at,i.withdrawal_reason,i.created_at,i.updated_at,t.title,t.demand_type,t.status topic_status,t.published_at,t.created_at topic_created_at,case when i.status='withdrawn' then 'You withdrew your interest. You can rejoin while the topic remains open.' when t.status<>'published' then 'This topic is no longer accepting interest.' else 'Your interest is recorded. You can update or withdraw it while the topic is open.' end next_action from marketplace_demand_interest i join marketplace_demand_topic t on t.id=i.topic_id where i.user_id=$1 order by i.updated_at desc",[userId])).rows;
+ return rows.map(row=>({...row,topic_reference:displayReference({type:row.demand_type==="mentorship"?"mentorship":"service",id:row.topic_id,createdAt:row.topic_created_at||row.published_at})}));
 }
 
 export async function withdrawDemandInterest(topicId,userId,reason,requestId){
@@ -307,7 +309,7 @@ export async function createDemandProviderMatch(demandId,actorId,input,requestId
  });
 }
 export async function listMyDemandProviderMatches(userId){
- return (await getPool().query("select mm.*,d.title demand_title,d.demand_type,d.requester_user_id,coalesce(sl.title,mp.headline,oo.title) listing_title,coalesce(org.display_name,person.display_name) provider_name,(d.requester_user_id=$1) is_requester,(mm.provider_user_id=$1) is_provider from marketplace_demand_provider_match mm join marketplace_demand d on d.id=mm.demand_id left join service_listing sl on mm.listing_type='service' and sl.id=mm.listing_id left join mentor_profile mp on mm.listing_type='mentorship' and mp.id=mm.listing_id left join organization_mentorship_offer oo on mm.listing_type='organization_mentorship' and oo.id=mm.listing_id left join organization org on org.id=mm.organization_id left join person on person.user_id=mm.provider_user_id where d.requester_user_id=$1 or mm.provider_user_id=$1 or exists(select 1 from organization_membership om where om.organization_id=mm.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[])) order by mm.updated_at desc",[userId,["owner","administrator","recruiter","project_manager"]])).rows;
+ return (await getPool().query("select mm.*,d.title demand_title,d.demand_type,d.requester_user_id,coalesce(sl.title,mp.headline,oo.title) listing_title,coalesce(org.display_name,person.display_name) provider_name,(d.requester_user_id=$1) is_requester,(mm.provider_user_id=$1) is_provider from marketplace_demand_provider_match mm join marketplace_demand d on d.id=mm.demand_id left join service_listing sl on mm.listing_type='service' and sl.id=mm.listing_id left join mentor_profile mp on mm.listing_type='mentorship' and mp.id=mm.listing_id left join organization_mentorship_offer oo on mm.listing_type='organization_mentorship' and oo.id=mm.listing_id left join organization org on org.id=mm.organization_id left join person on person.user_id=mm.provider_user_id where d.requester_user_id=$1 or mm.provider_user_id=$1 or exists(select 1 from organization_membership om where om.organization_id=mm.organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[])) order by mm.updated_at desc",[userId,["owner","administrator","recruiter","project_manager"]])).rows.map(row=>({...row,tracking_reference:displayReference({type:row.listing_type==="mentorship"||row.listing_type==="organization_mentorship"?"mentorship":"service",id:row.id,createdAt:row.created_at})}));
 }
 export async function respondToDemandProviderMatch(matchId,userId,status,note,requestId){
  if(!["accepted","declined"].includes(status))throw fail(400,"Choose accept or decline for this provider match.","VALIDATION_ERROR");
@@ -345,3 +347,4 @@ export async function getDemandSummary(userId,topicId){
  const _participants=(await db.query("select i.interest_level,count(*)::int count from marketplace_demand_interest i join marketplace_demand_topic t on t.id=i.topic_id where i.topic_id=$1 and i.status='active' group by i.interest_level",[topicId])).rows;
  return {topic,counts,uniqueInterests:counts.reduce((n,r)=>n+Number(r.count),0),readyCount:counts.filter(r=>["ready_to_engage","can_provide"].includes(r.interest_level)).reduce((n,r)=>n+Number(r.count),0)};
 }
+

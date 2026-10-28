@@ -2,7 +2,9 @@
 -- Additive only: preserve every existing application/payment and do not rewrite lifecycle state.
 alter table membership_application
   add column if not exists submission_idempotency_key text,
-  add column if not exists submission_payload_sha256 char(64);
+  add column if not exists submission_payload_sha256 char(64),
+  add column if not exists terms_acknowledged_at timestamptz,
+  add column if not exists terms_snapshot_sha256 char(64);
 
 create unique index if not exists ux_membership_application_user_submission_key
   on membership_application(user_id, submission_idempotency_key)

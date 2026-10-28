@@ -21,6 +21,7 @@
 - The payment screen displays the saved membership-fee purpose, saved currency and exact fee amount. The selected method must be enabled and match the application's currency before its instructions are displayed.
 - Manual methods can be configured to require private receipt/document evidence. The UI validates file type and size, calculates SHA-256, uses the existing private upload service, uploads and checksum-confirms the file, then sends the confirmed file object ID with the payment request.
 - The service requires an enabled configured payment method; direct API callers cannot bypass the method-specific evidence requirement by omitting a method code.
+- Application and renewal endpoints reject missing terms acknowledgement; renewal requests pass the same idempotency key through to the application service.
 - Hosted Chapa checkout is server-verified and never requires a receipt upload. Chapa cannot be submitted through the manual-payment endpoint.
 - Manual payment submissions include explicit membership-fee purpose and currency. Server validation enforces the saved fee amount/currency, method currency, bank/Telebirr references and bank sender details.
 - Payment submission retries reuse an application/method-scoped idempotency key. The service checks for an existing matching transaction before checking the application's current state or reapplying upload requirements, so retries return the original payment after a timeout or later status transition. Reusing the key with a different payload is rejected.
@@ -30,6 +31,7 @@
 Migration `db/migrations/20261028110000_guided_membership_application_payment.sql` is additive:
 
 - Adds nullable `submission_idempotency_key` and `submission_payload_sha256` to `membership_application`.
+- Adds `terms_acknowledged_at` and `terms_snapshot_sha256` to persist the applicant acknowledgement and bind it to the saved fee/validity/eligibility snapshot.
 - Adds a partial unique index scoped by account and non-null application submission key.
 - Adds `requires_evidence` to `membership_payment_method`, defaulting to required for manual methods; hosted Chapa records are explicitly set not to require an upload.
 - Does not delete, rewrite, or reclassify existing applications or payments.
@@ -40,7 +42,7 @@ Existing payment-policy behavior is preserved: payment verification while the ap
 
 ## Regression coverage added or extended
 
-- `test/membership/phase1.test.js`: application retry returns the same record; reusing an application key with changed payload is rejected; duplicate active applications are rejected; payment method and required-evidence bypasses are rejected; payment retries return the same transaction; early payment verification does not advance the application; correction/review/approval/activation remain separate; rejection after verified payment retains the succeeded transaction and reconciliation record.
+- `test/membership/phase1.test.js`: missing terms acknowledgement is rejected and its timestamp/hash are persisted; application retry returns the same record; reusing an application key with changed payload is rejected; duplicate active applications are rejected; payment method and required-evidence bypasses are rejected; payment retries return the same transaction; early payment verification does not advance the application; correction/review/approval/activation remain separate; rejection after verified payment retains the succeeded transaction and reconciliation record.
 - `test/p0/membership-early-payment.test.js`: manual evidence requirement follows configuration, while hosted checkout never requires an uploaded receipt; existing canonical status-transition and required-evidence tests remain.
 - `test/platform/private-file-storage.test.js`: covers retrying with a valid private evidence payload after invalid upload validation, in addition to existing content-type/signature/size and cross-scope privacy checks.
 

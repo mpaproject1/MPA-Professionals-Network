@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   assertMembershipPaymentMethodAdmin,
+  assertMembershipPaymentMethodAvailable,
   buildPaymentMethodAuditMetadata,
   canManageMembershipPaymentMethods,
   missingMembershipPaymentMethodFields,
@@ -93,4 +94,11 @@ test("audit metadata records changed field names without account values or secre
   assert.equal(JSON.stringify(metadata).includes("123456789"), false);
   assert.equal("accountNumber" in metadata, false);
   assert.equal("secretKey" in metadata, false);
+});
+
+test("disabled methods and currency mismatches are rejected by the payment policy", () => {
+  assert.throws(() => assertMembershipPaymentMethodAvailable({ enabled: false, currency: "ETB" }, "ETB"), error => error.code === "PAYMENT_METHOD_UNAVAILABLE");
+  assert.throws(() => assertMembershipPaymentMethodAvailable({ enabled: true, currency: "USD" }, "ETB"), error => error.code === "PAYMENT_CURRENCY_UNSUPPORTED");
+  const method = { enabled: true, currency: " etb " };
+  assert.equal(assertMembershipPaymentMethodAvailable(method, "ETB"), method);
 });

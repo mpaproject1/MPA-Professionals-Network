@@ -3,6 +3,7 @@ import {Bookmark,Handshake,MessageSquareText,RefreshCw,ShieldCheck,Star} from "l
 import Link from "next/link";
 import {type FormEvent,useCallback,useEffect,useRef,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
+import {ImpactListingBanner} from "../../components/impact-listing-banner";
 import { FormFeedback } from "../../components/form-feedback";
 import { OperationStatus } from "../../components/operation-status";
 import {Badge, Card} from "../../components/ui";
@@ -12,7 +13,7 @@ import {useUiStore} from "../../lib/store";
 import {useSavedDiscoveryItems} from "../../lib/use-saved-discovery-items";
 
 type ServiceAnnouncement={id:string;listing_id:string;listing_title:string;title:string;body:string;audience:"public"|"members";status:string;created_at:string};
-type Service={id:string;title:string;description:string;service_category:string;delivery_mode?:string;location_label?:string;pricing_model:string;price_amount?:number|string|null;reference_price_amount?:number|string|null;impact_model?:string;lifecycle_status?:string;expires_at?:string|null;organizations_interested?:number;users_interested?:number;users_pledged?:number;organizations_pledged?:number;agreed_services?:number;active_deliveries?:number;verified_outcomes?:number;currency?:string|null;display_name?:string;provider_name?:string};
+type Service={id:string;title:string;description:string;approved_banner_url?:string|null;approved_banner_alt?:string|null;service_category:string;delivery_mode?:string;location_label?:string;pricing_model:string;price_amount?:number|string|null;reference_price_amount?:number|string|null;impact_model?:string;lifecycle_status?:string;expires_at?:string|null;organizations_interested?:number;users_interested?:number;users_pledged?:number;organizations_pledged?:number;agreed_services?:number;active_deliveries?:number;verified_outcomes?:number;currency?:string|null;display_name?:string;provider_name?:string};
 function createSubmissionKey():string{if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function")throw new Error("Secure submission is unavailable in this browser. Please reload and try again.");return crypto.randomUUID()+crypto.randomUUID();}
 function impactLabel(model?:string):string|null {return model==="pro_bono"?"100% Pro-Bono / Impact":model==="community_discount"?"Community Discounted Rate":model==="capacity_grant"?"Capacity Grant":null;}
 function lifecycleLabel(service:{lifecycle_status?:string;expires_at?:string|null}):string {const status=service.lifecycle_status||"active";if(status==="active")return service.expires_at?"Active until "+new Date(service.expires_at).toLocaleDateString():"Ongoing · no expiry";if(status==="pending_review")return "Under review";if(status==="fulfilled")return "Fulfilled";if(status==="archived")return "Archived";if(status==="paused")return "Paused";if(status==="suspended")return "Temporarily suspended";return status.replaceAll("_"," ");}

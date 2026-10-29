@@ -64,6 +64,7 @@ test("account export applies member/non-member row scope and safely preserves Un
   assert.ok(csv.buffer.length > 64);
   const text = csv.buffer.toString("utf8");
   assert.ok(text.includes("የአባል ማውጫ"), "Unicode text must remain intact");
+  assert.ok(text.includes("long-value-".repeat(18)), "long values must not be truncated");
   assert.ok(text.includes("'=SUM(1,2)"), "formula-like values must be neutralized before spreadsheet import");
   assert.ok(text.includes(fixture.accountReference), "account reference must be retained as text");
 
@@ -76,5 +77,16 @@ test("account export applies member/non-member row scope and safely preserves Un
   assert.equal(empty.rowCount, 0);
   assert.ok(empty.buffer.length > 64, "empty results still produce a valid header/manifest file");
   assert.ok(empty.buffer.toString("utf8").includes("account_reference"));
+
+  const product = (await db.query("select id from membership_product where active=true order by product_code limit 1")).rows[0];
+  assert.ok(product, "an active membership product must exist in the migrated CI database");
+  await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,source) values($1,$2,$3,'active',current_date,'admin')", [fixture.id, product.id, "000012340056"]);
+  const nowMember = await previewDirectoryExport(identity, "accounts", { fields: ["account_reference"], membershipScope: "members", q: fixture.email });
+  const noLongerNonMember = await previewDirectoryExport(identity, "accounts", { fields: ["account_reference"], membershipScope: "non_members", q: fixture.email });
+  assert.equal(nowMember.expectedRows, 1, "membership scope must include an account with a membership record");
+  assert.equal(noLongerNonMember.expectedRows, 0, "non-member scope must exclude an account with a membership record");
+  const memberCsv = await exportDirectory({ sub: fixture.id, roles: ["membership_reviewer"], permissions: [] }, "members", { fields: ["membership_number", "full_name"], q: "000012340056", format: "csv" }, "directory-export-leading-zero-test");
+  assert.ok(memberCsv.buffer.toString("utf8").includes("000012340056"), "leading zeros in membership numbers must be preserved");
+  assert.equal(memberCsv.rowCount, 1);
   assert.ok((await db.query("select id from app_user where id=$1", [fixture.id])).rowCount === 1);
 });

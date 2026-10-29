@@ -8,6 +8,7 @@ import { Badge, Card } from "../../../components/ui";
 import { api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";
+import { DirectoryExportBuilder } from "../../../components/admin/directory-export-builder";
 import { type ManagedPermission, type ManagedRole, type ManagedUser, UsersTable } from "../users-table";
 
 type AuditEvent = { id: string; actor_user_id?: string | null; action: string; resource_type: string; resource_id?: string | null; request_id?: string | null; outcome: string; metadata?: Record<string, unknown>; created_at: string };
@@ -76,6 +77,7 @@ export default function AdminAccountsPage() {
 
   return <div className="grid" style={{ gap: 18, minWidth: 0 }}>
     <AdminPageHeader eyebrow="Administration · People & access" title="Account and Team" description="One searchable account catalogue for team identity, platform roles, status and access actions. Organization membership and job-specific roles remain in their own scoped workspaces." actions={<><a className="btn btn-ghost" href="/admin">Admin overview</a><a className="btn btn-ghost" href="/admin/organizations">Organizations</a><a className="btn btn-ghost" href="/admin/members/catalog">Member catalogue</a></>} />
+    <DirectoryExportBuilder kind="accounts" token={token} />
     <div className="grid grid-2" style={{ gap: 12 }}>
       <Card><div className="row" style={{ gap: 10, alignItems: "flex-start" }}><Users size={20}/><div><strong>Platform accounts</strong><p className="muted">Search, filter and paginate accounts. Open each account for details and contextual actions.</p></div></div></Card>
       <Card><div className="row" style={{ gap: 10, alignItems: "flex-start" }}><ShieldCheck size={20}/><div><strong>Governed access</strong><p className="muted">Sensitive actions require a reason. Server authorization remains authoritative; this interface does not replace scoped organization or membership workflows.</p></div></div></Card>

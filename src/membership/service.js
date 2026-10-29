@@ -485,7 +485,7 @@ export async function createManualPayment(applicationId,userId,input,requestId){
       if(prior.purpose!=="membership"||prior.application_id!==applicationId||prior.application_user_id!==userId||
          Number(prior.amount)!==amount||String(prior.currency).trim().toUpperCase()!==String(fee.currency).trim().toUpperCase()||
          prior.submitted_by!==userId||prior.payment_method_code!==paymentMethodCode||
-         (input.evidenceFileId&&prior.evidence_file_id!==input.evidenceFileId)||(input.channel&&prior.channel!==input.channel)||String(priorPayload.reference||"")!==requestedReference||
+         ((prior.evidence_file_id||null)!==(input.evidenceFileId||null))||(input.channel&&prior.channel!==input.channel)||String(priorPayload.reference||"")!==requestedReference||
          String(priorPayload.payerBankName||"")!==requestedPayerBank){
         throw httpError(409,"This payment retry key was already used for a different submission. Refresh the application and payment status before continuing.","IDEMPOTENCY_CONFLICT");
       }

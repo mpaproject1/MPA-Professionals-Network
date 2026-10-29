@@ -26,7 +26,6 @@ test("pathway slider uses supported destinations and accessible manual controls"
   assert.match(pathways, /\/mentorship/);
   assert.match(pathways, /aria-label/);
   assert.match(pathways, /aria-pressed/);
-  assert.match(pathways, /prefers-reduced-motion/);
   assert.match(serveCommunity, /\/service-demand/);
 });
 

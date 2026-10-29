@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   assertMembershipPaymentMethodAdmin,
+  buildPaymentMethodAuditMetadata,
   canManageMembershipPaymentMethods,
   missingMembershipPaymentMethodFields,
   normalizeMembershipPaymentMethodInput,
@@ -79,4 +80,17 @@ test("Chapa never requests receipt evidence and does not accept manual account d
   assert.equal(chapa.bankName, null);
   assert.equal(chapa.accountName, null);
   assert.equal(chapa.accountNumber, null);
+});
+
+test("audit metadata records changed field names without account values or secrets", () => {
+  const metadata = buildPaymentMethodAuditMetadata({
+    methodCode: "bank_primary", methodType: "bank_transfer", enabled: true, currency: "ETB",
+    changedFields: ["account_number", "bank_name", "account_number", "accountNumber", "webhook_secret"],
+  });
+  assert.deepEqual(metadata.changedFields, ["account_number", "bank_name"]);
+  assert.equal(metadata.methodCode, "bank_primary");
+  assert.equal(metadata.enabled, true);
+  assert.equal(JSON.stringify(metadata).includes("123456789"), false);
+  assert.equal("accountNumber" in metadata, false);
+  assert.equal("secretKey" in metadata, false);
 });

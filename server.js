@@ -84,6 +84,7 @@ async function auth(req){
     const isAdministrator=identity.roles.some(role=>["system_admin","admin"].includes(role));
     if(r.rows[0].auth_method==="recovery"&&!passkeySetupRoute&&!logoutRoute) throw Object.assign(new Error("Recovery sessions may only register a replacement passkey or sign out."),{statusCode:401,code:"UNAUTHENTICATED"});
     if(r.rows[0].admin_passkey_enforced_at&&isAdministrator&&r.rows[0].auth_method!=="passkey"&&!passkeySetupRoute&&!logoutRoute) throw Object.assign(new Error("Administrator passkey authentication is required."),{statusCode:401,code:"UNAUTHENTICATED"});
+    identity.auth_method=r.rows[0].auth_method;
     identity.credential_setup_required=Boolean(r.rows[0].credential_setup_required);
     if(identity.credential_setup_required){
       const allowedRecoveryRoute=(req.method==="GET"&&path==="api/v1/me")||(req.method==="PATCH"&&path==="api/v1/me/account")||(req.method==="POST"&&path==="api/v1/auth/logout");

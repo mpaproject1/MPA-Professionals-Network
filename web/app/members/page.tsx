@@ -17,7 +17,6 @@ type Me = {
   first_name?: string;
   last_name?: string;
   email?: string;
-  status?: string;
   has_active_membership?: boolean;
   completion_percent?: number;
   roles?: string[];
@@ -75,6 +74,10 @@ function labelStatus(value?: string | null) {
   const clean = cleanStatus(value);
   if (!clean) return "Status not returned";
   return clean.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+function safeInternalHref(value?: string) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\\\")) return null;
+  return value;
 }
 function dateLabel(value?: string | null) {
   if (!value) return "";
@@ -313,7 +316,7 @@ export default function MembersWorkspacePage() {
           {recentItems.length ? <ol className="m-0 list-none p-0">{recentItems.map((item, index) => <li key={item.id || item.trackingReference || index} className="border-t border-[var(--border)] py-3 first:border-t-0"><div className="flex items-start gap-3"><Clock3 size={17} className="mt-1 shrink-0" aria-hidden="true" /><div className="min-w-0"><p className="font-semibold">{item.title || "Application or request update"}</p><p className="muted text-sm">{labelStatus(item.statusLabel || item.status)}{item.nextAction ? " · " + item.nextAction : ""}</p>{dateLabel(item.updatedAt || item.submittedAt) ? <p className="muted mt-1 text-xs">Updated {dateLabel(item.updatedAt || item.submittedAt)}</p> : null}</div></div></li>)}</ol> : <p className="muted">No recent activity was returned. When you submit a request or application, its server-reported status will appear here.</p>}
         </Card>
         <Card><div className="mb-3 flex items-center justify-between gap-3"><div><div className="eyebrow">Your inbox</div><h2 className="h2">Recent updates</h2></div><Link className="text-sm underline underline-offset-4" href="/notifications">Open notifications</Link></div>
-          {notifications.length ? <ul className="m-0 list-none p-0">{notifications.map((item, index) => <li key={item.id || index} className="border-t border-[var(--border)] py-3 first:border-t-0"><p className="font-semibold">{item.title || "Update"}</p><p className="muted mt-1 text-sm">{item.body || "Open notifications to review this update."}</p>{item.actionUrl ? <Link href={item.actionUrl} className="mt-2 inline-flex items-center gap-1 text-sm underline underline-offset-4">Review update <ArrowRight size={14} /></Link> : null}</li>)}</ul> : <p className="muted">No recent notifications were returned.</p>}
+          {notifications.length ? <ul className="m-0 list-none p-0">{notifications.map((item, index) => <li key={item.id || index} className="border-t border-[var(--border)] py-3 first:border-t-0"><p className="font-semibold">{item.title || "Update"}</p><p className="muted mt-1 text-sm">{item.body || "Open notifications to review this update."}</p>{safeInternalHref(item.actionUrl) ? <Link href={safeInternalHref(item.actionUrl)!} className="mt-2 inline-flex items-center gap-1 text-sm underline underline-offset-4">Review update <ArrowRight size={14} /></Link> : null}</li>)}</ul> : <p className="muted">No recent notifications were returned.</p>}
         </Card>
       </section>
 

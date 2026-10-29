@@ -225,6 +225,7 @@ export default function MembersWorkspacePage() {
   else if (paymentAttention) next = { title: "Check your payment status", detail: "Review the payment record and current method-specific instructions. A submitted receipt is not proof of verification.", href: "/membership", label: "Review payment" };
   else if (waitingReview) next = { title: "Your application is being processed", detail: "The service reports " + labelStatus(latestApplication?.status) + ". Check status updates; payment and application approval remain separate decisions.", href: "/track", label: "Check application status" };
   else if (latestApplication) next = { title: "Continue your membership application", detail: "Resume the current application and follow the instructions shown by the membership service.", href: "/membership", label: "Continue application" };
+  else if (cleanStatus(me?.membership_status || me?.status) === "expired") next = { title: "Review your expired membership", detail: "Your account reports expired membership. Review renewal options and current eligibility with the membership service.", href: "/membership", label: "Review renewal options" };
   else if (profilePercent !== null && profilePercent < 100) next = { title: "Complete your professional profile", detail: "Your account reports " + profilePercent + "% completion. Finish the profile details relevant to your professional record.", href: "/profile", label: "Continue profile" };
 
   const recentItems = (data?.tracking.items || []).slice(0, 3);
@@ -310,7 +311,7 @@ export default function MembersWorkspacePage() {
 
       <footer className="flex flex-wrap items-start justify-between gap-4 border-t border-[var(--border)] pt-5">
         <div className="max-w-2xl"><h2 className="font-semibold">Need a hand?</h2><p className="muted mt-1 text-sm">Use the Guide control for the current screen tour, or contact support if a status looks incorrect. Your application, payment and membership activation are separate server-controlled decisions.</p></div>
-        <div className="flex flex-wrap gap-2"><Link href="/support" className="btn btn-ghost"><HelpCircle size={16} /> Get help</Link><Link href="/membership" className="btn btn-ghost">Membership guidance <ArrowRight size={15} /></Link></div>
+        <div className="flex flex-wrap gap-2"><Link href="/contact" className="btn btn-ghost"><HelpCircle size={16} /> Get help</Link><Link href="/membership" className="btn btn-ghost">Membership guidance <ArrowRight size={15} /></Link></div>
       </footer>
     </> : null}
   </main>;

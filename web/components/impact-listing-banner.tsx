@@ -10,7 +10,7 @@ type ImpactListingBannerProps = {
 };
 
 function approvedImageUrl(value?: string | null): string | null {
-  if (!value) return null;
+  if (!value || /[\\s\"'()\\\\]/.test(value)) return null;
   try {
     const parsed = new URL(value);
     if (parsed.protocol !== "https:" || parsed.username || parsed.password) return null;
@@ -35,7 +35,7 @@ export function ImpactListingBanner({
 }: ImpactListingBannerProps) {
   const safeImage = approvedImageUrl(imageUrl);
   const style: CSSProperties | undefined = safeImage
-    ? { backgroundImage: `linear-gradient(90deg,rgba(7,25,39,.88),rgba(7,25,39,.2)),url("${safeImage.replace(/["\\\\]/g, "")}")` }
+    ? { backgroundImage: `linear-gradient(90deg,rgba(7,25,39,.88),rgba(7,25,39,.2)),url("${safeImage}")` }
     : undefined;
 
   return (

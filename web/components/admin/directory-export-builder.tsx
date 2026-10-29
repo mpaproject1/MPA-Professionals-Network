@@ -19,6 +19,7 @@ export function DirectoryExportBuilder({ kind, token }: Props) {
   const [format, setFormat] = useState<"csv" | "xlsx">("xlsx");
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
+  const [membershipStatus, setMembershipStatus] = useState("");
   const [membershipScope, setMembershipScope] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -39,7 +40,7 @@ export function DirectoryExportBuilder({ kind, token }: Props) {
   }, [kind, token]);
 
   const hasOrganizationScope = Boolean(catalogue?.fields.some(field => field.key === "organization_names"));
-  const filters = useMemo(() => ({ kind, fields: selected, preset, q, status, membershipScope, from, to, organizationId, importBatch }), [kind, selected, preset, q, status, membershipScope, from, to, organizationId, importBatch]);
+  const filters = useMemo(() => ({ kind, fields: selected, preset, q, status, membershipStatus, membershipScope, from, to, organizationId, importBatch }), [kind, selected, preset, q, status, membershipStatus, membershipScope, from, to, organizationId, importBatch]);
   async function buildPreview() {
     setLoading(true); setError(""); setNotice(""); setPreview(null);
     try {
@@ -107,6 +108,7 @@ export function DirectoryExportBuilder({ kind, token }: Props) {
       <div className="grid grid-2" style={{ gap: 12 }}>
         <label>Search name, account reference, email or membership number<input value={q} maxLength={120} onChange={event => { setQ(event.target.value); setPreview(null); }} placeholder="Optional search phrase" /></label>
         <label>{kind === "members" ? "Membership status" : "Account status"}<select value={status} onChange={event => { setStatus(event.target.value); setPreview(null); }}><option value="">All statuses</option>{(kind === "members" ? ["active", "expired", "pending", "suspended", "cancelled"] : ["active", "suspended", "pending", "disabled"]).map(value => <option key={value} value={value}>{value.replaceAll("_", " ")}</option>)}</select></label>
+        {kind === "accounts" && <label>Membership status<select value={membershipStatus} onChange={event => { setMembershipStatus(event.target.value); setPreview(null); }}><option value="">All membership statuses</option>{["active", "pending", "suspended", "expired", "cancelled", "not_enrolled", "unknown"].map(value => <option key={value} value={value}>{value.replaceAll("_", " ")}</option>)}</select></label>}
         {kind === "accounts" && <label>Member scope<select value={membershipScope} onChange={event => { setMembershipScope(event.target.value); setPreview(null); }}><option value="all">All accounts</option><option value="members">Members (any non-merged membership)</option><option value="non_members">Non-members</option></select></label>}
         <label>Created from<input type="date" value={from} onChange={event => { setFrom(event.target.value); setPreview(null); }} /></label>
         <label>Created to<input type="date" value={to} onChange={event => { setTo(event.target.value); setPreview(null); }} /></label>

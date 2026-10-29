@@ -234,7 +234,7 @@ test("Member workspace preserves non-member profile and public-feature access an
   assert.match(page, /\/api\/v1\/membership\/history/);
   assert.match(page, /\/api\/v1\/notifications/);
   assert.match(page, /Browse jobs/);
-  assert.match(shell, /\["\/members","My workspace",LayoutDashboard\]/);
+  assert.match(shell, /\["\/members","My-Workspace",LayoutDashboard\]/);
 });
 
 test("Employer recruitment workspace keeps vacancy and applicant views organization/job scoped", () => {
@@ -313,8 +313,9 @@ test("Serve-Community routes discovery into existing private workflows with comp
   assert.match(marketplace, /href:"\/jobs"/);
   assert.match(marketplace, /A public listing is not a private agreement/);
   assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);
-  assert.ok(shell.includes('const desktopPrimary=visibleNav.filter(([href])=>["/serve-community","/jobs"].includes(href))'));
-  assert.ok(shell.includes('const mobilePrimary=visibleNav.filter(([href])=>["/serve-community","/jobs"].includes(href))'));
+  assert.match(shell, /const primaryHrefs=token\?\["\/about","\/jobs","\/serve-community","\/members","\/learning"\]:\["\/about","\/jobs","\/serve-community"\]/);
+  assert.match(shell, /const desktopPrimary=visibleNav\.filter\(\(\[href\]\)=>primaryHrefs\.includes\(href\)\)/);
+  assert.match(shell, /const mobilePrimary=visibleNav\.filter\(\(\[href\]\)=>primaryHrefs\.includes\(href\)\)/);
   assert.doesNotMatch(shell, /\["\/marketplace","Marketplace",Search\]/);
   assert.match(services, /Back to Serve-Community/);
   assert.match(mentorship, /Back to Serve-Community/);

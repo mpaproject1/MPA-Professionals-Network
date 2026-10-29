@@ -1,5 +1,5 @@
 "use client";
-import { BookOpenCheck, Building2, ClipboardList, FileBarChart, Fingerprint, HelpCircle, Mail, MessageSquareText, RefreshCw, Search, ShieldCheck, UserCog, Users } from "lucide-react";
+import { BookOpenCheck, Building2, ClipboardList, CreditCard, FileBarChart, Fingerprint, HelpCircle, Mail, MessageSquareText, RefreshCw, Search, ShieldCheck, UserCog, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
@@ -35,6 +35,7 @@ export default function AdminPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [scopeResolved, setScopeResolved] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [canReviewInquiries, setCanReviewInquiries] = useState(false);
@@ -74,6 +75,8 @@ export default function AdminPage() {
       try { const segment = token.split(".")[1]; if (segment) claims = JSON.parse(atob(segment.replace(/-/g, "+").replace(/_/g, "/"))); } catch { /* Display hints only; server authorization remains authoritative. */ }
       const currentRoles = Array.isArray(claims?.roles) ? claims.roles.map((role: any) => typeof role === "string" ? role : role?.role_code).filter(Boolean) : [];
       setRoles(currentRoles);
+      const currentPermissions = Array.isArray(claims?.permissions) ? claims.permissions.map((permission: any) => typeof permission === "string" ? permission : permission?.permission_code).filter((permission: unknown): permission is string => typeof permission === "string") : [];
+      setPermissions(currentPermissions);
       setIsPlatformAdmin(currentRoles.includes("system_admin") || currentRoles.includes("admin") || currentRoles.includes("platform_admin"));
       setCanReviewInquiries(currentRoles.includes("supporting_staff") || currentRoles.includes("system_admin") || currentRoles.includes("admin") || currentRoles.includes("platform_admin"));
       if (currentRoles.includes("system_admin")) {
@@ -125,6 +128,7 @@ export default function AdminPage() {
     {title:"Member records",desc:"Import approved member registers, resolve conflicts and export records.",href:"/admin/members",Icon:Users,group:"People & access",access:"admin"},
     {title:"Member catalogue",desc:"Search individual membership records and linked account status.",href:"/admin/members/catalog",Icon:Users,group:"People & access",access:"admin"},
     {title:"Membership operations",desc:"Membership plans, payment review and membership lifecycle controls.",href:"/admin/membership",Icon:ShieldCheck,group:"People & access",access:"admin"},
+    {title:"Membership payment methods",desc:"Configure bank, Telebirr, cash and other manual payment instructions with finance-only access.",href:"/admin/membership/payment-methods",Icon:CreditCard,group:"People & access",access:"finance"},
     {title:"Serve-Community review",desc:"Moderate shared demand, listings and provider matching.",href:"/admin/marketplace",Icon:ClipboardList,group:"Review & service",access:"staff"},
     {title:"Support desk",desc:"Manage inquiries, handoffs and the support knowledge base.",href:"/admin/support",Icon:MessageSquareText,group:"Review & service",access:"staff"},
     {title:"Mentorship participant reports",desc:"Review confidential participant reports and record audited outcomes.",href:"/admin/mentorship-reports",Icon:ClipboardList,group:"Review & service",access:"support"},
@@ -134,7 +138,7 @@ export default function AdminPage() {
     {title:"Security",desc:"Manage administrator passkeys and recovery controls.",href:"/admin/security",Icon:Fingerprint,group:"Governance",access:"admin"},
     {title:"Email operations",desc:"Review delivery queues, templates and retries.",href:"/admin/email",Icon:Mail,group:"Governance",access:"admin"},
     {title:"Help, guides and demos",desc:"Manage contextual guides, launch training scenarios and find support resources.",href:"/admin/experience",Icon:HelpCircle,group:"Enablement",access:"admin"},
-  ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "org" ? roles.some(role => ["system_admin","admin","reviewer"].includes(role)) : item.access === "support" ? roles.some(role => ["system_admin","supporting_staff"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin));
+  ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "finance" ? roles.some(role => ["system_admin","finance_officer"].includes(role)) || permissions.some(permission => ["members.manage","finance.manage"].includes(permission)) : item.access === "org" ? roles.some(role => ["system_admin","admin","reviewer"].includes(role)) : item.access === "support" ? roles.some(role => ["system_admin","supporting_staff"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin));
 
 
   async function decideInquiry(item: Inquiry, status: string, considerNonMember: boolean) {

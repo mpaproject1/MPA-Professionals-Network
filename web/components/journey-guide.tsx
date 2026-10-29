@@ -3,7 +3,7 @@
 import { ArrowRight, CheckCircle2, Circle, Clock3, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api, ApiError } from "../lib/api";
+import { ApiError, api } from "../lib/api";
 import { useUiStore } from "../lib/store";
 import { Card } from "./ui";
 

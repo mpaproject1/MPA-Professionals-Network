@@ -734,7 +734,7 @@ async function chapaVerifyAtProvider(ref,secret){
   return {status:String(data.status||"").toLowerCase(),reference:String(data.tx_ref||data.reference||""),currency:String(data.currency||"").toUpperCase(),amount:Number(data.amount),providerId:String(data.id||data.reference||ref)};
 }
 export async function listMembershipPaymentMethods({admin=false}={}){
-  const sql="select method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,requires_evidence,updated_by,updated_at from membership_payment_method "+(admin?"":"where enabled=true ")+"order by method_type,display_name,method_code";
+  const sql="select method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,requires_evidence,updated_at"+(admin?",updated_by":"")+" from membership_payment_method "+(admin?"":"where enabled=true and (method_type='chapa' or (method_type='bank_transfer' and coalesce(bank_name,'')<>'' and coalesce(account_name,'')<>'' and coalesce(account_number,'')<>'' and coalesce(instructions,'')<>'') or (method_type='telebirr' and coalesce(account_name,'')<>'' and coalesce(account_number,'')<>'' and coalesce(instructions,'')<>'') or (method_type in ('cash','manual') and coalesce(instructions,'')<>'')) ")+"order by method_type,display_name,method_code";
   return (await getPool().query(sql)).rows;
 }
 export async function saveMembershipPaymentMethod(actorId,input,requestId){

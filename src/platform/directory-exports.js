@@ -91,6 +91,7 @@ function cleanFilters(input = {}) {
   const from = String(input.from || "").trim();
   const to = String(input.to || "").trim();
   const status = String(input.status || "").trim().slice(0, 40);
+  const membershipStatus = String(input.membershipStatus || "").trim().slice(0, 40);
   const membershipScope = String(input.membershipScope || "all").trim();
   const organizationId = String(input.organizationId || "").trim().slice(0, 100);
   const importBatch = String(input.importBatch || "").trim().slice(0, 100);
@@ -99,7 +100,8 @@ function cleanFilters(input = {}) {
   if (!validDate(from) || !validDate(to)) throw fail(400, "Date filters must use YYYY-MM-DD.", "INVALID_DATE");
   if (from && to && from > to) throw fail(400, "The start date must be on or before the end date.", "INVALID_DATE_RANGE");
   if (!["all", "members", "non_members"].includes(membershipScope)) throw fail(400, "Choose all accounts, members, or non-members.", "INVALID_MEMBERSHIP_SCOPE");
-  return { from, to, status, membershipScope, organizationId, importBatch, q };
+  if (membershipStatus && !["active", "pending", "suspended", "expired", "cancelled", "not_enrolled", "unknown"].includes(membershipStatus)) throw fail(400, "Choose a recognized membership status.", "INVALID_MEMBERSHIP_STATUS");
+  return { from, to, status, membershipStatus, membershipScope, organizationId, importBatch, q };
 }
 function chooseFields(identity, kind, input) {
   const available = allowedFields(identity, kind);
@@ -141,20 +143,21 @@ function buildQuery(kind, identity, filters) {
     if (orgFilter) { clauses.push(`exists(select 1 from organization_membership om where om.user_id=u.id and om.organization_id::text=$${args.length + 1} and om.status='active')`); args.push(filters.organizationId); }
   } else {
     dateColumn = "u.created_at";
-    select = `u.id, u.account_reference, p.display_name full_name, u.status account_status, u.email, p.phone,
-      u.created_at, u.updated_at,
-      case when not exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status<>'merged') then 'not_enrolled'
+    const membershipState = `case when not exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status<>'merged') then 'not_enrolled'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='active' and mr.start_date is not null and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date)) then 'active'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='pending') then 'pending'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='suspended') then 'suspended'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and (mr.status='expired' or (mr.status='active' and mr.end_date<current_date))) then 'expired'
-      when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='cancelled') then 'cancelled' else 'unknown' end membership_status,
+      when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='cancelled') then 'cancelled' else 'unknown' end`;
+    select = `u.id, u.account_reference, p.display_name full_name, u.status account_status, u.email, p.phone,
+      u.created_at, u.updated_at, ${membershipState} membership_status,
       ${canOrgs ? "coalesce((select string_agg(distinct o.display_name, '; ' order by o.display_name) from organization_membership om join organization o on o.id=om.organization_id where om.user_id=u.id and om.status='active'),'') organization_names" : "null::text organization_names"}`;
     fromSql = "app_user u left join person p on p.user_id=u.id";
     clauses.push(`($${args.length + 1}::date is null or u.created_at >= $${args.length + 1}::date)`); args.push(filters.from || null);
     clauses.push(`($${args.length + 1}::date is null or u.created_at < ($${args.length + 1}::date + interval '1 day'))`); args.push(filters.to || null);
     clauses.push(`($${args.length + 1}='' or u.status=$${args.length + 1})`); args.push(filters.status);
     clauses.push(`($${args.length + 1}='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(u.account_reference,'')) like lower('%'||$${args.length + 1}||'%'))`); args.push(filters.q);
+    if (filters.membershipStatus) { clauses.push(`(${membershipState})=${args.length + 1}`); args.push(filters.membershipStatus); }
     if (filters.membershipScope === "members") clauses.push("exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status<>'merged')");
     if (filters.membershipScope === "non_members") clauses.push("not exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status<>'merged')");
     if (batchFilter) { clauses.push(`exists(select 1 from membership_record mr where mr.user_id=u.id and mr.source_import_id::text=$${args.length + 1})`); args.push(filters.importBatch); }

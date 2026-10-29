@@ -1,6 +1,6 @@
 "use client";
 import {CreditCard,RefreshCw,ShieldCheck} from "lucide-react";
-import {useCallback,useEffect,useState} from "react";
+import {type FormEvent,useCallback,useEffect,useState} from "react";
 import {Badge, Card} from "../../../components/ui";
 import {ApiError,api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";

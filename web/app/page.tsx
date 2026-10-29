@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowDown, ArrowRight, GraduationCap, LayoutDashboard, LockKeyhole, Network, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, GraduationCap, LayoutDashboard, LockKeyhole, Network, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import styles from "./landing-redesign.module.css";
 import { LandingLoginForm } from "../components/landing-login-form";
@@ -111,16 +111,14 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={reduceMotion ? { duration: 0 } : { duration: 0.5, delay: 0.2 }}
           >
-            <Link href="/services" className={styles.primaryCta}>Browse professional services <ArrowRight size={17} aria-hidden="true" /></Link>
-            <Link href="/jobs" className={styles.secondaryCta}>Explore opportunities</Link>
-            <Link href="/membership" className={styles.loginCta}>Join the network <ArrowRight size={15} aria-hidden="true" /></Link>
+            <Link href="/jobs" className={styles.primaryCta}>Browse the Job Portal <ArrowRight size={17} aria-hidden="true" /></Link>
+            <Link href="/serve-community" className={styles.secondaryCta}>Explore Serve-Community</Link>
           </motion.div>
           <div className={styles.trustSignals} aria-label="Network principles">
             <span><ShieldCheck size={16} aria-hidden="true" /> Evidence-led review</span>
             <span><LockKeyhole size={16} aria-hidden="true" /> Privacy-aware access</span>
             <span><Network size={16} aria-hidden="true" /> Professional connections</span>
           </div>
-          <Link href="#pathways-slider" className={styles.scrollHint}>Explore what is available <ArrowDown size={15} aria-hidden="true" /></Link>
         </div>
 
         {token ? (

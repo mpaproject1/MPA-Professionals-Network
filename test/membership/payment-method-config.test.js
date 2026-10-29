@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   assertMembershipPaymentMethodAdmin,
   assertMembershipPaymentMethodAvailable,
+  buildMembershipPaymentMethodSnapshot,
   buildPaymentMethodAuditMetadata,
   canManageMembershipPaymentMethods,
   missingMembershipPaymentMethodFields,
@@ -101,4 +102,15 @@ test("disabled methods and currency mismatches are rejected by the payment polic
   assert.throws(() => assertMembershipPaymentMethodAvailable({ enabled: true, currency: "USD" }, "ETB"), error => error.code === "PAYMENT_CURRENCY_UNSUPPORTED");
   const method = { enabled: true, currency: " etb " };
   assert.equal(assertMembershipPaymentMethodAvailable(method, "ETB"), method);
+});
+
+test("payment snapshots preserve method details without retaining a mutable configuration object", () => {
+  const current = { method_code: "bank_primary", method_type: "bank_transfer", display_name: "Main account", currency: " etb ", instructions: "Use the membership reference.", bank_name: "Example Bank", account_name: "MPA", account_number: "123456", provider_code: null, qr_image_url: "https://cdn.example.test/qr.png", requires_evidence: true, secret_key: "never copy" };
+  const snapshot = buildMembershipPaymentMethodSnapshot(current);
+  current.account_number = "654321";
+  current.instructions = "Changed later";
+  assert.equal(snapshot.accountNumber, "123456");
+  assert.equal(snapshot.instructions, "Use the membership reference.");
+  assert.equal(snapshot.currency, "ETB");
+  assert.equal("secret_key" in snapshot, false);
 });

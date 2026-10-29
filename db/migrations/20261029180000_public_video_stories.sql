@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public_media_story (
   evidence_status text NOT NULL DEFAULT 'participant_reported' CHECK (evidence_status='participant_reported'),
   consent_confirmed boolean NOT NULL CHECK (consent_confirmed=true),
   consent_version text NOT NULL CHECK (consent_version='public-media-story-v1'),
+  consent_text_snapshot text NOT NULL CHECK (length(trim(consent_text_snapshot)) BETWEEN 40 AND 1000),
   consented_at timestamptz NOT NULL,
   consent_withdrawn_at timestamptz,
   moderation_status text NOT NULL DEFAULT 'pending' CHECK (moderation_status IN ('pending','approved','rejected','withdrawn')),

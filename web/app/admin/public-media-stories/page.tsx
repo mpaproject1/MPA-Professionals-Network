@@ -7,7 +7,7 @@ import {Badge,Card} from "../../../components/ui";
 import {ApiError,api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
 
-type Story={id:string;service_listing_id?:string|null;mentor_profile_id?:string|null;author_user_id:string;author_display_name?:string;title:string;summary:string;transcript:string;video_url:string;attribution_mode:"named"|"anonymous";attribution_name?:string|null;evidence_status:string;consent_version:string;consented_at:string;moderation_status:string;moderation_note?:string|null;created_at:string;subject_title?:string|null};
+type Story={id:string;service_listing_id?:string|null;mentor_profile_id?:string|null;author_user_id:string;author_display_name?:string;title:string;summary:string;transcript:string;video_url:string;attribution_mode:"named"|"anonymous";attribution_name?:string|null;evidence_status:string;consent_version:string;consent_text_snapshot:string;consented_at:string;moderation_status:string;moderation_note?:string|null;created_at:string;subject_title?:string|null};
 
 export default function PublicMediaStoriesAdminPage(){
  const token=useUiStore(s=>s.token);const hydrateToken=useUiStore(s=>s.hydrateToken);
@@ -45,7 +45,7 @@ export default function PublicMediaStoriesAdminPage(){
    <div className="grid" style={{gap:14,marginTop:12}}>
     {stories.map(story=><Card key={story.id}>
      <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap"}}><div><h2 className="h2">{story.title}</h2><p className="muted">{story.subject_title||"Listing unavailable"} · Submitted by {story.author_display_name||"participant"} · {new Date(story.created_at).toLocaleString()}</p></div><Badge>{story.moderation_status.replaceAll("_"," ")}</Badge></div>
-     <p>{story.summary}</p><p className="tagline">Attribution: {story.attribution_mode==="anonymous"?"Anonymous":story.attribution_name||"Named"} · Evidence: participant-reported · Consent version: {story.consent_version}</p>
+     <p>{story.summary}</p><p className="tagline">Attribution: {story.attribution_mode==="anonymous"?"Anonymous":story.attribution_name||"Named"} · Evidence: participant-reported · Consent version: {story.consent_version}</p><details><summary>Recorded publication consent</summary><p className="muted">{story.consent_text_snapshot}</p><p className="muted">Consent recorded: {new Date(story.consented_at).toLocaleString()}</p></details>
      <p><a className="text-link" href={story.video_url} target="_blank" rel="noopener noreferrer">Open video URL in a new tab</a></p>
      <details><summary className="btn btn-ghost" style={{display:"inline-flex",cursor:"pointer"}}>Review transcript / captions</summary><p style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{story.transcript}</p></details>
      <label>Moderation note<textarea rows={2} maxLength={1000} value={notes[story.id]||story.moderation_note||""} onChange={e=>setNotes(v=>({...v,[story.id]:e.target.value}))} placeholder="Record any reason or review notes."/></label>

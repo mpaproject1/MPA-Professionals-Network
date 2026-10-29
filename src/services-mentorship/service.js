@@ -1340,6 +1340,7 @@ export async function getMyMentorProfile(userId){
 
 
 const PUBLIC_MEDIA_STORY_CONSENT_VERSION="public-media-story-v1";
+const PUBLIC_MEDIA_STORY_CONSENT_TEXT="I explicitly consent to public publication of this video URL, story summary, transcript/captions and selected attribution after moderation. I understand this is my reported experience, and I can withdraw publication consent.";
 function mediaStoryError(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e;}
 function normalizeStoryText(value,field,min,max){
  const result=String(value??"").trim();
@@ -1389,7 +1390,7 @@ export async function createPublicMediaStory(authorUserId,subjectType,subjectId,
    if(!engagement)throw mediaStoryError(403,"Only a mentee with a completed mentorship can submit a participant story.","COMPLETED_MENTORSHIP_REQUIRED");
    mentorProfileId=profile.id;
   }else throw mediaStoryError(400,"Unsupported story subject.","VALIDATION_ERROR");
-  const row=(await db.query("insert into public_media_story(service_listing_id,mentor_profile_id,author_user_id,title,summary,transcript,video_url,attribution_mode,attribution_name,evidence_status,consent_confirmed,consent_version,consented_at,moderation_status) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'participant_reported',true,$10,now(),'pending') returning id,title,moderation_status,created_at",[serviceListingId,mentorProfileId,authorUserId,title,summary,transcript,videoUrl,attributionMode,attributionName,PUBLIC_MEDIA_STORY_CONSENT_VERSION])).rows[0];
+  const row=(await db.query("insert into public_media_story(service_listing_id,mentor_profile_id,author_user_id,title,summary,transcript,video_url,attribution_mode,attribution_name,evidence_status,consent_confirmed,consent_version,consent_text_snapshot,consented_at,moderation_status) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'participant_reported',true,$10,$11,now(),'pending') returning id,title,moderation_status,created_at",[serviceListingId,mentorProfileId,authorUserId,title,summary,transcript,videoUrl,attributionMode,attributionName,PUBLIC_MEDIA_STORY_CONSENT_VERSION,PUBLIC_MEDIA_STORY_CONSENT_TEXT])).rows[0];
   await audit(db,authorUserId,"public_media_story.submitted","public_media_story",row.id,requestId,{subjectType,subjectId,attributionMode,consentVersion:PUBLIC_MEDIA_STORY_CONSENT_VERSION});
   return {...row,nextAction:"Your story is private until a moderator approves it. You can withdraw publication consent at any time."};
  });
@@ -1408,7 +1409,7 @@ export async function listPublicMediaStoryReviewQueue(actorId,status="pending"){
  const db=getPool();
  await requireMediaModerator(db,actorId);
  if(!["pending","approved","rejected"].includes(status))throw mediaStoryError(400,"Unsupported moderation filter.","VALIDATION_ERROR");
- return (await db.query("select s.id,s.service_listing_id,s.mentor_profile_id,s.author_user_id,p.display_name author_display_name,s.title,s.summary,s.transcript,s.video_url,s.attribution_mode,s.attribution_name,s.evidence_status,s.consent_version,s.consented_at,s.moderation_status,s.moderation_note,s.created_at,coalesce(sl.title,mp.headline) subject_title from public_media_story s join person p on p.user_id=s.author_user_id left join service_listing sl on sl.id=s.service_listing_id left join mentor_profile mp on mp.id=s.mentor_profile_id where s.moderation_status=$1 and s.consent_withdrawn_at is null order by s.created_at asc limit 100",[status])).rows;
+ return (await db.query("select s.id,s.service_listing_id,s.mentor_profile_id,s.author_user_id,p.display_name author_display_name,s.title,s.summary,s.transcript,s.video_url,s.attribution_mode,s.attribution_name,s.evidence_status,s.consent_version,s.consent_text_snapshot,s.consented_at,s.moderation_status,s.moderation_note,s.created_at,coalesce(sl.title,mp.headline) subject_title from public_media_story s join person p on p.user_id=s.author_user_id left join service_listing sl on sl.id=s.service_listing_id left join mentor_profile mp on mp.id=s.mentor_profile_id where s.moderation_status=$1 and s.consent_withdrawn_at is null order by s.created_at asc limit 100",[status])).rows;
 }
 export async function reviewPublicMediaStory(storyId,actorId,input,requestId){
  const db=getPool();

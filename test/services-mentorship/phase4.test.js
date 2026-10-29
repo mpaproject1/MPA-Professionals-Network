@@ -52,6 +52,8 @@ test("public video links accept supported HTTPS providers and reject unsafe or u
   assert.equal(normalizePublicVideoUrl("https://www.youtube.com/watch?v=abc123"),"https://www.youtube.com/watch?v=abc123");
   assert.equal(normalizePublicVideoUrl("https://youtu.be/abc123"),"https://youtu.be/abc123");
   assert.equal(normalizePublicVideoUrl("https://vimeo.com/123456"),"https://vimeo.com/123456");
+  assert.equal(normalizePublicVideoUrl("https://m.youtube.com/watch?v=abc123"),"https://m.youtube.com/watch?v=abc123");
+  assert.equal(normalizePublicVideoUrl("https://player.vimeo.com/video/123456"),"https://player.vimeo.com/video/123456");
   assert.equal(normalizePublicVideoUrl(""),null);
   for (const value of [
     "http://youtube.com/watch?v=abc123",

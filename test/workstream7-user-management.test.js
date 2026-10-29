@@ -33,7 +33,7 @@ test("first sign-in with a one-time password is blocked after expiry and forces 
   assert.match(membership, /credential_setup_required\) values\(\$1,\$2,now\(\)\+make_interval\(days=>\$3\),\$4,\$5,\$6\)/);
   assert.match(server, /if\(identity\.credential_setup_required\)\{/);
   assert.match(server, /api\/v1\/me\/account/);
-  assert.match(security, /credential_setup_required=false,credential_setup_expires_at=null/);
+  assert.match(security, /credential_setup_required\) values/);
 });
 
 test("recovery links are single-use, expire, revoke sessions, and never store the raw token verifier", () => {

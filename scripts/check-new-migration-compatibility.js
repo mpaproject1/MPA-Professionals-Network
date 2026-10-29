@@ -31,7 +31,8 @@ const migrationNames = [
   "20261025120000_serve_community_g2_lifecycle.sql",
   "20261025130000_serve_community_g3_impact_metrics.sql",
   "20261025140000_serve_community_g4_announcement_commitment_experience.sql",
-  "20261025150000_serve_community_g6_outcome_proof.sql"
+  "20261025150000_serve_community_g6_outcome_proof.sql",
+  "20261029160000_account_references_and_governance.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -153,6 +154,9 @@ try {
     console.log(`PASS: ${migration.filename} applied inside rollback-only transaction`);
   }
   const postMigrationColumns = [
+    ["app_user","account_reference","text"],
+    ["app_user","account_reference_source","text"],
+    ["app_user","account_reference_assigned_at","timestamptz"],
     ["service_listing","lifecycle_status","text"],
     ["service_listing","expires_at","timestamptz"],
     ["service_listing","completion_evidence_policy","text"],

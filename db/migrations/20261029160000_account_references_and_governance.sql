@@ -1,9 +1,9 @@
 -- Workstream 6: immutable human-facing account references and auditable backfill.
 -- UUID primary keys remain unchanged for all relationships, APIs and historical audit records.
 create sequence if not exists app_user_account_reference_seq start with 1;
-create or replace function next_account_reference_suffix() returns text language plpgsql as $
+create or replace function next_account_reference_suffix() returns text language plpgsql as $$
 declare n bigint;
-begin n:=nextval('app_user_account_reference_seq'); return lpad(n::text,greatest(6,length(n::text)),'0'); end; $;
+begin n:=nextval('app_user_account_reference_seq'); return lpad(n::text,greatest(6,length(n::text)),'0'); end; $$;
 alter table app_user add column if not exists account_reference text, add column if not exists account_reference_source text, add column if not exists account_reference_assigned_at timestamptz;
 update app_user set account_reference='MPA-'||to_char((created_at at time zone 'UTC')::date,'YYYYMMDD')||'-'||next_account_reference_suffix(),account_reference_source='migration_backfill',account_reference_assigned_at=coalesce(account_reference_assigned_at,now()) where account_reference is null;
 update app_user set account_reference_source=coalesce(account_reference_source,'migration_backfill'),account_reference_assigned_at=coalesce(account_reference_assigned_at,now()) where account_reference is not null and (account_reference_source is null or account_reference_assigned_at is null);

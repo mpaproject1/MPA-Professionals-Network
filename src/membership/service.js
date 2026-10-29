@@ -13,7 +13,7 @@ import { consumeHumanChallenge } from "../platform/security-controls.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
 import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
 import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence, requiresMembershipPaymentEvidence } from "./payment-policy.js";
-import { normalizeMembershipPaymentMethodInput } from "./payment-method-policy.js";
+import { buildPaymentMethodAuditMetadata, normalizeMembershipPaymentMethodInput } from "./payment-method-policy.js";
 
 export function generateMembershipNumber(date=new Date()) { return `MPA-${date.getUTCFullYear()}-${randomUUID().slice(0,8).toUpperCase()}`; }
 
@@ -748,7 +748,7 @@ export async function saveMembershipPaymentMethod(actorId,input,requestId){
     const after={method_code:code,method_type:type,display_name:name,enabled,currency,instructions,bank_name:bankName,account_name:accountName,account_number:accountNumber,provider_code:providerCode,qr_image_url:qr,requires_evidence:requiresEvidence};
     const changedFields=Object.keys(after).filter(key=>!before||String(before[key]??"")!==String(after[key]??""));
     const row=(await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,requires_evidence,updated_by,updated_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now()) on conflict(method_code) do update set method_type=excluded.method_type,display_name=excluded.display_name,enabled=excluded.enabled,currency=excluded.currency,instructions=excluded.instructions,bank_name=excluded.bank_name,account_name=excluded.account_name,account_number=excluded.account_number,provider_code=excluded.provider_code,qr_image_url=excluded.qr_image_url,requires_evidence=excluded.requires_evidence,updated_by=excluded.updated_by,updated_at=now() returning method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,provider_code,qr_image_url,requires_evidence,updated_by,updated_at",[code,type,name,enabled,currency,instructions,bankName,accountName,accountNumber,providerCode,qr,requiresEvidence,actorId])).rows[0];
-    await audit(db,actorId,"membership.payment_method_saved","membership_payment_method",null,requestId,{methodCode:code,methodType:type,enabled,currency,changedFields});
+    await audit(db,actorId,"membership.payment_method_saved","membership_payment_method",null,requestId,buildPaymentMethodAuditMetadata({methodCode:code,methodType:type,enabled,currency,changedFields}));
     return row;
   });
 }

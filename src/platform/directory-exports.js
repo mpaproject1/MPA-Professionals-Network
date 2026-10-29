@@ -138,8 +138,8 @@ function buildQuery(kind, identity, filters) {
     clauses.push(`($${args.length + 1}::date is null or mr.created_at >= $${args.length + 1}::date)`); args.push(filters.from || null);
     clauses.push(`($${args.length + 1}::date is null or mr.created_at < ($${args.length + 1}::date + interval '1 day'))`); args.push(filters.to || null);
     clauses.push(`($${args.length + 1}='' or mr.status=$${args.length + 1})`); args.push(filters.status);
-    clauses.push(`(${args.length + 1}='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(u.account_reference,'')||' '||coalesce(mr.membership_number,'')) like lower('%'||${args.length + 1}||'%'))`); args.push(filters.q);
-    if (filters.membershipStatus) { clauses.push(`mr.status=${args.length + 1}`); args.push(filters.membershipStatus); }
+    clauses.push(`($${args.length + 1}='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(u.account_reference,'')||' '||coalesce(mr.membership_number,'')) like lower('%'||$${args.length + 1}||'%'))`); args.push(filters.q);
+    if (filters.membershipStatus) { clauses.push(`mr.status=$${args.length + 1}`); args.push(filters.membershipStatus); }
     if (batchFilter) { clauses.push(`mr.source_import_id::text=$${args.length + 1}`); args.push(filters.importBatch); }
     if (orgFilter) { clauses.push(`exists(select 1 from organization_membership om where om.user_id=u.id and om.organization_id::text=$${args.length + 1} and om.status='active')`); args.push(filters.organizationId); }
   } else {
@@ -158,7 +158,7 @@ function buildQuery(kind, identity, filters) {
     clauses.push(`($${args.length + 1}::date is null or u.created_at < ($${args.length + 1}::date + interval '1 day'))`); args.push(filters.to || null);
     clauses.push(`($${args.length + 1}='' or u.status=$${args.length + 1})`); args.push(filters.status);
     clauses.push(`($${args.length + 1}='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(u.account_reference,'')) like lower('%'||$${args.length + 1}||'%'))`); args.push(filters.q);
-    if (filters.membershipStatus) { clauses.push(`(${membershipState})=${args.length + 1}`); args.push(filters.membershipStatus); }
+    if (filters.membershipStatus) { clauses.push(`(${membershipState})=$${args.length + 1}`); args.push(filters.membershipStatus); }
     if (filters.membershipScope === "members") clauses.push("exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status<>'merged')");
     if (filters.membershipScope === "non_members") clauses.push("not exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status<>'merged')");
     if (batchFilter) { clauses.push(`exists(select 1 from membership_record mr where mr.user_id=u.id and mr.source_import_id::text=$${args.length + 1})`); args.push(filters.importBatch); }

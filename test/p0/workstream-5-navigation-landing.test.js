@@ -55,7 +55,7 @@ test("pathway slider exposes public routes and accessible manual controls", () =
 
 test("learning preview clearly marks planned areas as coming soon without claiming credentials", () => {
   const learning = read("web/app/learning/page.tsx");
-  assert.match(learning, /if \(!token\) router\.replace\("\/login\?next=%2Flearning"\)/);
+  assert.match(learning, /if \(hydrated && !token\) router\.replace\("\/login\?next=%2Flearning"\)/);
   assert.match(learning, /Resources/);
   assert.match(learning, /Courses/);
   assert.match(learning, /Certifications/);

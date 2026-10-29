@@ -22,7 +22,7 @@ function httpError(status,message,code="BUSINESS_RULE"){
 }
 async function tokenFor(db,user,roles,requestMeta={}){
   const raw=newSessionToken(); const ttl=Number(process.env.AUTH_SESSION_DAYS||7);
-  const row=(await db.query("insert into auth_session(user_id,token_hash,expires_at,ip_address,user_agent) values($1,$2,now()+make_interval(days=>$3),$4,$5) returning id",[user.id,hashSessionToken(raw),ttl,requestMeta.ip||null,requestMeta.userAgent||null])).rows[0];
+  const row=(await db.query("insert into auth_session(user_id,token_hash,expires_at,ip_address,user_agent,credential_setup_required) values($1,$2,now()+make_interval(days=>$3),$4,$5,$6) returning id",[user.id,hashSessionToken(raw),ttl,requestMeta.ip||null,requestMeta.userAgent||null,user.credential_setup_required===true])).rows[0];
   return signToken(sessionTokenPayload(user,roles,row.id),loadConfig().jwtSecret);
 }
 function audit(db,actor,action,type,id,requestId,metadata={}){
@@ -127,7 +127,7 @@ export async function login(email,password,requestId,requestMeta={}){
   const recent=await db.query("select count(*)::int count from auth_login_attempt where identity_key=$1 and attempted_at>now()-interval '15 minutes' and succeeded=false",[identityKey]);
   if(recent.rows[0].count>=8) throw httpError(429,"Too many unsuccessful sign-in attempts. Try again later.","AUTH_RATE_LIMIT");
   const e=normalizeEmail(email);
-  const r=await db.query("select id,email,username,password_hash,status,email_verified_at,admin_passkey_enforced_at from app_user where lower(email)=lower($1) or lower(username)=lower($1) order by case when lower(email)=lower($1) then 0 else 1 end limit 2",[e]);
+  const r=await db.query("select id,email,username,password_hash,status,email_verified_at,admin_passkey_enforced_at,coalesce(credential_setup_required,false) credential_setup_required from app_user where lower(email)=lower($1) or lower(username)=lower($1) order by case when lower(email)=lower($1) then 0 else 1 end limit 2",[e]);
   const user=r.rows.length===1?r.rows[0]:null;
   if(!user || user.status!=="active" || !verifyPassword(password,user.password_hash)){
     await db.query("insert into auth_login_attempt(identity_key,ip_address,succeeded) values($1,$2,false)",[identityKey,requestMeta.ip||null]);

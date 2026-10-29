@@ -64,6 +64,8 @@ test("Workstream 7 PostgreSQL security workflows", { skip: !enabled }, async (t)
       const issued = await issueOneTimePassword(privilegedActor, target.id, crypto.randomUUID(), reason);
       assert.equal(verifyPassword(issued.oneTimePassword, (await db.query("select password_hash from app_user where id=$1", [target.id])).rows[0].password_hash), true);
       assert.notEqual((await db.query("select password_hash from app_user where id=$1", [target.id])).rows[0].password_hash, issued.oneTimePassword);
+      const auditMetadata = (await db.query("select metadata::text metadata from audit_log where action='admin.password.one_time_issued' and resource_id::text=$1 order by occurred_at desc limit 1", [target.id])).rows[0]?.metadata || "";
+      assert.equal(auditMetadata.includes(issued.oneTimePassword), false, "one-time password must never appear in audit metadata");
       assert.ok((await db.query("select revoked_at from auth_session where id=$1", [oldSession])).rows[0].revoked_at);
       await db.query("update app_user set credential_setup_expires_at=now()-interval '1 second' where id=$1", [target.id]);
       await assert.rejects(
@@ -110,6 +112,22 @@ test("Workstream 7 PostgreSQL security workflows", { skip: !enabled }, async (t)
       await assert.rejects(() => verifyRecoveryEmailChange(rawToken, crypto.randomUUID()), (error) => error.statusCode === 410);
     });
 
+    await t.test("expired recovery-email verification tokens are rejected", async () => {
+      const target = await createUser("recovery-email-expired");
+      const newEmail = `ws7-expired-${suffix}@example.test`;
+      emails.push(newEmail);
+      await requestRecoveryEmailChange(privilegedActor, target.id, { email: newEmail, confirmEmail: newEmail, reason }, crypto.randomUUID(), "https://portal.muslimprofession.org");
+      const outbox = (await db.query("select payload from notification_outbox where recipient=$1 and template_code='account.recovery_email_verify' order by created_at desc limit 1", [newEmail])).rows[0];
+      const payload = typeof outbox.payload === "string" ? JSON.parse(outbox.payload) : outbox.payload;
+      const url = new URL(payload.url);
+      const rawToken = new URLSearchParams(url.hash.replace(/^#/, "")).get("token");
+      const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+      await db.query("update app_user set recovery_email_change_expires_at=now()-interval '1 second' where id=$1", [target.id]);
+      await assert.rejects(() => verifyRecoveryEmailChange(rawToken, crypto.randomUUID()), (error) => error.statusCode === 410);
+      assert.ok((await db.query("select recovery_email from app_user where id=$1", [target.id])).rows[0].recovery_email === null);
+      assert.ok(tokenHash.length === 64);
+    });
+
     await t.test("recovery links are single-use and revoke existing sessions", async () => {
       const target = await createUser("recovery-link");
       const oldSession = await addSession(target.id);
@@ -123,6 +141,14 @@ test("Workstream 7 PostgreSQL security workflows", { skip: !enabled }, async (t)
       const redeemed = await redeemOneTimeSessionLink(rawToken, crypto.randomUUID());
       assert.equal(redeemed.credentialSetupRequired, true);
       assert.ok((await db.query("select revoked_at from auth_session where id=$1", [oldSession])).rows[0].revoked_at);
+      await assert.rejects(() => redeemOneTimeSessionLink(rawToken, crypto.randomUUID()), (error) => error.statusCode === 410);
+    });
+
+    await t.test("expired one-time session links are rejected", async () => {
+      const target = await createUser("recovery-link-expired");
+      const rawToken = crypto.randomBytes(32).toString("base64url");
+      const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+      await db.query("insert into one_time_session_link(user_id,token_hash,created_by,expires_at) values($1,$2,$3,now()-interval '1 second')", [target.id, tokenHash, actor.id]);
       await assert.rejects(() => redeemOneTimeSessionLink(rawToken, crypto.randomUUID()), (error) => error.statusCode === 410);
     });
   } finally {

@@ -262,10 +262,10 @@ const server=http.createServer(async (req,res)=>{
       const result=await serveCommunityImpactReports.runImpactReport(identity,parts[4],{from:q.get("from"),to:q.get("to")},requestId,view);
       const exportData=serveCommunityImpactReports.toImpactExportData(result,parts[4]);
       const format=q.get("format")||"pdf";
-      if(!["pdf","xlsx"].includes(format)) throw Object.assign(new Error("Choose PDF or XLSX export format."),{statusCode:400,code:"INVALID_EXPORT_FORMAT"});
-      const buffer=format==="pdf"?reports.makePdf(exportData):reports.makeXlsx(exportData);
+      if(!["csv","pdf","xlsx"].includes(format)) throw Object.assign(new Error("Choose CSV, PDF or XLSX export format."),{statusCode:400,code:"INVALID_EXPORT_FORMAT"});
+      const buffer=format==="pdf"?reports.makePdf(exportData):format==="csv"?reports.makeCsv(exportData):reports.makeXlsx(exportData);
       await getPool().query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'service_listing',$3,$4,'success',$5)",[identity.sub,view==="governance"?"serve_community.impact_governance_report_exported":"serve_community.impact_report_exported",parts[4],requestId,JSON.stringify({format,view,rows:exportData.rows.length,minimumGroupSize:result.minimumGroupSize})]);
-      res.writeHead(200,{"content-type":format==="pdf"?"application/pdf":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":`attachment; filename=serve-community-impact-${new Date().toISOString().slice(0,10)}.${format}`,"content-length":String(buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId});
+      res.writeHead(200,{"content-type":format==="pdf"?"application/pdf":format==="csv"?"text/csv; charset=utf-8":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":`attachment; filename=serve-community-impact-${new Date().toISOString().slice(0,10)}.${format}`,"content-length":String(buffer.length),"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId});
       return res.end(buffer);
     }
     if(req.method==="GET" && p==="api/v1/admin/reports") { const identity=await auth(req); return ok(res,reports.listReportCatalogue(identity),requestId); }

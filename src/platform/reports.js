@@ -69,7 +69,7 @@ function validateGrouping(reportId,groupBy){
  if(!allowed.includes(groupBy||"default"))throw fail(400,"This saved view uses a grouping that is not supported by the selected report.","INVALID_GROUPING");
 }
 function cleanFilters(input={}){const f={from:String(input.from||"").trim(),to:String(input.to||"").trim(),status:String(input.status||"").trim().slice(0,40),q:String(input.q||"").trim().slice(0,100),groupBy:String(input.groupBy||"default").trim().slice(0,30)};const valid=v=>!v||(/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(`${v}T00:00:00Z`)));if(!valid(f.from)||!valid(f.to))throw fail(400,"Dates must use YYYY-MM-DD.","INVALID_DATE");if(f.from&&f.to&&f.from>f.to)throw fail(400,"Start date must be on or before end date.","INVALID_DATE_RANGE");return f;}
-export function listReportCatalogue(identity){return REPORTS.filter(r=>{try{authorize(identity,r);return true}catch{return false}}).map(({id,title,description,category,scope,sensitive,columns,definition})=>({id,title,description,category,scope,sensitive,columns,definition,formats:["pdf","xlsx"]}));}
+export function listReportCatalogue(identity){return REPORTS.filter(r=>{try{authorize(identity,r);return true}catch{return false}}).map(({id,title,description,category,scope,sensitive,columns,definition})=>({id,title,description,category,scope,sensitive,columns,definition,formats:["csv","pdf","xlsx"]}));}
 async function fetchRows(db,id,f){
  const args=[f.from||null,f.to||null,f.status,f.q],_date="($1::date is null or created_at >= $1::date) and ($2::date is null or created_at < ($2::date + interval '1 day'))";
  if(id==="membership-status")return (await db.query("select case when mr.status='active' and mr.start_date<=current_date and mr.end_date is not null and mr.end_date<current_date then 'expired' when mr.status='active' and mr.start_date>current_date then 'not_yet_active' else mr.status end effective_status,mp.name product,count(*)::int members from membership_record mr left join membership_product mp on mp.id=mr.membership_product_id where ($1::date is null or mr.created_at >= $1::date) and ($2::date is null or mr.created_at < ($2::date + interval '1 day')) and ($3='' or (case when mr.status='active' and mr.start_date<=current_date and mr.end_date is not null and mr.end_date<current_date then 'expired' when mr.status='active' and mr.start_date>current_date then 'not_yet_active' else mr.status end)=$3) group by effective_status,mp.name order by mp.name,effective_status",args.slice(0,3))).rows.map(r=>({"Status":r.effective_status,"Product":r.product||"Unspecified","Members":r.members}));
@@ -140,6 +140,29 @@ function wrapPdfLine(value,width=105){
  for(const word of words){if(!word)continue;const parts=word.length>width?(word.match(new RegExp(".{1,"+width+"}","g"))||[word]):[word];for(const part of parts){if(line&&line.length+1+part.length>width){out.push(line);line=part;}else line=line?line+" "+part:part;}}
  if(line||!out.length)out.push(line);return out;
 }
+
+function csvCell(value){
+ const raw=value instanceof Date?value.toISOString():String(value??"");
+ const safe=/^[\u0000-\u0020]*[=+\-@]/.test(raw)?"'"+raw:raw;
+ return '"'+safe.replace(/"/g,'""')+'"';
+}
+export function makeCsv(r){
+ const headers=r.rows.length?Object.keys(r.rows[0]):r.report.columns;
+ const data=[
+  ["MPA PROFESSIONALS ASSOCIATION"],
+  [r.report.title],
+  ["Generated: "+r.generatedAt],
+  ["Scope: "+r.report.scope],
+  ["Filters: "+JSON.stringify(r.filters)],
+  ["Definition: "+r.report.definition],
+  ["Totals: "+JSON.stringify(r.totals)],
+  [],
+  headers,
+  ...(r.rows.length?r.rows.map(row=>headers.map(key=>row[key] instanceof Date?row[key].toISOString():row[key]??"")):[["No records matched these filters."]])
+ ];
+ return Buffer.from("\uFEFF"+data.map(row=>row.map(csvCell).join(",")).join("\r\n")+"\r\n","utf8");
+}
+
 export function makePdf(r){
  const headers=r.rows.length?Object.keys(r.rows[0]):r.report.columns;
  const lines=["MPA PROFESSIONALS ASSOCIATION",r.report.title,`Generated: ${r.generatedAt}`,`Scope: ${r.report.scope}`,`Filters: ${JSON.stringify(r.filters)}`,`Definition: ${r.report.definition}`,`Totals: ${JSON.stringify(r.totals)}`,"",headers.join(" | "),...(r.rows.length?r.rows.map(row=>headers.map(h=>row[h] instanceof Date?row[h].toISOString():String(row[h]??"")).join(" | ")):["No records matched these filters."])].flatMap(line=>wrapPdfLine(line));
@@ -151,13 +174,13 @@ export function makePdf(r){
  const xref=Buffer.byteLength(out,"ascii");out+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<offsets.length;i++)out+=`${String(offsets[i]).padStart(10,"0")} 00000 n \n`;out+=`trailer\n<< /Size ${objs.length+1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF`;return Buffer.from(out,"ascii");
 }
 export async function exportReport(identity,id,filters,format,requestId){
- if(!["pdf","xlsx"].includes(format))throw fail(400,"Choose PDF or XLSX export format.","INVALID_EXPORT_FORMAT");
+ if(!["csv","pdf","xlsx"].includes(format))throw fail(400,"Choose CSV, PDF or XLSX export format.","INVALID_EXPORT_FORMAT");
  const db=getPool();
  try{
   const result=await runReport(identity,id,filters,requestId);
-  const buffer=format==="pdf"?makePdf(result):makeXlsx(result);
+  const buffer=format==="pdf"?makePdf(result):format==="csv"?makeCsv(result):makeXlsx(result);
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'report.exported','report',$2,$3,'success',$4)",[identity.sub,id,requestId,JSON.stringify({format,rowCount:result.rows.length,filters:result.filters,sensitive:result.report.sensitive})]);
-  return {buffer,contentType:format==="pdf"?"application/pdf":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",filename:`mpa-${id}-${new Date().toISOString().slice(0,10)}.${format==="pdf"?"pdf":"xlsx"}`};
+  return {buffer,contentType:format==="pdf"?"application/pdf":format==="csv"?"text/csv; charset=utf-8":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",filename:`mpa-${id}-${new Date().toISOString().slice(0,10)}.${format}`};
  }catch(cause){
   try{await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'report.export_failed','report',$2,$3,'failure',$4)",[identity?.sub||null,id,requestId,JSON.stringify({format,code:cause?.code||"EXPORT_FAILED",message:String(cause?.message||"Export failed").slice(0,240)})]);}catch{}
   throw cause;

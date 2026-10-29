@@ -47,6 +47,7 @@ test("administrative audit report applies date, outcome and search filters to kn
   const runRequestId = randomUUID();
   const pdfRequestId = randomUUID();
   const xlsxRequestId = randomUUID();
+  const csvRequestId = randomUUID();
   const today = new Date().toISOString().slice(0, 10);
   const identity = { sub: null, roles: ["system_admin"], permissions: [] };
   try {
@@ -76,6 +77,14 @@ test("administrative audit report applies date, outcome and search filters to kn
     assert.equal(pdf.buffer.subarray(0, 8).toString("ascii"), "%PDF-1.4");
     assert.ok(pdf.buffer.toString("ascii").includes(marker), "PDF export should contain the known matching row");
 
+    const csv = await exportReport(identity, "audit-activity", {
+      from: today, to: today, status: "success", q: marker
+    }, "csv", csvRequestId);
+    assert.equal(csv.contentType, "text/csv; charset=utf-8");
+    assert.match(csv.filename, /\.csv$/);
+    assert.equal(csv.buffer.subarray(0, 3).toString("utf8"), "\uFEFF");
+    assert.ok(csv.buffer.toString("utf8").includes(marker), "CSV export should contain the known matching row");
+
     const xlsx = await exportReport(identity, "audit-activity", {
       from: today, to: today, status: "success", q: marker
     }, "xlsx", xlsxRequestId);
@@ -93,10 +102,10 @@ test("administrative audit report applies date, outcome and search filters to kn
 
     const audit = await db.query(
       "select action,metadata from audit_log where request_id::text = any($1::text[]) order by action",
-      [[runRequestId, pdfRequestId, xlsxRequestId]]
+      [[runRequestId, pdfRequestId, xlsxRequestId, csvRequestId]]
     );
     assert.ok(audit.rows.some(row => row.action === "report.generated"));
-    assert.equal(audit.rows.filter(row => row.action === "report.exported").length, 2);
+    assert.equal(audit.rows.filter(row => row.action === "report.exported").length, 3);
 
     const requesterId = await createRequester();
     const demandTitle = "report-support-demand-" + randomUUID();
@@ -117,7 +126,7 @@ test("administrative audit report applies date, outcome and search filters to kn
   } finally {
     await db.query(
       "delete from audit_log where request_id::text = any($1::text[])",
-      [[seedRequestId, runRequestId, pdfRequestId, xlsxRequestId]]
+      [[seedRequestId, runRequestId, pdfRequestId, xlsxRequestId, csvRequestId]]
     );
   }
 });

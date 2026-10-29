@@ -13,7 +13,7 @@ import { consumeHumanChallenge } from "../platform/security-controls.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
 import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
 import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence, requiresMembershipPaymentEvidence } from "./payment-policy.js";
-import { buildPaymentMethodAuditMetadata, normalizeMembershipPaymentMethodInput } from "./payment-method-policy.js";
+import { assertMembershipPaymentMethodAvailable, buildPaymentMethodAuditMetadata, normalizeMembershipPaymentMethodInput } from "./payment-method-policy.js";
 
 export function generateMembershipNumber(date=new Date()) { return `MPA-${date.getUTCFullYear()}-${randomUUID().slice(0,8).toUpperCase()}`; }
 
@@ -494,10 +494,10 @@ export async function createManualPayment(applicationId,userId,input,requestId){
     }
     if(!canSubmitMembershipPayment(app.status))throw httpError(409,"Payment evidence can be submitted only for an active, non-rejected membership application.","INVALID_STATE");
     if(!paymentMethodCode)throw httpError(400,"Choose an enabled configured payment method before submitting a manual payment.","PAYMENT_METHOD_REQUIRED");
-    const method=(await db.query("select * from membership_payment_method where method_code=$1 and enabled=true for share",[paymentMethodCode])).rows[0]||null;
-    if(!method)throw httpError(400,"This payment method is not currently available. Refresh the payment page and choose an enabled method.","PAYMENT_METHOD_UNAVAILABLE");
+    const methodRow=(await db.query("select * from membership_payment_method where method_code=$1 and enabled=true for share",[paymentMethodCode])).rows[0]||null;
+    let method; try { method=assertMembershipPaymentMethodAvailable(methodRow,fee.currency); } catch(error) { throw httpError(error.statusCode||400,error.message,error.code||"PAYMENT_METHOD_UNAVAILABLE"); }
     if(method.method_type==="chapa")throw httpError(400,"Chapa payments must use the secure hosted checkout flow, not manual evidence submission.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
-    if(String(method.currency).trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase())throw httpError(400,"This payment method does not support the application fee currency.","PAYMENT_CURRENCY_UNSUPPORTED");
+    
     if(requiresMembershipPaymentEvidence(method.method_type,method.requires_evidence)&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
     const methodType=method.method_type;
     const channel=methodType==="bank_transfer"?"bank_transfer":methodType==="cash"?"cash":methodType==="telebirr"?"other":"manual";

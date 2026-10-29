@@ -26,17 +26,14 @@ export function PublicMediaStories({subjectType,subjectId,token}:{subjectType:Su
  const [withdrawingId,setWithdrawingId]=useState("");
  const load=useCallback(async()=>{
   setLoading(true);setError("");
-  try{
-   const path=subjectType==="service"?"/api/v1/services/"+encodeURIComponent(subjectId)+"/stories":"/api/v1/mentors/"+encodeURIComponent(subjectId)+"/stories";
-   const rows=await api<PublicStory[]>(path,{},token||undefined);
-   setStories(Array.isArray(rows)?rows:[]);
-   if(token){
-    const params=new URLSearchParams({subjectType,subjectId});
-    const own=await api<OwnStory[]>("/api/v1/me/public-media-stories?"+params.toString(),{},token);
-    setMine(Array.isArray(own)?own:[]);
-   }else setMine([]);
-  }catch(e){setStories([]);setMine([]);setError(e instanceof ApiError?e.message:"Stories could not be loaded.");}
-  finally{setLoading(false);}
+  const path=subjectType==="service"?"/api/v1/services/"+encodeURIComponent(subjectId)+"/stories":"/api/v1/mentors/"+encodeURIComponent(subjectId)+"/stories";
+  try{const rows=await api<PublicStory[]>(path,{},token||undefined);setStories(Array.isArray(rows)?rows:[]);}
+  catch(e){setStories([]);setError(e instanceof ApiError?e.message:"Approved stories could not be loaded.");}
+  if(token){
+   try{const params=new URLSearchParams({subjectType,subjectId});const own=await api<OwnStory[]>("/api/v1/me/public-media-stories?"+params.toString(),{},token);setMine(Array.isArray(own)?own:[]);}
+   catch(e){setMine([]);setError(current=>current||(e instanceof ApiError?e.message:"Your consent records could not be loaded."));}
+  }else setMine([]);
+  setLoading(false);
  },[subjectType,subjectId,token]);
  useEffect(()=>{void load();},[load]);
  async function submit(e:FormEvent){

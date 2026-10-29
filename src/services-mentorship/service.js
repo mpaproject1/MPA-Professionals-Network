@@ -1357,7 +1357,10 @@ export async function listPublicMediaStories(subjectType,subjectId,viewerId=null
  else if(subjectType==="mentor")await getMentorProfile(subjectId,viewerId);
  else throw mediaStoryError(400,"Unsupported story subject.","VALIDATION_ERROR");
  const column=subjectType==="service"?"service_listing_id":"mentor_profile_id";
- return (await db.query("select id,title,summary,transcript,video_url,attribution_mode,attribution_name,evidence_status,created_at from public_media_story where "+column+"=$1 and moderation_status='approved' and consent_withdrawn_at is null order by created_at desc limit 20",[subjectId])).rows;
+ const visibleParent=subjectType==="service"
+  ? "exists(select 1 from service_listing sl where sl.id=public_media_story.service_listing_id and sl.status='published' and sl.lifecycle_status='active' and sl.moderation_status='approved' and (sl.expires_at is null or sl.expires_at>now()))"
+  : "exists(select 1 from mentor_profile mp where mp.id=public_media_story.mentor_profile_id and mp.status='active' and mp.moderation_status='approved')";
+ return (await db.query("select id,title,summary,transcript,video_url,attribution_mode,attribution_name,evidence_status,created_at from public_media_story where "+column+"=$1 and moderation_status='approved' and consent_withdrawn_at is null and "+visibleParent+" order by created_at desc limit 20",[subjectId])).rows;
 }
 export async function listMyPublicMediaStories(userId,subjectType,subjectId){
  const db=getPool();const args=[userId];let where=["author_user_id=$1"];

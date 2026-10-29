@@ -3,6 +3,7 @@ import {Bookmark,Clock3,HeartHandshake,Languages,RefreshCw,Search,Target} from "
 import Link from "next/link";
 import {type FormEvent,useCallback,useEffect,useRef,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
+import {ImpactListingBanner} from "../../components/impact-listing-banner";
 import { FormFeedback } from "../../components/form-feedback";
 import { JourneyGuide } from "../../components/journey-guide";
 import { OperationStatus } from "../../components/operation-status";
@@ -13,7 +14,7 @@ import { humanStatus } from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 import {useSavedDiscoveryItems} from "../../lib/use-saved-discovery-items";
 
-type Mentor={id:string;user_id:string;display_name:string;headline?:string;bio?:string;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number;circle_enabled?:boolean;circle_name?:string|null;circle_joined_count?:number;circle_joined_by_me?:boolean};
+type Mentor={id:string;user_id:string;display_name:string;approved_banner_url?:string|null;approved_banner_alt?:string|null;headline?:string;bio?:string;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number;circle_enabled?:boolean;circle_name?:string|null;circle_joined_count?:number;circle_joined_by_me?:boolean};
 type OrganizationOffer={id:string;organization_id:string;organization_name:string;title:string;description:string;expertise?:string[]|string;languages?:string[]|string;delivery_mode:string;visibility:string;status:string;moderation_status:string;moderation_note?:string|null};
 type Organization={id:string;display_name:string;verification_status:string};
 type OrganizationRequest={id:string;offer_id:string;offer_title:string;organization_name:string;requester_user_id:string;requester_name?:string;message:string;status:string;is_requester:boolean;response_note?:string|null};
@@ -227,6 +228,7 @@ export default function Mentorship(){
    {notice&&<FormFeedback kind="success" message={notice} actionHref={!token?"/login?next=/mentorship":undefined} actionLabel={!token?"Sign in":undefined}/>}
    {portalMode==="mentee"&&created&&<Card><Badge tone="green">Request recorded</Badge><h2 className="h2" style={{marginTop:10}}>Your request is in the system</h2><p className="muted">Request reference: {created.id}</p><p className="muted">Status: {humanStatus(created.status)}. The platform does not create a mentorship until the matching and acceptance steps are completed.</p><p className="muted">{created.nextAction||"Review your request status and wait for an eligible mentor proposal."}</p><a className="btn btn-ghost" href="#mentorship-requests">Track request and matching</a><button className="btn btn-ghost" type="button" onClick={()=>setCreated(null)}>Dismiss</button></Card>}
    {portalMode==="mentee"&&loading?<Card><OperationStatus state="loading" title="Loading mentor profiles" detail="We’re checking current mentor profiles against your selected filters. Your request records are not changed by this search." /></Card>:mentors.length===0&&!error?<Card className="mentorship-empty-state"><div className="marketplace-pathway-icon"><Search size={22}/></div><h2 className="h2">No mentors match these filters yet</h2><p className="muted">Try a broader topic or clear your filters. You can still submit your career goals as an open mentorship request and follow its status in your account. A match is confirmed only after the required participants agree.</p><div className="row" style={{gap:8,flexWrap:"wrap"}}><button className="btn btn-primary" type="button" disabled={submitting||submissionUncertain} onClick={()=>{setSelected(null);setShowRequestForm(true);setCreated(null);setNotice("");setError("");}}>Submit an open mentorship request <span aria-hidden="true">→</span></button><button className="btn btn-ghost" type="button" disabled={loading} onClick={()=>{setQuery("");setTopic("");void load("","",0)}}>Clear filters</button></div></Card>:<div className="grid grid-3" style={{marginTop:18}}>{mentors.map(mentor=><Card key={mentor.user_id}>
+      <ImpactListingBanner variant="mentorship" eyebrow="MPA Mentorship" title={mentor.display_name} description={mentor.headline||"Professional mentor"} imageUrl={mentor.approved_banner_url} imageAlt={mentor.approved_banner_alt||mentor.display_name}/>
      <div className="row"><div className="avatar">{mentor.display_name.split(" ").map(x=>x[0]).join("").slice(0,3)}</div><Badge>Active profile</Badge></div>
      <h2 style={{fontSize:19,marginBottom:4,marginTop:14}}>{mentor.display_name}</h2><div className="tagline">{mentor.headline||"Professional mentor"}</div>
      {mentor.bio&&<p className="muted">{mentor.bio}</p>}

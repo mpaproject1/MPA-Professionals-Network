@@ -500,6 +500,7 @@ export async function createManualPayment(applicationId,userId,input,requestId){
     if(requiresMembershipPaymentEvidence(method.method_type,method.requires_evidence)&&!input.evidenceFileId)throw httpError(400,"This payment method requires a receipt or supporting evidence before submission.","PAYMENT_EVIDENCE_REQUIRED");
     const methodType=method.method_type;
     const channel=methodType==="bank_transfer"?"bank_transfer":methodType==="cash"?"cash":methodType==="telebirr"?"other":"manual";
+    if(input.channel&&input.channel!==channel)throw httpError(400,"The submitted channel does not match the selected configured payment method.","PAYMENT_CHANNEL_MISMATCH");
     const methodReference=String(input.reference||"").trim();
     if(methodType==="bank_transfer"&&!methodReference)throw httpError(400,"Enter the bank transfer or transaction reference.","PAYMENT_REFERENCE_REQUIRED");
     if(methodType==="telebirr"&&!methodReference)throw httpError(400,"Enter the Telebirr transaction reference.","PAYMENT_REFERENCE_REQUIRED");

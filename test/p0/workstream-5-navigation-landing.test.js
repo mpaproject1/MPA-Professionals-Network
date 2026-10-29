@@ -38,7 +38,7 @@ test("landing sign-in uses the real authentication API and safe local return pat
   const login = read("web/components/landing-login-form.tsx");
   assert.match(login, /"\/api\/v1\/auth\/login"/);
   assert.match(login, /setToken\(result\.token\)/);
-  assert.match(login, /requested\?\.startsWith\("\/"\)&&!requested\.startsWith\("\/\/"\)/);
+  assert.match(login, /requested\?\.startsWith\("\/"\)\s*&&\s*!requested\.startsWith\("\/\/"\)/);
   assert.match(login, /EMAIL_VERIFICATION_REQUIRED/);
   assert.match(login, /autoComplete="current-password"/);
 });

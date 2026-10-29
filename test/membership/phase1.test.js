@@ -73,6 +73,12 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   },"phase1-early-payment");
   paymentId=prematurePayment.id;
   assert.equal(prematurePayment.status,"pending");
+  const capturedMethod=(await getPool().query("select payment_method_snapshot from payment_transaction where id=$1",[paymentId])).rows[0].payment_method_snapshot;
+  assert.equal(capturedMethod.accountNumber,"123456789","payment keeps the account identifier used when submitted");
+  assert.equal(capturedMethod.bankName,"Test Bank");
+  assert.equal(capturedMethod.requiresEvidence,true);
+  const snapshotAudit=(await getPool().query("select metadata from audit_log where actor_user_id=$1 and action='membership.payment_submitted' and request_id=$2",[userId,"phase1-early-payment"])).rows[0];
+  assert.match(snapshotAudit.metadata.paymentMethodSnapshotSha256,/^[a-f0-9]{64}$/,"the audit trail binds the transaction to its immutable method snapshot");
   const linkedEvidence=(await getPool().query("select p.evidence_file_id,f.visibility,f.created_by,s.status upload_status from payment_transaction p join file_object f on f.id=p.evidence_file_id join private_upload_session s on s.file_object_id=f.id where p.id=$1",[paymentId])).rows[0];
   assert.equal(linkedEvidence.evidence_file_id,evidenceFileId);
   assert.equal(linkedEvidence.visibility,"private");
@@ -82,6 +88,8 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.equal(applicantPaymentView.retryable,false);
   assert.equal(Object.hasOwn(applicantPaymentView,"verification_note"),false,"private finance notes are not exposed in the applicant response");
   await getPool().query("update membership_payment_method set requires_evidence=false where method_code=$1",[paymentMethodCode]);
+  const unchangedSnapshot=(await getPool().query("select payment_method_snapshot from payment_transaction where id=$1",[paymentId])).rows[0].payment_method_snapshot;
+  assert.equal(unchangedSnapshot.requiresEvidence,true,"later method configuration edits must not rewrite a historical payment snapshot");
   const paymentReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,evidenceFileId,idempotencyKey:`phase1_early_${suffix}`},"phase1-early-payment-retry");
   assert.equal(paymentReplay.id,prematurePayment.id,"repeated payment requests with the same idempotency key return the original transaction");
   await assert.rejects(membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:"CHANGED-"+suffix,payerBankName:"Test Bank",paymentMethodCode,evidenceFileId,idempotencyKey:`phase1_early_${suffix}`},"phase1-payment-key-conflict"),e=>e.code==="IDEMPOTENCY_CONFLICT");

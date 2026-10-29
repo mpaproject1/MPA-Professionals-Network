@@ -143,7 +143,7 @@ function wrapPdfLine(value,width=105){
 
 function csvCell(value){
  const raw=value instanceof Date?value.toISOString():String(value??"");
- const safe=/^[\u0000-\u0020]*[=+\-@]/.test(raw)?"'"+raw:raw;
+ const safe=typeof value==="string"&&/^[\u0000-\u0020]*[=+\-@]/.test(raw)?"'"+raw:raw;
  return '"'+safe.replace(/"/g,'""')+'"';
 }
 export function makeCsv(r){

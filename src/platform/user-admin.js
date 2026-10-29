@@ -64,7 +64,7 @@ export async function listUsers(actor,input={}) {
  const actorRoles=await allowed(db,actorId); admin(actorRoles,actorPermissions,"users.view");
  const q=String(input.q||"").trim().slice(0,120), status=input.status||null;
  const canViewOrganizations=actorRoles.some(role=>["system_admin","admin","platform_admin"].includes(role))||actorPermissions.includes("organizations.manage");
- const organizationNames=canViewOrganizations?"coalesce((select json_agg(distinct o.display_name order by o.display_name) from organization_membership om join organization o on o.id=om.organization_id where om.user_id=u.id and om.status='active'),'[]'::json)":"'[]'::json";
+ const organizationNames=canViewOrganizations?"coalesce((select json_agg(distinct o.display_name order by o.display_name) from organization_membership om join organization o on o.id=om.organization_id where om.user_id=u.id and om.status='active'),'[]'::json)":"null::json";
  const sql=`select u.id,u.account_reference,u.email,u.username,u.status,u.created_at,u.updated_at,
  coalesce(json_agg(distinct r.role_code) filter(where r.role_code is not null),'[]') roles,
  coalesce((select json_agg(up.permission_code order by up.permission_code) from app_user_permission up where up.user_id=u.id),'[]'::json) permissions,

@@ -4,6 +4,7 @@ import test from "node:test";
 
 const source = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const admin = source("../src/platform/user-admin.js");
+const emailOperations = source("../src/platform/email-operations.js");
 const security = source("../src/platform/account-security.js");
 const membership = source("../src/membership/service.js");
 const server = source("../server.js");
@@ -71,6 +72,12 @@ test("secret-bearing responses are rate-limited and non-cacheable; no repeat-dow
   assert.match(ui, /Issue one-time password/);
   assert.match(ui, /Close and clear credential/);
   assert.match(ui, /Change recovery email/);
+  const listUsersStart = admin.indexOf("export async function listUsers");
+  const listUsersEnd = admin.indexOf("export async function getAccountGovernance", listUsersStart);
+  assert.doesNotMatch(admin.slice(listUsersStart, listUsersEnd), /password_hash|oneTimePassword|token_hash/);
+  const outboxStart = emailOperations.indexOf("export async function listEmailOutbox");
+  const outboxEnd = emailOperations.indexOf("export async function listEmailTemplates", outboxStart);
+  assert.doesNotMatch(emailOperations.slice(outboxStart, outboxEnd), /select[^\n]*payload\s*,/i);
 });
 
 test("recovery dispatcher reads fragment tokens and removes token URLs from queued payloads after processing", () => {

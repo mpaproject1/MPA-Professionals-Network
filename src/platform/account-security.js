@@ -80,6 +80,7 @@ function normalizeRecoveryEmail(value){
 export async function requestRecoveryEmailChange(actor,userId,input,requestId,origin){
  const actorId=actor?.sub,actorRoles=requireUserAdmin(actor),reason=String(input?.reason||"").trim().slice(0,500);
  if(!reason)throw err(400,"An audit reason is required to change the recovery email.","AUDIT_REASON_REQUIRED");
+ if(actor?.auth_method!=="passkey")throw err(403,"Re-authenticate with your administrator passkey before changing a recovery email.","STEP_UP_AUTH_REQUIRED");
  if(userId===actorId)throw err(400,"For your own account, use Account & Security or ask another authorized administrator.","SELF_RECOVERY_EMAIL_CHANGE");
  if(!origin||!/^https:\/\/[^/]+$/i.test(origin))throw err(400,"A secure verification link could not be prepared. Contact the platform administrator.","PUBLIC_ORIGIN_REQUIRED");
  const email=normalizeRecoveryEmail(input?.email),confirmation=normalizeRecoveryEmail(input?.confirmEmail);

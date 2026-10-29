@@ -3,10 +3,10 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, GraduationCap, LayoutDashboard, LockKeyhole, Network, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
-import styles from "./landing-redesign.module.css";
 import { LandingLoginForm } from "../components/landing-login-form";
 import { PortalPathwaysSlider } from "../components/portal-pathways-slider";
 import { useUiStore } from "../lib/store";
+import styles from "./landing-redesign.module.css";
 
 
 function Reveal({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {

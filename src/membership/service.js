@@ -12,8 +12,8 @@ import { createInAppNotification } from "../platform/notifications.js";
 import { consumeHumanChallenge } from "../platform/security-controls.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
 import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
-import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence, requiresMembershipPaymentEvidence } from "./payment-policy.js";
 import { assertMembershipPaymentMethodAvailable, buildMembershipPaymentMethodSnapshot, buildPaymentMethodAuditMetadata, normalizeMembershipPaymentMethodInput } from "./payment-method-policy.js";
+import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence, requiresMembershipPaymentEvidence } from "./payment-policy.js";
 
 export function generateMembershipNumber(date=new Date()) { return `MPA-${date.getUTCFullYear()}-${randomUUID().slice(0,8).toUpperCase()}`; }
 
@@ -514,7 +514,7 @@ export async function createManualPayment(applicationId,userId,input,requestId){
     const paymentMethodSnapshot=buildMembershipPaymentMethodSnapshot(method);
     const p=(await db.query(`insert into payment_transaction(provider,provider_transaction_id,idempotency_key,purpose,amount,currency,status,request_payload,channel,submitted_by,purpose_reference,source,payment_method_code,payment_method_snapshot)
       values('manual',null,$1,'membership', $2,$3,'pending',$4::jsonb,$5,$6,$7,'manual_entry',$8,$9::jsonb) returning *`,
-      [idem,amount,fee.currency,JSON.stringify({purpose:"membership_fee",channel,reference:methodReference||null,paymentMethodCode:method?.method_code||null,payerBankName:payerBankName||null,methodSnapshot:paymentMethodSnapshot}),channel,userId,methodReference||applicationId,method?.method_code||null,JSON.stringify(paymentMethodSnapshot)]).rows[0];
+      [idem,amount,fee.currency,JSON.stringify({purpose:"membership_fee",channel,reference:methodReference||null,paymentMethodCode:method?.method_code||null,payerBankName:payerBankName||null,methodSnapshot:paymentMethodSnapshot}),channel,userId,methodReference||applicationId,method?.method_code||null,JSON.stringify(paymentMethodSnapshot)])).rows[0];
     await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[applicationId,p.id]);
     if(input.evidenceFileId){
       const file=await db.query("select f.id from file_object f join private_upload_session s on s.file_object_id=f.id where f.id=$1 and f.created_by=$2 and f.visibility='private' and s.user_id=$2 and s.status='confirmed' and s.actual_byte_size=f.byte_size and s.actual_checksum_sha256=f.checksum_sha256",[input.evidenceFileId,userId]);

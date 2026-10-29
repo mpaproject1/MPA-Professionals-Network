@@ -40,11 +40,12 @@ export async function createOneTimeSessionLink(actor,userId,requestId,reasonInpu
  if(userId===actorId)throw err(400,"For your own account, use Account & Security or ask another authorized administrator to help.","SELF_RECOVERY_LINK");
  const raw=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(raw).digest("hex"),url=`${origin}/account/one-time-access#token=${encodeURIComponent(raw)}`;
  return withTransaction(async tx=>{
-  const target=(await tx.query("select id,coalesce(case when recovery_email_verified_at is not null then recovery_email end,email) email,status from app_user where id=$1 for update",[userId])).rows[0];
+  const target=(await tx.query("select id,coalesce(case when recovery_email_verified_at is not null then recovery_email end,email) email,status,admin_passkey_enforced_at from app_user where id=$1 for update",[userId])).rows[0];
   if(!target)throw err(404,"That account could not be found.","NOT_FOUND");
   if(target.status!=="active")throw err(409,"This account is not active. Review its account status before sending a sign-in link.","ACCOUNT_NOT_ACTIVE");
   if(!target.email)throw err(409,"This account has no email address for a secure sign-in link. Update its contact details first.","ACCOUNT_EMAIL_MISSING");
   const targetRoles=await roles(tx,userId);if(targetRoles.some(role=>PRIVILEGED.has(role))&&!actorRoles.includes("system_admin"))throw err(403,"Only a system administrator may send a sign-in link for a privileged account.","PRIVILEGED_ACCOUNT_CHANGE");
+  if(target.admin_passkey_enforced_at&&targetRoles.some(role=>["system_admin","admin"].includes(role)))throw err(409,"This privileged account requires passkey authentication; use the approved administrator passkey recovery process instead of a password sign-in link.","PASSKEY_REQUIRED");
   await tx.query("update one_time_session_link set revoked_at=now() where user_id=$1 and used_at is null and revoked_at is null",[userId]);
   await tx.query("insert into one_time_session_link(user_id,token_hash,created_by,expires_at) values($1,$2,$3,now()+interval '20 minutes')",[userId,tokenHash,actorId]);
   await tx.query("insert into notification_outbox(channel,recipient,template_code,payload) values('email',$1,'account.one_time_session_link',$2)",[target.email,JSON.stringify({url,expiresMinutes:20,actionText:"Sign in securely and set a new password",requestedBy:"MPA Support"})]);

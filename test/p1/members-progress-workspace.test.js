@@ -32,6 +32,10 @@ test("membership journey does not conflate payment, review, and activation", asy
 test("members workspace preserves honest unavailable states and only exposes current-user data", async () => {
   const page = await read("../../web/app/members/page.tsx");
   assert.match(page, /Missing data is not treated as completed progress/);
+  assert.match(page, /applicationDataUnavailable/);
+  assert.match(page, /Confirm your membership status/);
+  assert.match(page, /Recent activity could not be loaded/);
+  assert.match(page, /Recent notifications could not be loaded/);
   assert.match(page, /api<Me>\("\/api\/v1\/me"/);
   assert.match(page, /api<Inbox>\("\/api\/v1\/notifications\?limit=5"/);
   assert.match(page, /role="alert"/);

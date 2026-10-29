@@ -17,6 +17,22 @@ export function assertMembershipPaymentMethodAdmin(identity = {}) {
   }
   return identity;
 }
+export function buildMembershipPaymentMethodSnapshot(method) {
+  if (!method) return null;
+  return {
+    methodCode: method.method_code ?? method.methodCode ?? null,
+    displayName: method.display_name ?? method.displayName ?? null,
+    methodType: method.method_type ?? method.methodType ?? null,
+    currency: String(method.currency ?? "").trim().toUpperCase() || null,
+    instructions: method.instructions ?? "",
+    bankName: method.bank_name ?? method.bankName ?? null,
+    accountName: method.account_name ?? method.accountName ?? null,
+    accountNumber: method.account_number ?? method.accountNumber ?? null,
+    providerCode: method.provider_code ?? method.providerCode ?? null,
+    qrImageUrl: method.qr_image_url ?? method.qrImageUrl ?? null,
+    requiresEvidence: (method.requires_evidence ?? method.requiresEvidence) === true,
+  };
+}
 export function assertMembershipPaymentMethodAvailable(method, feeCurrency) {
   if (!method || method.enabled !== true) {
     throw Object.assign(new Error("This payment method is not currently available. Refresh the payment page and choose an enabled method."), { statusCode: 400, code: "PAYMENT_METHOD_UNAVAILABLE" });

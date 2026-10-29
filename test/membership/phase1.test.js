@@ -55,7 +55,7 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.ok(Array.isArray(reviewQueueRow.review_history),"administrator queue should include prior review decisions");
   assert.equal(app.fee_snapshot.amount,1200);
   paymentMethodCode="bank_test_"+suffix;
-  await getPool().query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'bank_transfer','Test bank transfer',true,'ETB','Test-only payment method',true) on conflict(method_code) do update set enabled=true,requires_evidence=true",[paymentMethodCode]);
+  await getPool().query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,requires_evidence) values($1,'bank_transfer','Test bank transfer',true,'ETB','Test-only payment method','Test Bank','Test Association','123456789',true) on conflict(method_code) do update set enabled=true,requires_evidence=true,bank_name=excluded.bank_name,account_name=excluded.account_name,account_number=excluded.account_number,instructions=excluded.instructions",[paymentMethodCode]);
   const receiptBytes=Buffer.from("%PDF-1.7\nprivate membership receipt");
   const receiptChecksum=createHash("sha256").update(receiptBytes).digest("hex");
   const receiptObjectKey="private-test/"+randomUUID()+".pdf";

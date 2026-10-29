@@ -8,6 +8,7 @@ test("members workspace is a server-state-driven progress journey, not a card ca
   const page = await read("../../web/app/members/page.tsx");
   assert.match(page, /api<Me>\("\/api\/v1\/me"/);
   assert.match(page, /api<Application\[]>\("\/api\/v1\/membership\/applications\/me"/);
+  assert.match(page, /api<MembershipHistory>\("\/api\/v1\/membership\/history"/);
   assert.match(page, /api<Tracking>\("\/api\/v1\/me\/application-tracking/);
   assert.match(page, /Continue where you left off/);
   assert.match(page, /Membership progress/);
@@ -24,6 +25,8 @@ test("membership journey does not conflate payment, review, and activation", asy
   assert.match(page, /has_active_membership === true/);
   assert.match(page, /rejectedApplication/);
   assert.match(page, /correctionApplication/);
+  assert.match(page, /membershipExpired/);
+  assert.match(page, /has_active_membership === true/);
 });
 
 test("members workspace preserves honest unavailable states and only exposes current-user data", async () => {
@@ -34,6 +37,8 @@ test("members workspace preserves honest unavailable states and only exposes cur
   assert.match(page, /role="alert"/);
   assert.match(page, /aria-label="Your workspace shortcuts"/);
   assert.match(page, /focus-visible:outline/);
+  assert.match(page, /safeInternalHref/);
+  assert.match(page, /requestSequence/);
 });
 
 test("legacy /member route redirects to the canonical /members workspace", async () => {

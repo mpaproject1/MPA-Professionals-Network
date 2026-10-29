@@ -27,7 +27,7 @@ test("directory export rejects unauthorized columns, invalid date ranges and uns
   await assert.rejects(() => previewDirectoryExport(admin, "accounts", { fields: ["gender"] }), error => error.statusCode === 403);
   await assert.rejects(() => previewDirectoryExport(admin, "accounts", { from: "2026-12-31", to: "2026-01-01" }), error => error.statusCode === 400);
   await assert.rejects(() => exportDirectory(admin, "accounts", { fields: ["account_reference"], format: "pdf" }, "directory-export-invalid-format"), error => error.statusCode === 400);
-  await assert.rejects(() => previewDirectoryExport(admin, "accounts", { organizationId: "org-private" , fields: ["account_reference"] , roles: [] }), error => error.statusCode !== 500);
+  await assert.rejects(() => previewDirectoryExport({ sub: "scoped-user", roles: [], permissions: ["users.view"] }, "accounts", { organizationId: "org-private", fields: ["account_reference"] }), error => error.statusCode === 403);
 });
 
 async function createDirectoryFixture() {

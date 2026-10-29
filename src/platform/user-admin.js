@@ -74,7 +74,7 @@ export async function listUsers(actor,input={}) {
  when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='suspended') then 'suspended'
  when exists(select 1 from membership_record mr where mr.user_id=u.id and (mr.status='expired' or (mr.status='active' and mr.end_date<current_date))) then 'expired'
  when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='cancelled') then 'cancelled' else 'unknown' end membership_status,
- ${organizationNames} organization_names
+ ${organizationNames} organization_names, ${canViewOrganizations} organization_relationships_authorized
  from app_user u left join app_user_role ur on ur.user_id=u.id left join app_role r on r.id=ur.role_id
  where ($1='' or lower(coalesce(u.email,'')) like lower('%'||$1||'%') or lower(coalesce(u.username,'')) like lower('%'||$1||'%') or lower(coalesce(u.account_reference,'')) like lower('%'||$1||'%'))
  and ($2::text is null or u.status=$2) group by u.id order by u.created_at desc limit 200`;

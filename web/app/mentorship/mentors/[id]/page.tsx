@@ -11,8 +11,9 @@ import {Badge, Card} from "../../../../components/ui";
 import {ApiError, api} from "../../../../lib/api";
 import {useSavedDiscoveryItems} from "../../../../lib/use-saved-discovery-items";
 
-type Mentor={id:string;user_id:string;display_name:string;approved_banner_url?:string|null;approved_banner_alt?:string|null;video_url?:string|null;headline?:string|null;bio?:string|null;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number};
+type Mentor={id:string;user_id:string;display_name:string;approved_banner_url?:string|null;approved_banner_alt?:string|null;video_url?:string|null;headline?:string|null;bio?:string|null;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number;availability?:{day_of_week:number;start_time:string;end_time:string;timezone:string}[]|string};
 function values(v:unknown):string[]{if(Array.isArray(v))return v.map(String);if(typeof v==="string"){try{const x=JSON.parse(v);if(Array.isArray(x))return x.map(String)}catch{}return v?[v]:[]}return []}
+function availabilityLabel(value:unknown):string{let rows:unknown=value;if(typeof value==="string"){try{rows=JSON.parse(value)}catch{return ""}}if(!Array.isArray(rows))return "";const days=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];return rows.map((item:any)=>{if(!item||typeof item!=="object")return "";return (days[Number(item.day_of_week)]||"Day")+" "+String(item.start_time||"").slice(0,5)+"–"+String(item.end_time||"").slice(0,5)+(item.timezone?" "+item.timezone:"")}).filter(Boolean).join(" · ")}
 export default function PublicMentorProfile(){
  const params=useParams<{id:string}>();const id=String(params.id||"");const saved=useSavedDiscoveryItems();const token=useUiStore(s=>s.token);
  const [item,setItem]=useState<Mentor|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
@@ -26,6 +27,7 @@ export default function PublicMentorProfile(){
  {values(item.expertise).length>0&&<div><h2 className="h2">Expertise</h2><div className="row" style={{flexWrap:"wrap"}}>{values(item.expertise).map(x=><Badge key={x}>{x}</Badge>)}</div></div>}
  {values(item.languages).length>0&&<p className="tagline"><Languages size={15}/> Languages: {values(item.languages).join(", ")}</p>}
  {values(item.mentoring_modes).length>0&&<p className="tagline">Mentoring modes: {values(item.mentoring_modes).join(", ")}</p>}
+ {availabilityLabel(item.availability)&&<p className="tagline">Availability: {availabilityLabel(item.availability)}</p>}
  <p className="muted">Mentorship requests still use the MPA mentorship workflow, eligibility checks and mentor acceptance process.</p><Link className="btn btn-primary" href="/mentorship">Open mentorship workspace</Link>{saved.savedError&&<p aria-live="polite" aria-atomic="true" className="form-error">{saved.savedError}</p>}</Card>}
  {item&&<PublicMediaStories subjectType="mentor" subjectId={item.user_id} token={token}/>} 
  </main>;

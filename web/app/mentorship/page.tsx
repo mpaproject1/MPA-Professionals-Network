@@ -14,7 +14,7 @@ import { humanStatus } from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 import {useSavedDiscoveryItems} from "../../lib/use-saved-discovery-items";
 
-type Mentor={id:string;user_id:string;display_name:string;approved_banner_url?:string|null;approved_banner_alt?:string|null;video_url?:string|null;headline?:string;bio?:string;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number;circle_enabled?:boolean;circle_name?:string|null;circle_joined_count?:number;circle_joined_by_me?:boolean;active_mentee_count?:number};
+type Mentor={id:string;user_id:string;display_name:string;approved_banner_url?:string|null;approved_banner_alt?:string|null;video_url?:string|null;headline?:string;bio?:string;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number;circle_enabled?:boolean;circle_name?:string|null;circle_joined_count?:number;circle_joined_by_me?:boolean;active_mentee_count?:number;availability?:{day_of_week:number;start_time:string;end_time:string;timezone:string}[]|string};
 type OrganizationOffer={id:string;organization_id:string;organization_name:string;title:string;description:string;expertise?:string[]|string;languages?:string[]|string;delivery_mode:string;visibility:string;status:string;moderation_status:string;moderation_note?:string|null};
 type Organization={id:string;display_name:string;verification_status:string};
 type OrganizationRequest={id:string;offer_id:string;offer_title:string;organization_name:string;requester_user_id:string;requester_name?:string;message:string;status:string;is_requester:boolean;response_note?:string|null};
@@ -30,6 +30,7 @@ type MentorshipInterest={request_id:string;goals:string;topics:unknown;preferred
 type MentorshipOperationsReport={pending_invitations:number;overdue_invitations:number;average_response_minutes:number|null;active_relationships:number;session_proposals_awaiting_confirmation:number;confirmed_upcoming_sessions:number;feedback_submitted:number;delivered_notifications:number;failed_notifications:number;notification_delivery_unconfirmed:number;definitions?:{overdueInvitationDays:number;notificationDelivery:string}};
 type ParticipantReportHistory={id:string;mentorship_id:string;session_id?:string|null;category:string;status:string;created_at:string;reviewed_at?:string|null;resolution_note?:string|null};
 function values(value:unknown):string[]{if(Array.isArray(value))return value.map(String);if(typeof value==="string"){try{const parsed=JSON.parse(value);if(Array.isArray(parsed))return parsed.map(String)}catch{}return value?[value]:[]}return []}
+function availabilityLabel(value:unknown):string{let rows:unknown=value;if(typeof value==="string"){try{rows=JSON.parse(value)}catch{return ""}}if(!Array.isArray(rows))return "";const days=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];return rows.map((item:any)=>{if(!item||typeof item!=="object")return "";const day=days[Number(item.day_of_week)]||"Day";return day+" "+String(item.start_time||"").slice(0,5)+"–"+String(item.end_time||"").slice(0,5)+(item.timezone?" "+item.timezone:"")}).filter(Boolean).join(" · ")}
 export default function Mentorship(){
  const token=useUiStore(s=>s.token);
  const savedItems=useSavedDiscoveryItems();
@@ -232,6 +233,7 @@ export default function Mentorship(){
      <div className="row"><div className="avatar">{mentor.display_name.split(" ").map(x=>x[0]).join("").slice(0,3)}</div><Badge>Active profile</Badge></div>
      <div className="tagline">Verified professional profile · Active MPA membership required for mentorship participation.</div>
      <div className="tagline">Capacity: {Number(mentor.active_mentee_count||0)} of {Number(mentor.max_active_mentees||0)} active relationships{Number(mentor.active_mentee_count||0)>=Number(mentor.max_active_mentees||0)?" · Currently at capacity":""}.</div>
+     {availabilityLabel(mentor.availability)&&<div className="tagline">Availability: {availabilityLabel(mentor.availability)}</div>}
      {mentor.video_url&&<a className="btn btn-ghost" href={mentor.video_url} target="_blank" rel="noopener noreferrer">Watch mentor video</a>}
      {mentor.bio&&<p className="muted discovery-card-summary">{mentor.bio}</p>}
      {values(mentor.expertise).length>0&&<div style={{marginTop:12}}><b>Expertise</b><p className="muted">{values(mentor.expertise).join(" · ")}</p></div>}

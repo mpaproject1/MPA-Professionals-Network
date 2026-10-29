@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Award, FileText, LockKeyhole } from "lucide-react";
+import { Award, BookOpen, FileText, LockKeyhole } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";

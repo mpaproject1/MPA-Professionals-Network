@@ -10,7 +10,7 @@ test.describe("Workstream 5 homepage and navigation acceptance", () => {
     await expect(page.getByRole("heading", { name: /Professional participation, with community service in view/i })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Clear pathways for professional contribution" })).toHaveCount(0);
     await expect(page.getByRole("textbox", { name: /Email/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Mentorship/i })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Choose pathway slide" }).getByRole("button")).toHaveCount(3);
   });
 
   test("signed-out desktop navigation contains only approved public destinations", async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe("Workstream 5 homepage and navigation acceptance", () => {
     await expect(nav.getByRole("link", { name: /My-Workspace|My-Learning|Admin/i })).toHaveCount(0);
     const noHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
     expect(noHorizontalOverflow).toBe(true);
-    await page.getByRole("button", { name: "Ask MPA support" }).click();
+    await page.getByRole("button", { name: "Open MPA support" }).click();
     await expect(page.locator('section[aria-label="MPA support assistant"]')).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Ask MPA support" })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: /I ask MPA support to contact me about this inquiry/i })).toBeVisible();

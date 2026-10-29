@@ -156,6 +156,7 @@ export default function MembersWorkspacePage() {
     const applicationStatus = cleanStatus(latestApplication?.status);
     const paymentStatus = cleanStatus(latestApplication?.payment?.status);
     const hasApplication = Boolean(latestApplication);
+    const applicationDataUnavailable = data.errors.includes("Membership application status");
     const correction = correctionApplication.has(applicationStatus);
     const rejected = rejectedApplication.has(applicationStatus);
     const waitingReview = pendingApplication.has(applicationStatus);
@@ -173,7 +174,9 @@ export default function MembersWorkspacePage() {
         ? { title: "Profile", description: "Your server-reported profile completion is 100%.", state: "complete", href: "/profile", action: "Review profile" }
         : { title: "Complete your profile", description: profilePercent + "% complete according to your account record.", state: "current", href: "/profile", action: "Continue profile" };
 
-    const applicationStep: JourneyStep = active
+    const applicationStep: JourneyStep = applicationDataUnavailable
+      ? { title: "Membership status unavailable", description: "The application service did not return a status. Do not assume there is no application or start a duplicate; refresh or open the membership workspace to check the server record.", state: "unknown", href: "/membership", action: "Check membership status" }
+      : active
       ? { title: "Membership application", description: "Your account confirms active membership.", state: "complete", href: "/membership", action: "View membership" }
       : correction
         ? { title: "Update requested information", description: "The application has a correction request. Review the current server status and requested next step.", state: "attention", href: "/membership", action: "Review correction" }
@@ -185,7 +188,9 @@ export default function MembersWorkspacePage() {
               ? { title: "Continue your application", description: "Application status: " + labelStatus(latestApplication?.status) + ".", state: "current", href: "/membership", action: "Continue application" }
               : { title: "Membership application", description: "No application was returned for your account. Start only if the membership service confirms you are eligible.", state: "current", href: "/membership", action: "Review membership" };
 
-    const paymentStep: JourneyStep = active || paymentComplete
+    const paymentStep: JourneyStep = applicationDataUnavailable
+      ? { title: "Payment, if required", description: "Payment requirements cannot be confirmed until the current application status loads.", state: "unknown", href: "/membership", action: "Check application" }
+      : active || paymentComplete
       ? { title: "Payment", description: "Payment is complete or not needed for the active membership confirmed by the service.", state: "complete" }
       : paymentFailed
         ? { title: "Payment follow-up", description: "The payment record needs attention. Check the server's current instructions before retrying.", state: "attention", href: "/membership", action: "Review payment" }
@@ -197,7 +202,9 @@ export default function MembersWorkspacePage() {
               ? { title: "Payment, if required", description: "Payment requirements depend on your application and configured membership plan; no payment completion is inferred here.", state: "waiting" }
               : { title: "Payment, if required", description: "This step becomes relevant only if the server's application and plan require payment.", state: "locked" };
 
-    const reviewStep: JourneyStep = active
+    const reviewStep: JourneyStep = applicationDataUnavailable
+      ? { title: "Review status unavailable", description: "The current application state could not be confirmed. No review progress is inferred.", state: "unknown", href: "/membership", action: "Check application" }
+      : active
       ? { title: "Review", description: "Active membership confirms the service completed its required review and activation gates.", state: "complete" }
       : correction
         ? { title: "Review", description: "The reviewer has requested changes before the application can proceed.", state: "attention" }
@@ -233,6 +240,7 @@ export default function MembersWorkspacePage() {
 
   let next = { title: "Review your membership options", detail: "Check your current eligibility and the server-provided application status before starting or continuing.", href: "/membership", label: "Continue to membership" };
   if (error) next = { title: "Refresh your account status", detail: "Your current account state could not be confirmed. Retry before relying on progress or starting another action.", href: "#refresh-workspace", label: "Retry account status" };
+  else if (data?.errors.includes("Membership application status")) next = { title: "Confirm your membership status", detail: "The application service did not return your current record. Refresh before starting or resubmitting an application.", href: "#refresh-workspace", label: "Retry membership status" };
   else if (active) next = { title: "Your membership is active", detail: "Your account confirms active membership. Keep your profile current and use the services available to you.", href: "/profile", label: "Review your profile" };
   else if (correction) next = { title: "Your application needs an update", detail: "Review the correction request and submit only the information requested by the membership service.", href: "/membership", label: "Continue requested update" };
   else if (rejected) next = { title: "Review your application outcome", detail: "Your latest application was rejected. Read the recorded outcome and check the permitted next step; do not assume a new application is available.", href: "/membership", label: "Review application outcome" };
@@ -316,10 +324,10 @@ export default function MembersWorkspacePage() {
 
       <section aria-labelledby="activity-title" className="mb-7 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="eyebrow">Status updates</div><h2 id="activity-title" className="h2">Recent activity</h2></div><Link className="text-sm underline underline-offset-4" href="/track">View all activity</Link></div>
-          {recentItems.length ? <ol className="m-0 list-none p-0">{recentItems.map((item, index) => <li key={item.id || item.trackingReference || index} className="border-t border-[var(--border)] py-3 first:border-t-0"><div className="flex items-start gap-3"><Clock3 size={17} className="mt-1 shrink-0" aria-hidden="true" /><div className="min-w-0"><p className="font-semibold">{item.title || "Application or request update"}</p><p className="muted text-sm">{labelStatus(item.statusLabel || item.status)}{item.nextAction ? " · " + item.nextAction : ""}</p>{dateLabel(item.updatedAt || item.submittedAt) ? <p className="muted mt-1 text-xs">Updated {dateLabel(item.updatedAt || item.submittedAt)}</p> : null}</div></div></li>)}</ol> : <p className="muted">No recent activity was returned. When you submit a request or application, its server-reported status will appear here.</p>}
+          {recentItems.length ? <ol className="m-0 list-none p-0">{recentItems.map((item, index) => <li key={item.id || item.trackingReference || index} className="border-t border-[var(--border)] py-3 first:border-t-0"><div className="flex items-start gap-3"><Clock3 size={17} className="mt-1 shrink-0" aria-hidden="true" /><div className="min-w-0"><p className="font-semibold">{item.title || "Application or request update"}</p><p className="muted text-sm">{labelStatus(item.statusLabel || item.status)}{item.nextAction ? " · " + item.nextAction : ""}</p>{dateLabel(item.updatedAt || item.submittedAt) ? <p className="muted mt-1 text-xs">Updated {dateLabel(item.updatedAt || item.submittedAt)}</p> : null}</div></div></li>)}</ol> : <p className="muted">data.errors.includes("Application and request activity") ? "Recent activity could not be loaded. Retry to check your current server-reported status." : "No recent activity was returned. When you submit a request or application, its server-reported status will appear here."</p>}
         </Card>
         <Card><div className="mb-3 flex items-center justify-between gap-3"><div><div className="eyebrow">Your inbox</div><h2 className="h2">Recent updates</h2></div><Link className="text-sm underline underline-offset-4" href="/notifications">Open notifications</Link></div>
-          {notifications.length ? <ul className="m-0 list-none p-0">{notifications.map((item, index) => <li key={item.id || index} className="border-t border-[var(--border)] py-3 first:border-t-0"><p className="font-semibold">{item.title || "Update"}</p><p className="muted mt-1 text-sm">{item.body || "Open notifications to review this update."}</p>{safeInternalHref(item.actionUrl) ? <Link href={safeInternalHref(item.actionUrl)!} className="mt-2 inline-flex items-center gap-1 text-sm underline underline-offset-4">Review update <ArrowRight size={14} /></Link> : null}</li>)}</ul> : <p className="muted">No recent notifications were returned.</p>}
+          {notifications.length ? <ul className="m-0 list-none p-0">{notifications.map((item, index) => <li key={item.id || index} className="border-t border-[var(--border)] py-3 first:border-t-0"><p className="font-semibold">{item.title || "Update"}</p><p className="muted mt-1 text-sm">{item.body || "Open notifications to review this update."}</p>{safeInternalHref(item.actionUrl) ? <Link href={safeInternalHref(item.actionUrl)!} className="mt-2 inline-flex items-center gap-1 text-sm underline underline-offset-4">Review update <ArrowRight size={14} /></Link> : null}</li>)}</ul> : <p className="muted">{data.errors.includes("Recent notifications") ? "Recent notifications could not be loaded. Retry to check for updates." : "No recent notifications were returned."}</p>}
         </Card>
       </section>
 

@@ -3,8 +3,8 @@ import crypto from "node:crypto";
 import test from "node:test";
 import { hashPassword, verifyPassword } from "../src/membership/identity.js";
 import { login } from "../src/membership/service.js";
-import { updateOwnCredentials, createOneTimeSessionLink, redeemOneTimeSessionLink, requestRecoveryEmailChange, verifyRecoveryEmailChange } from "../src/platform/account-security.js";
-import { getPool, closePool } from "../src/platform/db.js";
+import { createOneTimeSessionLink, redeemOneTimeSessionLink, requestRecoveryEmailChange, updateOwnCredentials, verifyRecoveryEmailChange } from "../src/platform/account-security.js";
+import { closePool, getPool } from "../src/platform/db.js";
 import { issueOneTimePassword, revokeSessions } from "../src/platform/user-admin.js";
 
 const enabled = process.env.NODE_ENV === "test" && Boolean(process.env.DATABASE_URL);
@@ -68,6 +68,7 @@ test("Workstream 7 PostgreSQL security workflows", { skip: !enabled }, async (t)
 
     await t.test("one-time password expires, revokes sessions, and forces password replacement", async () => {
       const target = await createUser("otp");
+      await db.query("update app_user set email_verified_at=now() where id=$1", [target.id]);
       const oldSession = await addSession(target.id);
       const issued = await issueOneTimePassword(privilegedActor, target.id, crypto.randomUUID(), reason);
       assert.equal(verifyPassword(issued.oneTimePassword, (await db.query("select password_hash from app_user where id=$1", [target.id])).rows[0].password_hash), true);

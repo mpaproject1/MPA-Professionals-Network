@@ -1337,3 +1337,91 @@ export async function getMyMentorProfile(userId){
  profile.availability=(await db.query("select id,day_of_week,start_time,end_time,timezone,active from mentor_availability where mentor_profile_id=$1 order by day_of_week,start_time",[profile.id])).rows;
  return profile;
 }
+
+
+const PUBLIC_MEDIA_STORY_CONSENT_VERSION="public-media-story-v1";
+function mediaStoryError(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e;}
+function normalizeStoryText(value,field,min,max){
+ const result=String(value??"").trim();
+ if(result.length<min||result.length>max)throw mediaStoryError(400,field+" must be "+min+"–"+max+" characters.","VALIDATION_ERROR");
+ return result;
+}
+function requireMediaModerator(roles){
+ const list=Array.isArray(roles)?roles.map(role=>typeof role==="string"?role:role?.code||role?.name||""):[];
+ if(!list.some(role=>["supporting_staff","system_admin"].includes(role)))throw mediaStoryError(403,"Authorized moderation-team access is required.","FORBIDDEN");
+}
+export async function listPublicMediaStories(subjectType,subjectId,viewerId=null){
+ const db=getPool();
+ if(subjectType==="service")await getServiceListing(subjectId,viewerId);
+ else if(subjectType==="mentor")await getMentorProfile(subjectId,viewerId);
+ else throw mediaStoryError(400,"Unsupported story subject.","VALIDATION_ERROR");
+ const column=subjectType==="service"?"service_listing_id":"mentor_profile_id";
+ return (await db.query("select id,title,summary,transcript,video_url,attribution_mode,attribution_name,evidence_status,created_at from public_media_story where "+column+"=$1 and moderation_status='approved' and consent_withdrawn_at is null order by created_at desc limit 20",[subjectId])).rows;
+}
+export async function listMyPublicMediaStories(userId,subjectType,subjectId){
+ const db=getPool();const args=[userId];let where=["author_user_id=$1"];
+ if(subjectType==="service"&&subjectId){args.push(subjectId);where.push("service_listing_id=$2");}
+ if(subjectType==="mentor"&&subjectId){args.push(subjectId);where.push("mentor_profile_id=$2");}
+ return (await db.query("select id,service_listing_id,mentor_profile_id,title,moderation_status,moderation_note,consented_at,consent_withdrawn_at,created_at from public_media_story where "+where.join(" and ")+" order by created_at desc limit 50",args)).rows;
+}
+export async function createPublicMediaStory(authorUserId,subjectType,subjectId,input,requestId){
+ if(input.consentGiven!==true||input.consentVersion!==PUBLIC_MEDIA_STORY_CONSENT_VERSION)throw mediaStoryError(400,"Explicit publication consent is required before submitting a story.","PUBLICATION_CONSENT_REQUIRED");
+ const title=normalizeStoryText(input.title,"Story title",4,120);
+ const summary=normalizeStoryText(input.summary,"Story summary",20,1200);
+ const transcript=normalizeStoryText(input.transcript,"Video transcript or captions",20,12000);
+ const videoUrl=normalizePublicVideoUrl(input.videoUrl,"Video URL");
+ if(!videoUrl)throw mediaStoryError(400,"A public YouTube or Vimeo video URL is required.","VALIDATION_ERROR");
+ const attributionMode=input.attributionMode==="anonymous"?"anonymous":input.attributionMode==="named"?"named":null;
+ if(!attributionMode)throw mediaStoryError(400,"Choose named attribution or anonymous attribution.","VALIDATION_ERROR");
+ const attributionName=attributionMode==="named"?normalizeStoryText(input.attributionName,"Approved display name",1,120):null;
+ return withTransaction(async db=>{
+  let serviceListingId=null,mentorProfileId=null;
+  if(subjectType==="service"){
+   const listing=(await db.query("select id from service_listing where id=$1 and status='published' and lifecycle_status='active' and moderation_status='approved' and (expires_at is null or expires_at>now())",[subjectId])).rows[0];
+   if(!listing)throw mediaStoryError(404,"The published service listing is not available for a public story.","NOT_FOUND");
+   const engagement=(await db.query("select 1 from service_request where service_listing_id=$1 and requester_user_id=$2 and status='completed' and requester_accepted_at is not null limit 1",[subjectId,authorUserId])).rowCount;
+   if(!engagement)throw mediaStoryError(403,"Only a requester with a completed, accepted service engagement can submit a participant story.","COMPLETED_ENGAGEMENT_REQUIRED");
+   serviceListingId=subjectId;
+  }else if(subjectType==="mentor"){
+   const profile=(await db.query("select id,user_id from mentor_profile where user_id=$1 and status='active' and moderation_status='approved'",[subjectId])).rows[0];
+   if(!profile)throw mediaStoryError(404,"The approved mentor profile is not available for a public story.","NOT_FOUND");
+   const engagement=(await db.query("select 1 from mentorship where mentor_user_id=$1 and mentee_user_id=$2 and status='completed' limit 1",[subjectId,authorUserId])).rowCount;
+   if(!engagement)throw mediaStoryError(403,"Only a mentee with a completed mentorship can submit a participant story.","COMPLETED_MENTORSHIP_REQUIRED");
+   mentorProfileId=profile.id;
+  }else throw mediaStoryError(400,"Unsupported story subject.","VALIDATION_ERROR");
+  const row=(await db.query("insert into public_media_story(service_listing_id,mentor_profile_id,author_user_id,title,summary,transcript,video_url,attribution_mode,attribution_name,evidence_status,consent_confirmed,consent_version,consented_at,moderation_status) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'participant_reported',true,$10,now(),'pending') returning id,title,moderation_status,created_at",[serviceListingId,mentorProfileId,authorUserId,title,summary,transcript,videoUrl,attributionMode,attributionName,PUBLIC_MEDIA_STORY_CONSENT_VERSION])).rows[0];
+  await audit(db,authorUserId,"public_media_story.submitted","public_media_story",row.id,requestId,{subjectType,subjectId,attributionMode,consentVersion:PUBLIC_MEDIA_STORY_CONSENT_VERSION});
+  return {...row,nextAction:"Your story is private until a moderator approves it. You can withdraw publication consent at any time."};
+ });
+}
+export async function withdrawPublicMediaStory(storyId,authorUserId,requestId){
+ return withTransaction(async db=>{
+  const story=(await db.query("select id,moderation_status,consent_withdrawn_at from public_media_story where id=$1 and author_user_id=$2 for update",[storyId,authorUserId])).rows[0];
+  if(!story)throw mediaStoryError(404,"Story not found for this account.","NOT_FOUND");
+  if(story.consent_withdrawn_at)return {...story,idempotent:true,nextAction:"Publication consent was already withdrawn."};
+  const row=(await db.query("update public_media_story set consent_withdrawn_at=now(),moderation_status='withdrawn',moderated_at=coalesce(moderated_at,now()),updated_at=now() where id=$1 returning id,moderation_status,consent_withdrawn_at",[storyId])).rows[0];
+  await audit(db,authorUserId,"public_media_story.consent_withdrawn","public_media_story",storyId,requestId);
+  return {...row,nextAction:"The story is no longer publicly visible. The consent withdrawal is recorded."};
+ });
+}
+export async function listPublicMediaStoryReviewQueue(actorId,roles,status="pending"){
+ requireMediaModerator(roles);
+ if(!["pending","approved","rejected"].includes(status))throw mediaStoryError(400,"Unsupported moderation filter.","VALIDATION_ERROR");
+ const db=getPool();
+ return (await db.query("select s.id,s.service_listing_id,s.mentor_profile_id,s.author_user_id,p.display_name author_display_name,s.title,s.summary,s.transcript,s.video_url,s.attribution_mode,s.attribution_name,s.evidence_status,s.consent_version,s.consented_at,s.moderation_status,s.moderation_note,s.created_at,coalesce(sl.title,mp.headline) subject_title from public_media_story s join person p on p.user_id=s.author_user_id left join service_listing sl on sl.id=s.service_listing_id left join mentor_profile mp on mp.id=s.mentor_profile_id where s.moderation_status=$1 and s.consent_withdrawn_at is null order by s.created_at asc limit 100",[status])).rows;
+}
+export async function reviewPublicMediaStory(storyId,actorId,roles,input,requestId){
+ requireMediaModerator(roles);
+ if(!["approved","rejected"].includes(input.status))throw mediaStoryError(400,"Review status must be approved or rejected.","VALIDATION_ERROR");
+ const note=String(input.note||"").trim().slice(0,1000)||null;
+ if(input.status==="rejected"&&!note)throw mediaStoryError(400,"A moderation reason is required when rejecting a story.","MODERATION_REASON_REQUIRED");
+ return withTransaction(async db=>{
+  const story=(await db.query("select * from public_media_story where id=$1 for update",[storyId])).rows[0];
+  if(!story)throw mediaStoryError(404,"Public media story not found.","NOT_FOUND");
+  if(story.consent_withdrawn_at||story.moderation_status==="withdrawn")throw mediaStoryError(409,"Publication consent was withdrawn; this story cannot be approved.","CONSENT_WITHDRAWN");
+  if(story.moderation_status!=="pending")throw mediaStoryError(409,"Only pending stories can be reviewed.","INVALID_STATE");
+  const row=(await db.query("update public_media_story set moderation_status=$1,moderation_note=$2,moderated_by=$3,moderated_at=now(),updated_at=now() where id=$4 returning id,moderation_status,moderation_note,moderated_at",[input.status,note,actorId,storyId])).rows[0];
+  await audit(db,actorId,"public_media_story.moderated","public_media_story",storyId,requestId,{status:input.status,consentVersion:story.consent_version});
+  return {...row,nextAction:input.status==="approved"?"The consented story is approved for public display.":"The story was rejected and remains private."};
+ });
+}

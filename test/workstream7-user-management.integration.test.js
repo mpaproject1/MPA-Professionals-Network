@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
 import { hashPassword, verifyPassword } from "../src/membership/identity.js";
-import { login, } from "../src/membership/service.js";
+import { login } from "../src/membership/service.js";
 import { updateOwnCredentials, createOneTimeSessionLink, redeemOneTimeSessionLink, requestRecoveryEmailChange, verifyRecoveryEmailChange } from "../src/platform/account-security.js";
 import { getPool, closePool } from "../src/platform/db.js";
-import { issueOneTimePassword } from "../src/platform/user-admin.js";
+import { issueOneTimePassword, revokeSessions } from "../src/platform/user-admin.js";
 
 const enabled = process.env.NODE_ENV === "test" && Boolean(process.env.DATABASE_URL);
 
@@ -56,6 +56,14 @@ test("Workstream 7 PostgreSQL security workflows", { skip: !enabled }, async (t)
       );
       const state = (await db.query("select credential_setup_required from app_user where id=$1", [target.id])).rows[0];
       assert.equal(state.credential_setup_required, false);
+      await assert.rejects(
+        () => revokeSessions({ sub: nonAdmin.id, roles: ["member"], permissions: [] }, target.id, crypto.randomUUID(), reason),
+        (error) => error.statusCode === 403 && error.code === "FORBIDDEN"
+      );
+      await assert.rejects(
+        () => requestRecoveryEmailChange({ sub: nonAdmin.id, roles: ["member"], permissions: [], auth_method: "passkey" }, target.id, { email: `ws7-denied-${suffix}@example.test`, confirmEmail: `ws7-denied-${suffix}@example.test`, reason }, crypto.randomUUID(), "https://portal.muslimprofession.org"),
+        (error) => error.statusCode === 403 && error.code === "FORBIDDEN"
+      );
     });
 
     await t.test("one-time password expires, revokes sessions, and forces password replacement", async () => {

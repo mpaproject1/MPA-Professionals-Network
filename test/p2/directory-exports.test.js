@@ -78,8 +78,8 @@ test("account export applies member/non-member row scope and safely preserves Un
   assert.ok(empty.buffer.length > 64, "empty results still produce a valid header/manifest file");
   assert.ok(empty.buffer.toString("utf8").includes("account_reference"));
 
-  const product = (await db.query("select id from membership_product where active=true order by product_code limit 1")).rows[0];
-  assert.ok(product, "an active membership product must exist in the migrated CI database");
+  const product = (await db.query("insert into membership_product(product_code,name,billing_model,price,active) values($1,'Directory export test product','one_time',0,true) returning id", ["DIR-" + randomUUID()])).rows[0];
+  assert.ok(product?.id, "the isolated membership product fixture must be created");
   await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,source) values($1,$2,$3,'active',current_date,'admin')", [fixture.id, product.id, "000012340056"]);
   const nowMember = await previewDirectoryExport(identity, "accounts", { fields: ["account_reference"], membershipScope: "members", q: fixture.email });
   const noLongerNonMember = await previewDirectoryExport(identity, "accounts", { fields: ["account_reference"], membershipScope: "non_members", q: fixture.email });

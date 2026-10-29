@@ -27,12 +27,16 @@ test("public organization directory is private and named sharing uses bounded se
   assert.match(publicOpportunitySource, /verification_status='verified' and public_visible=true and \(display_name ilike \$1 or legal_name ilike \$1\)[\s\S]*limit 10/);
 });
 test("compact public primary navigation and organization workspace privacy remain enforced", () => {
-  assert.match(shell, /\["\/services","Services",BriefcaseBusiness\]/);
+  assert.match(shell, /\["\/about","About",Info\]/);
+  assert.match(shell, /\["\/jobs","Job Portal",BriefcaseBusiness\]/);
   assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);
+  assert.match(shell, /\["\/members","My-Workspace",LayoutDashboard\]/);
+  assert.match(shell, /\["\/learning","My-Learning",GraduationCap\]/);
   assert.doesNotMatch(shell, /\["\/","Home",/);
   assert.doesNotMatch(shell, /\["\/network","Network",/);
-  assert.ok(shell.includes('const desktopPrimary=visibleNav.filter(([href])=>["/serve-community","/jobs"].includes(href))'));
-  assert.ok(shell.includes('const mobilePrimary=visibleNav.filter(([href])=>["/serve-community","/jobs"].includes(href))'));
+  assert.match(shell, /const primaryHrefs=token\?\["\/about","\/jobs","\/serve-community","\/members","\/learning"\]:\["\/about","\/jobs","\/serve-community"\]/);
+  assert.match(shell, /const desktopPrimary=visibleNav\.filter\(\(\[href\]\)=>primaryHrefs\.includes\(href\)\)/);
+  assert.match(shell, /const mobilePrimary=visibleNav\.filter\(\(\[href\]\)=>primaryHrefs\.includes\(href\)\)/);
   assert.doesNotMatch(shell, /\/organizations\/directory/);
   assert.match(shell, /if\(token&&hasOrganizations\)[\s\S]*mobileMore\.push\(orgLink\)/);
 });

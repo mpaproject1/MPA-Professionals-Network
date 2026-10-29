@@ -16,6 +16,7 @@ on:
       - feat/serve-community-g5-reconciled
       - feat/serve-community-g6-reconciled
       - feat/serve-community-g7-acceptance
+      - feat/workstream-3-progress-members-workspace
   workflow_dispatch:
 
 permissions:

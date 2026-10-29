@@ -514,7 +514,7 @@ export async function createManualPayment(applicationId,userId,input,requestId){
       [idem,amount,fee.currency,JSON.stringify({purpose:"membership_fee",channel,reference:methodReference||null,paymentMethodCode:method?.method_code||null,payerBankName:payerBankName||null,methodSnapshot:method?{displayName:method.display_name,methodType:method.method_type,currency:method.currency,bankName:method.bank_name,accountName:method.account_name,accountNumber:method.account_number,providerCode:method.provider_code,requiresEvidence:method.requires_evidence===true}:null}),channel,userId,methodReference||applicationId,method?.method_code||null])).rows[0];
     await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[applicationId,p.id]);
     if(input.evidenceFileId){
-      const file=await db.query("select id from file_object where id=$1 and (created_by=$2)",[input.evidenceFileId,userId]);
+      const file=await db.query("select f.id from file_object f join private_upload_session s on s.file_object_id=f.id where f.id=$1 and f.created_by=$2 and f.visibility='private' and s.user_id=$2 and s.status='confirmed' and s.actual_byte_size=f.byte_size and s.actual_checksum_sha256=f.checksum_sha256",[input.evidenceFileId,userId]);
       if(!file.rows[0]) throw httpError(400,"Payment evidence file is not available to this account.","INVALID_EVIDENCE");
       await db.query("update payment_transaction set evidence_file_id=$1 where id=$2",[input.evidenceFileId,p.id]);
     }

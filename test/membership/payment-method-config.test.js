@@ -99,8 +99,9 @@ test("audit metadata records changed field names without account values or secre
 
 test("disabled methods and currency mismatches are rejected by the payment policy", () => {
   assert.throws(() => assertMembershipPaymentMethodAvailable({ enabled: false, currency: "ETB" }, "ETB"), error => error.code === "PAYMENT_METHOD_UNAVAILABLE");
-  assert.throws(() => assertMembershipPaymentMethodAvailable({ enabled: true, currency: "USD" }, "ETB"), error => error.code === "PAYMENT_CURRENCY_UNSUPPORTED");
-  const method = { enabled: true, currency: " etb " };
+  const mismatched = { method_code: "bank_primary", method_type: "bank_transfer", display_name: "Primary bank", enabled: true, currency: "USD", instructions: "Transfer the fee.", bank_name: "Example Bank", account_name: "MPA", account_number: "123456", requires_evidence: true };
+  assert.throws(() => assertMembershipPaymentMethodAvailable(mismatched, "ETB"), error => error.code === "PAYMENT_CURRENCY_UNSUPPORTED");
+  const method = { method_code: "bank_primary", method_type: "bank_transfer", display_name: "Primary bank", enabled: true, currency: " etb ", instructions: "Transfer the fee.", bank_name: "Example Bank", account_name: "MPA", account_number: "123456", requires_evidence: true };
   assert.equal(assertMembershipPaymentMethodAvailable(method, "ETB"), method);
 });
 

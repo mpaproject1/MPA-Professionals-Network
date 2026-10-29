@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, BriefcaseBusiness, Handshake, HeartHandshake, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, Handshake, HeartHandshake } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 

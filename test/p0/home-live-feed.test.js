@@ -5,17 +5,15 @@ import test from "node:test";
 const homePage = readFileSync(new URL("../../web/app/page.tsx", import.meta.url), "utf8");
 const liveFeed = readFileSync(new URL("../../web/app/live-network-feeds.tsx", import.meta.url), "utf8");
 
-test("homepage keeps the live network feed without a separate feed-wide CTA", () => {
-  assert.match(homePage, /import LiveNetworkFeeds from "\.\/live-network-feeds";/);
-  assert.match(homePage, /<LiveNetworkFeeds\s*\/>/);
+test("homepage keeps the hero focused and does not render the separate live-feed section", () => {
+  assert.match(homePage, /Your expertise can open/);
+  assert.match(homePage, /<PortalPathwaysSlider\s*\/>/);
+  assert.doesNotMatch(homePage, /LiveNetworkFeeds|live-network-feeds/);
+  assert.doesNotMatch(homePage, /View all updates|Explore the live network/i);
+  // The live feed component remains available for other supported destinations;
+  // this check deliberately does not delete or weaken the feed itself.
   assert.match(liveFeed, /Services people can help with/);
   assert.match(liveFeed, /Work opportunities/);
   assert.match(liveFeed, /Professionals in the network/);
   assert.match(liveFeed, /Mentors and guides/);
-  assert.match(liveFeed, /Needs people are talking about/);
-  assert.doesNotMatch(
-    liveFeed,
-    /<Link\b[^>]*>\s*(?:View all|See all|Browse all|Explore all)\b/i,
-    "the feed should not add a separate all-items CTA; individual feed cards remain navigable",
-  );
 });

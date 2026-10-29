@@ -42,14 +42,15 @@ test.describe("MPA support assistant movement and viewport safety", () => {
     const page = await context.newPage();
     try {
       await page.goto("/");
-      // The redesigned mobile-first shell intentionally removes the duplicate bottom
-      // navigation. Public links remain in the compact header; signed-in destinations
-      // are in the header menu. Do not regress by restoring the old five-item nav.
-      const nav = page.locator(".mobile-nav");
-      await expect(nav).toBeHidden();
+      // The current compact mobile navigation is a dedicated, reachable row.
+      // It keeps public pathways visible while the logo remains the Home link.
+      const nav = page.getByRole("navigation", { name: "Mobile navigation" });
+      await expect(nav).toBeVisible();
+      await expect(nav.getByRole("link", { name: "About", exact: true })).toBeVisible();
+      await expect(nav.getByRole("link", { name: "Serve-Community", exact: true })).toBeVisible();
+      await expect(nav.getByRole("link", { name: "Job Portal", exact: true })).toBeVisible();
+      await expect(nav.getByRole("link", { name: /My-Workspace|My-Learning|Admin/i })).toHaveCount(0);
       await expect(page.locator(".topbar .brand")).toBeVisible();
-      await expect(page.getByRole("link", { name: /Serve-Community/ })).toBeVisible();
-      await expect(page.getByRole("link", { name: /Jobs/ })).toBeVisible();
 
       await page.getByRole("button", { name: "Open MPA support" }).tap();
       await expect(page.locator('section[aria-label="MPA support assistant"]')).toBeVisible();

@@ -3,7 +3,7 @@
 **Status:** Active remediation plan; source implementation is tracked by workstream below  
 **Target repository:** `Jcodestest/MPA-Professionals-Network`  
 **Target branch for this plan:** `main`  
-**Implementation status:** Workstream 1 source hardening is recorded; Workstream 2 source implementation is on `feat/workstream-2-payment-method-configuration`; final CI, migration/rollback and browser acceptance remain deferred to the final workstream. Other workstreams remain subject to their own source review and acceptance evidence.  
+**Implementation status:** Workstream 1 source hardening is recorded. Workstream 2 payment-method configuration is integrated into `main` through PR #17. Workstream 3 progress-based `/members` workspace source implementation is in review on `feat/workstream-3-progress-members-workspace`. Final CI, migration/rollback and browser/accessibility acceptance remain deferred to the final workstream. Other workstreams remain subject to their own source review and acceptance evidence.  
 **Scope:** Close the development-environment gaps observed after PR #13 was merged. This document records intended UX, workflows, security invariants, sequencing, source implementation and acceptance evidence. It distinguishes source changes from final acceptance and does not claim deployment or successful validation unless explicitly recorded.
 
 ## 1. Purpose and operating rules
@@ -152,6 +152,17 @@ Avoid showing the same call-to-action or explanatory paragraph in multiple secti
 - Progress/status is driven by server data and permission checks.
 - New, incomplete, pending, active, rejected and expired membership states each have a relevant next action and no misleading progress.
 - Mobile, tablet, desktop, keyboard focus and screen-reader labels are tested.
+
+### Source implementation record — Workstream 3 (in review)
+
+- Added canonical `/members` workspace and changed the signed-in “My workspace” navigation destination to `/members`; legacy `/member` redirects to the canonical route so old bookmarks remain usable.
+- The page loads the signed-in account, current-user application tracking, membership applications, and notifications from authenticated current-user endpoints. Failed sections are reported and missing data is never counted as completed progress.
+- Replaced the equal-weight shortcut catalogue with one dominant “Continue where you left off” action, a five-stage profile/application/payment-if-required/review/active-membership sequence, compact permission-relevant shortcuts, recent status/activity, and contextual help. Completion is based on server-reported profile completion and membership/application/payment states, not page views or client-side counters.
+- Handles incomplete/no-application, correction-required, pending review/payment, rejected, active and server-reported expired membership states with distinct guidance. Rejection is not presented as permission to resubmit. Payment status is not treated as application approval or activation; only the server-confirmed active-membership flag completes the activation stage.
+- Adds source regression checks for route canonicalization, server-backed progress, unavailable data, accessibility semantics and separation of payment/review/activation.
+
+**Verification boundary:** implementation and regression test sources are committed on `feat/workstream-3-progress-members-workspace`. CI, actual mobile/tablet/desktop browser checks, keyboard/screen-reader acceptance, and confirmation of each real API status shape remain pending; do not mark Workstream 3 accepted or merge it until those checks pass. No production deployment is authorized.
+
 
 ## 7. Workstream 4 — Updated screen tour and contextual help
 

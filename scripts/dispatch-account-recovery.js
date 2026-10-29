@@ -43,6 +43,8 @@ if(!apiKey||!from){
      if(process.env.NODE_ENV==="production"&&url.protocol!=="https:")throw new Error("Recovery links must use HTTPS in production.");
      const rawLinkToken=new URLSearchParams(url.hash.replace(/^#/,"")).get("token")||url.searchParams.get("token");
      if(!rawLinkToken)throw new Error("Recovery email payload is missing its single-use token.");
+     // Migrate any legacy queued query-token link to a fragment before delivery. Fragments are not sent to HTTP servers.
+     if(url.searchParams.has("token")){url.searchParams.delete("token");url.hash=`token=${encodeURIComponent(rawLinkToken)}`;payload.url=url.toString();}
      const tokenHash=crypto.createHash("sha256").update(rawLinkToken).digest("hex");
      if(row.template_code==="account.one_time_session_link"){
       if(url.pathname!=="/account/one-time-access")throw new Error("Recovery email payload did not contain a valid account recovery URL.");

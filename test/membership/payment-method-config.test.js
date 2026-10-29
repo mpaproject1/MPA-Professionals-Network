@@ -114,3 +114,11 @@ test("payment snapshots preserve method details without retaining a mutable conf
   assert.equal(snapshot.currency, "ETB");
   assert.equal("secret_key" in snapshot, false);
 });
+
+test("a direct payment submission cannot use an enabled but incomplete configuration", () => {
+  assert.throws(() => assertMembershipPaymentMethodAvailable({
+    method_code: "bank_primary", method_type: "bank_transfer", display_name: "Primary bank",
+    enabled: true, currency: "ETB", instructions: "Transfer the fee.", bank_name: "Example Bank",
+    account_name: null, account_number: null, requires_evidence: true,
+  }, "ETB"), error => error.code === "PAYMENT_METHOD_INCOMPLETE");
+});

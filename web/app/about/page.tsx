@@ -18,7 +18,7 @@ export default function AboutPage() {
           <h1 id="about-title">Professional connections, directed toward <span>meaningful contribution.</span></h1>
           <p className={styles.lead}>MPA Professionals Network brings professional opportunities, community service, mentorship and membership pathways into one place for people and organizations to explore.</p>
           <div className={styles.actions}>
-            <Link href="/membership" className={styles.primaryAction}>Explore membership <ArrowRight size={17} aria-hidden="true" /></Link>
+            <Link href="#pathways-title" className={styles.primaryAction}>Explore pathways <ArrowRight size={17} aria-hidden="true" /></Link>
             <Link href="/jobs" className={styles.secondaryAction}>Browse the Job Portal</Link>
           </div>
         </div>

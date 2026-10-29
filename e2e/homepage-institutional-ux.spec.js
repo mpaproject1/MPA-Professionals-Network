@@ -40,6 +40,7 @@ test.describe("Workstream 5 homepage and navigation acceptance", () => {
     await page.getByRole("button", { name: "Open MPA support" }).click();
     await expect(page.locator('section[aria-label="MPA support assistant"]')).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Ask MPA support" })).toBeVisible();
+    await page.getByRole("button", { name: /Add contact details/i }).click();
     await expect(page.getByRole("checkbox", { name: /I ask MPA support to contact me about this inquiry/i })).toBeVisible();
   });
 

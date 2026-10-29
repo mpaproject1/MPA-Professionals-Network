@@ -17,6 +17,15 @@ export function assertMembershipPaymentMethodAdmin(identity = {}) {
   }
   return identity;
 }
+export function assertMembershipPaymentMethodAvailable(method, feeCurrency) {
+  if (!method || method.enabled !== true) {
+    throw Object.assign(new Error("This payment method is not currently available. Refresh the payment page and choose an enabled method."), { statusCode: 400, code: "PAYMENT_METHOD_UNAVAILABLE" });
+  }
+  if (String(method.currency || "").trim().toUpperCase() !== String(feeCurrency || "").trim().toUpperCase()) {
+    throw Object.assign(new Error("This payment method does not support the application fee currency."), { statusCode: 400, code: "PAYMENT_CURRENCY_UNSUPPORTED" });
+  }
+  return method;
+}
 export function buildPaymentMethodAuditMetadata({ methodCode, methodType, enabled, currency, changedFields = [] } = {}) {
   const allowed = new Set(["method_type", "display_name", "enabled", "currency", "instructions", "bank_name", "account_name", "account_number", "provider_code", "qr_image_url", "requires_evidence"]);
   return {

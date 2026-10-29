@@ -988,7 +988,7 @@ export async function addMentorTimeOff(profileId,userId,input,requestId){
 
 export async function getMentorProfile(userId,viewerId=null){
  const db=getPool();
- const row=(await db.query(`select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees
+ const row=(await db.query(`select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees,mp.approved_banner_url,mp.approved_banner_alt,mp.video_url
  from mentor_profile mp join app_user u on u.id=mp.user_id join person p on p.user_id=mp.user_id
  where mp.user_id=$1 and u.status='active' and mp.status='active' and mp.moderation_status='approved'
  and exists(select 1 from membership_record mm where mm.user_id=mp.user_id and mm.status='active' and mm.start_date<=current_date and (mm.end_date is null or mm.end_date>=current_date))

@@ -3,7 +3,7 @@
 ## Implemented API contract
 
 - `POST /api/v1/admin/users/:id/revoke-sessions`: revokes all active sessions for the selected account; requires server-side user-management permission, a reason, target-account checks and an audit event.
-- `POST /api/v1/admin/users/:id/one-time-session-link`: queues a short-lived, single-use recovery link to the currently authorized recovery destination. It reports queue acceptance, not confirmed delivery.
+- `POST /api/v1/admin/users/:id/one-time-session-link`: queues a short-lived, single-use recovery link to the currently authorized, verified recovery destination. It reports queue acceptance, not confirmed delivery.
 - `POST /api/v1/admin/users/:id/one-time-password`: creates a cryptographically random one-time password, persists only the existing scrypt password verifier, revokes sessions and outstanding one-time links, sets forced credential replacement, marks it consumed atomically at first sign-in, and returns the credential only in the immediate authorized response. The response is rate-limited and marked `Cache-Control: no-store`; no retrieval endpoint exists.
 - Legacy `POST /api/v1/admin/users/:id/reset-password` is retained for compatibility but no longer accepts an administrator-selected reusable password; it follows the one-time-password policy.
 - `PATCH /api/v1/admin/users/:id/recovery-email`: requires a reason, matching email confirmation, server-side permission checks, privileged-target checks and a passkey-authenticated session. It creates a pending change; the current trusted recovery address remains active until verification.

@@ -222,15 +222,19 @@ test("reviewer private portfolio evidence must be attached to the authorized cas
 });
 
 test("Member workspace preserves non-member profile and public-feature access and uses only self-scoped APIs", () => {
-  const page = read("web/app/member/page.tsx");
+  const legacyPage = read("web/app/member/page.tsx");
+  const page = read("web/app/members/page.tsx");
   const shell = read("web/components/shell.tsx");
-  assert.match(page, /What should I do next/);
-  assert.match(page, /You do not need active membership to update your own profile or explore public opportunities/);
+  assert.match(legacyPage, /redirect\("\/members"\)/);
+  assert.match(page, /Your next step, in one place/);
+  assert.match(page, /Sign in to see your own membership status, profile progress and recent requests/);
+  assert.match(page, /\/api\/v1\/me/);
   assert.match(page, /\/api\/v1\/me\/application-tracking/);
-  assert.match(page, /\/api\/v1\/me\/saved-items/);
+  assert.match(page, /\/api\/v1\/membership\/applications\/me/);
+  assert.match(page, /\/api\/v1\/membership\/history/);
   assert.match(page, /\/api\/v1\/notifications/);
-  assert.match(page, /\/api\/v1\/me\/verification\/cases/);
-  assert.match(shell, /\["\/member","My workspace",LayoutDashboard\]/);
+  assert.match(page, /Browse jobs/);
+  assert.match(shell, /\["\/members","My workspace",LayoutDashboard\]/);
 });
 
 test("Employer recruitment workspace keeps vacancy and applicant views organization/job scoped", () => {

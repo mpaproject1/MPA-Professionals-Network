@@ -63,7 +63,7 @@ test("account catalogue dialog uses the same guarded manageability value as acce
   assert.ok(users.includes("const targetManageable = selected ? canManage(selected) : false;"));
   assert.ok(users.includes('onClick={() => open(user, "access")} disabled={!manageable}'), "catalogue actions must use the current row account guard");
   assert.ok(users.includes('onClick={() => open(selected, "access")} disabled={!targetManageable}'), "detail actions must use the selected account guard");
-  assert.equal(users.split("disabled={!manageable}").length - 1, 4, "row-level actions use the row-local guard");
+  assert.equal(users.split("disabled={!manageable}").length - 1, 6, "every row-level account action uses the row-local guard");
   assert.ok(!users.includes('open(selected, "access")} disabled={!manageable}'), "detail controls must not reference the row-local variable");
 });
 

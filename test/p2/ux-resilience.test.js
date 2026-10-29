@@ -17,7 +17,7 @@ test("private demand draft persistence is opt-in, tab-scoped, expiring and clear
 });
 
 test("membership payment retry reuses a persisted idempotency key and official application reference", async () => {
-  const page = await read("../../web/app/membership/workspace.tsx");
+  const page = await read("../../web/app/membership/payment/page.tsx");
   const service = await read("../../src/membership/service.js");
   assert.match(page, /mpa-membership-payment-key:/);
   assert.match(page, /idempotencyKey/);

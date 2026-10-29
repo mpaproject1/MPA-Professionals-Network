@@ -220,7 +220,7 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
 test("P0: membership activation requires approval and confirmed payment; reversal suspends access", async () => {
   const applicant = await register(randomUUID());
   const reviewer = await register(randomUUID());
-  const application = await membership.createApplication(applicant.user.id, { productCode: "BASIC" }, "p0-membership-ordering-create");
+  const application = await membership.createApplication(applicant.user.id, { productCode: "BASIC", termsAcknowledged: true, idempotencyKey: `p0-membership-application-${randomUUID()}` }, "p0-membership-ordering-create");
   assert.equal(application.status, "submitted");
   await assert.rejects(
     membership.activateApplication(application.id, reviewer.user.id, "p0-membership-activate-unapproved"),
@@ -231,10 +231,17 @@ test("P0: membership activation requires approval and confirmed payment; reversa
   await membership.reviewApplication(application.id, reviewer.user.id, {
     decision: "approved", note: "P0 payment-ordering invariant"
   }, "p0-membership-ordering-approve");
+  const paymentMethodCode = `p0_bank_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
+  await getPool().query(
+    "insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,requires_evidence) values($1,'bank_transfer','P0 test bank',true,$2,'Test-only payment instructions','P0 Test Bank','P0 Test Account','P0-TEST-ACCOUNT',false)",
+    [paymentMethodCode, application.fee_snapshot.currency]
+  );
   const pending = await membership.createManualPayment(application.id, applicant.user.id, {
     amount: Number(application.fee_snapshot.amount),
     idempotencyKey: `p0-membership-payment-${randomUUID()}`,
+    paymentMethodCode,
     channel: "bank_transfer",
+    payerBankName: "P0 Sender Bank",
     reference: `P0-MANUAL-${randomUUID()}`
   }, "p0-membership-ordering-payment");
   await assert.rejects(
@@ -307,7 +314,7 @@ test("P0: applications retain their original fee-rule version after a future pla
     renewalRequired: true, gracePeriodDays: 0, effectiveFrom: today, planEffectiveFrom: today,
     planEffectiveTo: null, active: true, benefits: [], eligibility: {}, taxAmount: 0, serviceFee: 0
   }, "p0-plan-version-create");
-  const application = await membership.createApplication(applicant.user.id, { productCode }, "p0-plan-version-application");
+  const application = await membership.createApplication(applicant.user.id, { productCode, termsAcknowledged: true, idempotencyKey: `p0-plan-version-application-${randomUUID()}` }, "p0-plan-version-application");
   assert.equal(Number(application.fee_snapshot.amount), 100);
   assert.equal(Number(application.fee_snapshot.feeRuleVersion), 1);
 

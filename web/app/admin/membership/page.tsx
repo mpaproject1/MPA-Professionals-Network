@@ -15,6 +15,7 @@ export default function MembershipAdministrationPage() {
   const hydrated = useUiStore((state) => state.hydrated);
   const hydrateToken = useUiStore((state) => state.hydrateToken);
   const [access, setAccess] = useState<AccessState>("loading");
+  const [canManageMethods, setCanManageMethods] = useState(false);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 
@@ -36,6 +37,7 @@ export default function MembershipAdministrationPage() {
           roles.some((role) => ["system_admin", "reviewer", "finance_officer"].includes(role)) ||
           permissions.some((permission) => ["members.view", "members.manage", "finance.view", "finance.manage"].includes(permission));
         setAccess(allowed ? "allowed" : "denied");
+        setCanManageMethods(roles.includes("system_admin") || roles.includes("finance_officer") || permissions.some((permission) => ["members.manage", "finance.manage"].includes(permission)));
       })
       .catch(() => { if (!cancelled) setAccess("denied"); });
 
@@ -52,5 +54,5 @@ export default function MembershipAdministrationPage() {
     return <Card><h1 className="h1">You do not have access to this workspace</h1><p className="muted">Membership administration is available only to authorized reviewers, finance staff and administrators. Your account and membership records have not been changed.</p><a className="btn btn-ghost" href="/membership">Return to my membership</a></Card>;
   }
 
-  return <MembershipWorkspace adminWorkspace />;
+  return <><div className="grid">{canManageMethods && <Card><div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><div><h2 className="h2">Finance configuration</h2><p className="muted">Manage member-facing bank, Telebirr and manual payment instructions.</p></div><a className="btn btn-ghost" href="/admin/membership/payment-methods">Payment methods</a></div></Card>}</div><MembershipWorkspace adminWorkspace /></>;
 }

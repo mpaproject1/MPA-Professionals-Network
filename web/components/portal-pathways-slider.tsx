@@ -17,7 +17,7 @@ export function PortalPathwaysSlider() {
   const next = () => setActive((current) => (current + 1) % slides.length);
 
   return (
-    <section aria-label="Explore MPA pathways" aria-roledescription="carousel" className="mx-auto w-full max-w-6xl px-4 pb-10 sm:px-6 lg:px-10">
+    <section id="pathways-slider" aria-label="Explore MPA pathways" aria-roledescription="carousel" className="mx-auto w-full max-w-6xl px-4 pb-10 sm:px-6 lg:px-10">
       <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] p-6 shadow-[0_18px_60px_rgba(7,25,39,.08)] sm:p-9">
         <div className="grid items-center gap-7 md:grid-cols-[minmax(0,1fr)_auto]">
           <div key={slide.eyebrow} aria-live="polite" aria-atomic="true" className="min-w-0">

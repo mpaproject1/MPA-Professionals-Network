@@ -179,20 +179,29 @@ export async function revokeSessions(actor,userId,requestId,reasonInput){
   return {revoked:r.rowCount};
  });
 }
-export async function resetPassword(actor,userId,newPassword,requestId,reasonInput){
+export async function issueOneTimePassword(actor,userId,requestId,reasonInput){
+ const crypto = await import("node:crypto");
  const db=getPool(); const actorId=typeof actor==="string"?actor:actor?.sub; const actorPermissions=Array.isArray(actor?.permissions)?actor.permissions:[]; const actorRoles=await allowed(db,actorId); admin(actorRoles,actorPermissions,"users.manage");
- if(String(newPassword||"").length<12)throw err(400,"Password must be at least 12 characters.","VALIDATION_ERROR");
  const reason=String(reasonInput||"").trim().slice(0,500);
- if(!reason)throw err(400,"An audit reason is required to reset a password.","AUDIT_REASON_REQUIRED");
+ if(!reason)throw err(400,"An audit reason is required to issue a one-time password.","AUDIT_REASON_REQUIRED");
+ if(userId===actorId)throw err(400,"For your own account, use Account & Security or ask another authorized administrator.","SELF_RECOVERY_LINK");
+ // The credential is returned only in this successful response; only its password hash is persisted.
+ const oneTimePassword=`Mpa-${crypto.randomBytes(24).toString("base64url")}!9`;
  return withTransaction(async tx=>{
-  const target=(await tx.query("select id from app_user where id=$1 for update",[userId])).rows[0];
+  const target=(await tx.query("select id,status from app_user where id=$1 for update",[userId])).rows[0];
   if(!target)throw err(404,"User not found.","NOT_FOUND");
+  if(target.status!=="active")throw err(409,"Only active accounts can receive a one-time password.","ACCOUNT_NOT_ACTIVE");
   const targetRoles=await allowed(tx,userId);
-  if(targetRoles.some(r=>PRIVILEGED_ROLES.has(r))&&!actorRoles.includes(SYSTEM_ROLE))throw err(403,"Only a system administrator may reset a privileged account.","PRIVILEGED_ACCOUNT_CHANGE");
-  await tx.query("update app_user set password_hash=$1,updated_at=now() where id=$2",[hashPassword(newPassword),userId]);
-  await tx.query("update auth_session set revoked_at=now() where user_id=$1 and revoked_at is null",[userId]);
-  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'admin.password.reset','app_user',$2,$3,'success',$4)",[actorId,userId,requestId,JSON.stringify({reason})]);
-  await createInAppNotification(tx,userId,"security.admin_password_reset","security_event",userId,{category:"security",critical:true,priority:"urgent",message:"An MPA administrator reset your account password and revoked active sessions.",nextAction:"Sign in securely, set a new password if prompted, and contact MPA support if you did not expect this change.",actionUrl:"/profile",actionRequired:true});
-  return {id:userId,sessionsRevoked:true};
+  if(targetRoles.some(r=>PRIVILEGED_ROLES.has(r))&&!actorRoles.includes(SYSTEM_ROLE))throw err(403,"Only a system administrator may issue a one-time password for a privileged account.","PRIVILEGED_ACCOUNT_CHANGE");
+  await tx.query("update app_user set password_hash=$1,credential_setup_required=true,updated_at=now() where id=$2",[hashPassword(oneTimePassword),userId]);
+  const revoked=await tx.query("update auth_session set revoked_at=now() where user_id=$1 and revoked_at is null",[userId]);
+  await tx.query("update one_time_session_link set revoked_at=now() where user_id=$1 and used_at is null and revoked_at is null",[userId]);
+  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'admin.password.one_time_issued','app_user',$2,$3,'success',$4)",[actorId,userId,requestId,JSON.stringify({reason,sessionsRevoked:revoked.rowCount,credentialSetupRequired:true,delivery:"authorized_admin_one_time_response"})]);
+  await createInAppNotification(tx,userId,"security.admin_password_reset","security_event",userId,{category:"security",critical:true,priority:"urgent",message:"MPA account support issued a one-time password and revoked active sessions.",nextAction:"Use the credential only to sign in once, then set a new password before continuing. Contact support if this was unexpected.",actionUrl:"/profile",actionRequired:true});
+  return {id:userId,sessionsRevoked:revoked.rowCount,credentialSetupRequired:true,oneTimePassword,warning:"Sensitive one-time credential. Copy or securely deliver it now; it cannot be retrieved again."};
  });
+}
+export async function resetPassword(actor,userId,_newPassword,requestId,reasonInput){
+ // Backwards-compatible route: never accept an administrator-selected reusable password.
+ return issueOneTimePassword(actor,userId,requestId,reasonInput);
 }

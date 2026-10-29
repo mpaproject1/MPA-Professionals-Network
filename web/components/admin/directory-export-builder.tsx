@@ -76,6 +76,7 @@ export function DirectoryExportBuilder({ kind, token }: Props) {
     } finally { setExporting(false); }
   }
   function choosePreset(next: string) {
+    setPreview(null);
     setPreset(next);
     const match = catalogue?.presets.find(item => item.id === next);
     if (match) setSelected(match.fields);

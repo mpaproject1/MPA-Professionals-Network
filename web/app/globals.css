@@ -539,6 +539,7 @@ button[aria-busy=true]{pointer-events:none}
 .impact-listing-banner__title{max-width:100%;font-size:clamp(18px,2vw,24px);line-height:1.1;font-weight:800;letter-spacing:-.035em;text-wrap:balance;overflow-wrap:anywhere}
 .impact-listing-banner__description{max-width:42ch;font-size:12px;line-height:1.5;color:rgba(255,255,255,.82);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .mpa-services .grid.grid-2>.card:has(.impact-listing-banner),.mpa-mentorship-page .grid.grid-3>.card:has(.impact-listing-banner){min-width:0;overflow:hidden;padding:12px;gap:0}
+.discovery-card-summary{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .mpa-services .impact-listing-banner,.mpa-mentorship-page .impact-listing-banner{margin-bottom:15px}
 .mpa-services .grid.grid-2>.card:has(.impact-listing-banner)>h2,.mpa-mentorship-page .grid.grid-3>.card:has(.impact-listing-banner)>h2{font-size:clamp(18px,2vw,22px);line-height:1.2;letter-spacing:-.025em}
 @media(max-width:700px){

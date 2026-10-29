@@ -225,8 +225,10 @@ export default function Services(){
    {loading?<Card><OperationStatus state="loading" title="Loading published services" detail="We’re retrieving currently approved services that your account is allowed to see. Draft listings and private requests are not being changed." /></Card>:items.length===0&&!error?<Card><h2 className="h2">No services match this search yet</h2><p className="muted">Try another keyword or share what you need so the community can respond through the service-demand workflow.</p><div className="row" style={{gap:8,flexWrap:"wrap"}}><button className="btn btn-ghost" type="button" onClick={()=>{setQuery("");void load("",0)}}>Clear search</button><Link className="btn btn-primary" href="/service-demand">Share a need <span aria-hidden="true">→</span></Link></div></Card>:<div className="grid grid-2">{items.map(service=><Card key={service.id}>
      <ImpactListingBanner variant="service" eyebrow={service.service_category} title={service.title} description={service.description} imageUrl={service.approved_banner_url} imageAlt={service.approved_banner_alt||service.title}/>
      <div className="row" style={{gap:8,flexWrap:"wrap"}}><Badge>{service.service_category}</Badge>{impactLabel(service.impact_model)&&<Badge>{impactLabel(service.impact_model)}</Badge>}<span className="tagline">{(service.delivery_mode||"remote").replaceAll("_"," ")}</span></div>
-     <h2 className="h2" style={{marginTop:12}}>{service.title}</h2>
-     <p className="muted">{service.description}</p>
+     <p className="muted discovery-card-summary">{service.description}</p>
+     <div className="tagline">Eligibility: Active MPA membership is required to request services.</div>
+     <div className="tagline">Trust: Moderated listing; provider eligibility checked.</div>
+     {service.video_url&&<a className="btn btn-ghost" href={service.video_url} target="_blank" rel="noopener noreferrer">Watch service video</a>}
      <div className="tagline">Provider: {service.display_name||service.provider_name||"Verified member"}</div>
      {service.location_label&&<div className="tagline" style={{marginTop:6}}>Location: {service.location_label}</div>}
      <div className="tagline" style={{marginTop:6}}>Pricing: {priceLabel(service)}{service.impact_model==="community_discount"&&Number(service.reference_price_amount)>Number(service.price_amount)&&<span> · Standard {service.currency||""} {Number(service.reference_price_amount).toLocaleString()} · {Math.round((1-Number(service.price_amount)/Number(service.reference_price_amount))*100)}% community discount</span>}</div>

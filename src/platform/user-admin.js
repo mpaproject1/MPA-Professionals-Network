@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import {hashPassword} from "../membership/identity.js";
 import {getPool,withTransaction} from "./db.js";
 import {createInAppNotification} from "./notifications.js";
@@ -180,7 +181,6 @@ export async function revokeSessions(actor,userId,requestId,reasonInput){
  });
 }
 export async function issueOneTimePassword(actor,userId,requestId,reasonInput){
- const crypto = await import("node:crypto");
  const db=getPool(); const actorId=typeof actor==="string"?actor:actor?.sub; const actorPermissions=Array.isArray(actor?.permissions)?actor.permissions:[]; const actorRoles=await allowed(db,actorId); admin(actorRoles,actorPermissions,"users.manage");
  const reason=String(reasonInput||"").trim().slice(0,500);
  if(!reason)throw err(400,"An audit reason is required to issue a one-time password.","AUDIT_REASON_REQUIRED");
@@ -193,7 +193,7 @@ export async function issueOneTimePassword(actor,userId,requestId,reasonInput){
   if(target.status!=="active")throw err(409,"Only active accounts can receive a one-time password.","ACCOUNT_NOT_ACTIVE");
   const targetRoles=await allowed(tx,userId);
   if(targetRoles.some(r=>PRIVILEGED_ROLES.has(r))&&!actorRoles.includes(SYSTEM_ROLE))throw err(403,"Only a system administrator may issue a one-time password for a privileged account.","PRIVILEGED_ACCOUNT_CHANGE");
-  await tx.query("update app_user set password_hash=$1,credential_setup_required=true,updated_at=now() where id=$2",[hashPassword(oneTimePassword),userId]);
+  await tx.query("update app_user set password_hash=$1,credential_setup_required=true,credential_setup_expires_at=now()+interval '24 hours',updated_at=now() where id=$2",[hashPassword(oneTimePassword),userId]);
   const revoked=await tx.query("update auth_session set revoked_at=now() where user_id=$1 and revoked_at is null",[userId]);
   await tx.query("update one_time_session_link set revoked_at=now() where user_id=$1 and used_at is null and revoked_at is null",[userId]);
   await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'admin.password.one_time_issued','app_user',$2,$3,'success',$4)",[actorId,userId,requestId,JSON.stringify({reason,sessionsRevoked:revoked.rowCount,credentialSetupRequired:true,delivery:"authorized_admin_one_time_response"})]);

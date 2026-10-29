@@ -5,7 +5,8 @@ import {
   allowedMentorshipTransition,
   allowedServiceRequestTransition,
   allowedSessionTransition,
-  canAcceptServiceCompletion
+  canAcceptServiceCompletion,
+  normalizePublicVideoUrl
 } from "../../src/services-mentorship/service.js";
 
 test("service request lifecycle is controlled",()=>{
@@ -45,4 +46,21 @@ test("mentorship sessions cannot be reopened after terminal state",()=>{
   assert.equal(allowedSessionTransition("scheduled","no_show"),true);
   assert.equal(allowedSessionTransition("completed","scheduled"),false);
   assert.equal(allowedSessionTransition("cancelled","completed"),false);
+});
+
+test("public video links accept supported HTTPS providers and reject unsafe or unapproved hosts",()=>{
+  assert.equal(normalizePublicVideoUrl("https://www.youtube.com/watch?v=abc123"),"https://www.youtube.com/watch?v=abc123");
+  assert.equal(normalizePublicVideoUrl("https://youtu.be/abc123"),"https://youtu.be/abc123");
+  assert.equal(normalizePublicVideoUrl("https://vimeo.com/123456"),"https://vimeo.com/123456");
+  assert.equal(normalizePublicVideoUrl(""),null);
+  for (const value of [
+    "http://youtube.com/watch?v=abc123",
+    "https://youtube.com.evil.example/watch?v=abc123",
+    "https://evil.example/youtube.com/watch?v=abc123",
+    "https://user:password@youtube.com/watch?v=abc123",
+    "javascript:alert(1)",
+    "https://youtube.com/ (x)",
+    "https://youtube.com/",
+    "https://notvimeo.com/123"
+  ]) assert.throws(()=>normalizePublicVideoUrl(value),{code:"VALIDATION_ERROR"},value);
 });

@@ -4,6 +4,7 @@ import http from "node:http";
 import * as membershipAdminBulk from "./src/membership/admin-bulk.js";
 import * as membershipCard from "./src/membership/card.js";
 import * as membership from "./src/membership/service.js";
+import { assertMembershipPaymentMethodAdmin } from "./src/membership/payment-method-policy.js";
 import * as organizationJobs from "./src/organization-jobs/service.js";
 import * as accountSecurity from "./src/platform/account-security.js";
 import * as adminAudit from "./src/platform/admin-audit.js";
@@ -184,13 +185,13 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && p==="api/v1/auth/member-invitation/claim") return ok(res,await membershipAdminBulk.claimMemberInvitation(await body(req)),requestId);
     if(req.method==="POST" && p==="api/v1/auth/register") { const b=await body(req); await enforcePersistentRateLimit(req,"register",5,60000,String(b.email||"").trim().toLowerCase()); return ok(res,await membership.register(b,requestId),requestId,201); }
     if(req.method==="GET" && p==="api/v1/membership/products") return ok(res,await membership.listMembershipProducts(),requestId);
-    if(req.method==="GET" && p==="api/v1/membership/payment-methods") return ok(res,await membership.listMembershipPaymentMethods(),requestId);
+    if(req.method==="GET" && p==="api/v1/membership/payment-methods") { await auth(req); return ok(res,await membership.listMembershipPaymentMethods(),requestId); }
      if(req.method==="GET" && p==="api/v1/admin/membership/payment-methods") {
-       const identity=await auth(req); anyRoleOrPermission(identity,["system_admin"],["members.manage","finance.manage"]);
+       const identity=await auth(req); assertMembershipPaymentMethodAdmin(identity);
        return ok(res,await membership.listMembershipPaymentMethods({admin:true}),requestId);
      }
      if(req.method==="PUT" && p==="api/v1/admin/membership/payment-methods") {
-       const identity=await auth(req); anyRoleOrPermission(identity,["system_admin"],["members.manage","finance.manage"]);
+       const identity=await auth(req); assertMembershipPaymentMethodAdmin(identity);
        return ok(res,await membership.saveMembershipPaymentMethod(identity.sub,await body(req),requestId),requestId);
      }
      if(req.method==="GET" && p==="api/v1/admin/membership/products") {

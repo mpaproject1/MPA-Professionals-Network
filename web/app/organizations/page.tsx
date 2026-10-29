@@ -534,8 +534,7 @@ export default function Organizations() {
         </div>
       </Card>
       </details>
-      <details className="mpa-collapsible-guide">
-        <summary>How organization verification and hiring workflows work</summary>
+      <section className="grid" aria-label="Organization progress journey">
       <JourneyGuide
         eyebrow="Employer / recruiter"
         title="Verify → Publish → Review → Report"
@@ -549,7 +548,7 @@ export default function Organizations() {
           { title: "Report", description: "Record interview decisions, hiring outcomes and follow-up feedback through the authorized workflow.", href: "/recruitment", action: "Track hiring" },
         ]}
       />
-      </details>
+      </section>
       {!token ? (
         <Card>
           <h2 className="h2">Sign in to manage an organization</h2>

@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public_media_story (
   moderated_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CHECK ((service_listing_id IS NOT NULL)::integer + (mentor_profile_id IS NOT NULL)::integer = 1),
+  CHECK ((CASE WHEN service_listing_id IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN mentor_profile_id IS NOT NULL THEN 1 ELSE 0 END) = 1),
   CHECK ((attribution_mode='anonymous' AND attribution_name IS NULL) OR (attribution_mode='named' AND attribution_name IS NOT NULL AND length(trim(attribution_name)) BETWEEN 1 AND 120)),
   CHECK ((moderation_status IN ('pending','rejected') AND moderated_at IS NULL) OR (moderation_status IN ('approved','withdrawn') AND moderated_at IS NOT NULL) OR moderation_status='rejected'),
   CHECK (consent_withdrawn_at IS NULL OR moderation_status='withdrawn')

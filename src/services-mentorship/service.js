@@ -1367,8 +1367,8 @@ export async function listMyPublicMediaStories(userId,subjectType,subjectId){
 export async function createPublicMediaStory(authorUserId,subjectType,subjectId,input,requestId){
  if(input.consentGiven!==true||input.consentVersion!==PUBLIC_MEDIA_STORY_CONSENT_VERSION)throw mediaStoryError(400,"Explicit publication consent is required before submitting a story.","PUBLICATION_CONSENT_REQUIRED");
  const title=normalizeStoryText(input.title,"Story title",4,120);
- const summary=normalizeStoryText(input.summary,"Story summary",20,1200);
- const transcript=normalizeStoryText(input.transcript,"Video transcript or captions",20,12000);
+ const summary=validateCommunityText(input.summary,{field:"Story summary",min:20,max:1200});
+ const transcript=validateCommunityText(input.transcript,{field:"Video transcript or captions",min:20,max:12000});
  const videoUrl=normalizePublicVideoUrl(input.videoUrl,"Video URL");
  if(!videoUrl)throw mediaStoryError(400,"A public YouTube or Vimeo video URL is required.","VALIDATION_ERROR");
  const attributionMode=input.attributionMode==="anonymous"?"anonymous":input.attributionMode==="named"?"named":null;

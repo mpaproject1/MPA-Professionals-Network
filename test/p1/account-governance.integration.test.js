@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import * as membership from "../../src/membership/service.js";
-import * as userAdmin from "../../src/platform/user-admin.js";
 import { getPool } from "../../src/platform/db.js";
+import * as userAdmin from "../../src/platform/user-admin.js";
 
 async function registerAccount(label) {
   const suffix=randomUUID();

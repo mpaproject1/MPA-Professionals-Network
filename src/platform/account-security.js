@@ -27,7 +27,7 @@ export async function updateOwnCredentials(identity,input,requestId){
   const nextUsername=usernameChanged?usernameInput:user.username;
   if(usernameChanged)await tx.query("update app_user set username=$1,updated_at=now() where id=$2",[nextUsername,userId]);
   let revokedOtherSessions=0;
-  if(newPassword){await tx.query("update app_user set password_hash=$1,credential_setup_required=false,updated_at=now() where id=$2",[hashPassword(newPassword),userId]);const r=await tx.query("update auth_session set revoked_at=now() where user_id=$1 and id<>$2 and revoked_at is null",[userId,sessionId]);revokedOtherSessions=r.rowCount;await tx.query("update auth_session set credential_setup_required=false where id=$1 and user_id=$2",[sessionId,userId])}
+  if(newPassword){await tx.query("update app_user set password_hash=$1,credential_setup_required=false,credential_setup_expires_at=null,updated_at=now() where id=$2",[hashPassword(newPassword),userId]);const r=await tx.query("update auth_session set revoked_at=now() where user_id=$1 and id<>$2 and revoked_at is null",[userId,sessionId]);revokedOtherSessions=r.rowCount;await tx.query("update auth_session set credential_setup_required=false where id=$1 and user_id=$2",[sessionId,userId])}
   await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'account.credentials.updated','app_user',$2,$3,'success',$4)",[userId,userId,requestId,JSON.stringify({usernameChanged,passwordChanged:Boolean(newPassword),recoverySession:recovery,otherSessionsRevoked:revokedOtherSessions})]);
   if(newPassword||usernameInput!==undefined)await createInAppNotification(tx,userId,"security.credentials_changed","security_event",userId,{category:"security",critical:true,priority:"high",message:"Your account credentials were updated.",nextAction:"If you made this change, no further action is needed. If you did not, secure your account and contact MPA support.",actionUrl:"/profile",actionRequired:true,eventVersion:requestId});
   return {username:nextUsername,passwordChanged:Boolean(newPassword),otherSessionsRevoked:revokedOtherSessions,credentialSetupRequired:false};
@@ -86,7 +86,7 @@ export async function requestRecoveryEmailChange(actor,userId,input,requestId,or
  if(email!==confirmation)throw err(400,"The recovery email and confirmation do not match.","RECOVERY_EMAIL_CONFIRMATION_MISMATCH");
  const raw=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(raw).digest("hex");
  return withTransaction(async tx=>{
-  const target=(await tx.query("select id,email,status,recovery_email,recovery_email_verified_at from app_user where id=$1 for update",[userId])).rows[0];
+  const target=(await tx.query("select id,email,email_verified_at,status,recovery_email,recovery_email_verified_at from app_user where id=$1 for update",[userId])).rows[0];
   if(!target)throw err(404,"User not found.","NOT_FOUND");
   if(target.status!=="active")throw err(409,"Recovery email cannot be changed for an inactive account.","ACCOUNT_NOT_ACTIVE");
   const targetRoles=await roles(tx,userId);
@@ -98,7 +98,8 @@ export async function requestRecoveryEmailChange(actor,userId,input,requestId,or
   await tx.query("update app_user set recovery_email_pending=$1,recovery_email_change_token_hash=$2,recovery_email_change_expires_at=now()+interval '30 minutes',updated_at=now() where id=$3",[email,tokenHash,userId]);
   const verifyUrl=`${origin}/account/recovery-email/verify#token=${encodeURIComponent(raw)}`;
   await tx.query("insert into notification_outbox(channel,recipient,template_code,payload) values('email',$1,'account.recovery_email_verify',$2)",[email,JSON.stringify({url:verifyUrl,expiresMinutes:30,actionText:"Verify recovery email"})]);
-  await tx.query("insert into notification_outbox(channel,recipient,template_code,payload) values('email',$1,'account.recovery_email_change_notice',$2)",[target.email,JSON.stringify({newEmailMasked:maskEmail(email),requestedBy:"MPA Support"})]);
+  const notificationRecipient=target.email_verified_at?target.email:(target.recovery_email_verified_at?target.recovery_email:null);
+  if(notificationRecipient)await tx.query("insert into notification_outbox(channel,recipient,template_code,payload) values('email',$1,'account.recovery_email_change_notice',$2)",[notificationRecipient,JSON.stringify({newEmailMasked:maskEmail(email),requestedBy:"MPA Support"})]);
   await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'admin.recovery_email.change_requested','app_user',$2,$3,'success',$4)",[actorId,userId,requestId,JSON.stringify({oldEmail:target.recovery_email||target.email,oldEmailMasked:maskEmail(target.recovery_email||target.email),newEmail:email,newEmailMasked:maskEmail(email),previouslyVerified:Boolean(target.recovery_email_verified_at),reason,verificationExpiresMinutes:30})]);
   await createInAppNotification(tx,userId,"security.recovery_email_change_requested","security_event",userId,{category:"security",critical:true,priority:"high",message:"An administrator requested a change to your recovery email.",nextAction:"The new address will not be trusted until its verification link is used. Contact MPA Support if you did not expect this request.",actionUrl:"/profile",actionRequired:true});
   return {accepted:true,verificationExpiresInMinutes:30,message:"The recovery-email change request was accepted. The new address is not trusted until it is verified; email delivery has not been confirmed."};
@@ -108,14 +109,14 @@ export async function verifyRecoveryEmailChange(rawToken,requestId){
  const token=String(rawToken||"");if(token.length<32||token.length>256)throw err(400,"This verification link is invalid. Ask an administrator to start a new recovery-email change.","RECOVERY_EMAIL_TOKEN_INVALID");
  const tokenHash=crypto.createHash("sha256").update(token).digest("hex");
  return withTransaction(async tx=>{
-  const user=(await tx.query("select id,email,recovery_email_pending,recovery_email_change_expires_at,recovery_email_change_token_hash from app_user where recovery_email_change_token_hash=$1 for update",[tokenHash])).rows[0];
+  const user=(await tx.query("select id,email,recovery_email,recovery_email_pending,recovery_email_change_expires_at,recovery_email_change_token_hash from app_user where recovery_email_change_token_hash=$1 for update",[tokenHash])).rows[0];
   if(!user||!user.recovery_email_pending||!user.recovery_email_change_expires_at||new Date(user.recovery_email_change_expires_at).getTime()<=Date.now())throw err(410,"This verification link has expired or has already been used. Request a new recovery-email change.","RECOVERY_EMAIL_TOKEN_EXPIRED");
   await tx.query("select pg_advisory_xact_lock(hashtext($1))",[`recovery_email:${user.recovery_email_pending}`]);
   const duplicate=await tx.query("select id from app_user where id<>$1 and (lower(email)=lower($2) or lower(recovery_email)=lower($2) or lower(recovery_email_pending)=lower($2)) limit 1",[user.id,user.recovery_email_pending]);
   if(duplicate.rowCount)throw err(409,"That address is now associated with another account. Contact support.","RECOVERY_EMAIL_IN_USE");
   const oldMasked=maskEmail(user.email);
   await tx.query("update app_user set recovery_email=$1,recovery_email_verified_at=now(),recovery_email_pending=null,recovery_email_change_token_hash=null,recovery_email_change_expires_at=null,updated_at=now() where id=$2",[user.recovery_email_pending,user.id]);
-  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'account.recovery_email.verified','app_user',$1,$2,'success',$3)",[user.id,requestId,JSON.stringify({newRecoveryEmail:user.recovery_email_pending,newEmailMasked:maskEmail(user.recovery_email_pending),previousLoginEmail:user.email,previousLoginEmailMasked:oldMasked})]);
+  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'account.recovery_email.verified','app_user',$1,$2,'success',$3)",[user.id,requestId,JSON.stringify({oldRecoveryEmail:user.recovery_email||user.email,newRecoveryEmail:user.recovery_email_pending,newEmailMasked:maskEmail(user.recovery_email_pending),previousLoginEmail:user.email,previousLoginEmailMasked:oldMasked})]);
   await createInAppNotification(tx,user.id,"security.recovery_email_verified","security_event",user.id,{category:"security",critical:true,priority:"high",message:"Your recovery email has been verified and is now available for account recovery.",nextAction:"Contact MPA Support if you did not request this change.",actionUrl:"/profile",actionRequired:true});
   return {verified:true,message:"Recovery email verified."};
  });

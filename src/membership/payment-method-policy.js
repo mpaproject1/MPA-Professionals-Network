@@ -37,6 +37,14 @@ export function assertMembershipPaymentMethodAvailable(method, feeCurrency) {
   if (!method || method.enabled !== true) {
     throw Object.assign(new Error("This payment method is not currently available. Refresh the payment page and choose an enabled method."), { statusCode: 400, code: "PAYMENT_METHOD_UNAVAILABLE" });
   }
+  const missing = missingMembershipPaymentMethodFields({
+    ...method, methodCode: method.method_code ?? method.methodCode,
+    methodType: method.method_type ?? method.methodType, displayName: method.display_name ?? method.displayName,
+    currency: method.currency, instructions: method.instructions,
+  });
+  if (missing.length) {
+    throw Object.assign(new Error("This payment method is not fully configured and cannot accept payments yet."), { statusCode: 400, code: "PAYMENT_METHOD_INCOMPLETE" });
+  }
   if (String(method.currency || "").trim().toUpperCase() !== String(feeCurrency || "").trim().toUpperCase()) {
     throw Object.assign(new Error("This payment method does not support the application fee currency."), { statusCode: 400, code: "PAYMENT_CURRENCY_UNSUPPORTED" });
   }

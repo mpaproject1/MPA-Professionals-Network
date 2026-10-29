@@ -128,7 +128,7 @@ The separate member workspace is `/membership/payment`. The membership applicati
 
 ## Configured payment methods
 
-Authorized membership/finance administrators configure methods from the payment workspace. Supported manual evidence methods include local bank transfer, Telebirr, cash/in-person and other manual payments. Bank/account details, currency, instructions and an HTTPS QR image URL are configured in the database; the application never hardcodes actual account numbers. Telebirr and bank references are required for those methods.
+Authorized membership/finance administrators configure methods in `/admin/membership/payment-methods`; member-facing instructions appear in the signed-in `/membership/payment` journey. Supported manual evidence methods include local bank transfer, Telebirr, cash/in-person and other manual payments. Bank/account details, currency, instructions and an optional HTTPS QR image URL are stored in the existing `membership_payment_method` configuration table; the application never hardcodes actual account numbers. Bank and Telebirr references are required for those methods. Account details are not served to unauthenticated public visitors. Payment transactions preserve the method details captured at submission time in an immutable snapshot so later configuration edits do not rewrite historical payment context.
 
 ### Chapa hosted checkout
 

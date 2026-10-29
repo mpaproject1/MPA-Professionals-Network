@@ -55,7 +55,7 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.ok(Array.isArray(reviewQueueRow.review_history),"administrator queue should include prior review decisions");
   assert.equal(app.fee_snapshot.amount,1200);
   paymentMethodCode="bank_test_"+suffix;
-  await getPool().query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'bank_transfer','Test bank transfer',true,'ETB','Test-only payment method',true) on conflict(method_code) do update set enabled=true,requires_evidence=true",[paymentMethodCode]);
+  await getPool().query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number,requires_evidence) values($1,'bank_transfer','Test bank transfer',true,'ETB','Test-only payment method','Test Bank','Test Association','123456789',true) on conflict(method_code) do update set enabled=true,requires_evidence=true,bank_name=excluded.bank_name,account_name=excluded.account_name,account_number=excluded.account_number,instructions=excluded.instructions",[paymentMethodCode]);
   const receiptBytes=Buffer.from("%PDF-1.7\nprivate membership receipt");
   const receiptChecksum=createHash("sha256").update(receiptBytes).digest("hex");
   const receiptObjectKey="private-test/"+randomUUID()+".pdf";
@@ -73,6 +73,12 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   },"phase1-early-payment");
   paymentId=prematurePayment.id;
   assert.equal(prematurePayment.status,"pending");
+  const capturedMethod=(await getPool().query("select payment_method_snapshot from payment_transaction where id=$1",[paymentId])).rows[0].payment_method_snapshot;
+  assert.equal(capturedMethod.accountNumber,"123456789","payment keeps the account identifier used when submitted");
+  assert.equal(capturedMethod.bankName,"Test Bank");
+  assert.equal(capturedMethod.requiresEvidence,true);
+  const snapshotAudit=(await getPool().query("select metadata from audit_log where actor_user_id=$1 and action='membership.payment_submitted' and request_id=$2",[userId,"phase1-early-payment"])).rows[0];
+  assert.match(snapshotAudit.metadata.paymentMethodSnapshotSha256,/^[a-f0-9]{64}$/,"the audit trail binds the transaction to its immutable method snapshot");
   const linkedEvidence=(await getPool().query("select p.evidence_file_id,f.visibility,f.created_by,s.status upload_status from payment_transaction p join file_object f on f.id=p.evidence_file_id join private_upload_session s on s.file_object_id=f.id where p.id=$1",[paymentId])).rows[0];
   assert.equal(linkedEvidence.evidence_file_id,evidenceFileId);
   assert.equal(linkedEvidence.visibility,"private");
@@ -82,6 +88,8 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.equal(applicantPaymentView.retryable,false);
   assert.equal(Object.hasOwn(applicantPaymentView,"verification_note"),false,"private finance notes are not exposed in the applicant response");
   await getPool().query("update membership_payment_method set requires_evidence=false where method_code=$1",[paymentMethodCode]);
+  const unchangedSnapshot=(await getPool().query("select payment_method_snapshot from payment_transaction where id=$1",[paymentId])).rows[0].payment_method_snapshot;
+  assert.equal(unchangedSnapshot.requiresEvidence,true,"later method configuration edits must not rewrite a historical payment snapshot");
   const paymentReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,evidenceFileId,idempotencyKey:`phase1_early_${suffix}`},"phase1-early-payment-retry");
   assert.equal(paymentReplay.id,prematurePayment.id,"repeated payment requests with the same idempotency key return the original transaction");
   await assert.rejects(membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:"CHANGED-"+suffix,payerBankName:"Test Bank",paymentMethodCode,evidenceFileId,idempotencyKey:`phase1_early_${suffix}`},"phase1-payment-key-conflict"),e=>e.code==="IDEMPOTENCY_CONFLICT");
@@ -96,6 +104,32 @@ test("Phase 1 completes registration, profile and application identity flow",asy
 
   const duplicate=membership.createApplication(userId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:"phase1_duplicate_"+suffix},"phase1-test-duplicate");
   await assert.rejects(duplicate,e=>e.code==="APPLICATION_EXISTS");
+});
+
+test("Workstream 2 payment method configuration writes redacted actor/change audit history",async()=>{
+  const methodCode="config_test_"+suffix;
+  const requestId="phase1-payment-method-config-"+suffix;
+  const saved=await membership.saveMembershipPaymentMethod(userId,{
+    methodCode,methodType:"bank_transfer",displayName:"Test configuration audit",
+    enabled:false,requiresEvidence:true,currency:"ETB",instructions:"Test transfer instructions",
+    bankName:"Sensitive Test Bank",accountName:"Sensitive Test Holder",accountNumber:"987654321",
+    qrImageUrl:"https://payments.example.test/test-qr.png"
+  },requestId);
+  assert.equal(saved.method_code,methodCode);
+  assert.equal(saved.enabled,false);
+  const auditRow=(await getPool().query(
+    "select actor_user_id,action,outcome,metadata,occurred_at from audit_log where actor_user_id=$1 and action='membership.payment_method_saved' and request_id=$2 order by occurred_at desc limit 1",
+    [userId,requestId]
+  )).rows[0];
+  assert.ok(auditRow,"configuration changes must create an audit event");
+  assert.equal(auditRow.actor_user_id,userId);
+  assert.equal(auditRow.outcome,"success");
+  assert.ok(auditRow.occurred_at);
+  assert.ok(auditRow.metadata.changedFields.includes("account_number"));
+  assert.ok(auditRow.metadata.changedFields.includes("enabled"));
+  const serialized=JSON.stringify(auditRow.metadata);
+  assert.equal(serialized.includes("987654321"),false,"account numbers must never enter audit metadata");
+  assert.equal(serialized.includes("Sensitive Test Holder"),false,"account holder values must never enter audit metadata");
 });
 
 test("Phase 1 correction and review workflow is auditable",async()=>{

@@ -2,6 +2,7 @@
 alter table app_user
   add column if not exists credential_setup_required boolean not null default false,
   add column if not exists credential_setup_expires_at timestamptz,
+  add column if not exists credential_setup_used_at timestamptz,
   add column if not exists recovery_email text,
   add column if not exists recovery_email_verified_at timestamptz,
   add column if not exists recovery_email_pending text,

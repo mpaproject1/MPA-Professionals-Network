@@ -21,7 +21,7 @@ test("workspace and learning destinations are signed-in navigation items, not pu
   assert.match(shell, /href==="\/profile"&&\(accountRoles===null\|\|!hasProfessionalIdentity\(accountRoles\)\)/);
   assert.match(shell, /aria-label="Mobile navigation"/);
   assert.match(shell, /aria-current=\{pathname===href\?"page":undefined\}/);
-  assert.match(shell, /event\.key==="Escape"\)setMobileMoreOpen\(false\)/);
+  assert.match(shell, /event\.key==="Escape"\)setMobileMoreOpen\(false\)/);\n  assert.doesNotMatch(shell, /href="\\/admin\\/support"/);
 });
 
 test("home is a portal landing page with the original hero, live login, and pathway slider only", () => {

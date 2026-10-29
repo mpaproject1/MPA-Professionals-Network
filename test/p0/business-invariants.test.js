@@ -231,10 +231,17 @@ test("P0: membership activation requires approval and confirmed payment; reversa
   await membership.reviewApplication(application.id, reviewer.user.id, {
     decision: "approved", note: "P0 payment-ordering invariant"
   }, "p0-membership-ordering-approve");
+  const paymentMethodCode = `p0_bank_${randomUUID().replace(/-/g, "").slice(0, 8)}`;
+  await getPool().query(
+    "insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,bank_name,account_name,account_number) values($1,'bank_transfer','P0 test bank',true,$2,'Test-only payment instructions','P0 Test Bank','P0 Test Account','P0-TEST-ACCOUNT')",
+    [paymentMethodCode, application.fee_snapshot.currency]
+  );
   const pending = await membership.createManualPayment(application.id, applicant.user.id, {
     amount: Number(application.fee_snapshot.amount),
     idempotencyKey: `p0-membership-payment-${randomUUID()}`,
+    paymentMethodCode,
     channel: "bank_transfer",
+    payerBankName: "P0 Sender Bank",
     reference: `P0-MANUAL-${randomUUID()}`
   }, "p0-membership-ordering-payment");
   await assert.rejects(

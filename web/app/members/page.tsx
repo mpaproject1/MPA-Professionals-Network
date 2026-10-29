@@ -18,7 +18,6 @@ type Me = {
   last_name?: string;
   email?: string;
   status?: string;
-  membership_status?: string;
   has_active_membership?: boolean;
   completion_percent?: number;
   roles?: string[];
@@ -51,7 +50,8 @@ type Application = {
   latest_correction?: { status?: string } | null;
 };
 type Inbox = { items?: { id?: string; title?: string; body?: string; created_at?: string; actionUrl?: string }[]; counts?: { unread?: number; action_required?: number } };
-type WorkspaceData = { me: Me; tracking: Tracking; applications: Application[]; inbox: Inbox; errors: string[] };
+type MembershipHistory = { memberships?: { status?: string; start_date?: string | null; end_date?: string | null; membership_number?: string }[] };
+type WorkspaceData = { me: Me; tracking: Tracking; applications: Application[]; history: MembershipHistory; inbox: Inbox; errors: string[] };
 
 type JourneyStep = {
   title: string;
@@ -103,6 +103,7 @@ export default function MembersWorkspacePage() {
       api<Me>("/api/v1/me", {}, token),
       api<Tracking>("/api/v1/me/application-tracking?limit=5", {}, token),
       api<Application[]>("/api/v1/membership/applications/me", {}, token),
+      api<MembershipHistory>("/api/v1/membership/history", {}, token),
       api<Inbox>("/api/v1/notifications?limit=5", {}, token),
     ]);
     if (results[0].status === "rejected") {
@@ -112,13 +113,14 @@ export default function MembersWorkspacePage() {
       setLoading(false);
       return;
     }
-    const failures = ["Application and request activity", "Membership application status", "Recent notifications"]
+    const failures = ["Application and request activity", "Membership application status", "Membership history", "Recent notifications"]
       .filter((_, index) => results[index + 1].status === "rejected");
     setData({
       me: results[0].value as Me,
       tracking: results[1].status === "fulfilled" ? results[1].value as Tracking : {},
       applications: results[2].status === "fulfilled" && Array.isArray(results[2].value) ? results[2].value as Application[] : [],
-      inbox: results[3].status === "fulfilled" ? results[3].value as Inbox : {},
+      history: results[3].status === "fulfilled" ? results[3].value as MembershipHistory : {},
+      inbox: results[4].status === "fulfilled" ? results[4].value as Inbox : {},
       errors: failures,
     });
     setLoading(false);
@@ -155,6 +157,9 @@ export default function MembersWorkspacePage() {
     const paymentPending = paymentStatusesPending.has(paymentStatus) || applicationStatus === "payment_pending";
     const paymentFailed = paymentStatusesFailed.has(paymentStatus) || latestApplication?.payment?.retryable === true;
     const profileComplete = profilePercent !== null && profilePercent >= 100;
+    const membershipRecord = me.has_active_membership === true ? null : data.history.memberships?.[0];
+    const membershipStatus = cleanStatus(membershipRecord?.status);
+    const membershipExpired = membershipStatus === "expired" || Boolean(membershipRecord?.end_date && String(membershipRecord.end_date).slice(0, 10) < new Date().toISOString().slice(0, 10));
 
     const profileStep: JourneyStep = profilePercent === null
       ? { title: "Complete your profile", description: "The service did not return a profile-completion value, so this step is not marked complete.", state: "unknown", href: "/profile", action: "Review profile" }
@@ -198,7 +203,7 @@ export default function MembersWorkspacePage() {
 
     const activeStep: JourneyStep = active
       ? { title: "Active membership", description: "Your account currently has active membership.", state: "complete", href: "/membership", action: "View membership" }
-      : { title: "Active membership", description: cleanStatus(me.membership_status || me.status) === "expired" ? "The account reports expired membership. Review renewal options and current eligibility." : "Membership benefits unlock only after the service confirms activation.", state: "locked", href: "/membership", action: cleanStatus(me.membership_status || me.status) === "expired" ? "Review renewal" : undefined };
+      : { title: "Active membership", description: membershipExpired ? "The account reports expired membership. Review renewal options and current eligibility." : "Membership benefits unlock only after the service confirms activation.", state: "locked", href: "/membership", action: membershipExpired ? "Review renewal" : undefined };
 
     return [profileStep, applicationStep, paymentStep, reviewStep, activeStep];
   }, [data, latestApplication]);
@@ -216,6 +221,9 @@ export default function MembersWorkspacePage() {
   const paymentStatus = cleanStatus(latestApplication?.payment?.status);
   const paymentAttention = paymentStatusesFailed.has(paymentStatus) || correction || rejected;
   const profilePercent = typeof me?.completion_percent === "number" ? Math.max(0, Math.min(100, me.completion_percent)) : null;
+  const latestMembership = data?.history.memberships?.[0];
+  const membershipStatus = cleanStatus(latestMembership?.status);
+  const membershipExpired = membershipStatus === "expired" || Boolean(latestMembership?.end_date && String(latestMembership.end_date).slice(0, 10) < new Date().toISOString().slice(0, 10));
 
   let next = { title: "Review your membership options", detail: "Check your current eligibility and the server-provided application status before starting or continuing.", href: "/membership", label: "Continue to membership" };
   if (error) next = { title: "Refresh your account status", detail: "Your current account state could not be confirmed. Retry before relying on progress or starting another action.", href: "#refresh-workspace", label: "Retry account status" };
@@ -225,7 +233,7 @@ export default function MembersWorkspacePage() {
   else if (paymentAttention) next = { title: "Check your payment status", detail: "Review the payment record and current method-specific instructions. A submitted receipt is not proof of verification.", href: "/membership", label: "Review payment" };
   else if (waitingReview) next = { title: "Your application is being processed", detail: "The service reports " + labelStatus(latestApplication?.status) + ". Check status updates; payment and application approval remain separate decisions.", href: "/track", label: "Check application status" };
   else if (latestApplication) next = { title: "Continue your membership application", detail: "Resume the current application and follow the instructions shown by the membership service.", href: "/membership", label: "Continue application" };
-  else if (cleanStatus(me?.membership_status || me?.status) === "expired") next = { title: "Review your expired membership", detail: "Your account reports expired membership. Review renewal options and current eligibility with the membership service.", href: "/membership", label: "Review renewal options" };
+  else if (membershipExpired) next = { title: "Review your expired membership", detail: "Your membership history reports an expired or ended membership. Review renewal options and current eligibility with the membership service.", href: "/membership", label: "Review renewal options" };
   else if (profilePercent !== null && profilePercent < 100) next = { title: "Complete your professional profile", detail: "Your account reports " + profilePercent + "% completion. Finish the profile details relevant to your professional record.", href: "/profile", label: "Continue profile" };
 
   const recentItems = (data?.tracking.items || []).slice(0, 3);
@@ -258,7 +266,7 @@ export default function MembersWorkspacePage() {
             <h2 id="continue-title" className="h2 mt-1">{next.title}</h2>
             <p className="muted mt-2 max-w-2xl">{next.detail}</p>
             <div className="mt-4 flex flex-wrap items-center gap-2" aria-label="Current account status">
-              <Badge tone={active ? "green" : paymentAttention ? "gold" : "slate"}>{active ? "Active member" : labelStatus(me?.membership_status || me?.status || "non_member")}</Badge>
+              <Badge tone={active ? "green" : paymentAttention ? "gold" : "slate"}>{active ? "Active member" : membershipExpired ? "Expired membership" : latestMembership?.status ? labelStatus(latestMembership.status) : "Not currently an active member"}</Badge>
               {latestApplication ? <Badge tone={paymentAttention ? "gold" : waitingReview ? "slate" : "green"}>Application: {labelStatus(latestApplication.status)}</Badge> : <Badge tone="slate">No application returned</Badge>}
               {profilePercent !== null ? <Badge tone={profilePercent >= 100 ? "green" : "slate"}>Profile {profilePercent}%</Badge> : <Badge tone="slate">Profile progress unavailable</Badge>}
             </div>

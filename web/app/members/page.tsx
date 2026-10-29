@@ -5,7 +5,7 @@ import {
   GraduationCap, HelpCircle, RefreshCw, ShieldCheck, UserRound, Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
@@ -76,7 +76,7 @@ function labelStatus(value?: string | null) {
   return clean.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 function safeInternalHref(value?: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\\\")) return null;
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes(String.fromCharCode(92))) return null;
   return value;
 }
 function dateLabel(value?: string | null) {
@@ -92,8 +92,10 @@ export default function MembersWorkspacePage() {
   const [data, setData] = useState<WorkspaceData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const requestSequence = useRef(0);
 
   const load = useCallback(async () => {
+    const sequence = ++requestSequence.current;
     if (!token) {
       setData(null);
       setLoading(false);
@@ -109,6 +111,7 @@ export default function MembersWorkspacePage() {
       api<MembershipHistory>("/api/v1/membership/history", {}, token),
       api<Inbox>("/api/v1/notifications?limit=5", {}, token),
     ]);
+    if (sequence !== requestSequence.current) return;
     if (results[0].status === "rejected") {
       const cause = results[0].reason;
       setError(cause instanceof ApiError ? cause.message : "Your account status could not be loaded. Retry before relying on this workspace.");

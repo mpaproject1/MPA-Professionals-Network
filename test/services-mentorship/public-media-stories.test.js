@@ -14,9 +14,12 @@ function identity(suffix){
 }
 async function account(){const suffix=randomUUID().replaceAll("-","").slice(0,16);return (await membership.register(identity(suffix),"public-story-account-"+suffix)).user.id;}
 async function fixture(){
- const owner=await account(),requester=await account(),suffix=randomUUID().replaceAll("-","").slice(0,12);
+ const owner=await account(),requester=await account(),moderator=await account(),suffix=randomUUID().replaceAll("-","").slice(0,12);
  const org=await organizationJobs.registerOrganization(owner,{legalName:"Public Story "+suffix,displayName:"Public Story "+suffix},"public-story-org-"+suffix);
  const db=getPool();
+ const role=(await db.query("select id from app_role where role_code='system_admin' limit 1")).rows[0];
+ assert.ok(role,"system_admin role exists in the disposable schema");
+ await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing",[moderator,role.id]);
  await db.query("update organization set verification_status='verified',verified_at=now(),verified_by=$2,public_visible=true where id=$1",[org.id,owner]);
  const listing=await services.createServiceListing(owner,{organizationId:org.id,title:"Community service for story testing",description:"A service whose participant outcomes can be documented after accepted delivery.",serviceCategory:"education",visibility:"public",pricingModel:"free",priceAmount:0,currency:"ETB"},"public-story-listing-"+suffix,"public-story-listing-key-"+suffix+"-0123456789");
  await db.query("update service_listing set moderation_status='approved',moderated_by=$2,moderated_at=now() where id=$1",[listing.id,owner]);
@@ -29,7 +32,7 @@ async function fixture(){
  await services.reviewServiceDelivery(delivery.id,requester,{status:"accepted",note:"The submitted delivery evidence meets the agreed service scope."},"public-story-review-delivery-"+suffix);
  await services.changeServiceRequestStatus(request.id,owner,"completed","The provider submitted the completed service for requester outcome review.","public-story-submit-completion-"+suffix);
  await services.acceptServiceCompletion(request.id,requester,"The agreed learning support was delivered and the requester accepts the recorded outcome.","public-story-accept-completion-"+suffix);
- return {owner,requester,suffix,listing,db};
+ return {owner,requester,moderator,suffix,listing,db};
 }
 
 test("public video stories require completed engagement, explicit consent, moderation and withdrawal",async()=>{
@@ -40,8 +43,8 @@ test("public video stories require completed engagement, explicit consent, moder
  const story=await services.createPublicMediaStory(f.requester,"service",f.listing.id,input,"public-story-submit-"+f.suffix);
  assert.equal(story.moderation_status,"pending");
  assert.equal((await services.listPublicMediaStories("service",f.listing.id)).length,0,"pending story is never public");
- await assert.rejects(services.reviewPublicMediaStory(story.id,f.owner,[],{status:"approved"},"public-story-forbidden-review-"+f.suffix),e=>e.code==="FORBIDDEN");
- const approved=await services.reviewPublicMediaStory(story.id,f.owner,["system_admin"],{status:"approved"},"public-story-approve-"+f.suffix);
+ await assert.rejects(services.reviewPublicMediaStory(story.id,f.owner,{status:"approved"},"public-story-forbidden-review-"+f.suffix),e=>e.code==="FORBIDDEN");
+ const approved=await services.reviewPublicMediaStory(story.id,f.moderator,{status:"approved"},"public-story-approve-"+f.suffix);
  assert.equal(approved.moderation_status,"approved");
  const published=await services.listPublicMediaStories("service",f.listing.id);
  assert.equal(published.length,1);

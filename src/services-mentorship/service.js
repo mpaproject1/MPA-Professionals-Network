@@ -21,7 +21,7 @@ function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message);
 function normalizePublicMediaUrl(value,field){
  if(value===undefined||value===null||String(value).trim()==="")return null;
  const raw=String(value).trim();
- if(/[\\s"'()\\\\<>]/.test(raw))throw error(400,field+" must be a valid HTTPS URL.","VALIDATION_ERROR");
+ if(/[\s"'()\\<>]/.test(raw))throw error(400,field+" must be a valid HTTPS URL.","VALIDATION_ERROR");
  let parsed;try{parsed=new URL(raw);}catch{throw error(400,field+" must be a valid HTTPS URL.","VALIDATION_ERROR");}
  if(parsed.protocol!=="https:"||parsed.username||parsed.password||!parsed.hostname)throw error(400,field+" must be a valid HTTPS URL without embedded credentials.","VALIDATION_ERROR");
  return parsed.toString();

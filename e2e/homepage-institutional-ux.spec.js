@@ -65,7 +65,7 @@ test.describe("Workstream 5 homepage and navigation acceptance", () => {
         const rgb = [0,2,4].map(i => Number.parseInt(hex.slice(i,i+2),16)/255).map(c => c <= .04045 ? c/12.92 : ((c+.055)/1.055)**2.4);
         const lum = rgb[0]*.2126 + rgb[1]*.7152 + rgb[2]*.0722;
         return lum;
-      });
+      };
       const a = parse(root.getPropertyValue("--bg"));
       const b = parse(root.getPropertyValue("--text"));
       return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);

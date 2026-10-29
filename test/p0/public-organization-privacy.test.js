@@ -47,5 +47,6 @@ test("membership management is separated from the member self-service page", () 
   assert.match(membershipPage, /\{adminWorkspace&&token&&\(roles\.includes/);
   assert.match(membershipPage, /\{adminWorkspace&&token&&\(roles\.some/);
   assert.match(adminMembershipPage, /Membership administration is available only to authorized/);
-  assert.match(adminMembershipPage, /return <MembershipWorkspace adminWorkspace \/>/);
+  assert.match(adminMembershipPage, /<MembershipWorkspace adminWorkspace \/>/);
+  assert.match(adminMembershipPage, /\/admin\/membership\/payment-methods/);
 });

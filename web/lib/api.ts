@@ -31,6 +31,7 @@ const FRIENDLY_ERRORS: Record<string,string> = {
   CURRENT_PASSWORD_INCORRECT: "That current password does not match. Please try again.",
   PASSWORD_RESET_REQUIRED: "Set a new password to finish securing your account.",
   ONE_TIME_PASSWORD_EXPIRED: "This one-time password has expired. Ask an authorized MPA administrator to issue a new one.",
+  ONE_TIME_PASSWORD_ALREADY_USED: "This one-time password has already been used or expired. Ask an authorized MPA administrator to issue a new one.",
   STEP_UP_AUTH_REQUIRED: "Re-authenticate with your administrator passkey before changing a recovery email.",
   RECOVERY_EMAIL_INVALID: "Enter a valid recovery email address.",
   RECOVERY_EMAIL_CONFIRMATION_MISMATCH: "The recovery email and confirmation do not match.",

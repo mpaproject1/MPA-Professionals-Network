@@ -116,13 +116,11 @@ function chooseFields(identity, kind, input) {
   if (requested.length > 30 || requested.some(key => !availableKeys.has(key))) throw fail(403, "One or more selected fields are not permitted for this directory or administrator.", "FIELD_NOT_ALLOWED");
   return available.filter(field => requested.includes(field.key));
 }
-function buildQuery(kind, identity, filters, selectedFields) {
+function buildQuery(kind, identity, filters) {
   const args = [];
-  const bind = value => { args.push(value); return "$" + args.length; };
   const clauses = [];
-  const from = bind(filters.from || null), to = bind(filters.to || null), status = bind(filters.status), q = bind(filters.q);
-  const orgFilter = filters.organizationId ? bind(filters.organizationId) : null;
-  const batchFilter = filters.importBatch ? bind(filters.importBatch) : null;
+  const orgFilter = filters.organizationId || null;
+  const batchFilter = filters.importBatch || null;
   const canOrgs = canViewOrganizations(identity);
   if (filters.organizationId && !canOrgs) throw fail(403, "Organization filtering requires authorized organization-directory access.", "ORGANIZATION_SCOPE_FORBIDDEN");
   let select, fromSql, dateColumn;

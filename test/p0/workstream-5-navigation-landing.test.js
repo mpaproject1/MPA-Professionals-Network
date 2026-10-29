@@ -10,7 +10,7 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 test("signed-out navigation exposes only the intended public destinations", () => {
   const shell = read("web/components/shell.tsx");
   assert.match(shell, /if\(!token\)return \["\/about","\/jobs","\/serve-community"\]\.includes\(href\)/);
-  assert.match(shell, /\["\/about","\/About",Info\]/); // covered by the case-insensitive route label assertion below
+  assert.match(shell, /\["\/about","About",Info\]/);
 });
 
 test("workspace and learning destinations are signed-in navigation items, not public links", () => {

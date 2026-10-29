@@ -76,13 +76,6 @@ test("Workstream 7 PostgreSQL security workflows", { skip: !enabled }, async (t)
       const claims = JSON.parse(Buffer.from(signedIn.token.split(".")[1], "base64url").toString("utf8"));
       let session = (await db.query("select credential_setup_required from auth_session where id=$1 and user_id=$2", [claims.sid, target.id])).rows[0];
       assert.equal(session.credential_setup_required, true);
-      await assert.rejects(
-        () => db.query("select credential_setup_required from auth_session where id=$1", [claims.sid]).then(result => {
-          assert.equal(result.rows[0].credential_setup_required, true);
-          return Promise.reject(Object.assign(new Error("simulated protected-route guard"), { code: "PASSWORD_RESET_REQUIRED" }));
-        }),
-        (error) => error.code === "PASSWORD_RESET_REQUIRED"
-      );
       await updateOwnCredentials({ sub: target.id, sid: claims.sid, credential_setup_required: true }, { newPassword: "Replacement-Password-2026-Strong!" }, crypto.randomUUID());
       session = (await db.query("select credential_setup_required from auth_session where id=$1 and user_id=$2", [claims.sid, target.id])).rows[0];
       assert.equal(session.credential_setup_required, false);

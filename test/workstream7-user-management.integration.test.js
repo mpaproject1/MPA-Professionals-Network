@@ -76,6 +76,7 @@ test("Workstream 7 PostgreSQL security workflows", { skip: !enabled }, async (t)
       const claims = JSON.parse(Buffer.from(signedIn.token.split(".")[1], "base64url").toString("utf8"));
       let session = (await db.query("select credential_setup_required from auth_session where id=$1 and user_id=$2", [claims.sid, target.id])).rows[0];
       assert.equal(session.credential_setup_required, true);
+      await assert.rejects(() => login(target.email, renewed.oneTimePassword, crypto.randomUUID()), (error) => error.code === "ONE_TIME_PASSWORD_ALREADY_USED");
       await updateOwnCredentials({ sub: target.id, sid: claims.sid, credential_setup_required: true }, { newPassword: "Replacement-Password-2026-Strong!" }, crypto.randomUUID());
       session = (await db.query("select credential_setup_required from auth_session where id=$1 and user_id=$2", [claims.sid, target.id])).rows[0];
       assert.equal(session.credential_setup_required, false);

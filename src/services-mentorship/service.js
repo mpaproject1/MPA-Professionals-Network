@@ -1368,8 +1368,10 @@ export async function listMyPublicMediaStories(userId,subjectType,subjectId){
  if(subjectType==="mentor"&&subjectId){args.push(subjectId);where.push("mentor_profile_id=(select id from mentor_profile where user_id=$2)");}
  return (await db.query("select id,service_listing_id,mentor_profile_id,title,moderation_status,moderation_note,consented_at,consent_withdrawn_at,created_at from public_media_story where "+where.join(" and ")+" order by created_at desc limit 50",args)).rows;
 }
-export async function createPublicMediaStory(authorUserId,subjectType,subjectId,input,requestId){
+export async function createPublicMediaStory(authorUserId,subjectType,subjectId,input,requestId,idempotencyKey){
  if(input.consentGiven!==true||input.consentVersion!==PUBLIC_MEDIA_STORY_CONSENT_VERSION)throw mediaStoryError(400,"Explicit publication consent is required before submitting a story.","PUBLICATION_CONSENT_REQUIRED");
+ const key=String(idempotencyKey||"").trim();
+ if(key.length<16||key.length>200)throw mediaStoryError(400,"A stable idempotency key is required for story submission.","IDEMPOTENCY_KEY_REQUIRED");
  const title=normalizeStoryText(input.title,"Story title",4,120);
  const summary=validateCommunityText(input.summary,{field:"Story summary",min:20,max:1200});
  const transcript=validateCommunityText(input.transcript,{field:"Video transcript or captions",min:20,max:12000});
@@ -1378,7 +1380,10 @@ export async function createPublicMediaStory(authorUserId,subjectType,subjectId,
  const attributionMode=input.attributionMode==="anonymous"?"anonymous":input.attributionMode==="named"?"named":null;
  if(!attributionMode)throw mediaStoryError(400,"Choose named attribution or anonymous attribution.","VALIDATION_ERROR");
  const attributionName=attributionMode==="named"?normalizeStoryText(input.attributionName,"Approved display name",1,120):null;
+ const payloadHash=hashPayload({subjectType,subjectId,title,summary,transcript,videoUrl,attributionMode,attributionName,consentVersion:PUBLIC_MEDIA_STORY_CONSENT_VERSION});
  return withTransaction(async db=>{
+  const prior=(await db.query("select id,title,moderation_status,created_at,idempotency_payload_hash from public_media_story where author_user_id=$1 and idempotency_key=$2 for update",[authorUserId,key])).rows[0];
+  if(prior){if(prior.idempotency_payload_hash!==payloadHash)throw mediaStoryError(409,"This submission key was already used for different story content. Start a new submission.","IDEMPOTENCY_CONFLICT");return {...prior,idempotent:true,nextAction:"This story submission was already saved; its existing moderation status is unchanged."};}
   let serviceListingId=null,mentorProfileId=null;
   if(subjectType==="service"){
    const listing=(await db.query("select id from service_listing where id=$1 and status='published' and lifecycle_status='active' and moderation_status='approved' and (expires_at is null or expires_at>now())",[subjectId])).rows[0];
@@ -1393,7 +1398,7 @@ export async function createPublicMediaStory(authorUserId,subjectType,subjectId,
    if(!engagement)throw mediaStoryError(403,"Only a mentee with a completed mentorship can submit a participant story.","COMPLETED_MENTORSHIP_REQUIRED");
    mentorProfileId=profile.id;
   }else throw mediaStoryError(400,"Unsupported story subject.","VALIDATION_ERROR");
-  const row=(await db.query("insert into public_media_story(service_listing_id,mentor_profile_id,author_user_id,title,summary,transcript,video_url,attribution_mode,attribution_name,evidence_status,consent_confirmed,consent_version,consent_text_snapshot,consented_at,moderation_status) values($1,$2,$3,$4,$5,$6,$7,$8,$9,'participant_reported',true,$10,$11,now(),'pending') returning id,title,moderation_status,created_at",[serviceListingId,mentorProfileId,authorUserId,title,summary,transcript,videoUrl,attributionMode,attributionName,PUBLIC_MEDIA_STORY_CONSENT_VERSION,PUBLIC_MEDIA_STORY_CONSENT_TEXT])).rows[0];
+  const row=(await db.query("insert into public_media_story(service_listing_id,mentor_profile_id,author_user_id,idempotency_key,idempotency_payload_hash,title,summary,transcript,video_url,attribution_mode,attribution_name,evidence_status,consent_confirmed,consent_version,consent_text_snapshot,consented_at,moderation_status) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'participant_reported',true,$12,$13,now(),'pending') returning id,title,moderation_status,created_at",[serviceListingId,mentorProfileId,authorUserId,key,payloadHash,title,summary,transcript,videoUrl,attributionMode,attributionName,PUBLIC_MEDIA_STORY_CONSENT_VERSION,PUBLIC_MEDIA_STORY_CONSENT_TEXT])).rows[0];
   await audit(db,authorUserId,"public_media_story.submitted","public_media_story",row.id,requestId,{subjectType,subjectId,attributionMode,consentVersion:PUBLIC_MEDIA_STORY_CONSENT_VERSION});
   return {...row,nextAction:"Your story is private until a moderator approves it. You can withdraw publication consent at any time."};
  });

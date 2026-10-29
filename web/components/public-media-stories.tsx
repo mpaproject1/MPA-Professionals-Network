@@ -24,6 +24,7 @@ export function PublicMediaStories({subjectType,subjectId,token}:{subjectType:Su
  const [attributionName,setAttributionName]=useState("");
  const [consentGiven,setConsentGiven]=useState(false);
  const [withdrawingId,setWithdrawingId]=useState("");
+ const [submissionKey,setSubmissionKey]=useState("");
  const load=useCallback(async()=>{
   setLoading(true);setError("");
   const path=subjectType==="service"?"/api/v1/services/"+encodeURIComponent(subjectId)+"/stories":"/api/v1/mentors/"+encodeURIComponent(subjectId)+"/stories";
@@ -41,11 +42,13 @@ export function PublicMediaStories({subjectType,subjectId,token}:{subjectType:Su
   setSaving(true);setError("");setNotice("");
   try{
    const path=subjectType==="service"?"/api/v1/services/"+encodeURIComponent(subjectId)+"/stories":"/api/v1/mentors/"+encodeURIComponent(subjectId)+"/stories";
-   await api(path,{method:"POST",body:JSON.stringify({title,summary,transcript,videoUrl,attributionMode,attributionName:attributionMode==="named"?attributionName:null,consentGiven,consentVersion:CONSENT_VERSION})},token);
+   const key=submissionKey||crypto.randomUUID();if(!submissionKey)setSubmissionKey(key);
+   await api(path,{method:"POST",headers:{"x-idempotency-key":key},body:JSON.stringify({title,summary,transcript,videoUrl,attributionMode,attributionName:attributionMode==="named"?attributionName:null,consentGiven,consentVersion:CONSENT_VERSION})},token);
+   setSubmissionKey("");
    setTitle("");setSummary("");setTranscript("");setVideoUrl("");setAttributionName("");setAttributionMode("anonymous");setConsentGiven(false);
    setNotice("Story submitted for moderation. It will not appear publicly unless approved; it is labelled participant-reported.");
    await load();
-  }catch(e){setError(e instanceof ApiError?e.message:"Story submission failed. Your consent and story were not confirmed as saved.");}
+  }catch(e){if(e instanceof ApiError&&e.status>=400&&e.status<500)setSubmissionKey("");setError(e instanceof ApiError?e.message:"Story submission failed. Your consent and story were not confirmed as saved.");}
   finally{setSaving(false);}
  }
  async function withdraw(storyId:string){

@@ -38,10 +38,13 @@ async function fixture(){
 test("public video stories require completed engagement, explicit consent, moderation and withdrawal",async()=>{
  const f=await fixture();
  const input={title:"My learning support experience",summary:"The service helped me organize a practical learning plan and understand my next steps.",transcript:"I received the learning support described in the service agreement and used the recommendations to plan my next steps.",videoUrl:"https://www.youtube.com/watch?v=abc123",attributionMode:"anonymous",consentGiven:true,consentVersion:"public-media-story-v1"};
- await assert.rejects(services.createPublicMediaStory(f.owner,"service",f.listing.id,input,"public-story-owner-denied-"+f.suffix),e=>e.code==="COMPLETED_ENGAGEMENT_REQUIRED");
- await assert.rejects(services.createPublicMediaStory(f.requester,"service",f.listing.id,{...input,consentGiven:false},"public-story-no-consent-"+f.suffix),e=>e.code==="PUBLICATION_CONSENT_REQUIRED");
- const story=await services.createPublicMediaStory(f.requester,"service",f.listing.id,input,"public-story-submit-"+f.suffix);
+ await assert.rejects(services.createPublicMediaStory(f.owner,"service",f.listing.id,input,"public-story-owner-denied-"+f.suffix,"public-story-owner-key-"+f.suffix+"-0123456789"),e=>e.code==="COMPLETED_ENGAGEMENT_REQUIRED");
+ await assert.rejects(services.createPublicMediaStory(f.requester,"service",f.listing.id,{...input,consentGiven:false},"public-story-no-consent-"+f.suffix,"public-story-no-consent-key-"+f.suffix+"-0123456789"),e=>e.code==="PUBLICATION_CONSENT_REQUIRED");
+ const story=await services.createPublicMediaStory(f.requester,"service",f.listing.id,input,"public-story-submit-"+f.suffix,"public-story-submit-key-"+f.suffix+"-0123456789");
  assert.equal(story.moderation_status,"pending");
+ const duplicate=await services.createPublicMediaStory(f.requester,"service",f.listing.id,input,"public-story-retry-"+f.suffix,"public-story-submit-key-"+f.suffix+"-0123456789");
+ assert.equal(duplicate.id,story.id,"retrying the same key returns the original story");assert.equal(duplicate.idempotent,true);
+ await assert.rejects(services.createPublicMediaStory(f.requester,"service",f.listing.id,{...input,summary:"This is changed content for the same saved story key."},"public-story-key-conflict-"+f.suffix,"public-story-submit-key-"+f.suffix+"-0123456789"),e=>e.code==="IDEMPOTENCY_CONFLICT");
  assert.equal((await services.listPublicMediaStories("service",f.listing.id)).length,0,"pending story is never public");
  await assert.rejects(services.reviewPublicMediaStory(story.id,f.owner,{status:"approved"},"public-story-forbidden-review-"+f.suffix),e=>e.code==="FORBIDDEN");
  const approved=await services.reviewPublicMediaStory(story.id,f.moderator,{status:"approved"},"public-story-approve-"+f.suffix);

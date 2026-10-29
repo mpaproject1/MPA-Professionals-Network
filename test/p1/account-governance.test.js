@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../..");
 const read=path=>readFileSync(resolve(root,path),"utf8");
 test("account reference migration is immutable, unique, server-generated and preserves UUIDs",()=>{const sql=read("db/migrations/20261029160000_account_references_and_governance.sql");assert.match(sql,/add column if not exists account_reference text/);assert.match(sql,/uq_app_user_account_reference/);assert.match(sql,/nextval\('app_user_account_reference_seq'\)/);assert.match(sql,/created_at at time zone 'UTC'/);assert.match(sql,/account\.reference\.backfilled/);assert.match(sql,/Account reference and its provenance are immutable/);assert.match(sql,/where account_reference is null/);assert.doesNotMatch(sql,/alter table app_user\s+alter column id/i);});

@@ -88,5 +88,10 @@ test("account export applies member/non-member row scope and safely preserves Un
   const memberCsv = await exportDirectory({ sub: fixture.id, roles: ["membership_reviewer"], permissions: [] }, "members", { fields: ["membership_number", "full_name"], q: "000012340056", format: "csv" }, "directory-export-leading-zero-test");
   assert.ok(memberCsv.buffer.toString("utf8").includes("000012340056"), "leading zeros in membership numbers must be preserved");
   assert.equal(memberCsv.rowCount, 1);
+
+  await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,source) select $1,$2,'BULK-'||lpad(n::text,8,'0'),'active',current_date,'admin' from generate_series(1,505) n", [fixture.id, product.id]);
+  const paged = await exportDirectory({ sub: fixture.id, roles: ["membership_reviewer"], permissions: [] }, "members", { fields: ["membership_number"], q: fixture.email, format: "csv" }, "directory-export-paged-test");
+  assert.equal(paged.rowCount, 506, "exports must fetch all rows across the 500-row database page boundary");
+  assert.ok(paged.buffer.toString("utf8").includes("BULK-00000505"), "rows after the first page must be included");
   assert.ok((await db.query("select id from app_user where id=$1", [fixture.id])).rowCount === 1);
 });

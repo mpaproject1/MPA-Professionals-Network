@@ -27,6 +27,7 @@ function Reveal({ children, delay = 0, className = "" }: { children: React.React
 export default function Home() {
   const reduceMotion = useReducedMotion();
   const token = useUiStore((state) => state.token);
+  const hydrated = useUiStore((state) => state.hydrated);
 
   return (
     <div className={styles.page}>
@@ -144,8 +145,10 @@ export default function Home() {
             </div>
             <div className={styles.visualFootnote}><span aria-hidden="true" /> Learning areas are labelled clearly until supported features are released.</div>
           </Reveal>
-        ) : (
+        ) : hydrated ? (
           <Reveal className={styles.heroVisual}><LandingLoginForm /></Reveal>
+        ) : (
+          <Reveal className={styles.heroVisual}><div role="status" aria-live="polite" className="grid min-h-64 place-items-center text-center text-sm text-[var(--muted)]">Checking your sign-in status…</div></Reveal>
         )}
       </section>
 

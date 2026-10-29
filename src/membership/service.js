@@ -185,7 +185,7 @@ export async function listMyApplications(userId){
   const db=getPool();
   const rows=(await db.query(`select a.id,a.tracking_reference,a.application_type,a.status,a.submitted_at,a.terms_acknowledged_at,a.reviewed_at,a.approved_at,a.created_at,a.updated_at,
       a.data_snapshot,a.fee_snapshot,
-      (select jsonb_build_object('id',p.id,'status',p.status,'amount',p.amount,'currency',p.currency,'channel',p.channel,'reference',coalesce(p.request_payload->>'reference',p.purpose_reference),'payment_method_code',p.payment_method_code,'payer_bank_name',p.request_payload->>'payerBankName','checkout_url',p.request_payload->>'checkoutUrl','purpose','membership_fee','created_at',p.created_at,'updated_at',p.updated_at,'verified_at',p.verified_at,'verification_note',p.verification_note,'reconciliation_status',(select pr.reconciliation_status from payment_reconciliation pr where pr.payment_transaction_id=p.id order by pr.reconciled_at desc nulls last limit 1),'reversal',(select jsonb_build_object('type',rev.reversal_type,'reason',rev.reason,'created_at',rev.created_at) from membership_payment_reversal rev where rev.payment_transaction_id=p.id))
+      (select jsonb_build_object('id',p.id,'status',p.status,'amount',p.amount,'currency',p.currency,'channel',p.channel,'reference',coalesce(p.request_payload->>'reference',p.purpose_reference),'payment_method_code',p.payment_method_code,'payer_bank_name',p.request_payload->>'payerBankName','checkout_url',p.request_payload->>'checkoutUrl','purpose','membership_fee','created_at',p.created_at,'updated_at',p.updated_at,'verified_at',p.verified_at,'retryable',(p.status='pending' and p.verification_note is not null),'reconciliation_status',(select pr.reconciliation_status from payment_reconciliation pr where pr.payment_transaction_id=p.id order by pr.reconciled_at desc nulls last limit 1),'reversal',(select jsonb_build_object('type',rev.reversal_type,'created_at',rev.created_at) from membership_payment_reversal rev where rev.payment_transaction_id=p.id))
        from membership_application_payment ap join payment_transaction p on p.id=ap.payment_transaction_id
        where ap.application_id=a.id order by p.created_at desc limit 1) as payment,
       (select jsonb_build_object('id',c.id,'requested_fields',c.requested_fields,'reviewer_note',c.reviewer_note,'status',c.status,'applicant_response',c.applicant_response,'created_at',c.created_at)
@@ -503,6 +503,7 @@ export async function createManualPayment(applicationId,userId,input,requestId){
     const methodReference=String(input.reference||"").trim();
     if(methodType==="bank_transfer"&&!methodReference)throw httpError(400,"Enter the bank transfer or transaction reference.","PAYMENT_REFERENCE_REQUIRED");
     if(methodType==="telebirr"&&!methodReference)throw httpError(400,"Enter the Telebirr transaction reference.","PAYMENT_REFERENCE_REQUIRED");
+    if(methodType==="manual"&&!methodReference)throw httpError(400,"Enter the payment reference required for this configured manual method.","PAYMENT_REFERENCE_REQUIRED");
     const payerBankName=String(input.payerBankName||"").trim();
     if(methodType==="bank_transfer"&&(!payerBankName||payerBankName.length>100))throw httpError(400,"Enter the name of the bank you used to send the transfer (maximum 100 characters).","PAYER_BANK_REQUIRED");
     const activePayment=(await db.query("select pt.id,pt.status from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id where ap.application_id=$1 and pt.status in ('initiated','pending','succeeded') and not (pt.status='pending' and pt.verification_note is not null) order by pt.created_at desc limit 1 for update of pt",[applicationId])).rows[0];
@@ -513,7 +514,7 @@ export async function createManualPayment(applicationId,userId,input,requestId){
       [idem,amount,fee.currency,JSON.stringify({purpose:"membership_fee",channel,reference:methodReference||null,paymentMethodCode:method?.method_code||null,payerBankName:payerBankName||null,methodSnapshot:method?{displayName:method.display_name,methodType:method.method_type,currency:method.currency,bankName:method.bank_name,accountName:method.account_name,accountNumber:method.account_number,providerCode:method.provider_code,requiresEvidence:method.requires_evidence===true}:null}),channel,userId,methodReference||applicationId,method?.method_code||null])).rows[0];
     await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[applicationId,p.id]);
     if(input.evidenceFileId){
-      const file=await db.query("select id from file_object where id=$1 and (created_by=$2 or created_by is null)",[input.evidenceFileId,userId]);
+      const file=await db.query("select id from file_object where id=$1 and (created_by=$2)",[input.evidenceFileId,userId]);
       if(!file.rows[0]) throw httpError(400,"Payment evidence file is not available to this account.","INVALID_EVIDENCE");
       await db.query("update payment_transaction set evidence_file_id=$1 where id=$2",[input.evidenceFileId,p.id]);
     }

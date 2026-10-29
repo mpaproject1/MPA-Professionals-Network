@@ -17,6 +17,16 @@ export function assertMembershipPaymentMethodAdmin(identity = {}) {
   }
   return identity;
 }
+export function buildPaymentMethodAuditMetadata({ methodCode, methodType, enabled, currency, changedFields = [] } = {}) {
+  const allowed = new Set(["method_type", "display_name", "enabled", "currency", "instructions", "bank_name", "account_name", "account_number", "provider_code", "qr_image_url", "requires_evidence"]);
+  return {
+    methodCode: String(methodCode || "").slice(0, 40),
+    methodType: String(methodType || "").slice(0, 30),
+    enabled: enabled === true,
+    currency: String(currency || "").slice(0, 3),
+    changedFields: [...new Set(changedFields.filter(field => allowed.has(field)))].sort(),
+  };
+}
 export function missingMembershipPaymentMethodFields(input = {}) {
   const type = String(input.methodType ?? input.method_type ?? "").trim().toLowerCase();
   const missing = [];

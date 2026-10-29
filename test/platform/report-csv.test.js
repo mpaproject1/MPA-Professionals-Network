@@ -5,7 +5,7 @@ import {makeCsv} from "../../src/platform/reports.js";
 test("CSV export preserves Unicode and raw leading zeroes while neutralizing formula-leading text",()=>{
  const csv=makeCsv({report:{title:"Unicode አማርኛ",scope:"test",definition:"A report",columns:["Name","Reference","Formula"]},generatedAt:"2026-10-29T12:00:00.000Z",filters:{},totals:{rows:1},rows:[{Name:"አበበ",Reference:"0012345",Formula:"=HYPERLINK(\\"https://example.test\\",\\"open\\")"}]});
  const text=csv.toString("utf8");
- assert.ok(text.startsWith("\\uFEFF"));
+ assert.ok(text.startsWith("\uFEFF"));
  assert.ok(text.includes("አበበ"));
  assert.ok(text.includes("0012345"));
  assert.ok(text.includes("'=HYPERLINK"));

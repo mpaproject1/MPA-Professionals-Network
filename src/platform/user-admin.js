@@ -31,7 +31,7 @@ export async function updateUserPermissions(actor,userId,input,requestId){
   const actorRoles=await allowed(tx,actor);
   if(!actorRoles.includes(SYSTEM_ROLE))throw err(403,"Only a system administrator may manage per-user permissions.","SYSTEM_ADMIN_REQUIRED");
   if(userId===actor)throw err(403,"You cannot change your own direct permissions.","SELF_PERMISSION_CHANGE");
-  const target=(await tx.query("select id,status from app_user where id=$1 for update",[userId])).rows[0];
+  const target=(await tx.query("select id,status,email_verified_at from app_user where id=$1 for update",[userId])).rows[0];
   if(!target)throw err(404,"User not found.","NOT_FOUND");
   const reason=String(input.reason||"").trim().slice(0,500);
   if(!reason)throw err(400,"An audit reason is required for permission changes.","AUDIT_REASON_REQUIRED");
@@ -191,6 +191,7 @@ export async function issueOneTimePassword(actor,userId,requestId,reasonInput){
   const target=(await tx.query("select id,status from app_user where id=$1 for update",[userId])).rows[0];
   if(!target)throw err(404,"User not found.","NOT_FOUND");
   if(target.status!=="active")throw err(409,"Only active accounts can receive a one-time password.","ACCOUNT_NOT_ACTIVE");
+  if(!target.email_verified_at)throw err(409,"This account must verify its sign-in email before a one-time password can be issued. Use the approved recovery-link workflow if appropriate.","EMAIL_VERIFICATION_REQUIRED");
   const targetRoles=await allowed(tx,userId);
   if(targetRoles.some(r=>PRIVILEGED_ROLES.has(r))&&!actorRoles.includes(SYSTEM_ROLE))throw err(403,"Only a system administrator may issue a one-time password for a privileged account.","PRIVILEGED_ACCOUNT_CHANGE");
   await tx.query("update app_user set password_hash=$1,credential_setup_required=true,credential_setup_expires_at=now()+interval '24 hours',updated_at=now() where id=$2",[hashPassword(oneTimePassword),userId]);

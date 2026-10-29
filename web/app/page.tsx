@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, GraduationCap, LayoutDashboard, LockKeyhole, Network, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowRight, GraduationCap, LayoutDashboard, LockKeyhole, Network, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import styles from "./landing-redesign.module.css";
 import { LandingLoginForm } from "../components/landing-login-form";
@@ -119,7 +119,7 @@ export default function Home() {
             <span><LockKeyhole size={16} aria-hidden="true" /> Privacy-aware access</span>
             <span><Network size={16} aria-hidden="true" /> Professional connections</span>
           </div>
-          <Link href="#live-network" className={styles.scrollHint}>Explore what is available <ArrowDown size={15} aria-hidden="true" /></Link>
+          <Link href="#pathways-slider" className={styles.scrollHint}>Explore what is available <ArrowDown size={15} aria-hidden="true" /></Link>
         </div>
 
         {token ? (

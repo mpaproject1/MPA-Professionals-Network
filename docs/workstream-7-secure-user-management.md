@@ -20,7 +20,7 @@
 
 ## Validation matrix
 
-The source-contract tests in `test/workstream7-user-management.test.js` protect the security-critical implementation structure. The PR quality workflow must also pass TypeScript, Biome, production build, browser acceptance and disposable-PostgreSQL migration/backend checks.
+The source-contract tests in `test/workstream7-user-management.test.js` protect the security-critical implementation structure. The disposable-PostgreSQL integration tests in `test/workstream7-user-management.integration.test.js` exercise denied actions, one-time credential expiry and use, session revocation, forced password replacement, recovery-link expiry/reuse, and recovery-email verification/audit. The PR quality workflow must also pass TypeScript, Biome, production build, browser acceptance and disposable-PostgreSQL migration/backend checks.
 
 Required integration evidence before merging:
 1. Non-admin and out-of-scope actors receive server-side 403 responses for every administrative action.

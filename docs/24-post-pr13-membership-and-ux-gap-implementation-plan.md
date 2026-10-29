@@ -431,3 +431,10 @@ The guided membership application/payment source and additive schema changes are
 
 
 **Final Workstream 1 source sweep:** application and renewal creation now require a valid idempotency key as well as explicit terms acknowledgement; the service records the acknowledgement timestamp and a digest of the saved fee/validity/eligibility snapshot. Regression coverage includes replay after activation, payment replay after paid/rejected status transitions, changed-payload key conflict, missing configured method/evidence, and rejection-after-payment reconciliation. See the updated [Workstream 1 implementation record](26-workstream-1-guided-membership-application-payment.md). Full CI and disposable PostgreSQL rollback verification remain deliberately deferred to Workstream 9; no claim of runtime acceptance is made before those checks run.
+
+## CI #147 follow-up — Workstream 3
+
+- Run [40861605180](https://github.com/Jcodestest/MPA-Professionals-Network/actions/runs/40861605180) failed one backend regression assertion in `test/p0/role-workspace-authorization.test.js`: it still expected the previous `/member` page's copy and API references after the canonical workspace moved to `/members`.
+- Updated that regression test to assert the legacy redirect, canonical `/members` page, session-scoped account/membership/history/notification APIs, public job browsing, and canonical navigation link. No production authorization logic, payment logic, or database migration was changed.
+- The failed run's other checks were green: Biome lint, Next.js production build and support-widget browser acceptance, and TypeScript type-check. Backend test summary was 289 passed, 1 failed, 3 skipped (293 total).
+- Verification boundary: this commit corrects the stale assertion, but a fresh CI run on the new commit is still required before the workstream can be accepted. Responsive/keyboard/screen-reader acceptance remains pending. No merge or deployment is implied.

@@ -1,10 +1,10 @@
 # Post-PR #13 Membership and UX Gap Remediation Plan
 
-**Status:** Draft for review — planning only  
+**Status:** Active remediation plan; source implementation is tracked by workstream below  
 **Target repository:** `Jcodestest/MPA-Professionals-Network`  
 **Target branch for this plan:** `main`  
-**Implementation status:** Not started by this document  
-**Scope:** Close the development-environment gaps observed after PR #13 was merged. This document records the intended UX, workflows, security invariants, sequencing, and acceptance evidence. It does not claim the features already exist or that any code has been changed.
+**Implementation status:** Workstream 1 source hardening is recorded; Workstream 2 source implementation is on `feat/workstream-2-payment-method-configuration`; final CI, migration/rollback and browser acceptance remain deferred to the final workstream. Other workstreams remain subject to their own source review and acceptance evidence.  
+**Scope:** Close the development-environment gaps observed after PR #13 was merged. This document records intended UX, workflows, security invariants, sequencing, source implementation and acceptance evidence. It distinguishes source changes from final acceptance and does not claim deployment or successful validation unless explicitly recorded.
 
 ## 1. Purpose and operating rules
 

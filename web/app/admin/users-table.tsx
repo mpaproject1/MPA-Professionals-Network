@@ -8,7 +8,7 @@ import { ApiError, api } from "../../lib/api";
 import styles from "./users-table.module.css";
 
 export type ManagedUser = {
-  id: string; email: string; username: string; status: string; roles: string[];
+  id: string; account_reference: string; email: string; username: string; status: string; roles: string[];
   permissions?: string[];
   full_name?: string | null; created_at?: string | null; updated_at?: string | null;
   last_activity_at?: string | null; membership_status?: string | null;
@@ -32,12 +32,13 @@ export function UsersTable({ users, roleCatalog, permissionCatalog, auditEvents 
   const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [copyNotice, setCopyNotice] = useState("");
   const isSystemAdmin = currentRoles.includes("system_admin");
   const choices = roleCatalog.filter(r => r.assignable && (!r.privileged || isSystemAdmin));
   const pageSize = 10;
   const filtered = useMemo(() => users.filter(user => {
     const q = query.trim().toLowerCase();
-    const matchesText = !q || [user.email, user.username, user.full_name || "", user.id].some(v => v.toLowerCase().includes(q));
+    const matchesText = !q || [user.email, user.username, user.full_name || "", user.account_reference || ""].some(v => v.toLowerCase().includes(q));
     return matchesText && (statusFilter === "all" || user.status === statusFilter);
   }), [users, query, statusFilter]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -74,7 +75,7 @@ export function UsersTable({ users, roleCatalog, permissionCatalog, auditEvents 
     <div className={styles.toolbar}>
       <label className={styles.search}>Search accounts<input value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} placeholder="Name, email, username or ID" /></label>
       <label className={styles.filter}>Status<select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}><option value="all">All statuses</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="disabled">Disabled</option></select></label>
-      <span className={styles.resultCount}>{filtered.length} account{filtered.length === 1 ? "" : "s"}</span>
+      <span className={styles.resultCount}>{filtered.length} account{filtered.length === 1 ? "" : "s"}</span>{copyNotice && <span role="status" className={styles.mutedLabel}>{copyNotice}</span>}
     </div>
     {usersLoadFailed ? <div className={styles.emptyState}><b>Accounts could not be loaded</b><p>Check your administrator access and connection, then retry the page.</p></div> : pageUsers.length === 0 ? <div className={styles.emptyState}><b>{users.length ? "No matching accounts" : "No accounts available"}</b><p>{users.length ? "Change the search or status filter." : "When accounts are available to this administrator, they will appear here."}</p></div> :
     <div className={styles.list} role="list" aria-label="Account catalogue">
@@ -83,7 +84,7 @@ export function UsersTable({ users, roleCatalog, permissionCatalog, auditEvents 
         return <article className={styles.accountCard} key={user.id} role="listitem">
           <div className={styles.identity}>
             <span className={styles.avatar} aria-hidden="true"><UserRound size={19}/></span>
-            <div className={styles.identityText}><b>{user.full_name || user.username || user.email}</b><span>{user.email}</span><small>{user.username} · ID {user.id}</small></div>
+            <div className={styles.identityText}><b>{user.full_name || user.username || user.email}</b><span>{user.email}</span><small>Account ID: {user.account_reference}</small><button className="btn btn-ghost" type="button" onClick={() => { void navigator.clipboard.writeText(user.account_reference).then(() => setCopyNotice(`Copied Account ID ${user.account_reference}`)).catch(() => setCopyNotice("Could not copy Account ID. Select the reference to copy it manually.")); }}>Copy Account ID</button></div>
           </div>
           <div className={styles.stateCol}><Badge tone={user.status === "active" ? "green" : "gold"}>{user.status}</Badge><small>Membership: {user.membership_status || "Not available"}</small></div>
           <div className={styles.roleCol}><span className={styles.mutedLabel}>Platform roles</span><div className={styles.roles}>{user.roles.length ? user.roles.map(code => <Badge key={code} tone="slate">{roleCatalog.find(r => r.role_code === code)?.name || code}</Badge>) : <span className={styles.mutedLabel}>No platform roles</span>}</div></div>
@@ -111,8 +112,8 @@ export function UsersTable({ users, roleCatalog, permissionCatalog, auditEvents 
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="account-dialog-title">
         <header className={styles.dialogHeader}><div><span className={styles.eyebrow}>Account administration</span><h2 id="account-dialog-title">{panel === "details" ? "Account details" : panel === "access" ? "Manage access" : panel === "status" ? (selected.status === "active" ? "Suspend account" : "Reactivate account") : panel === "recovery" ? "Account recovery" : "Revoke active sessions"}</h2><p>{selected.full_name || selected.email}</p></div><button className="icon-btn" type="button" aria-label="Close dialog" disabled={busy} onClick={() => { setSelected(null); setPanel(null); }}><X size={19}/></button></header>
         {panel === "details" ? <div className={styles.detailBody}>
-          <section><h3><UserRound size={16}/> Identity & account</h3><dl><dt>Name</dt><dd>{selected.full_name || "Not available"}</dd><dt>Email</dt><dd>{selected.email}</dd><dt>Username</dt><dd>{selected.username || "Not available"}</dd><dt>Account ID</dt><dd>{selected.id}</dd><dt>Account status</dt><dd>{selected.status}</dd><dt>Created</dt><dd>{date(selected.created_at)}</dd><dt>Last updated</dt><dd>{date(selected.updated_at)}</dd></dl></section>
-          <section><h3><ShieldCheck size={16}/> Access & membership</h3><dl><dt>Platform roles</dt><dd>{selected.roles.length ? selected.roles.map(code => roleCatalog.find(r => r.role_code === code)?.name || code).join(", ") : "No platform roles"}</dd><dt>Membership status</dt><dd>{selected.membership_status || "Not available from this account response"}</dd><dt>Organizations</dt><dd>{selected.organization_names?.length ? selected.organization_names.join(", ") : "Not available from this account response"}</dd></dl></section>
+          <section><h3><UserRound size={16}/> Identity & account</h3><dl><dt>Name</dt><dd>{selected.full_name || "Not available"}</dd><dt>Email</dt><dd>{selected.email}</dd><dt>Username</dt><dd>{selected.username || "Not available"}</dd><dt>Account ID</dt><dd>{selected.account_reference} <button className="btn btn-ghost" type="button" onClick={() => { void navigator.clipboard.writeText(selected.account_reference).then(() => setCopyNotice(`Copied Account ID ${selected.account_reference}`)).catch(() => setCopyNotice("Could not copy Account ID. Select the reference to copy it manually.")); }}>Copy</button></dd><dt>Account status</dt><dd>{selected.status}</dd><dt>Created</dt><dd>{date(selected.created_at)}</dd><dt>Last updated</dt><dd>{date(selected.updated_at)}</dd></dl></section>
+          <section><h3><ShieldCheck size={16}/> Access & membership</h3><dl><dt>Platform roles</dt><dd>{selected.roles.length ? selected.roles.map(code => roleCatalog.find(r => r.role_code === code)?.name || code).join(", ") : "No platform roles"}</dd><dt>Membership status</dt><dd>{selected.membership_status ? selected.membership_status.replaceAll("_"," ") : "Unable to load — refresh the account list"}</dd><dt>Organizations</dt><dd>{selected.organization_names ? (selected.organization_names.length ? selected.organization_names.join(", ") : "No active organization relationships returned") : "Unable to load — refresh the account list"}</dd></dl></section>
           <section><h3><Activity size={16}/> Profile & activity</h3>{Object.keys(profile).length ? <dl>{Object.entries(profile).map(([key,value]) => <ReactDetail key={key} label={key} value={value}/>)}</dl> : <p className={styles.help}>Profile details are not included in the account catalogue response. This view does not invent missing data.</p>}<dl><dt>Last relevant activity</dt><dd>{date(selected.last_activity_at || selected.updated_at)}</dd></dl></section>
           <section><h3><Activity size={16}/> Account audit history</h3>{auditEvents.filter(event => event.resource_id === selected.id && event.resource_type === "app_user").length ? auditEvents.filter(event => event.resource_id === selected.id && event.resource_type === "app_user").map(event => <div key={event.id} className={styles.auditItem}><div><b>{event.action.replaceAll("_"," ")}</b><span>{event.outcome}</span></div><small>{date(event.created_at)} · Actor: {event.actor_user_id || "System"}</small>{typeof event.metadata?.reason === "string" ? <p>Reason: {event.metadata.reason}</p> : null}</div>) : <p className={styles.help}>No matching events were found in the latest audit records available to this session. This does not prove the account has no historical events.</p>}</section>
           <div className={styles.dialogActions}><button className="btn btn-ghost" type="button" onClick={() => open(selected, "access")} disabled={!targetManageable}>Manage access</button><button className="btn btn-primary" type="button" onClick={() => { setPanel(null); setSelected(null); }}>Close details</button></div>

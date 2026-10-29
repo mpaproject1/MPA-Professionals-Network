@@ -12,6 +12,7 @@ type Destination = { href: string; label: string; description: string; icon: typ
 const destinations: Destination[] = [
   { href: "/admin", label: "Overview", description: "Review and administration", icon: Activity, exact: true },
   { href: "/admin/accounts", label: "Account and Team", description: "Account catalogue, roles and access actions", icon: Users },
+  { href: "/admin/account-governance", label: "Account governance", description: "Account references, membership history and authorized organization relationships", icon: ShieldCheck },
   { href: "/admin/experience", label: "Help, guides and demos", description: "Contextual guides, training scenarios and support resources", icon: BookOpenCheck },
   { href: "/admin/organizations", label: "Organizations & accounts", description: "Organization register and account relationships", icon: Building2 },
   { href: "/admin/members", label: "Members", description: "Imports and member records", icon: Users },
@@ -53,7 +54,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const navDestinations = useMemo(() => {
     const platformAdmin = Boolean(roles?.some((role) => ["system_admin", "admin", "platform_admin"].includes(role)));
     const organizationWorkspaceAllowed = Boolean(roles?.some((role) => ["system_admin", "reviewer"].includes(role)));
-    const available = destinations.filter((item) => (item.href !== "/organizations" || organizationWorkspaceAllowed) && (!["/admin/accounts", "/admin/experience"].includes(item.href) || platformAdmin));
+    const available = destinations.filter((item) => (item.href !== "/organizations" || organizationWorkspaceAllowed) && (!["/admin/accounts", "/admin/account-governance", "/admin/experience"].includes(item.href) || platformAdmin));
     if (platformAdmin || !roles?.includes("supporting_staff")) return available;
     const priority: Record<string, number> = { "/admin": 0, "/admin/marketplace": 1, "/organizations": 2, "/admin/support": 3 };
     return [...available].sort((a, b) => (priority[a.href] ?? 10) - (priority[b.href] ?? 10));

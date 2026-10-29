@@ -59,10 +59,42 @@ export async function logout(userId,sessionId,requestId){
  });
 }
 
-export async function listUsers(actor,input={}){
- const db=getPool(); const actorId=typeof actor==="string"?actor:actor?.sub; const actorPermissions=Array.isArray(actor?.permissions)?actor.permissions:[]; admin(await allowed(db,actorId),actorPermissions,"users.view"); const q=String(input.q||"").trim(); const status=input.status;
- const sql="select u.id,u.email,u.username,u.status,u.created_at,u.updated_at,coalesce(json_agg(distinct r.role_code) filter(where r.role_code is not null),'[]') roles,coalesce((select json_agg(up.permission_code order by up.permission_code) from app_user_permission up where up.user_id=u.id),'[]'::json) permissions from app_user u left join app_user_role ur on ur.user_id=u.id left join app_role r on r.id=ur.role_id where ($1='' or lower(u.email) like lower('%'||$1||'%') or lower(u.username) like lower('%'||$1||'%')) and ($2::text is null or u.status=$2) group by u.id order by u.created_at desc limit 200";
- return (await db.query(sql,[q,status||null])).rows;
+export async function listUsers(actor,input={}) {
+ const db=getPool(), actorId=typeof actor==="string"?actor:actor?.sub, actorPermissions=Array.isArray(actor?.permissions)?actor.permissions:[];
+ const actorRoles=await allowed(db,actorId); admin(actorRoles,actorPermissions,"users.view");
+ const q=String(input.q||"").trim().slice(0,120), status=input.status||null;
+ const canViewOrganizations=actorRoles.some(role=>["system_admin","admin","platform_admin"].includes(role))||actorPermissions.includes("organizations.manage");
+ const organizationNames=canViewOrganizations?"coalesce((select json_agg(distinct o.display_name order by o.display_name) from organization_membership om join organization o on o.id=om.organization_id where om.user_id=u.id and om.status='active'),'[]'::json)":"'[]'::json";
+ const sql=`select u.id,u.account_reference,u.email,u.username,u.status,u.created_at,u.updated_at,
+ coalesce(json_agg(distinct r.role_code) filter(where r.role_code is not null),'[]') roles,
+ coalesce((select json_agg(up.permission_code order by up.permission_code) from app_user_permission up where up.user_id=u.id),'[]'::json) permissions,
+ case when not exists(select 1 from membership_record mr where mr.user_id=u.id) then 'not_enrolled'
+ when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='active' and (mr.start_date is null or mr.start_date<=current_date) and (mr.end_date is null or mr.end_date>=current_date)) then 'active'
+ when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='pending') then 'pending'
+ when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='suspended') then 'suspended'
+ when exists(select 1 from membership_record mr where mr.user_id=u.id and (mr.status='expired' or (mr.status='active' and mr.end_date<current_date))) then 'expired'
+ when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='cancelled') then 'cancelled' else 'unknown' end membership_status,
+ ${organizationNames} organization_names
+ from app_user u left join app_user_role ur on ur.user_id=u.id left join app_role r on r.id=ur.role_id
+ where ($1='' or lower(coalesce(u.email,'')) like lower('%'||$1||'%') or lower(coalesce(u.username,'')) like lower('%'||$1||'%') or lower(coalesce(u.account_reference,'')) like lower('%'||$1||'%'))
+ and ($2::text is null or u.status=$2) group by u.id order by u.created_at desc limit 200`;
+ return (await db.query(sql,[q,status])).rows;
+}
+
+export async function getAccountGovernance(actor,accountReference) {
+ const db=getPool(), actorId=typeof actor==="string"?actor:actor?.sub, actorPermissions=Array.isArray(actor?.permissions)?actor.permissions:[];
+ const actorRoles=await allowed(db,actorId);
+ if(!actorRoles.some(role=>["system_admin","admin","platform_admin"].includes(role))&&!actorPermissions.includes("users.manage")) throw err(403,"Account governance requires authorized platform-administration access.","FORBIDDEN");
+ const reference=String(accountReference||"").trim();
+ if(!/^MPA-\d{8}-\d{6,}$/.test(reference)) throw err(400,"Provide a valid Account ID reference.","INVALID_ACCOUNT_REFERENCE");
+ const user=(await db.query(`select u.id,u.account_reference,u.email,u.username,u.status,u.created_at,u.updated_at,coalesce((select json_agg(r.role_code order by r.role_code) from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id),'[]'::json) roles from app_user u where u.account_reference=$1`,[reference])).rows[0];
+ if(!user)throw err(404,"No account was found for that Account ID.","NOT_FOUND");
+ const memberships=(await db.query(`select mr.membership_number,mr.status,mr.start_date,mr.end_date,mr.source,mr.legacy_member_id,mr.created_at,mi.source_system,mi.status import_status,mi.created_at import_created_at,mr.legacy_payload->>'status' historical_source_status from membership_record mr left join membership_import mi on mi.id=mr.source_import_id where mr.user_id=$1 order by mr.created_at desc,mr.id`,[user.id])).rows;
+ let membershipStatus="not_enrolled";
+ if(memberships.length){if(memberships.some(m=>m.status==="active"&&(!m.start_date||new Date(m.start_date)<=new Date())&&(!m.end_date||new Date(m.end_date)>=new Date())))membershipStatus="active";else if(memberships.some(m=>m.status==="pending"))membershipStatus="pending";else if(memberships.some(m=>m.status==="suspended"))membershipStatus="suspended";else if(memberships.some(m=>m.status==="expired"||(m.status==="active"&&m.end_date&&new Date(m.end_date)<new Date())))membershipStatus="expired";else if(memberships.every(m=>["cancelled","merged"].includes(m.status)))membershipStatus="cancelled";else membershipStatus="unknown";}
+ const canViewOrganizations=actorRoles.some(role=>["system_admin","admin","platform_admin"].includes(role))||actorPermissions.includes("organizations.manage");
+ const organizations=canViewOrganizations?(await db.query(`select o.display_name organization_name,om.role_code,om.status,om.joined_at from organization_membership om join organization o on o.id=om.organization_id where om.user_id=$1 order by o.display_name,om.created_at`,[user.id])).rows:null;
+ return {account:{account_reference:user.account_reference,email:user.email,username:user.username,status:user.status,created_at:user.created_at,updated_at:user.updated_at,roles:user.roles},membership:{status:membershipStatus,records:memberships},organizations:{authorized:canViewOrganizations,items:organizations}};
 }
 
 export async function listRoles(actor){

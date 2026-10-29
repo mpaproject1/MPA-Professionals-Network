@@ -30,7 +30,8 @@ test("home is a portal landing page with the original hero, live login, and path
   assert.match(home, /<section className=\{styles\.hero\}/);
   assert.match(home, /<LandingLoginForm \/>/);
   assert.match(home, /<PortalPathwaysSlider \/>/);
-  assert.match(home, /Browse the Job Portal/);\n  assert.match(home, /Explore Serve-Community/);
+  assert.match(home, /Browse the Job Portal/);
+  assert.match(home, /Explore Serve-Community/);
   assert.doesNotMatch(home, /LiveNetworkFeeds|platform-update-title|live-network-heading|portal-pillars-heading|journeysHeadingId|dispatchHeadingId/);
 });
 

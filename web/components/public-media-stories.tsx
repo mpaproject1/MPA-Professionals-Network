@@ -25,6 +25,7 @@ export function PublicMediaStories({subjectType,subjectId,token}:{subjectType:Su
  const [consentGiven,setConsentGiven]=useState(false);
  const [withdrawingId,setWithdrawingId]=useState("");
  const [submissionKey,setSubmissionKey]=useState("");
+ const [submissionUncertain,setSubmissionUncertain]=useState(false);
  const load=useCallback(async()=>{
   setLoading(true);setError("");
   const path=subjectType==="service"?"/api/v1/services/"+encodeURIComponent(subjectId)+"/stories":"/api/v1/mentors/"+encodeURIComponent(subjectId)+"/stories";
@@ -44,11 +45,11 @@ export function PublicMediaStories({subjectType,subjectId,token}:{subjectType:Su
    const path=subjectType==="service"?"/api/v1/services/"+encodeURIComponent(subjectId)+"/stories":"/api/v1/mentors/"+encodeURIComponent(subjectId)+"/stories";
    const key=submissionKey||crypto.randomUUID();if(!submissionKey)setSubmissionKey(key);
    await api(path,{method:"POST",headers:{"x-idempotency-key":key},body:JSON.stringify({title,summary,transcript,videoUrl,attributionMode,attributionName:attributionMode==="named"?attributionName:null,consentGiven,consentVersion:CONSENT_VERSION})},token);
-   setSubmissionKey("");
+   setSubmissionKey("");setSubmissionUncertain(false);
    setTitle("");setSummary("");setTranscript("");setVideoUrl("");setAttributionName("");setAttributionMode("anonymous");setConsentGiven(false);
    setNotice("Story submitted for moderation. It will not appear publicly unless approved; it is labelled participant-reported.");
    await load();
-  }catch(e){if(e instanceof ApiError&&e.status>=400&&e.status<500)setSubmissionKey("");setError(e instanceof ApiError?e.message:"Story submission failed. Your consent and story were not confirmed as saved.");}
+  }catch(e){const uncertain=e instanceof ApiError&&(e.status===0||e.status>=500||e.code==="INVALID_RESPONSE");setSubmissionUncertain(uncertain);if(!uncertain)setSubmissionKey("");setError(e instanceof ApiError?e.message:"Story submission failed. Your consent and story were not confirmed as saved.");}
   finally{setSaving(false);}
  }
  async function withdraw(storyId:string){
@@ -72,7 +73,7 @@ export function PublicMediaStories({subjectType,subjectId,token}:{subjectType:Su
     <label>Public attribution<select value={attributionMode} onChange={e=>setAttributionMode(e.target.value as "named"|"anonymous")}><option value="anonymous">Anonymous participant</option><option value="named">Use an approved display name</option></select></label>
     {attributionMode==="named"&&<label>Display name<input required minLength={1} maxLength={120} value={attributionName} onChange={e=>setAttributionName(e.target.value)} /></label>}
     <label className="row" style={{alignItems:"flex-start",gap:10}}><input type="checkbox" required checked={consentGiven} onChange={e=>setConsentGiven(e.target.checked)} /><span>I explicitly consent to public publication of this video URL, story summary, transcript and selected attribution after moderation. I understand this is my reported experience, and I can withdraw publication consent.</span></label>
-    <button className="btn btn-primary" type="submit" disabled={saving}>{saving?"Submitting…":"Submit story for review"}</button>
+    <button className="btn btn-primary" type="submit" disabled={saving}>{saving?"Submitting…":submissionUncertain?"Retry same submission":"Submit story for review"}</button>
    </form>
    {mine.length>0&&<div className="grid" style={{gap:8,marginTop:16}}><h4 className="h2">Your stories and consent</h4>{mine.map(story=><div className="case-row" key={story.id}><b>{story.title}</b><div className="tagline">Status: {story.moderation_status.replaceAll("_"," ")}{story.consent_withdrawn_at?" · consent withdrawn":""}</div>{story.moderation_note&&<p className="muted">{story.moderation_note}</p>}{!story.consent_withdrawn_at&&story.moderation_status!=="withdrawn"&&<button className="btn btn-ghost" type="button" disabled={Boolean(withdrawingId)} onClick={()=>void withdraw(story.id)}>{withdrawingId===story.id?"Withdrawing…":"Withdraw publication consent"}</button>}</div>)}</div>}
   </Card>}

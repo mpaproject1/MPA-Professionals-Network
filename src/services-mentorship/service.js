@@ -1382,6 +1382,7 @@ export async function createPublicMediaStory(authorUserId,subjectType,subjectId,
  const attributionName=attributionMode==="named"?normalizeStoryText(input.attributionName,"Approved display name",1,120):null;
  const payloadHash=hashPayload({subjectType,subjectId,title,summary,transcript,videoUrl,attributionMode,attributionName,consentVersion:PUBLIC_MEDIA_STORY_CONSENT_VERSION});
  return withTransaction(async db=>{
+  await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[authorUserId+":"+key]);
   const prior=(await db.query("select id,title,moderation_status,created_at,idempotency_payload_hash from public_media_story where author_user_id=$1 and idempotency_key=$2 for update",[authorUserId,key])).rows[0];
   if(prior){if(prior.idempotency_payload_hash!==payloadHash)throw mediaStoryError(409,"This submission key was already used for different story content. Start a new submission.","IDEMPOTENCY_CONFLICT");return {...prior,idempotent:true,nextAction:"This story submission was already saved; its existing moderation status is unchanged."};}
   let serviceListingId=null,mentorProfileId=null;

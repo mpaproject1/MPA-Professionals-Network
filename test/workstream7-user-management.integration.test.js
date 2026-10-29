@@ -117,6 +117,13 @@ test("Workstream 7 PostgreSQL security workflows", { skip: !enabled }, async (t)
       assert.equal(state.recovery_email_pending, null);
       assert.ok(state.recovery_email_verified_at);
       assert.equal(state.recovery_email_change_token_hash, null);
+      const requestedAudit = (await db.query("select action,outcome,request_id,metadata::text metadata from audit_log where action='admin.recovery_email.change_requested' and resource_id::text=$1 order by occurred_at desc limit 1", [target.id])).rows[0];
+      assert.equal(requestedAudit.action, "admin.recovery_email.change_requested");
+      assert.equal(requestedAudit.outcome, "success");
+      assert.ok(requestedAudit.request_id);
+      assert.ok(requestedAudit.metadata.includes(newEmail));
+      const verifiedAudit = (await db.query("select action from audit_log where action='account.recovery_email.verified' and resource_id::text=$1 order by occurred_at desc limit 1", [target.id])).rows[0];
+      assert.equal(verifiedAudit.action, "account.recovery_email.verified");
       await assert.rejects(() => verifyRecoveryEmailChange(rawToken, crypto.randomUUID()), (error) => error.statusCode === 410);
     });
 

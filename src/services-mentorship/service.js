@@ -1347,7 +1347,7 @@ function normalizeStoryText(value,field,min,max){
  return result;
 }
 function requireMediaModerator(roles){
- const list=Array.isArray(roles)?roles.map(role=>typeof role==="string"?role:role?.code||role?.name||""):[];
+ const list=Array.isArray(roles)?roles.map(role=>typeof role==="string"?role:role?.role_code||role?.code||role?.name||""):[];
  if(!list.some(role=>["supporting_staff","system_admin"].includes(role)))throw mediaStoryError(403,"Authorized moderation-team access is required.","FORBIDDEN");
 }
 export async function listPublicMediaStories(subjectType,subjectId,viewerId=null){

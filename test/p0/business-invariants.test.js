@@ -220,7 +220,7 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
 test("P0: membership activation requires approval and confirmed payment; reversal suspends access", async () => {
   const applicant = await register(randomUUID());
   const reviewer = await register(randomUUID());
-  const application = await membership.createApplication(applicant.user.id, { productCode: "BASIC" }, "p0-membership-ordering-create");
+  const application = await membership.createApplication(applicant.user.id, { productCode: "BASIC", idempotencyKey: `p0-membership-application-${randomUUID()}` }, "p0-membership-ordering-create");
   assert.equal(application.status, "submitted");
   await assert.rejects(
     membership.activateApplication(application.id, reviewer.user.id, "p0-membership-activate-unapproved"),
@@ -314,7 +314,7 @@ test("P0: applications retain their original fee-rule version after a future pla
     renewalRequired: true, gracePeriodDays: 0, effectiveFrom: today, planEffectiveFrom: today,
     planEffectiveTo: null, active: true, benefits: [], eligibility: {}, taxAmount: 0, serviceFee: 0
   }, "p0-plan-version-create");
-  const application = await membership.createApplication(applicant.user.id, { productCode }, "p0-plan-version-application");
+  const application = await membership.createApplication(applicant.user.id, { productCode, idempotencyKey: `p0-plan-version-application-${randomUUID()}` }, "p0-plan-version-application");
   assert.equal(Number(application.fee_snapshot.amount), 100);
   assert.equal(Number(application.fee_snapshot.feeRuleVersion), 1);
 

@@ -38,7 +38,7 @@ export async function createOneTimeSessionLink(actor,userId,requestId,reasonInpu
  if(!reason)throw err(400,"Add a short reason so the account recovery is recorded properly.","AUDIT_REASON_REQUIRED");
  if(!origin||!/^https?:\/\/[^/]+$/i.test(origin))throw err(400,"The secure sign-in link could not be prepared for this website. Please contact the platform administrator.","PUBLIC_ORIGIN_REQUIRED");
  if(userId===actorId)throw err(400,"For your own account, use Account & Security or ask another authorized administrator to help.","SELF_RECOVERY_LINK");
- const raw=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(raw).digest("hex"),url=`${origin}/account/one-time-access?token=${encodeURIComponent(raw)}`;
+ const raw=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(raw).digest("hex"),url=`${origin}/account/one-time-access#token=${encodeURIComponent(raw)}`;
  return withTransaction(async tx=>{
   const target=(await tx.query("select id,coalesce(case when recovery_email_verified_at is not null then recovery_email end,email) email,status from app_user where id=$1 for update",[userId])).rows[0];
   if(!target)throw err(404,"That account could not be found.","NOT_FOUND");

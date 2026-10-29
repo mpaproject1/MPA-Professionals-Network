@@ -19,18 +19,20 @@ export function assertMembershipPaymentMethodAdmin(identity = {}) {
 }
 export function buildMembershipPaymentMethodSnapshot(method) {
   if (!method) return null;
+  const methodType = method.method_type ?? method.methodType ?? null;
+  const accountMethod = ["bank_transfer", "telebirr"].includes(methodType);
   return {
     methodCode: method.method_code ?? method.methodCode ?? null,
     displayName: method.display_name ?? method.displayName ?? null,
-    methodType: method.method_type ?? method.methodType ?? null,
+    methodType,
     currency: String(method.currency ?? "").trim().toUpperCase() || null,
     instructions: method.instructions ?? "",
-    bankName: method.bank_name ?? method.bankName ?? null,
-    accountName: method.account_name ?? method.accountName ?? null,
-    accountNumber: method.account_number ?? method.accountNumber ?? null,
-    providerCode: method.provider_code ?? method.providerCode ?? null,
-    qrImageUrl: method.qr_image_url ?? method.qrImageUrl ?? null,
-    requiresEvidence: (method.requires_evidence ?? method.requiresEvidence) === true,
+    bankName: methodType === "bank_transfer" ? (method.bank_name ?? method.bankName ?? null) : null,
+    accountName: accountMethod ? (method.account_name ?? method.accountName ?? null) : null,
+    accountNumber: accountMethod ? (method.account_number ?? method.accountNumber ?? null) : null,
+    providerCode: methodType === "telebirr" ? (method.provider_code ?? method.providerCode ?? null) : null,
+    qrImageUrl: methodType === "chapa" ? null : (method.qr_image_url ?? method.qrImageUrl ?? null),
+    requiresEvidence: methodType === "chapa" ? false : (method.requires_evidence ?? method.requiresEvidence) === true,
   };
 }
 export function assertMembershipPaymentMethodAvailable(method, feeCurrency) {

@@ -190,6 +190,17 @@ export function JourneyGuide({
             {loadState === "ready" && organizations.map((org) => {
               const state = organizationState(org);
               const verified = state.kind === "complete";
+              const journeySteps = [
+                { title: "Register organization", status: "complete", detail: "The organization record exists on the service." },
+                {
+                  title: "Verify organization",
+                  status: verified ? "complete" : state.kind === "waiting" ? "awaiting review" : state.kind === "blocked" ? "not approved" : "action needed",
+                  detail: verified ? "The service confirms verification." : state.kind === "waiting" ? "The submitted case is awaiting a reviewer decision." : state.kind === "blocked" ? "Review the recorded decision and available next steps." : "Complete the supported evidence and review requirements.",
+                },
+                { title: "Publish opportunities", status: verified ? "next step" : "locked until verification", detail: verified ? "Use recruitment; publication remains subject to server-side eligibility and permissions." : "Publishing is not represented as available before verification." },
+                { title: "Manage applicants", status: verified ? "use recruitment workspace" : "locked until verification", detail: "Application and candidate records remain in the existing organization-scoped recruitment workflow." },
+                { title: "Review outcomes", status: "open report when needed", detail: "Use the existing authorized report; only server-returned metrics are shown." },
+              ];
               return (
                 <article className="case-row" key={org.id} aria-label={`Progress for ${org.display_name}`}>
                   <div className="row" style={{ alignItems: "flex-start", gap: 10 }}>
@@ -202,6 +213,22 @@ export function JourneyGuide({
                       {org.tracking_reference && <p className="muted">Reference: {org.tracking_reference}</p>}
                       <p className="muted">{state.detail}</p>
                       <p className="muted">Server status: verification {humanize(org.verification_status)} · case {humanize(org.verification_case_status)}</p>
+                      <ol aria-label={`Guided progress for ${org.display_name || org.legal_name}`} className="grid" style={{ gap: 8, padding: 0, margin: "12px 0", listStyle: "none" }}>
+                        {journeySteps.map((step, index) => (
+                          <li key={step.title} className="case-row" aria-current={index === 1 && !verified ? "step" : index === 2 && verified ? "step" : undefined}>
+                            <div className="row" style={{ alignItems: "flex-start", gap: 10 }}>
+                              <span className="avatar" aria-hidden="true" style={{ flexShrink: 0 }}>{index + 1}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                                  <strong>{step.title}</strong>
+                                  <span className="badge">{step.status}</span>
+                                </div>
+                                <p className="muted">{step.detail}</p>
+                              </div>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
                       <a className="btn btn-ghost" href={state.href}>{state.action} <ArrowRight size={15} /></a>
                     </div>
                   </div>

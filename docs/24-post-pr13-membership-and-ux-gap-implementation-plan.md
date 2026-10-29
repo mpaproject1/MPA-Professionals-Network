@@ -116,6 +116,19 @@ The existing workflow specification says authorized membership/finance administr
 - Existing payment records retain the method/details that applied at the time of payment, or an explicit audited snapshot; editing current configuration must not silently rewrite historical transactions.
 - Tests cover permissions, validation, disabled methods, currency consistency, audit history and safe handling of account details.
 
+### Source implementation record — Workstream 2
+
+- The existing `membership_payment_method` table and `/api/v1/admin/membership/payment-methods` endpoints are reused; no duplicate configuration table is introduced.
+- Added `/admin/membership/payment-methods`, linked from Admin overview and the signed-in payment workspace. The client and server enforce system-admin, finance-officer, `members.manage`, or `finance.manage` access. Server-side checks remain authoritative.
+- The member-facing configured-method endpoint now requires an authenticated session and returns only enabled, complete methods. Account details and management controls are not available to unauthenticated public visitors.
+- Server validation is method-aware: enabled bank transfer requires bank, account holder, account identifier and instructions; enabled Telebirr requires account holder, account/merchant number and instructions; enabled cash/other manual methods require instructions. QR image URLs must use HTTPS. Chapa secret keys remain API environment configuration.
+- Added a method-specific form, enabled/disabled and incomplete warnings, required-evidence display, last-updated timestamp, and a member-facing preview. Type-specific controls hide irrelevant bank/account fields.
+- Successful configuration changes record actor, timestamp, success outcome and changed field names in the existing audit log. Account values and provider secrets are excluded from audit metadata.
+- Added an additive `payment_method_snapshot` JSONB field on payment transactions. It backfills only snapshots already stored in the request payload and captures new manual and hosted-checkout configuration at payment creation. It never reconstructs old details from mutable current configuration.
+- Added regression tests for explicit access policy, method-specific validation, disabled/incomplete methods, HTTPS QR URLs, Chapa evidence separation, provider-secret exclusion and redacted audit metadata.
+
+**Verification boundary:** source and regression test files are committed on the Workstream 2 feature branch. Full CI, database migration/rollback execution and browser acceptance remain deferred to the final workstream as requested.
+
 ## 6. Workstream 3 — Progress-based `/members` workspace
 
 ### UX direction

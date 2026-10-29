@@ -115,7 +115,7 @@ export async function updateUser(actor,userId,input,requestId){
  return withTransaction(async tx=>{
   // Resolve authority from the current database state inside the same transaction as the mutation.
   const actorRoles=await allowed(tx,actorId); admin(actorRoles,actorPermissions,"users.manage");
-  const u=(await tx.query("select id,status from app_user where id=$1 for update",[userId])).rows[0];
+  const u=(await tx.query("select id,status,email_verified_at from app_user where id=$1 for update",[userId])).rows[0];
   if(!u)throw err(404,"User not found.","NOT_FOUND");
   const status=input.status, roleCode=input.roleCode, removeRoleCode=input.removeRoleCode;
   if(status!==undefined && !["active","suspended","disabled"].includes(status))throw err(400,"Invalid user status.","VALIDATION_ERROR");

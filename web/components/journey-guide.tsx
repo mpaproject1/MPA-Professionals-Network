@@ -108,6 +108,7 @@ export function JourneyGuide({
   const [organizations, setOrganizations] = useState<OrganizationProgressRecord[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [loadError, setLoadError] = useState("");
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
 
   useEffect(() => {
     if (!isOrganizationJourney) return;
@@ -123,7 +124,10 @@ export function JourneyGuide({
     api<OrganizationProgressRecord[]>("/api/v1/organizations", {}, token)
       .then((result) => {
         if (cancelled) return;
-        setOrganizations(Array.isArray(result) ? result : []);
+        if (!Array.isArray(result)) {
+          throw new Error("The organization status response was not in the expected format.");
+        }
+        setOrganizations(result);
         setLoadState("ready");
       })
       .catch((error: unknown) => {
@@ -139,7 +143,7 @@ export function JourneyGuide({
     return () => {
       cancelled = true;
     };
-  }, [isOrganizationJourney, token]);
+  }, [isOrganizationJourney, token, refreshAttempt]);
 
   return (
     <Card>
@@ -169,22 +173,7 @@ export function JourneyGuide({
                 <div>
                   <strong>Progress could not be confirmed</strong>
                   <p className="muted">{loadError}</p>
-                  <button className="btn btn-ghost" type="button" onClick={() => {
-                    setLoadState("idle");
-                    setLoadError("");
-                    if (token) {
-                      setLoadState("loading");
-                      api<OrganizationProgressRecord[]>("/api/v1/organizations", {}, token)
-                        .then((result) => {
-                          setOrganizations(Array.isArray(result) ? result : []);
-                          setLoadState("ready");
-                        })
-                        .catch((error: unknown) => {
-                          setLoadState("error");
-                          setLoadError(error instanceof ApiError ? error.message : "We couldn't confirm organization progress. Refresh and try again.");
-                        });
-                    }
-                  }}>Retry status check</button>
+                  <button className="btn btn-ghost" type="button" onClick={() => setRefreshAttempt((attempt) => attempt + 1)}>Retry status check</button>
                 </div>
               </div>
             )}

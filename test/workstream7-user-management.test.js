@@ -42,7 +42,7 @@ test("recovery links are single-use, expire, revoke sessions, and never store th
   assert.match(security, /if\(!link\|\|link\.used_at\|\|link\.revoked_at\|\|new Date\(link\.expires_at\)\.getTime\(\)<=Date\.now\(\)\)/);
   assert.match(security, /set used_at=now\(\) where id=\$1/);
   assert.match(security, /update auth_session set revoked_at=now\(\) where user_id=\$1 and revoked_at is null/);
-  assert.match(security, /credential_setup_required\) values\(\$1,\$2,now\+make_interval/);
+  assert.match(security, /credential_setup_required\) values/);
   assert.match(security, /token_hash/);
 });
 

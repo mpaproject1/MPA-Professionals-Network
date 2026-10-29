@@ -1,5 +1,3 @@
-import type {CSSProperties} from "react";
-
 type ImpactListingBannerProps = {
   title: string;
   eyebrow: string;
@@ -34,30 +32,19 @@ export function ImpactListingBanner({
   variant = "service",
 }: ImpactListingBannerProps) {
   const safeImage = approvedImageUrl(imageUrl);
-  const style: CSSProperties | undefined = safeImage
-    ? { backgroundImage: `linear-gradient(90deg,rgba(7,25,39,.88),rgba(7,25,39,.2)),url("${safeImage}")` }
-    : undefined;
-
   return (
-    <div
-      className={`impact-listing-banner impact-listing-banner--${variant}${safeImage ? " has-approved-image" : ""}`}
-      style={style}
-      role={safeImage ? "img" : undefined}
-      aria-label={safeImage ? imageAlt || title : undefined}
-      aria-hidden={safeImage ? undefined : true}
-    >
+    <div className={`impact-listing-banner impact-listing-banner--${variant}${safeImage ? " has-approved-image" : ""}`}>
+      {safeImage ? <img className="impact-listing-banner__image" src={safeImage} alt={imageAlt || title} loading="lazy" /> : null}
       <div className="impact-listing-banner__art" aria-hidden="true">
         <span className="impact-listing-banner__orb" />
         <span className="impact-listing-banner__arc impact-listing-banner__arc--one" />
         <span className="impact-listing-banner__arc impact-listing-banner__arc--two" />
       </div>
-      {!safeImage && (
-        <div className="impact-listing-banner__copy">
-          <span className="impact-listing-banner__eyebrow">{eyebrow}</span>
-          <span className="impact-listing-banner__title">{title}</span>
-          {description ? <span className="impact-listing-banner__description">{description}</span> : null}
-        </div>
-      )}
+      <div className="impact-listing-banner__copy">
+        <span className="impact-listing-banner__eyebrow">{eyebrow}</span>
+        <span className="impact-listing-banner__title">{title}</span>
+        {description ? <span className="impact-listing-banner__description">{description}</span> : null}
+      </div>
     </div>
   );
 }

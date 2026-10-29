@@ -30,7 +30,7 @@ const PUBLIC_VIDEO_HOSTS=new Set(["youtube.com","www.youtube.com","m.youtube.com
 export function normalizePublicVideoUrl(value,field="Video URL"){
  if(value===undefined||value===null||String(value).trim()==="")return null;
  const raw=String(value).trim();
- if(/[\\s"'()\\\\<>]/.test(raw))throw error(400,field+" must be a valid HTTPS video page URL.","VALIDATION_ERROR");
+ if (/\s|["'()\\<>]/.test(raw)) throw error(400,field+" must be a valid HTTPS video page URL.","VALIDATION_ERROR");
  let parsed;try{parsed=new URL(raw);}catch{throw error(400,field+" must be a valid HTTPS video page URL.","VALIDATION_ERROR");}
  if(parsed.protocol!=="https:"||parsed.username||parsed.password||!PUBLIC_VIDEO_HOSTS.has(parsed.hostname.toLowerCase())||!parsed.pathname||parsed.pathname==="/")throw error(400,field+" must be a public YouTube or Vimeo video page URL without embedded credentials.","VALIDATION_ERROR");
  return parsed.toString();

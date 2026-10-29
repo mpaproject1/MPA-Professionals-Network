@@ -28,7 +28,7 @@ test("one-time password is random, hash-only at rest, short-lived, and session-r
 });
 
 test("first sign-in with a one-time password is blocked after expiry and forces credential setup", () => {
-  assert.match(membership, /credential_setup_required,credential_setup_expires_at from app_user/);
+  assert.match(membership, /credential_setup_required,credential_setup_expires_at,credential_setup_used_at from app_user/);
   assert.match(membership, /ONE_TIME_PASSWORD_EXPIRED/);
   assert.match(membership, /credential_setup_required\) values\(\$1,\$2,now\(\)\+make_interval\(days=>\$3\),\$4,\$5,\$6\)/);
   assert.match(server, /if\(identity\.credential_setup_required\)\{/);
@@ -58,6 +58,7 @@ test("recovery email edits require step-up, ownership checks, expiry, and verifi
   assert.match(security, /recovery_email_change_token_hash=null/);
   assert.match(migration, /add column if not exists recovery_email_verified_at timestamptz/);
   assert.match(migration, /add column if not exists credential_setup_expires_at timestamptz/);
+  assert.match(migration, /add column if not exists credential_setup_used_at timestamptz/);
 });
 
 test("secret-bearing responses are rate-limited and non-cacheable; no repeat-download route exists", () => {

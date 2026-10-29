@@ -85,6 +85,10 @@ test("account export applies member/non-member row scope and safely preserves Un
   const noLongerNonMember = await previewDirectoryExport(identity, "accounts", { fields: ["account_reference"], membershipScope: "non_members", q: fixture.email });
   assert.equal(nowMember.expectedRows, 1, "membership scope must include an account with a membership record");
   assert.equal(noLongerNonMember.expectedRows, 0, "non-member scope must exclude an account with a membership record");
+  const activeMembership = await previewDirectoryExport(identity, "accounts", { fields: ["account_reference"], membershipStatus: "active", q: fixture.email });
+  const pendingMembership = await previewDirectoryExport(identity, "accounts", { fields: ["account_reference"], membershipStatus: "pending", q: fixture.email });
+  assert.equal(activeMembership.expectedRows, 1, "membership status filter must use current membership state");
+  assert.equal(pendingMembership.expectedRows, 0, "membership status filter must exclude accounts outside the requested state");
   const memberCsv = await exportDirectory({ sub: fixture.id, roles: ["membership_reviewer"], permissions: [] }, "members", { fields: ["membership_number", "full_name"], q: "000012340056", format: "csv" }, "directory-export-leading-zero-test");
   assert.ok(memberCsv.buffer.toString("utf8").includes("000012340056"), "leading zeros in membership numbers must be preserved");
   assert.equal(memberCsv.rowCount, 1);

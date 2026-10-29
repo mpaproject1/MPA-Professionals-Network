@@ -166,7 +166,8 @@ function buildQuery(kind, identity, filters) {
   }
   const where = clauses.join(" and ");
   const count = `select count(*)::int total from ${fromSql} where ${where}`;
-  const rows = `select ${select} from ${fromSql} where ${where} order by ${dateColumn} desc, u.id`;
+  const stableKey = kind === "members" ? "mr.id" : "u.id";
+  const rows = `select ${select} from ${fromSql} where ${where} order by ${dateColumn} desc, ${stableKey}`;
   return { args, count, rows };
 }
 function valueFor(row, key) {
@@ -223,6 +224,7 @@ export async function exportDirectory(identity, kind, input = {}, requestId) {
     const result = await db.query(query.rows + ` limit $${args.length - 1} offset $${args.length}`, args);
     rows.push(...result.rows);
   }
+  if (rows.length !== total) throw fail(409, "The directory changed while the export was being generated. Refresh the preview and retry; no successful export was recorded.", "EXPORT_SNAPSHOT_CHANGED");
   const generatedAt = new Date().toISOString();
   const result = { kind, report: { title: kind === "members" ? "MPA member directory export" : "MPA account directory export", scope: "Restricted administrative data", definition: "Generated for authorized administration. Store and share only through approved MPA channels.", columns: fields.map(field => field.label) }, fields, filters, generatedAt, expectedRows: total, rows, totals: { rows: rows.length } };
   let buffer, contentType;

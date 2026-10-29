@@ -4,7 +4,7 @@
 
 - `POST /api/v1/admin/users/:id/revoke-sessions`: revokes all active sessions for the selected account; requires server-side user-management permission, a reason, target-account checks and an audit event.
 - `POST /api/v1/admin/users/:id/one-time-session-link`: queues a short-lived, single-use recovery link to the currently authorized recovery destination. It reports queue acceptance, not confirmed delivery.
-- `POST /api/v1/admin/users/:id/one-time-password`: creates a cryptographically random one-time password, persists only the existing scrypt password verifier, revokes sessions and outstanding one-time links, sets forced credential replacement, and returns the credential only in the immediate authorized response. The response is rate-limited and marked `Cache-Control: no-store`; no retrieval endpoint exists.
+- `POST /api/v1/admin/users/:id/one-time-password`: creates a cryptographically random one-time password, persists only the existing scrypt password verifier, revokes sessions and outstanding one-time links, sets forced credential replacement, marks it consumed atomically at first sign-in, and returns the credential only in the immediate authorized response. The response is rate-limited and marked `Cache-Control: no-store`; no retrieval endpoint exists.
 - Legacy `POST /api/v1/admin/users/:id/reset-password` is retained for compatibility but no longer accepts an administrator-selected reusable password; it follows the one-time-password policy.
 - `PATCH /api/v1/admin/users/:id/recovery-email`: requires a reason, matching email confirmation, server-side permission checks, privileged-target checks and a passkey-authenticated session. It creates a pending change; the current trusted recovery address remains active until verification.
 - `POST /api/v1/auth/recovery-email/verify`: verifies the single-use token and promotes the pending address only when the 30-minute expiry has not passed.
@@ -12,7 +12,7 @@
 ## Secret and audit handling
 
 - One-time passwords are generated from cryptographically secure random bytes and are never emailed or written to audit metadata.
-- One-time password verifier is stored in `app_user.password_hash`; `credential_setup_required` and `credential_setup_expires_at` enforce replacement before normal use and expiry after 24 hours.
+- One-time password verifier is stored in `app_user.password_hash`; `credential_setup_required`, `credential_setup_expires_at` and `credential_setup_used_at` enforce replacement before normal use, single use at sign-in, and expiry after 24 hours.
 - Recovery tokens are SHA-256 hashed in persistent account state. Recovery links place tokens in URL fragments, which are not sent in HTTP request URLs. The web page removes the fragment from the visible address bar before calling the verification API.
 - Recovery-email changes keep the proposed address pending until proof of control. Duplicate sign-in/recovery/pending addresses are checked under a transaction advisory lock. A notice is queued to an existing verified email channel when available.
 - Audit events record actor, target, action, request/correlation ID, outcome and reason where required. Recovery-email addresses are present only in protected audit metadata; ordinary service logs do not include request bodies, tokens or credentials. The one-time credential is not included in audit events, notifications, email payloads, or export fields.

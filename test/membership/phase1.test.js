@@ -98,6 +98,32 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   await assert.rejects(duplicate,e=>e.code==="APPLICATION_EXISTS");
 });
 
+test("Workstream 2 payment method configuration writes redacted actor/change audit history",async()=>{
+  const methodCode="config_test_"+suffix;
+  const requestId="phase1-payment-method-config-"+suffix;
+  const saved=await membership.saveMembershipPaymentMethod(userId,{
+    methodCode,methodType:"bank_transfer",displayName:"Test configuration audit",
+    enabled:false,requiresEvidence:true,currency:"ETB",instructions:"Test transfer instructions",
+    bankName:"Sensitive Test Bank",accountName:"Sensitive Test Holder",accountNumber:"987654321",
+    qrImageUrl:"https://payments.example.test/test-qr.png"
+  },requestId);
+  assert.equal(saved.method_code,methodCode);
+  assert.equal(saved.enabled,false);
+  const auditRow=(await getPool().query(
+    "select actor_user_id,action,outcome,metadata,occurred_at from audit_log where actor_user_id=$1 and action='membership.payment_method_saved' and request_id=$2 order by occurred_at desc limit 1",
+    [userId,requestId]
+  )).rows[0];
+  assert.ok(auditRow,"configuration changes must create an audit event");
+  assert.equal(auditRow.actor_user_id,userId);
+  assert.equal(auditRow.outcome,"success");
+  assert.ok(auditRow.occurred_at);
+  assert.ok(auditRow.metadata.changedFields.includes("account_number"));
+  assert.ok(auditRow.metadata.changedFields.includes("enabled"));
+  const serialized=JSON.stringify(auditRow.metadata);
+  assert.equal(serialized.includes("987654321"),false,"account numbers must never enter audit metadata");
+  assert.equal(serialized.includes("Sensitive Test Holder"),false,"account holder values must never enter audit metadata");
+});
+
 test("Phase 1 correction and review workflow is auditable",async()=>{
   const db=getPool();
   await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='reviewer' on conflict do nothing",[userId]);

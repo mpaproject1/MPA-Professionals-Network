@@ -150,3 +150,6 @@ export default function Home() {
       </section>
 
       <PortalPathwaysSlider />
+    </div>
+  );
+}

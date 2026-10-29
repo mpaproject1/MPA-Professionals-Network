@@ -504,7 +504,7 @@ button[aria-busy=true]{pointer-events:none}
 .mpa-experience form[aria-busy=true] button[type=submit]::after{content:"";display:inline-block;width:15px;height:15px;margin-left:8px;border:2px solid color-mix(in srgb,currentColor 22%,transparent);border-top-color:var(--gold);border-right-color:var(--primary);border-radius:50%;animation:mpa-brand-spin .75s linear infinite}
 
 /* Workstream 5: compact public and signed-in mobile navigation. */
-@media(max-width:760px){
+@media(max-width:900px){
   .topbar .desktop-nav{display:none!important}
   .topbar{gap:8px;padding-inline:12px}
   .topbar .brand{flex:0 0 auto}

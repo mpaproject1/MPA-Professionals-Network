@@ -35,6 +35,7 @@ export default function AdminPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [scopeResolved, setScopeResolved] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [canReviewInquiries, setCanReviewInquiries] = useState(false);
@@ -74,6 +75,8 @@ export default function AdminPage() {
       try { const segment = token.split(".")[1]; if (segment) claims = JSON.parse(atob(segment.replace(/-/g, "+").replace(/_/g, "/"))); } catch { /* Display hints only; server authorization remains authoritative. */ }
       const currentRoles = Array.isArray(claims?.roles) ? claims.roles.map((role: any) => typeof role === "string" ? role : role?.role_code).filter(Boolean) : [];
       setRoles(currentRoles);
+      const currentPermissions = Array.isArray(claims?.permissions) ? claims.permissions.map((permission: any) => typeof permission === "string" ? permission : permission?.permission_code).filter((permission: unknown): permission is string => typeof permission === "string") : [];
+      setPermissions(currentPermissions);
       setIsPlatformAdmin(currentRoles.includes("system_admin") || currentRoles.includes("admin") || currentRoles.includes("platform_admin"));
       setCanReviewInquiries(currentRoles.includes("supporting_staff") || currentRoles.includes("system_admin") || currentRoles.includes("admin") || currentRoles.includes("platform_admin"));
       if (currentRoles.includes("system_admin")) {

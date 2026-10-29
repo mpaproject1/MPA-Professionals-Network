@@ -14,13 +14,14 @@ const learningAreas = [
 
 export default function MyLearningPage() {
   const token = useUiStore((state) => state.token);
+  const hydrated = useUiStore((state) => state.hydrated);
   const router = useRouter();
 
   useEffect(() => {
-    if (!token) router.replace("/login?next=%2Flearning");
-  }, [token, router]);
+    if (hydrated && !token) router.replace("/login?next=%2Flearning");
+  }, [hydrated, token, router]);
 
-  if (!token) {
+  if (!hydrated || !token) {
     return <main className="mx-auto flex min-h-[55vh] max-w-xl items-center justify-center px-5 py-12"><p role="status" className="text-sm text-[var(--muted)]">Checking your sign-in status…</p></main>;
   }
 

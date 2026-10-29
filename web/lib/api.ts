@@ -33,6 +33,7 @@ const FRIENDLY_ERRORS: Record<string,string> = {
   ONE_TIME_PASSWORD_EXPIRED: "This one-time password has expired. Ask an authorized MPA administrator to issue a new one.",
   ONE_TIME_PASSWORD_ALREADY_USED: "This one-time password has already been used or expired. Ask an authorized MPA administrator to issue a new one.",
   STEP_UP_AUTH_REQUIRED: "Re-authenticate with your administrator passkey before changing a recovery email.",
+  RECOVERY_DESTINATION_UNVERIFIED: "No verified recovery destination is available. Verify the sign-in email or recovery email first.",
   RECOVERY_EMAIL_INVALID: "Enter a valid recovery email address.",
   RECOVERY_EMAIL_CONFIRMATION_MISMATCH: "The recovery email and confirmation do not match.",
   RECOVERY_EMAIL_IN_USE: "That email address is already associated with another account or pending recovery change.",

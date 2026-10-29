@@ -4,6 +4,8 @@ import Link from "next/link";
 import {useParams} from "next/navigation";
 import {useCallback,useEffect,useState} from "react";
 import {ImpactListingBanner} from "../../../../components/impact-listing-banner";
+import {PublicMediaStories} from "../../../../components/public-media-stories";
+import {useUiStore} from "../../../../lib/store";
 import { OperationStatus } from "../../../../components/operation-status";
 import {Badge, Card} from "../../../../components/ui";
 import {ApiError, api} from "../../../../lib/api";
@@ -12,7 +14,7 @@ import {useSavedDiscoveryItems} from "../../../../lib/use-saved-discovery-items"
 type Mentor={id:string;user_id:string;display_name:string;approved_banner_url?:string|null;approved_banner_alt?:string|null;video_url?:string|null;headline?:string|null;bio?:string|null;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number};
 function values(v:unknown):string[]{if(Array.isArray(v))return v.map(String);if(typeof v==="string"){try{const x=JSON.parse(v);if(Array.isArray(x))return x.map(String)}catch{}return v?[v]:[]}return []}
 export default function PublicMentorProfile(){
- const params=useParams<{id:string}>();const id=String(params.id||"");const saved=useSavedDiscoveryItems();
+ const params=useParams<{id:string}>();const id=String(params.id||"");const saved=useSavedDiscoveryItems();const token=useUiStore(s=>s.token);
  const [item,setItem]=useState<Mentor|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
  const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{setItem(await api<Mentor>(`/api/v1/mentors/${encodeURIComponent(id)}`));}catch(e){setItem(null);setError(e instanceof ApiError?e.message:"This mentor profile is unavailable to your account.");}finally{setLoading(false);}},[id]);
  useEffect(()=>{void load();},[load]);
@@ -25,5 +27,6 @@ export default function PublicMentorProfile(){
  {values(item.languages).length>0&&<p className="tagline"><Languages size={15}/> Languages: {values(item.languages).join(", ")}</p>}
  {values(item.mentoring_modes).length>0&&<p className="tagline">Mentoring modes: {values(item.mentoring_modes).join(", ")}</p>}
  <p className="muted">Mentorship requests still use the MPA mentorship workflow, eligibility checks and mentor acceptance process.</p><Link className="btn btn-primary" href="/mentorship">Open mentorship workspace</Link>{saved.savedError&&<p aria-live="polite" aria-atomic="true" className="form-error">{saved.savedError}</p>}</Card>}
+ {item&&<PublicMediaStories subjectType="mentor" subjectId={item.user_id} token={token}/>} 
  </main>;
 }

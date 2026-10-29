@@ -4,6 +4,7 @@ import Link from "next/link";
 import {useParams} from "next/navigation";
 import {type FormEvent,useCallback,useEffect,useState} from "react";
 import {ImpactListingBanner} from "../../../components/impact-listing-banner";
+import {PublicMediaStories} from "../../../components/public-media-stories";
 import {OperationStatus} from "../../../components/operation-status";
 import {Badge,Card} from "../../../components/ui";
 import {ApiError,api} from "../../../lib/api";
@@ -55,5 +56,6 @@ export default function PublicServiceProfile(){
  {!token&&item.lifecycle_status==="active"&&<p className="muted">Sign in to express interest or pledge support. A request, a pledge and an expression of interest are recorded separately. <Link className="text-link" href={"/login?next="+encodeURIComponent("/services/"+item.id)}>Sign in to continue</Link>.</p>}
  <p className="muted" style={{marginTop:12}}>Interest, pledges, agreed services and active deliveries are separate measures. Only persisted eligible records contribute to the counts; anonymous page views do not.</p>
  </Card>}
+ {item&&<PublicMediaStories subjectType="service" subjectId={item.id} token={token}/>} 
  </main>;
 }

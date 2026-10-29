@@ -1361,7 +1361,7 @@ export async function listPublicMediaStories(subjectType,subjectId,viewerId=null
 export async function listMyPublicMediaStories(userId,subjectType,subjectId){
  const db=getPool();const args=[userId];let where=["author_user_id=$1"];
  if(subjectType==="service"&&subjectId){args.push(subjectId);where.push("service_listing_id=$2");}
- if(subjectType==="mentor"&&subjectId){args.push(subjectId);where.push("mentor_profile_id=$2");}
+ if(subjectType==="mentor"&&subjectId){args.push(subjectId);where.push("mentor_profile_id=(select id from mentor_profile where user_id=$2)");}
  return (await db.query("select id,service_listing_id,mentor_profile_id,title,moderation_status,moderation_note,consented_at,consent_withdrawn_at,created_at from public_media_story where "+where.join(" and ")+" order by created_at desc limit 50",args)).rows;
 }
 export async function createPublicMediaStory(authorUserId,subjectType,subjectId,input,requestId){

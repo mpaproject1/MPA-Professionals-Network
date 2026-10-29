@@ -520,3 +520,28 @@ button[aria-busy=true]{pointer-events:none}
 @media(prefers-reduced-motion:reduce){
   .app-brand-backdrop__nodes,.app-brand-backdrop__glow{animation:none!important}
 }
+
+
+/* Shared editorial listing visuals: media is optional and only rendered from approved server data. */
+.impact-listing-banner{position:relative;isolation:isolate;display:flex;align-items:flex-end;min-height:156px;overflow:hidden;border-radius:16px;background:radial-gradient(ellipse at 83% 14%,rgba(151,192,36,.38),transparent 28%),linear-gradient(128deg,#071927 0%,#103b53 58%,#365a42 100%);color:#fff}
+.impact-listing-banner--mentorship{background:radial-gradient(ellipse at 82% 12%,rgba(229,240,68,.28),transparent 29%),linear-gradient(128deg,#071927 0%,#173e5a 58%,#53643b 100%)}
+.impact-listing-banner.has-approved-image{background-position:center;background-size:cover;background-repeat:no-repeat}
+.impact-listing-banner__art{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.impact-listing-banner__orb{position:absolute;width:145px;height:145px;right:9%;top:-60px;border:1px solid rgba(229,240,68,.52);border-radius:50%;box-shadow:0 0 0 18px rgba(229,240,68,.06),0 0 0 38px rgba(229,240,68,.04)}
+.impact-listing-banner__arc{position:absolute;width:180px;height:180px;right:-18px;bottom:-133px;border:1px solid rgba(255,255,255,.24);border-radius:50%}
+.impact-listing-banner__arc--two{width:235px;height:235px;right:20px;bottom:-180px;border-color:rgba(151,192,36,.4)}
+.impact-listing-banner__copy{position:relative;z-index:1;display:flex;flex-direction:column;align-items:flex-start;gap:7px;max-width:86%;padding:19px}
+.impact-listing-banner__eyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#e5f044}
+.impact-listing-banner__title{max-width:100%;font-size:clamp(18px,2vw,24px);line-height:1.1;font-weight:800;letter-spacing:-.035em;text-wrap:balance;overflow-wrap:anywhere}
+.impact-listing-banner__description{max-width:42ch;font-size:12px;line-height:1.5;color:rgba(255,255,255,.82);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mpa-services .grid.grid-2>.card:has(.impact-listing-banner),.mpa-mentorship-page .grid.grid-3>.card:has(.impact-listing-banner){min-width:0;overflow:hidden;padding:12px;gap:0}
+.mpa-services .impact-listing-banner,.mpa-mentorship-page .impact-listing-banner{margin-bottom:15px}
+.mpa-services .grid.grid-2>.card:has(.impact-listing-banner)>h2,.mpa-mentorship-page .grid.grid-3>.card:has(.impact-listing-banner)>h2{font-size:clamp(18px,2vw,22px);line-height:1.2;letter-spacing:-.025em}
+@media(max-width:700px){
+ .impact-listing-banner{min-height:138px;border-radius:13px}
+ .impact-listing-banner__copy{padding:15px;max-width:94%}
+ .impact-listing-banner__description{font-size:12px}
+ .mpa-services .grid.grid-2,.mpa-mentorship-page .grid.grid-3{grid-template-columns:minmax(0,1fr)}
+ .mpa-services .grid.grid-2>.card:has(.impact-listing-banner),.mpa-mentorship-page .grid.grid-3>.card:has(.impact-listing-banner){padding:10px}
+}
+@media(prefers-reduced-motion:reduce){.impact-listing-banner *{scroll-behavior:auto!important}}

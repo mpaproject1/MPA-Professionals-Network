@@ -188,7 +188,7 @@ export async function issueOneTimePassword(actor,userId,requestId,reasonInput){
  // The credential is returned only in this successful response; only its password hash is persisted.
  const oneTimePassword=`Mpa-${crypto.randomBytes(24).toString("base64url")}!9`;
  return withTransaction(async tx=>{
-  const target=(await tx.query("select id,status from app_user where id=$1 for update",[userId])).rows[0];
+  const target=(await tx.query("select id,status,email_verified_at from app_user where id=$1 for update",[userId])).rows[0];
   if(!target)throw err(404,"User not found.","NOT_FOUND");
   if(target.status!=="active")throw err(409,"Only active accounts can receive a one-time password.","ACCOUNT_NOT_ACTIVE");
   if(!target.email_verified_at)throw err(409,"This account must verify its sign-in email before a one-time password can be issued. Use the approved recovery-link workflow if appropriate.","EMAIL_VERIFICATION_REQUIRED");

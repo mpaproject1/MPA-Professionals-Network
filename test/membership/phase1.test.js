@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 import * as membership from "../../src/membership/service.js";
 import { closePool, getPool } from "../../src/platform/db.js";
@@ -12,6 +12,7 @@ let paymentId;
 let membershipId;
 let renewalApplicationId;
 let paymentMethodCode;
+let evidenceFileId;
 
 test("Phase 1 completes registration, profile and application identity flow",async()=>{
   const phone=`09${String(Date.now()).slice(-8)}`;
@@ -55,18 +56,32 @@ test("Phase 1 completes registration, profile and application identity flow",asy
   assert.equal(app.fee_snapshot.amount,1200);
   paymentMethodCode="bank_test_"+suffix;
   await getPool().query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'bank_transfer','Test bank transfer',true,'ETB','Test-only payment method',true) on conflict(method_code) do update set enabled=true,requires_evidence=true",[paymentMethodCode]);
+  const receiptBytes=Buffer.from("%PDF-1.7\nprivate membership receipt");
+  const receiptChecksum=createHash("sha256").update(receiptBytes).digest("hex");
+  const receiptObjectKey="private-test/"+randomUUID()+".pdf";
+  const receipt=(await getPool().query("insert into file_object(storage_provider,object_key,original_name,content_type,byte_size,checksum_sha256,visibility,created_by) values('private-local',$1,'membership-receipt.pdf','application/pdf',$2,$3,'private',$4) returning id",[receiptObjectKey,receiptBytes.length,receiptChecksum,userId])).rows[0];
+  evidenceFileId=receipt.id;
+  await getPool().query("insert into private_upload_session(user_id,object_key,original_name,content_type,expected_byte_size,expected_checksum_sha256,upload_token_sha256,status,actual_byte_size,actual_checksum_sha256,file_object_id,expires_at,uploaded_at,confirmed_at) values($1,$2,'membership-receipt.pdf','application/pdf',$3,$4,repeat('b',64),'confirmed',$3,$4,$5,now()+interval '1 day',now(),now())",[userId,receiptObjectKey,receiptBytes.length,receiptChecksum,evidenceFileId]);
   await assert.rejects(membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:"NO-EVIDENCE-"+suffix,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:"phase1_evidence_required_"+suffix},"phase1-required-evidence"),e=>e.code==="PAYMENT_EVIDENCE_REQUIRED");
   await assert.rejects(membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:"NO-METHOD-"+suffix,payerBankName:"Test Bank",idempotencyKey:"phase1_missing_method_"+suffix},"phase1-missing-method"),e=>e.code==="PAYMENT_METHOD_REQUIRED");
-  await getPool().query("update membership_payment_method set requires_evidence=false where method_code=$1",[paymentMethodCode]);
   const prematurePayment=await membership.createManualPayment(applicationId,userId,{
-    amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,
+    amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,evidenceFileId,
     idempotencyKey:`phase1_early_${suffix}`
   },"phase1-early-payment");
   paymentId=prematurePayment.id;
   assert.equal(prematurePayment.status,"pending");
-  const paymentReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:`phase1_early_${suffix}`},"phase1-early-payment-retry");
+  const linkedEvidence=(await getPool().query("select p.evidence_file_id,f.visibility,f.created_by,s.status upload_status from payment_transaction p join file_object f on f.id=p.evidence_file_id join private_upload_session s on s.file_object_id=f.id where p.id=$1",[paymentId])).rows[0];
+  assert.equal(linkedEvidence.evidence_file_id,evidenceFileId);
+  assert.equal(linkedEvidence.visibility,"private");
+  assert.equal(linkedEvidence.created_by,userId);
+  assert.equal(linkedEvidence.upload_status,"confirmed");
+  const applicantPaymentView=(await membership.listMyApplications(userId)).find(item=>item.id===applicationId).payment;
+  assert.equal(applicantPaymentView.retryable,false);
+  assert.equal(Object.hasOwn(applicantPaymentView,"verification_note"),false,"private finance notes are not exposed in the applicant response");
+  await getPool().query("update membership_payment_method set requires_evidence=false where method_code=$1",[paymentMethodCode]);
+  const paymentReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,evidenceFileId,idempotencyKey:`phase1_early_${suffix}`},"phase1-early-payment-retry");
   assert.equal(paymentReplay.id,prematurePayment.id,"repeated payment requests with the same idempotency key return the original transaction");
-  await assert.rejects(membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:"CHANGED-"+suffix,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:`phase1_early_${suffix}`},"phase1-payment-key-conflict"),e=>e.code==="IDEMPOTENCY_CONFLICT");
+  await assert.rejects(membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:"CHANGED-"+suffix,payerBankName:"Test Bank",paymentMethodCode,evidenceFileId,idempotencyKey:`phase1_early_${suffix}`},"phase1-payment-key-conflict"),e=>e.code==="IDEMPOTENCY_CONFLICT");
   const earlyVerified=await membership.verifyPayment(prematurePayment.id,userId,{
     decision:"approved",evidenceChecked:[{type:"bank_reference",valid:true}],note:"Early payment verified independently of application review."
   },"phase1-early-payment-verification");
@@ -109,7 +124,7 @@ test("Phase 1 early payment verification cannot bypass approval or activation ga
   const approvedApp=(await db.query("select status,approved_at from membership_application where id=$1",[applicationId])).rows[0];
   assert.equal(approvedApp.status,"paid");
   assert.ok(approvedApp.approved_at,"application approval must be recorded separately before activation");
-  const paidReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,idempotencyKey:`phase1_early_${suffix}`},"phase1-paid-payment-retry");
+  const paidReplay=await membership.createManualPayment(applicationId,userId,{amount:1200,currency:"ETB",channel:"bank_transfer",reference:`EARLY-BANK-${suffix}`,payerBankName:"Test Bank",paymentMethodCode,evidenceFileId,idempotencyKey:`phase1_early_${suffix}`},"phase1-paid-payment-retry");
   assert.equal(paidReplay.id,paymentId,"same-key payment retry must return the original transaction even after the application advances to paid");
 
   const activated=await membership.activateApplication(applicationId,userId,"phase1-test-activation");

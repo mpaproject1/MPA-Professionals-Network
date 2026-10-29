@@ -470,11 +470,3 @@
 @keyframes heroMeshDrift{from{transform:translate3d(-.3%,0,0) scale(1)}to{transform:translate3d(.3%,.5%,0) scale(1.015)}}
 @keyframes heroLightFloat{from{transform:translate3d(-2%,0,0);opacity:.65}to{transform:translate3d(2%,3%,0);opacity:1}}
 @media(prefers-reduced-motion:reduce){.heroMesh,.heroGlowOne,.heroGlowTwo{animation:none!important;transform:none!important}}
-
-/* Gentle hero light and network drift; the global reduced-motion preference disables both. */
-.heroMesh{transform-origin:center;animation:heroMeshDrift 34s ease-in-out infinite alternate}
-.heroGlowOne{animation:heroLightFloat 18s ease-in-out infinite alternate}
-.heroGlowTwo{animation:heroLightFloat 22s ease-in-out -8s infinite alternate-reverse}
-@keyframes heroMeshDrift{from{transform:translate3d(-.3%,0,0) scale(1)}to{transform:translate3d(.3%,.5%,0) scale(1.015)}}
-@keyframes heroLightFloat{from{transform:translate3d(-2%,0,0);opacity:.65}to{transform:translate3d(2%,3%,0);opacity:1}}
-@media(prefers-reduced-motion:reduce){.heroMesh,.heroGlowOne,.heroGlowTwo{animation:none!important;transform:none!important}}

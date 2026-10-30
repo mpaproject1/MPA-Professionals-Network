@@ -37,12 +37,14 @@ test.describe("Accessible contextual screen tours",()=>{
   await expect(page.getByRole("region",{name:"MPA support assistant"})).toBeVisible();
   await page.getByRole("button",{name:"Show me around this screen"}).click();
   await expect(page.getByRole("region",{name:"MPA support assistant"})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Open MPA support"})).toHaveCount(0);
   const tour=page.getByRole("dialog",{name:"Getting around MPA"});
   await tour.getByRole("button",{name:"Next"}).click();
   await tour.getByRole("button",{name:"Next"}).click();
   await expect(tour).toContainText("Step 3 of 3");
   await tour.getByRole("button",{name:"Finish"}).click();
   await expect(page.getByTestId("guide-overlay")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Open MPA support"})).toBeVisible();
  });
 
  test("mobile layout shows an explanation rather than an empty spotlight when a target is unavailable",async({page})=>{

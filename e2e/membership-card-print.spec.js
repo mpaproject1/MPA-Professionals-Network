@@ -30,7 +30,7 @@ test("bulk membership print produces independently parsed A4 PDF with one eligib
  await expect(page.getByRole("heading",{name:"Review before printing"})).toBeVisible();
  await expect(page.getByText(/2 eligible cards prepared/)).toBeVisible();
  await page.getByRole("button",{name:"Print / Save PDF"}).click();
- expect(await page.evaluate(()=>window.__membershipPrintInvoked)).toBe(true);
+ await expect.poll(()=>page.evaluate(()=>window.__membershipPrintInvoked)).toBe(true);
  await page.emulateMedia({media:"print"});
  const pdf=await page.pdf({format:"A4",printBackground:true,preferCSSPageSize:true});
  expect(pdf.subarray(0,5).toString()).toBe("%PDF-");

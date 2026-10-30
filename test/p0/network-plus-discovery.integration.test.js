@@ -162,7 +162,9 @@ test("member discovery enforces public, member-only, private, expired-member and
   );
   await talent.updateVisibility(publicProfessional.user.id, { directoryVisible: true, showContact: true }, `network-plus-contact-opt-in-${suffix}`);
   await talent.respondToTalentInquiry(inquiry.id, publicProfessional.user.id, { status: "accepted", releaseContact: true }, `network-plus-inquiry-consented-${suffix}`);
-  const professionalInquiries = await talent.listTalentInquiries(publicProfessional.user.id);\n  assert.ok(professionalInquiries.some(row => row.id === inquiry.id), "the professional participant can view their own inquiry");\n  const requesterInquiries = await talent.listTalentInquiries(activeViewer.user.id);
+  const professionalInquiries = await talent.listTalentInquiries(publicProfessional.user.id);
+  assert.ok(professionalInquiries.some(row => row.id === inquiry.id), "the professional participant can view their own inquiry");
+  const requesterInquiries = await talent.listTalentInquiries(activeViewer.user.id);
   assert.equal(requesterInquiries.find(row => row.id === inquiry.id)?.professional_email, publicProfessional.user.email,
     "contact is released to inquiry participants only after explicit acceptance and contact opt-in");
   assert.deepEqual(await talent.listTalentInquiries(expiredViewer.user.id), [], "contact-bearing inquiry data remains participant-scoped");

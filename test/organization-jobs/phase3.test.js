@@ -4,6 +4,7 @@ import {
   allowedApplicationTransition,
   allowedCandidateResponse,
   canCandidateAcceptOffer,
+  canRespondToInterview,
   ELIGIBILITY_RULES,
   isAllowedJobPostingScope,
   isEligibleVerifiedClaimForJobs,
@@ -118,4 +119,11 @@ test("applicant progress exposes interview and offer actions without internal re
   assert.match(tracking,/Accept approved offer/);
   assert.match(tracking,/Withdraw application/);
   assert.match(tracking,/job-applications\/.*\/progress/);
+});
+
+test("only open interviews accept participant responses",()=>{
+  assert.equal(canRespondToInterview("scheduled"),true);
+  assert.equal(canRespondToInterview("confirmed"),true);
+  assert.equal(canRespondToInterview("reschedule_requested"),true);
+  for(const status of ["completed","cancelled","no_show","unknown"]) assert.equal(canRespondToInterview(status),false);
 });

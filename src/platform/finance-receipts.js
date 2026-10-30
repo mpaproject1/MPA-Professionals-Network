@@ -34,6 +34,9 @@ export async function recordManualFinancePayment(identity,input,requestId){
   const payerUserId=input?.payerUserId?clean(input.payerUserId,64):null;
   const evidenceFileId=input?.evidenceFileId?clean(input.evidenceFileId,64):null;
   const organizationId=input?.organizationId?clean(input.organizationId,64):null;
+  const bankName=clean(input.bankName,180)||null,bankReference=clean(input.bankReference,120)||null;
+  if(method==="bank_transfer"&&!evidenceFileId&&!bankReference)throw fail(400,"Attach the bank receipt or enter its bank transaction reference.","BANK_EVIDENCE_REQUIRED");
+  if(organizationId&&payerType!=="organization")throw fail(400,"Link an existing organization only when the payer type is Organization.","PAYER_TYPE_MISMATCH");
   const db=getPool();
   return withTransaction(async tx=>{
     if(payerUserId){
@@ -49,6 +52,10 @@ export async function recordManualFinancePayment(identity,input,requestId){
     if(evidenceFileId){
       const file=await tx.query("select id from file_object where id=$1 and created_by=$2 and visibility='private'",[evidenceFileId,identity.sub]);
       if(!file.rows[0])throw fail(403,"Attach a confirmed private receipt uploaded by your finance account.","EVIDENCE_FILE_NOT_OWNED");
+    }
+    if(bankReference){
+      const duplicate=await tx.query("select id,receipt_number from finance_payment_record where lower(coalesce(bank_name,''))=lower(coalesce($1,'')) and bank_reference=$2 and currency=$3 and amount=$4::numeric and status<>'reversed' limit 1",[bankName,bankReference,currency,amount]);
+      if(duplicate.rows[0])throw fail(409,"A finance receipt with this bank reference, currency and amount is already recorded.","DUPLICATE_PAYMENT_REFERENCE");
     }
     const receiptNumber="MPA-FIN-"+new Date().getUTCFullYear()+"-"+randomUUID().replaceAll("-","").slice(0,12).toUpperCase();
     const row=(await tx.query(`insert into finance_payment_record

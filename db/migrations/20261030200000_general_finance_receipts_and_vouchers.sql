@@ -67,3 +67,5 @@ alter table finance_payment_voucher add constraint finance_payment_voucher_one_s
   check ((payment_record_id is not null and payment_transaction_id is null) or (payment_record_id is null and payment_transaction_id is not null));
 create unique index if not exists finance_payment_voucher_one_active_membership_idx
   on finance_payment_voucher(payment_transaction_id) where revoked_at is null and payment_transaction_id is not null;
+
+create unique index if not exists finance_payment_record_bank_reference_unique_idx on finance_payment_record(lower(coalesce(bank_name,'')),bank_reference,currency,amount) where bank_reference is not null;

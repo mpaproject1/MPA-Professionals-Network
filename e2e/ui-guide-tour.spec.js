@@ -61,6 +61,9 @@ test.describe("Accessible contextual screen tours",()=>{
   const dialog=page.getByRole("dialog",{name:"Membership payment and receipt"});
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Step 1 of 2");
+  await expect(page.locator(".guide-spotlight")).toBeVisible();
+  await dialog.getByRole("button",{name:"Next"}).click();
+  await expect(dialog).toContainText("Step 2 of 2");
   await expect(dialog).toContainText("That control is not visible in this layout");
   await expect(dialog.getByRole("button",{name:"Skip"})).toBeVisible();
   await expect(dialog.getByRole("button",{name:"Close tour"})).toBeVisible();

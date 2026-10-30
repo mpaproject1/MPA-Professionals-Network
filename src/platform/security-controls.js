@@ -65,8 +65,8 @@ export async function verifyHumanChallenge(id, answer) {
   const rawToken = randomBytes(32).toString("base64url");
   const result = await withTransaction(async db => {
     const row = (await db.query("select * from security_human_challenge where id=$1 and purpose='registration' for update", [id])).rows[0];
-    if (!row || row.consumed_at || row.verified_at || new Date(row.expires_at) <= new Date() || row.failed_attempts >= 5) {
-      return { ok: false, code: "CHALLENGE_INVALID" };
+    if (!row || row.consumed_at || row.verified_at || new Date(row.expires_at) <= new Date() || row.failed_attempts >= 10) {
+      return { ok: false, code: row?.failed_attempts >= 10 ? "CHALLENGE_ATTEMPTS_EXCEEDED" : "CHALLENGE_INVALID" };
     }
     const suppliedAnswer = normalizeAnswer(answer);
     const actual = sha256(`registration:${row.question}:${suppliedAnswer}`);
@@ -74,15 +74,19 @@ export async function verifyHumanChallenge(id, answer) {
     const actualBytes = Buffer.from(actual, "hex");
     const match = /^-?\d{1,3}$/.test(suppliedAnswer) && expectedBytes.length === actualBytes.length && timingSafeEqual(expectedBytes, actualBytes);
     if (!match) {
-      await db.query("update security_human_challenge set failed_attempts=least(failed_attempts+1,5) where id=$1", [id]);
+      await db.query("update security_human_challenge set failed_attempts=least(failed_attempts+1,10) where id=$1", [id]);
       return { ok: false, code: "CHALLENGE_INCORRECT" };
     }
     await db.query("update security_human_challenge set token_hash=$1,verified_at=now(),expires_at=now()+interval '5 minutes' where id=$2", [sha256(rawToken), id]);
     return { ok: true };
   });
   if (!result.ok) {
-    const invalid = result.code === "CHALLENGE_INVALID";
-    throw Object.assign(new Error(invalid ? "This human check has expired. Please try again." : "That answer was not correct. Please try again."), {
+    const messages = {
+      CHALLENGE_INVALID: "This human check has expired, was already used, or is no longer valid. Please request a new one.",
+      CHALLENGE_INCORRECT: "That answer was not correct. Please try again.",
+      CHALLENGE_ATTEMPTS_EXCEEDED: "This challenge has reached its 10-attempt limit. Request a new human check."
+    };
+    throw Object.assign(new Error(messages[result.code] || "The human check could not be verified. Request a new one."), {
       statusCode: 400, code: result.code
     });
   }

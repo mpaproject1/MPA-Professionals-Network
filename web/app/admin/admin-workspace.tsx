@@ -60,15 +60,16 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const navDestinations = useMemo(() => {
     const platformAdmin = Boolean(roles?.some((role) => ["system_admin", "admin", "platform_admin"].includes(role)));
     const membershipReviewer = Boolean(roles?.some((role) => ["reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
-    const financeOfficer = Boolean(roles?.includes("finance_officer") || permissions.some((permission) => ["finance.view", "finance.manage", "finance.payment.verify", "finance.payment.reverse"].includes(permission)));
+    const financeOfficer = Boolean(roles?.includes("finance_officer"));
+    const financeConfig = Boolean(financeOfficer || permissions.some((permission) => ["members.manage", "finance.manage"].includes(permission)));
     const recruitmentScoped = Boolean(roles?.some((role) => ["recruiter", "project_manager"].includes(role)) || permissions.includes("reports.view"));
     const supportStaff = Boolean(roles?.includes("supporting_staff"));
     if (platformAdmin) return destinations;
     return destinations.filter((item) => {
       if (["/admin/accounts", "/admin/account-governance", "/admin/experience", "/admin/members", "/admin/members/catalog", "/admin/membership-card", "/admin/reference-portfolio"].includes(item.href)) return false;
       if (item.href === "/admin/membership") return membershipReviewer;
-      if (item.href === "/admin/membership/payment-methods") return financeOfficer;
-      if (item.href === "/admin/reports") return membershipReviewer || financeOfficer || recruitmentScoped || supportStaff || roles?.includes("reviewer") === true;
+      if (item.href === "/admin/membership/payment-methods") return financeConfig;
+      if (item.href === "/admin/reports") return membershipReviewer || financeOfficer || recruitmentScoped || supportStaff || roles?.includes("reviewer") === true || permissions.some((permission) => ["reports.view", "reports.sensitive"].includes(permission));
       if (item.href === "/admin/organizations") return roles?.some((role) => ["reviewer", "organization_admin"].includes(role)) === true;
       if (item.href === "/admin/marketplace") return membershipReviewer || supportStaff;
       if (item.href === "/admin/support") return supportStaff || roles?.includes("reviewer") === true;

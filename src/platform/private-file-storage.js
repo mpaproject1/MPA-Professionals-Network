@@ -90,6 +90,11 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
     allowed=applicationShare.rowCount>0;
   }
   if(!allowed){
+    const ethicsRole=roles.some(role=>["ethics_reviewer","system_admin"].includes(role))||permissions.includes("ethics.case.review");
+    const ethicsEvidence=await db.query("select 1 from ethics_case_evidence e join ethics_case c on c.id=e.case_id where e.file_object_id=$1 and not exists(select 1 from ethics_case_conflict x where x.case_id=c.id and x.reviewer_id=$2 and x.resolution='recused') and (c.reporter_user_id=$2 or c.subject_user_id=$2 or $3::boolean or ($4::boolean and (c.assigned_reviewer_id=$2 or exists(select 1 from ethics_case_panel_member pm where pm.case_id=c.id and pm.reviewer_id=$2 and pm.active=true)))) limit 1",[fileId,userId,roles.includes("system_admin"),ethicsRole]);
+    allowed=ethicsEvidence.rowCount>0;
+  }
+  if(!allowed){
     const canReviewVetting=roles.some(role=>["verification_reviewer","appeal_reviewer","system_admin"].includes(role))||permissions.includes("verification.manage");
     const canReviewOrganization=roles.some(role=>["reviewer","system_admin"].includes(role))||permissions.includes("organizations.review");
     const canReviewMembership=roles.some(role=>["reviewer","finance_officer","system_admin"].includes(role))||permissions.some(permission=>["finance.view","finance.manage","members.view","members.manage"].includes(permission));

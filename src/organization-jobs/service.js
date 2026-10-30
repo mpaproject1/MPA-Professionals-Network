@@ -457,7 +457,7 @@ const APPLICATION_TRANSITIONS={
 };
 export function allowedApplicationTransition(from,to){ return (APPLICATION_TRANSITIONS[from]||[]).includes(to); }
 export function allowedCandidateResponse(from,to){ return from==="offer"&&to==="accepted" || ["submitted","screening","shortlisted","interview","offer","accepted"].includes(from)&&to==="withdrawn"; }
-export function canRespondToInterview(status){ return ["scheduled","confirmed","reschedule_requested"].includes(status); }
+export function canRespondToInterview(status){ return ["scheduled","confirmed"].includes(status); }
 export function allowedInterviewStatusTransition(from,to){ const transitions={scheduled:["completed","cancelled","no_show"],confirmed:["completed","cancelled","no_show"],reschedule_requested:["scheduled","confirmed","cancelled"]}; return (transitions[from]||[]).includes(to); }
 
 export async function updateCandidate(jobId,applicationId,userId,input,requestId){

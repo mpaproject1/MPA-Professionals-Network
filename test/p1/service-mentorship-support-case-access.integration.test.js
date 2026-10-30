@@ -104,6 +104,11 @@ test("MPA Support Desk can open only a specific service or mentorship case with 
     (cause) => cause.statusCode === 403 && cause.code === "FORBIDDEN",
     "a provider or ordinary member must not open MPA-only participant details",
   );
+  await assert.rejects(
+    supportCases.openSupportCase(support.id, "service", serviceRequest.id, { reason: "short" }, "support-case-invalid-reason"),
+    (cause) => cause.statusCode === 400 && cause.code === "ACCESS_REASON_REQUIRED",
+    "support access must require a case-specific reason",
+  );
 
   const index = await supportCases.listSupportCases(support.id, { type: "all", limit: 50 });
   assert.ok(index.items.some((item) => item.case_type === "service" && item.id === serviceRequest.id));
@@ -125,6 +130,7 @@ test("MPA Support Desk can open only a specific service or mentorship case with 
   assert.ok(serviceDetails.participants.some((item) => item.email === requesterContact.email && item.person.phone === requesterContact.phone));
   assert.ok(serviceDetails.participants.some((item) => item.email === providerContact.email && item.person.phone === providerContact.phone));
   assert.equal(serviceDetails.caseRecord.request.id, serviceRequest.id);
+  assert.equal(serviceDetails.participants.some((item) => item.userId === mentor.id || item.userId === mentee.id), false, "service case detail must not pull participants from another case");
 
   const mentorshipDetails = await supportCases.openSupportCase(
     support.id,
@@ -137,6 +143,7 @@ test("MPA Support Desk can open only a specific service or mentorship case with 
   assert.ok(mentorshipDetails.participants.some((item) => item.email === mentorContact.email && item.person.phone === mentorContact.phone));
   assert.ok(mentorshipDetails.participants.some((item) => item.email === menteeContact.email && item.person.phone === menteeContact.phone));
   assert.equal(mentorshipDetails.caseRecord.relationship.id, mentorship.id);
+  assert.equal(mentorshipDetails.participants.some((item) => item.userId === requester.id || item.userId === provider.id), false, "mentorship case detail must remain scoped to its own participants");
 
   const organizationDetails = await supportCases.openSupportCase(
     support.id,

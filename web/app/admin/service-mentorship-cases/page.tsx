@@ -93,6 +93,8 @@ export default function ServiceMentorshipSupportCasesPage() {
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<CaseSummary[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -100,14 +102,14 @@ export default function ServiceMentorshipSupportCasesPage() {
   const [openingId, setOpeningId] = useState("");
   const [details, setDetails] = useState<CaseDetails | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (nextOffset = offset, nextSearch = appliedSearch) => {
     if (!token) return;
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ type: caseType, limit: "50", offset: "0" });
+      const params = new URLSearchParams({ type: caseType, limit: "25", offset: String(nextOffset) });
       if (status) params.set("status", status);
-      if (search.trim()) params.set("q", search.trim());
+      if (nextSearch.trim()) params.set("q", nextSearch.trim());
       const result = await api<{ items: CaseSummary[]; totalCount: number }>(
         "/api/v1/admin/service-mentorship-cases?" + params.toString(),
         {},
@@ -122,7 +124,7 @@ export default function ServiceMentorshipSupportCasesPage() {
     } finally {
       setLoading(false);
     }
-  }, [caseType, search, status, token]);
+  }, [appliedSearch, caseType, offset, status, token]);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
   useEffect(() => { if (token) void load(); }, [load, token]);
@@ -167,9 +169,9 @@ export default function ServiceMentorshipSupportCasesPage() {
         </Card>
       ) : (
         <Card>
-          <form className="grid grid-2" style={{ gap: 12 }} onSubmit={(event) => { event.preventDefault(); void load(); }}>
+          <form className="grid grid-2" style={{ gap: 12 }} onSubmit={(event) => { event.preventDefault(); setOffset(0); setAppliedSearch(search.trim()); void load(0, search.trim()); }}>
             <label>Case type
-              <select value={caseType} onChange={(event) => setCaseType(event.target.value as CaseType)}>
+              <select value={caseType} onChange={(event) => { setCaseType(event.target.value as CaseType); setOffset(0); setDetails(null); }}>
                 <option value="all">Services and mentorship</option>
                 <option value="service">Service requests</option>
                 <option value="mentorship">Individual mentorship relationships</option>
@@ -177,7 +179,7 @@ export default function ServiceMentorshipSupportCasesPage() {
               </select>
             </label>
             <label>Case status
-              <select value={status} onChange={(event) => setStatus(event.target.value)}>
+              <select value={status} onChange={(event) => { setStatus(event.target.value); setOffset(0); setDetails(null); }}>
                 <option value="">All statuses</option>
                 {["draft", "requested", "accepted", "in_progress", "active", "paused", "completed", "disputed", "declined", "cancelled"].map((value) => (
                   <option key={value} value={value}>{value.replaceAll("_", " ")}</option>
@@ -189,7 +191,7 @@ export default function ServiceMentorshipSupportCasesPage() {
             </label>
             <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
               <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? "Searching…" : "Search cases"}</button>
-              <button className="btn btn-ghost" type="button" disabled={loading} onClick={() => { setCaseType("all"); setStatus(""); setSearch(""); setDetails(null); }}>Clear filters</button>
+              <button className="btn btn-ghost" type="button" disabled={loading} onClick={() => { setCaseType("all"); setStatus(""); setSearch(""); setAppliedSearch(""); setOffset(0); setDetails(null); }}>Clear filters</button>
             </div>
           </form>
           <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", marginTop: 16 }}>
@@ -215,6 +217,13 @@ export default function ServiceMentorshipSupportCasesPage() {
               </section>
             ))}
           </div>
+          {totalCount > 25 && <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
+            <span className="muted">Showing {offset + 1}–{Math.min(offset + items.length, totalCount)} of {totalCount}</span>
+            <div className="row" style={{ gap: 8 }}>
+              <button className="btn btn-ghost" type="button" disabled={loading || offset === 0} onClick={() => setOffset((current) => Math.max(0, current - 25))}>Previous</button>
+              <button className="btn btn-ghost" type="button" disabled={loading || offset + items.length >= totalCount} onClick={() => setOffset((current) => current + 25)}>Next</button>
+            </div>
+          </div>}
         </Card>
       )}
       {details && (

@@ -23,20 +23,22 @@ Branch: `feat/workstream-3-progress-members-workspace`
 
 `e2e/registration-human-verification.spec.js` covers:
 1. challenge loading;
-2. correct answer and registration handoff;
-3. incorrect answer and challenge refresh;
+2. correct answer returns a proof token;
+3. incorrect answer and automatic challenge refresh;
 4. expired challenge and refresh;
-5. repeated proof-token use;
-6. ten failed attempts and rejection of the eleventh;
-7. ten consecutive refreshes;
+5. repeated proof-token use is rejected;
+6. ten failed attempts are permitted and the eleventh is rejected;
+7. ten consecutive manual refreshes;
 8. registration after successful verification;
-9. registration without a valid token.
+9. explicit server-side opt-out submits without requesting a challenge proof;
+10. registration without a valid token is rejected.
 
 The Playwright tests stub HTTP responses to exercise the browser flow and request/response contracts. A separate PostgreSQL integration suite now exercises actual challenge issuance, correct and incorrect answers, ten persisted failed attempts, expiry, single-use token consumption, and missing-token rejection against the migrated CI database.
 
 ## Validation status
 
 - Source changes are committed to PR #18.
-- The Playwright suite and PostgreSQL integration tests are authored but have not been executed in this implementation pass. The complete PR Quality workflow has not been run to completion on this head.
+- The Playwright suite and PostgreSQL integration tests are authored but have not been executed in this implementation pass.
+- GitHub automatically created PR Quality run #667 for this head. All four jobs failed before exposing any steps or log URLs (`steps: null`, `logs_url: null`); no test output is available. This is not evidence of a source-code failure or a passing validation run.
 - Do not treat the E2E assertions as passed until an Actions runner actually executes them.
 - No database migration, production database change, deployment, or change to email verification, membership, identity, or authorization behavior was made.

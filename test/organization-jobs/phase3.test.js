@@ -91,3 +91,14 @@ test("candidate tracking gives actionable next steps for each recruitment stage"
   assert.match(tracking,/a\.offer_approval_status='pending'/);
   assert.match(tracking,/Review the offer terms and accept or withdraw your application/);
 });
+
+test("candidate pipeline mutations use the same job-scoped team authorization as pipeline reads",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const service=await readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8");
+  const list=service.slice(service.indexOf("export async function listCandidates"),service.indexOf("const APPLICATION_TRANSITIONS"));
+  const update=service.slice(service.indexOf("export async function updateCandidate"),service.indexOf("export async function approveJobOffer"));
+  assert.match(list,/jobRole\(db,jobId,userId,\["hiring_manager","recruiter"\]\)/);
+  assert.match(update,/jobRole\(db,jobId,userId,\["hiring_manager","recruiter"\]\)/);
+  assert.doesNotMatch(list,/orgRole\(db,j\.organization_id,userId,CANDIDATE_ROLES\)/);
+  assert.doesNotMatch(update,/orgRole\(db,j\.organization_id,userId,CANDIDATE_ROLES\)/);
+});

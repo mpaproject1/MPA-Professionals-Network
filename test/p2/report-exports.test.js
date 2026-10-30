@@ -97,14 +97,15 @@ test("finance reports reconcile verified, failed, refunded and outstanding amoun
  const product=(await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
  assert.ok(product,"BASIC membership product must exist in migrated test database");
  const created=await register({email:"finance-fixture-"+suffix+"@example.test",password:"FinanceFixtureP1Password!2026",firstName:"Finance",lastName:"Fixture",phone:"07"+digits},"finance-report-fixture-"+suffix);
- const userId=created.user.id;
+ const userId=created.user.id,marker=suffix.slice(0,8);
  const applicationIds=[],paymentIds=[],reversalIds=[];
  async function application(ref,status,amount,currency){
-  const row=(await db.query("insert into membership_application(user_id,application_type,membership_product_id,status,approved_at,fee_snapshot,tracking_reference) values($1,'new',$2,$3,now(),$4::jsonb,$5) returning id",[userId,product.id,status,JSON.stringify({amount,currency}),ref])).rows[0];
+  const row=(await db.query("insert into membership_application(user_id,application_type,membership_product_id,status,approved_at,fee_snapshot,tracking_reference) values($1,'new',$2,$3,now(),$4::jsonb,$5) returning id",[userId,product.id,status,JSON.stringify({amount,currency}),marker+"-"+ref])).rows[0];
   applicationIds.push(row.id);
   return row.id;
  }
  async function payment(appId,status,amount,currency,reference){
+  reference=marker+"-"+reference;
   const row=(await db.query("insert into payment_transaction(provider,idempotency_key,purpose,amount,currency,status,request_payload,channel,source,submitted_by,verified_by,verified_at,completed_at,purpose_reference) values('finance-report-fixture',$1,'membership',$2,$3,$4,$5::jsonb,'manual','manual_entry',$6,$6,now(),now(),$7) returning id",[suffix+"-"+reference,amount,currency,status,JSON.stringify({reference}),userId,reference])).rows[0];
   paymentIds.push(row.id);
   await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[appId,row.id]);
@@ -124,8 +125,7 @@ test("finance reports reconcile verified, failed, refunded and outstanding amoun
   reversalIds.push(reversal.id);
   await payment(usdApproved,"succeeded",50,"USD","approved-usd");
   const finance={sub:userId,roles:["finance_officer"],permissions:[]};
-  const from=new Date().toISOString().slice(0,10),to=from;
-  const filters={from,to};
+  const filters={q:marker};
   const approved=await runReport(finance,"approved-payments",filters,randomUUID());
   assert.equal(approved.rows.length,2);
   assert.deepEqual(new Set(approved.rows.map(row=>row.Currency)),new Set(["ETB","USD"]));
@@ -140,7 +140,7 @@ test("finance reports reconcile verified, failed, refunded and outstanding amoun
   assert.equal(Number(etbCollections["Net collected"]),1000);
   const outstanding=await runReport(finance,"outstanding-membership-payments",filters,randomUUID());
   assert.equal(outstanding.rows.length,3,"failed and refunded applications remain outstanding until a new successful payment");
-  assert.ok(outstanding.rows.some(row=>row["Application reference"]==="ETB-OUTSTANDING"));
+  assert.ok(outstanding.rows.some(row=>row["Application reference"]===marker+"-ETB-OUTSTANDING"));
   const summary=await runReport(finance,"finance-summary",filters,randomUUID());
   const etb=summary.rows.find(row=>row.Currency==="ETB"),usd=summary.rows.find(row=>row.Currency==="USD");
   assert.equal(Number(etb["Gross verified"]),1300);

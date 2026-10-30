@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import test from "node:test";
 import {readFile} from "node:fs/promises";
+import test from "node:test";
 
 test("vacancy publication is gated by an explicit MPA review decision",async()=>{
  const [service,server,migration,queuePage,adminPage]=await Promise.all([

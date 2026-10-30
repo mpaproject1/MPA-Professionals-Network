@@ -30,7 +30,7 @@ test("organization directory query uses verified canonical records and an explic
   assert.match(query, /resolveNetworkPlusAccess\(db,viewerId\)/);
   assert.match(query, /o\.network_plus_visible=true/);
   assert.match(query, /o\.verification_status='verified'/);
-  assert.match(query, /select o\.id,o\.display_name,o\.organization_type,o\.description,o\.website,ri\.label location_label/);
+  assert.match(query, /case when o\.website ~\* '\^https:\/\//);
   assert.match(query, /ilike \$\$\{args\.length\}/);
   assert.match(query, /organization_type=\$\$\{args\.length\}/);
   assert.doesNotMatch(query, /o\.legal_name|o\.email|o\.phone|o\.address_text|verification_evidence|organization_membership/);

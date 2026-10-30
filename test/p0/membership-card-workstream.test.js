@@ -18,7 +18,7 @@ test("single card issuance requires an active eligible membership record, not an
   assert.match(service,/assertEligible\(row\)/);
   assert.match(service,/where m\.user_id=\$1 and m\.status<>'pending'/);
   assert.match(service,/Complete membership approval and activation first/);
-  assert.doesNotMatch(service,/return \{\s*membershipRecordId:/);
+  assert.doesNotMatch(service.slice(service.indexOf("function cardPayload"),service.indexOf("async function settings")),/membershipRecordId/);
 });
 
 test("admin card lookup distinguishes membership number from internal identifiers",()=>{

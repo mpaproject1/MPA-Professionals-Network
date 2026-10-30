@@ -2,7 +2,7 @@
 
 import {
   ArrowRight, BriefcaseBusiness, CheckCircle2, Clock3, Compass, FileCheck2,
-  GraduationCap, RefreshCw, ShieldCheck, UserRound, Users,
+  GraduationCap, HelpCircle, RefreshCw, ShieldCheck, UserRound, Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

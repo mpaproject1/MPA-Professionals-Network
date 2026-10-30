@@ -117,7 +117,7 @@ async function hasPlatformRole(db,userId,roles){
   const row=(await db.query("select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code=any($2::text[]) limit 1",[userId,roles])).rows[0];
   return Boolean(row);
 }
-async function assertSessionFitsAvailability(db,mentorUserId,startAt,endAt){
+export async function assertSessionFitsAvailability(db,mentorUserId,startAt,endAt){
   const profile=(await db.query("select id from mentor_profile where user_id=$1",[mentorUserId])).rows[0];
   if(!profile) throw error(409,"Mentor profile is unavailable.","MENTOR_UNAVAILABLE");
   const slot=(await db.query("select 1 from mentor_availability a where a.mentor_profile_id=$1 and a.active=true and a.day_of_week=extract(dow from ($2::timestamptz at time zone a.timezone))::int and a.start_time <= (($2::timestamptz at time zone a.timezone)::time) and a.end_time >= (($3::timestamptz at time zone a.timezone)::time) limit 1",[profile.id,startAt,endAt])).rows[0];
@@ -1243,7 +1243,7 @@ export async function changeMentorshipSession(sessionId,userId,status,notes,requ
 
 export async function listMentorshipSessions(mentorshipId,userId){
   const db=getPool(); await mentorshipParticipant(db,mentorshipId,userId);
-  return (await db.query("select id,mentorship_id,scheduled_start_at,scheduled_end_at,mode,case when coordination_status='accepted' then location_label else null end location_label,case when coordination_status='accepted' then meeting_reference else null end meeting_reference,agenda,status,notes,completed_at,created_by,created_at,updated_at,coordination_status,proposed_by,responded_by,responded_at,proposal_note from mentorship_session where mentorship_id=$1 order by scheduled_start_at",[mentorshipId])).rows;
+  return (await db.query("select s.id,s.mentorship_id,s.scheduled_start_at,s.scheduled_end_at,s.mode,case when s.coordination_status='accepted' then s.location_label else null end location_label,case when s.coordination_status='accepted' then s.meeting_reference else null end meeting_reference,s.agenda,s.status,s.notes,s.completed_at,s.created_by,s.created_at,s.updated_at,s.coordination_status,s.proposed_by,s.responded_by,s.responded_at,s.proposal_note,cp.id change_proposal_id,cp.status change_proposal_status,cp.proposed_by change_proposed_by,cp.proposed_start_at change_proposed_start_at,cp.proposed_end_at change_proposed_end_at,cp.proposal_note change_proposal_note,cp.responded_at change_responded_at,cp.response_note change_response_note from mentorship_session s left join lateral (select id,status,proposed_by,proposed_start_at,proposed_end_at,proposal_note,responded_at,response_note from mentorship_session_change_proposal where session_id=s.id order by created_at desc limit 1) cp on true where s.mentorship_id=$1 order by s.scheduled_start_at",[mentorshipId])).rows;
 }
 
 export async function submitMentorshipFeedback(mentorshipId,userId,input,requestId){

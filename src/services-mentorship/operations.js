@@ -1,7 +1,7 @@
 import { getPool, withTransaction } from "../platform/db.js";
 import { hasCurrentActiveMembership, hasProfessionalIdentity } from "../platform/identity-policy.js";
 import { createInAppNotification } from "../platform/notifications.js";
-import { getMyMentorProfile, proposeMentorMatch } from "./service.js";
+import { assertSessionFitsAvailability, getMyMentorProfile, proposeMentorMatch } from "./service.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 function redactContactText(value){return String(value||"").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[redacted email]").replace(/\+?\d[\d\s().-]{7,}\d/g,"[redacted phone]");}
@@ -112,6 +112,51 @@ export async function respondToSessionProposal(sessionId,userId,status,note,requ
   await audit(db,userId,"mentorship.session_proposal_responded","mentorship_session",sessionId,requestId,{status});
   if(s.proposed_by)await notify(db,s.proposed_by,"mentorship.session_proposal_responded","mentorship_session",sessionId,{message:status==="accepted"?"The other participant confirmed your session proposal.":"The other participant declined your session proposal.",nextAction:status==="accepted"?"Review the confirmed session details in the mentorship workspace.":"Propose a new time in the mentorship workspace if appropriate.",actionUrl:"/mentorship",actionRequired:status==="declined"});
   return {...row,nextAction:status==="accepted"?"Session confirmed by both participants.":"Session proposal declined; no private contact details were exchanged."};
+ });
+}
+export async function proposeMentorshipSessionChange(sessionId,userId,input,requestId){
+ return withTransaction(async db=>{
+  const session=(await db.query("select s.*,m.mentor_user_id,m.mentee_user_id,m.status mentorship_status from mentorship_session s join mentorship m on m.id=s.mentorship_id where s.id=$1 for update",[sessionId])).rows[0];
+  if(!session)fail(404,"Mentorship session not found.","NOT_FOUND");
+  if(session.mentor_user_id!==userId&&session.mentee_user_id!==userId)fail(403,"Only a mentorship participant can propose a schedule change.","FORBIDDEN");
+  if(session.mentorship_status!=="active"||session.status!=="scheduled"||session.coordination_status!=="accepted")fail(409,"Only a confirmed, upcoming session in an active mentorship can be rescheduled.","SESSION_NOT_RESCHEDULABLE");
+  const start=new Date(input.proposedStartAt),end=new Date(input.proposedEndAt);
+  if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||start<=new Date()||end<=start||end-start>4*60*60*1000)fail(400,"Choose a future start and end time no more than four hours apart.","VALIDATION_ERROR");
+  if(start.toISOString()===new Date(session.scheduled_start_at).toISOString()&&end.toISOString()===new Date(session.scheduled_end_at).toISOString())fail(400,"The proposed schedule is unchanged.","NO_SCHEDULE_CHANGE");
+  const note=String(input.note||"").trim();
+  if(note.length>1000)fail(400,"The schedule-change note must be 1,000 characters or fewer.","VALIDATION_ERROR");
+  const pending=(await db.query("select id from mentorship_session_change_proposal where session_id=$1 and status='pending' for update",[sessionId])).rows[0];
+  if(pending)fail(409,"A schedule change is already awaiting the other participant's response.","CHANGE_ALREADY_PENDING");
+  await assertSessionFitsAvailability(db,session.mentor_user_id,start.toISOString(),end.toISOString());
+  const proposal=(await db.query("insert into mentorship_session_change_proposal(session_id,proposed_by,previous_start_at,previous_end_at,proposed_start_at,proposed_end_at,proposal_note) values($1,$2,$3,$4,$5,$6,$7) returning *",[sessionId,userId,session.scheduled_start_at,session.scheduled_end_at,start.toISOString(),end.toISOString(),note||null])).rows[0];
+  await audit(db,userId,"mentorship.session_change_proposed","mentorship_session_change_proposal",proposal.id,requestId,{sessionId,previousStartAt:session.scheduled_start_at,proposedStartAt:proposal.proposed_start_at,proposedEndAt:proposal.proposed_end_at});
+  const other=session.mentor_user_id===userId?session.mentee_user_id:session.mentor_user_id;
+  await notify(db,other,"mentorship.session_change_proposed","mentorship_session_change_proposal",proposal.id,{message:"The other participant proposed a change to a confirmed mentorship session.",nextAction:"Review the proposed time and accept or decline it. The existing confirmed appointment remains in place until you accept.",actionUrl:"/mentorship",actionRequired:true,priority:"high"});
+  return {...proposal,nextAction:"Schedule change proposed. The existing confirmed appointment remains unchanged until the other participant accepts."};
+ });
+}
+export async function respondToMentorshipSessionChange(proposalId,userId,status,note,requestId){
+ if(!["accepted","declined","withdrawn"].includes(status))fail(400,"Choose accept, decline or withdraw for this schedule proposal.","VALIDATION_ERROR");
+ return withTransaction(async db=>{
+  const proposal=(await db.query("select cp.*,s.mentorship_id,s.scheduled_start_at current_start_at,s.scheduled_end_at current_end_at,s.status session_status,s.coordination_status,m.mentor_user_id,m.mentee_user_id,m.status mentorship_status from mentorship_session_change_proposal cp join mentorship_session s on s.id=cp.session_id join mentorship m on m.id=s.mentorship_id where cp.id=$1 for update of cp,s",[proposalId])).rows[0];
+  if(!proposal)fail(404,"Schedule-change proposal not found.","NOT_FOUND");
+  if(proposal.mentor_user_id!==userId&&proposal.mentee_user_id!==userId)fail(403,"Only a mentorship participant can respond to this schedule change.","FORBIDDEN");
+  if(proposal.status===status)return {...proposal,idempotent:true,nextAction:status==="accepted"?"The proposed schedule is already confirmed.":"This schedule proposal has already been closed."};
+  if(proposal.status!=="pending")fail(409,"This schedule proposal is no longer awaiting a response.","INVALID_STATE");
+  if(status==="withdrawn"&&proposal.proposed_by!==userId)fail(403,"Only the participant who proposed this schedule change can withdraw it.","FORBIDDEN");
+  if(status!=="withdrawn"&&proposal.proposed_by===userId)fail(403,"The proposer cannot approve their own schedule change.","PROPOSER_CANNOT_CONFIRM");
+  const responseNote=String(note||"").trim().slice(0,1000)||null;
+  if(status==="accepted"){
+   if(proposal.mentorship_status!=="active"||proposal.session_status!=="scheduled"||proposal.coordination_status!=="accepted")fail(409,"The original session is no longer eligible for rescheduling.","SESSION_NOT_RESCHEDULABLE");
+   if(new Date(proposal.current_start_at).toISOString()!==new Date(proposal.previous_start_at).toISOString()||new Date(proposal.current_end_at).toISOString()!==new Date(proposal.previous_end_at).toISOString())fail(409,"The confirmed appointment changed after this proposal was created. Refresh the session before responding.","STALE_SCHEDULE_PROPOSAL");
+   await assertSessionFitsAvailability(db,proposal.mentor_user_id,proposal.proposed_start_at,proposal.proposed_end_at);
+   await db.query("update mentorship_session set scheduled_start_at=$1,scheduled_end_at=$2,updated_at=now() where id=$3",[proposal.proposed_start_at,proposal.proposed_end_at,proposal.session_id]);
+  }
+  const updated=(await db.query("update mentorship_session_change_proposal set status=$1,responded_by=$2,responded_at=now(),response_note=$3 where id=$4 returning *",[status,userId,responseNote,proposalId])).rows[0];
+  await audit(db,userId,"mentorship.session_change_"+status,"mentorship_session_change_proposal",proposalId,requestId,{sessionId:proposal.session_id,status});
+  const other=proposal.proposed_by===userId?(proposal.mentor_user_id===userId?proposal.mentee_user_id:proposal.mentor_user_id):proposal.proposed_by;
+  await notify(db,other,"mentorship.session_change_responded","mentorship_session_change_proposal",proposalId,{message:status==="accepted"?"The proposed session change was accepted and the new time is confirmed.":status==="declined"?"The proposed session change was declined; the original confirmed appointment remains in place.":"The proposed session change was withdrawn; the original confirmed appointment remains in place.",nextAction:status==="accepted"?"Review the updated confirmed session details.":"Keep the original appointment or propose another time.",actionUrl:"/mentorship",actionRequired:false});
+  return {...updated,nextAction:status==="accepted"?"Both participants have confirmed the new session time. The original schedule remains in the proposal history.":status==="declined"?"Schedule change declined. The original confirmed appointment remains unchanged.":"Schedule change withdrawn. The original confirmed appointment remains unchanged."};
  });
 }
 export async function joinMentorshipCircle(profileId,userId,requestId){

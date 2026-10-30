@@ -88,3 +88,28 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(interestPage, /no contact addresses/i);
   assert.match(page, /Notification evidence/);
 });
+
+test("mentorship rescheduling preserves the confirmed appointment until the other participant accepts", async () => {
+  const [migration, operations, service, server, page] = await Promise.all([
+    source("../../db/migrations/20261030100000_mentorship_session_change_proposals.sql"),
+    source("../../src/services-mentorship/operations.js"),
+    source("../../src/services-mentorship/service.js"),
+    source("../../server.js"),
+    source("../../web/app/mentorship/page.tsx"),
+  ]);
+  assert.match(migration, /ux_mentorship_session_one_pending_change/);
+  assert.match(migration, /previous_start_at timestamptz NOT NULL/);
+  assert.match(migration, /proposed_start_at timestamptz NOT NULL/);
+  assert.match(operations, /Only a mentorship participant can propose a schedule change/);
+  assert.match(operations, /PROPOSER_CANNOT_CONFIRM/);
+  assert.match(operations, /The existing confirmed appointment remains unchanged until the other participant accepts/);
+  assert.match(operations, /update mentorship_session set scheduled_start_at=\$1,scheduled_end_at=\$2/);
+  assert.match(operations, /STALE_SCHEDULE_PROPOSAL/);
+  assert.match(service, /change_proposal_id/);
+  assert.match(server, /proposeMentorshipSessionChange/);
+  assert.match(server, /respondToMentorshipSessionChange/);
+  assert.match(page, /Propose a different session time/);
+  assert.match(page, /Confirm new time/);
+  assert.match(page, /Keep original time/);
+  assert.match(page, /Withdraw schedule change/);
+});

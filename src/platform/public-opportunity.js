@@ -17,7 +17,7 @@ async function audit(db,actor,action,type,id,requestId,metadata={}){ await db.qu
 async function notify(db,userId,eventCode,type,id,payload={}){if(!userId)return;await db.query("insert into notification_event(user_id,event_code,resource_type,resource_id,payload) values($1,$2,$3,$4,$5)",[userId,eventCode,type,id,payload]);}
 async function hasRole(db,userId,roles){ const r=(await db.query("select 1 from app_user_role ur join app_role ar on ar.id=ur.role_id where ur.user_id=$1 and ar.role_code=any($2::text[]) limit 1",[userId,roles])).rows[0]; return Boolean(r); }
 async function orgAuthorized(db,jobId,userId){
- const r=(await db.query("select 1 from job j join organization_membership om on om.organization_id=j.organization_id where j.id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator','recruiter','project_manager')",[jobId,userId])).rows[0];
+ const r=(await db.query("select 1 from job j where j.id=$1 and (exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator','recruiter')) or exists(select 1 from job_team_member jt join organization_membership om on om.organization_id=j.organization_id and om.user_id=jt.user_id and om.status='active' where jt.job_id=j.id and jt.user_id=$2 and jt.active=true and jt.role_code in ('recruiter','hiring_manager')))",[jobId,userId])).rows[0];
  return Boolean(r);
 }
 async function mentorAuthorized(db,mentorUserId,userId){
@@ -227,15 +227,15 @@ export async function getLinkedSharingHistory(reference,userId){
  return (await getPool().query("select s.id share_id,o.display_name,o.legal_name,s.shared_fields,s.shared_at,s.revoked_at,s.revoke_reason from job_seeker_demand_share s join organization o on o.id=s.organization_id where s.inquiry_id=$1 order by s.shared_at desc",[inquiry.id])).rows.map(row=>({shareId:row.share_id,organizationName:row.display_name||row.legal_name,sharedFields:Array.isArray(row.shared_fields)?row.shared_fields:JSON.parse(row.shared_fields||"[]"),sharedAt:row.shared_at,revokedAt:row.revoked_at,revokeReason:row.revoke_reason,status:row.revoked_at?"revoked":"shared"}));
 }
 async function visibleInquiries(db,userId,filters={}){
- const admin=await hasRole(db,userId,["system_admin","admin","supporting_staff"]);
+ const admin=await hasRole(db,userId,["system_admin","admin","platform_admin","supporting_staff"]);
  if(!admin){
-   const scope=(await db.query("select exists(select 1 from organization_membership om where om.user_id=$1 and om.status='active' and om.role_code in ('owner','administrator','recruiter','project_manager','read_only')) or exists(select 1 from mentor_profile mp where mp.user_id=$1)",[userId])).rows[0];
+   const scope=(await db.query("select exists(select 1 from organization_membership om where om.user_id=$1 and om.status='active' and om.role_code in ('owner','administrator','recruiter')) or exists(select 1 from job_team_member jt join job j on j.id=jt.job_id join organization_membership om on om.organization_id=j.organization_id and om.user_id=jt.user_id and om.status='active' where jt.user_id=$1 and jt.active=true and jt.role_code in ('recruiter','hiring_manager')) or exists(select 1 from mentor_profile mp where mp.user_id=$1)",[userId])).rows[0];
    if(!scope||!scope.exists) throw error(403,"An active organization role or mentor profile is required to inspect opportunity inquiries.","FORBIDDEN");
  }
  const params=admin?[]:[userId]; const clauses=[];
  if(admin){ clauses.push("true"); }
  else {
-   clauses.push("(i.inquiry_type='job' and exists (select 1 from job j join organization_membership om on om.organization_id=j.organization_id where j.id=i.job_id and om.user_id=$1 and om.status='active' and om.role_code in ('owner','administrator','recruiter','project_manager','read_only')) or i.inquiry_type='mentorship' and (i.preferred_mentor_user_id=$1))");
+   clauses.push("(i.inquiry_type='job' and exists (select 1 from job j where j.id=i.job_id and (exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id=$1 and om.status='active' and om.role_code in ('owner','administrator','recruiter')) or exists(select 1 from job_team_member jt join organization_membership om on om.organization_id=j.organization_id and om.user_id=jt.user_id and om.status='active' where jt.job_id=j.id and jt.user_id=$1 and jt.active=true and jt.role_code in ('recruiter','hiring_manager')))) or i.inquiry_type='mentorship' and (i.preferred_mentor_user_id=$1))");
  }
  if(filters.type){ params.push(filters.type); clauses.push(`i.inquiry_type=$${params.length}`); }
  if(filters.status){ params.push(filters.status); clauses.push(`i.status=$${params.length}`); }
@@ -260,7 +260,7 @@ export async function decideInquiry(inquiryId,userId,input,requestId,idempotency
  return withTransaction(async db=>{
   const r=(await db.query("select i.*,j.organization_id from public_opportunity_inquiry i left join job j on j.id=i.job_id where i.id=$1 for update of i",[inquiryId])).rows[0];
   if(!r) throw error(404,"Inquiry not found.","NOT_FOUND");
-  const admin=await hasRole(db,userId,["system_admin","admin","supporting_staff"]);
+  const admin=await hasRole(db,userId,["system_admin","admin","platform_admin","supporting_staff"]);
   const allowed=r.inquiry_type==="job" ? await orgAuthorized(db,r.job_id,userId) : await mentorAuthorized(db,r.preferred_mentor_user_id,userId);
   if(!admin&&!allowed) throw error(403,"You are not authorized to review this inquiry.","FORBIDDEN");
   const status=input.status||r.status;

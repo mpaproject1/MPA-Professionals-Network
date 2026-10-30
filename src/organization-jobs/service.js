@@ -290,27 +290,65 @@ export async function updateJob(jobId,userId,input,requestId){
  });
 }
 
+async function assertJobReviewer(db,userId){
+ const allowed=(await db.query("select 1 where exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code in ('reviewer','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=$1 and up.permission_code='jobs.review')",[userId])).rows[0];
+ if(!allowed)throw error(403,"MPA vacancy reviewer permission required.","FORBIDDEN");
+}
+export async function listJobsForReview(reviewerId){
+ const db=getPool();await assertJobReviewer(db,reviewerId);
+ return (await db.query(`select j.id,j.organization_id,j.title,j.description,j.employment_type,j.work_mode,j.location_label,j.posting_scope,j.visibility,j.application_deadline,j.created_at,j.review_status,j.review_submitted_at,o.display_name organization_name,o.verification_status
+  from job j join organization o on o.id=j.organization_id
+  where j.status='pending_review' and j.review_status='pending'
+  order by j.review_submitted_at nulls last,j.created_at`)).rows;
+}
 export async function publishJob(jobId,userId,requestId){
  return withTransaction(async db=>{
-  const j=(await db.query("select * from job where id=$1 for update",[jobId])).rows[0]; if(!j) throw error(404,"Job not found.","NOT_FOUND");
-  await orgRole(db,j.organization_id,userId); await verifiedOrg(db,j.organization_id);
-  if(!j.title||!j.description) throw error(400,"Job is incomplete.","VALIDATION_ERROR");
-  if(j.visibility==="exclusive") await ensureExclusiveDefaults(db,jobId);
-  await db.query("update job set status='published',published_at=coalesce(published_at,now()),updated_by=$1,updated_at=now() where id=$2",[userId,jobId]);
-  await audit(db,userId,"job.published","job",jobId,requestId,{visibility:j.visibility});
-  return (await db.query("select * from job where id=$1",[jobId])).rows[0];
+  const j=(await db.query("select * from job where id=$1 for update",[jobId])).rows[0];if(!j)throw error(404,"Job not found.","NOT_FOUND");
+  await orgRole(db,j.organization_id,userId);
+  if(["closed","archived"].includes(j.status))throw error(409,"Closed or archived vacancies cannot be submitted for review.","INVALID_STATE");
+  if(!j.title||!j.description)throw error(400,"Job is incomplete.","VALIDATION_ERROR");
+  await verifiedOrg(db,j.organization_id);
+  if(j.visibility==="exclusive"||["mpa_members","partner_network"].includes(j.posting_scope))await ensureExclusiveDefaults(db,jobId);
+  if(j.status==="published")throw error(409,"This vacancy is already published. Material changes require a new review submission.","INVALID_STATE");
+  const row=(await db.query("update job set status='pending_review',review_status='pending',review_submitted_at=now(),reviewed_by=null,reviewed_at=null,review_reason=null,updated_by=$1,updated_at=now() where id=$2 returning *",[userId,jobId])).rows[0];
+  await audit(db,userId,"job.review_submitted","job",jobId,requestId,{organizationId:j.organization_id});
+  const reviewers=(await db.query("select distinct u.id user_id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='jobs.review'))")).rows;
+  for(const reviewer of reviewers)await queueWorkflowEmail(db,reviewer.user_id,"organization.review_queue_item",{category:"jobs",title:"Vacancy awaiting MPA review",organizationName:"An organization",status:"pending_review",message:"A vacancy has been submitted and is awaiting MPA approval.",nextAction:"Review the vacancy in the MPA vacancy review queue.",actionUrl:"/admin/jobs/review",reviewerQueue:true,actionRequired:true,priority:"high",eventVersion:row.review_submitted_at?.toISOString?.()||jobId},"job",jobId);
+  return row;
  });
 }
-
+export async function reviewJob(jobId,reviewerId,input,requestId){
+ return withTransaction(async db=>{
+  await assertJobReviewer(db,reviewerId);
+  const j=(await db.query("select j.*,o.verification_status,o.public_visible from job j join organization o on o.id=j.organization_id where j.id=$1 for update of j",[jobId])).rows[0];
+  if(!j)throw error(404,"Vacancy not found.","NOT_FOUND");
+  if(j.status!=="pending_review"||j.review_status!=="pending")throw error(409,"This vacancy is not awaiting MPA review.","INVALID_STATE");
+  const decision=String(input.decision||"");
+  if(!["approved","rejected","correction_required"].includes(decision))throw error(400,"Choose approve, reject or return for correction.","VALIDATION_ERROR");
+  const reason=String(input.reason||"").trim();
+  if(decision!=="approved"&&reason.length<8)throw error(400,"A clear decision reason is required for rejection or correction.","REVIEW_REASON_REQUIRED");
+  if(decision==="approved"){
+   if(j.verification_status!=="verified"||j.public_visible!==true)throw error(409,"The organization must remain verified and publicly visible before a vacancy can be approved.","ORGANIZATION_NOT_VERIFIED");
+   if(!j.title||!j.description)throw error(400,"The vacancy is incomplete.","VALIDATION_ERROR");
+   if(j.visibility==="exclusive"||["mpa_members","partner_network"].includes(j.posting_scope))await ensureExclusiveDefaults(db,jobId);
+  }
+  const nextStatus=decision==="approved"?"published":"draft";
+  const row=(await db.query("update job set status=$1,review_status=$2,reviewed_by=$3,reviewed_at=now(),review_reason=$4,published_at=case when $2='approved' then now() else published_at end,updated_by=$3,updated_at=now() where id=$5 returning *",[nextStatus,decision,reviewerId,reason||null,jobId])).rows[0];
+  await audit(db,reviewerId,"job.review_decided","job",jobId,requestId,{decision,reason:reason||null,organizationId:j.organization_id});
+  const recipients=(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code in ('owner','administrator','recruiter')",[j.organization_id])).rows;
+  for(const recipient of recipients)await queueWorkflowEmail(db,recipient.user_id,"employer.candidate_update",{notificationEventCode:"job.review_decided",category:"recruitment",title:decision==="approved"?"Vacancy approved":"Vacancy needs attention",audience:"employer",status:decision,message:decision==="approved"?"MPA approved your vacancy. It is now published according to its posting scope.":decision==="rejected"?"MPA did not approve this vacancy.":"MPA returned this vacancy for correction.",nextAction:decision==="approved"?"Review your published vacancy and manage applications.":"Update the vacancy and submit it for MPA review again.",actionUrl:"/recruitment",actionRequired:decision!=="approved",priority:decision==="approved"?"normal":"high",decisionReason:reason||undefined},"job",jobId);
+  return row;
+ });
+}
 export async function changeJobStatus(jobId,userId,status,requestId){
  return withTransaction(async db=>{
-  const j=(await db.query("select * from job where id=$1 for update",[jobId])).rows[0]; if(!j) throw error(404,"Job not found.","NOT_FOUND");
+  const j=(await db.query("select * from job where id=$1 for update",[jobId])).rows[0];if(!j)throw error(404,"Job not found.","NOT_FOUND");
   await orgRole(db,j.organization_id,userId);
-  if(!["draft","pending_review","published","paused","closed","archived"].includes(status)) throw error(400,"Invalid job status.","VALIDATION_ERROR");
-  if(status==="published") await verifiedOrg(db,j.organization_id);
-  await db.query("update job set status=$1,closed_at=case when $1='closed' then now() else closed_at end,updated_by=$2,updated_at=now() where id=$3",[status,userId,jobId]);
+  if(!["draft","paused","closed","archived"].includes(status))throw error(403,"Only an MPA reviewer may submit or publish a vacancy; use the review submission workflow.","FORBIDDEN");
+  if(["closed","archived"].includes(j.status)&&status!=="archived")throw error(409,"Closed or archived vacancies cannot be reopened through a status change.","INVALID_STATE");
+  const row=(await db.query("update job set status=$1,closed_at=case when $1='closed' then now() else closed_at end,updated_by=$2,updated_at=now() where id=$3 returning *",[status,userId,jobId])).rows[0];
   await audit(db,userId,"job.status_changed","job",jobId,requestId,{status});
-  return (await db.query("select * from job where id=$1",[jobId])).rows[0];
+  return row;
  });
 }
 

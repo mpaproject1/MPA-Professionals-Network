@@ -179,7 +179,7 @@ test.describe("registration human verification", () => {
     await page.goto("/register");
     for (let retry = 0; retry < 10; retry += 1) {
       await page.getByRole("button", { name: "Refresh human verification challenge" }).click();
-      await expect(page.getByRole("button", { name: /Get a new question/i })).toBeEnabled();
+      await expect(page.getByRole("button", { name: "Refresh human verification challenge" })).toBeEnabled();
     }
     expect(issued.issued()).toBe(11);
   });

@@ -169,3 +169,19 @@ test("employer interview status transitions preserve completed and cancelled ter
   assert.equal(allowedInterviewStatusTransition("cancelled","confirmed"),false);
   assert.equal(allowedInterviewStatusTransition("scheduled","unknown"),false);
 });
+
+test("employer interview management exposes authorized schedules and completed-interview feedback",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const [service,server,page]=await Promise.all([
+    readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8"),
+    readFile(new URL("../../server.js",import.meta.url),"utf8"),
+    readFile(new URL("../../web/app/recruitment/page.tsx",import.meta.url),"utf8")
+  ]);
+  assert.match(server,/api\/v1\/job-applications\/.*interviews/);
+  assert.match(server,/api\/v1\/job-interviews\/.*status/);
+  assert.match(service,/currentUserRole:\(row\.participants\|\|\[\]\)\.find/);
+  assert.match(service,/INTERVIEW_NOT_COMPLETED/);
+  assert.match(page,/View interview schedule/);
+  assert.match(page,/Mark completed/);
+  assert.match(page,/Save interview feedback/);
+});

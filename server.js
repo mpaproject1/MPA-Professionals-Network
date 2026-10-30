@@ -583,6 +583,7 @@ const server=http.createServer(async (req,res)=>{
 
     if(req.method==="POST" && p==="api/v1/ethics/cases") return ok(res,await ethics.createEthicsCase(identity.sub,await body(req),requestId),requestId,201);
     if(req.method==="GET" && p==="api/v1/me/ethics/cases") return ok(res,await ethics.listMyEthicsCases(identity.sub),requestId);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/ethics/cases/") && parts[5]==="respond") return ok(res,await ethics.submitEthicsRespondentResponse(parts[4],identity.sub,await body(req),requestId),requestId);
     if(req.method==="GET" && p==="api/v1/review/ethics/cases") { const q=query(req.url); return ok(res,await ethics.listEthicsCases(identity.sub,{status:q.get("status"),severity:q.get("severity"),limit:q.get("limit")}),requestId); }
     if(req.method==="GET" && p==="api/v1/review/ethics/reviewers") return ok(res,await ethics.listEthicsReviewers(identity.sub),requestId);
     if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/review/ethics/cases/")) return ok(res,await ethics.getEthicsCase(parts[5],identity.sub),requestId);

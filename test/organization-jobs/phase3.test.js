@@ -125,7 +125,7 @@ test("applicant progress exposes interview and offer actions without internal re
 test("only open interviews accept participant responses",()=>{
   assert.equal(canRespondToInterview("scheduled"),true);
   assert.equal(canRespondToInterview("confirmed"),true);
-  assert.equal(canRespondToInterview("reschedule_requested"),true);
+  assert.equal(canRespondToInterview("reschedule_requested"),false);
   for(const status of ["completed","cancelled","no_show","unknown"]) assert.equal(canRespondToInterview(status),false);
 });
 
@@ -184,4 +184,26 @@ test("employer interview management exposes authorized schedules and completed-i
   assert.match(page,/View interview schedule/);
   assert.match(page,/Mark completed/);
   assert.match(page,/Save interview feedback/);
+});
+
+test("interview reschedule proposals are persisted, single-pending, auditable and participant-decided",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const [migration,service,server,candidatePage,employerPage]=await Promise.all([
+    readFile(new URL("../../db/migrations/20261030110000_job_interview_change_proposals.sql",import.meta.url),"utf8"),
+    readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8"),
+    readFile(new URL("../../server.js",import.meta.url),"utf8"),
+    readFile(new URL("../../web/app/track/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../../web/app/recruitment/page.tsx",import.meta.url),"utf8")
+  ]);
+  assert.match(migration,/ux_job_interview_change_pending/);
+  assert.match(migration,/where status='pending'/);
+  assert.match(service,/export async function proposeInterviewChange/);
+  assert.match(service,/export async function decideInterviewChange/);
+  assert.match(service,/job\.interview_change_proposed/);
+  assert.match(service,/job\.interview_change_decided/);
+  assert.match(server,/job-interview-change-proposals/);
+  assert.match(candidatePage,/Accept new time/);
+  assert.match(candidatePage,/Propose a different time/);
+  assert.match(employerPage,/Accept proposed time/);
+  assert.match(employerPage,/Keep original time/);
 });

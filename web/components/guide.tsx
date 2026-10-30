@@ -14,7 +14,7 @@ function visibleTarget(selector?:string):HTMLElement|null{
 }
 export function GuideLauncher(){
  const pathname=usePathname()||"/";const [guides,setGuides]=useState<Guide[]>([]);
- const [open,setOpen]=useState(false);const [index,setIndex]=useState(0);const launcherRef=useRef<HTMLButtonElement>(null);const headingRef=useRef<HTMLHeadingElement>(null);
+ const [open,setOpen]=useState(false);const [index,setIndex]=useState(0);const [cardPlacement,setCardPlacement]=useState<"top"|"bottom">("bottom");const launcherRef=useRef<HTMLButtonElement>(null);const headingRef=useRef<HTMLHeadingElement>(null);
  useEffect(()=>{let cancelled=false;setIndex(0);api<Guide[]>(`/api/v1/experience/guides?route=${encodeURIComponent(pathname)}`).then(rows=>{if(!cancelled)setGuides(Array.isArray(rows)?rows:[])}).catch(()=>{if(!cancelled)setGuides([])});return()=>{cancelled=true}},[pathname]);
  const guide=useMemo(()=>guides.find(g=>g.route_pattern===pathname)||guides.find(g=>g.route_pattern==="*")||fallback,[guides,pathname]);
  const steps=guide.steps?.length?guide.steps:fallback.steps;const step=steps[Math.min(index,steps.length-1)];
@@ -22,14 +22,14 @@ export function GuideLauncher(){
  const begin=useCallback(()=>{setIndex(0);setOpen(true);window.dispatchEvent(new Event("mpa:close-support"));},[]);
  useEffect(()=>{const start=()=>begin();window.addEventListener("mpa:open-guide",start);return()=>window.removeEventListener("mpa:open-guide",start)},[begin]);
  useEffect(()=>{if(!open)return;const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape"){event.preventDefault();close()}};window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey)},[open,close]);
- useEffect(()=>{if(!open)return;const target=visibleTarget(step?.target);target?.scrollIntoView({behavior:"auto",block:"center",inline:"nearest"});headingRef.current?.focus({preventScroll:true});},[open,step]);
+ useEffect(()=>{if(!open)return;const target=visibleTarget(step?.target);if(target){target.scrollIntoView({behavior:"auto",block:"center",inline:"nearest"});const rect=target.getBoundingClientRect();setCardPlacement(rect.top>window.innerHeight*0.52?"top":"bottom")}else setCardPlacement("bottom");headingRef.current?.focus({preventScroll:true});},[open,step]);
  const targetExists=Boolean(visibleTarget(step?.target));
  function next(){if(index<steps.length-1)setIndex(value=>value+1);else close()}
  return <>
   <button ref={launcherRef} type="button" id="mpa-help" data-guide-target="help-control" className="guide-help" aria-label="Show me around this screen" onClick={begin}><HelpCircle size={18}/> {pathname==="/members"?"Show me around":"Guide"}</button>
   {open?<div className="guide-overlay" data-testid="guide-overlay">
    {targetExists&&step?.target?<GuideSpotlight target={step.target}/>:null}
-   <aside className="guide-card" role="dialog" aria-modal="false" aria-labelledby="guide-title" aria-describedby="guide-description">
+   <aside className="guide-card" style={cardPlacement==="top"?{top:"calc(76px + env(safe-area-inset-top))",bottom:"auto"}:undefined} role="dialog" aria-modal="false" aria-labelledby="guide-title" aria-describedby="guide-description">
     <div className="row"><span className="badge badge-green"><PlayCircle size={13}/> Guided tour</span><button type="button" className="icon-btn" onClick={close} aria-label="Close tour"><X size={17}/></button></div>
     <div className="eyebrow" style={{marginTop:14}}>{guide.title}</div>
     <p className="muted" aria-live="polite">Step {index+1} of {steps.length}</p>

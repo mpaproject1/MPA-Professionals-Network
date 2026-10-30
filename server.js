@@ -538,7 +538,7 @@ const server=http.createServer(async (req,res)=>{
       assertPaymentReversalAccess(identity);
       return ok(res,await membership.reverseMembershipPayment(parts[3],identity.sub,await body(req),requestId),requestId);
     }
-    if(req.method==="GET" && p==="api/v1/finance/membership/payments") { assertFinancePaymentQueueAccess(identity); return ok(res,await membership.listMembershipPaymentsForFinance(),requestId); }
+    if(req.method==="GET" && p==="api/v1/finance/membership/payments") { const identity=await auth(req); assertFinancePaymentQueueAccess(identity); return ok(res,await membership.listMembershipPaymentsForFinance(),requestId); }
     if(req.method==="GET" && p==="api/v1/review/membership/applications") {
       assertMembershipReviewQueueAccess(identity);
       return ok(res,await membership.listApplicationsForReview(),requestId);

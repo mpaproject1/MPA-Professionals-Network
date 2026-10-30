@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { ArrowRight, BriefcaseBusiness, Network } from "lucide-react";
-import { Card } from "../../components/ui";
+import Link from "next/link";
 import { NetworkPlusAccessGuard } from "../../components/network-plus-access-guard";
+import { Card } from "../../components/ui";
 
 export default function NetworkPlusPage() {
   return (

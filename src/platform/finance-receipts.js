@@ -86,11 +86,11 @@ export async function issueFinancePaymentVoucher(identity,id,requestId){
     if(!row)throw fail(404,"Finance payment record not found.","NOT_FOUND");
     if(row.status!=="verified")throw fail(409,"A payment voucher can only be issued for a verified payment.","PAYMENT_NOT_VERIFIED");
     const active=(await tx.query("select id,voucher_number from finance_payment_voucher where payment_record_id=$1 and revoked_at is null",[id])).rows[0];
-    if(active)return {voucherId:active.id,voucherNumber:active.voucher_number,verificationPath:"/finance/verify/"+active.id,alreadyIssued:true};
+    if(active)return {voucherId:active.id,voucherNumber:active.voucher_number,alreadyIssued:true,downloadUnavailable:true};
     const token=randomBytes(32).toString("base64url"),voucherNumber="MPA-VCH-"+new Date().getUTCFullYear()+"-"+randomUUID().replaceAll("-","").slice(0,12).toUpperCase();
     const voucher=(await tx.query("insert into finance_payment_voucher(payment_record_id,voucher_number,verification_token_sha256,issued_by) values($1,$2,$3,$4) returning id,voucher_number,issued_at",[id,voucherNumber,hash(token),identity.sub])).rows[0];
     await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.payment_voucher_issued','finance_payment_voucher',$2,$3,'success',$4)",[identity.sub,voucher.id,requestId||null,JSON.stringify({voucherNumber,paymentRecordId:id})]);
-    return {voucherId:voucher.id,voucherNumber:voucher.voucher_number,token,verificationPath:"/finance/verify/"+voucher.id+"?token="+encodeURIComponent(token),issuedAt:voucher.issued_at};
+    return {voucherId:voucher.id,voucherNumber:voucher.voucher_number,token,verificationPath:"/finance/verify/"+voucher.id+"?token="+encodeURIComponent(token),issuedAt:voucher.issued_at,payment:safeReceipt(row)};
   });
 }
 export async function verifyFinancePaymentVoucher(voucherId,token){
@@ -100,4 +100,19 @@ export async function verifyFinancePaymentVoucher(voucherId,token){
   if(!row||row.revoked_at||row.status!=="verified"||!token||hash(String(token))!==(await getPool().query("select verification_token_sha256 from finance_payment_voucher where id=$1",[voucherId])).rows[0]?.verification_token_sha256)
     throw fail(404,"This payment voucher is invalid, revoked or unavailable.","VOUCHER_INVALID");
   return {valid:true,status:"verified",voucherNumber:row.voucher_number,receiptNumber:row.receipt_number,payerName:row.payer_name,payerType:row.payer_type,organizationName:row.organization_name,amount:row.amount,currency:row.currency,purpose:row.purpose,paymentDate:row.payment_date,paymentMethod:row.payment_method,verifiedAt:row.verified_at,issuedAt:row.issued_at};
+}
+
+export async function reverseManualFinancePayment(identity,id,reason,requestId){
+  assertFinance(identity,"finance.payment.reverse");
+  const note=clean(reason,1000);
+  if(note.length<8)throw fail(400,"A reversal reason of at least eight characters is required.","REVERSAL_REASON_REQUIRED");
+  return withTransaction(async tx=>{
+    const row=(await tx.query("select * from finance_payment_record where id=$1 for update",[id])).rows[0];
+    if(!row)throw fail(404,"Finance payment record not found.","NOT_FOUND");
+    if(row.status!=="verified")throw fail(409,"Only a verified manual finance payment can be reversed.","INVALID_STATE");
+    const updated=(await tx.query("update finance_payment_record set status='reversed',reversed_at=now(),reversed_by=$2,reversal_reason=$3,updated_at=now() where id=$1 returning *",[id,identity.sub,note])).rows[0];
+    const vouchers=await tx.query("update finance_payment_voucher set revoked_at=now(),revoked_by=$2,revocation_reason=$3 where payment_record_id=$1 and revoked_at is null returning id",[id,identity.sub,note]);
+    await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.manual_payment_reversed','finance_payment_record',$2,$3,'success',$4)",[identity.sub,id,requestId||null,JSON.stringify({receiptNumber:row.receipt_number,revokedVouchers:vouchers.rowCount,reason:note})]);
+    return safeReceipt(updated);
+  });
 }

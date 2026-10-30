@@ -166,6 +166,7 @@ export default function FinanceWorkspacePage() {
 
   return <div className="grid" style={{ gap: 16 }}>
     <AdminPageHeader eyebrow="MPA · Finance operations" title="Membership payment queue" description="Verify eligible payments, review payment exceptions and record authorized reversals. This workspace does not approve or activate membership applications." actions={<button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={busy !== ""}>{busy === "load" ? "Refreshing…" : "Refresh queue"}</button>} />
+    <div className="row" style={{gap:8,flexWrap:"wrap"}}><a className="btn btn-primary" href="/admin/finance/receipts">Record manual payment & issue QR vouchers</a><a className="btn btn-ghost" href="/admin/reports?report=manual-finance-receipts">Manual finance receipts report</a></div>
     {error && <p className="form-error" role="alert">{error}</p>}
     {notice && <p className="form-success" role="status" aria-live="polite">{notice}</p>}
     <Card>

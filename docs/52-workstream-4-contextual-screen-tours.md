@@ -1,7 +1,7 @@
 # Workstream 4 — Current screen tours and contextual help
 
 ## Reconciliation with Ask MPA support
-The floating Ask MPA assistant remains the conversational help and human-follow-up channel. The screen tour is a separate, short visual orientation. The Guide launcher is positioned on the opposite side of the viewport from the support assistant; the tour layer sits above the assistant, and starting a tour closes an open assistant panel without disabling the assistant.
+The floating Ask MPA assistant remains the conversational help and human-follow-up channel. The screen tour is a separate, short visual orientation. The Guide launcher is positioned on the opposite side of the viewport from the support assistant and remains above its movable launcher. Starting a tour closes an open assistant panel and temporarily hides the assistant launcher—even if it was dragged over the guide control. The assistant returns when the tour closes; its conversation state is preserved.
 
 The tour is deliberately non-modal. Its overlay does not intercept page clicks, so forms, navigation and other critical controls remain usable. The spotlight is a visual outline only. The tour card itself remains interactive.
 

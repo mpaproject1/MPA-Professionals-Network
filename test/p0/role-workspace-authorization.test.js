@@ -386,6 +386,7 @@ test("finance payment workspace uses a privacy-minimized queue and separate fina
   const financeUi = read("web/app/admin/finance/page.tsx");
   const membershipUi = read("web/app/membership/workspace.tsx");
   assert.ok(server.includes("api/v1/finance/membership/payments"));
+  assert.ok(server.includes('const identity=await auth(req); assertFinancePaymentQueueAccess(identity)'));
   assert.ok(server.includes("assertFinancePaymentQueueAccess(identity)"));
   assert.ok(service.includes("export async function listMembershipPaymentsForFinance"));
   assert.ok(service.includes("pt.id payment_id"));

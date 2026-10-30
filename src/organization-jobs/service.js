@@ -90,6 +90,11 @@ export async function listMyOrganizations(userId){
   where om.user_id=$1 and om.status='active' order by o.created_at desc`,[userId])).rows;
 }
 
+export async function listMyJobAssignments(userId){
+ const db=getPool();
+ return (await db.query("select jt.id team_assignment_id,j.id job_id,j.title job_title,j.status job_status,j.organization_id,o.display_name organization_name,jt.role_code,jt.created_at assigned_at from job_team_member jt join job j on j.id=jt.job_id join organization o on o.id=j.organization_id join organization_membership om on om.organization_id=j.organization_id and om.user_id=jt.user_id and om.status='active' where jt.user_id=$1 and jt.active=true order by o.display_name,j.title,jt.role_code",[userId])).rows;
+}
+
 export async function addVerificationEvidence(orgId,userId,input,requestId){
  return withTransaction(async db=>{
   await orgRole(db,orgId,userId,["owner","administrator"]);

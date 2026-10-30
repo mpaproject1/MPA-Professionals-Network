@@ -6,7 +6,7 @@ The floating Ask MPA assistant remains the conversational help and human-follow-
 The tour is deliberately non-modal. Its overlay does not intercept page clicks, so forms, navigation and other critical controls remain usable. The spotlight is a visual outline only. The tour card itself remains interactive.
 
 ## Current guide inventory
-Migration `20261030160000_workstream_4_contextual_screen_tours.sql` disables older tours whose route/selector combinations have not been validated against the current interface. It upserts four audited guides:
+Migration `20261030160000_workstream_4_contextual_screen_tours.sql` disables older tours whose route/selector combinations have not been validated against the current interface. The administrator catalogue exposes only the four audited guides, and the service rejects attempts to re-enable a retired guide until a reviewed replacement is created. It upserts four audited guides:
 - Global navigation: brand, visible navigation and guide restart control.
 - `/members`: current workspace summary, progress, shortcuts and help area.
 - `/membership`: membership status, application/plan area and restart control.

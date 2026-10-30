@@ -217,7 +217,8 @@ test("interview schedule changes are offered only to participants and decisions 
     readFile(new URL("../../web/app/track/page.tsx",import.meta.url),"utf8"),
     readFile(new URL("../../web/app/recruitment/page.tsx",import.meta.url),"utf8")
   ]);
-  assert.match(service,/isParticipant,currentUserRole:/);
+  assert.match(service,/isParticipant,isInterviewer:participantRole==="interviewer"/);
+  assert.match(service,/currentUserRole:canManage\?accessRole/);
   assert.match(service,/canDecide:isParticipant&&proposal\.proposedBy!==userId/);
   assert.match(service,/const isApplicant=a\.applicant_user_id===userId/);
   assert.match(service,/participants:isApplicant\?/);

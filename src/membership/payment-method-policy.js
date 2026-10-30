@@ -9,7 +9,7 @@ export function canManageMembershipPaymentMethods(identity = {}) {
   const roles = Array.isArray(identity.roles) ? identity.roles : [];
   const permissions = Array.isArray(identity.permissions) ? identity.permissions : [];
   return roles.includes("system_admin") || roles.includes("finance_officer") ||
-    permissions.some(permission => ["members.manage", "finance.manage"].includes(permission));
+    permissions.includes("finance.manage");
 }
 export function assertMembershipPaymentMethodAdmin(identity = {}) {
   if (!canManageMembershipPaymentMethods(identity)) {

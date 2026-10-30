@@ -32,10 +32,10 @@ test("report catalogue respects role scope and hides restricted personal/financi
  assert.equal(support.some(r=>r.id==="member-directory"),false);
  assert.equal(support.some(r=>r.id==="payment-reconciliation"),false);
 });
-test("the full catalogue contains all 24 required reports and preserves role boundaries",async()=>{
+test("the full catalogue contains all 25 required reports and preserves role boundaries",async()=>{
  const reports=await listReportCatalogue(admin),ids=new Set(reports.map(report=>report.id));
- assert.equal(reports.length,24,"all 23 report definitions must remain available to an administrator");
- for(const id of ["membership-status","membership-applications","member-directory","payment-reconciliation","approved-payments","failed-reversed-payments","membership-collections","outstanding-membership-payments","finance-summary","job-seeker-demand","service-demand","job-application-funnel","service-listings","service-request-outcomes","mentorship-offers-requests-matches","mentorship-lifecycle","job-seeker-sharing-activity","professional-verification","organization-verification","support-demand-response","reference-import-quality","platform-usage","audit-activity"])assert.ok(ids.has(id),`missing agreed report: ${id}`);
+ assert.equal(reports.length,25,"all 25 report definitions must remain available to an administrator");
+ for(const id of ["membership-status","membership-applications","member-directory","payment-reconciliation","approved-payments","failed-reversed-payments","membership-collections","outstanding-membership-payments","finance-summary","job-seeker-demand","service-demand","job-application-funnel","service-listings","service-request-outcomes","mentorship-offers-requests-matches","mentorship-lifecycle","job-seeker-sharing-activity","professional-verification","organization-verification","support-demand-response","reference-import-quality","platform-usage","audit-activity","member-volunteer-capacity"])assert.ok(ids.has(id),`missing agreed report: ${id}`);
  const support=await listReportCatalogue({sub:"support",roles:["supporting_staff"],permissions:[]});
  assert.ok(support.some(report=>report.id==="support-demand-response"));
  assert.ok(support.some(report=>report.id==="job-seeker-demand"),"Support Desk may access only suppressed job-seeker demand aggregates");
@@ -190,7 +190,7 @@ function unzipEntries(buffer){
 function resultFor(report,rows=[]){return {report:{...report,scope:report.scope||"Test scope",definition:report.definition||"Test report definition.",columns:report.columns||["Status","Count"]},filters:{from:"2026-01-01",to:"2026-01-31",status:"",q:"",groupBy:"default"},generatedAt:"2026-10-28T12:00:00.000Z",rows,totals:{rows:rows.length,Count:rows.length}};}
 
 test("every report produces empty-state PDF and XLSX files with defined headings",async()=>{
- const reports=await listReportCatalogue(admin);assert.equal(reports.length,24);
+ const reports=await listReportCatalogue(admin);assert.equal(reports.length,25);
  for(const report of reports){
   const result=resultFor(report),pdf=makePdf(result),xlsx=makeXlsx(result),entries=unzipEntries(xlsx),sheet=entries.get("xl/worksheets/sheet1.xml");
   assert.ok(pdf.toString("ascii").startsWith("%PDF-1.4"),report.id+" PDF signature");

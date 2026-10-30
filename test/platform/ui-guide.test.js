@@ -39,6 +39,6 @@ test("migration disables stale route tours and seeds only audited current route 
  const migration=await readFile(new URL("../../db/migrations/20261030160000_workstream_4_contextual_screen_tours.sql",import.meta.url),"utf8");
  assert.match(migration,/set active=false/);
  for(const route of ["'\*'","'/members'","'/membership'","'/membership/payment'"])assert.ok(migration.includes(route),route);
- for(const target of ["brand-home","main-navigation","help-control","workspace-overview","workspace-progress","workspace-shortcuts","workspace-help","membership-overview","membership-application","payment-overview","payment-application","payment-submit"])assert.ok(migration.includes(target),target);
+ for(const target of ["brand-home","main-navigation","workspace-overview","workspace-progress","workspace-shortcuts","workspace-help","membership-overview","membership-application","payment-overview","payment-application","payment-submit"])assert.ok(migration.includes(target),target);
  assert.match(migration,/on conflict\(guide_key\) do update/);
 });

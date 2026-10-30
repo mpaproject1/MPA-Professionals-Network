@@ -619,8 +619,8 @@ export async function updateOrganizationUser(orgId,actorUserId,userId,input,requ
  });
 }
 export async function listOrganizationUsers(orgId,actorUserId){
- const db=getPool(); await orgRole(db,orgId,actorUserId,["owner","administrator"]);
- return (await db.query("select om.user_id,om.role_code,om.status,om.joined_at,p.display_name,u.email from organization_membership om join app_user u on u.id=om.user_id left join person p on p.user_id=u.id where om.organization_id=$1 order by om.created_at",[orgId])).rows;
+ const db=getPool(); await orgRole(db,orgId,actorUserId,["owner","administrator","recruiter"]);
+ return (await db.query("select om.user_id,om.role_code,om.status,om.joined_at,p.display_name,u.email from organization_membership om join app_user u on u.id=om.user_id left join person p on p.user_id=u.id where om.organization_id=$1 and om.status="active" order by om.created_at",[orgId])).rows;
 }
 
 function assertOrganizationAdminMutation(identity){

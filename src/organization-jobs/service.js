@@ -65,10 +65,10 @@ export async function listNetworkPlusOrganizations(viewerId,filters={}) {
  const args=[];
  const where=["o.network_plus_visible=true","o.verification_status='verified'"];
  const term=String(filters.q||"").trim().slice(0,120);
- if(term){args.push(`%${term}%`);where.push(`(o.display_name ilike ${args.length} or coalesce(o.description,'') ilike ${args.length})`);}
- if(filters.organizationType){args.push(String(filters.organizationType).trim().slice(0,80));where.push(`o.organization_type=${args.length}`);}
+ if(term){args.push(`%${term}%`);where.push(`(o.display_name ilike $${args.length} or coalesce(o.description,'') ilike $${args.length})`);}
+ if(filters.organizationType){args.push(String(filters.organizationType).trim().slice(0,80));where.push(`o.organization_type=$${args.length}`);}
  const location=String(filters.location||"").trim().slice(0,100);
- if(location){args.push(`%${location}%`);where.push(`coalesce(ri.label,'') ilike ${args.length}`);}
+ if(location){args.push(`%${location}%`);where.push(`coalesce(ri.label,'') ilike $${args.length}`);}
  const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
  const base=` from organization o left join reference_item ri on ri.id=o.geography_reference_item_id where ${where.join(" and ")}`;
  const total=Number((await db.query(`select count(*)::int count${base}`,args)).rows[0]?.count||0);

@@ -815,8 +815,9 @@ export async function respondInterview(interviewId,userId,status,requestId){
 }
 export async function submitInterviewFeedback(interviewId,userId,input,requestId){
  return withTransaction(async db=>{
-  const p=(await db.query("select jp.*,ji.application_id,a.job_id from job_interview_participant jp join job_interview ji on ji.id=jp.interview_id join job_application a on a.id=ji.application_id where ji.id=$1 and jp.user_id=$2 and jp.role_code='interviewer'",[interviewId,userId])).rows[0];
+  const p=(await db.query("select jp.*,ji.application_id,ji.status interview_status,a.job_id from job_interview_participant jp join job_interview ji on ji.id=jp.interview_id join job_application a on a.id=ji.application_id where ji.id=$1 and jp.user_id=$2 and jp.role_code='interviewer'",[interviewId,userId])).rows[0];
   if(!p) throw error(403,"Only assigned interviewers can submit feedback.","FORBIDDEN");
+  if(p.interview_status!=="completed") throw error(409,"Interview feedback can be submitted after the interview is marked completed.","INTERVIEW_NOT_COMPLETED");
   if(input.scorecardId){
    const scorecard=(await db.query("select id from job_interview_scorecard where id=$1 and job_id=$2 and active=true",[input.scorecardId,p.job_id])).rows[0];
    if(!scorecard)throw error(400,"The selected scorecard is not active for this interview's job.","SCORECARD_SCOPE");
@@ -896,7 +897,8 @@ export async function listApplicationInterviews(applicationId,userId){
  const db=getPool();
  const a=(await db.query("select applicant_user_id,job_id from job_application where id=$1",[applicationId])).rows[0]; if(!a) throw error(404,"Application not found.","NOT_FOUND");
  if(a.applicant_user_id!==userId) await jobRole(db,a.job_id,userId,["hiring_manager","recruiter","interviewer","observer"]);
- return (await db.query("select ji.*,coalesce((select json_agg(json_build_object('userId',jp.user_id,'role',jp.role_code,'response',jp.response_status)) from job_interview_participant jp where jp.interview_id=ji.id),'[]'::json) participants from job_interview ji where ji.application_id=$1 order by ji.scheduled_start",[applicationId])).rows;
+ const rows=(await db.query("select ji.*,coalesce((select json_agg(json_build_object('userId',jp.user_id,'role',jp.role_code,'response',jp.response_status)) from job_interview_participant jp where jp.interview_id=ji.id),'[]'::json) participants from job_interview ji where ji.application_id=$1 order by ji.scheduled_start",[applicationId])).rows;
+ return rows.map(row=>({...row,currentUserRole:(row.participants||[]).find(participant=>participant.userId===userId)?.role||null}));
 }
 export async function getMyApplicationProgress(applicationId,userId){
  const db=getPool(); const a=(await db.query("select a.*,j.id job_id,j.title,o.display_name organization_name from job_application a join job j on j.id=a.job_id join organization o on o.id=j.organization_id where a.id=$1 and a.applicant_user_id=$2",[applicationId,userId])).rows[0];

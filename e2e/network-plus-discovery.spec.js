@@ -37,8 +37,8 @@ async function mockNetworkPlus(page, { eligible = true, onSearch, items = [organ
     await route.fulfill({
       status: 200, contentType: "application/json",
       body: JSON.stringify({ data: {
-        items: [organization], limit: 21, offset: Number(url.searchParams.get("offset") || 0),
-        total: 1, hasMore: false,
+        items, limit: 21, offset: Number(url.searchParams.get("offset") || 0),
+        total: items.length, hasMore: false,
       } }),
     });
   });

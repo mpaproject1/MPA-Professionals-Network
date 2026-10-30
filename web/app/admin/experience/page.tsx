@@ -43,7 +43,7 @@ export default function AdminExperiencePage() {
     setLoading(true); setError(""); setFailed({ demos: false, guides: false });
     const [demoResult, guideResult] = await Promise.allSettled([
       api<any>("/api/v1/experience/demo-cases", {}, token),
-      api<any>("/api/v1/experience/guides", {}, token),
+      api<any>("/api/v1/admin/experience/guides", {}, token),
     ]);
     const getRows = (value: any, key: string) => Array.isArray(value) ? value : Array.isArray(value?.[key]) ? value[key] : Array.isArray(value?.items) ? value.items : null;
     if (demoResult.status === "fulfilled") {

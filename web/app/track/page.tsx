@@ -76,6 +76,29 @@ export default function Track() {
   const [loading, setLoading] = useState(true);
 
   async function copyReference(value: string) { const ref=String(value||"").trim(); if(!ref){setCopyNotice("No display reference is available yet.");return;} try { await navigator.clipboard.writeText(ref); setCopyNotice("Reference copied to clipboard."); } catch { setCopyNotice("Clipboard access is unavailable. Select the displayed reference and copy it manually."); } }
+  async function respondToInterview(interviewId: string, status: "accepted" | "declined") {
+    if (!token || interviewAction) return;
+    if (status === "declined" && typeof window !== "undefined" && !window.confirm("Decline this interview invitation? The recruiting team will be notified.")) return;
+    setInterviewAction(interviewId); setError("");
+    try {
+      await api("/api/v1/job-interviews/" + encodeURIComponent(interviewId) + "/response", { method: "POST", body: JSON.stringify({ status }) }, token);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Your interview response could not be confirmed. Refresh the timeline before retrying.");
+    } finally { setInterviewAction(""); }
+  }
+  async function respondToOffer(applicationId: string, status: "accepted" | "withdrawn") {
+    if (!token || applicationAction) return;
+    const message = status === "accepted" ? "Accept this approved employment offer?" : "Withdraw this job application? This cannot be undone from this page.";
+    if (typeof window !== "undefined" && !window.confirm(message)) return;
+    setApplicationAction(applicationId); setError("");
+    try {
+      await api("/api/v1/job-applications/" + encodeURIComponent(applicationId) + "/respond", { method: "POST", body: JSON.stringify({ status }) }, token);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Your application response could not be confirmed. Refresh the timeline before retrying.");
+    } finally { setApplicationAction(""); }
+  }
 
   const load = useCallback(async (append = false) => {
     if (!token) {

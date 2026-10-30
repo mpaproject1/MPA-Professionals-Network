@@ -137,22 +137,27 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
   assert.ok(supportRole, "supporting_staff role must exist");
   await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing", [support.user.id, supportRole.id]);
 
-  const inquiry = await publicOpportunity.createPublicInquiry({
-    inquiryType: "job",
+  const product = (await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
+  assert.ok(product, "BASIC membership product must exist for the eligible job-interest applicant");
+  await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,current_date+365,'online')", [applicant.user.id, product.id, `MPA-P0-JI-${randomUUID().slice(0,8).toUpperCase()}`]);
+
+  const inquiry = await publicOpportunity.createMemberJobInterest(applicant.user.id, {
     contactName: "P0 Applicant",
     contactEmail: applicant.user.email,
     targetRole: "Accountant",
     skills: ["bookkeeping", "Excel"],
     intent: "Please consider me for relevant work even when no vacancy is listed.",
     consent: true
-  }, "p0-job-demand-create", null, randomUUID());
-  const initial = (await db.query("select job_id,employer_sharing_consent,employer_sharing_scope from public_opportunity_inquiry where id=$1", [inquiry.id])).rows[0];
+  }, "p0-job-demand-create", randomUUID());
+  const inquiryRow = (await db.query("select id,job_id,employer_sharing_consent,employer_sharing_scope from public_opportunity_inquiry where public_reference=$1", [inquiry.reference])).rows[0];
+  assert.ok(inquiryRow, "the authenticated member request must be persisted");
+  const initial = inquiryRow;
   assert.equal(initial.job_id, null, "job-interest demand must not require a vacancy");
   assert.equal(initial.employer_sharing_consent, false, "employer-sharing consent is separate from intake consent");
   assert.equal(initial.employer_sharing_scope, "support_desk_only");
 
   await assert.rejects(
-    publicOpportunity.shareJobSeekerDemand(inquiry.id, support.user.id, { organizationId: randomUUID(), fields: ["targetRole"] }, "p0-share-without-consent"),
+    publicOpportunity.shareJobSeekerDemand(inquiryRow.id, support.user.id, { organizationId: randomUUID(), fields: ["targetRole"] }, "p0-share-without-consent"),
     error => error.code === "CONSENT_REQUIRED"
   );
 
@@ -163,7 +168,7 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
   await db.query("update organization set verification_status='verified',public_visible=true,verified_at=now() where id=$1", [organization.id]);
 
   await assert.rejects(
-    publicOpportunity.updateSharingConsent(inquiry.public_reference, inquiry.continuationToken, {
+    publicOpportunity.updateMyMemberJobInterestConsent(inquiry.reference, applicant.user.id, {
       employerSharingConsent: true, scope: "named_employer", fields: ["targetRole", "skills"]
     }, "p0-sharing-consent-without-audience"),
     error => error.code === "SHARING_AUDIENCE_REQUIRED",
@@ -179,7 +184,7 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
   assert.equal(granted.employer_sharing_consent, true);
   assert.deepEqual(granted.employer_sharing_fields, ["targetRole", "skills"]);
   assert.equal(granted.employer_sharing_consent_version, "job-seeker-sharing-v2");
-  const recovered = await publicOpportunity.getPublicInquiry(inquiry.public_reference, inquiry.continuationToken);
+  const recovered = await publicOpportunity.getMyMemberJobInterest(inquiry.reference, applicant.user.id);
   assert.equal(recovered.employerSharingConsent, true);
   assert.deepEqual(recovered.employerSharingFields, ["targetRole", "skills"]);
 
@@ -205,13 +210,13 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
   }, "p0-sharing-consent-revoked");
   assert.equal(revoked.employer_sharing_consent, false);
   assert.ok(revoked.employer_sharing_revoked_at);
-  const persisted = (await db.query("select employer_sharing_consent,employer_sharing_scope,employer_sharing_fields,employer_sharing_revoked_at from public_opportunity_inquiry where id=$1", [inquiry.id])).rows[0];
+  const persisted = (await db.query("select employer_sharing_consent,employer_sharing_scope,employer_sharing_fields,employer_sharing_revoked_at from public_opportunity_inquiry where id=$1", [inquiryRow.id])).rows[0];
   assert.equal(persisted.employer_sharing_consent, false);
   assert.equal(persisted.employer_sharing_scope, "support_desk_only");
   assert.deepEqual(persisted.employer_sharing_fields, []);
   assert.ok(persisted.employer_sharing_revoked_at);
   assert.deepEqual(await publicOpportunity.listSharedJobSeekerDemands(organization.id, support.user.id), [], "revocation must remove employer access");
-  const history = await publicOpportunity.getSharingHistory(inquiry.public_reference, inquiry.continuationToken);
+  const history = await publicOpportunity.getMyMemberJobInterestSharingHistory(inquiry.reference, applicant.user.id);
   assert.equal(history.length, 1);
   assert.equal(history[0].organizationName, "P0 Consent Test Organization");
   assert.equal(history[0].status, "revoked");

@@ -46,15 +46,13 @@ async function settings(db=getPool()){
 export async function getMyMembershipCard(userId){
   const db=getPool();
   const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,
-      p.name membership_type,p.product_code,p.id membership_product_id,coalesce((a.fee_snapshot->>'renewalRequired')::boolean,p.renewal_required) renewal_required,
-      coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name,
-      pr.profile_picture_file_id
+      p.name membership_type,coalesce((a.fee_snapshot->>'renewalRequired')::boolean,p.renewal_required) renewal_required,
+      coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m
     join membership_product p on p.id=m.membership_product_id
     left join membership_application a on a.id=m.application_id
     join app_user u on u.id=m.user_id
     left join person on person.user_id=u.id
-    left join professional_profile pr on pr.person_id=person.id
     where m.user_id=$1 and m.status<>'pending'
     order by (m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)) desc,m.start_date desc nulls last,m.created_at desc
     limit 1`,[userId]);

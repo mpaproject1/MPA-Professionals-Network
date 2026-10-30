@@ -94,9 +94,10 @@ test("direct report execution denies roles excluded from restricted reports",asy
 test("finance reports reconcile verified, failed, refunded and outstanding amounts by currency",async t=>{
  if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
  const db=getPool(),suffix=randomUUID(),digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
- const created=await register({email:"finance-fixture-"+suffix+"@example.test",password:"FinanceFixtureP1Password!2026",firstName:"Finance",lastName:"Fixture",phone:"07"+digits},"finance-report-fixture-"+suffix);
- const userId=created.user.id,product=(await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
+ const product=(await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
  assert.ok(product,"BASIC membership product must exist in migrated test database");
+ const created=await register({email:"finance-fixture-"+suffix+"@example.test",password:"FinanceFixtureP1Password!2026",firstName:"Finance",lastName:"Fixture",phone:"07"+digits},"finance-report-fixture-"+suffix);
+ const userId=created.user.id;
  const applicationIds=[],paymentIds=[],reversalIds=[];
  async function application(ref,status,amount,currency){
   const row=(await db.query("insert into membership_application(user_id,application_type,membership_product_id,status,approved_at,fee_snapshot,tracking_reference) values($1,'new',$2,$3,now(),$4::jsonb,$5) returning id",[userId,product.id,status,JSON.stringify({amount,currency}),ref])).rows[0];
@@ -109,12 +110,12 @@ test("finance reports reconcile verified, failed, refunded and outstanding amoun
   await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[appId,row.id]);
   return row.id;
  }
- const etbApproved=await application("ETB-APPROVED","approved",1000,"ETB");
- const etbFailed=await application("ETB-FAILED","payment_pending",200,"ETB");
- const etbRefunded=await application("ETB-REFUNDED","payment_pending",300,"ETB");
- const usdApproved=await application("USD-APPROVED","approved",50,"USD");
- const etbOutstanding=await application("ETB-OUTSTANDING","approved",1200,"ETB");
  try{
+  const etbApproved=await application("ETB-APPROVED","approved",1000,"ETB");
+  const etbFailed=await application("ETB-FAILED","payment_pending",200,"ETB");
+  const etbRefunded=await application("ETB-REFUNDED","payment_pending",300,"ETB");
+  const usdApproved=await application("USD-APPROVED","approved",50,"USD");
+  const etbOutstanding=await application("ETB-OUTSTANDING","approved",1200,"ETB");
   const approvedEtbPayment=await payment(etbApproved,"succeeded",1000,"ETB","approved-etb");
   await db.query("insert into payment_reconciliation(payment_transaction_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,'matched',$2,now(),'Finance report fixture')",[approvedEtbPayment,userId]);
   await payment(etbFailed,"failed",200,"ETB","failed-etb");

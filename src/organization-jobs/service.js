@@ -51,7 +51,7 @@ export async function listPublicOrganizations(filters={}) {
  if(filters.q){args.push(`%${String(filters.q).trim()}%`);where.push(`(o.display_name ilike $${args.length} or o.legal_name ilike $${args.length} or coalesce(o.description,'') ilike $${args.length})`);}
  if(filters.organizationType){args.push(String(filters.organizationType));where.push(`o.organization_type=$${args.length}`);}
  if(filters.location){args.push(`%${String(filters.location).trim()}%`);where.push(`(coalesce(ri.label,'') ilike $${args.length} or coalesce(o.address_text,'') ilike $${args.length})`);}
- const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
+ const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
  const base=` from organization o left join reference_item ri on ri.id=o.geography_reference_item_id where ${where.join(" and ")}`;
  const total=Number((await db.query(`select count(*)::int count${base}`,args)).rows[0]?.count||0);
  const rows=(await db.query(`select o.id,o.display_name,o.organization_type,o.description,o.website,ri.label location_label,o.created_at${base} order by o.display_name limit ${limit+1} offset ${offset}`,args)).rows;
@@ -69,7 +69,7 @@ export async function listNetworkPlusOrganizations(viewerId,filters={}) {
  if(filters.organizationType){args.push(String(filters.organizationType).trim().slice(0,80));where.push(`o.organization_type=${args.length}`);}
  const location=String(filters.location||"").trim().slice(0,100);
  if(location){args.push(`%${location}%`);where.push(`coalesce(ri.label,'') ilike ${args.length}`);}
- const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
+ const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
  const base=` from organization o left join reference_item ri on ri.id=o.geography_reference_item_id where ${where.join(" and ")}`;
  const total=Number((await db.query(`select count(*)::int count${base}`,args)).rows[0]?.count||0);
  const rows=(await db.query(`select o.id,o.display_name,o.organization_type,o.description,o.website,ri.label location_label${base} order by o.display_name limit ${limit+1} offset ${offset}`,args)).rows;
@@ -421,7 +421,7 @@ export async function listJobs(filters={},viewerId=null){
  where.push(`(j.posting_scope='public' or (j.posting_scope in ('mpa_members','partner_network') and ${viewerParam}::uuid is not null and exists(select 1 from membership_record m where m.user_id=${viewerParam}::uuid and m.status='active')) or (j.posting_scope='organization_internal' and ${viewerParam}::uuid is not null and exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id=${viewerParam}::uuid and om.status='active')))`);
  const predicate=where.join(" and ");
  const total=Number((await db.query(`select count(*)::int count from job j join organization o on o.id=j.organization_id where ${predicate}`,args)).rows[0]?.count||0);
- const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
+ const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
  const rows=(await db.query(`select j.id,j.title,j.description,j.employment_type,j.work_mode,j.location_label,j.visibility,j.posting_scope,j.department,j.seniority_level,j.positions_count,j.salary_min,j.salary_max,j.salary_currency,j.application_deadline,j.published_at,o.id organization_id,o.display_name organization_name from job j join organization o on o.id=j.organization_id where ${predicate} order by j.published_at desc,j.id desc limit $${args.length+1} offset $${args.length+2}`,[...args,limit,offset])).rows;
  return {items:rows,limit,offset,total,hasMore:offset+rows.length<total};
 }

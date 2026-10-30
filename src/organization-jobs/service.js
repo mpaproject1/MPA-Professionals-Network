@@ -4,7 +4,7 @@ import { assertOrganizationCapability } from "../platform/identity-policy.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
 
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
-const ORG_WRITE_ROLES=["owner","administrator","recruiter"];
+const ORG_WRITE_ROLES=["owner","administrator","recruiter","project_manager"];
 const CANDIDATE_ROLES=["owner","administrator","recruiter"];
 
 async function audit(db,actor,action,type,id,requestId,metadata={}){ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,metadata]); }

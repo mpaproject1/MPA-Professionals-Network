@@ -311,6 +311,13 @@ const server=http.createServer(async (req,res)=>{
      if(req.method==="GET" && p==="api/v1/organization-mentorship-offers") { const viewer=req.headers.authorization?.startsWith("Bearer ")?await auth(req):null; return ok(res,await organizationMentorshipOffers.listOrganizationMentorshipOffers(viewer?.sub||null),requestId); }
     const identity=await auth(req);
     if(req.method==="GET" && p==="api/v1/network-plus/access") return ok(res,await resolveNetworkPlusAccess(getPool(),identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/network-plus/organizations"){
+      const q=query(req.url);
+      return ok(res,await organizationJobs.listNetworkPlusOrganizations(identity.sub,{q:q.get("q"),organizationType:q.get("organizationType"),location:q.get("location"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
+    }
+    if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/organizations/") && parts[4]==="network-plus-visibility"){
+      return ok(res,await organizationJobs.updateNetworkPlusVisibility(parts[3],identity.sub,await body(req),requestId),requestId);
+    }
     if(req.method==="POST" && p==="api/v1/admin/experience/demo-cases") { return ok(res,await experience.createDemoCase(identity.sub,await body(req),requestId),requestId,201); }
     if(req.method==="PATCH" && parts.length===6 && p.startsWith("api/v1/admin/experience/demo-cases/")) { return ok(res,await experience.updateDemoCase(parts[5],identity.sub,await body(req),requestId),requestId); }
     if(req.method==="POST" && p==="api/v1/admin/experience/guides") { return ok(res,await experience.createGuide(identity.sub,await body(req),requestId),requestId,201); }

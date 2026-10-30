@@ -7,6 +7,7 @@ import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";
 import styles from "./membership-cards.module.css";
+
 type CardSettings={header_text:string;subtitle_text:string;footer_text:string;background_style:"geometric"|"gradient"|"midnight";background_start:string;background_end:string;accent_color:string;text_color:string;show_membership_type:boolean};
 type Candidate={membershipNumber:string;memberName:string;membershipType:string;startDate:string;endDate:string|null};
 type Card=Candidate&{status:"active";verificationPath:string;settings:CardSettings};

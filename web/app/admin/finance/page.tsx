@@ -174,7 +174,7 @@ export default function FinanceWorkspacePage() {
       </div>}
       <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 12 }}>
         <a className="btn btn-ghost" href="/admin/reports?report=approved-payments">Approved payments</a>
-        <a className="btn btn-ghost" href="/admin/reports?report=failed-reversed-payments">Failed and refunded/reversed</a>
+        <a className="btn btn-ghost" href="/admin/reports?report=failed-reversed-payments">Failed, refunded/reversed and disputed</a>
         <a className="btn btn-ghost" href="/admin/reports?report=membership-collections">Membership collections</a>
         <a className="btn btn-ghost" href="/admin/reports?report=outstanding-membership-payments">Outstanding payments</a>
         <a className="btn btn-ghost" href="/admin/reports?report=payment-reconciliation">Payment reconciliation</a>

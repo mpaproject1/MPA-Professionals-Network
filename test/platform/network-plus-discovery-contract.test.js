@@ -32,7 +32,7 @@ test("organization directory query uses verified canonical records and an explic
   assert.match(query, /o\.verification_status='verified'/);
   assert.match(query, /case when o\.website ~\* '\^https:\/\//);
   assert.match(query, /ilike \$\$\{args\.length\}/);
-  assert.match(query, /organization_type=\$\$\{args\.length\}/);
+  assert.match(query, /lower\(o\.organization_type\)=lower\(\$\$\{args\.length\}\)/);
   assert.doesNotMatch(query, /o\.legal_name|o\.email|o\.phone|o\.address_text|verification_evidence|organization_membership/);
   assert.match(migration, /alter table organization[\s\S]*network_plus_visible boolean not null default false/);
   assert.doesNotMatch(migration, /create table/i);

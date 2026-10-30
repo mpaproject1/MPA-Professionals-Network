@@ -9,7 +9,7 @@ const organization = {
   location_label: "Addis Ababa",
 };
 
-async function mockNetworkPlus(page, { eligible = true, onSearch } = {}) {
+async function mockNetworkPlus(page, { eligible = true, onSearch, items = [organization] } = {}) {
   await page.addInitScript(() => {
     window.sessionStorage.setItem("mpa-session-token", "e2e-network-plus-session");
   });
@@ -78,6 +78,34 @@ test.describe("Network-Plus discovery acceptance", () => {
       await expect(page.getByLabel("Location")).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
+  });
+
+  test("empty organization discovery has a clear, recoverable empty state", async ({ page }) => {
+    await mockNetworkPlus(page, { items: [] });
+    await page.goto("/network-plus/organizations");
+    await expect(page.getByRole("heading", { name: "No organizations match these filters" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Clear filters and explore" })).toBeVisible();
+  });
+
+  test("organization discovery keeps keyboard focus order and server errors separate from empty results", async ({ page }) => {
+    await mockNetworkPlus(page);
+    await page.goto("/network-plus/organizations");
+    const backLink = page.getByRole("link", { name: "Back to Network-Plus" });
+    await backLink.focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel("Organization name or description")).toBeFocused();
+
+    await page.unroute("**/api/v1/network-plus/organizations*");
+    await page.route("**/api/v1/network-plus/organizations*", route => route.fulfill({
+      status: 503, contentType: "application/json",
+      body: JSON.stringify({ error: { code: "SERVICE_UNAVAILABLE", message: "private database stack detail" } }),
+    }));
+    await page.getByRole("button", { name: "Search organizations" }).click();
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("server problem");
+    await expect(alert).not.toContainText("private database stack detail");
+    await expect(page.getByRole("heading", { name: "No organizations match these filters" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
   });
 
   test("direct URL entry is denied when the server does not confirm eligibility", async ({ page }) => {

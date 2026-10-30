@@ -6,6 +6,9 @@ import { recordManualFinancePayment, decideManualFinancePayment, issueFinancePay
 test("manual finance receipts keep verification and voucher issuance as separate decisions",async()=>{
   const source=await readFile(new URL("../../src/platform/finance-receipts.js",import.meta.url),"utf8");
   const migration=await readFile(new URL("../../db/migrations/20261030200000_general_finance_receipts_and_vouchers.sql",import.meta.url),"utf8");
+  const server=await readFile(new URL("../../server.js",import.meta.url),"utf8");
+  const fileAccess=await readFile(new URL("../../src/platform/private-file-storage.js",import.meta.url),"utf8");
+  const reports=await readFile(new URL("../../src/platform/reports.js",import.meta.url),"utf8");
   assert.match(source,/status!=="verified"/);
   assert.match(source,/payment voucher can only be issued for a verified payment/);
   assert.match(source,/verification_token_sha256/);
@@ -13,6 +16,13 @@ test("manual finance receipts keep verification and voucher issuance as separate
   assert.match(source,/timingSafeEqual/);
   assert.match(source,/DUPLICATE_PAYMENT_REFERENCE/);
   assert.match(source,/BANK_EVIDENCE_REQUIRED/);
+  assert.match(source,/searchFinancePayers/);
+  assert.match(source,/searchFinanceOrganizations/);
+  assert.match(server,/financeReceipts\.recordManualFinancePayment/);
+  assert.match(server,/financeReceipts\.issueVerifiedMembershipPaymentVoucher/);
+  assert.match(server,/financeReceipts\.verifyFinancePaymentVoucher/);
+  assert.match(fileAccess,/canReadFinanceEvidence/);
+  assert.match(reports,/manual-finance-receipts/);
   assert.match(migration,/payer_user_id uuid references app_user/);
   assert.match(migration,/evidence_file_id uuid references file_object/);
   assert.match(migration,/finance_payment_voucher_one_active_idx/);

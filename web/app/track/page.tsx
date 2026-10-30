@@ -124,6 +124,19 @@ export default function Track() {
         : page;
       dataRef.current = next;
       setData(next);
+      const jobItems = page.items.filter((item) => item.type === "job");
+      if (jobItems.length) {
+        const progressRows = await Promise.all(jobItems.map(async (item) => {
+          try {
+            const progress = await api<JobProgress>("/api/v1/job-applications/" + encodeURIComponent(item.id) + "/progress", {}, token);
+            return [item.id, progress] as const;
+          } catch (cause) {
+            setProgressErrors((current) => ({ ...current, [item.id]: cause instanceof Error ? cause.message : "Job progress details could not be loaded." }));
+            return null;
+          }
+        }));
+        setJobProgress((current) => ({ ...current, ...Object.fromEntries(progressRows.filter((row): row is readonly [string, JobProgress] => Boolean(row))) }));
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Your application progress could not be loaded.");
     } finally {

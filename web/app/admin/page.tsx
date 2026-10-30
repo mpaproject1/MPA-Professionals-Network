@@ -124,6 +124,7 @@ export default function AdminPage() {
   const operationalQueueLinks: Record<string, string> = { "Membership application": "/admin/membership", "Professional verification": "/verification", "Organization verification": "/organizations", "Marketplace demand": "/admin/marketplace" };
   const workspaces = [
     {title:"Organizations",desc:"Search organizations, inspect linked accounts and open verification review workflows.",href:"/admin/organizations",Icon:Building2,group:"Review & service",access:"org"},
+    {title:"Vacancy review",desc:"Review submitted job vacancies and approve publication only after MPA governance checks.",href:"/admin/jobs/review",Icon:ClipboardList,group:"Review & service",access:"jobs"},
     {title:"Account and Team",desc:"Search platform accounts, review status and manage roles with audit reasons.",href:"/admin/accounts",Icon:Users,group:"People & access",access:"admin"},
     {title:"Member records",desc:"Import approved member registers, resolve conflicts and export records.",href:"/admin/members",Icon:Users,group:"People & access",access:"admin"},
     {title:"Member catalogue",desc:"Search individual membership records and linked account status.",href:"/admin/members/catalog",Icon:Users,group:"People & access",access:"admin"},
@@ -140,7 +141,7 @@ export default function AdminPage() {
     {title:"Security",desc:"Manage administrator passkeys and recovery controls.",href:"/admin/security",Icon:Fingerprint,group:"Governance",access:"admin"},
     {title:"Email operations",desc:"Review delivery queues, templates and retries.",href:"/admin/email",Icon:Mail,group:"Governance",access:"admin"},
     {title:"Help, guides and demos",desc:"Manage contextual guides, launch training scenarios and find support resources.",href:"/admin/experience",Icon:HelpCircle,group:"Enablement",access:"admin"},
-  ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "finance" ? roles.some(role => ["system_admin","finance_officer"].includes(role)) || permissions.some(permission => ["members.manage","finance.manage"].includes(permission)) : item.access === "org" ? roles.some(role => ["system_admin","admin","reviewer"].includes(role)) : item.access === "support" ? roles.some(role => ["system_admin","supporting_staff"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin));
+  ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "finance" ? roles.some(role => ["system_admin","finance_officer"].includes(role)) || permissions.some(permission => ["members.manage","finance.manage"].includes(permission)) : item.access === "jobs" ? roles.some(role => ["reviewer","system_admin"].includes(role)) || permissions.includes("jobs.review") : item.access === "org" ? roles.some(role => ["system_admin","admin","reviewer"].includes(role)) : item.access === "support" ? roles.some(role => ["system_admin","supporting_staff"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin));
 
 
   async function decideInquiry(item: Inquiry, status: string, considerNonMember: boolean) {
@@ -179,7 +180,9 @@ export default function AdminPage() {
     scopeResolved &&
     !error &&
     !isPlatformAdmin &&
-    !roles.includes("supporting_staff")
+    !roles.includes("supporting_staff") &&
+    !roles.includes("reviewer") &&
+    !permissions.includes("jobs.review")
   )
     return (
       <div className="auth-page">

@@ -22,17 +22,19 @@ export default function NetworkPlusPage() {
                 <Network size={22} aria-hidden="true" />
               </span>
               <div>
-                <div className="eyebrow">People and organizations</div>
+                <div className="eyebrow">Member discovery</div>
                 <h2 className="h2">Verified Member Discovery</h2>
               </div>
             </div>
             <p className="muted">
               Find MPA professionals with verified expertise and explore professional interests.
-              Verified organization discovery will be added as a separate view after its visibility
-              rules are reconciled. Profile visibility and contact sharing remain under each owner's control.
+              Profile visibility and contact sharing remain under each owner's control.
             </p>
             <Link className="btn btn-primary mt-2 w-fit" href="/network">
               Discover members <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+            <Link className="btn btn-ghost mt-2 w-fit" href="/network-plus/organizations">
+              Discover verified organizations <ArrowRight size={16} aria-hidden="true" />
             </Link>
           </section>
 

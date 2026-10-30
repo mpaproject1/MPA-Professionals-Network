@@ -206,7 +206,8 @@ const server=http.createServer(async (req,res)=>{
        return ok(res,await membership.saveMembershipPaymentMethod(identity.sub,await body(req),requestId),requestId);
      }
      if(req.method==="GET" && p==="api/v1/admin/membership/products") {
-     const identity=await auth(req);
+     if(req.method==="GET" && p==="api/v1/admin/experience/guides") { const identity=await auth(req); return ok(res,await experience.listAdminGuides(identity.sub),requestId); }
+    const identity=await auth(req);
       anyRoleOrPermission(identity,["system_admin","reviewer"],["members.view","members.manage"]);
       return ok(res,await membership.listMembershipProductsForAdmin(),requestId);
     }

@@ -38,9 +38,10 @@ test("bulk membership print produces independently parsed A4 PDF with one eligib
  const pdfPath=join(directory,"membership-cards.pdf");
  try{
   await writeFile(pdfPath,pdf);
-  const parser="from pypdf import PdfReader\nimport sys\nr=PdfReader(sys.argv[1])\nprint('PAGES='+str(len(r.pages)))\nprint('TEXT='+'\\n'.join((p.extract_text() or '') for p in r.pages))";
+  const parser="from pypdf import PdfReader\nimport sys\nr=PdfReader(sys.argv[1])\nprint('PAGES='+str(len(r.pages)))\\nprint('A4='+str(all(abs(float(p.mediabox.width)-595.28)<1 and abs(float(p.mediabox.height)-841.89)<1 for p in r.pages)))\nprint('TEXT='+'\\n'.join((p.extract_text() or '') for p in r.pages))";
   const extracted=execFileSync("python3",["-c",parser,pdfPath],{encoding:"utf8"});
   expect(extracted).toContain("PAGES=2");
+  expect(extracted).toContain("A4=True");
   expect(extracted).toContain("Ada Lovelace");
   expect(extracted).toContain("Grace Hopper");
   expect(extracted).toContain("MPA-2026-11AA22BB");

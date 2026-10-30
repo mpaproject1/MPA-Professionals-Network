@@ -1,0 +1,185 @@
+"use client";
+
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Badge, Card } from "../../../components/ui";
+import { OperationStatus } from "../../../components/operation-status";
+import { ApiError, api } from "../../../lib/api";
+import { useUiStore } from "../../../lib/store";
+import { AdminPageHeader } from "../admin-page-header";
+
+type Payment = {
+  payment_id: string;
+  payment_status: string;
+  amount: string | number;
+  currency: string;
+  channel: string;
+  source: string;
+  purpose_reference?: string | null;
+  payment_reference?: string | null;
+  created_at: string;
+  verified_at?: string | null;
+  verification_note?: string | null;
+  application_id: string;
+  tracking_reference?: string | null;
+  application_type: string;
+  application_status: string;
+  product_code: string;
+  product_name: string;
+  reconciliation_status?: string | null;
+  reconciliation_note?: string | null;
+  reversed: boolean;
+};
+type Me = { roles?: string[]; permissions?: string[] };
+
+function dateLabel(value?: string | null) {
+  return value ? new Date(value).toLocaleString() : "Not recorded";
+}
+
+export default function FinanceWorkspacePage() {
+  const token = useUiStore(state => state.token);
+  const hydrated = useUiStore(state => state.hydrated);
+  const hydrateToken = useUiStore(state => state.hydrateToken);
+  const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "signin">("loading");
+  const [rows, setRows] = useState<Payment[]>([]);
+  const [canVerify, setCanVerify] = useState(false);
+  const [canReverse, setCanReverse] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [decisions, setDecisions] = useState<Record<string, "approved" | "needs_correction" | "rejected">>({});
+  const [verificationNotes, setVerificationNotes] = useState<Record<string, string>>({});
+  const [reversalTypes, setReversalTypes] = useState<Record<string, "refund" | "reversal">>({});
+  const [reversalReasons, setReversalReasons] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setError("");
+    setNotice("");
+    setBusy("load");
+    try {
+      const me = await api<Me>("/api/v1/me", {}, token);
+      const roles = Array.isArray(me.roles) ? me.roles : [];
+      const permissions = Array.isArray(me.permissions) ? me.permissions : [];
+      const financeRole = roles.some(role => ["finance_officer", "system_admin"].includes(role));
+      const readAccess = financeRole || permissions.some(permission => ["finance.view", "finance.payment.verify", "finance.payment.reverse", "finance.manage"].includes(permission));
+      if (!readAccess) {
+        setAccess("denied");
+        setRows([]);
+        return;
+      }
+      setCanVerify(financeRole || permissions.some(permission => ["finance.payment.verify", "finance.manage"].includes(permission)));
+      setCanReverse(financeRole || permissions.some(permission => ["finance.payment.reverse", "finance.manage"].includes(permission)));
+      const payments = await api<Payment[]>("/api/v1/finance/membership/payments", {}, token);
+      setRows(Array.isArray(payments) ? payments : []);
+      setAccess("allowed");
+    } catch (cause) {
+      setRows([]);
+      setAccess("denied");
+      setError(cause instanceof ApiError ? cause.message : "The finance payment queue could not be loaded.");
+    } finally {
+      setBusy("");
+    }
+  }, [token]);
+
+  useEffect(() => { hydrateToken(); }, [hydrateToken]);
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!token) { setAccess("signin"); return; }
+    setAccess("loading");
+    void load();
+  }, [hydrated, token, load]);
+
+  async function verifyPayment(event: FormEvent, payment: Payment) {
+    event.preventDefault();
+    if (!token || !canVerify || busy) return;
+    setBusy(payment.payment_id);
+    setError("");
+    setNotice("");
+    try {
+      await api("/api/v1/payments/" + payment.payment_id + "/verify", {
+        method: "POST",
+        body: JSON.stringify({
+          decision: decisions[payment.payment_id] || "approved",
+          note: verificationNotes[payment.payment_id] || "",
+          evidenceChecked: [],
+        }),
+      }, token);
+      setNotice("Payment decision recorded. Membership application approval and activation remain separate decisions.");
+      await load();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : "Payment verification could not be recorded.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function reversePayment(event: FormEvent, payment: Payment) {
+    event.preventDefault();
+    const reason = (reversalReasons[payment.payment_id] || "").trim();
+    if (!token || !canReverse || reason.length < 8 || busy) return;
+    setBusy(payment.payment_id);
+    setError("");
+    setNotice("");
+    try {
+      await api("/api/v1/payments/" + payment.payment_id + "/reverse", {
+        method: "POST",
+        body: JSON.stringify({ type: reversalTypes[payment.payment_id] || "refund", reason }),
+      }, token);
+      setNotice("Payment refund/reversal recorded. Any linked active membership is handled by the existing reversal workflow.");
+      await load();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : "Payment reversal could not be recorded.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  if (!hydrated || access === "loading") return <Card><OperationStatus state="loading" title="Checking finance permissions" detail="Verifying the current account before retrieving payment records." /></Card>;
+  if (access === "signin") return <Card><h1 className="h1">Sign in required</h1><p className="muted">Finance payment records are available only to authorized finance staff and administrators.</p><a className="btn btn-primary" href="/login?next=/admin/finance">Sign in</a></Card>;
+  if (access === "denied") return <Card><OperationStatus state="error" title="Finance workspace access denied" detail={error || "Your account does not have finance payment queue access. Membership-review permissions do not grant finance access."} /><a className="btn btn-ghost" href="/dashboard">Return to your dashboard</a></Card>;
+
+  return <div className="grid" style={{ gap: 16 }}>
+    <AdminPageHeader eyebrow="MPA · Finance operations" title="Membership payment queue" description="Verify eligible payments, review payment exceptions and record authorized reversals. This workspace does not approve or activate membership applications." actions={<button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={busy !== ""}>{busy === "load" ? "Refreshing…" : "Refresh queue"}</button>} />
+    {error && <p className="form-error" role="alert">{error}</p>}
+    {notice && <p className="form-success" role="status" aria-live="polite">{notice}</p>}
+    <Card>
+      <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+        <div><h2 className="h2">Payment records</h2><p className="muted">Up to 500 membership payment records, newest and pending items first. Applicant contact details and private application evidence are not included in this queue.</p></div>
+        <Badge tone="slate">{rows.length} records returned</Badge>
+      </div>
+      {rows.length === 0 ? <OperationStatus state="empty" title="No membership payments in this queue" detail="No matching payment records were returned. Refresh to check the current source records." /> : rows.map(payment => <article key={payment.payment_id} className="case-row" style={{ alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: 0 }} className="grid">
+          <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+            <div><strong>{payment.product_name || payment.product_code} · {payment.application_type}</strong><p className="muted">Application {payment.tracking_reference || payment.application_id}</p></div>
+            <Badge tone={payment.payment_status === "succeeded" ? "green" : payment.payment_status === "pending" ? "amber" : "slate"}>{payment.payment_status.replaceAll("_", " ")}</Badge>
+          </div>
+          <div className="grid grid-2">
+            <p><span className="muted">Amount</span><br/><b>{payment.currency} {payment.amount}</b></p>
+            <p><span className="muted">Application state</span><br/><b>{payment.application_status.replaceAll("_", " ")}</b></p>
+            <p><span className="muted">Channel / source</span><br/><b>{payment.channel} · {payment.source}</b></p>
+            <p><span className="muted">Payment reference</span><br/><b>{payment.payment_reference || payment.purpose_reference || "Not supplied"}</b></p>
+            <p><span className="muted">Submitted</span><br/><b>{dateLabel(payment.created_at)}</b></p>
+            <p><span className="muted">Verified</span><br/><b>{dateLabel(payment.verified_at)}</b></p>
+            <p><span className="muted">Reconciliation</span><br/><b>{payment.reconciliation_status || "Not recorded"}</b></p>
+          </div>
+          {payment.verification_note && <p className="muted">Payment note: {payment.verification_note}</p>}
+          {payment.reconciliation_note && <p className="muted">Reconciliation note: {payment.reconciliation_note}</p>}
+          {payment.reversed && <p className="form-error" role="status">A refund or reversal is already recorded for this payment.</p>}
+          {canVerify && payment.payment_status === "pending" && payment.source !== "provider_webhook" && <form className="form-stack" onSubmit={event => void verifyPayment(event, payment)}>
+            <h3 className="h2">Verify payment</h3>
+            <label>Decision<select value={decisions[payment.payment_id] || "approved"} onChange={event => setDecisions(current => ({ ...current, [payment.payment_id]: event.target.value as "approved" | "needs_correction" | "rejected" }))}><option value="approved">Approve payment</option><option value="needs_correction">Request correction</option><option value="rejected">Reject payment</option></select></label>
+            <label>Finance note<textarea rows={2} maxLength={1000} value={verificationNotes[payment.payment_id] || ""} onChange={event => setVerificationNotes(current => ({ ...current, [payment.payment_id]: event.target.value }))} placeholder="Record what was checked or what needs correction."/></label>
+            <button type="submit" className="btn btn-primary" disabled={busy === payment.payment_id}>{busy === payment.payment_id ? "Recording…" : "Record payment decision"}</button>
+          </form>}
+          {canReverse && payment.payment_status === "succeeded" && !payment.reversed && <form className="form-stack" onSubmit={event => void reversePayment(event, payment)}>
+            <h3 className="h2">Refund or reverse payment</h3>
+            <label>Action<select value={reversalTypes[payment.payment_id] || "refund"} onChange={event => setReversalTypes(current => ({ ...current, [payment.payment_id]: event.target.value as "refund" | "reversal" }))}><option value="refund">Refund</option><option value="reversal">Payment reversal</option></select></label>
+            <label>Reason<textarea required minLength={8} maxLength={1000} value={reversalReasons[payment.payment_id] || ""} onChange={event => setReversalReasons(current => ({ ...current, [payment.payment_id]: event.target.value }))} placeholder="Explain why this payment is being refunded or reversed."/></label>
+            <button type="submit" className="btn btn-ghost" disabled={busy === payment.payment_id || (reversalReasons[payment.payment_id] || "").trim().length < 8}>{busy === payment.payment_id ? "Recording…" : "Record refund / reversal"}</button>
+          </form>}
+        </div>
+      </article>)}
+    </Card>
+    <Card><p className="muted">Payment verification, reversal and reconciliation remain audited financial actions. A successful payment does not by itself approve or activate a membership application.</p></Card>
+  </div>;
+}

@@ -11,6 +11,7 @@ import { SupportAction } from "../../components/support-action";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
+import { VolunteerPledgePanel } from "../../components/volunteer-pledge-panel";
 
 type Me = {
   user_id: string;
@@ -315,6 +316,8 @@ export default function MembersWorkspacePage() {
           })}
         </ol>
       </section>
+
+      <VolunteerPledgePanel token={token} active={active} />
 
       <section aria-labelledby="shortcuts-title" className="mb-7">
         <div className="mb-3"><div className="eyebrow">Quick access</div><h2 id="shortcuts-title" data-guide-target="workspace-shortcuts" className="h2">Your workspace</h2></div>

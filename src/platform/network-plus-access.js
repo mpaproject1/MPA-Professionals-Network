@@ -37,7 +37,7 @@ export async function resolveNetworkPlusAccess(db, userId) {
     eligible,
     access: { member, organization },
     nextAction: eligible
-      ? "Choose Verified Member Discovery or Business Discovery."
+      ? "Choose Verified Member Discovery, including verified organization discovery. Business Discovery will be introduced separately."
       : "A current active MPA membership or active owner, administrator or project-manager access to a verified MPA organization is required.",
   };
 }

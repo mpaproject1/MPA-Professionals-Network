@@ -39,7 +39,7 @@ type PublicInquiry = {
 type JobProgress = {
   application: { id: string; status: string; offer?: { amount?: number | string | null; currency?: string | null; terms?: string | null; approvalStatus?: string | null } };
   events: { from_status?: string | null; to_status: string; note?: string | null; created_at: string }[];
-  interviews: { id: string; scheduled_start: string; scheduled_end: string; timezone?: string; mode: string; location_text?: string | null; meeting_url?: string | null; status: string; agenda?: string | null; participants: { userId: string; role: string; response: string }[] }[];
+  interviews: { id: string; scheduled_start: string; scheduled_end: string; timezone?: string; mode: string; location_text?: string | null; meeting_url?: string | null; status: string; agenda?: string | null; participants: { role: string; response: string }[] }[];
 };
 const PAGE_SIZE = 20;
 
@@ -129,6 +129,7 @@ export default function Track() {
         const progressRows = await Promise.all(jobItems.map(async (item) => {
           try {
             const progress = await api<JobProgress>("/api/v1/job-applications/" + encodeURIComponent(item.id) + "/progress", {}, token);
+            setProgressErrors((current) => { const next = { ...current }; delete next[item.id]; return next; });
             return [item.id, progress] as const;
           } catch (cause) {
             setProgressErrors((current) => ({ ...current, [item.id]: cause instanceof Error ? cause.message : "Job progress details could not be loaded." }));
@@ -255,7 +256,7 @@ export default function Track() {
               </div>
               {item.type === "job" && progressErrors[item.id] && <FormFeedback kind="error" message={progressErrors[item.id]} onRetry={() => void load()} retryLabel="Refresh job progress" />}
               {item.type === "job" && jobProgress[item.id] && <section className="grid" aria-label="Job application details" style={{ gap: 10, marginTop: 12 }}>
-                <div className="case-row"><b>Recruitment history</b>{jobProgress[item.id].events.length ? jobProgress[item.id].events.map((event, index) => <div className="tracker-line" key={index}><span className="timeline-dot" /><div><b>{humanStatus(event.to_status)}</b><p className="muted">{dateLabel(event.created_at, true)}{event.note ? " · " + event.note : ""}</p></div></div>) : <p className="muted">No additional stage events have been recorded yet.</p>}</div>
+                <div className="case-row"><b>Recruitment history</b>{jobProgress[item.id].events.length ? jobProgress[item.id].events.map((event, index) => <div className="tracker-line" key={index}><span className="timeline-dot" /><div><b>{humanStatus(event.to_status)}</b><p className="muted">{dateLabel(event.created_at, true)}</p></div></div>) : <p className="muted">No additional stage events have been recorded yet.</p>}</div>
                 {jobProgress[item.id].interviews.length > 0 && <div className="case-row"><b>Interview schedule</b>{jobProgress[item.id].interviews.map((interview) => {
                   const candidateParticipant = interview.participants.find((participant) => participant.role === "candidate");
                   return <div key={interview.id} style={{ display: "grid", gap: 6, marginTop: 10 }}>

@@ -34,14 +34,19 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const hydrated = useUiStore((state) => state.hydrated);
   const hydrateToken = useUiStore((state) => state.hydrateToken);
   const [roles, setRoles] = useState<string[] | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
   useEffect(() => {
     let cancelled = false;
     if (!hydrated || !token) { setRoles(null); return () => { cancelled = true; }; }
-    api<{ roles?: unknown }>("/api/v1/me", {}, token)
-      .then((me) => { if (!cancelled) setRoles(Array.isArray(me.roles) ? me.roles.map((role) => typeof role === "string" ? role : role && typeof role === "object" && "role_code" in role && typeof role.role_code === "string" ? role.role_code : "").filter(Boolean) : []); })
-      .catch(() => { if (!cancelled) setRoles([]); });
+    api<{ roles?: unknown; permissions?: unknown }>("/api/v1/me", {}, token)
+      .then((me) => {
+        if (cancelled) return;
+        setRoles(Array.isArray(me.roles) ? me.roles.map((role) => typeof role === "string" ? role : role && typeof role === "object" && "role_code" in role && typeof role.role_code === "string" ? role.role_code : "").filter(Boolean) : []);
+        setPermissions(Array.isArray(me.permissions) ? me.permissions.map((permission) => typeof permission === "string" ? permission : permission && typeof permission === "object" && "permission_code" in permission && typeof permission.permission_code === "string" ? permission.permission_code : "").filter(Boolean) : []);
+      })
+      .catch(() => { if (!cancelled) { setRoles([]); setPermissions([]); } });
     return () => { cancelled = true; };
   }, [hydrated, token]);
 

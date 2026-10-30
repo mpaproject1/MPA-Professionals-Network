@@ -579,6 +579,23 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/talent/inquiries/") && parts[5]==="response") return ok(res,await talent.respondToTalentInquiry(parts[4],identity.sub,await body(req),requestId),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/talent/inquiries/") && parts[5]==="close") return ok(res,await talent.closeTalentInquiry(parts[4],identity.sub,requestId),requestId);
 
+    if(req.method==="POST" && p==="api/v1/ethics/cases") return ok(res,await ethics.createEthicsCase(identity.sub,await body(req),requestId),requestId,201);
+    if(req.method==="GET" && p==="api/v1/me/ethics/cases") return ok(res,await ethics.listMyEthicsCases(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/review/ethics/cases") { const q=query(req.url); return ok(res,await ethics.listEthicsCases(identity.sub,{status:q.get("status"),severity:q.get("severity"),limit:q.get("limit")}),requestId); }
+    if(req.method==="GET" && p==="api/v1/review/ethics/reviewers") return ok(res,await ethics.listEthicsReviewers(identity.sub),requestId);
+    if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/review/ethics/cases/")) return ok(res,await ethics.getEthicsCase(parts[5],identity.sub),requestId);
+    if(req.method==="PATCH" && parts.length===6 && p.startsWith("api/v1/review/ethics/cases/")) return ok(res,await ethics.updateEthicsCase(parts[5],await body(req),identity.sub,requestId),requestId);
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/review/ethics/cases/") && parts[6]==="assign") { const b=await body(req); return ok(res,await ethics.assignEthicsCase(parts[5],b.reviewerId,identity.sub,b.reason,requestId),requestId); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/review/ethics/cases/") && parts[6]==="panel") { const b=await body(req); return ok(res,await ethics.assignEthicsPanelMember(parts[5],b.reviewerId,identity.sub,b.reason,requestId),requestId); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/review/ethics/cases/") && parts[6]==="conflict") { const b=await body(req); return ok(res,await ethics.declareEthicsConflict(parts[5],identity.sub,b.reason,requestId),requestId); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/review/ethics/cases/") && parts[6]==="review") { const b=await body(req); return ok(res,await ethics.recordEthicsReview(parts[5],b,identity.sub,requestId),requestId); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/review/ethics/cases/") && parts[6]==="decision") { const b=await body(req); return ok(res,await ethics.decideEthicsCase(parts[5],b,identity.sub,requestId),requestId); }
+
+    if(req.method==="GET" && p==="api/v1/me/volunteer-pledges") return ok(res,await volunteerPledges.listMyVolunteerPledges(identity.sub),requestId);
+    if(req.method==="POST" && p==="api/v1/me/volunteer-pledges") return ok(res,await volunteerPledges.saveVolunteerPledge(identity.sub,await body(req),requestId),requestId,201);
+    if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/me/volunteer-pledges/")) return ok(res,await volunteerPledges.updateVolunteerPledge(parts[4],identity.sub,await body(req),requestId),requestId);
+    if(req.method==="DELETE" && parts.length===5 && p.startsWith("api/v1/me/volunteer-pledges/")) return ok(res,await volunteerPledges.withdrawVolunteerPledge(parts[4],identity.sub,requestId),requestId);
+
     if(req.method==="GET" && p==="api/v1/verification/programs") return ok(res,await verification.listPrograms(),requestId);
     if(req.method==="GET" && p==="api/v1/verification/claim-types") return ok(res,await verification.listClaimTypes(),requestId);
     if(req.method==="GET" && p==="api/v1/me/verification/cases") return ok(res,await verification.listCases({viewerId:identity.sub,subjectUserId:identity.sub}),requestId);

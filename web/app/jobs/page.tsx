@@ -14,10 +14,11 @@ type Job={
  location_label?:string;posting_scope?:string;employment_type?:string;work_mode?:string;
  seniority_level?:string;department?:string;application_deadline?:string;salary_min?:number|string|null;
  salary_max?:number|string|null;salary_currency?:string|null;
+ screeningQuestions?:{id:string;question:string;question_type:string;options?:string[];required:boolean;knockout?:boolean}[];
 };
 type Eligibility={eligible:boolean;summary:string;results:{code:string;eligible:boolean;reason:string}[]};
 type EligibilityResult=Eligibility|{error:string};
-type ExistingApplication={id:string;job_id:string;status:string;cover_letter?:string|null};
+type ExistingApplication={id:string;job_id:string;status:string;cover_letter?:string|null;screening_answers?:{questionId:string;answer:string|string[]}[]};
 type Filters={q:string;location:string;employmentType:string;workMode:string;seniority:string;postingScope:string};
 const initialFilters:Filters={q:"",location:"",employmentType:"",workMode:"",seniority:"",postingScope:""};
 
@@ -49,6 +50,7 @@ export default function Jobs(){
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const [coverLetters,setCoverLetters]=useState<Record<string,string>>({});
+ const [screeningAnswersByJob,setScreeningAnswersByJob]=useState<Record<string,Record<string,string|string[]>>>({});
  const [draftIds,setDraftIds]=useState<Record<string,string>>({});
  const [applyingIds,setApplyingIds]=useState<Record<string,boolean>>({});
  const [eligibilityByJob,setEligibilityByJob]=useState<Record<string,EligibilityResult>>({});
@@ -71,7 +73,7 @@ export default function Jobs(){
 
  useEffect(()=>{void loadJobs(initialFilters)},[loadJobs]);
  useEffect(()=>{
-   if(!token){setSaved([]);setDraftIds({});setCoverLetters({});return;}
+   if(!token){setSaved([]);setDraftIds({});setCoverLetters({});setScreeningAnswersByJob({});return;}
    let active=true;
    api<Job[]>("/api/v1/me/saved-jobs",{},token).then(rows=>{if(active)setSaved(Array.isArray(rows)?rows.map(row=>row.id):[])}).catch(e=>{if(active)setError(e instanceof ApiError?e.message:"We couldn't load saved opportunities.")});
    api<ExistingApplication[]>("/api/v1/me/job-applications",{},token).then(rows=>{
@@ -79,11 +81,15 @@ export default function Jobs(){
      const drafts=Array.isArray(rows)?rows.filter(row=>row.status==="draft"&&typeof row.job_id==="string"):[];
      setDraftIds(Object.fromEntries(drafts.map(row=>[row.job_id,row.id])));
      setCoverLetters(Object.fromEntries(drafts.map(row=>[row.job_id,row.cover_letter||""])));
+     setScreeningAnswersByJob(Object.fromEntries(drafts.map(row=>[row.job_id,Object.fromEntries((row.screening_answers||[]).map(answer=>[answer.questionId,answer.answer]))])));
    }).catch(e=>{if(active)setError(e instanceof ApiError?e.message:"Saved application drafts could not be restored. Retry loading your applications before submitting.")});
    return ()=>{active=false};
  },[token]);
 
  async function submitFilters(e:FormEvent){e.preventDefault();await loadJobs(filters,0);}
+ function answersFor(jobId:string){return Object.entries(screeningAnswersByJob[jobId]||{}).map(([questionId,answer])=>({questionId,answer}));}
+ function updateScreeningAnswer(jobId:string,questionId:string,answer:string|string[]){setScreeningAnswersByJob(current=>({...current,[jobId]:{...(current[jobId]||{}),[questionId]:answer}}));}
+ function missingRequiredAnswers(job:Job){return (job.screeningQuestions||[]).some(question=>{const answer=screeningAnswersByJob[job.id]?.[question.id];return question.required&&(answer===undefined||answer===null||answer===""||(Array.isArray(answer)&&answer.length===0));});}
  async function createAlert(){
    if(!token){setNotice("Sign in to save a job alert for these search criteria.");return;}
    setCreatingAlert(true);setError("");setNotice("");
@@ -112,10 +118,10 @@ export default function Jobs(){
    try{
      let draftId=draftIds[job.id];
      if(!draftId){
-       const draft=await api<{id:string}>("/api/v1/jobs/"+encodeURIComponent(job.id)+"/application-drafts",{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+       const draft=await api<{id:string}>("/api/v1/jobs/"+encodeURIComponent(job.id)+"/application-drafts",{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id)})},token);
        draftId=draft.id;setDraftIds(current=>({...current,[job.id]:draftId!}));
      }else{
-       await api("/api/v1/job-applications/"+encodeURIComponent(draftId),{method:"PATCH",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+       await api("/api/v1/job-applications/"+encodeURIComponent(draftId),{method:"PATCH",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id)})},token);
      }
      setNotice("Your application draft is saved to your account. You can return to it before submitting.");
    }catch(e){setError(e instanceof ApiError?e.message:"We couldn't save this draft. Your text is still on this page; retry before leaving.");}
@@ -124,15 +130,16 @@ export default function Jobs(){
 
   async function submitFormalApplication(job:Job){
     if(!token){setNotice("Sign in to start a formal application. Public interest intake remains available separately.");return;}
+    if(missingRequiredAnswers(job)){setError("Answer each required screening question before submitting. Your draft remains available.");return;}
     if(applyingIds[job.id])return;
     setApplyingIds(current=>({...current,[job.id]:true}));setError("");setNotice("");
     try{
       let draftId=draftIds[job.id];
       if(!draftId){
-        const draft=await api<{id:string}>(`/api/v1/jobs/${encodeURIComponent(job.id)}/application-drafts`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+        const draft=await api<{id:string}>(`/api/v1/jobs/${encodeURIComponent(job.id)}/application-drafts`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id)})},token);
         draftId=draft.id;setDraftIds(current=>({...current,[job.id]:draftId!}));
       }
-      const submitted=await api<{status?:string;tracking_reference?:string|null}>(`/api/v1/job-applications/${encodeURIComponent(draftId)}/submit`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||""})},token);
+      const submitted=await api<{status?:string;tracking_reference?:string|null}>(`/api/v1/job-applications/${encodeURIComponent(draftId)}/submit`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id)})},token);
       setNotice(`Formal application status: ${humanStatus(submitted.status||"submitted")}.${submitted.tracking_reference?` Reference ${submitted.tracking_reference}.`:""} Open application tracking for the next steps.`);
       setDraftIds(current=>{const next={...current};delete next[job.id];return next;});
     }catch(e){
@@ -217,7 +224,8 @@ export default function Jobs(){
            {salary(job)&&<span className="tagline">{salary(job)}</span>}
          </div>
          {job.application_deadline&&<p className="muted">Application deadline: {new Date(job.application_deadline).toLocaleDateString()}</p>}
-         {expanded[job.id]&&<div style={{marginTop:14}}><p>{job.description||"No further description has been published."}</p>{token?<div className="case-row" style={{margin:"12px 0"}}><div style={{flex:1,minWidth:0}}><b>Are you eligible for this opportunity?</b>{eligibilityLoading[job.id]?<p className="muted">Checking the published requirements for your account…</p>:<EligibilityDetails result={eligibilityByJob[job.id]}/>}</div><div className="row" style={{gap:8,flexWrap:"wrap"}}>{eligibilityByJob[job.id]&&"error" in eligibilityByJob[job.id]&&<button className="btn btn-ghost" type="button" onClick={()=>void retryEligibility(job)} disabled={eligibilityLoading[job.id]}>Retry eligibility check</button>}</div></div>:<p className="muted">Sign in to check your eligibility against this vacancy's actual requirements.</p>}<p className="muted">A public inquiry is not a formal application. Formal submission is authenticated and checks eligibility, required screening answers and duplicate applications.</p>{token?<div className="grid" style={{gap:8,marginTop:10}}><label htmlFor={`cover-${job.id}`}>Cover letter (optional)<textarea id={`cover-${job.id}`} rows={3} disabled={applyingIds[job.id]} value={coverLetters[job.id]||""} onChange={e=>setCoverLetters(current=>({...current,[job.id]:e.target.value}))} placeholder="Explain your interest and relevant experience."/></label><div className="row" style={{gap:8,flexWrap:"wrap"}}><button className="btn btn-ghost" type="button" disabled={applyingIds[job.id]} onClick={()=>void saveFormalApplicationDraft(job)}>{applyingIds[job.id]?"Saving…":draftIds[job.id]?"Save draft changes":"Save draft"}</button><button className="btn btn-primary" type="button" disabled={applyingIds[job.id]} onClick={()=>void submitFormalApplication(job)}>{applyingIds[job.id]?"Submitting application…":draftIds[job.id]?"Submit saved draft":"Submit formal application"}</button></div></div>:<p className="muted"><a href="/login?next=/jobs">Sign in to submit a formal application</a>; use public inquiry only if you want to ask questions first.</p>}</div>}
+         {expanded[job.id]&&<div style={{marginTop:14}}><p>{job.description||"No further description has been published."}</p>
+         {(job.screeningQuestions||[]).length>0&&<fieldset className="form-category grid" style={{gap:12,marginTop:14}}><legend>Application questions</legend><p className="muted">Your answers are saved with this application draft and submitted with your application. Required questions must be answered before submission.</p>{(job.screeningQuestions||[]).map(question=><div className="grid" style={{gap:6}} key={question.id}><label><b>{question.question}</b>{question.required?<span className="muted"> · Required</span>:<span className="muted"> · Optional</span>}</label>{question.question_type==="text"&&<textarea rows={3} disabled={applyingIds[job.id]} value={String(screeningAnswersByJob[job.id]?.[question.id]||"")} onChange={e=>updateScreeningAnswer(job.id,question.id,e.target.value)}/ >}{question.question_type==="number"&&<input type="number" disabled={applyingIds[job.id]} value={String(screeningAnswersByJob[job.id]?.[question.id]||"")} onChange={e=>updateScreeningAnswer(job.id,question.id,e.target.value)}/ >}{["yes_no","single_choice"].includes(question.question_type)&&<select disabled={applyingIds[job.id]} value={String(screeningAnswersByJob[job.id]?.[question.id]||"")} onChange={e=>updateScreeningAnswer(job.id,question.id,e.target.value)}><option value="">Choose an answer</option>{(question.question_type==="yes_no"?["yes","no"]:(question.options||[])).map(option=><option key={option} value={option}>{option==="yes"?"Yes":option==="no"?"No":option}</option>)}</select>}{question.question_type==="multiple_choice"&&(question.options||[]).map(option=><label key={option} className="check-row"><input type="checkbox" disabled={applyingIds[job.id]} checked={Array.isArray(screeningAnswersByJob[job.id]?.[question.id])&&(screeningAnswersByJob[job.id]?.[question.id] as string[]).includes(option)} onChange={e=>{const current=Array.isArray(screeningAnswersByJob[job.id]?.[question.id])?screeningAnswersByJob[job.id][question.id] as string[]:[];updateScreeningAnswer(job.id,question.id,e.target.checked?[...new Set([...current,option])]:current.filter(value=>value!==option));}}/>{option}</label>)}</div>)}</fieldset>{token?<div className="case-row" style={{margin:"12px 0"}}><div style={{flex:1,minWidth:0}}><b>Are you eligible for this opportunity?</b>{eligibilityLoading[job.id]?<p className="muted">Checking the published requirements for your account…</p>:<EligibilityDetails result={eligibilityByJob[job.id]}/>}</div><div className="row" style={{gap:8,flexWrap:"wrap"}}>{eligibilityByJob[job.id]&&"error" in eligibilityByJob[job.id]&&<button className="btn btn-ghost" type="button" onClick={()=>void retryEligibility(job)} disabled={eligibilityLoading[job.id]}>Retry eligibility check</button>}</div></div>:<p className="muted">Sign in to check your eligibility against this vacancy's actual requirements.</p>}<p className="muted">A public inquiry is not a formal application. Formal submission is authenticated and checks eligibility, required screening answers and duplicate applications.</p>{token?<div className="grid" style={{gap:8,marginTop:10}}><label htmlFor={`cover-${job.id}`}>Cover letter (optional)<textarea id={`cover-${job.id}`} rows={3} disabled={applyingIds[job.id]} value={coverLetters[job.id]||""} onChange={e=>setCoverLetters(current=>({...current,[job.id]:e.target.value}))} placeholder="Explain your interest and relevant experience."/></label><div className="row" style={{gap:8,flexWrap:"wrap"}}><button className="btn btn-ghost" type="button" disabled={applyingIds[job.id]} onClick={()=>void saveFormalApplicationDraft(job)}>{applyingIds[job.id]?"Saving…":draftIds[job.id]?"Save draft changes":"Save draft"}</button><button className="btn btn-primary" type="button" disabled={applyingIds[job.id]} onClick={()=>void submitFormalApplication(job)}>{applyingIds[job.id]?"Submitting application…":draftIds[job.id]?"Submit saved draft":"Submit formal application"}</button></div></div>:<p className="muted"><a href="/login?next=/jobs">Sign in to submit a formal application</a>; use public inquiry only if you want to ask questions first.</p>}</div>}
          <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:18}}>
            <button className="btn btn-ghost" type="button" disabled={applyingIds[job.id]} onClick={()=>void toggleDetails(job)}>{expanded[job.id]?"Hide details":"View details"}</button>
            <a className="btn btn-primary" href={`/apply/job?jobId=${encodeURIComponent(job.id)}`}>Ask about this vacancy</a>

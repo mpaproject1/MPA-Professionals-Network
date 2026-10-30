@@ -18,6 +18,7 @@ const destinations: Destination[] = [
   { href: "/admin/members", label: "Members", description: "Imports and member records", icon: Users },
   { href: "/admin/members/catalog", label: "Member catalogue", description: "Search membership records and account links", icon: Users },
   { href: "/admin/membership", label: "Membership administration", description: "Plan versions, reviews and payments", icon: ShieldCheck },
+  { href: "/admin/membership/payment-methods", label: "Payment methods", description: "Finance-only member payment configuration", icon: CreditCard },
   { href: "/admin/membership-card", label: "Membership card", description: "Credential appearance", icon: ShieldCheck },
   { href: "/admin/reference-portfolio", label: "Reference data", description: "Governed profile options", icon: BookOpenCheck },
   { href: "/admin/marketplace", label: "Serve-Community review", description: "Demand and listing review", icon: ClipboardList },
@@ -66,6 +67,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     return destinations.filter((item) => {
       if (["/admin/accounts", "/admin/account-governance", "/admin/experience", "/admin/members", "/admin/members/catalog", "/admin/membership-card", "/admin/reference-portfolio"].includes(item.href)) return false;
       if (item.href === "/admin/membership") return membershipReviewer;
+      if (item.href === "/admin/membership/payment-methods") return financeOfficer;
       if (item.href === "/admin/reports") return membershipReviewer || financeOfficer || recruitmentScoped || supportStaff || roles?.includes("reviewer") === true;
       if (item.href === "/admin/organizations") return roles?.some((role) => ["reviewer", "organization_admin"].includes(role)) === true;
       if (item.href === "/admin/marketplace") return membershipReviewer || supportStaff;

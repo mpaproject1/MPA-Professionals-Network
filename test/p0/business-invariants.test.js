@@ -175,7 +175,7 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
     "named-employer consent cannot be saved without identifying its audience"
   );
 
-  const granted = await publicOpportunity.updateSharingConsent(inquiry.public_reference, inquiry.continuationToken, {
+  const granted = await publicOpportunity.updateMyMemberJobInterestConsent(inquiry.reference, applicant.user.id, {
     employerSharingConsent: true,
     scope: "named_employer",
     organizationId: organization.id,
@@ -189,15 +189,15 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
   assert.deepEqual(recovered.employerSharingFields, ["targetRole", "skills"]);
 
   await assert.rejects(
-    publicOpportunity.shareJobSeekerDemand(inquiry.id, support.user.id, { organizationId: organization.id, fields: ["contactEmail"] }, "p0-share-outside-consent"),
+    publicOpportunity.shareJobSeekerDemand(inquiryRow.id, support.user.id, { organizationId: organization.id, fields: ["contactEmail"] }, "p0-share-outside-consent"),
     error => error.code === "CONSENT_FIELD_MISMATCH",
     "the Support Desk cannot share contact information outside the applicant's field-level consent"
   );
   await assert.rejects(
-    publicOpportunity.shareJobSeekerDemand(inquiry.id, support.user.id, { organizationId: randomUUID(), fields: ["targetRole"] }, "p0-share-to-unknown-organization"),
+    publicOpportunity.shareJobSeekerDemand(inquiryRow.id, support.user.id, { organizationId: randomUUID(), fields: ["targetRole"] }, "p0-share-to-unknown-organization"),
     error => error.code === "CONSENT_AUDIENCE_MISMATCH"
   );
-  const shared = await publicOpportunity.shareJobSeekerDemand(inquiry.id, support.user.id, { organizationId: organization.id, fields: ["targetRole", "skills"] }, "p0-share-with-consent");
+  const shared = await publicOpportunity.shareJobSeekerDemand(inquiryRow.id, support.user.id, { organizationId: organization.id, fields: ["targetRole", "skills"] }, "p0-share-with-consent");
   assert.equal(shared.status, "shared");
   const employerView = await publicOpportunity.listSharedJobSeekerDemands(organization.id, support.user.id);
   assert.equal(employerView.length, 1);
@@ -205,7 +205,7 @@ test("P0: no-vacancy job-seeker demand remains private until explicit named-empl
   assert.deepEqual(employerView[0].skills, ["bookkeeping", "Excel"]);
   assert.equal("contactEmail" in employerView[0], false, "contact details must not be shared unless separately consented");
 
-  const revoked = await publicOpportunity.updateSharingConsent(inquiry.public_reference, inquiry.continuationToken, {
+  const revoked = await publicOpportunity.updateMyMemberJobInterestConsent(inquiry.reference, applicant.user.id, {
     employerSharingConsent: false
   }, "p0-sharing-consent-revoked");
   assert.equal(revoked.employer_sharing_consent, false);

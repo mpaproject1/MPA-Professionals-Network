@@ -72,7 +72,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     const membershipReviewer = Boolean(roles?.some((role) => ["reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
     const financeOfficer = Boolean(roles?.includes("finance_officer"));
     const financeAccess = Boolean(financeOfficer || permissions.some((permission) => ["finance.view", "finance.payment.verify", "finance.payment.reverse", "finance.manage"].includes(permission)));
-    const financeConfig = Boolean(financeOfficer || permissions.some((permission) => ["members.manage", "finance.manage"].includes(permission)));
+    const financeConfig = Boolean(financeOfficer || permissions.includes("finance.manage"));
     const supportStaff = Boolean(roles?.includes("supporting_staff"));
     if (platformAdmin) return destinations;
     return destinations.filter((item) => {

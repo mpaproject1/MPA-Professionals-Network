@@ -15,3 +15,10 @@ export async function uploadPrivateFile(token:string,file:File):Promise<string>{
  const confirmed=await api<{id:string}>(`/api/v1/files/uploads/${encodeURIComponent(upload.uploadId)}/confirm`,{method:"POST"},token);
  return confirmed.id;
 }
+
+export async function downloadPrivateFile(token:string,fileObjectId:string,fileName:string):Promise<void>{
+ const response=await fetch(`/api/v1/files/${encodeURIComponent(fileObjectId)}`,{headers:{Authorization:"Bearer "+token},cache:"no-store"});
+ if(!response.ok)throw new Error("You do not have permission to download this private file, or it is no longer available.");
+ const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement("a");
+ link.href=url;link.download=fileName||"private-evidence";document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+}

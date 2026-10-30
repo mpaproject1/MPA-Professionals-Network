@@ -28,10 +28,10 @@ The existing 18 reports are preserved. Five finance reports are added, bringing 
 | Report | Definition |
 | --- | --- |
 | Approved membership payments | Currently succeeded membership transactions only; excludes failed, pending and refunded/reversed transactions. |
-| Failed, refunded and reversed payments | Failed transactions are distinguished from refund/reversal outcomes and successful payments with a disputed reconciliation state. Reversal type and reason come from the reversal record. |
+| Failed, refunded, reversed and disputed payments | Failed transactions are distinguished from refund/reversal outcomes and successful payments with a disputed reconciliation state. Written-off reconciliation states remain distinct in the summary. Reversal type and reason come from the reversal record. |
 | Membership collections by currency | Gross verified includes succeeded plus refunded transactions; refunds/reversals are shown separately; net collected equals currently succeeded, non-reversed transactions. |
 | Outstanding membership payments | Approved/payment_pending applications without a currently succeeded, non-reversed linked payment. Amount/currency come from the immutable fee snapshot. |
-| Finance summary by currency | Period summary of collections, failures, refunds/reversals, reconciliation and outstanding balances, with each currency kept separate. |
+| Finance summary by currency | Period summary of collections, failures, refunds/reversals, matched/unreconciled/disputed/written-off reconciliation amounts and outstanding balances, with each currency kept separate. |
 
 The existing payment reconciliation report is also corrected:
 - It is restricted to membership-linked transactions.

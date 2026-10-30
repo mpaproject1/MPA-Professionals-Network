@@ -38,7 +38,19 @@ test.describe("registration human verification", () => {
     await expect(page.getByRole("textbox", { name: /Confirm you are human/ })).toBeVisible();
   });
 
-  test("accepts a correct answer and uses the returned proof for registration", async ({ page }) => {
+  test("a correct answer returns a short-lived proof token", async ({ page }) => {
+    await stubChallenge(page, {
+      verify: route => route.fulfill(json({ token: "correct-answer-proof-token-012345678901234567890123456789" }))
+    });
+    await page.goto("/register");
+    const result = await page.evaluate(() => fetch("/api/v1/auth/human-challenge/verify", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "challenge-1", answer: "11" })
+    }).then(response => response.json()));
+    expect(result.data.token).toMatch(/^correct-answer-proof-token-/);
+  });
+
+  test("registration proceeds after successful human verification", async ({ page }) => {
     await stubChallenge(page, {
       verify: route => route.fulfill(json({ token: "verified-proof-token-012345678901234567890123456789" }))
     });
@@ -170,6 +182,26 @@ test.describe("registration human verification", () => {
       await expect(page.getByRole("button", { name: /Get a new question/i })).toBeEnabled();
     }
     expect(issued.issued()).toBe(11);
+  });
+
+  test("explicit server-side opt-out allows registration without requesting a challenge token", async ({ page }) => {
+    let verifyRequests = 0;
+    await page.route("**/api/v1/auth/human-challenge", route => route.fulfill(json({ required: false })));
+    await page.route("**/api/v1/auth/human-challenge/verify", route => {
+      verifyRequests += 1;
+      return route.fulfill(json({ token: "unexpected" }));
+    });
+    await page.route("**/api/v1/auth/register", route => route.fulfill(json({
+      verificationRequired: true,
+      verificationSent: true,
+      user: { email: "human-check-disabled@example.test" }
+    })));
+    await page.goto("/register");
+    await expect(page.getByRole("region", { name: "Human verification" })).toHaveCount(0);
+    await completeRegistrationForm(page);
+    await page.getByRole("button", { name: /Create professional account/i }).click();
+    await expect(page.getByText(/account was created/i)).toBeVisible();
+    expect(verifyRequests).toBe(0);
   });
 
   test("registration without a valid token is rejected by the registration contract", async ({ page }) => {

@@ -87,10 +87,10 @@ export async function register(input,requestId){
   const accountType=input.accountType==="organization"||input.accountType==="organization_representative"?"organization_representative":"professional";
   const roleCode=accountType==="organization_representative"?"organization_representative":"member";
   const verificationRequired=true;
-  const humanChallengeRequired=String(process.env.HUMAN_CHALLENGE_REQUIRED||"false").toLowerCase()==="true"||loadConfig().nodeEnv==="production";
+  const humanChallengeRequired=loadConfig().humanChallengeRequired;
   let verificationMessage=null;
   const registered=await withTransaction(async db=>{
-    if(humanChallengeRequired || input.humanCheckToken) await consumeHumanChallenge(db,input.humanCheckToken);
+    if(humanChallengeRequired) await consumeHumanChallenge(db,input.humanCheckToken);
     assertEmailDeliveryConfigured();
     const identity=await db.query(`
       select u.id from app_user u where lower(u.email)=lower($1)

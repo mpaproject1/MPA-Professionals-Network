@@ -72,7 +72,7 @@ const FRIENDLY_ERRORS: Record<string,string> = {
   PAYMENT_AMOUNT_MISMATCH: "The amount does not match the approved application fee. Check the amount and try again.",
   NOT_FOUND: "We could not find that item. It may have been removed or is no longer available.",
   MEMBERSHIP_NOT_FOUND: "No membership record was found for this account or membership ID. Check the canonical MPA membership number, or complete membership approval and activation first.",
-  WRONG_MEMBERSHIP_IDENTIFIER: "That value is an internal account or record reference, not a membership number. Use the human-readable MPA membership ID shown in the member workspace.",
+  WRONG_MEMBERSHIP_IDENTIFIER: "That value is an internal account, payment or application reference, not a membership number. Use the human-readable MPA membership ID shown in the member workspace.",
   MEMBERSHIP_NOT_ELIGIBLE: "This membership is not currently active, so a card cannot be issued. Check its approval, activation, expiry or suspension status.",
   EMPTY_CARD_SELECTION: "Select at least one eligible member before preparing cards.",
   INVALID_CARD_SELECTION: "Select unique canonical MPA membership numbers. Internal account IDs and record references cannot be used.",

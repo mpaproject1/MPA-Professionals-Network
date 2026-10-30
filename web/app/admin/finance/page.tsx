@@ -164,7 +164,7 @@ export default function FinanceWorkspacePage() {
           {payment.verification_note && <p className="muted">Payment note: {payment.verification_note}</p>}
           {payment.reconciliation_note && <p className="muted">Reconciliation note: {payment.reconciliation_note}</p>}
           {payment.reversed && <p className="form-error" role="status">A refund or reversal is already recorded for this payment.</p>}
-          {canVerify && payment.payment_status === "pending" && payment.source !== "provider_webhook" && <form className="form-stack" onSubmit={event => void verifyPayment(event, payment)}>
+          {canVerify && payment.payment_status === "pending" && payment.source !== "provider_webhook" && ["submitted", "in_review", "correction_required", "approved", "payment_pending"].includes(payment.application_status) && <form className="form-stack" onSubmit={event => void verifyPayment(event, payment)}>
             <h3 className="h2">Verify payment</h3>
             <label>Decision<select value={decisions[payment.payment_id] || "approved"} onChange={event => setDecisions(current => ({ ...current, [payment.payment_id]: event.target.value as "approved" | "needs_correction" | "rejected" }))}><option value="approved">Approve payment</option><option value="needs_correction">Request correction</option><option value="rejected">Reject payment</option></select></label>
             <label>Finance note<textarea rows={2} maxLength={1000} value={verificationNotes[payment.payment_id] || ""} onChange={event => setVerificationNotes(current => ({ ...current, [payment.payment_id]: event.target.value }))} placeholder="Record what was checked or what needs correction."/></label>

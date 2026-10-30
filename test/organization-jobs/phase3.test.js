@@ -225,3 +225,12 @@ test("interview schedule changes are offered only to participants and decisions 
   assert.match(candidatePage,/interview\.isParticipant&&\["scheduled","confirmed"\]/);
   assert.match(employerPage,/interview\.isParticipant&&\["scheduled","confirmed"\]/);
 });
+
+test("interview scheduling restricts interviewer assignment to active authorized job-team members",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const service=await readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8");
+  const schedule=service.slice(service.indexOf("export async function scheduleInterview"),service.indexOf("export async function respondInterview"));
+  assert.match(schedule,/select 1 from app_user where id=\$1 and status='active'/);
+  assert.match(schedule,/jobRole\(db,a\.job_id,interviewerUserId,\["hiring_manager","recruiter","interviewer"\]\)/);
+  assert.doesNotMatch(schedule,/om\.role_code in/);
+});

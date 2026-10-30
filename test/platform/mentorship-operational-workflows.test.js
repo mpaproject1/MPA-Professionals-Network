@@ -112,4 +112,9 @@ test("mentorship rescheduling preserves the confirmed appointment until the othe
   assert.match(page, /Confirm new time/);
   assert.match(page, /Keep original time/);
   assert.match(page, /Withdraw schedule change/);
+  assert.match(service, /previous_start_at change_previous_start_at/);
+  assert.match(service, /responded_at change_responded_at/);
+  assert.match(page, /targetDate:goalDueDates/);
+  assert.match(page, /Target date/);
+  assert.match(page, /Schedule-change history/);
 });

@@ -36,6 +36,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const hydrateToken = useUiStore((state) => state.hydrateToken);
   const [roles, setRoles] = useState<string[] | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [reportIds, setReportIds] = useState<string[]>([]);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
   useEffect(() => {
@@ -48,6 +49,14 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
         setPermissions(Array.isArray(me.permissions) ? me.permissions.map((permission) => typeof permission === "string" ? permission : permission && typeof permission === "object" && "permission_code" in permission && typeof permission.permission_code === "string" ? permission.permission_code : "").filter(Boolean) : []);
       })
       .catch(() => { if (!cancelled) { setRoles([]); setPermissions([]); } });
+    return () => { cancelled = true; };
+  }, [hydrated, token]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!hydrated || !token) { setReportIds([]); return () => { cancelled = true; }; }
+    api<{ id?: unknown }[]>("/api/v1/admin/reports", {}, token)
+      .then((reports) => { if (!cancelled) setReportIds(Array.isArray(reports) ? reports.map((report) => typeof report?.id === "string" ? report.id : "").filter(Boolean) : []); })
+      .catch(() => { if (!cancelled) setReportIds([]); });
     return () => { cancelled = true; };
   }, [hydrated, token]);
 
@@ -69,14 +78,14 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
       if (["/admin/accounts", "/admin/account-governance", "/admin/experience", "/admin/members", "/admin/members/catalog", "/admin/membership-card", "/admin/reference-portfolio"].includes(item.href)) return false;
       if (item.href === "/admin/membership") return membershipReviewer;
       if (item.href === "/admin/membership/payment-methods") return financeConfig;
-      if (item.href === "/admin/reports") return membershipReviewer || financeOfficer || recruitmentScoped || supportStaff || roles?.includes("reviewer") === true || permissions.some((permission) => ["reports.view", "reports.sensitive"].includes(permission));
+      if (item.href === "/admin/reports") return reportIds.length > 0;
       if (item.href === "/admin/organizations") return roles?.some((role) => ["reviewer", "organization_admin"].includes(role)) === true;
       if (item.href === "/admin/marketplace") return membershipReviewer || supportStaff;
       if (item.href === "/admin/support") return supportStaff || roles?.includes("reviewer") === true;
       if (item.href === "/admin/security" || item.href === "/admin/email") return false;
       return false;
     });
-  }, [roles, permissions]);
+  }, [roles, permissions, reportIds]);
 
   return <div className={styles.workspace}>
     <aside className={styles.sidebar} aria-label="Administration navigation">

@@ -99,7 +99,7 @@ test("finance reports reconcile verified, failed, refunded and outstanding amoun
  assert.ok(product,"BASIC membership product must exist in migrated test database");
  const applicationIds=[],paymentIds=[],reversalIds=[];
  async function application(ref,status,amount,currency){
-  const row=(await db.query("insert into membership_application(user_id,application_type,membership_product_id,status,approved_at,fee_snapshot) values($1,'new',$2,$3,now(),$4::jsonb) returning id",[userId,product.id,status,JSON.stringify({amount,currency})])).rows[0];
+  const row=(await db.query("insert into membership_application(user_id,application_type,membership_product_id,status,approved_at,fee_snapshot,tracking_reference) values($1,'new',$2,$3,now(),$4::jsonb,$5) returning id",[userId,product.id,status,JSON.stringify({amount,currency}),ref])).rows[0];
   applicationIds.push(row.id);
   return row.id;
  }

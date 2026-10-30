@@ -373,7 +373,7 @@ test("admin navigation resolves current server roles and separates finance from 
   assert.ok(workspace.includes('item.href === "/admin/reports") return membershipReviewer || financeOfficer'));
   assert.ok(overview.includes('const me = await api<any>("/api/v1/me"'));
   assert.ok(!overview.includes("token.split"));
-  assert.ok(workspace.includes('item.href === "/admin/membership/payment-methods") return financeOfficer'));
+  assert.ok(workspace.includes('item.href === "/admin/membership/payment-methods") return financeConfig'));
   assert.ok(!membershipPage.includes('"system_admin", "reviewer", "finance_officer"'));
   assert.ok(membershipPage.includes('"membership.review"'));
 });

@@ -67,7 +67,7 @@ test("workspace operation loading uses the branded mark and route loaders share 
   assert.match(operationStatus, /<BrandedLoader[^>]*markOnly/);
   assert.match(loaderCss, /prefers-reduced-motion/);
   assert.match(brandedLoader, /markOnly/);
-  for (const route of ["jobs", "mentorship", "serve-community", "organizations", "membership", "admin", "notifications", "verification", "track", "members", "profile"]) {
+  for (const route of ["jobs", "mentorship", "serve-community", "organizations", "membership", "admin", "notifications", "verification", "track", "members", "profile", "dashboard", "services", "recruitment", "network"]) {
     const loader = await readFile(path.join(webRoot, "app", route, "loading.tsx"), "utf8");
     assert.match(loader, /BrandedLoader/);
   }

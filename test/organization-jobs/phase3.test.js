@@ -218,6 +218,9 @@ test("interview schedule changes are offered only to participants and decisions 
   ]);
   assert.match(service,/isParticipant,currentUserRole:/);
   assert.match(service,/canDecide:isParticipant&&proposal\.proposedBy!==userId/);
+  assert.match(service,/const isApplicant=a\.applicant_user_id===userId/);
+  assert.match(service,/participants:isApplicant\?/);
+  assert.match(service,/\!isApplicant\?\{proposedBy\}:\{\}/);
   assert.match(service,/user_id<>\$3/);
   assert.match(candidatePage,/interview\.isParticipant&&\["scheduled","confirmed"\]/);
   assert.match(employerPage,/interview\.isParticipant&&\["scheduled","confirmed"\]/);

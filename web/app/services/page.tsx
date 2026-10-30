@@ -6,6 +6,7 @@ import {DiscoveryPagination} from "../../components/discovery-pagination";
 import { FormFeedback } from "../../components/form-feedback";
 import { ImpactListingBanner } from "../../components/impact-listing-banner";
 import { OperationStatus } from "../../components/operation-status";
+import { ServiceImpactReportPanel } from "../../components/service-impact-report-panel";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
 import { humanStatus } from "../../lib/status-labels";

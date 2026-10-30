@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
 import { OperationStatus } from "../../components/operation-status";
+import { EmptyState } from "../../components/empty-state";
 import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
 import { humanStatus } from "../../lib/status-labels";
@@ -304,14 +305,10 @@ export default function Track() {
           );
         })}
         {!loading && !error && data?.items.length === 0 && (
-          <Card>
-            <h2 className="h2">No applications to show yet</h2>
-            <p className="muted">When you submit a membership, organization or job application, its progress will appear here.</p>
-            <div className="row" style={{ flexWrap: "wrap" }}>
-              <Link className="btn btn-primary" href="/membership">Explore membership</Link>
-              <Link className="btn btn-ghost" href="/jobs">Browse opportunities</Link>
-            </div>
-          </Card>
+          <div>
+            <EmptyState title="No applications to show yet" description="When you submit a membership, organization or job application, its progress will appear here." actionHref="/membership" actionLabel="Explore membership" />
+            <p className="mt-2"><Link className="btn btn-ghost" href="/jobs">Browse opportunities</Link></p>
+          </div>
         )}
         {data?.hasMore && (
           <div className="row" style={{ justifyContent: "center", flexWrap: "wrap" }}>

@@ -31,9 +31,9 @@ export function GuideLauncher(){
    {targetExists&&step?.target?<GuideSpotlight target={step.target}/>:null}
    <aside className="guide-card" style={cardPlacement==="top"?{top:"calc(76px + env(safe-area-inset-top))",bottom:"auto"}:undefined} role="dialog" aria-modal="false" aria-labelledby="guide-title" aria-describedby="guide-description">
     <div className="row"><span className="badge badge-green"><PlayCircle size={13}/> Guided tour</span><button type="button" className="icon-btn" onClick={close} aria-label="Close tour"><X size={17}/></button></div>
-    <div className="eyebrow" style={{marginTop:14}}>{guide.title}</div>
+    <div id="guide-title" className="eyebrow" style={{marginTop:14}}>{guide.title}</div>
     <p className="muted" aria-live="polite">Step {index+1} of {steps.length}</p>
-    <h2 id="guide-title" ref={headingRef} tabIndex={-1}>{step?.title||guide.title}</h2>
+    <h2 id="guide-step-title" ref={headingRef} tabIndex={-1}>{step?.title||guide.title}</h2>
     <p id="guide-description" className="muted">{step?.text||guide.description}</p>
     {!targetExists&&step?.target?<p className="guide-fallback" role="status">That control is not visible in this layout. You can continue using this explanation; no page controls are blocked.</p>:null}
     <div className="guide-progress" aria-hidden="true">{steps.map((_,i)=><span key={i} className={i<=index?"done":""}/>)}</div>

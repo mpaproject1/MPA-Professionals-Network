@@ -30,6 +30,7 @@ test("recruiters and project managers cannot read another organization's recruit
   const ownerB = await account("owner-b");
   const recruiterA = await account("recruiter-a");
   const projectManagerB = await account("project-manager-b");
+  const unrelatedUser = await account("unrelated");
 
   const orgA = await organizationJobs.registerOrganization(ownerA, {
     legalName: "Report Scope Organization A " + suffix,
@@ -56,6 +57,9 @@ test("recruiters and project managers cannot read another organization's recruit
     description: "Integration fixture for project manager report isolation.",
   }, "report-scope-job-b-" + suffix);
 
+  const unrelatedCatalogue = await listReportCatalogue({ sub: unrelatedUser, roles: [], permissions: [] });
+  assert.ok(!unrelatedCatalogue.some(report => report.id === "job-application-funnel"),
+    "an account without an organization or job-team assignment must not discover the recruitment report");
   const recruiterIdentity = { sub: recruiterA, roles: [], permissions: [] };
   const recruiterCatalogue = await listReportCatalogue(recruiterIdentity);
   assert.ok(recruiterCatalogue.some(report => report.id === "job-application-funnel"),

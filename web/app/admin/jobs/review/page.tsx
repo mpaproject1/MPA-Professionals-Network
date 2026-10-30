@@ -8,14 +8,17 @@ import {useUiStore} from "../../../../lib/store";
 type ReviewJob={id:string;organization_id:string;organization_name:string;title:string;description:string;employment_type?:string|null;work_mode?:string|null;location_label?:string|null;posting_scope:string;visibility:string;application_deadline?:string|null;review_submitted_at?:string|null;verification_status:string};
 export default function JobReviewQueue(){
  const token=useUiStore(s=>s.token);
+ const hydrated=useUiStore(s=>s.hydrated);
+ const hydrateToken=useUiStore(s=>s.hydrateToken);
  const [items,setItems]=useState<ReviewJob[]>([]);
  const [reasons,setReasons]=useState<Record<string,string>>({});
  const [loading,setLoading]=useState(true);
  const [busy,setBusy]=useState("");
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
- const load=useCallback(async()=>{if(!token){setLoading(false);setItems([]);return;}setLoading(true);setError("");try{const rows=await api<ReviewJob[]>("/api/v1/review/jobs",{},token);setItems(Array.isArray(rows)?rows:[]);}catch(e){setError(e instanceof ApiError?e.message:"The MPA vacancy review queue could not be loaded.");}finally{setLoading(false);}},[token]);
- useEffect(()=>{void load();},[load]);
+ const load=useCallback(async()=>{if(!hydrated)return;if(!token){setLoading(false);setItems([]);return;}setLoading(true);setError("");try{const rows=await api<ReviewJob[]>("/api/v1/review/jobs",{},token);setItems(Array.isArray(rows)?rows:[]);}catch(e){setError(e instanceof ApiError?e.message:"The MPA vacancy review queue could not be loaded.");}finally{setLoading(false);}},[token,hydrated]);
+ useEffect(()=>{hydrateToken();},[hydrateToken]);
+ useEffect(()=>{if(hydrated)void load();},[hydrated,load]);
  async function decide(job:ReviewJob,decision:"approved"|"rejected"|"correction_required"){
   setBusy(job.id);setError("");setNotice("");
   try{await api("/api/v1/review/jobs/"+encodeURIComponent(job.id)+"/decision",{method:"POST",body:JSON.stringify({decision,reason:reasons[job.id]||""})},token||undefined);setNotice(decision==="approved"?"Vacancy approved and published.":decision==="rejected"?"Vacancy rejected.":"Vacancy returned for correction.");setItems(current=>current.filter(item=>item.id!==job.id));}

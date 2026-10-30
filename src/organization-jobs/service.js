@@ -458,6 +458,7 @@ const APPLICATION_TRANSITIONS={
 export function allowedApplicationTransition(from,to){ return (APPLICATION_TRANSITIONS[from]||[]).includes(to); }
 export function allowedCandidateResponse(from,to){ return from==="offer"&&to==="accepted" || ["submitted","screening","shortlisted","interview","offer","accepted"].includes(from)&&to==="withdrawn"; }
 export function canRespondToInterview(status){ return ["scheduled","confirmed"].includes(status); }
+export function isValidScreeningAnswer(question,answer){const options=Array.isArray(question.options)?question.options.map(String):[];switch(question.question_type){case "text":return typeof answer==="string"&&answer.length<=10000;case "number":return Number.isFinite(Number(answer));case "yes_no":return ["yes","no"].includes(String(answer));case "single_choice":return typeof answer==="string"&&options.includes(answer);case "multiple_choice":return Array.isArray(answer)&&answer.every(value=>typeof value==="string"&&options.includes(value))&&new Set(answer).size===answer.length;default:return false;}}
 export function allowedInterviewStatusTransition(from,to){ const transitions={scheduled:["completed","cancelled","no_show"],confirmed:["completed","cancelled","no_show"]}; return (transitions[from]||[]).includes(to); }
 
 export async function updateCandidate(jobId,applicationId,userId,input,requestId){
@@ -675,6 +676,8 @@ async function saveScreeningAnswers(db,applicationId,jobId,answers=[],requireAll
  for(const q of questions){
    const answer=byId.get(String(q.id));
    if(requireAll&&q.required && (answer===undefined||answer===null||answer===""||(Array.isArray(answer)&&answer.length===0))) throw error(400,"Required screening question is unanswered.","SCREENING_REQUIRED");
+   if(answer===undefined||answer===null||answer===""||(Array.isArray(answer)&&answer.length===0)) continue;
+   if(!isValidScreeningAnswer(q,answer)) throw error(400,"A screening answer does not match the question type or available options.","INVALID_SCREENING_ANSWER");
    if(answer!==undefined){
      let knockout=false;
      if(requireAll&&q.knockout && q.knockout_operator){

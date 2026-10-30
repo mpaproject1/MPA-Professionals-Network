@@ -1,11 +1,11 @@
 # Public Job & Mentorship Intake
 
 ## Purpose
-The public side now supports low-friction first contact for employment and mentorship without forcing a visitor to complete the full authenticated workflow before their intent is understood.
+Public first-contact intake remains available for mentorship and inquiries tied to a specific published public vacancy. No-vacancy job interest is a separate members-only workflow at `/jobs/interest`.
 
 The design follows **Adl (Justice)** and **Satr (Confidentiality)**:
 
-1. Public visitor selects a public job or mentorship path.
+1. A visitor selects a specific published public vacancy or a public mentorship path. No-vacancy job interest requires an authenticated, currently eligible MPA member.
 2. First submission collects only intent and contact information plus consent.
 3. The system returns a reference and one continuation secret.
 4. The continuation page explains the formal application path and accepts useful detailed information.
@@ -14,7 +14,9 @@ The design follows **Adl (Justice)** and **Satr (Confidentiality)**:
 
 ## Job path
 - Public vacancies are discoverable through `/jobs`.
-- `/apply/job` accepts a specific public vacancy or general job interest.
+- `/apply/job` accepts inquiries tied to a specific published public vacancy.
+- `/jobs/interest` is reserved for authenticated accounts with a current active membership record (`status='active'`, start date reached, and no expired end date). A role named `member` is not sufficient.
+- Member job-interest requests use a server-generated `MPA-JI-YYYYMMDD-NNNNNN` support reference. The reference is not an access credential; private details and consent actions are scoped to the authenticated owning account.
 - The first step records name, email/phone and intent.
 - The detailed continuation can capture summary, experience, education, skills, availability, motivation and document notes.
 - Organization users authorized for the vacancy can see the inquiry.
@@ -32,10 +34,16 @@ The design follows **Adl (Justice)** and **Satr (Confidentiality)**:
 ## Privacy boundary
 The public inquiry stores contact information and applicant-provided intent/details. It does not expose Phase 2 private evidence, reviewer notes, verification evidence, or internal organization notes.
 
-The continuation token is stored only as a SHA-256 hash. The raw token is returned to the applicant at submission time and is required for unauthenticated continuation/tracking.
+For public mentorship and specific-vacancy inquiries, the continuation token is stored only as a SHA-256 hash and the raw token is used for their secure continuation flow. No-vacancy job-interest requests use a separately generated server-side secret whose hash is stored; that secret is never returned to or displayed in the member UI. Members track their own requests by account and support reference.
 
 ## API
-- `POST /api/v1/public/opportunity-inquiries`
+- `POST /api/v1/public/opportunity-inquiries` (mentorship or specific published public vacancy only; no-vacancy job interest is rejected)
+- `GET /api/v1/me/job-interests`
+- `POST /api/v1/me/job-interests`
+- `GET /api/v1/me/job-interests/:reference`
+- `GET /api/v1/me/job-interests/:reference/sharing-history`
+- `POST /api/v1/me/job-interests/:reference/sharing-consent`
+- `GET /api/v1/me/job-interest-sharing-organizations?q=...`
 - `GET /api/v1/public/opportunity-inquiries/:reference/details?token=...`
 - `PATCH /api/v1/public/opportunity-inquiries/:reference/details`
 - `POST /api/v1/public/opportunity-inquiries/:reference/link`
@@ -45,7 +53,8 @@ The continuation token is stored only as a SHA-256 hash. The raw token is return
 ## UI entry points
 - Landing page: public Jobs and Mentorship application cards.
 - Global navigation: Apply.
-- `/jobs` → public job inquiry.
+- `/jobs` → public vacancy discovery.
+- `/jobs/interest` → authenticated, eligible-member no-vacancy job-interest workspace.
 - `/mentorship` → public mentorship inquiry.
 - `/track?ref=...&token=...` → secure inquiry tracking.
 - `/apply/opportunity?ref=...&token=...` → detailed continuation.

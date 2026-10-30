@@ -1,6 +1,7 @@
 "use client";
 
-import { CheckCircle2, CircleAlert, LoaderCircle, type LucideIcon } from "lucide-react";
+import { CheckCircle2, CircleAlert, type LucideIcon } from "lucide-react";
+import { BrandedLoader } from "./branded-loader";
 import type { ReactNode } from "react";
 
 type OperationStatusProps = {
@@ -12,7 +13,7 @@ type OperationStatusProps = {
 };
 
 const icons: Record<OperationStatusProps["state"], LucideIcon> = {
-  loading: LoaderCircle,
+  loading: CircleAlert,
   success: CheckCircle2,
   error: CircleAlert,
   info: CircleAlert,
@@ -29,7 +30,7 @@ export function OperationStatus({ state, title, detail, action, className = "" }
       aria-busy={state === "loading" ? true : undefined}
     >
       <span className={`operation-status__icon ${state === "loading" ? "operation-status__icon--moving" : ""}`}>
-        <Icon size={19} aria-hidden="true" />
+        {state === "loading" ? <BrandedLoader label={title} compact markOnly /> : <Icon size={19} aria-hidden="true" />}
       </span>
       <span className="operation-status__copy">
         <strong>{title}</strong>

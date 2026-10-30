@@ -4,7 +4,7 @@ import { SupportAction } from "../components/support-action";
 
 export default function NotFound() {
   return (
-    <main className="auth-page" role="main">
+    <div className="auth-page">
       <section className="card" aria-labelledby="not-found-title">
         <p className="eyebrow">404 · Page not found</p>
         <h1 id="not-found-title" className="h1">We couldn’t find that page.</h1>
@@ -14,6 +14,6 @@ export default function NotFound() {
           <SupportAction label="Report this to MPA Support" />
         </div>
       </section>
-    </main>
+    </div>
   );
 }

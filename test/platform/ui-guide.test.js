@@ -48,4 +48,7 @@ test("migration disables stale route tours and seeds only audited current route 
  for(const route of ["'\*'","'/members'","'/membership'","'/membership/payment'"])assert.ok(migration.includes(route),route);
  for(const target of ["brand-home","main-navigation","help-control","workspace-overview","workspace-progress","workspace-shortcuts","workspace-help","membership-overview","membership-application","payment-overview","payment-application","payment-submit"])assert.ok(migration.includes(target),target);
  assert.match(migration,/on conflict\(guide_key\) do update/);
+ assert.match(service,/GUIDE_RETIRED/);
+ assert.match(service,/CURRENT_GUIDE_KEYS\.has\(current\.guide_key\)/);
+ assert.match(admin,/currentGuideKeys\.has\(guide\.guide_key\)/);
 });

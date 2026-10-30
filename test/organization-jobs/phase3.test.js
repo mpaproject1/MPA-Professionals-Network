@@ -68,3 +68,26 @@ test("application draft saving updates an existing draft and restores applicant-
   assert.match(page,/saveFormalApplicationDraft/);
   assert.match(page,/Save draft changes/);
 });
+
+test("job seeker UX requires deliberate vacancy selection and separates future job interest",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const [jobs,publicInquiry]=await Promise.all([
+    readFile(new URL("../../web/app/jobs/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../../web/app/apply/job/page.tsx",import.meta.url),"utf8")
+  ]);
+  assert.match(jobs,/\/apply\/job\?jobId=\$\{encodeURIComponent\(job\.id\)\}/);
+  assert.match(jobs,/employmentType=\{filters\.employmentType\}/);
+  assert.match(jobs,/value="full_time">Full-time/);
+  assert.match(publicInquiry,/requestedJobId&&list\.some\(job=>job\.id===requestedJobId\)/);
+  assert.doesNotMatch(publicInquiry,/if\(list\.length\)setJobId\(list\[0\]\.id\)/);
+  assert.match(publicInquiry,/\/jobs\/interest/);
+});
+
+test("candidate tracking gives actionable next steps for each recruitment stage",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const tracking=await readFile(new URL("../../src/platform/application-tracking.js",import.meta.url),"utf8");
+  for(const status of ["submitted","screening","shortlisted","interview","offer","accepted","hired","rejected","withdrawn"])
+    assert.match(tracking,new RegExp("a\\.status='"+status+"'"));
+  assert.match(tracking,/a\.offer_approval_status='pending'/);
+  assert.match(tracking,/Review the offer terms and accept or withdraw your application/);
+});

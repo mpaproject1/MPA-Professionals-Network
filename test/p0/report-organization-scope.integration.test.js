@@ -62,9 +62,11 @@ test("recruiters and project managers cannot read another organization's recruit
     userId: jobTeamRecruiterA, roleCode: "recruiter",
   }, "report-scope-job-team-recruiter-" + suffix);
 
-  const unrelatedCatalogue = await listReportCatalogue({ sub: unrelatedUser, roles: [], permissions: [] });
+  const unrelatedIdentity = { sub: unrelatedUser, roles: [], permissions: ["reports.view"] };
+  const unrelatedCatalogue = await listReportCatalogue(unrelatedIdentity);
   assert.ok(!unrelatedCatalogue.some(report => report.id === "job-application-funnel"),
     "an account without an organization or job-team assignment must not discover the recruitment report");
+  await assert.rejects(runReport(unrelatedIdentity, "job-application-funnel", { q: suffix }, "report-scope-run-unrelated-" + suffix), error => error?.code === "REPORT_FORBIDDEN");
   const recruiterIdentity = { sub: recruiterA, roles: [], permissions: [] };
   const recruiterCatalogue = await listReportCatalogue(recruiterIdentity);
   assert.ok(recruiterCatalogue.some(report => report.id === "job-application-funnel"),

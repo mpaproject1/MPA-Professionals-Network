@@ -141,8 +141,9 @@ test("recruiting interview scheduling validates organization/job-team scope and 
   const end = service.indexOf("export async function respondInterview(", start);
   const interview = service.slice(start, end);
   assert.match(interview, /INVALID_INTERVIEWER/);
-  assert.match(interview, /organization_membership om where om\.organization_id=\$2/);
-  assert.match(interview, /job_team_member jt where jt\.job_id=\$3/);
+  assert.match(interview, /jobRole\(db,a\.job_id,userId,\["hiring_manager","recruiter"\]\)/);
+  assert.match(interview, /jobRole\(db,a\.job_id,interviewerUserId,\["hiring_manager","recruiter","interviewer"\]\)/);
+  assert.match(interview, /job_team_member/);
   assert.match(interview, /Interviews can only be scheduled for an active application/);
   const notesStart = service.indexOf("export async function listApplicationNotes(");
   const notesEnd = service.indexOf("export async function scheduleInterview(", notesStart);

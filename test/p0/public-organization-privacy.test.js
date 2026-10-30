@@ -34,7 +34,7 @@ test("compact public primary navigation and organization workspace privacy remai
   assert.match(shell, /\["\/learning","My-Learning",GraduationCap\]/);
   assert.doesNotMatch(shell, /\["\/","Home",/);
   assert.doesNotMatch(shell, /\["\/network","Network",/);
-  assert.match(shell, /const primaryHrefs=token\?\["\/about","\/jobs","\/serve-community","\/members","\/learning"\]:\["\/about","\/jobs","\/serve-community"\]/);
+  assert.match(shell, /const primaryHrefs=token\?\["\/about","\/jobs","\/network-plus","\/serve-community","\/members","\/learning"\]:\["\/about","\/jobs","\/serve-community"\]/);
   assert.match(shell, /const desktopPrimary=visibleNav\.filter\(\(\[href\]\)=>primaryHrefs\.includes\(href\)\)/);
   assert.match(shell, /const mobilePrimary=visibleNav\.filter\(\(\[href\]\)=>primaryHrefs\.includes\(href\)\)/);
   assert.doesNotMatch(shell, /\/organizations\/directory/);

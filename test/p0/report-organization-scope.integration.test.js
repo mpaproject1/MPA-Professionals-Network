@@ -45,6 +45,9 @@ test("recruiters and project managers cannot read another organization's recruit
   await organizationJobs.addOrganizationUser(orgA.id, ownerA, {
     userId: recruiterA, roleCode: "recruiter",
   }, "report-scope-recruiter-" + suffix);
+  await organizationJobs.addOrganizationUser(orgA.id, ownerA, {
+    userId: jobTeamRecruiterA, roleCode: "read_only",
+  }, "report-scope-job-team-member-" + suffix);
   await organizationJobs.addOrganizationUser(orgB.id, ownerB, {
     userId: projectManagerB, roleCode: "project_manager",
   }, "report-scope-project-manager-" + suffix);

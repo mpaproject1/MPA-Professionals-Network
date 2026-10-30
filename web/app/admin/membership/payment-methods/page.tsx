@@ -78,7 +78,7 @@ export default function MembershipPaymentMethodsPage() {
     api<Me>("/api/v1/me", {}, token).then(me => {
       if (cancelled) return;
       const roles = me.roles || [], permissions = me.permissions || [];
-      const allowed = roles.includes("system_admin") || roles.includes("finance_officer") || permissions.some(p => ["members.manage", "finance.manage"].includes(p));
+      const allowed = roles.includes("system_admin") || roles.includes("finance_officer") || permissions.includes("finance.manage");
       setAccess(allowed ? "allowed" : "denied");
       if (allowed) void load();
     }).catch(() => { if (!cancelled) setAccess("denied"); });

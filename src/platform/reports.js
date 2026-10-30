@@ -26,7 +26,7 @@ function fail(status,message,code="REPORT_ERROR"){const e=new Error(message);e.s
 async function hasRecruitmentReportScope(db,identity){
  const roles=Array.isArray(identity?.roles)?identity.roles:[];
  if(roles.some(role=>["system_admin","admin","supporting_staff","reviewer"].includes(role)))return false;
- if(!identity?.sub)return false;
+ if(!identity?.sub||! /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(identity.sub)))return false;
  const result=await db.query("select (exists(select 1 from organization_membership om where om.user_id=$1 and om.status='active' and om.role_code in ('recruiter','project_manager')) or exists(select 1 from job_team_member jt where jt.user_id=$1 and jt.active=true and jt.role_code in ('recruiter','hiring_manager','project_manager'))) allowed",[identity.sub]);
  return result.rows[0]?.allowed===true;
 }

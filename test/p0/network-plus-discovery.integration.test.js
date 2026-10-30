@@ -182,6 +182,7 @@ test("organization discovery requires Network-Plus eligibility, explicit opt-in 
   const org = await organizationJobs.registerOrganization(owner.user.id, {
     legalName: `Network Plus Visible Organization ${suffix}`,
     displayName: `Network Plus Visible ${suffix}`,
+    organizationType: "nonprofit",
     description: "Approved organization discovery profile.",
     website: "https://example.test",
   }, `network-plus-visible-org-${suffix}`);
@@ -227,7 +228,7 @@ test("organization discovery requires Network-Plus eligibility, explicit opt-in 
     displayName: `Network Plus Unverified ${suffix}`,
   }, `network-plus-unverified-org-${suffix}`);
 
-  const memberDirectory = await organizationJobs.listNetworkPlusOrganizations(activeMember.user.id, { q: suffix });
+  const memberDirectory = await organizationJobs.listNetworkPlusOrganizations(activeMember.user.id, { q: suffix, organizationType: "NONPROFIT" });
   const ownerDirectory = await organizationJobs.listNetworkPlusOrganizations(owner.user.id, { q: suffix });
   const projectDirectory = await organizationJobs.listNetworkPlusOrganizations(projectManager.user.id, { q: suffix });
   assert.ok(memberDirectory.items.some(row => row.id === org.id));

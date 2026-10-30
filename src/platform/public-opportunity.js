@@ -145,7 +145,7 @@ export async function createMemberJobInterest(userId,input,requestId,idempotency
 }
 export async function listMyMemberJobInterests(userId){
  const db=getPool();await requireEligibleJobInterestMember(db,userId);
- return (await db.query(`select i.public_reference reference,i.status,i.created_at,i.updated_at,i.employer_sharing_consent,
+ return (await db.query(`select i.public_reference reference,i.status,i.created_at,i.updated_at,i.details->>'targetRole' target_role,i.employer_sharing_consent,
   i.employer_sharing_revoked_at,
   case when i.status in ('converted','declined','closed') then 'Review the recorded outcome.'
    when i.employer_sharing_consent=true and i.employer_sharing_revoked_at is null then 'Review sharing history or revoke consent.'

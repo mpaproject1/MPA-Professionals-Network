@@ -35,7 +35,7 @@ The report contains workflow aggregates only. It does not expose applicant ident
 
 The admin workspace now resolves roles and explicit permissions from the authenticated \`/api/v1/me\` response instead of relying on stale token claims. Navigation discovery is filtered by current role/permission data and by the report catalogue returned from the backend:
 
-- Finance users are offered Reports, not membership decision controls.
+- Finance users are offered a separate payment queue, finance reports and finance-only payment-method configuration, not membership decision controls. The payment queue returns minimal transaction/application references and excludes applicant contact details, private application snapshots and attachments.
 - Membership reviewers are offered membership operations and permitted reports.
 - Recruiters and project managers can discover reports, with the server enforcing their actual organization/job scope.
 - Support and review roles retain only their operationally relevant workspace links.

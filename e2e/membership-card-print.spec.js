@@ -12,7 +12,7 @@ const settings={header_text:"Muslim Professionals Association",subtitle_text:"Me
 const cards=candidates.map(candidate=>({...candidate,status:"active",verificationPath:"/membership/verify?membershipNumber="+encodeURIComponent(candidate.membershipNumber)+"&token="+"a".repeat(43),settings}));
 
 test("bulk membership print produces independently parsed A4 PDF with one eligible card per page",async({page})=>{
- await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","membership-card-print-ci-token"));
+ await page.addInitScript(()=>{sessionStorage.setItem("mpa-session-token","membership-card-print-ci-token");window.print=()=>{window.__membershipPrintInvoked=true;};});
  await page.route("**/api/v1/admin/membership-cards/eligible**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({items:candidates,total:candidates.length,limit:100,offset:0,hasMore:false})}));
  await page.route("**/api/v1/admin/membership-cards/print",async route=>{ expect(route.request().method()).toBe("POST"); expect(route.request().postDataJSON().batchReference).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"); await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({recorded:true})}); });
  await page.route("**/api/v1/admin/membership-cards/batch",async route=>{
@@ -30,6 +30,7 @@ test("bulk membership print produces independently parsed A4 PDF with one eligib
  await expect(page.getByRole("heading",{name:"Review before printing"})).toBeVisible();
  await expect(page.getByText(/2 eligible cards prepared/)).toBeVisible();
  await page.getByRole("button",{name:"Print / Save PDF"}).click();
+ expect(await page.evaluate(()=>window.__membershipPrintInvoked)).toBe(true);
  await page.emulateMedia({media:"print"});
  const pdf=await page.pdf({format:"A4",printBackground:true,preferCSSPageSize:true});
  expect(pdf.subarray(0,5).toString()).toBe("%PDF-");

@@ -36,6 +36,11 @@ type PublicInquiry = {
   reference: string;
   nextStep: string;
 };
+type JobProgress = {
+  application: { id: string; status: string; offer?: { amount?: number | string | null; currency?: string | null; terms?: string | null; approvalStatus?: string | null } };
+  events: { from_status?: string | null; to_status: string; note?: string | null; created_at: string }[];
+  interviews: { id: string; scheduled_start: string; scheduled_end: string; timezone?: string; mode: string; location_text?: string | null; meeting_url?: string | null; status: string; agenda?: string | null; participants: { userId: string; role: string; response: string }[] }[];
+};
 const PAGE_SIZE = 20;
 
 function actionFor(item: Item) {
@@ -62,6 +67,10 @@ export default function Track() {
   const [publicRef, setPublicRef] = useState("");
   const [publicToken, setPublicToken] = useState("");
   const [publicLookupFinished, setPublicLookupFinished] = useState(false);
+  const [jobProgress, setJobProgress] = useState<Record<string, JobProgress>>({});
+  const [progressErrors, setProgressErrors] = useState<Record<string, string>>({});
+  const [interviewAction, setInterviewAction] = useState("");
+  const [applicationAction, setApplicationAction] = useState("");
   const [error, setError] = useState("");
   const [copyNotice, setCopyNotice] = useState("");
   const [loading, setLoading] = useState(true);

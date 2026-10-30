@@ -19,6 +19,8 @@ test.describe("MPA support, loading and error experience", () => {
     await support.press("Enter");
     await expect(page.locator('section[aria-label="MPA support assistant"]')).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Ask MPA support" })).toBeFocused();
+    await page.getByRole("button", { name: "Close support panel" }).click();
+    await expect(page.getByRole("button", { name: "Open MPA support" })).toBeFocused();
   });
 
   test("workspace loading uses the branded mark and respects reduced motion", async ({ page }) => {
@@ -37,6 +39,20 @@ test.describe("MPA support, loading and error experience", () => {
     const orbit = loading.locator("svg").first();
     await expect.poll(() => orbit.evaluate(node => getComputedStyle(node).animationName)).toBe("none");
     await expect(page.getByRole("heading", { name: "No roles match these filters yet" })).toBeVisible();
+  });
+
+  test("forbidden responses do not invent a required role or permission grantor", async ({ page }) => {
+    await page.route("**/api/v1/jobs?*", route => route.fulfill({
+      status: 403,
+      headers: { "x-request-id": "support-test-403" },
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "FORBIDDEN", message: "private authorization detail" } })
+    }));
+    await page.goto("/jobs");
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("does not have permission");
+    await expect(alert).not.toContainText("administrator must grant");
+    await expect(alert).not.toContainText("private authorization detail");
   });
 
   test("server errors remain errors and do not become empty results", async ({ page }) => {

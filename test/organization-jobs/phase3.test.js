@@ -251,3 +251,17 @@ test("screening answers are validated against question type and configured optio
   assert.equal(isValidScreeningAnswer({question_type:"multiple_choice",options:["a","b"]}, ["a","c"]),false);
   assert.equal(isValidScreeningAnswer({question_type:"multiple_choice",options:["a","b"]}, ["a","a"]),false);
 });
+
+test("interview change proposals enforce participant identity, overlap checks and applicant privacy",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const service=await readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8");
+  const propose=service.slice(service.indexOf("export async function proposeInterviewChange"),service.indexOf("export async function decideInterviewChange"));
+  const decide=service.slice(service.indexOf("export async function decideInterviewChange"),service.indexOf("export async function updateInterviewStatus"));
+  const list=service.slice(service.indexOf("export async function listApplicationInterviews"),service.indexOf("export async function getMyApplicationProgress"));
+  assert.match(propose,/Only an interview participant may propose/);
+  assert.match(propose,/user_id in \(select user_id from job_interview_participant where interview_id=\$1\)/);
+  assert.match(decide,/user_id=\$2 and user_id<>\$3/);
+  assert.match(list,/const isApplicant=a\.applicant_user_id===userId/);
+  assert.match(list,/participants:isApplicant\?/);
+  assert.match(list,/\!isApplicant\?\{proposedBy\}:\{\}/);
+});

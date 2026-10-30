@@ -34,8 +34,8 @@ export default function MembershipAdministrationPage() {
         const roles = Array.isArray(me.roles) ? me.roles : [];
         const permissions = Array.isArray(me.permissions) ? me.permissions : [];
         const allowed =
-          roles.some((role) => ["system_admin", "reviewer", "finance_officer"].includes(role)) ||
-          permissions.some((permission) => ["members.view", "members.manage", "finance.view", "finance.manage"].includes(permission));
+          roles.some((role) => ["system_admin", "reviewer", "membership_reviewer"].includes(role)) ||
+          permissions.some((permission) => ["membership.review", "members.view"].includes(permission));
         setAccess(allowed ? "allowed" : "denied");
         setCanManageMethods(roles.includes("system_admin") || roles.includes("finance_officer") || permissions.some((permission) => ["members.manage", "finance.manage"].includes(permission)));
       })
@@ -45,13 +45,13 @@ export default function MembershipAdministrationPage() {
   }, [hydrated, token]);
 
   if (!hydrated || access === "loading") {
-    return <Card><OperationStatus state="loading" title="Checking membership administration access" detail="We’re verifying your reviewer or finance permissions before loading member records. No membership decision or payment action is being performed." /></Card>;
+    return <Card><OperationStatus state="loading" title="Checking membership administration access" detail="We’re verifying current membership-review permissions before loading application records. Payment authority is checked separately and does not grant membership decision access." /></Card>;
   }
   if (access === "signin") {
     return <Card><h1 className="h1">Sign in required</h1><p className="muted">Sign in with an authorized MPA administration account to manage membership applications, plan versions and payment review.</p><a className="btn btn-primary" href="/login?next=/admin/membership">Sign in</a></Card>;
   }
   if (access === "denied") {
-    return <Card><h1 className="h1">You do not have access to this workspace</h1><p className="muted">Membership administration is available only to authorized reviewers, finance staff and administrators. Your account and membership records have not been changed.</p><a className="btn btn-ghost" href="/membership">Return to my membership</a></Card>;
+    return <Card><h1 className="h1">You do not have access to this workspace</h1><p className="muted">Membership application review and activation are available only to authorized membership reviewers and administrators. Finance authority does not grant membership decision access. Your account and membership records have not been changed.</p><a className="btn btn-ghost" href="/membership">Return to my membership</a></Card>;
   }
 
   return <><div className="grid">{canManageMethods && <Card><div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><div><h2 className="h2">Finance configuration</h2><p className="muted">Manage member-facing bank, Telebirr and manual payment instructions.</p></div><a className="btn btn-ghost" href="/admin/membership/payment-methods">Payment methods</a></div></Card>}</div><MembershipWorkspace adminWorkspace /></>;

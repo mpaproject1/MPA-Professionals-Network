@@ -518,6 +518,7 @@ export default function Organizations() {
           continue through server-governed due diligence. Verified status is
           never assumed by the interface.
         </p>
+        <a className="btn btn-ghost mt-3 inline-flex" href="/organizations/workspace">Open my organization workspace</a>
       </div>
       <details className="mpa-collapsible-guide">
         <summary>Why partner with MPA · Explore benefits</summary>

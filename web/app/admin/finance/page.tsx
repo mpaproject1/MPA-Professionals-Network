@@ -54,7 +54,6 @@ export default function FinanceWorkspacePage() {
   const load = useCallback(async () => {
     if (!token) return;
     setError("");
-    setNotice("");
     setBusy("load");
     try {
       const me = await api<Me>("/api/v1/me", {}, token);

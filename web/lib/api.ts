@@ -53,7 +53,7 @@ const FRIENDLY_ERRORS: Record<string,string> = {
   FORBIDDEN: "Your account does not have permission to perform this action. If you believe this is incorrect, contact support.",
   APPLICATION_EXISTS: "You already have an application in progress. Open application tracking to continue it.",
   ACTIVE_MEMBERSHIP: "You already have an active membership. Choose the renewal option instead.",
-  MEMBERSHIP_REQUIRED: "A current active membership is required for this action. You can still browse public opportunities, request public services, and submit a job-interest request without a membership.",
+  MEMBERSHIP_REQUIRED: "A current active MPA membership is required for this action. Check your membership status or application, or contact MPA Support Desk.",
   PROFESSIONAL_PROFILE_FORBIDDEN: "This account uses an organization profile. Open the organization workspace instead of the professional profile.",
   APPLICATION_NOT_APPROVED: "The membership application must be approved before its payment can be verified. No activation has occurred.",
   CONSENT_REQUIRED: "The applicant has not granted current employer-sharing consent. No employer sharing was completed.",

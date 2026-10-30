@@ -9,7 +9,7 @@ values
 ('global-navigation','*','Getting around MPA','A short orientation to the shared navigation and help controls. The page remains usable while this guide is open.','[
  {"target":"[data-guide-target=\"brand-home\"]","title":"Return to MPA home","text":"Select the MPA brand at any time to return to the network home page."},
  {"target":"[data-guide-target=\"main-navigation\"]","title":"Move between workspaces","text":"Use the visible desktop or mobile navigation to open the areas available to your account."},
- {"title":"Restart this guide","text":"Use the Guide control to restart this walkthrough whenever you need a reminder. Use the separate Ask MPA assistant for questions or human support."}
+ {"target":"[data-guide-target=\"help-control\"]","title":"Restart this guide","text":"Use the Guide control to restart this walkthrough whenever you need a reminder. Use the separate Ask MPA assistant for questions or human support."}
 ]'::jsonb,true,10),
 ('member-workspace','/members','Your MPA workspace','Follow the current account status, membership progress and next action. Progress is based on service records, not page visits.','[
  {"target":"[data-guide-target=\"workspace-overview\"]","title":"Your current position","text":"This summary shows the next recommended action and server-confirmed account and application status."},
@@ -20,7 +20,7 @@ values
 ('membership-application','/membership','Membership application and status','Understand the membership plan, submitted application and the separate payment and review stages.','[
  {"target":"[data-guide-target=\"membership-overview\"]","title":"Understand membership status","text":"This screen distinguishes an application, a current membership and a renewal. A submitted application is not an active membership."},
  {"target":"[data-guide-target=\"membership-application\"]","title":"Review your application or plan","text":"Continue an existing application instead of creating a duplicate, or compare an available plan before applying. The service controls eligibility and status transitions."},
- {"title":"Return to this guide","text":"Use the Guide control to restart this walkthrough. Payment evidence and membership approval remain separate decisions."}
+ {"target":"[data-guide-target=\"help-control\"]","title":"Return to this guide","text":"Use the Guide control to restart this walkthrough. Payment evidence and membership approval remain separate decisions."}
 ]'::jsonb,true,30),
 ('membership-payment','/membership/payment','Membership payment and receipt','Follow the configured payment instructions and check the recorded payment status. Payment does not itself activate membership.','[
  {"target":"[data-guide-target=\"payment-overview\"]","title":"Payment is a separate step","text":"The application and membership decision remain separate from payment verification. Do not pay again while an existing payment is pending."},

@@ -33,6 +33,7 @@ create table if not exists ethics_case (
 );
 alter table ethics_case add column if not exists subject_name text;
 alter table ethics_case add column if not exists organization_name text;
+alter table ethics_case add column if not exists respondent_response_submitted_at timestamptz;
 
 create index if not exists ethics_case_queue_idx on ethics_case(status,severity desc,created_at) where status not in ('closed','withdrawn');
 create index if not exists ethics_case_assignee_idx on ethics_case(assigned_reviewer_id,status,updated_at desc);

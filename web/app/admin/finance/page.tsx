@@ -33,6 +33,13 @@ type Me = { roles?: string[]; permissions?: string[] };
 type FinanceSummaryRow = { Currency: string; "Gross verified": string | number; "Refunds/reversals": string | number; "Net collected": string | number; "Failed amount": string | number; "Matched amount": string | number; "Unreconciled amount": string | number; "Outstanding amount": string | number; "Missing fee amount": number; "Disputed amount": string | number; "Written off amount": string | number; "Disputed payments": number; "Written off payments": number; "Approved payments": number; "Failed payments": number; "Refunded/reversed payments": number; "Outstanding applications": number };
 type FinanceSummary = { rows: FinanceSummaryRow[]; generatedAt: string };
 
+const financeMoneyColumns = new Set(["Gross verified", "Refunds/reversals", "Net collected", "Failed amount", "Matched amount", "Unreconciled amount", "Disputed amount", "Written off amount", "Outstanding amount"]);
+
+function financeSummaryValue(label: string, value: string | number) {
+  if (label === "Currency") return String(value);
+  return Number(value || 0).toLocaleString(undefined, financeMoneyColumns.has(label) ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 });
+}
+
 function dateLabel(value?: string | null) {
   return value ? new Date(value).toLocaleString() : "Not recorded";
 }
@@ -169,7 +176,7 @@ export default function FinanceWorkspacePage() {
       {summaryError ? <OperationStatus state="error" title="Finance summary unavailable" detail={summaryError} /> : summaryRows.length === 0 ? <OperationStatus state="info" title="No finance summary records" detail="No membership payments or outstanding approved applications were found for the current period." /> : <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr>{["Currency", "Gross verified", "Refunds/reversals", "Net collected", "Failed amount", "Matched", "Unreconciled", "Disputed", "Written off", "Outstanding", "Missing fee amount", "Approved", "Failed", "Refunded/reversed", "Disputed payments", "Written off payments", "Outstanding applications"].map(label => <th key={label} scope="col" style={{ textAlign: "left", padding: 9, borderBottom: "1px solid var(--border, #cbd5e1)" }}>{label}</th>)}</tr></thead>
-          <tbody>{summaryRows.map(row => <tr key={row.Currency}>{[row.Currency,row["Gross verified"],row["Refunds/reversals"],row["Net collected"],row["Failed amount"],row["Matched amount"],row["Unreconciled amount"],row["Disputed amount"],row["Written off amount"],row["Outstanding amount"],row["Missing fee amount"],row["Approved payments"],row["Failed payments"],row["Refunded/reversed payments"],row["Disputed payments"],row["Written off payments"],row["Outstanding applications"]].map((value,index) => <td key={index} style={{ padding: 9, borderBottom: "1px solid var(--border, #e2e8f0)", whiteSpace: "nowrap" }}>{index===0?String(value):Number(value||0).toLocaleString(undefined,index<=9?{minimumFractionDigits:2,maximumFractionDigits:2}:{maximumFractionDigits:0})}</td>)}</tr>)}</tbody>
+          <tbody>{summaryRows.map(row => <tr key={row.Currency}>{[["Currency",row.Currency],["Gross verified",row["Gross verified"]],["Refunds/reversals",row["Refunds/reversals"]],["Net collected",row["Net collected"]],["Failed amount",row["Failed amount"]],["Matched",row["Matched amount"]],["Unreconciled",row["Unreconciled amount"]],["Disputed",row["Disputed amount"]],["Written off",row["Written off amount"]],["Outstanding",row["Outstanding amount"]],["Missing fee amount",row["Missing fee amount"]],["Approved",row["Approved payments"]],["Failed",row["Failed payments"]],["Refunded/reversed",row["Refunded/reversed payments"]],["Disputed payments",row["Disputed payments"]],["Written off payments",row["Written off payments"]],["Outstanding applications",row["Outstanding applications"]]].map(([label,value]) => <td key={label} style={{ padding: 9, borderBottom: "1px solid var(--border, #e2e8f0)", whiteSpace: "nowrap" }}>{financeSummaryValue(label,value)}</td>)}</tr>)}</tbody>
         </table>
       </div>}
       <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 12 }}>

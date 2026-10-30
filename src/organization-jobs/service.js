@@ -673,7 +673,7 @@ async function saveScreeningAnswers(db,applicationId,jobId,answers=[],requireAll
  await db.query("delete from job_application_answer where application_id=$1",[applicationId]);
  for(const q of questions){
    const answer=byId.get(String(q.id));
-   if(requireAll&&q.required && (answer===undefined||answer===null||answer==="")) throw error(400,"Required screening question is unanswered.","SCREENING_REQUIRED");
+   if(requireAll&&q.required && (answer===undefined||answer===null||answer===""||(Array.isArray(answer)&&answer.length===0))) throw error(400,"Required screening question is unanswered.","SCREENING_REQUIRED");
    if(answer!==undefined){
      let knockout=false;
      if(requireAll&&q.knockout && q.knockout_operator){

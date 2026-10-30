@@ -71,7 +71,6 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     const membershipReviewer = Boolean(roles?.some((role) => ["reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
     const financeOfficer = Boolean(roles?.includes("finance_officer"));
     const financeConfig = Boolean(financeOfficer || permissions.some((permission) => ["members.manage", "finance.manage"].includes(permission)));
-    const recruitmentScoped = Boolean(roles?.some((role) => ["recruiter", "project_manager"].includes(role)) || permissions.includes("reports.view"));
     const supportStaff = Boolean(roles?.includes("supporting_staff"));
     if (platformAdmin) return destinations;
     return destinations.filter((item) => {

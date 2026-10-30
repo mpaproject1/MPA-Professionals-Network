@@ -162,7 +162,12 @@ test("formal applications collect and persist required screening answers across 
   assert.match(page,/screeningQuestions/);
   assert.match(page,/answersFor\(job\.id\)/);
   assert.match(page,/Answer each required screening question/);
-  for(const type of ["text","number","yes_no","single_choice","multiple_choice"]) assert.match(page,new RegExp('question_type==="'+type+'"'));
+for(const type of ["text","number","multiple_choice"]) assert.ok(page.includes('question_type==="'+type+'"'));
+  assert.ok(page.includes('["yes_no","single_choice"].includes(question.question_type)'));
+  assert.ok(page.includes('question.question_type==="yes_no"?["yes","no"]:(question.options||[])'));
+  assert.ok(page.includes("missingRequiredAnswers(job)"));
+  assert.ok(page.includes("answers:answersFor(job.id)"));
+  assert.ok(page.includes('question.required&&(answer===undefined||answer===null||answer===""||(Array.isArray(answer)&&answer.length===0))'));
 });
 
 test("employer interview status transitions preserve completed and cancelled terminal states",()=>{

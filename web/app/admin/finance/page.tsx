@@ -69,6 +69,9 @@ export default function FinanceWorkspacePage() {
       if (!readAccess) {
         setAccess("denied");
         setRows([]);
+        setSummaryRows([]);
+        setSummaryError("");
+        setSummaryGeneratedAt("");
         return;
       }
       setCanVerify(financeRole || permissions.some(permission => ["finance.payment.verify", "finance.manage"].includes(permission)));
@@ -87,6 +90,9 @@ export default function FinanceWorkspacePage() {
       setAccess("allowed");
     } catch (cause) {
       setRows([]);
+      setSummaryRows([]);
+      setSummaryError("");
+      setSummaryGeneratedAt("");
       setAccess("denied");
       setError(cause instanceof ApiError ? cause.message : "The finance payment queue could not be loaded.");
     } finally {

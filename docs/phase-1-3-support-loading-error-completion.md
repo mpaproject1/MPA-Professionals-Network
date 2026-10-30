@@ -32,7 +32,8 @@ Branch: `feat/workstream-3-progress-members-workspace`
 ## Regression coverage added
 
 - Playwright: legacy `/contact` redirect opens the assistant and focuses the input.
-- Playwright: 404 Support action is keyboard operable and focus moves into the assistant.
+- Playwright: 404 Support action is keyboard operable; focus moves into the assistant and returns to its launcher on close.
+- Playwright: 403 authorization errors remain generic because the current server response does not identify the missing permission or grantor.
 - Playwright: delayed Jobs API response exposes branded loading; reduced-motion preference disables the orbit animation; successful empty response remains distinct.
 - Playwright: 503 response displays a safe generic message and request reference, does not expose internal server text, and does not render an empty-results message.
 - Node test: recursive web-source scan for direct legacy support navigation.

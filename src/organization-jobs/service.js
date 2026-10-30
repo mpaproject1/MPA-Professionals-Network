@@ -72,7 +72,7 @@ export async function listNetworkPlusOrganizations(viewerId,filters={}) {
  const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
  const base=` from organization o left join reference_item ri on ri.id=o.geography_reference_item_id where ${where.join(" and ")}`;
  const total=Number((await db.query(`select count(*)::int count${base}`,args)).rows[0]?.count||0);
- const rows=(await db.query(`select o.id,o.display_name,o.organization_type,o.description,o.website,ri.label location_label${base} order by o.display_name limit ${limit+1} offset ${offset}`,args)).rows;
+ const rows=(await db.query(`select o.id,o.display_name,o.organization_type,o.description,case when o.website ~* '^https://' then o.website else null end website,ri.label location_label${base} order by o.display_name limit ${limit+1} offset ${offset}`,args)).rows;
  return {items:rows.slice(0,limit),limit,offset,total,hasMore:offset+limit<total};
 }
 

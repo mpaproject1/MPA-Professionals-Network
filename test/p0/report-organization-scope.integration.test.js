@@ -4,7 +4,7 @@ import test, { after } from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import { closePool } from "../../src/platform/db.js";
-import { runReport } from "../../src/platform/reports.js";
+import { listReportCatalogue, runReport } from "../../src/platform/reports.js";
 
 async function account(label) {
   const suffix = randomUUID();
@@ -56,16 +56,20 @@ test("recruiters and project managers cannot read another organization's recruit
     description: "Integration fixture for project manager report isolation.",
   }, "report-scope-job-b-" + suffix);
 
-  const recruiterReport = await runReport({
-    sub: recruiterA, roles: ["recruiter"], permissions: [],
-  }, "job-application-funnel", { q: suffix }, "report-scope-run-recruiter-" + suffix);
+  const recruiterIdentity = { sub: recruiterA, roles: [], permissions: [] };
+  const recruiterCatalogue = await listReportCatalogue(recruiterIdentity);
+  assert.ok(recruiterCatalogue.some(report => report.id === "job-application-funnel"),
+    "an active organization recruiter must discover the scoped recruitment report");
+  const recruiterReport = await runReport(recruiterIdentity, "job-application-funnel", { q: suffix }, "report-scope-run-recruiter-" + suffix);
   assert.ok(recruiterReport.rows.some(row => row.Job === jobA.title));
   assert.ok(!recruiterReport.rows.some(row => row.Job === jobB.title),
     "recruiter must not see another organization's vacancy");
 
-  const projectReport = await runReport({
-    sub: projectManagerB, roles: ["project_manager"], permissions: [],
-  }, "job-application-funnel", { q: suffix }, "report-scope-run-project-" + suffix);
+  const projectIdentity = { sub: projectManagerB, roles: [], permissions: [] };
+  const projectCatalogue = await listReportCatalogue(projectIdentity);
+  assert.ok(projectCatalogue.some(report => report.id === "job-application-funnel"),
+    "an active organization project manager must discover the scoped recruitment report");
+  const projectReport = await runReport(projectIdentity, "job-application-funnel", { q: suffix }, "report-scope-run-project-" + suffix);
   assert.ok(projectReport.rows.some(row => row.Job === jobB.title));
   assert.ok(!projectReport.rows.some(row => row.Job === jobA.title),
     "project manager must not see another organization's vacancy");

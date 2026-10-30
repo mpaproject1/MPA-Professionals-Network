@@ -95,6 +95,7 @@ create table if not exists ethics_case_evidence (
 );
 
 insert into app_permission(permission_code,area,label,description,sensitive,system_only) values
+ ('verification.appeal.review','Verification','Review independent verification appeals','Access and decide verification appeals independently from the original case reviewer.',true,false),
  ('ethics.case.intake','Ethics','Submit a confidential ethics concern','Submit a confidential professional ethics concern for independent review.',true,false),
  ('ethics.case.review','Ethics','Review assigned ethics cases','Access assigned ethics cases, edit reviewer assessments and record independent panel recommendations.',true,false),
  ('ethics.case.assign','Ethics','Assign ethics reviewers','Assign ethics case owners and panel members; system administrator authority only.',true,true)

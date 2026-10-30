@@ -198,3 +198,17 @@ jobs:
 # fixtures configured. Keep e2e/p2-role-journeys.spec.js; re-enable this job after
 # those non-production fixtures are provisioned. Do not substitute production data.
 
+  biome-import-order-diagnostic:
+    name: Temporary Biome import-order diagnostic (isolated)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply Biome import organization to the affected file and print the diff
+        run: |
+          npx --yes @biomejs/biome@2.2.4 check --formatter-enabled=false --linter-enabled=false --organize-imports-enabled=true --write web/app/admin/membership-cards/page.tsx
+          git diff --no-ext-diff -- web/app/admin/membership-cards/page.tsx

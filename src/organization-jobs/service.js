@@ -286,6 +286,7 @@ export async function updateJob(jobId,userId,input,requestId){
   if(Array.isArray(input.eligibilityRules)) await replaceRules(db,jobId,input.eligibilityRules);
   if(visibility==="exclusive" || postingScope==="mpa_members" || postingScope==="partner_network") await ensureExclusiveDefaults(db,jobId);
   await audit(db,userId,"job.updated","job",jobId,requestId,{postingScope});
+  if(j.status==="published")await audit(db,userId,"job.review_resubmitted","job",jobId,requestId,{reason:"Published vacancy edited; MPA approval required again."});
   return updated;
  });
 }
@@ -309,6 +310,7 @@ export async function publishJob(jobId,userId,requestId){
   if(!j.title||!j.description)throw error(400,"Job is incomplete.","VALIDATION_ERROR");
   await verifiedOrg(db,j.organization_id);
   if(j.visibility==="exclusive"||["mpa_members","partner_network"].includes(j.posting_scope))await ensureExclusiveDefaults(db,jobId);
+  if(j.status==="pending_review"&&j.review_status==="pending")throw error(409,"This vacancy is already awaiting MPA review.","INVALID_STATE");
   if(j.status==="published")throw error(409,"This vacancy is already published. Material changes require a new review submission.","INVALID_STATE");
   const row=(await db.query("update job set status='pending_review',review_status='pending',review_submitted_at=now(),reviewed_by=null,reviewed_at=null,review_reason=null,updated_by=$1,updated_at=now() where id=$2 returning *",[userId,jobId])).rows[0];
   await audit(db,userId,"job.review_submitted","job",jobId,requestId,{organizationId:j.organization_id});

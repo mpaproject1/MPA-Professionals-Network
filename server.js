@@ -33,6 +33,7 @@ import * as marketplaceDemand from "./src/services-mentorship/demand.js";
 import * as mentorshipOperations from "./src/services-mentorship/operations.js";
 import * as organizationMentorshipOffers from "./src/services-mentorship/organization-offers.js";
 import * as servicesMentorship from "./src/services-mentorship/service.js";
+import * as serviceMentorshipSupportCases from "./src/services-mentorship/support-cases.js";
 import * as talent from "./src/talent/service.js";
 import * as verification from "./src/verification/service.js";
 
@@ -422,6 +423,8 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/me/mentorship-operations") return ok(res,await mentorshipOperations.getMentorshipOperationalReport(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/me/mentorship-reports") return ok(res,await mentorshipOperations.listMyMentorshipParticipantReports(identity.sub,{limit:query(req.url).get("limit")||50}),requestId);
     if(req.method==="GET" && p==="api/v1/admin/mentorship-reports") return ok(res,await mentorshipOperations.listMentorshipParticipantReports(identity.sub,{status:query(req.url).get("status")||"open",limit:query(req.url).get("limit")||25,offset:query(req.url).get("offset")||0}),requestId);
+    if(req.method==="GET" && p==="api/v1/admin/service-mentorship-cases") { const params=query(req.url); return ok(res,await serviceMentorshipSupportCases.listSupportCases(identity.sub,{type:params.get("type")||"all",status:params.get("status")||"",q:params.get("q")||"",limit:params.get("limit")||25,offset:params.get("offset")||0},requestId),requestId); }
+    if(req.method==="POST" && parts.length===7 && parts[2]==="admin" && parts[3]==="service-mentorship-cases" && parts[6]==="access") return ok(res,await serviceMentorshipSupportCases.openSupportCase(identity.sub,parts[4],parts[5],await body(req),requestId),requestId);
     if(req.method==="GET" && p==="api/v1/admin/mentorship-interest") return ok(res,await mentorshipOperations.listMentorshipInterestReviewQueue(identity.sub),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/admin/mentorship-interest/") && parts[5]==="propose") return ok(res,await mentorshipOperations.proposeMentorshipInterestMatch(identity.sub,parts[4],requestId),requestId,201);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/admin/mentorship-interest/") && parts[5]==="review") return ok(res,await mentorshipOperations.markMentorshipInterestReviewed(identity.sub,parts[4],requestId),requestId);

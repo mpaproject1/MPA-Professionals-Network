@@ -10,6 +10,7 @@ Branch: `feat/workstream-3-progress-members-workspace`
 - The only intended `/contact` route remaining is the compatibility redirect. The `/contact/privacy` legal/privacy route is intentionally preserved.
 - `openSupport()` dispatches the established `mpa:open-support-contact` event. The single globally mounted SupportBot remains the only inquiry mechanism; no second inbox, API, contact table or duplicate inquiry workflow was added.
 - The assistant now moves keyboard focus into its question field when opened and returns focus to its launcher when closed.
+- Playwright coverage also verifies focus restoration after closing and confirms that a 403 response does not invent a required role or permission grantor.
 - Added a repository-wide source regression test that detects direct navigation to the exact legacy `/contact` path outside the compatibility page. This test is authored but still needs execution; do not treat the automated inventory as passed until it runs.
 
 ## Phase 2 — Branded loading

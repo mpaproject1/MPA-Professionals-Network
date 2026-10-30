@@ -19,6 +19,10 @@ test("screen tour uses accessible non-blocking controls and stable semantic targ
  assert.match(css,/\.guide-card\{position:fixed;z-index:102;/);
  assert.match(css,/\.guide-help\{position:fixed;left:22px;right:auto;/);
  assert.match(botCss,/\.root\{position:fixed;right:24px;bottom:24px;z-index:80;/);
+ assert.match(css,/\.guide-help\{position:fixed;left:22px;right:auto;bottom:22px;z-index:85;/);
+ assert.match(bot,/setGuideActive\(true\)/);
+ assert.match(bot,/mpa:guide-closed/);
+ assert.match(guide,/mpa:guide-closed/);
 });
 
 test("current workspace and membership screens expose every curated tour target and restart action",async()=>{

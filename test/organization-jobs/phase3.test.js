@@ -6,6 +6,7 @@ import {
   canCandidateAcceptOffer,
   canRespondToInterview,
   allowedInterviewStatusTransition,
+  isValidScreeningAnswer,
   ELIGIBILITY_RULES,
   isAllowedJobPostingScope,
   isEligibleVerifiedClaimForJobs,
@@ -233,4 +234,18 @@ test("interview scheduling restricts interviewer assignment to active authorized
   assert.match(schedule,/select 1 from app_user where id=\$1 and status='active'/);
   assert.match(schedule,/jobRole\(db,a\.job_id,interviewerUserId,\["hiring_manager","recruiter","interviewer"\]\)/);
   assert.doesNotMatch(schedule,/om\.role_code in/);
+});
+
+test("screening answers are validated against question type and configured options",()=>{
+  assert.equal(isValidScreeningAnswer({question_type:"text"}, "Relevant experience"),true);
+  assert.equal(isValidScreeningAnswer({question_type:"text"}, 12),false);
+  assert.equal(isValidScreeningAnswer({question_type:"number"}, "4"),true);
+  assert.equal(isValidScreeningAnswer({question_type:"number"}, "four"),false);
+  assert.equal(isValidScreeningAnswer({question_type:"yes_no"}, "yes"),true);
+  assert.equal(isValidScreeningAnswer({question_type:"yes_no"}, "maybe"),false);
+  assert.equal(isValidScreeningAnswer({question_type:"single_choice",options:["a","b"]}, "b"),true);
+  assert.equal(isValidScreeningAnswer({question_type:"single_choice",options:["a","b"]}, "c"),false);
+  assert.equal(isValidScreeningAnswer({question_type:"multiple_choice",options:["a","b"]}, ["a","b"]),true);
+  assert.equal(isValidScreeningAnswer({question_type:"multiple_choice",options:["a","b"]}, ["a","c"]),false);
+  assert.equal(isValidScreeningAnswer({question_type:"multiple_choice",options:["a","b"]}, ["a","a"]),false);
 });

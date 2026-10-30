@@ -33,9 +33,22 @@ export async function getApplicationTracking(userId,{limit=50,offset=0,reference
       left join lateral (select status,submitted_at,reviewed_at from organization_verification_case where organization_id=o.id order by submitted_at desc limit 1) ov on true
       union all
       select a.id::text,a.tracking_reference,'job'::text,j.title,'Application · '||o.display_name,a.status,coalesce(a.updated_at,a.created_at),a.created_at,a.submitted_at,
-        case when a.status='draft' then 'Complete and submit application'
-          when a.status in ('rejected','withdrawn') then 'No action available' else 'Monitor recruitment progress' end,
-        jsonb_build_object('jobId',j.id,'jobStatus',j.status,'organization',o.display_name)
+        case
+          when a.status='draft' then 'Complete and submit application'
+          when a.status='submitted' then 'Your application is submitted. Wait for the employer review and check for updates.'
+          when a.status='screening' then 'Your application is being screened. Check your timeline for any employer request.'
+          when a.status='shortlisted' then 'You are shortlisted. Watch for an interview invitation and scheduling request.'
+          when a.status='interview' then 'Review your interview invitation and respond to the proposed schedule.'
+          when a.status='offer' and a.offer_approval_status='pending' then 'Your proposed offer is awaiting the employer’s internal approval.'
+          when a.status='offer' and a.offer_approval_status='rejected' then 'The proposed offer was not approved. Review the latest employer update.'
+          when a.status='offer' then 'Review the offer terms and accept or withdraw your application.'
+          when a.status='accepted' then 'You accepted the offer. Await the employer’s hiring confirmation and next instructions.'
+          when a.status='hired' then 'Your hiring outcome is recorded. Review any onboarding instructions shared by the employer.'
+          when a.status='rejected' then 'Review the recorded decision. You can continue exploring other opportunities.'
+          when a.status='withdrawn' then 'You withdrew this application. No further action is required.'
+          else 'Check your application timeline for the latest recorded update.'
+        end,
+        jsonb_build_object('jobId',j.id,'jobStatus',j.status,'organization',o.display_name,'offerApprovalStatus',a.offer_approval_status)
       from job_application a join job j on j.id=a.job_id join organization o on o.id=j.organization_id where a.applicant_user_id=$1
     ), matching as (
       select * from tracking where $4::text is null or upper(tracking_reference)=upper($4)

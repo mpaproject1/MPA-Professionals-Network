@@ -31,6 +31,9 @@ create table if not exists ethics_case (
   updated_at timestamptz not null default now(),
   check ((status <> 'decided') or (decision is not null and decided_by is not null and decided_at is not null and length(trim(coalesce(decision_reason,''))) >= 8))
 );
+alter table ethics_case add column if not exists subject_name text;
+alter table ethics_case add column if not exists organization_name text;
+
 create index if not exists ethics_case_queue_idx on ethics_case(status,severity desc,created_at) where status not in ('closed','withdrawn');
 create index if not exists ethics_case_assignee_idx on ethics_case(assigned_reviewer_id,status,updated_at desc);
 create index if not exists ethics_case_reporter_idx on ethics_case(reporter_user_id,created_at desc);

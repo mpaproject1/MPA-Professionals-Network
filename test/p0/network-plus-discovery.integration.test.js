@@ -219,6 +219,11 @@ test("organization discovery requires Network-Plus eligibility, explicit opt-in 
   );
   const expiredMember = await register(`org-directory-expired-${suffix}`);
   await setMembership(expiredMember.user.id, "current_date-1");
+  const unverifiedOwner = await register(`org-directory-unverified-${suffix}`, "organization");
+  await organizationJobs.registerOrganization(unverifiedOwner.user.id, {
+    legalName: `Network Plus Unverified Organization ${suffix}`,
+    displayName: `Network Plus Unverified ${suffix}`,
+  }, `network-plus-unverified-org-${suffix}`);
 
   const memberDirectory = await organizationJobs.listNetworkPlusOrganizations(activeMember.user.id, { q: suffix });
   const ownerDirectory = await organizationJobs.listNetworkPlusOrganizations(owner.user.id, { q: suffix });
@@ -236,9 +241,11 @@ test("organization discovery requires Network-Plus eligibility, explicit opt-in 
 
   await assert.rejects(organizationJobs.listNetworkPlusOrganizations(null), error => error.code === "UNAUTHENTICATED");
   await assert.rejects(organizationJobs.listNetworkPlusOrganizations(expiredMember.user.id), error => error.code === "NETWORK_PLUS_FORBIDDEN");
+  await assert.rejects(organizationJobs.listNetworkPlusOrganizations(unverifiedOwner.user.id), error => error.code === "NETWORK_PLUS_FORBIDDEN",
+    "an owner of an unverified organization has no Network-Plus entry context");
   await assert.rejects(organizationJobs.listNetworkPlusOrganizations(recruiter.user.id), error => error.code === "NETWORK_PLUS_FORBIDDEN");
   await assert.rejects(organizationJobs.listNetworkPlusOrganizations(inactiveOrganizationUser.user.id), error => error.code === "NETWORK_PLUS_FORBIDDEN");
-  await assert.equal((await resolveNetworkPlusAccess(projectManager.user.id ? db : db, projectManager.user.id)).eligible, true);
+  await assert.equal((await resolveNetworkPlusAccess(db, projectManager.user.id)).eligible, true);
 
   await assert.rejects(
     organizationJobs.updateNetworkPlusVisibility(org.id, recruiter.user.id, { visible: false, reason: "Attempt to change visibility" }, `network-plus-recruiter-change-${suffix}`),

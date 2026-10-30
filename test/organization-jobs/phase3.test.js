@@ -168,6 +168,7 @@ test("employer interview status transitions preserve completed and cancelled ter
   assert.equal(allowedInterviewStatusTransition("completed","scheduled"),false);
   assert.equal(allowedInterviewStatusTransition("cancelled","confirmed"),false);
   assert.equal(allowedInterviewStatusTransition("scheduled","unknown"),false);
+  assert.equal(allowedInterviewStatusTransition("reschedule_requested","scheduled"),false);
 });
 
 test("employer interview management exposes authorized schedules and completed-interview feedback",async()=>{

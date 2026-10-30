@@ -33,11 +33,18 @@ export async function recordManualFinancePayment(identity,input,requestId){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)||Number.isNaN(Date.parse(paymentDate)))throw fail(400,"Enter a valid payment date.","INVALID_PAYMENT_DATE");
   const payerUserId=input?.payerUserId?clean(input.payerUserId,64):null;
   const evidenceFileId=input?.evidenceFileId?clean(input.evidenceFileId,64):null;
+  const organizationId=input?.organizationId?clean(input.organizationId,64):null;
   const db=getPool();
   return withTransaction(async tx=>{
     if(payerUserId){
       const user=await tx.query("select id from app_user where id=$1 and status='active'",[payerUserId]);
       if(!user.rows[0])throw fail(400,"The selected user account is not active or no longer exists.","PAYER_USER_NOT_FOUND");
+    }
+    let organizationSnapshot=clean(input.organizationName,180)||null;
+    if(organizationId){
+      const org=(await tx.query("select id,display_name from organization where id=$1",[organizationId])).rows[0];
+      if(!org)throw fail(400,"The selected organization no longer exists.","PAYER_ORGANIZATION_NOT_FOUND");
+      organizationSnapshot=org.display_name;
     }
     if(evidenceFileId){
       const file=await tx.query("select id from file_object where id=$1 and created_by=$2 and visibility='private'",[evidenceFileId,identity.sub]);
@@ -48,8 +55,9 @@ export async function recordManualFinancePayment(identity,input,requestId){
       (receipt_number,payer_type,payer_name,payer_email,payer_phone,payer_user_id,organization_name,amount,currency,purpose,payment_method,payment_date,bank_name,bank_reference,external_reference,evidence_file_id,notes,status,recorded_by,request_id)
       values($1,$2,$3,$4,$5,$6,$7,$8::numeric,$9,$10,$11,$12::date,$13,$14,$15,$16,$17,'recorded',$18,$19)
       returning *`,[receiptNumber,payerType,payerName,clean(input.payerEmail,254)||null,clean(input.payerPhone,60)||null,payerUserId,
-      clean(input.organizationName,180)||null,amount,currency,purpose,method,paymentDate,clean(input.bankName,180)||null,
+      organizationSnapshot,amount,currency,purpose,method,paymentDate,clean(input.bankName,180)||null,
       clean(input.bankReference,120)||null,clean(input.externalReference,120)||null,evidenceFileId,clean(input.notes,4000)||null,identity.sub,requestId||null])).rows[0];
+    if(organizationId)await tx.query("update finance_payment_record set organization_id=$2 where id=$1",[row.id,organizationId]);
     await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.manual_payment_recorded','finance_payment_record',$2,$3,'success',$4)",
       [identity.sub,row.id,requestId||null,JSON.stringify({receiptNumber,payerType,amount,currency,paymentMethod:method,evidenceAttached:Boolean(evidenceFileId),linkedUser:Boolean(payerUserId)})]);
     return safeReceipt(row);
@@ -115,4 +123,10 @@ export async function reverseManualFinancePayment(identity,id,reason,requestId){
     await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.manual_payment_reversed','finance_payment_record',$2,$3,'success',$4)",[identity.sub,id,requestId||null,JSON.stringify({receiptNumber:row.receipt_number,revokedVouchers:vouchers.rowCount,reason:note})]);
     return safeReceipt(updated);
   });
+}
+
+export async function searchFinanceOrganizations(identity,q=""){
+  assertFinance(identity,"finance.view");const term=clean(q,100);if(term.length<2)return [];
+  const rows=await getPool().query("select id,display_name from organization where display_name ilike $1 order by display_name limit 15",["%"+term+"%"]);
+  return rows.rows.map(row=>({organizationId:row.id,label:row.display_name}));
 }

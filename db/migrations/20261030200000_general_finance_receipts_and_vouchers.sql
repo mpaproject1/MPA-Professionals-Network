@@ -56,3 +56,6 @@ insert into app_permission(permission_code,area,label,description,sensitive,syst
  ('finance.payment.record','Finance','Record manual finance payments','Record manual receipts and attach evidence; does not verify receipt or issue vouchers.',true,false),
  ('finance.voucher.issue','Finance','Issue verified payment vouchers','Issue branded QR-verifiable receipts for independently verified payments.',true,false)
 on conflict(permission_code) do update set area=excluded.area,label=excluded.label,description=excluded.description,sensitive=excluded.sensitive,system_only=excluded.system_only;
+
+alter table finance_payment_record add column if not exists organization_id uuid references organization(id) on delete set null;
+create index if not exists finance_payment_record_organization_idx on finance_payment_record(organization_id) where organization_id is not null;

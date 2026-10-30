@@ -68,7 +68,7 @@ test.describe("Accessible contextual screen tours",()=>{
  test("mobile navigation tour targets the visible mobile navigation rather than the hidden desktop bar",async({page})=>{
   await page.route("**/api/v1/experience/guides**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(globalGuide)}));
   await page.setViewportSize({width:390,height:844});
-  const guidesLoaded=page.waitForResponse(/\\/api\\/v1\\/experience\\/guides/);
+  const guidesLoaded=page.waitForResponse(/\/api\/v1\/experience\/guides/);
   await page.goto("/");
   await guidesLoaded;
   await page.getByRole("button",{name:"Show me around this screen"}).click();

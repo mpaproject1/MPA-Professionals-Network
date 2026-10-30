@@ -5,6 +5,7 @@ import {FormFeedback} from "../../components/form-feedback";
 import { OperationStatus } from "../../components/operation-status";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
+import { uploadPrivateFile } from "../../lib/private-upload";
 import {useUiStore} from "../../lib/store";
 
 type Product={product_code:string;name:string;description?:string;billing_model:string;price:string|number;base_amount?:string|number;tax_amount?:string|number;service_fee?:string|number;currency:string;duration_days?:number|null;renewal_required:boolean;benefits?:unknown;eligibility?:Record<string,unknown>;fee_rule_version?:number;effective_from?:string|null;effective_to?:string|null};
@@ -58,16 +59,10 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
 
  async function attachFile(app:Application){
   const file=attachmentFiles[app.id];if(!file){setError("Choose a private document before attaching it.");return;}
-  const allowed=["application/pdf","image/png","image/jpeg","text/plain"];if(!allowed.includes(file.type)){setError("Choose a PDF, PNG, JPEG or plain-text file.");return;}if(file.size<1||file.size>10*1024*1024){setError("Choose a file between 1 byte and 10 MiB.");return;}
   setBusy(`attachment:${app.id}`);setError("");setNotice("");
   try{
-   const bytes=await file.arrayBuffer();const digest=await crypto.subtle.digest("SHA-256",bytes);const checksum=Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,"0")).join("");
-   const auth=await api<{uploadId:string;uploadToken:string;uploadUrl:string}>("/api/v1/files/uploads",{method:"POST",body:JSON.stringify({fileName:file.name,contentType:file.type,byteSize:file.size,checksumSha256:checksum})},token);
-  const base="";
-   const response=await fetch(base+auth.uploadUrl,{method:"PUT",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/octet-stream","X-Upload-Token":auth.uploadToken},body:file,cache:"no-store"});
-   if(!response.ok)throw new Error("Private file upload failed. Retry without changing the application.");
-   const confirmed=await api<{id:string}>(`/api/v1/files/uploads/${encodeURIComponent(auth.uploadId)}/confirm`,{method:"POST"},token);
-   await api(`/api/v1/membership/applications/${encodeURIComponent(app.id)}/attachments`,{method:"POST",body:JSON.stringify({fileObjectId:confirmed.id,attachmentType:attachmentTypes[app.id]||"supporting_document"})},token);
+   const fileObjectId=await uploadPrivateFile(token,file);
+   await api(`/api/v1/membership/applications/${encodeURIComponent(app.id)}/attachments`,{method:"POST",body:JSON.stringify({fileObjectId,attachmentType:attachmentTypes[app.id]||"supporting_document"})},token);
    setAttachmentFiles(current=>({...current,[app.id]:null}));setNotice("Private application evidence was uploaded, checksum-confirmed and attached. It does not approve the application or confirm payment.");await load();
   }catch(e){setError(e instanceof ApiError||e instanceof Error?e.message:"Evidence attachment failed.");}finally{setBusy("");}
  }

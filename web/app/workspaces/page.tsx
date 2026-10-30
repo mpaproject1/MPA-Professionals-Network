@@ -9,10 +9,11 @@ import { useUiStore } from "../../lib/store";
 
 type Identity = { user_id: string; roles?: string[]; permissions?: string[] };
 type Organization = { id: string; display_name?: string; legal_name?: string; role_code?: string; status?: string };
-type Task = { title: string; detail: string; href: string; roles?: string[]; permissions?: string[]; scopeRoles?: string[]; icon: typeof Users; group: string };
+type Task = { title: string; detail: string; href: string; roles?: string[]; permissions?: string[]; scopeRoles?: string[]; always?: boolean; icon: typeof Users; group: string };
 const tasks: Task[] = [
  { title: "Member journey", detail: "Profile completion, membership, verification progress and personal requests.", href: "/members", icon: Users, group: "My account" },
  { title: "Professional profile", detail: "Maintain your own professional information and verification evidence.", href: "/profile", icon: FileCheck2, group: "My account" },
+ { title: "Mentorship and mentor journey", detail: "Explore mentor and mentee workflows. Mentor eligibility is evaluated from the verified professional profile and mentorship rules, not a platform role.", href: "/mentorship", always: true, icon: Handshake, group: "My account" },
  { title: "Membership review", detail: "Review submitted applications using the existing decision and correction workflow.", href: "/membership", roles: ["reviewer","membership_reviewer","system_admin"], permissions: ["membership.review"], icon: ClipboardCheck, group: "Review queues" },
  { title: "Verification cases", detail: "Review authorized professional evidence, checklists and case decisions.", href: "/verification", roles: ["verification_reviewer","ethics_reviewer","system_admin"], permissions: ["verification.manage"], icon: ShieldCheck, group: "Review queues" },
  { title: "Independent appeals", detail: "Review verification appeals independently from the original case decision.", href: "/verification", roles: ["appeal_reviewer","system_admin"], permissions: ["verification.manage"], icon: ClipboardCheck, group: "Review queues" },
@@ -29,7 +30,7 @@ function allowed(task: Task, identity: Identity, organizations: Organization[]) 
  const roles = identity.roles || [], permissions = identity.permissions || [];
  const platformAccess = Boolean(task.roles?.some(role => roles.includes(role)) || task.permissions?.some(permission => permissions.includes(permission)));
  const scopedAccess = Boolean(task.scopeRoles?.some(role => organizations.some(org => String(org.role_code || "").toLowerCase() === role)));
- return platformAccess || scopedAccess;
+ return Boolean(task.always) || platformAccess || scopedAccess;
 }
 export default function RoleWorkspacesPage() {
  const token = useUiStore(state => state.token), hydrated = useUiStore(state => state.hydrated), hydrateToken = useUiStore(state => state.hydrateToken);

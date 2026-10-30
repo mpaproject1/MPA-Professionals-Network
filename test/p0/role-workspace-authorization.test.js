@@ -343,13 +343,14 @@ test("Mentorship requires both participants to consent before activation", () =>
 test("finance authority is separate from membership review and activation authority", () => {
   const server = read("server.js");
   const reports = read("src/platform/reports.js");
-  assert.match(server, /membership\.reviewApplication\(parts\[4\],identity\.sub/);
-  assert.match(server, /membership\.activateApplication\(parts\[4\],identity\.sub/);
-  assert.match(server, /anyRoleOrPermission\(identity,\["reviewer","membership_reviewer","system_admin"\],\["membership\.review"\]\)/);
-  assert.match(server, /anyRoleOrPermission\(identity,\["reviewer","membership_reviewer","system_admin"\],\["membership\.activate"\]\)/);
-  assert.doesNotMatch(server, /anyRoleOrPermission\(identity,\["reviewer","finance_officer","system_admin"\],\["members\.manage"\]\)/);
-  assert.match(server, /finance\.payment\.verify/);
-  assert.match(server, /finance\.payment\.reverse/);
+  const policy = read("src/platform/workspace-authorization.js");
+  assert.match(server, /assertMembershipReviewAccess\(identity\)/);
+  assert.match(server, /assertMembershipActivationAccess\(identity\)/);
+  assert.match(server, /assertPaymentVerificationAccess\(identity\)/);
+  assert.match(server, /assertPaymentReversalAccess\(identity\)/);
+  assert.match(policy, /finance\.payment\.verify/);
+  assert.match(policy, /finance\.payment\.reverse/);
+  assert.doesNotMatch(server, /finance_officer.*membership\.(review|activate)/);
   assert.doesNotMatch(reports, /id:"membership-status"[^\\n]*finance_officer/);
 });
 

@@ -36,4 +36,7 @@ test("vacancy publication is gated by an explicit MPA review decision",async()=>
  assert.match(queuePage,/Approve and publish/);
  assert.match(queuePage,/Return for correction/);
  assert.match(adminPage,/\/admin\/jobs\/review/);
+ assert.match(service,/const ORG_WRITE_ROLES=\["owner","administrator","recruiter","project_manager"\]/);
+ assert.match(service,/const CANDIDATE_ROLES=\["owner","administrator","recruiter"\]/);
+ assert.match(service,/if\(org && \["owner","administrator","recruiter"\]\.includes\(org\.role_code\)\)/);
 });

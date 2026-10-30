@@ -29,14 +29,14 @@ export default function JobReviewQueue(){
   <div className="eyebrow">MPA governance · Jobs</div><h1 className="h1">Vacancy review queue</h1>
   <p className="muted">Every vacancy requires an MPA decision before it can appear in public or restricted job discovery. Organization verification is necessary, but does not replace vacancy approval.</p>
   {error&&<p className="form-error" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
-  {loading?<Card><p>Loading submitted vacancies…</p></Card>:items.length===0?<Card><h2>No vacancies awaiting review</h2><p className="muted">New submissions will appear here for authorized MPA reviewers.</p><button className="btn btn-ghost" onClick={()=>void load()}>Refresh queue</button></Card>:<div className="grid" style={{gap:14}}>{items.map(job=><Card key={job.id}>
+  {loading?<Card><p>Loading submitted vacancies…</p></Card>:items.length===0?<Card><h2>No vacancies awaiting review</h2><p className="muted">New submissions will appear here for authorized MPA reviewers.</p><button type="button" className="btn btn-ghost" onClick={()=>void load()}>Refresh queue</button></Card>:<div className="grid" style={{gap:14}}>{items.map(job=><Card key={job.id}>
    <div className="row" style={{justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><div><div className="eyebrow">{job.organization_name}</div><h2>{job.title}</h2></div><span className="badge">{humanStatus("pending_review")}</span></div>
    <p>{job.description}</p><p className="muted">Organization verification: {humanStatus(job.verification_status)} · Scope: {humanStatus(job.posting_scope)} · Visibility: {humanStatus(job.visibility)}</p>
    <label style={{display:"grid",gap:6}}>Decision reason (required for return or rejection)<textarea rows={3} value={reasons[job.id]||""} onChange={e=>setReasons(current=>({...current,[job.id]:e.target.value}))} placeholder="Explain the decision and any changes required."/></label>
    <div className="row" style={{gap:8,flexWrap:"wrap",marginTop:12}}>
-    <button className="btn btn-primary" disabled={busy===job.id||job.verification_status!=="verified"} onClick={()=>void decide(job,"approved")}>Approve and publish</button>
-    <button className="btn btn-secondary" disabled={busy===job.id} onClick={()=>void decide(job,"correction_required")}>Return for correction</button>
-    <button className="btn btn-ghost" disabled={busy===job.id} onClick={()=>void decide(job,"rejected")}>Reject vacancy</button>
+    <button type="button" className="btn btn-primary" disabled={busy===job.id||job.verification_status!=="verified"} onClick={()=>void decide(job,"approved")}>Approve and publish</button>
+    <button type="button" className="btn btn-secondary" disabled={busy===job.id} onClick={()=>void decide(job,"correction_required")}>Return for correction</button>
+    <button type="button" className="btn btn-ghost" disabled={busy===job.id} onClick={()=>void decide(job,"rejected")}>Reject vacancy</button>
    </div>
   </Card>)}</div>}
  </main>;

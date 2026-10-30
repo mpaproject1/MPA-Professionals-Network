@@ -16,7 +16,7 @@ Branch: `feat/workstream-3-progress-members-workspace`
 ## Phase 2 — Branded loading
 
 - Root `web/app/loading.tsx` remains the global App Router fallback.
-- Added nested route loading boundaries for Jobs, Mentorship, Serve-Community, Organizations, Membership, Admin, Notifications, Verification, Tracking, Members and Profile.
+- Added nested route loading boundaries for Jobs, Mentorship, Serve-Community, Organizations, Membership, Admin, Notifications, Verification, Tracking, Members, Profile, Dashboard, Services, Recruitment, Network and Organization Directory.
 - Updated `OperationStatus` so client-side data-loading states also use the branded P mark rather than a generic spinner. This is important because client-side API fetches do not trigger Next.js route loading boundaries.
 - Reduced-motion behavior is supported by the loader CSS.
 - Loading is scoped to route transitions or individual operations; no persistent global overlay is introduced.

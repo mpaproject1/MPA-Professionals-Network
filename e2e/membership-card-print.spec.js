@@ -14,11 +14,12 @@ const cards=candidates.map(candidate=>({...candidate,status:"active",verificatio
 test("bulk membership print produces independently parsed A4 PDF with one eligible card per page",async({page})=>{
  await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","membership-card-print-ci-token"));
  await page.route("**/api/v1/admin/membership-cards/eligible**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({items:candidates,total:candidates.length,limit:100,offset:0,hasMore:false})}));
+ await page.route("**/api/v1/admin/membership-cards/print",async route=>{ expect(route.request().method()).toBe("POST"); expect(route.request().postDataJSON().batchReference).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"); await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({recorded:true})}); });
  await page.route("**/api/v1/admin/membership-cards/batch",async route=>{
   expect(route.request().method()).toBe("POST");
   const body=route.request().postDataJSON();
   expect(body.membershipNumbers).toEqual(candidates.map(item=>item.membershipNumber));
-  await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({cards,skipped:[],selectedCount:2,generatedCount:2,skippedCount:0})});
+  await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({batchReference:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",cards,skipped:[],selectedCount:2,generatedCount:2,skippedCount:0})});
  });
  await page.goto("/admin/membership-cards");
  await expect(page.getByRole("heading",{name:"Single and bulk card printing"})).toBeVisible();
@@ -28,6 +29,7 @@ test("bulk membership print produces independently parsed A4 PDF with one eligib
  await page.getByRole("button",{name:"Prepare 2 cards"}).click();
  await expect(page.getByRole("heading",{name:"Review before printing"})).toBeVisible();
  await expect(page.getByText(/2 eligible cards prepared/)).toBeVisible();
+ await page.getByRole("button",{name:"Print / Save PDF"}).click();
  await page.emulateMedia({media:"print"});
  const pdf=await page.pdf({format:"A4",printBackground:true,preferCSSPageSize:true});
  expect(pdf.subarray(0,5).toString()).toBe("%PDF-");

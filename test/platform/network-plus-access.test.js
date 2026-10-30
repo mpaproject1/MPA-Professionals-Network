@@ -30,6 +30,7 @@ test("Network-Plus access accepts an active authorized member of a verified orga
   const result = await resolveNetworkPlusAccess(db, "org-user-1");
   assert.equal(result.eligible, true);
   assert.deepEqual(result.access, { member: false, organization: true });
+  assert.match(calls[1].sql, /om.status='active'/);
   assert.match(calls[1].sql, /verification_status='verified'/);
   assert.deepEqual(calls[1].params[1], ["owner", "administrator", "project_manager"]);
 });

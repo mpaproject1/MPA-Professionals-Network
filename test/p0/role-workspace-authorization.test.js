@@ -338,3 +338,25 @@ test("Mentorship requires both participants to consent before activation", () =>
  assert.match(ui, /Accept this mentor/);
  assert.match(migration, /mentee_consent_status/);
 });
+
+
+test("finance authority is separate from membership review and activation authority", () => {
+  const server = read("server.js");
+  const reports = read("src/platform/reports.js");
+  assert.match(server, /membership\.reviewApplication\(parts\[4\],identity\.sub/);
+  assert.match(server, /membership\.activateApplication\(parts\[4\],identity\.sub/);
+  assert.match(server, /anyRoleOrPermission\(identity,\["reviewer","membership_reviewer","system_admin"\],\["membership\.review"\]\)/);
+  assert.match(server, /anyRoleOrPermission\(identity,\["reviewer","membership_reviewer","system_admin"\],\["membership\.activate"\]\)/);
+  assert.doesNotMatch(server, /anyRoleOrPermission\(identity,\["reviewer","finance_officer","system_admin"\],\["members\.manage"\]\)/);
+  assert.match(server, /finance\.payment\.verify/);
+  assert.match(server, /finance\.payment\.reverse/);
+  assert.doesNotMatch(reports, /id:"membership-status"[^\\n]*finance_officer/);
+});
+
+test("recruiter and project-manager report access is explicitly scoped to organization or job-team membership", () => {
+  const reports = read("src/platform/reports.js");
+  assert.match(reports, /async function fetchRows\(db,id,f,identity\)/);
+  assert.match(reports, /organization_membership om where om\.organization_id=j\.organization_id and om\.user_id=\$6 and om\.status='active'/);
+  assert.match(reports, /job_team_member jt where jt\.job_id=j\.id and jt\.user_id=\$6 and jt\.active=true/);
+  assert.match(reports, /fetchRows\(db,id,applied,identity\)/);
+});

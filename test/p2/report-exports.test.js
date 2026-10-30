@@ -150,6 +150,7 @@ test("finance reports reconcile verified, failed, refunded and outstanding amoun
   assert.equal(Number(etb["Matched amount"]),1000);
   assert.equal(Number(etb["Unreconciled amount"]),0);
   assert.equal(Number(etb["Outstanding amount"]),1700);
+  assert.equal(Number(etb["Missing fee amount"]),0);
   assert.equal(Number(etb["Approved payments"]),1);
   assert.equal(Number(etb["Failed payments"]),1);
   assert.equal(Number(etb["Refunded/reversed payments"]),1);

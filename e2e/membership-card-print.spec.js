@@ -9,7 +9,7 @@ const candidates=[
  {membershipNumber:"MPA-2026-33CC44DD",memberName:"Grace Hopper",membershipType:"Lifetime",startDate:"2026-02-01",endDate:null}
 ];
 const settings={header_text:"Muslim Professionals Association",subtitle_text:"Membership ID",footer_text:"Verify membership using the QR code",background_style:"geometric",background_start:"#0A3258",background_end:"#174A78",accent_color:"#E5F044",text_color:"#FFFFFF",show_membership_type:true};
-const cards=candidates.map((candidate,index)=>({...candidate,status:"active",verificationPath:"/membership/verify?membershipNumber="+encodeURIComponent(candidate.membershipNumber)+"&token="+"a".repeat(43),settings}));
+const cards=candidates.map(candidate=>({...candidate,status:"active",verificationPath:"/membership/verify?membershipNumber="+encodeURIComponent(candidate.membershipNumber)+"&token="+"a".repeat(43),settings}));
 
 test("bulk membership print produces independently parsed A4 PDF with one eligible card per page",async({page})=>{
  await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","membership-card-print-ci-token"));
@@ -27,7 +27,7 @@ test("bulk membership print produces independently parsed A4 PDF with one eligib
  await expect(page.getByText("2 selected")).toBeVisible();
  await page.getByRole("button",{name:"Prepare 2 cards"}).click();
  await expect(page.getByRole("heading",{name:"Review before printing"})).toBeVisible();
- await expect(page.getByText(/2 cards prepared/)).toBeVisible();
+ await expect(page.getByText(/2 eligible cards prepared/)).toBeVisible();
  await page.emulateMedia({media:"print"});
  const pdf=await page.pdf({format:"A4",printBackground:true,preferCSSPageSize:true});
  expect(pdf.subarray(0,5).toString()).toBe("%PDF-");

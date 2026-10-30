@@ -140,3 +140,22 @@ test("employer screening and interview forms submit database-supported option va
   assert.match(migration,/mode in \('online','onsite','phone'\)/);
   assert.doesNotMatch(page,/value="single_select"|value="multi_select"|value="boolean"|value="in_person"/);
 });
+
+test("formal applications collect and persist required screening answers across draft and submit",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const [service,page]=await Promise.all([
+    readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8"),
+    readFile(new URL("../../web/app/jobs/page.tsx",import.meta.url),"utf8")
+  ]);
+  const createDraft=service.slice(service.indexOf("export async function saveApplicationDraft"),service.indexOf("export async function updateApplicationDraft"));
+  const updateDraft=service.slice(service.indexOf("export async function updateApplicationDraft"),service.indexOf("export async function submitApplication"));
+  const screening=service.slice(service.indexOf("async function saveScreeningAnswers"),service.indexOf("export async function createRequisition"));
+  assert.match(createDraft,/saveScreeningAnswers\(db,app\.id,jobId,input\.answers,false\)/);
+  assert.match(updateDraft,/saveScreeningAnswers\(db,applicationId,a\.job_id,input\.answers,false\)/);
+  assert.match(screening,/Array\.isArray\(answer\)&&answer\.length===0/);
+  assert.match(service,/screening_answers from job_application_answer/);
+  assert.match(page,/screeningQuestions/);
+  assert.match(page,/answersFor\(job\.id\)/);
+  assert.match(page,/Complete each required screening question/);
+  for(const type of ["text","number","yes_no","single_choice","multiple_choice"]) assert.match(page,new RegExp('question_type==="'+type+'"'));
+});

@@ -90,6 +90,79 @@ test("direct report execution denies roles excluded from restricted reports",asy
  await assert.rejects(()=>runReport(support,"payment-reconciliation",{},"report-auth-payment"),error=>error.statusCode===403);
  await assert.rejects(()=>runReport(support,"audit-activity",{},"report-auth-audit"),error=>error.statusCode===403);
 });
+
+test("finance reports reconcile verified, failed, refunded and outstanding amounts by currency",async t=>{
+ if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
+ const db=getPool(),suffix=randomUUID(),digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
+ const created=await register({email:"finance-fixture-"+suffix+"@example.test",password:"FinanceFixtureP1Password!2026",firstName:"Finance",lastName:"Fixture",phone:"07"+digits},"finance-report-fixture-"+suffix);
+ const userId=created.user.id,product=(await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
+ assert.ok(product,"BASIC membership product must exist in migrated test database");
+ const applicationIds=[],paymentIds=[],reversalIds=[];
+ async function application(ref,status,amount,currency){
+  const row=(await db.query("insert into membership_application(user_id,application_type,membership_product_id,status,approved_at,fee_snapshot) values($1,'new',$2,$3,now(),$4::jsonb) returning id",[userId,product.id,status,JSON.stringify({amount,currency})])).rows[0];
+  applicationIds.push(row.id);
+  return row.id;
+ }
+ async function payment(appId,status,amount,currency,reference){
+  const row=(await db.query("insert into payment_transaction(provider,idempotency_key,purpose,amount,currency,status,request_payload,channel,source,submitted_by,verified_by,verified_at,completed_at,purpose_reference) values('finance-report-fixture',$1,'membership',$2,$3,$4,$5::jsonb,'manual','manual_entry',$6,$6,now(),now(),$7) returning id",[suffix+"-"+reference,amount,currency,status,JSON.stringify({reference}),userId,reference])).rows[0];
+  paymentIds.push(row.id);
+  await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[appId,row.id]);
+  return row.id;
+ }
+ const etbApproved=await application("ETB-APPROVED","approved",1000,"ETB");
+ const etbFailed=await application("ETB-FAILED","payment_pending",200,"ETB");
+ const etbRefunded=await application("ETB-REFUNDED","payment_pending",300,"ETB");
+ const usdApproved=await application("USD-APPROVED","approved",50,"USD");
+ const etbOutstanding=await application("ETB-OUTSTANDING","approved",1200,"ETB");
+ try{
+  const approvedEtbPayment=await payment(etbApproved,"succeeded",1000,"ETB","approved-etb");
+  await db.query("insert into payment_reconciliation(payment_transaction_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,'matched',$2,now(),'Finance report fixture')",[approvedEtbPayment,userId]);
+  await payment(etbFailed,"failed",200,"ETB","failed-etb");
+  const refundedPayment=await payment(etbRefunded,"refunded",300,"ETB","refunded-etb");
+  const reversal=(await db.query("insert into membership_payment_reversal(payment_transaction_id,application_id,reversal_type,reason,reversed_by) values($1,$2,'refund','Finance report test refund',$3) returning id",[refundedPayment,etbRefunded,userId])).rows[0];
+  reversalIds.push(reversal.id);
+  await payment(usdApproved,"succeeded",50,"USD","approved-usd");
+  const finance={sub:userId,roles:["finance_officer"],permissions:[]};
+  const from=new Date().toISOString().slice(0,10),to=from;
+  const filters={from,to};
+  const approved=await runReport(finance,"approved-payments",filters,randomUUID());
+  assert.equal(approved.rows.length,2);
+  assert.deepEqual(new Set(approved.rows.map(row=>row.Currency)),new Set(["ETB","USD"]));
+  const exceptions=await runReport(finance,"failed-reversed-payments",filters,randomUUID());
+  assert.equal(exceptions.rows.length,2);
+  assert.ok(exceptions.rows.some(row=>row.Outcome==="Failed payment"));
+  assert.ok(exceptions.rows.some(row=>row.Outcome==="Refunded"&&row["Reversal type"]==="refund"));
+  const collections=await runReport(finance,"membership-collections",filters,randomUUID());
+  const etbCollections=collections.rows.find(row=>row.Currency==="ETB");
+  assert.equal(Number(etbCollections["Gross verified"]),1300);
+  assert.equal(Number(etbCollections["Refunds and reversals"]),300);
+  assert.equal(Number(etbCollections["Net collected"]),1000);
+  const outstanding=await runReport(finance,"outstanding-membership-payments",filters,randomUUID());
+  assert.equal(outstanding.rows.length,3,"failed and refunded applications remain outstanding until a new successful payment");
+  assert.ok(outstanding.rows.some(row=>row["Application reference"]==="ETB-OUTSTANDING"));
+  const summary=await runReport(finance,"finance-summary",filters,randomUUID());
+  const etb=summary.rows.find(row=>row.Currency==="ETB"),usd=summary.rows.find(row=>row.Currency==="USD");
+  assert.equal(Number(etb["Gross verified"]),1300);
+  assert.equal(Number(etb["Refunds/reversals"]),300);
+  assert.equal(Number(etb["Net collected"]),1000);
+  assert.equal(Number(etb["Failed amount"]),200);
+  assert.equal(Number(etb["Matched amount"]),1000);
+  assert.equal(Number(etb["Unreconciled amount"]),0);
+  assert.equal(Number(etb["Outstanding amount"]),1700);
+  assert.equal(Number(etb["Approved payments"]),1);
+  assert.equal(Number(etb["Failed payments"]),1);
+  assert.equal(Number(etb["Refunded/reversed payments"]),1);
+  assert.equal(Number(usd["Net collected"]),50);
+  assert.equal(Number(usd["Unreconciled amount"]),50);
+  assert.equal(Number(usd["Outstanding amount"]),0);
+ }finally{
+  if(paymentIds.length)await db.query("delete from payment_reconciliation where payment_transaction_id=any($1::uuid[])",[paymentIds]);
+  if(reversalIds.length)await db.query("delete from membership_payment_reversal where id=any($1::uuid[])",[reversalIds]);
+  if(applicationIds.length)await db.query("delete from membership_application_payment where application_id=any($1::uuid[])",[applicationIds]);
+  if(paymentIds.length)await db.query("delete from payment_transaction where id=any($1::uuid[])",[paymentIds]);
+  if(applicationIds.length)await db.query("delete from membership_application where id=any($1::uuid[])",[applicationIds]);
+ }
+});
 function unzipEntries(buffer){
  const entries=new Map();let offset=0;
  while(offset+4<=buffer.length&&buffer.readUInt32LE(offset)===0x04034b50){

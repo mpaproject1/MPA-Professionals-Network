@@ -38,6 +38,8 @@ export async function updateUserPermissions(actor,userId,input,requestId){
   if(!Array.isArray(input.permissionCodes))throw err(400,"permissionCodes must be an array.","VALIDATION_ERROR");
   const requested=[...new Set(input.permissionCodes.map(value=>String(value)))];
   if(requested.length>100)throw err(400,"Too many permissions were submitted.","VALIDATION_ERROR");
+  const targetRoles=await allowed(tx,userId);
+  if(targetRoles.includes("ethics_reviewer")&&requested.some(code=>["verification.manage","verification.appeal.review"].includes(code)))throw err(409,"An Ethics Reviewer account cannot also receive general verification or appeal permissions. Assign separate accounts for independent review.","REVIEWER_PERMISSION_SEPARATION");
   const catalog=(await tx.query("select permission_code,system_only from app_permission where permission_code=any($1::text[])",[requested])).rows;
   if(catalog.length!==requested.length)throw err(400,"One or more permission codes are unknown.","INVALID_PERMISSION");
   if(catalog.some(permission=>permission.system_only))throw err(403,"One or more requested permissions are reserved to system administrators.","SYSTEM_ONLY_PERMISSION");
@@ -125,6 +127,8 @@ export async function updateUser(actor,userId,input,requestId){
   if((status!==undefined||roleCode!==undefined||removeRoleCode!==undefined)&&!reason)throw err(400,"An audit reason is required for account status and role changes.","AUDIT_REASON_REQUIRED");
 
   const currentRoles=await allowed(tx,userId);
+  const projectedRoles=new Set(currentRoles); if(roleCode!==undefined)projectedRoles.add(roleCode); if(removeRoleCode!==undefined)projectedRoles.delete(removeRoleCode);
+  if(projectedRoles.has("ethics_reviewer")&&(projectedRoles.has("verification_reviewer")||projectedRoles.has("appeal_reviewer")))throw err(409,"Ethics reviewers must remain independent from professional verification and verification appeals. Assign those responsibilities to separate accounts.","REVIEWER_ROLE_SEPARATION");
   const requestedRoles=[roleCode,removeRoleCode].filter(v=>v!==undefined);
   for(const requested of requestedRoles){
    const rr=(await tx.query("select id from app_role where role_code=$1",[requested])).rows[0];

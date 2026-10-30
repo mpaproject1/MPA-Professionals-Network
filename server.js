@@ -29,6 +29,7 @@ import * as serveCommunityImpactReports from "./src/platform/serve-community-imp
 import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
 import * as supportBot from "./src/platform/support-bot.js";
 import * as userAdmin from "./src/platform/user-admin.js";
+import {assertMembershipActivationAccess,assertMembershipReviewAccess,assertMembershipReviewQueueAccess,assertPaymentReversalAccess,assertPaymentVerificationAccess} from "./src/platform/workspace-authorization.js";
 import {beginAdminPasskeyAuthentication, beginAdminPasskeyRegistration, finishAdminPasskeyAuthentication, finishAdminPasskeyRegistration, listAdminPasskeys, recoverAdminPasskey, revokeAdminPasskey} from "./src/platform/webauthn.js";
 import * as marketplaceDemand from "./src/services-mentorship/demand.js";
 import * as mentorshipOperations from "./src/services-mentorship/operations.js";
@@ -513,7 +514,7 @@ const server=http.createServer(async (req,res)=>{
       requireRole(identity,"member"); return ok(res,await membership.createApplication(identity.sub,await body(req),requestId),requestId,201);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/membership/applications/") && parts[5]==="review") {
-      anyRoleOrPermission(identity,["reviewer","membership_reviewer","system_admin"],["membership.review"]); return ok(res,await membership.reviewApplication(parts[4],identity.sub,await body(req),requestId),requestId);
+      assertMembershipReviewAccess(identity); return ok(res,await membership.reviewApplication(parts[4],identity.sub,await body(req),requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/membership/applications/") && parts[5]==="correction") {
       requireRole(identity,"member"); return ok(res,await membership.respondCorrection(parts[4],identity.sub,await body(req),requestId),requestId);
@@ -525,21 +526,20 @@ const server=http.createServer(async (req,res)=>{
       requireRole(identity,"member"); const b=await body(req); return ok(res,await membership.createManualPayment(parts[4],identity.sub,b,requestId),requestId,201);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/membership/applications/") && parts[5]==="activate") {
-      anyRoleOrPermission(identity,["reviewer","membership_reviewer","system_admin"],["membership.activate"]); return ok(res,await membership.activateApplication(parts[4],identity.sub,requestId),requestId);
+      assertMembershipActivationAccess(identity); return ok(res,await membership.activateApplication(parts[4],identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && p==="api/v1/membership/renew") {
       requireRole(identity,"member"); const b=await body(req); return ok(res,await membership.renew(identity.sub,b.productCode,requestId,b.termsAcknowledged===true,b.idempotencyKey),requestId,201);
     }
     if(req.method==="POST" && parts.length===5 && parts[0]==="api" && parts[1]==="v1" && parts[2]==="payments" && parts[4]==="verify") {
-      anyRoleOrPermission(identity,["finance_officer","system_admin"],["finance.payment.verify","finance.manage"]); return ok(res,await membership.verifyPayment(parts[3],identity.sub,await body(req),requestId),requestId);
+      assertPaymentVerificationAccess(identity); return ok(res,await membership.verifyPayment(parts[3],identity.sub,await body(req),requestId),requestId);
     }
     if(req.method==="POST" && parts.length===5 && parts[0]==="api" && parts[1]==="v1" && parts[2]==="payments" && parts[4]==="reverse") {
-      anyRoleOrPermission(identity,["finance_officer","system_admin"],["finance.payment.reverse","finance.manage"]);
+      assertPaymentReversalAccess(identity);
       return ok(res,await membership.reverseMembershipPayment(parts[3],identity.sub,await body(req),requestId),requestId);
     }
     if(req.method==="GET" && p==="api/v1/review/membership/applications") {
-      const roles=Array.isArray(identity.roles)?identity.roles:[]; const permissions=Array.isArray(identity.permissions)?identity.permissions:[];
-      if(!roles.some(role=>["reviewer","membership_reviewer","system_admin"].includes(role))&&!permissions.some(permission=>["membership.review","members.view"].includes(permission))) throw Object.assign(new Error("Forbidden."),{statusCode:403,code:"FORBIDDEN"});
+      assertMembershipReviewQueueAccess(identity);
       return ok(res,await membership.listApplicationsForReview(),requestId);
     }
 

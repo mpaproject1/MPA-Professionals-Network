@@ -152,3 +152,24 @@ export async function searchFinancePayers(identity,q=""){
   const rows=await getPool().query("select u.id,u.email,coalesce(nullif(p.display_name,''),concat_ws(' ',p.first_name,p.middle_name,p.last_name),u.email) display_name from app_user u left join person p on p.user_id=u.id where u.status='active' and (u.email ilike $1 or p.display_name ilike $1 or concat_ws(' ',p.first_name,p.middle_name,p.last_name) ilike $1) order by display_name limit 15",["%"+term+"%"]);
   return rows.rows.map(row=>({userId:row.id,label:row.display_name,email:row.email}));
 }
+
+export async function issueVerifiedMembershipPaymentVoucher(identity,paymentId,requestId){
+  assertFinance(identity,"finance.voucher.issue");
+  return withTransaction(async tx=>{
+    const payment=(await tx.query(`select pt.id,pt.amount,pt.currency,pt.purpose_reference,pt.channel,
+      coalesce(pt.verified_at,pt.completed_at,pt.created_at) paid_at,
+      coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name),'MPA Member') payer_name
+      from payment_transaction pt join membership_application_payment ap on ap.payment_transaction_id=pt.id
+      join membership_application ma on ma.id=ap.application_id left join person on person.user_id=ma.user_id
+      where pt.id=$1 and pt.status='succeeded'
+      and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)
+      for update of pt`,[paymentId])).rows[0];
+    if(!payment)throw fail(409,"Only a successfully verified, non-reversed membership payment can receive a payment voucher.","PAYMENT_NOT_VERIFIED");
+    const active=(await tx.query("select id,voucher_number from finance_payment_voucher where payment_transaction_id=$1 and revoked_at is null",[paymentId])).rows[0];
+    if(active)return {voucherId:active.id,voucherNumber:active.voucher_number,alreadyIssued:true,downloadUnavailable:true};
+    const token=randomBytes(32).toString("base64url"),voucherNumber="MPA-VCH-"+new Date().getUTCFullYear()+"-"+randomUUID().replaceAll("-","").slice(0,12).toUpperCase();
+    const voucher=(await tx.query("insert into finance_payment_voucher(payment_record_id,payment_transaction_id,voucher_number,verification_token_sha256,issued_by) values(null,$1,$2,$3,$4) returning id,voucher_number,issued_at",[paymentId,voucherNumber,hash(token),identity.sub])).rows[0];
+    await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_payment_voucher_issued','finance_payment_voucher',$2,$3,'success',$4)",[identity.sub,voucher.id,requestId||null,JSON.stringify({voucherNumber,paymentId})]);
+    return {voucherId:voucher.id,voucherNumber:voucher.voucher_number,token,verificationPath:"/finance/verify/"+voucher.id+"?token="+encodeURIComponent(token),issuedAt:voucher.issued_at,payment:{receiptNumber:payment.purpose_reference||payment.id,payerName:payment.payer_name,payerType:"member",amount:payment.amount,currency:payment.currency,purpose:payment.purpose_reference||"Membership payment",paymentDate:payment.paid_at,paymentMethod:payment.channel}};
+  });
+}

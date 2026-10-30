@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { recordManualFinancePayment, decideManualFinancePayment, issueFinancePaymentVoucher, verifyFinancePaymentVoucher } from "../../src/platform/finance-receipts.js";
+import { recordManualFinancePayment, decideManualFinancePayment, issueFinancePaymentVoucher, issueVerifiedMembershipPaymentVoucher, verifyFinancePaymentVoucher } from "../../src/platform/finance-receipts.js";
 
 test("manual finance receipts keep verification and voucher issuance as separate decisions",async()=>{
   const source=await readFile(new URL("../../src/platform/finance-receipts.js",import.meta.url),"utf8");
@@ -20,6 +20,7 @@ test("manual finance receipts keep verification and voucher issuance as separate
   assert.equal(typeof recordManualFinancePayment,"function");
   assert.equal(typeof decideManualFinancePayment,"function");
   assert.equal(typeof issueFinancePaymentVoucher,"function");
+  assert.equal(typeof issueVerifiedMembershipPaymentVoucher,"function");
   assert.equal(typeof verifyFinancePaymentVoucher,"function");
   assert.match(source,/Only a successfully verified, non-reversed membership payment can receive a payment voucher/);
 });

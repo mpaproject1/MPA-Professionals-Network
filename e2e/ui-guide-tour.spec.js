@@ -8,9 +8,11 @@ const globalGuide=[{id:"tour-global",guide_key:"global-navigation",route_pattern
 
 test.describe("Accessible contextual screen tours",()=>{
  test("supports progress, Back, Next, Skip, Finish, restart and does not block page controls",async({page})=>{
-  await page.route("**/api/v1/experience/guides?route=*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(globalGuide)}));
+  await page.route("**/api/v1/experience/guides**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(globalGuide)}));
   await page.setViewportSize({width:1280,height:800});
+  const guidesLoaded=page.waitForResponse(/\/api\/v1\/experience\/guides/);
   await page.goto("/");
+  await guidesLoaded;
   const open=page.getByRole("button",{name:"Show me around this screen"});
   await expect(open).toBeVisible();
   await open.click();
@@ -22,8 +24,11 @@ test.describe("Accessible contextual screen tours",()=>{
   await expect(dialog).toContainText("Step 2 of 3");
   await dialog.getByRole("button",{name:"Back"}).click();
   await expect(dialog).toContainText("Step 1 of 3");
-  await expect(page.getByRole("link",{name:"Job Portal"})).toBeVisible();
-  await page.getByRole("link",{name:"Job Portal"}).click();
+  const jobLink=page.getByRole("navigation",{name:"Main navigation"}).getByRole("link",{name:"Job Portal"});
+  await expect(jobLink).toBeVisible();
+  const nextRouteGuide=page.waitForResponse(/\/api\/v1\/experience\/guides/);
+  await jobLink.click();
+  await nextRouteGuide;
   await expect(page).toHaveURL(/\/jobs$/);
   await expect(page.getByTestId("guide-overlay")).toBeVisible();
   await page.getByRole("button",{name:"Skip"}).click();
@@ -45,9 +50,11 @@ test.describe("Accessible contextual screen tours",()=>{
    {target:'[data-guide-target="payment-overview"]',title:"Payment is separate",text:"Payment verification does not activate membership."},
    {target:'[data-guide-target="payment-submit"]',title:"Submit configured evidence",text:"Follow the configured method instructions."}
   ]}];
-  await page.route("**/api/v1/experience/guides?route=*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(paymentGuide)}));
+  await page.route("**/api/v1/experience/guides**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(paymentGuide)}));
   await page.setViewportSize({width:390,height:844});
+  const guidesLoaded=page.waitForResponse(/\/api\/v1\/experience\/guides/);
   await page.goto("/membership/payment");
+  await guidesLoaded;
   await page.getByRole("button",{name:"Show me around this screen"}).click();
   const dialog=page.getByRole("dialog",{name:"Membership payment and receipt"});
   await expect(dialog).toBeVisible();

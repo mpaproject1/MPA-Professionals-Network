@@ -2,7 +2,7 @@ import { getPool } from "./db.js";
 import { displayReference } from "./display-reference.js";
 
 function statusLabel(status){
-  const labels={submitted:"Submitted for review",in_review:"Under review",correction_required:"Correction required",payment_pending:"Payment required",paid:"Payment verified",activated:"Approved and active",rejected:"Rejected",draft:"Draft",pending:"Pending",verified:"Verified"};
+  const labels={submitted:"Submitted for review",screening:"Under review",shortlisted:"Shortlisted",interview:"Interview stage",offer:"Offer received",accepted:"Offer accepted",hired:"Hired",withdrawn:"Withdrawn by you",in_review:"Under review",correction_required:"Correction required",payment_pending:"Payment required",paid:"Payment verified",activated:"Approved and active",rejected:"Not selected",draft:"Draft",pending:"Pending",verified:"Verified"};
   return labels[status]||String(status||"Unknown").replace(/_/g," ");
 }
 

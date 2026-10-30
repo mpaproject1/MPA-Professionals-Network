@@ -105,7 +105,7 @@ function optionalIdentity(req){
   if(!req.headers.authorization?.startsWith("Bearer ")) return null;
   try { return verifyToken(req.headers.authorization.slice(7),config.jwtSecret); } catch { return null; }
 }
-const ROLE_PERMISSION={verification_reviewer:"verification.manage",appeal_reviewer:"verification.manage",organization_admin:"organizations.manage",recruiter:"jobs.manage",project_manager:"jobs.manage",mentor:"mentorship.manage",supporting_staff:"reviews.view",admin:"users.manage"};
+const ROLE_PERMISSION={verification_reviewer:"verification.manage",appeal_reviewer:"verification.appeal.review",supporting_staff:"reviews.view",admin:"users.manage"};
 function anyRole(identity,allowed){
   const roles=Array.isArray(identity.roles)?identity.roles:[];
   const permissions=Array.isArray(identity.permissions)?identity.permissions:[];
@@ -646,7 +646,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="response") return ok(res,await verification.memberResponse(parts[4],await body(req),identity.sub,requestId),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="appeal") return ok(res,await verification.submitAppeal(parts[4],await body(req),identity.sub,requestId),requestId,201);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/verification/appeals/") && parts[4]==="decision"){
-      anyRoleOrPermission(identity,["appeal_reviewer","system_admin"],["verification.manage"]);
+      anyRoleOrPermission(identity,["appeal_reviewer","system_admin"],["verification.appeal.review"]);
       return ok(res,await verification.decideAppeal(parts[3],await body(req),identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="claim-status"){

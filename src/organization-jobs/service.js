@@ -77,7 +77,7 @@ export async function listNetworkPlusOrganizations(viewerId,filters={}) {
 }
 
 export async function updateNetworkPlusVisibility(orgId,userId,input,requestId){
- if(typeof input.visible!=="boolean") throw error(400,"Choose whether the organization should appear in Network-Plus discovery.","VALIDATION_ERROR");
+ if(!input||typeof input!=="object"||Array.isArray(input)||typeof input.visible!=="boolean") throw error(400,"Choose whether the organization should appear in Network-Plus discovery.","VALIDATION_ERROR");
  const reason=String(input.reason||"").trim();
  if(reason.length<8||reason.length>500) throw error(400,"Provide a reason between 8 and 500 characters for this visibility change.","VISIBILITY_REASON_REQUIRED");
  return withTransaction(async db=>{

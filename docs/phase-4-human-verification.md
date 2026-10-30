@@ -39,6 +39,6 @@ The Playwright tests stub HTTP responses to exercise the browser flow and reques
 
 - Source changes are committed to PR #18.
 - The Playwright suite and PostgreSQL integration tests are authored but have not been executed in this implementation pass.
-- GitHub automatically created PR Quality run #667 for this head. All four jobs failed before exposing any steps or log URLs (`steps: null`, `logs_url: null`); no test output is available. This is not evidence of a source-code failure or a passing validation run.
+- GitHub automatically created PR Quality runs after the branch updates. The latest observed run (#669) had all four jobs fail before exposing any steps or log URLs (`steps: null`, `logs_url: null`); the job-log endpoints returned `BlobNotFound`. No test output is available. This is not evidence of a source-code failure or a passing validation run.
 - Do not treat the E2E assertions as passed until an Actions runner actually executes them.
 - No database migration, production database change, deployment, or change to email verification, membership, identity, or authorization behavior was made.

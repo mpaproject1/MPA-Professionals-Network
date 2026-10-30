@@ -23,7 +23,7 @@ test("single card issuance requires an active eligible membership record, not an
 
 test("admin card lookup distinguishes membership number from internal identifiers",()=>{
   assert.match(service,/WRONG_MEMBERSHIP_IDENTIFIER/);
-  assert.match(service,/internal account or record reference, not a membership number/);
+  assert.match(service,/internal account, payment or application reference, not a membership number/);
   assert.match(service,/No membership record matches that membership ID/);
   assert.match(service,/membershipNumber:row\.membership_number/);
   assert.match(service,/membershipNumber=\+encodeURIComponent\(row\.membership_number\)/);

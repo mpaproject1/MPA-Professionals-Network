@@ -75,6 +75,6 @@ Payment reporting periods use verification/completion timestamps where available
 
 ## Known validation boundary
 
-The report queries and UI changes are committed to the feature branch, but this document does not claim that CI or browser acceptance passed. The preceding Phase 1 PR Quality run #804 failed in Biome, TypeScript, backend PostgreSQL tests and Next.js/browser acceptance; its log retrieval returned a GitHub 404. The latest branch head must pass the full PR Quality workflow before Phase 2 or Phase 1 is marked complete.
+The report queries and UI changes are committed to the feature branch, but this document does not claim that CI or browser acceptance passed. The latest observed PR Quality run #887 for commit `bf51db62b5b21786b73982bd7a9835eee5a8f539` failed in all four jobs: Biome, TypeScript, backend PostgreSQL tests and Next.js/browser acceptance. GitHub returned empty step summaries and `404 BlobNotFound` for each job log, so the failure causes remain unverified. JavaScript syntax parsing passed for `src/platform/reports.js`, `test/p2/report-exports.test.js` and `test/p0/role-workspace-authorization.test.js`; this is not a substitute for executing those tests. The latest branch head must pass the full PR Quality workflow before Phase 2 or Phase 1 is marked complete.
 
 No production database migration or deployment has been executed.

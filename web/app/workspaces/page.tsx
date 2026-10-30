@@ -26,7 +26,9 @@ const tasks: Task[] = [
 ];
 function allowed(task: Task, identity: Identity, organizations: Organization[]) {
  const roles = identity.roles || [], permissions = identity.permissions || [];
- return Boolean(task.roles?.some(role => roles.includes(role)) || task.permissions?.some(permission => permissions.includes(permission)) || (task.orgScope && organizations.length > 0));
+ const platformAccess = Boolean(task.roles?.some(role => roles.includes(role)) || task.permissions?.some(permission => permissions.includes(permission)));
+ const scopedAccess = Boolean(task.scopeRoles?.some(role => organizations.some(org => String(org.role_code || "").toLowerCase() === role)));
+ return platformAccess || scopedAccess;
 }
 export default function RoleWorkspacesPage() {
  const token = useUiStore(state => state.token), hydrated = useUiStore(state => state.hydrated), hydrateToken = useUiStore(state => state.hydrateToken);

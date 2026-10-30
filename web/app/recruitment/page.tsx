@@ -14,6 +14,7 @@ type Organization={id:string;legal_name:string;display_name:string;verification_
 type Job={id:string;title:string;description?:string;status:string;posting_scope?:string;application_deadline?:string;organization_id:string};
 type Candidate={id:string;job_id:string;status:string;cover_letter?:string|null;submitted_at?:string|null;updated_at:string;candidate_name?:string;eligibility_snapshot?:any;attachments?:{id:string;fileObjectId:string;fileName:string;contentType:string;byteSize:number;attachmentType:string}[];offer_amount?:number|string|null;offer_currency?:string|null;offer_terms?:string|null;offer_approval_status?:string};
 type Scorecard={id:string;title:string;instructions?:string;criteria:any[]};
+type Interview={id:string;scheduled_start:string;scheduled_end:string;timezone?:string;location_text?:string|null;meeting_url?:string|null;mode:string;status:string;agenda?:string|null;currentUserRole?:string;participants:{userId:string;role:string;response:string}[]};
 type TeamMember={id:string;user_id:string;role_code:string;active?:boolean;status?:string;display_name?:string;email?:string};
 type ScoreCriterion={draftId:string;key:string;label:string;weight:number};
 type ScreeningQuestion={id:string;question:string;question_type:string;required:boolean;options?:string[];active?:boolean};
@@ -23,6 +24,9 @@ export default function Recruitment(){
  const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated);
  const [organizations,setOrganizations]=useState<Organization[]>([]),[orgId,setOrgId]=useState(""),[jobs,setJobs]=useState<Job[]>([]),[jobId,setJobId]=useState(""),[organizationUsers,setOrganizationUsers]=useState<TeamMember[]>([]),[teamDirectoryError,setTeamDirectoryError]=useState("");
  const [candidates,setCandidates]=useState<Candidate[]>([]),[dashboard,setDashboard]=useState<Dashboard|null>(null),[scorecards,setScorecards]=useState<Scorecard[]>([]),[team,setTeam]=useState<TeamMember[]>([]),[questions,setQuestions]=useState<ScreeningQuestion[]>([]);
+ const [interviewsByApplication,setInterviewsByApplication]=useState<Record<string,Interview[]>>({});
+ const [interviewLoading,setInterviewLoading]=useState("");
+ const [feedbackDrafts,setFeedbackDrafts]=useState<Record<string,{recommendation:string;comments:string;scorecardId:string}>>({});
  const [teamDraft,setTeamDraft]=useState({userId:"",roleCode:"interviewer"}),[questionDraft,setQuestionDraft]=useState({question:"",questionType:"text",options:[] as string[],required:true});
  const [scorecardDraft,setScorecardDraft]=useState({title:"Interview scorecard",instructions:""}),[criteriaDraft,setCriteriaDraft]=useState<ScoreCriterion[]>([{draftId:"initial-criterion",key:"communication",label:"Communication",weight:1}]);
  const [offerDrafts,setOfferDrafts]=useState<Record<string,{amount:string;currency:string;terms:string}>>({});

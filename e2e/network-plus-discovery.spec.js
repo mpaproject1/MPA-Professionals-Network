@@ -54,7 +54,7 @@ test.describe("Network-Plus discovery acceptance", () => {
     await expect(page.getByRole("heading", { name: "Discover verified organizations." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Verified Community Health Network" })).toBeVisible();
     await expect(page.getByText("MPA verified")).toBeVisible();
-    await expect(page.getByText("Private registration details, verification evidence, contacts and member rosters are not disclosed.")).toHaveCount(0);
+    await expect(page.getByText(/private registration details, verification evidence, contacts and member rosters are not disclosed/i)).toBeVisible();
     await expect(page.getByText("Organization discovery is read-only.")).toBeVisible();
 
     await page.getByLabel("Organization name or description").fill("Community Health");
@@ -110,6 +110,7 @@ test.describe("Network-Plus discovery acceptance", () => {
     });
 
     await page.goto("/");
+    await expect.poll(() => Boolean(releaseAccess)).toBe(true);
     const nav = page.getByRole("navigation", { name: "Main navigation" });
     await expect(nav.getByRole("link", { name: "Network-Plus", exact: true })).toHaveCount(0);
     releaseAccess?.();

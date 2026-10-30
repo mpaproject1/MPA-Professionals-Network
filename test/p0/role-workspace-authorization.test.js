@@ -410,3 +410,13 @@ test("payment-method configuration is not granted by generic membership manageme
   assert.ok(!policy.includes("members.manage"));
   assert.ok(!methodsPage.includes('"members.manage"'));
 });
+
+
+test("phase-one permission migration registers capabilities without assigning them to accounts", () => {
+  const migration = read("db/migrations/20261030190000_membership_finance_permission_separation.sql");
+  for (const permission of ["membership.review", "membership.activate", "finance.payment.verify", "finance.payment.reverse"]) {
+    assert.ok(migration.includes("'" + permission + "'"));
+  }
+  assert.ok(migration.includes("on conflict(permission_code) do update"));
+  assert.ok(!/insert\s+into\s+app_user_permission/i.test(migration));
+});

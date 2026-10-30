@@ -815,6 +815,55 @@ export async function respondInterview(interviewId,userId,status,requestId){
   return row;
  });
 }
+export async function proposeInterviewChange(interviewId,userId,input,requestId){
+ return withTransaction(async db=>{
+  const interview=(await db.query("select ji.*,a.job_id from job_interview ji join job_application a on a.id=ji.application_id where ji.id=$1 for update",[interviewId])).rows[0];
+  if(!interview)throw error(404,"Interview not found.","NOT_FOUND");
+  const participant=(await db.query("select 1 from job_interview_participant where interview_id=$1 and user_id=$2",[interviewId,userId])).rows[0];
+  if(!participant)throw error(403,"Only an interview participant may propose a schedule change.","FORBIDDEN");
+  if(!["scheduled","confirmed"].includes(interview.status))throw error(409,"Only an open interview can be rescheduled.","INVALID_STATE");
+  const start=new Date(input.proposedStart),end=new Date(input.proposedEnd);
+  if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())||end<=start||start<=new Date())throw error(400,"Choose a valid future interview time range.","VALIDATION_ERROR");
+  const mode=String(input.mode||interview.mode);
+  if(!["online","onsite","phone"].includes(mode))throw error(400,"Choose a supported interview format.","VALIDATION_ERROR");
+  const pending=(await db.query("select 1 from job_interview_change_proposal where interview_id=$1 and status='pending'",[interviewId])).rows[0];
+  if(pending)throw error(409,"An interview schedule change is already awaiting a response.","CHANGE_PROPOSAL_PENDING");
+  const overlap=(await db.query("select 1 from job_interview ji join job_interview_participant jp on jp.interview_id=ji.id where ji.id<>$1 and ji.status in ('scheduled','confirmed') and jp.user_id in (select user_id from job_interview_participant where interview_id=$1) and ji.scheduled_start<$3 and ji.scheduled_end>$2 limit 1",[interviewId,start,end])).rows[0];
+  if(overlap)throw error(409,"One or more interview participants already have an overlapping interview.","INTERVIEW_CONFLICT");
+  const proposal=(await db.query("insert into job_interview_change_proposal(interview_id,proposed_by,previous_status,proposed_start,proposed_end,timezone,mode,location_text,meeting_url,note) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *",[interviewId,userId,interview.status,start,end,input.timezone||interview.timezone,mode,input.locationText??interview.location_text,input.meetingUrl??interview.meeting_url,input.note||null])).rows[0];
+  await db.query("update job_interview set status='reschedule_requested',updated_at=now() where id=$1",[interviewId]);
+  await audit(db,userId,"job.interview_change_proposed","job_interview",interviewId,requestId,{proposalId:proposal.id,proposedStart:start.toISOString(),proposedEnd:end.toISOString()});
+  const recipients=(await db.query("select user_id,role_code from job_interview_participant where interview_id=$1 and user_id<>$2",[interviewId,userId])).rows;
+  for(const recipient of recipients)await queueWorkflowEmail(db,recipient.user_id,recipient.role_code==="candidate"?"professional.workflow_update":"employer.interview_response",{notificationEventCode:"job.interview_change_proposed",category:"recruitment",title:"Interview time change proposed",audience:recipient.role_code==="candidate"?undefined:"employer",status:"reschedule_requested",message:"A participant proposed a new interview time. The current schedule remains unchanged until you respond.",nextAction:"Review the proposed time and accept or decline the change.",actionUrl:recipient.role_code==="candidate"?"/track":"/recruitment",actionRequired:true,priority:"high",proposedStart:start.toISOString(),proposedEnd:end.toISOString(),timezone:proposal.timezone},"job_interview",interviewId);
+  return proposal;
+ });
+}
+
+export async function decideInterviewChange(proposalId,userId,input,requestId){
+ return withTransaction(async db=>{
+  const proposal=(await db.query("select cp.*,ji.id interview_id,ji.status interview_status,a.job_id from job_interview_change_proposal cp join job_interview ji on ji.id=cp.interview_id join job_application a on a.id=ji.application_id where cp.id=$1 for update of cp,ji",[proposalId])).rows[0];
+  if(!proposal)throw error(404,"Interview change proposal not found.","NOT_FOUND");
+  if(proposal.status!=="pending"||proposal.interview_status!=="reschedule_requested")throw error(409,"This interview change is no longer awaiting a response.","INVALID_STATE");
+  const participant=(await db.query("select 1 from job_interview_participant where interview_id=$1 and user_id=$2 and user_id<>$3",[proposal.interview_id,userId,proposal.proposed_by])).rows[0];
+  if(!participant)throw error(403,"Only another interview participant may decide this proposal.","FORBIDDEN");
+  const decision=String(input.decision||"");
+  if(!["accepted","declined"].includes(decision))throw error(400,"Choose accept or decline for the proposed schedule change.","VALIDATION_ERROR");
+  const updated=(await db.query("update job_interview_change_proposal set status=$1,decided_by=$2,decided_at=now() where id=$3 returning *",[decision,userId,proposalId])).rows[0];
+  if(decision==="accepted"){
+   await db.query("update job_interview set scheduled_start=$1,scheduled_end=$2,timezone=$3,mode=$4,location_text=$5,meeting_url=$6,status='scheduled',updated_at=now() where id=$7",[proposal.proposed_start,proposal.proposed_end,proposal.timezone,proposal.mode,proposal.location_text,proposal.meeting_url,proposal.interview_id]);
+   await db.query("update job_interview_participant set response_status=case when user_id=any($2::uuid[]) then 'accepted' else 'pending' end where interview_id=$1",[proposal.interview_id,[proposal.proposed_by,userId]]);
+   const pending=(await db.query("select 1 from job_interview_participant where interview_id=$1 and response_status<>'accepted' limit 1",[proposal.interview_id])).rows[0];
+   if(!pending)await db.query("update job_interview set status='confirmed',updated_at=now() where id=$1",[proposal.interview_id]);
+  }else{
+   await db.query("update job_interview set status=$1,updated_at=now() where id=$2",[proposal.previous_status,proposal.interview_id]);
+  }
+  await audit(db,userId,"job.interview_change_decided","job_interview",proposal.interview_id,requestId,{proposalId,decision});
+  const recipients=(await db.query("select user_id,role_code from job_interview_participant where interview_id=$1",[proposal.interview_id])).rows;
+  for(const recipient of recipients)await queueWorkflowEmail(db,recipient.user_id,recipient.role_code==="candidate"?"professional.workflow_update":"employer.interview_response",{notificationEventCode:"job.interview_change_decided",category:"recruitment",title:decision==="accepted"?"Interview time change accepted":"Interview time change declined",audience:recipient.role_code==="candidate"?undefined:"employer",status:decision,message:decision==="accepted"?"The interview time was changed. Participant confirmations have been reset where needed.":"The original interview time remains in place.",nextAction:decision==="accepted"?"Confirm the updated interview time if you are still pending.":"Review the original interview schedule.",actionUrl:recipient.role_code==="candidate"?"/track":"/recruitment",actionRequired:decision==="accepted",priority:"normal"},"job_interview",proposal.interview_id);
+  return updated;
+ });
+}
+
 export async function updateInterviewStatus(interviewId,userId,input,requestId){
  return withTransaction(async db=>{
   const interview=(await db.query("select ji.id,ji.status,a.job_id from job_interview ji join job_application a on a.id=ji.application_id where ji.id=$1 for update",[interviewId])).rows[0];
@@ -914,7 +963,7 @@ export async function listApplicationInterviews(applicationId,userId){
  const a=(await db.query("select applicant_user_id,job_id from job_application where id=$1",[applicationId])).rows[0]; if(!a) throw error(404,"Application not found.","NOT_FOUND");
  let accessRole="candidate";
  if(a.applicant_user_id!==userId){const access=await jobRole(db,a.job_id,userId,["hiring_manager","recruiter","interviewer","observer"]);accessRole=access.role;}
- const rows=(await db.query("select ji.*,coalesce((select json_agg(json_build_object('userId',jp.user_id,'role',jp.role_code,'response',jp.response_status)) from job_interview_participant jp where jp.interview_id=ji.id),'[]'::json) participants from job_interview ji where ji.application_id=$1 order by ji.scheduled_start",[applicationId])).rows;
+ const rows=(await db.query("select ji.*,coalesce((select json_agg(json_build_object('userId',jp.user_id,'role',jp.role_code,'response',jp.response_status)) from job_interview_participant jp where jp.interview_id=ji.id),'[]'::json) participants,coalesce((select json_agg(json_build_object('id',cp.id,'proposedBy',cp.proposed_by,'proposedStart',cp.proposed_start,'proposedEnd',cp.proposed_end,'timezone',cp.timezone,'mode',cp.mode,'locationText',cp.location_text,'meetingUrl',cp.meeting_url,'note',cp.note,'status',cp.status,'createdAt',cp.created_at,'canDecide',cp.proposed_by<>$2) order by cp.created_at desc) from job_interview_change_proposal cp where cp.interview_id=ji.id),'[]'::json) change_proposals from job_interview ji where ji.application_id=$1 order by ji.scheduled_start",[applicationId,userId])).rows;
  return rows.map(row=>({...row,currentUserRole:(row.participants||[]).find(participant=>participant.userId===userId)?.role||accessRole}));
 }
 export async function getMyApplicationProgress(applicationId,userId){

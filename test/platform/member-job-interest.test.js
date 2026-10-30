@@ -1,6 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
+import test from "node:test";
 
 test("member job-interest requests require current active membership and account ownership",async()=>{
  const service=await readFile(new URL("../../src/platform/public-opportunity.js",import.meta.url),"utf8");

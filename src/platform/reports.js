@@ -141,9 +141,15 @@ function wrapPdfLine(value,width=105){
  if(line||!out.length)out.push(line);return out;
 }
 
+function startsWithFormulaPrefix(raw){
+ let index=0;
+ while(index<raw.length&&raw.charCodeAt(index)<=0x20)index+=1;
+ const first=raw[index];
+ return first!==undefined&&"=+-@".includes(first);
+}
 function csvCell(value){
  const raw=value instanceof Date?value.toISOString():String(value??"");
- const safe=typeof value==="string"&&/^[\u0000-\u0020]*[=+\-@]/.test(raw)?"'"+raw:raw;
+ const safe=typeof value==="string"&&startsWithFormulaPrefix(raw)?"'"+raw:raw;
  return '"'+safe.replace(/"/g,'""')+'"';
 }
 export function makeCsv(r){

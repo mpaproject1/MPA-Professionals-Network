@@ -1,15 +1,15 @@
 "use client";
-import {ArrowLeft,Bookmark,HeartHandshake,Languages,RefreshCw} from "lucide-react";
+import { ArrowLeft, Bookmark, HeartHandshake, Languages, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import {useParams} from "next/navigation";
-import {useCallback,useEffect,useState} from "react";
-import {ImpactListingBanner} from "../../../../components/impact-listing-banner";
-import {PublicMediaStories} from "../../../../components/public-media-stories";
-import {useUiStore} from "../../../../lib/store";
+import { useParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { ImpactListingBanner } from "../../../../components/impact-listing-banner";
 import { OperationStatus } from "../../../../components/operation-status";
-import {Badge, Card} from "../../../../components/ui";
-import {ApiError, api} from "../../../../lib/api";
-import {useSavedDiscoveryItems} from "../../../../lib/use-saved-discovery-items";
+import { PublicMediaStories } from "../../../../components/public-media-stories";
+import { Badge, Card } from "../../../../components/ui";
+import { ApiError, api } from "../../../../lib/api";
+import { useUiStore } from "../../../../lib/store";
+import { useSavedDiscoveryItems } from "../../../../lib/use-saved-discovery-items";
 
 type Mentor={id:string;user_id:string;display_name:string;approved_banner_url?:string|null;approved_banner_alt?:string|null;video_url?:string|null;headline?:string|null;bio?:string|null;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number;availability?:{day_of_week:number;start_time:string;end_time:string;timezone:string}[]|string};
 function values(v:unknown):string[]{if(Array.isArray(v))return v.map(String);if(typeof v==="string"){try{const x=JSON.parse(v);if(Array.isArray(x))return x.map(String)}catch{}return v?[v]:[]}return []}

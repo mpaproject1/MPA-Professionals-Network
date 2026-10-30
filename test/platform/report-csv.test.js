@@ -17,3 +17,15 @@ test("CSV export preserves Unicode and raw leading zeroes while neutralizing for
   assert.ok(text.includes("'=HYPERLINK"));
   assert.ok(text.includes('"Name","Reference","Formula"'));
 });
+
+
+test("CSV formula guard neutralizes control whitespace before formula markers", () => {
+  const csv = makeCsv({
+    report: { title: "Formula guard", scope: "test", definition: "A report", columns: ["Value"] },
+    generatedAt: "2026-10-30T00:00:00.000Z",
+    filters: {},
+    totals: { rows: 1 },
+    rows: [{ Value: "\t=1+1" }],
+  });
+  assert.ok(csv.toString("utf8").includes("'\t=1+1"));
+});

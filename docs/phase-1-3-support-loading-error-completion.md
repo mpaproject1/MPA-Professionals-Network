@@ -45,8 +45,10 @@ Branch: `feat/workstream-3-progress-members-workspace`
 
 - All changes were written to the existing PR #18 branch.
 - The focused Node and Playwright tests are authored but **not executed yet** in this pass. Build, lint, TypeScript and browser acceptance therefore remain unverified.
-- CI was not triggered because the workstream's agreed plan is to run the full CI suite at the final validation stage.
-- Earlier Actions runner allocation failures (#560/#561) do not establish that the new tests pass or fail.
+- No manual CI run was initiated. GitHub automatically created PR Quality run #641 after a branch push. All four jobs failed within roughly three seconds with runner ID 0, zero steps and no downloadable logs. This is a runner-allocation failure, not evidence of source/test failure.
+- The latest branch commit was checked separately and had no associated workflow run at the time of verification.
+- The focused Node and Playwright tests have not executed. The runner failure does not establish that they pass or fail.
+- Earlier Actions runner allocation failures (#560/#561) show the same pattern.
 
 ## Safety
 - No auth, permission enforcement, membership lifecycle, organization privacy or API mutation behavior was weakened.

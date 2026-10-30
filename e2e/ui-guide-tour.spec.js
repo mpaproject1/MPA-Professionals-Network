@@ -65,4 +65,21 @@ test.describe("Accessible contextual screen tours",()=>{
   await dialog.getByRole("button",{name:"Skip"}).click();
   await expect(page.getByTestId("guide-overlay")).toHaveCount(0);
  });
+ test("mobile navigation tour targets the visible mobile navigation rather than the hidden desktop bar",async({page})=>{
+  await page.route("**/api/v1/experience/guides**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(globalGuide)}));
+  await page.setViewportSize({width:390,height:844});
+  const guidesLoaded=page.waitForResponse(/\\/api\\/v1\\/experience\\/guides/);
+  await page.goto("/");
+  await guidesLoaded;
+  await page.getByRole("button",{name:"Show me around this screen"}).click();
+  const dialog=page.getByRole("dialog",{name:"Getting around MPA"});
+  await dialog.getByRole("button",{name:"Next"}).click();
+  const visibleNavigation=page.locator('[data-guide-target="main-navigation"]:visible');
+  await expect(visibleNavigation).toHaveCount(1);
+  await expect(visibleNavigation).toBeVisible();
+  await expect(page.locator(".guide-spotlight")).toBeVisible();
+  await expect(dialog).toContainText("Step 2 of 3");
+  await dialog.getByRole("button",{name:"Skip"}).click();
+ });
+
 });

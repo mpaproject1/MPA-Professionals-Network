@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import test, { after } from "node:test";
+import * as membership from "../../src/membership/service.js";
+import * as organizationJobs from "../../src/organization-jobs/service.js";
+import { closePool } from "../../src/platform/db.js";
+import { runReport } from "../../src/platform/reports.js";
+
+async function account(label) {
+  const suffix = randomUUID();
+  const digits = suffix.replace(/\D/g, "").slice(0, 8).padEnd(8, "7");
+  const created = await membership.register({
+    email: "report-scope-" + label + "-" + suffix + "@example.test",
+    password: "ReportScopeP0Password!2026",
+    firstName: "Report",
+    lastName: "Scope" + label,
+    phone: "09" + digits,
+  }, "report-scope-" + label + "-" + suffix);
+  return created.user.id;
+}
+
+test("recruiters and project managers cannot read another organization's recruitment report rows", async t => {
+  if (!process.env.DATABASE_URL) {
+    t.skip("requires the disposable PostgreSQL database configured by PR Quality");
+    return;
+  }
+
+  const suffix = randomUUID().replace(/-/g, "");
+  const ownerA = await account("owner-a");
+  const ownerB = await account("owner-b");
+  const recruiterA = await account("recruiter-a");
+  const projectManagerB = await account("project-manager-b");
+
+  const orgA = await organizationJobs.registerOrganization(ownerA, {
+    legalName: "Report Scope Organization A " + suffix,
+    displayName: "Report Scope A " + suffix,
+  }, "report-scope-org-a-" + suffix);
+  const orgB = await organizationJobs.registerOrganization(ownerB, {
+    legalName: "Report Scope Organization B " + suffix,
+    displayName: "Report Scope B " + suffix,
+  }, "report-scope-org-b-" + suffix);
+
+  await organizationJobs.addOrganizationUser(orgA.id, ownerA, {
+    userId: recruiterA, roleCode: "recruiter",
+  }, "report-scope-recruiter-" + suffix);
+  await organizationJobs.addOrganizationUser(orgB.id, ownerB, {
+    userId: projectManagerB, roleCode: "project_manager",
+  }, "report-scope-project-manager-" + suffix);
+
+  const jobA = await organizationJobs.createJob(orgA.id, ownerA, {
+    title: "Scoped Recruiter Vacancy " + suffix,
+    description: "Integration fixture for recruiter report isolation.",
+  }, "report-scope-job-a-" + suffix);
+  const jobB = await organizationJobs.createJob(orgB.id, ownerB, {
+    title: "Scoped Project Vacancy " + suffix,
+    description: "Integration fixture for project manager report isolation.",
+  }, "report-scope-job-b-" + suffix);
+
+  const recruiterReport = await runReport({
+    sub: recruiterA, roles: ["recruiter"], permissions: [],
+  }, "job-application-funnel", { q: suffix }, "report-scope-run-recruiter-" + suffix);
+  assert.ok(recruiterReport.rows.some(row => row.Job === jobA.title));
+  assert.ok(!recruiterReport.rows.some(row => row.Job === jobB.title),
+    "recruiter must not see another organization's vacancy");
+
+  const projectReport = await runReport({
+    sub: projectManagerB, roles: ["project_manager"], permissions: [],
+  }, "job-application-funnel", { q: suffix }, "report-scope-run-project-" + suffix);
+  assert.ok(projectReport.rows.some(row => row.Job === jobB.title));
+  assert.ok(!projectReport.rows.some(row => row.Job === jobA.title),
+    "project manager must not see another organization's vacancy");
+});
+
+after(async () => { await closePool(); });

@@ -33,7 +33,7 @@ export async function createEthicsCase(reporterId,input={},requestId){
  });
 }
 export async function listMyEthicsCases(userId){
- return (await getPool().query("select id,case_reference,title,category,status,created_at,updated_at,decision,decided_at,case when subject_user_id=$1 then 'respondent' else 'reporter' end relationship,incident_summary,incident_date,location_text,respondent_response_submitted_at from ethics_case where reporter_user_id=$1 or subject_user_id=$1 order by created_at desc limit 100",[userId])).rows;
+ return (await getPool().query("select c.id,c.case_reference,c.title,c.category,c.status,c.created_at,c.updated_at,c.decision,c.decided_at,case when c.subject_user_id=$1 then 'respondent' else 'reporter' end relationship,c.incident_summary,c.incident_date,c.location_text,c.respondent_response_submitted_at,coalesce((select json_agg(json_build_object('id',e.id,'fileObjectId',e.file_object_id,'fileName',f.original_name,'description',e.description,'createdAt',e.created_at) order by e.created_at) from ethics_case_evidence e join file_object f on f.id=e.file_object_id where e.case_id=c.id),'[]'::json) evidence from ethics_case c where c.reporter_user_id=$1 or c.subject_user_id=$1 order by c.created_at desc limit 100",[userId])).rows;
 }
 export async function listEthicsCases(userId,filters={}){
  const db=getPool();await requireEthicsReviewer(db,userId);const userRoles=await roles(db,userId);const isAdmin=userRoles.includes("system_admin");
@@ -47,17 +47,34 @@ export async function listEthicsCases(userId,filters={}){
 export async function getEthicsCase(caseId,userId){
  const db=getPool(),row=(await db.query("select c.*,coalesce(c.subject_name,p.display_name) subject_name,rp.display_name reporter_name,coalesce(c.organization_name,o.display_name) organization_name from ethics_case c left join person p on p.user_id=c.subject_user_id left join person rp on rp.user_id=c.reporter_user_id left join organization o on o.id=c.organization_id where c.id=$1",[caseId])).rows[0];
  if(!row)throw fail(404,"Ethics case not found.","NOT_FOUND");
- const reviewer=await isEthicsReviewer(db,userId),isReporter=row.reporter_user_id===userId,isSubject=row.subject_user_id===userId;
+ const isReporter=row.reporter_user_id===userId,isSubject=row.subject_user_id===userId,reviewer=await isEthicsReviewer(db,userId)&&!isReporter&&!isSubject;
  if(!reviewer&&!isReporter&&!isSubject)throw fail(403,"You are not authorized to view this ethics case.","FORBIDDEN");
  if(reviewer){await assertNoConflict(db,caseId,userId);const userRoles=await roles(db,userId);if(!userRoles.includes("system_admin")&&row.assigned_reviewer_id!==userId&&!(await db.query("select 1 from ethics_case_panel_member where case_id=$1 and reviewer_id=$2 and active=true",[caseId,userId])).rowCount)throw fail(403,"This ethics case is not assigned to you.","ETHICS_CASE_NOT_ASSIGNED");}
- const [reviews,events,conflicts,panel]=await Promise.all([
+ const [reviews,events,conflicts,panel,evidence]=await Promise.all([
   reviewer?db.query("select r.*,p.display_name reviewer_name from ethics_case_review r left join person p on p.user_id=r.reviewer_id where r.case_id=$1 order by r.created_at",[caseId]):Promise.resolve({rows:[]}),
   reviewer?db.query("select e.event_type,e.details,e.created_at,p.display_name actor_name from ethics_case_event e left join person p on p.user_id=e.actor_user_id where e.case_id=$1 order by e.created_at desc limit 100",[caseId]):Promise.resolve({rows:[]}),
   reviewer?db.query("select reviewer_id,reason,resolution,created_at from ethics_case_conflict where case_id=$1",[caseId]):Promise.resolve({rows:[]}),
-  reviewer?db.query("select pm.reviewer_id,pm.active,p.display_name from ethics_case_panel_member pm left join person p on p.user_id=pm.reviewer_id where pm.case_id=$1 order by pm.created_at",[caseId]):Promise.resolve({rows:[]})
+  reviewer?db.query("select pm.reviewer_id,pm.active,p.display_name from ethics_case_panel_member pm left join person p on p.user_id=pm.reviewer_id where pm.case_id=$1 order by pm.created_at",[caseId]):Promise.resolve({rows:[]}),
+  db.query("select e.id,e.file_object_id,f.original_name file_name,e.description,e.added_by,e.created_at from ethics_case_evidence e join file_object f on f.id=e.file_object_id where e.case_id=$1 order by e.created_at",[caseId])
  ]);
- if(!reviewer){const safe={id:row.id,case_reference:row.case_reference,title:row.title,category:row.category,status:row.status,created_at:row.created_at,updated_at:row.updated_at,decision:row.decision,decision_reason:row.decision_reason,outcome_summary:row.outcome_summary};return isSubject?{...safe,incident_summary:row.incident_summary,incident_date:row.incident_date,location_text:row.location_text,respondent_response:row.respondent_response,respondent_response_submitted_at:row.respondent_response_submitted_at}:safe;}
- return {...row,reviews:reviews.rows,events:events.rows,conflicts:conflicts.rows,panel:panel.rows};
+ if(!reviewer){const safe={id:row.id,case_reference:row.case_reference,title:row.title,category:row.category,status:row.status,created_at:row.created_at,updated_at:row.updated_at,decision:row.decision,decision_reason:row.decision_reason,outcome_summary:row.outcome_summary};return {...safe,evidence:evidence.rows,...(isSubject?{incident_summary:row.incident_summary,incident_date:row.incident_date,location_text:row.location_text,respondent_response:row.respondent_response,respondent_response_submitted_at:row.respondent_response_submitted_at}:{})};}
+ return {...row,reviews:reviews.rows,events:events.rows,conflicts:conflicts.rows,panel:panel.rows,evidence:evidence.rows};
+}
+export async function addEthicsCaseEvidence(caseId,userId,input={},requestId){
+ return withTransaction(async db=>{
+  const row=await caseForUpdate(db,caseId),reviewer=await isEthicsReviewer(db,userId),party=row.reporter_user_id===userId||row.subject_user_id===userId;
+  if(reviewer){const userRoles=await roles(db,userId);if(!userRoles.includes("system_admin"))await assertAssigned(db,row,userId,{panel:(await db.query("select 1 from ethics_case_panel_member where case_id=$1 and reviewer_id=$2 and active=true",[caseId,userId])).rowCount>0});}
+  else if(!party)throw fail(403,"You are not authorized to attach evidence to this ethics case.","FORBIDDEN");
+  if(["decided","referred","closed","withdrawn"].includes(row.status))throw fail(409,"Evidence cannot be added after the case is closed.","INVALID_STATE");
+  if(party&&!reviewer&&!["submitted","triage","respondent_response"].includes(row.status))throw fail(409,"Evidence can be submitted only while the case is open for information.","INVALID_STATE");
+  const file=(await db.query("select id from file_object where id=$1 and created_by=$2 and visibility='private'",[input.fileObjectId,userId])).rows[0];
+  if(!file)throw fail(400,"Evidence must be a private file uploaded by your own account.","INVALID_FILE");
+  const description=text(input.description,500);if(description.length<5)throw fail(400,"Provide a short description for this evidence file.","VALIDATION_ERROR");
+  const saved=(await db.query("insert into ethics_case_evidence(case_id,file_object_id,description,added_by) values($1,$2,$3,$4) on conflict(case_id,file_object_id) do nothing returning id,file_object_id,description,created_at",[caseId,file.id,description,userId])).rows[0];
+  if(!saved)throw fail(409,"This file is already attached to the case.","DUPLICATE_EVIDENCE");
+  await event(db,caseId,userId,"evidence_added",{requestId,evidenceId:saved.id});
+  return saved;
+ });
 }
 export async function submitEthicsRespondentResponse(caseId,userId,input={},requestId){
  return withTransaction(async db=>{

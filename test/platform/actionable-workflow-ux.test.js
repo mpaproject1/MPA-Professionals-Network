@@ -266,7 +266,7 @@ test("service listing and no-vacancy job-interest forms recover uncertain create
   assert.ok(servicesPage.includes("providerSaveUncertain"));
   assert.ok(servicesPage.includes("X-Idempotency-Key"));
   assert.ok(interestPage.includes("X-Idempotency-Key"));
-  assert.ok(interestPage.includes("Start another request"));
+  assert.ok(interestPage.includes("Submit job-interest request"));
   assert.ok(interestPage.includes("submissionUncertain"));
 });
 

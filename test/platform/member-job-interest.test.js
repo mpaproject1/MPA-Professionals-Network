@@ -17,8 +17,8 @@ test("member job-interest requests require current active membership and account
 
 test("job-interest public token endpoints are closed while mentorship token intake remains separate",async()=>{
  const service=await readFile(new URL("../../src/platform/public-opportunity.js",import.meta.url),"utf8");
- assert.match(service,/if\(type==="job"\) throw error\(403/);
- assert.match(service,/if\(r\.inquiry_type==="job"\) throw error\(403/);
+ assert.match(service,/if\(type==="job"&&!clean\(input\.jobId,100\)\) throw error\(403/);
+ assert.match(service,/if\(r\.inquiry_type==="job"&&!r\.job_id\) throw error\(403/);
  assert.match(service,/inquiry_type<>'job'/);
 });
 

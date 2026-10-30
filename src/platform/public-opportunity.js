@@ -28,6 +28,7 @@ async function mentorAuthorized(db,mentorUserId,userId){
 export async function createPublicInquiry(input,requestId,identity=null,idempotencyKey=null){
  return withTransaction(async db=>{
   const type=input.inquiryType==="mentorship"?"mentorship":"job";
+  if(type==="job") throw error(403,"Job-interest requests require sign-in and a current active MPA membership.","MEMBERSHIP_REQUIRED");
   if(typeof idempotencyKey!=="string" || !/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
    throw error(400,"This form needs a secure submission key. Reload the form and try again.","IDEMPOTENCY_KEY_REQUIRED");
   const normalized={
@@ -180,6 +181,7 @@ export async function searchMemberJobInterestOrganizations(userId,searchTerm){
 async function getByToken(db,reference,token){
  const r=(await db.query("select i.*,j.title job_title,j.organization_id,mp.user_id mentor_user_id from public_opportunity_inquiry i left join job j on j.id=i.job_id left join mentor_profile mp on mp.user_id=i.preferred_mentor_user_id where i.public_reference=$1 and i.continuation_token_hash=$2",[reference,hashToken(token)])).rows[0];
  if(!r) throw error(404,"Inquiry reference or continuation token is invalid.","NOT_FOUND");
+ if(r.inquiry_type==="job") throw error(403,"Job-interest requests are available only through your authenticated member workspace.","MEMBERSHIP_REQUIRED");
  return r;
 }
 
@@ -208,17 +210,18 @@ export async function updatePublicInquiryDetails(reference,token,input,requestId
  return withTransaction(async db=>{const r=await getByToken(db,reference,token);return saveInquiryDetails(db,r,input,requestId,r.app_user_id||null);});
 }
 export async function listMyLinkedInquiries(userId){
- return (await getPool().query("select i.public_reference reference,i.inquiry_type,i.job_id is not null has_linked_job,j.title job_title,i.status,i.created_at,i.updated_at,i.employer_sharing_consent,i.employer_sharing_organization_id,i.employer_sharing_revoked_at,case when i.status in ('converted','declined','closed') then 'Review the recorded outcome.' when i.employer_sharing_consent=true and i.employer_sharing_revoked_at is null then 'Review sharing history or revoke consent.' else 'Review your saved details or choose whether to share selected fields with one named organization.' end next_action from public_opportunity_inquiry i left join job j on j.id=i.job_id where i.app_user_id=$1 order by i.updated_at desc limit 100",[userId])).rows;
+ return (await getPool().query("select i.public_reference reference,i.inquiry_type,i.job_id is not null has_linked_job,j.title job_title,i.status,i.created_at,i.updated_at,i.employer_sharing_consent,i.employer_sharing_organization_id,i.employer_sharing_revoked_at,case when i.status in ('converted','declined','closed') then 'Review the recorded outcome.' when i.employer_sharing_consent=true and i.employer_sharing_revoked_at is null then 'Review sharing history or revoke consent.' else 'Review your saved details or choose whether to share selected fields with one named organization.' end next_action from public_opportunity_inquiry i left join job j on j.id=i.job_id where i.app_user_id=$1 and i.inquiry_type<>'job' order by i.updated_at desc limit 100",[userId])).rows;
 }
 export async function getLinkedInquiryDetails(reference,userId){
- const r=(await getPool().query("select i.*,j.title job_title from public_opportunity_inquiry i left join job j on j.id=i.job_id where i.public_reference=$1 and i.app_user_id=$2",[reference,userId])).rows[0];
+ const r=(await getPool().query("select i.*,j.title job_title from public_opportunity_inquiry i left join job j on j.id=i.job_id where i.public_reference=$1 and i.app_user_id=$2 and i.inquiry_type<>'job'",[reference,userId])).rows[0];
  if(!r)throw error(404,"No inquiry linked to this account has that reference.","NOT_FOUND");
  return {reference:r.public_reference,inquiryType:r.inquiry_type,jobTitle:r.job_title,hasLinkedJob:Boolean(r.job_id),status:r.status,contactName:r.contact_name,contactEmail:r.contact_email,contactPhone:r.contact_phone,intent:r.intent,details:r.details,employerSharingConsent:r.employer_sharing_consent===true,employerSharingScope:r.employer_sharing_scope,employerSharingOrganizationId:r.employer_sharing_organization_id||null,employerSharingFields:Array.isArray(r.employer_sharing_fields)?r.employer_sharing_fields:JSON.parse(r.employer_sharing_fields||"[]"),employerSharingConsentedAt:r.employer_sharing_consented_at||null,employerSharingRevokedAt:r.employer_sharing_revoked_at||null,nextStep:"This inquiry is linked to your account. Update your details, review sharing history, or revoke consent from this secure workspace."};
 }
 export async function updateLinkedInquiryDetails(reference,userId,input,requestId){
- return withTransaction(async db=>{const r=(await db.query("select * from public_opportunity_inquiry where public_reference=$1 and app_user_id=$2 for update",[reference,userId])).rows[0];if(!r)throw error(404,"No inquiry linked to this account has that reference.","NOT_FOUND");return saveInquiryDetails(db,r,input,requestId,userId);});
+ return withTransaction(async db=>{const r=(await db.query("select * from public_opportunity_inquiry where public_reference=$1 and app_user_id=$2 and inquiry_type<>'job' for update",[reference,userId])).rows[0];if(!r)throw error(404,"No inquiry linked to this account has that reference.","NOT_FOUND");return saveInquiryDetails(db,r,input,requestId,userId);});
 }
 export async function getLinkedSharingHistory(reference,userId){
+ const db=getPool();await requireEligibleJobInterestMember(db,userId);
  const inquiry=(await getPool().query("select id from public_opportunity_inquiry where public_reference=$1 and app_user_id=$2 and inquiry_type='job' and job_id is null",[reference,userId])).rows[0];
  if(!inquiry)throw error(404,"No linked job-seeker demand was found for this account.","NOT_FOUND");
  return (await getPool().query("select s.id share_id,o.display_name,o.legal_name,s.shared_fields,s.shared_at,s.revoked_at,s.revoke_reason from job_seeker_demand_share s join organization o on o.id=s.organization_id where s.inquiry_id=$1 order by s.shared_at desc",[inquiry.id])).rows.map(row=>({shareId:row.share_id,organizationName:row.display_name||row.legal_name,sharedFields:Array.isArray(row.shared_fields)?row.shared_fields:JSON.parse(row.shared_fields||"[]"),sharedAt:row.shared_at,revokedAt:row.revoked_at,revokeReason:row.revoke_reason,status:row.revoked_at?"revoked":"shared"}));
@@ -305,7 +308,7 @@ export async function updateSharingConsent(reference,token,input,requestId){
  return withTransaction(async db=>{const r=await getByToken(db,reference,token);return saveSharingConsentForInquiry(db,r,input,requestId,r.app_user_id||null);});
 }
 export async function updateLinkedSharingConsent(reference,userId,input,requestId){
- return withTransaction(async db=>{const r=(await db.query("select * from public_opportunity_inquiry where public_reference=$1 and app_user_id=$2 for update",[reference,userId])).rows[0];if(!r)throw error(404,"No inquiry linked to this account has that reference.","NOT_FOUND");return saveSharingConsentForInquiry(db,r,input,requestId,userId);});
+ return withTransaction(async db=>{const r=(await db.query("select * from public_opportunity_inquiry where public_reference=$1 and app_user_id=$2 for update",[reference,userId])).rows[0];if(!r)throw error(404,"No inquiry linked to this account has that reference.","NOT_FOUND");if(r.inquiry_type==="job")await requireEligibleJobInterestMember(db,userId);return saveSharingConsentForInquiry(db,r,input,requestId,userId);});
 }
 export async function shareJobSeekerDemand(inquiryId,actorId,input,requestId){
  return withTransaction(async db=>{

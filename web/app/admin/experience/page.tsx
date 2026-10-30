@@ -34,6 +34,7 @@ export default function AdminExperiencePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [failed, setFailed] = useState({ demos: false, guides: false });
+  const currentGuideKeys = new Set(["global-navigation", "member-workspace", "membership-application", "membership-payment"]);
   const [editing, setEditing] = useState<Demo | null>(null);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
@@ -51,7 +52,7 @@ export default function AdminExperiencePage() {
     } else { setFailed(s => ({ ...s, demos: true })); setError(demoResult.reason instanceof Error ? demoResult.reason.message : "Demo scenarios could not be loaded."); }
     if (guideResult.status === "fulfilled") {
       const rows = getRows(guideResult.value, "guides");
-      if (rows) setGuides(rows); else { setFailed(s => ({ ...s, guides: true })); setError(s => s ? s + " Guides returned an unexpected list response." : "Guides returned an unexpected list response."); }
+      if (rows) setGuides(rows.filter((guide: Guide) => currentGuideKeys.has(guide.guide_key))); else { setFailed(s => ({ ...s, guides: true })); setError(s => s ? s + " Guides returned an unexpected list response." : "Guides returned an unexpected list response."); }
     } else { setFailed(s => ({ ...s, guides: true })); setError(s => s ? s + " Guides could not be loaded." : guideResult.reason instanceof Error ? guideResult.reason.message : "Guides could not be loaded."); }
     setLoading(false);
   }, [token, isPlatformAdmin]);

@@ -253,6 +253,25 @@ export default function Track() {
                 <span className="timeline-dot" />
                 <div><b>{item.statusLabel || humanStatus(item.status)}</b><p className="muted">Submitted {dateLabel(item.submittedAt)}</p></div>
               </div>
+              {item.type === "job" && progressErrors[item.id] && <FormFeedback kind="error" message={progressErrors[item.id]} onRetry={() => void load()} retryLabel="Refresh job progress" />}
+              {item.type === "job" && jobProgress[item.id] && <section className="grid" aria-label="Job application details" style={{ gap: 10, marginTop: 12 }}>
+                <div className="case-row"><b>Recruitment history</b>{jobProgress[item.id].events.length ? jobProgress[item.id].events.map((event, index) => <div className="tracker-line" key={index}><span className="timeline-dot" /><div><b>{humanStatus(event.to_status)}</b><p className="muted">{dateLabel(event.created_at, true)}{event.note ? " · " + event.note : ""}</p></div></div>) : <p className="muted">No additional stage events have been recorded yet.</p>}</div>
+                {jobProgress[item.id].interviews.length > 0 && <div className="case-row"><b>Interview schedule</b>{jobProgress[item.id].interviews.map((interview) => {
+                  const candidateParticipant = interview.participants.find((participant) => participant.role === "candidate");
+                  return <div key={interview.id} style={{ display: "grid", gap: 6, marginTop: 10 }}>
+                    <Badge>{humanStatus(interview.status)}</Badge>
+                    <b>{dateLabel(interview.scheduled_start, true)} – {dateLabel(interview.scheduled_end, true)}</b>
+                    <p className="muted">{interview.mode.replaceAll("_", " ")}{interview.timezone ? " · " + interview.timezone : ""}{interview.location_text ? " · " + interview.location_text : ""}</p>
+                    {interview.agenda && <p className="muted">Agenda: {interview.agenda}</p>}
+                    {interview.meeting_url && <a href={interview.meeting_url} target="_blank" rel="noreferrer">Open meeting link</a>}
+                    {candidateParticipant?.response === "pending" && interviewAction !== interview.id && <div className="row" style={{ gap: 8, flexWrap: "wrap" }}><button type="button" className="btn btn-primary" onClick={() => void respondToInterview(interview.id, "accepted")}>Confirm interview</button><button type="button" className="btn btn-ghost" onClick={() => void respondToInterview(interview.id, "declined")}>Decline invitation</button></div>}
+                    {interviewAction === interview.id && <p className="muted" role="status">Saving your interview response…</p>}
+                    {candidateParticipant && candidateParticipant.response !== "pending" && <p className="muted">Your response: {humanStatus(candidateParticipant.response)}</p>}
+                  </div>;
+                })}</div>}
+                {jobProgress[item.id].application.status === "offer" && <div className="case-row"><b>Employment offer</b><p className="muted">{jobProgress[item.id].application.offer?.currency || ""} {jobProgress[item.id].application.offer?.amount ?? "Amount not specified"} · approval: {humanStatus(jobProgress[item.id].application.offer?.approvalStatus || "not required")}</p>{jobProgress[item.id].application.offer?.terms && <p>{jobProgress[item.id].application.offer.terms}</p>}{jobProgress[item.id].application.offer?.approvalStatus === "pending" ? <p className="muted">The offer must be approved by the employer before you can respond.</p> : jobProgress[item.id].application.offer?.approvalStatus === "rejected" ? <p className="muted">This proposed offer was not approved.</p> : <button type="button" className="btn btn-primary" disabled={applicationAction === item.id} onClick={() => void respondToOffer(item.id, "accepted")}>{applicationAction === item.id ? "Saving response…" : "Accept approved offer"}</button>}</div>}
+                {["submitted", "screening", "shortlisted", "interview", "offer", "accepted"].includes(jobProgress[item.id].application.status) && <button type="button" className="btn btn-ghost" disabled={applicationAction === item.id} onClick={() => void respondToOffer(item.id, "withdrawn")}>{applicationAction === item.id ? "Saving response…" : "Withdraw application"}</button>}
+              </section>}
               {action && <div className="row" style={{ marginTop: 12 }}><Link className="btn btn-ghost" href={action.href}>{action.label} <ArrowRight size={15} /></Link></div>}
             </Card>
           );

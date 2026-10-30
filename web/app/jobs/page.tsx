@@ -27,7 +27,7 @@ function queryString(filters:Filters){
  for(const [key,value] of Object.entries(filters)) if(value.trim()) p.set(key,value.trim());
  return p.toString();
 }
-function scopeLabel(scope?:string){return scope==="public"?"Public":scope==="partner_network"?"Member network":scope==="organization_internal"?"Organization only":scope||"Opportunity";}
+function scopeLabel(scope?:string){return scope==="public"?"Public":scope==="mpa_members"?"MPA members":scope==="partner_network"?"Partner network":scope==="organization_internal"?"My organization": "Opportunity";}
 function salary(job:Job){
  if(job.salary_min==null&&job.salary_max==null)return null;
  const money=(n:number|string)=>Number(n).toLocaleString();
@@ -194,7 +194,7 @@ export default function Jobs(){
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Employment type<select value={filters.employmentType} onChange={e=>setFilters({...filters,employmentType:e.target.value})}><option value="">Any employment type</option><option value="full_time">Full-time</option><option value="part_time">Part-time</option><option value="contract">Contract</option><option value="temporary">Temporary</option><option value="internship">Internship</option></select></label>
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Work arrangement<select value={filters.workMode} onChange={e=>setFilters({...filters,workMode:e.target.value})}><option value="">Any work arrangement</option><option value="onsite">On-site</option><option value="hybrid">Hybrid</option><option value="remote">Remote</option></select></label>
          <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Experience level<input value={filters.seniority} onChange={e=>setFilters({...filters,seniority:e.target.value})} placeholder="e.g. entry, mid-level, senior"/></label>
-         <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Scope<select value={filters.postingScope} onChange={e=>setFilters({...filters,postingScope:e.target.value})}><option value="">All opportunities visible to me</option><option value="public">Public opportunities</option><option value="partner_network">MPA and partner network</option><option value="organization_internal">My organization only</option></select></label></div></details>
+         <label style={{display:"grid",gap:6,marginTop:16,fontSize:13,fontWeight:700}}>Scope<select value={filters.postingScope} onChange={e=>setFilters({...filters,postingScope:e.target.value})}><option value="">All opportunities visible to me</option><option value="public">Public opportunities</option><option value="mpa_members">MPA members</option><option value="partner_network">Partner network</option><option value="organization_internal">My organization only</option></select></label></div></details>
          <button className="btn btn-primary" type="submit" disabled={loading} style={{width:"100%",marginTop:18}}>{loading?"Finding matching jobs…":"Apply filters"}</button>
          <button className="btn btn-ghost" type="button" onClick={()=>{setFilters(initialFilters);void loadJobs(initialFilters,0)}} disabled={loading} style={{width:"100%",marginTop:8}}>Clear filters</button>
          <button className="btn btn-ghost" type="button" onClick={()=>void createAlert()} disabled={creatingAlert||loading} style={{width:"100%",marginTop:8}}>{creatingAlert?"Saving alert…":"Save job alert"}</button>

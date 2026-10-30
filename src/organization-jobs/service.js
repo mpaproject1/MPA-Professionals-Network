@@ -458,6 +458,7 @@ const APPLICATION_TRANSITIONS={
 export function allowedApplicationTransition(from,to){ return (APPLICATION_TRANSITIONS[from]||[]).includes(to); }
 export function allowedCandidateResponse(from,to){ return from==="offer"&&to==="accepted" || ["submitted","screening","shortlisted","interview","offer","accepted"].includes(from)&&to==="withdrawn"; }
 export function canRespondToInterview(status){ return ["scheduled","confirmed","reschedule_requested"].includes(status); }
+export function allowedInterviewStatusTransition(from,to){ const transitions={scheduled:["completed","cancelled","no_show"],confirmed:["completed","cancelled","no_show"],reschedule_requested:["scheduled","confirmed","cancelled"]}; return (transitions[from]||[]).includes(to); }
 
 export async function updateCandidate(jobId,applicationId,userId,input,requestId){
   return withTransaction(async db=>{
@@ -807,9 +808,24 @@ export async function respondInterview(interviewId,userId,status,requestId){
   if(!canRespondToInterview(p.interview_status)) throw error(409,"This interview is no longer accepting participant responses.","INVALID_STATE");
   if(!["accepted","declined"].includes(status)) throw error(400,"Invalid interview response.","VALIDATION_ERROR");
   const row=(await db.query("update job_interview_participant set response_status=$1 where interview_id=$2 and user_id=$3 returning *",[status,interviewId,userId])).rows[0];
+  if(status==="accepted"){const pending=(await db.query("select count(*)::int count from job_interview_participant where interview_id=$1 and response_status<>'accepted'",[interviewId])).rows[0]?.count||0;if(Number(pending)===0)await db.query("update job_interview set status='confirmed',updated_at=now() where id=$1 and status='scheduled'",[interviewId]);}
   await audit(db,userId,"job.interview_response","job_interview",interviewId,requestId,{status});
   const otherParticipants=(await db.query("select user_id,role_code from job_interview_participant where interview_id=$1 and user_id<>$2",[interviewId,userId])).rows;
   for(const participant of otherParticipants){const candidate=participant.role_code==="candidate";await queueWorkflowEmail(db,participant.user_id,candidate?"professional.workflow_update":"employer.interview_response",{notificationEventCode:"job.interview_response",category:"recruitment",title:"Interview response received",audience:candidate?undefined:"employer",status,message:`An interview participant ${status} the scheduled interview.`,nextAction:candidate?"Review the interview details and prepare for the meeting.":"Review the interview schedule and coordinate any needed changes.",actionUrl:candidate?"/jobs":"/recruitment",actionRequired:status==="declined",priority:status==="declined"?"high":"normal"},"job_interview",interviewId);}
+  return row;
+ });
+}
+export async function updateInterviewStatus(interviewId,userId,input,requestId){
+ return withTransaction(async db=>{
+  const interview=(await db.query("select ji.id,ji.status,a.job_id from job_interview ji join job_application a on a.id=ji.application_id where ji.id=$1 for update",[interviewId])).rows[0];
+  if(!interview)throw error(404,"Interview not found.","NOT_FOUND");
+  await jobRole(db,interview.job_id,userId,["hiring_manager","recruiter"]);
+  const status=String(input.status||"");
+  if(!allowedInterviewStatusTransition(interview.status,status))throw error(409,"Invalid interview status transition.","INVALID_STATE");
+  const row=(await db.query("update job_interview set status=$1,updated_at=now() where id=$2 returning *",[status,interviewId])).rows[0];
+  await audit(db,userId,"job.interview_status_changed","job_interview",interviewId,requestId,{from:interview.status,to:status});
+  const participants=(await db.query("select user_id,role_code from job_interview_participant where interview_id=$1",[interviewId])).rows;
+  for(const participant of participants)await queueWorkflowEmail(db,participant.user_id,participant.role_code==="candidate"?"professional.workflow_update":"employer.interview_response",{notificationEventCode:"job.interview_status_changed",category:"recruitment",title:"Interview schedule updated",audience:participant.role_code==="candidate"?undefined:"employer",status,message:"The interview status changed to "+status.replaceAll("_"," ")+".",nextAction:status==="completed"?"Review the interview outcome and any follow-up.":status==="cancelled"?"Review the updated recruitment timeline.":"Review the interview details.",actionUrl:participant.role_code==="candidate"?"/track":"/recruitment",actionRequired:false,priority:"normal"},"job_interview",interviewId);
   return row;
  });
 }

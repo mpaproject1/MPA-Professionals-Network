@@ -5,6 +5,7 @@ import {
   allowedCandidateResponse,
   canCandidateAcceptOffer,
   canRespondToInterview,
+  allowedInterviewStatusTransition,
   ELIGIBILITY_RULES,
   isAllowedJobPostingScope,
   isEligibleVerifiedClaimForJobs,
@@ -158,4 +159,13 @@ test("formal applications collect and persist required screening answers across 
   assert.match(page,/answersFor\(job\.id\)/);
   assert.match(page,/Answer each required screening question/);
   for(const type of ["text","number","yes_no","single_choice","multiple_choice"]) assert.match(page,new RegExp('question_type==="'+type+'"'));
+});
+
+test("employer interview status transitions preserve completed and cancelled terminal states",()=>{
+  assert.equal(allowedInterviewStatusTransition("scheduled","completed"),true);
+  assert.equal(allowedInterviewStatusTransition("confirmed","cancelled"),true);
+  assert.equal(allowedInterviewStatusTransition("scheduled","no_show"),true);
+  assert.equal(allowedInterviewStatusTransition("completed","scheduled"),false);
+  assert.equal(allowedInterviewStatusTransition("cancelled","confirmed"),false);
+  assert.equal(allowedInterviewStatusTransition("scheduled","unknown"),false);
 });

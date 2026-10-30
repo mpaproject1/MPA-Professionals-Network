@@ -39,7 +39,7 @@ type PublicInquiry = {
 type JobProgress = {
   application: { id: string; status: string; offer?: { amount?: number | string | null; currency?: string | null; terms?: string | null; approvalStatus?: string | null } };
   events: { from_status?: string | null; to_status: string; note?: string | null; created_at: string }[];
-  interviews: { id: string; scheduled_start: string; scheduled_end: string; timezone?: string; mode: string; location_text?: string | null; meeting_url?: string | null; status: string; agenda?: string | null; participants: { role: string; response: string }[] }[];
+  interviews: { id: string; scheduled_start: string; scheduled_end: string; timezone?: string; mode: string; location_text?: string | null; meeting_url?: string | null; status: string; agenda?: string | null; participants: { role: string; response: string }[]; change_proposals?: { id:string; proposedStart:string; proposedEnd:string; timezone:string; mode:string; locationText?:string|null; meetingUrl?:string|null; note?:string|null; status:string; createdAt:string; canDecide:boolean }[] }[];
 };
 const PAGE_SIZE = 20;
 
@@ -71,6 +71,7 @@ export default function Track() {
   const [progressErrors, setProgressErrors] = useState<Record<string, string>>({});
   const [interviewAction, setInterviewAction] = useState("");
   const [applicationAction, setApplicationAction] = useState("");
+  const [changeDrafts, setChangeDrafts] = useState<Record<string,{start:string;end:string;mode:string;note:string}>>({});
   const [error, setError] = useState("");
   const [copyNotice, setCopyNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -85,6 +86,29 @@ export default function Track() {
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Your interview response could not be confirmed. Refresh the timeline before retrying.");
+    } finally { setInterviewAction(""); }
+  }
+  async function proposeInterviewChange(interviewId: string) {
+    if (!token || interviewAction) return;
+    const draft = changeDrafts[interviewId];
+    if (!draft?.start || !draft?.end) { setError("Choose a proposed start and end time."); return; }
+    setInterviewAction(interviewId); setError("");
+    try {
+      await api("/api/v1/job-interviews/" + encodeURIComponent(interviewId) + "/change-proposals", { method: "POST", body: JSON.stringify({ proposedStart: new Date(draft.start).toISOString(), proposedEnd: new Date(draft.end).toISOString(), timezone: "Africa/Addis_Ababa", mode: draft.mode, note: draft.note.trim() || undefined }) }, token);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Your interview time proposal could not be saved.");
+    } finally { setInterviewAction(""); }
+  }
+  async function decideInterviewChange(proposalId: string, decision: "accepted" | "declined") {
+    if (!token || interviewAction) return;
+    if (decision === "declined" && typeof window !== "undefined" && !window.confirm("Decline the proposed interview time? The original schedule will remain in place.")) return;
+    setInterviewAction(proposalId); setError("");
+    try {
+      await api("/api/v1/job-interview-change-proposals/" + encodeURIComponent(proposalId) + "/decision", { method: "POST", body: JSON.stringify({ decision }) }, token);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Your decision could not be confirmed.");
     } finally { setInterviewAction(""); }
   }
   async function respondToOffer(applicationId: string, status: "accepted" | "withdrawn") {

@@ -29,9 +29,9 @@ export function OperationStatus({ state, title, detail, action, className = "" }
       aria-live={state === "error" ? "assertive" : "polite"}
       aria-busy={state === "loading" ? true : undefined}
     >
-      <span className={`operation-status__icon ${state === "loading" ? "operation-status__icon--moving" : ""}`}>
+      <div className={`operation-status__icon ${state === "loading" ? "operation-status__icon--moving" : ""}`}>
         {state === "loading" ? <BrandedLoader label={title} compact markOnly /> : <Icon size={19} aria-hidden="true" />}
-      </span>
+      </div>
       <span className="operation-status__copy">
         <strong>{title}</strong>
         {detail ? <span>{detail}</span> : null}

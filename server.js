@@ -30,7 +30,7 @@ import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
 import * as supportBot from "./src/platform/support-bot.js";
 import * as userAdmin from "./src/platform/user-admin.js";
 import {beginAdminPasskeyAuthentication, beginAdminPasskeyRegistration, finishAdminPasskeyAuthentication, finishAdminPasskeyRegistration, listAdminPasskeys, recoverAdminPasskey, revokeAdminPasskey} from "./src/platform/webauthn.js";
-import {assertMembershipActivationAccess,assertMembershipReviewAccess,assertMembershipReviewQueueAccess,assertPaymentReversalAccess,assertPaymentVerificationAccess} from "./src/platform/workspace-authorization.js";
+import {assertFinancePaymentQueueAccess,assertMembershipActivationAccess,assertMembershipReviewAccess,assertMembershipReviewQueueAccess,assertPaymentReversalAccess,assertPaymentVerificationAccess} from "./src/platform/workspace-authorization.js";
 import * as marketplaceDemand from "./src/services-mentorship/demand.js";
 import * as mentorshipOperations from "./src/services-mentorship/operations.js";
 import * as organizationMentorshipOffers from "./src/services-mentorship/organization-offers.js";
@@ -538,6 +538,7 @@ const server=http.createServer(async (req,res)=>{
       assertPaymentReversalAccess(identity);
       return ok(res,await membership.reverseMembershipPayment(parts[3],identity.sub,await body(req),requestId),requestId);
     }
+    if(req.method==="GET" && p==="api/v1/finance/membership/payments") { assertFinancePaymentQueueAccess(identity); return ok(res,await membership.listMembershipPaymentsForFinance(),requestId); }
     if(req.method==="GET" && p==="api/v1/review/membership/applications") {
       assertMembershipReviewQueueAccess(identity);
       return ok(res,await membership.listApplicationsForReview(),requestId);

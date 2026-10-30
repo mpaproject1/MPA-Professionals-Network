@@ -23,14 +23,20 @@ const REPORTS=[
 {id:"audit-activity",title:"Administrative audit activity",description:"Administrative actions and outcomes.",category:"Governance",scope:"Restricted audit",sensitive:true,roles:["system_admin","admin"],columns:["When","Actor","Action","Resource","Outcome"],definition:"Operational audit events; metadata is omitted from exports by default."}
 ];
 function fail(status,message,code="REPORT_ERROR"){const e=new Error(message);e.statusCode=status;e.code=code;return e;}
+async function hasRecruitmentReportScope(db,identity){
+ if(!identity?.sub)return false;
+ const result=await db.query("select (exists(select 1 from organization_membership om where om.user_id=$1 and om.status='active' and om.role_code in ('recruiter','project_manager')) or exists(select 1 from job_team_member jt where jt.user_id=$1 and jt.active=true and jt.role_code in ('recruiter','hiring_manager','project_manager'))) allowed",[identity.sub]);
+ return result.rows[0]?.allowed===true;
+}
 export async function listSavedViews(identity){
- const rows=(await getPool().query("select id,report_id,name,filters,created_at,updated_at from report_saved_view where owner_user_id=$1 order by updated_at desc,id",[identity.sub])).rows;
- return rows.filter(row=>REPORTS.some(report=>report.id===row.report_id&&(()=>{try{authorize(identity,report);return true}catch{return false}})())).map(row=>({...row,reportTitle:REPORTS.find(report=>report.id===row.report_id)?.title||row.report_id}));
+ const db=getPool(),scopedRecruitment=await hasRecruitmentReportScope(db,identity);
+ const rows=(await db.query("select id,report_id,name,filters,created_at,updated_at from report_saved_view where owner_user_id=$1 order by updated_at desc,id",[identity.sub])).rows;
+ return rows.filter(row=>REPORTS.some(report=>report.id===row.report_id&&(()=>{try{authorize(identity,report,scopedRecruitment);return true}catch{return false}})())).map(row=>({...row,reportTitle:REPORTS.find(report=>report.id===row.report_id)?.title||row.report_id}));
 }
 export async function saveSavedView(identity,input={},requestId){
  const report=REPORTS.find(row=>row.id===String(input.reportId||""));
  if(!report)throw fail(404,"Choose a report from the current catalogue before saving a view.","REPORT_NOT_FOUND");
- authorize(identity,report);
+ authorize(identity,report,await hasRecruitmentReportScope(getPool(),identity));
  const name=String(input.name||"").trim().slice(0,100);
  if(name.length<1)throw fail(400,"Give this saved view a name.","VIEW_NAME_REQUIRED");
  const filters=cleanFilters(input.filters||{});
@@ -49,13 +55,13 @@ export async function deleteSavedView(identity,viewId,requestId){
   if(!row)throw fail(404,"Saved report view not found.","SAVED_VIEW_NOT_FOUND");
   const report=REPORTS.find(item=>item.id===row.report_id);
   if(!report)throw fail(409,"This saved view references a report that is no longer available.","REPORT_NOT_FOUND");
-  authorize(identity,report);
+  authorize(identity,report,await hasRecruitmentReportScope(db,identity));
   await db.query("delete from report_saved_view where id=$1 and owner_user_id=$2",[viewId,identity.sub]);
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'report.saved_view_deleted','report_saved_view',$2,$3,'success',$4)",[identity.sub,row.id,requestId,JSON.stringify({reportId:row.report_id,name:row.name})]);
   return {id:row.id,deleted:true,nextAction:"The saved view was deleted. The source report data was not changed."};
  });
 }
-function authorize(identity,report){const roles=identity?.roles||[],permissions=identity?.permissions||[];if(!report.roles.some(r=>roles.includes(r))&&!permissions.includes("reports.view"))throw fail(403,"Your account is not authorized to run this report.","REPORT_FORBIDDEN");if(report.sensitive&&!roles.some(r=>["system_admin","admin"].includes(r))&&!(report.id==="payment-reconciliation"&&roles.includes("finance_officer"))&&!permissions.includes("reports.sensitive"))throw fail(403,"This report contains restricted data and requires explicit sensitive-report permission.","SENSITIVE_REPORT_FORBIDDEN");}
+function authorize(identity,report,scopedRecruitment=false){const roles=identity?.roles||[],permissions=identity?.permissions||[];if(!report.roles.some(r=>roles.includes(r))&&!permissions.includes("reports.view")&&!(report.id==="job-application-funnel"&&scopedRecruitment))throw fail(403,"Your account is not authorized to run this report.","REPORT_FORBIDDEN");if(report.sensitive&&!roles.some(r=>["system_admin","admin"].includes(r))&&!(report.id==="payment-reconciliation"&&roles.includes("finance_officer"))&&!permissions.includes("reports.sensitive"))throw fail(403,"This report contains restricted data and requires explicit sensitive-report permission.","SENSITIVE_REPORT_FORBIDDEN");}
 const GROUPINGS={
  "service-listings":["default","category","status","moderation"],
  "service-request-outcomes":["default","status","category","month"],
@@ -69,7 +75,7 @@ function validateGrouping(reportId,groupBy){
  if(!allowed.includes(groupBy||"default"))throw fail(400,"This saved view uses a grouping that is not supported by the selected report.","INVALID_GROUPING");
 }
 function cleanFilters(input={}){const f={from:String(input.from||"").trim(),to:String(input.to||"").trim(),status:String(input.status||"").trim().slice(0,40),q:String(input.q||"").trim().slice(0,100),groupBy:String(input.groupBy||"default").trim().slice(0,30)};const valid=v=>!v||(/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(`${v}T00:00:00Z`)));if(!valid(f.from)||!valid(f.to))throw fail(400,"Dates must use YYYY-MM-DD.","INVALID_DATE");if(f.from&&f.to&&f.from>f.to)throw fail(400,"Start date must be on or before end date.","INVALID_DATE_RANGE");return f;}
-export function listReportCatalogue(identity){return REPORTS.filter(r=>{try{authorize(identity,r);return true}catch{return false}}).map(({id,title,description,category,scope,sensitive,columns,definition})=>({id,title,description,category,scope,sensitive,columns,definition,formats:["csv","pdf","xlsx"]}));}
+export async function listReportCatalogue(identity){const scopedRecruitment=await hasRecruitmentReportScope(getPool(),identity);return REPORTS.filter(r=>{try{authorize(identity,r,scopedRecruitment);return true}catch{return false}}).map(({id,title,description,category,scope,sensitive,columns,definition})=>({id,title,description,category,scope,sensitive,columns,definition,formats:["csv","pdf","xlsx"]}));}
 async function fetchRows(db,id,f,identity){
  const args=[f.from||null,f.to||null,f.status,f.q],_date="($1::date is null or created_at >= $1::date) and ($2::date is null or created_at < ($2::date + interval '1 day'))";
  if(id==="membership-status")return (await db.query("select case when mr.status='active' and mr.start_date<=current_date and mr.end_date is not null and mr.end_date<current_date then 'expired' when mr.status='active' and mr.start_date>current_date then 'not_yet_active' else mr.status end effective_status,mp.name product,count(*)::int members from membership_record mr left join membership_product mp on mp.id=mr.membership_product_id where ($1::date is null or mr.created_at >= $1::date) and ($2::date is null or mr.created_at < ($2::date + interval '1 day')) and ($3='' or (case when mr.status='active' and mr.start_date<=current_date and mr.end_date is not null and mr.end_date<current_date then 'expired' when mr.status='active' and mr.start_date>current_date then 'not_yet_active' else mr.status end)=$3) group by effective_status,mp.name order by mp.name,effective_status",args.slice(0,3))).rows.map(r=>({"Status":r.effective_status,"Product":r.product||"Unspecified","Members":r.members}));
@@ -108,8 +114,9 @@ const REPORT_MEASURES=Object.freeze({
  "support-demand-response":["Requests","Unreviewed"],"reference-import-quality":["Imports"],"platform-usage":["Events"],"audit-activity":[]
 });
 export async function runReport(identity,id,filters={},requestId){
- const report=REPORTS.find(r=>r.id===id);if(!report)throw fail(404,"Report not found.","REPORT_NOT_FOUND");authorize(identity,report);
- const applied=cleanFilters(filters),db=getPool(),rows=await fetchRows(db,id,applied,identity),totals={rows:rows.length};
+ const report=REPORTS.find(r=>r.id===id);if(!report)throw fail(404,"Report not found.","REPORT_NOT_FOUND");
+ const db=getPool(),scopedRecruitment=await hasRecruitmentReportScope(db,identity);authorize(identity,report,scopedRecruitment);
+ const applied=cleanFilters(filters),rows=await fetchRows(db,id,applied,identity),totals={rows:rows.length};
  for(const key of REPORT_MEASURES[id]||[])totals[key]=rows.reduce((sum,row)=>sum+(typeof row[key]==="number"?row[key]:Number(row[key]||0)),0);
  if(id==="payment-reconciliation"){
   const a=[applied.from||null,applied.to||null,applied.status,applied.q];

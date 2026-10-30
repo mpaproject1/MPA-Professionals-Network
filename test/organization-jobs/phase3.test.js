@@ -79,7 +79,9 @@ test("job seeker UX requires deliberate vacancy selection and separates future j
     readFile(new URL("../../web/app/apply/job/page.tsx",import.meta.url),"utf8")
   ]);
   assert.match(jobs,/\/apply\/job\?jobId=\$\{encodeURIComponent\(job\.id\)\}/);
-  assert.match(jobs,/employmentType=\{filters\.employmentType\}/);
+  assert.match(jobs,/employmentType:string/);
+  assert.match(jobs,/value=\{filters\.employmentType\} onChange=\{e=>setFilters\(\{\.\.\.filters,employmentType:e\.target\.value\}\)\}/);
+  assert.match(jobs,/p\.set\(key,value\.trim\(\)\)/);
   assert.match(jobs,/value="full_time">Full-time/);
   assert.match(publicInquiry,/requestedJobId&&list\.some\(job=>job\.id===requestedJobId\)/);
   assert.doesNotMatch(publicInquiry,/if\(list\.length\)setJobId\(list\[0\]\.id\)/);
@@ -155,7 +157,8 @@ test("formal applications collect and persist required screening answers across 
   assert.match(createDraft,/saveScreeningAnswers\(db,app\.id,jobId,input\.answers,false\)/);
   assert.match(updateDraft,/saveScreeningAnswers\(db,applicationId,a\.job_id,input\.answers,false\)/);
   assert.match(screening,/Array\.isArray\(answer\)&&answer\.length===0/);
-  assert.match(service,/screening_answers from job_application_answer/);
+  assert.match(service,/from job_application_answer aa where aa\.application_id=a\.id/);
+  assert.match(service,/\) screening_answers from job_application a/);
   assert.match(page,/screeningQuestions/);
   assert.match(page,/answersFor\(job\.id\)/);
   assert.match(page,/Answer each required screening question/);
@@ -181,7 +184,8 @@ test("employer interview management exposes authorized schedules and completed-i
   ]);
   assert.match(server,/api\/v1\/job-applications\/.*interviews/);
   assert.match(server,/api\/v1\/job-interviews\/.*status/);
-  assert.match(service,/currentUserRole:\(row\.participants\|\|\[\]\)\.find/);
+  assert.match(service,/currentUserRole:canManage\?accessRole:participantRole\|\|accessRole/);
+  assert.match(service,/participants:isApplicant\?/);
   assert.match(service,/INTERVIEW_NOT_COMPLETED/);
   assert.match(page,/View interview schedule/);
   assert.match(page,/Mark completed/);
@@ -219,7 +223,7 @@ test("interview schedule changes are offered only to participants and decisions 
   ]);
   assert.match(service,/isParticipant,isInterviewer:participantRole==="interviewer"/);
   assert.match(service,/currentUserRole:canManage\?accessRole/);
-  assert.match(service,/canDecide:isParticipant&&proposal\.proposedBy!==userId/);
+  assert.match(service,/canDecide:isParticipant&&proposedBy!==userId/);
   assert.match(service,/const isApplicant=a\.applicant_user_id===userId/);
   assert.match(service,/participants:isApplicant\?/);
   assert.match(service,/\!isApplicant\?\{proposedBy\}:\{\}/);

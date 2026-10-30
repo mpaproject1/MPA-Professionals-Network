@@ -370,7 +370,8 @@ test("admin navigation resolves current server roles and separates finance from 
   assert.ok(workspace.includes('api<{ roles?: unknown; permissions?: unknown }>("/api/v1/me"'));
   assert.ok(workspace.includes("const financeOfficer = Boolean"));
   assert.ok(workspace.includes('item.href === "/admin/membership") return membershipReviewer'));
-  assert.ok(workspace.includes('item.href === "/admin/reports") return membershipReviewer || financeOfficer'));
+  assert.ok(workspace.includes('item.href === "/admin/reports") return reportIds.length > 0'));
+  assert.ok(workspace.includes('"/api/v1/admin/reports"'));
   assert.ok(overview.includes('const me = await api<any>("/api/v1/me"'));
   assert.ok(!overview.includes("token.split"));
   assert.ok(workspace.includes('item.href === "/admin/membership/payment-methods") return financeConfig'));

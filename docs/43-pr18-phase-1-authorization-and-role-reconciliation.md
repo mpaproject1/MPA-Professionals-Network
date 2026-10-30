@@ -2,7 +2,7 @@
 
 ## Scope and safety contract
 
-This phase is implemented on \`feat/workstream-3-progress-members-workspace\`. It changes authorization boundaries and role-based workspace discovery only. It does not change membership/payment lifecycle state machines, payment records, migrations, production configuration, or deployment.
+This phase is implemented on \`feat/workstream-3-progress-members-workspace\`. It changes authorization boundaries and role-based workspace discovery only. It does not change membership/payment lifecycle state machines, existing payment records, production configuration, or deployment. One additive migration registers the new permission catalogue entries; it does not assign permissions to users.
 
 The server remains the authority. Navigation visibility is a usability aid and must never be treated as access control.
 
@@ -17,7 +17,7 @@ Membership decisions and finance operations are distinct capabilities:
 | Verify payment | \`finance_officer\`, \`system_admin\` | \`finance.payment.verify\` or legacy \`finance.manage\` | membership reviewer role alone |
 | Reverse payment | \`finance_officer\`, \`system_admin\` | \`finance.payment.reverse\` or legacy \`finance.manage\` | membership reviewer role alone |
 
-The legacy \`finance.manage\` permission remains limited to payment verification/reversal routes. It is not accepted by membership review, activation, or membership review-queue routes. A payment verification event must not activate a membership; the existing activation workflow remains a separate action.
+The legacy \`finance.manage\` permission remains limited to payment verification/reversal routes. It is not accepted by membership review, activation, or membership review-queue routes. A payment verification event must not activate a membership; the existing activation workflow remains a separate action. The additive migration `20261030190000_membership_finance_permission_separation.sql` registers the four explicit permission codes in the existing permission catalogue without assigning them to users.
 
 ## Recruitment report scope
 
@@ -33,7 +33,7 @@ The report contains workflow aggregates only. It does not expose applicant ident
 
 ## Frontend role reconciliation
 
-The admin workspace now resolves roles and explicit permissions from the authenticated \`/api/v1/me\` response instead of relying on stale token claims. Navigation discovery is filtered by the current role/permission set:
+The admin workspace now resolves roles and explicit permissions from the authenticated \`/api/v1/me\` response instead of relying on stale token claims. Navigation discovery is filtered by current role/permission data and by the report catalogue returned from the backend:
 
 - Finance users are offered Reports, not membership decision controls.
 - Membership reviewers are offered membership operations and permitted reports.

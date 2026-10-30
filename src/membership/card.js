@@ -184,25 +184,15 @@ export async function rotateMembershipCardVerification(recordId,actorId,requestI
   });
 }
 export async function verifyMembershipCard(identifier,token){
-  if(typeof identifier!=="string"||identifier.length>100||typeof token!=="string") return {valid:false,status:"invalid",message:"This membership ID could not be verified."};
+  if(typeof identifier!=="string"||!identifier.trim()||identifier.length>100||typeof token!=="string") return {valid:false,status:"invalid",message:"This membership ID could not be verified."};
   const db=getPool();
   const row=(await db.query(`select m.id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,
       p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m join membership_product p on p.id=m.membership_product_id
     join person on person.user_id=m.user_id
-    where m.id=$1 limit 1`,[recordId])).rows[0];
+    where (m.id::text=$1 or upper(m.membership_number)=upper($1)) limit 1`,[identifier.trim()])).rows[0];
   if(!row||!tokenMatches(tokenFor(row.id,row.card_token_version),token))
     return {valid:false,status:"invalid",message:"This membership ID could not be verified."};
   const status=getMembershipCardStatus(row);
-  return {
-    valid:status==="active",
-    status,
-    membershipNumber:row.membership_number,
-    memberName:row.member_name||"MPA Member",
-    membershipType:row.membership_type,
-    startDate:row.start_date,
-    endDate:row.end_date,
-    verifiedAt:new Date().toISOString(),
-    message:status==="active"?"This membership is currently active.":status==="expired"?"This membership is not currently active.":`This membership is ${status}.`
-  };
+  return {valid:status==="active",status,membershipNumber:row.membership_number,memberName:row.member_name||"MPA Member",membershipType:row.membership_type,startDate:row.start_date,endDate:row.end_date,verifiedAt:new Date().toISOString(),message:status==="active"?"This membership is currently active.":status==="expired"?"This membership is not currently active.":`This membership is ${status}.`};
 }

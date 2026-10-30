@@ -63,12 +63,13 @@ export default function JobInterestPage(){
   event.preventDefault();if(busy||!token)return;
   setBusy(true);setError("");setNotice("");
   try{
-   const created=await api<InterestDetail>("/api/v1/me/job-interests",{method:"POST",headers:{"X-Idempotency-Key":requestKey||submissionKey()},body:JSON.stringify({...form,skills,consent:true})},token);
+   const key=requestKey||submissionKey();setRequestKey(key);
+   const created=await api<InterestDetail>("/api/v1/me/job-interests",{method:"POST",headers:{"X-Idempotency-Key":key},body:JSON.stringify({...form,skills,consent:true})},token);
    setRequestKey("");setNotice("Your request was submitted. Reference: "+created.reference+". "+created.nextStep);
    setForm({contactName:"",contactEmail:"",contactPhone:"",targetRole:"",experience:"",location:"",workMode:"",availability:"",intent:""});setSkills([]);setConsent(false);
    await load();await openInterest(created.reference);
    if(shareOptIn&&organizationId){await api("/api/v1/me/job-interests/"+encodeURIComponent(created.reference)+"/sharing-consent",{method:"POST",body:JSON.stringify({employerSharingConsent:true,scope:"named_employer",organizationId,fields:shareFields})},token);}
-  }catch(e){if(!requestKey)setRequestKey(requestKey||submissionKey());setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Your request could not be submitted.");}
+  }catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Your request could not be submitted.");}
   finally{setBusy(false);}
  }
  async function saveConsent(enabled:boolean){

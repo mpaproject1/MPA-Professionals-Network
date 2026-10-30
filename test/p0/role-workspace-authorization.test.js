@@ -437,4 +437,6 @@ test("finance reporting is separate from membership and payment mutation authori
   assert.ok(reports.includes("pt.status='succeeded'"));
   assert.ok(reports.includes("membership_payment_reversal"));
   assert.ok(reports.includes("ma.status in ('approved','payment_pending')"));
+  assert.ok(reports.includes("rows.length>=5000"));
+  assert.ok(reportUi.includes("result.totals.mayBeTruncated===true"));
 });

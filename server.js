@@ -615,6 +615,8 @@ const server=http.createServer(async (req,res)=>{
       return ok(res,await verification.recordCheckResult(parts[4],b.checklistItemId,b,identity.sub,requestId),requestId);
     }
 
+    if(req.method==="GET" && p==="api/v1/review/jobs") { anyRoleOrPermission(identity,["reviewer","system_admin"],["jobs.review"]); return ok(res,await organizationJobs.listJobsForReview(identity.sub),requestId); }
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/review/jobs/") && parts[4]==="decision") { anyRoleOrPermission(identity,["reviewer","system_admin"],["jobs.review"]); return ok(res,await organizationJobs.reviewJob(parts[3],identity.sub,await body(req),requestId),requestId); }
     if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/jobs/") && parts[4]==="eligibility") return ok(res,await organizationJobs.evaluateEligibility(parts[3],identity.sub),requestId);
     if(req.method==="PATCH" && parts.length===4 && p.startsWith("api/v1/jobs/")) return ok(res,await organizationJobs.updateJob(parts[3],identity.sub,await body(req),requestId),requestId);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/jobs/") && parts[4]==="publish") return ok(res,await organizationJobs.publishJob(parts[3],identity.sub,requestId),requestId);

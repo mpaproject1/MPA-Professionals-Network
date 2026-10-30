@@ -366,10 +366,14 @@ test("recruiter and project-manager report access is explicitly scoped to organi
 test("admin navigation resolves current server roles and separates finance from membership controls", () => {
   const workspace = read("web/app/admin/admin-workspace.tsx");
   const overview = read("web/app/admin/page.tsx");
+  const membershipPage = read("web/app/admin/membership/page.tsx");
   assert.match(workspace, /api<\{ roles\?: unknown; permissions\?: unknown \}>\("\\/api\\/v1\\/me"/);
   assert.match(workspace, /const financeOfficer = Boolean/);
   assert.match(workspace, /if \(item\.href === "\\/admin\\/membership"\) return membershipReviewer/);
   assert.match(workspace, /if \(item\.href === "\\/admin\\/reports"\) return membershipReviewer \|\| financeOfficer/);
   assert.match(overview, /const me = await api<any>\\("\\/api\\/v1\\/me"/);
   assert.doesNotMatch(overview, /token\.split\\("\\."\\)/);
+  assert.match(workspace, /item\.href === "\/admin\/membership\/payment-methods"\) return financeOfficer/);
+  assert.doesNotMatch(membershipPage, /\["system_admin", "reviewer", "finance_officer"\]/);
+  assert.match(membershipPage, /"membership\.review"/);
 });

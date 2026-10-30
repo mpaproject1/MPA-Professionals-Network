@@ -37,7 +37,15 @@ async function setMembership(userId, endDate = "current_date+365") {
   );
 }
 
-async function createVerifiedProfessional(label, visibility, showContact = false) {
+async function createReviewer(label) {
+  const db = getPool();
+  const reviewer = await register("reviewer-" + label);
+  const role = (await db.query("select id from app_role where role_code='verification_reviewer'")).rows[0];
+  assert.ok(role, "verification_reviewer role must exist");
+  await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing", [reviewer.user.id, role.id]);
+  return reviewer;
+}
+async function createVerifiedProfessional(label, visibility, reviewerId, showContact = false) {
   const db = getPool();
   const account = await register(label);
   await setMembership(account.user.id);
@@ -62,14 +70,18 @@ async function createVerifiedProfessional(label, visibility, showContact = false
   if (verificationCase.status === "consent_pending") {
     await verification.giveConsent(verificationCase.id, account.user.id, "network-plus-test-v1", `network-plus-consent-${randomUUID()}`);
   }
-  const claim = await verification.addClaim(
-    verificationCase.id,
-    "SERVICE_CAPABILITY",
-    { capability: `Verified ${label} capability` },
-    account.user.id,
-    `network-plus-claim-${randomUUID()}`,
-  );
-  await db.query("update verification_claim set status='verified',verified_at=now(),updated_at=now() where id=$1", [claim.id]);
+  await db.query("update verification_case set assigned_reviewer_id=$1 where id=$2", [reviewerId, verificationCase.id]);
+  await verification.transitionCase(verificationCase.id, "review", reviewerId, "network-plus-review-" + randomUUID());
+  const claim = await verification.addClaim(verificationCase.id, "SERVICE_CAPABILITY", { capability: "Verified " + label + " capability" }, account.user.id, "network-plus-claim-" + randomUUID());
+  await verification.addEvidence(verificationCase.id, {
+    claimId: claim.id,
+    evidenceType: "supporting_document",
+    sourceType: "member",
+    sourceName: "Synthetic discovery-test evidence",
+    sourceReference: "test-reference-" + randomUUID(),
+    notes: "Synthetic evidence fixture used only to establish a verified claim in the disposable test database.",
+  }, account.user.id, "network-plus-evidence-" + randomUUID());
+  await verification.setClaimStatus(claim.id, "verified", reviewerId, "network-plus-verify-" + randomUUID(), verificationCase.id);
   return account;
 }
 
@@ -81,9 +93,10 @@ test("member discovery enforces public, member-only, private, expired-member and
 
   const db = getPool();
   const suffix = randomUUID().replace(/-/g, "");
-  const publicProfessional = await createVerifiedProfessional(`public-${suffix}`, "public");
-  const memberProfessional = await createVerifiedProfessional(`members-${suffix}`, "members");
-  const privateProfessional = await createVerifiedProfessional(`private-${suffix}`, "private");
+  const reviewer = await createReviewer(suffix);
+  const publicProfessional = await createVerifiedProfessional(`public-${suffix}`, "public", reviewer.user.id);
+  const memberProfessional = await createVerifiedProfessional(`members-${suffix}`, "members", reviewer.user.id);
+  const privateProfessional = await createVerifiedProfessional(`private-${suffix}`, "private", reviewer.user.id);
   const activeViewer = await register(`active-viewer-${suffix}`);
   await setMembership(activeViewer.user.id);
   const expiredViewer = await register(`expired-viewer-${suffix}`);
@@ -119,6 +132,7 @@ test("member discovery enforces public, member-only, private, expired-member and
   assert.ok(!ids(expiredResults).includes(memberProfessional.user.id), "expired members lose member-only discovery");
   assert.ok(ids(expiredResults).includes(publicProfessional.user.id), "expired members retain only explicitly public profiles");
   assert.ok(!ids(organizationResults).includes(memberProfessional.user.id), "organization entry eligibility does not silently broaden member-only profile visibility");
+  assert.equal((await resolveNetworkPlusAccess(db, reviewer.user.id)).eligible, false, "a verification reviewer role alone does not grant Network-Plus discovery access");
   assert.ok(ids(organizationResults).includes(publicProfessional.user.id), "organization-context viewers may see explicitly public profiles");
 
   const memberDetail = await talent.getTalent(memberProfessional.user.id, activeViewer.user.id);

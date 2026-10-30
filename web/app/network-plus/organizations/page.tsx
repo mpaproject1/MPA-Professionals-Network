@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { DiscoveryPagination } from "../../../components/discovery-pagination";
 import { OperationStatus } from "../../../components/operation-status";
+import { FormFeedback } from "../../../components/form-feedback";
 import { Badge, Card } from "../../../components/ui";
 import { NetworkPlusAccessGuard } from "../../../components/network-plus-access-guard";
 import { ApiError, api } from "../../../lib/api";
@@ -75,9 +76,9 @@ export default function NetworkPlusOrganizationsPage() {
       <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6">
         <header className="grid gap-3">
           <Link className="btn btn-ghost w-fit" href="/network-plus"><ArrowLeft size={16} aria-hidden="true" /> Back to Network-Plus</Link>
-          <div className="eyebrow">Network-Plus · Verified Member Discovery</div>
+          <div className="eyebrow">Network-Plus · Verified Organization Discovery</div>
           <h1 className="h1">Discover verified organizations.</h1>
-          <p className="muted max-w-3xl">Explore organizations that have completed MPA verification and explicitly opted into Network-Plus discovery. This read-only directory shows approved organization profile fields only; private registration details, verification evidence, contacts and member rosters are not disclosed.</p>
+          <p className="muted max-w-3xl">Explore organizations that have completed MPA verification and explicitly opted into Network-Plus discovery. This read-only directory displays only fields the organization chose to share: its display name, type, description, website and broad location. Private registration details, verification evidence, contacts and member rosters are not disclosed.</p>
         </header>
 
         <Card>
@@ -101,7 +102,7 @@ export default function NetworkPlusOrganizationsPage() {
           </form>
         </Card>
 
-        {error ? <div className="form-error" role="alert">{error}<button className="btn btn-ghost ml-2" type="button" onClick={() => void load(filters, page)}>Retry</button></div> : null}
+        {error ? <div className="grid gap-2"><FormFeedback kind="error" message={error}/><button className="btn btn-ghost w-fit" type="button" onClick={() => void load(filters, page)}>Retry</button></div> : null}
         {loading ? <Card><OperationStatus state="loading" title="Loading verified organizations" detail="Applying Network-Plus eligibility, organization verification and explicit visibility rules." /></Card> : null}
         {!loading && !error && items.length === 0 ? <Card><h2 className="h2">No organizations match these filters</h2><p className="muted mt-1">Only verified organizations that have opted into Network-Plus discovery appear here. Try a broader search or clear the filters.</p><button className="btn btn-primary mt-3" type="button" onClick={() => { setFilters(emptyFilters); void load(emptyFilters, 0); }}>Clear filters and explore</button></Card> : null}
         {!loading && items.length > 0 ? <section className="grid gap-4 md:grid-cols-2" aria-label="Verified organization results">

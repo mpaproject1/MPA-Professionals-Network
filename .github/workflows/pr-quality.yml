@@ -139,7 +139,7 @@ jobs:
           node --test "${TEST_FILES[@]}"
 
   production-build:
-    name: Next.js production build and support widget browser acceptance (no deployment)
+    name: Next.js build, browser acceptance and membership card PDF validation (no deployment)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

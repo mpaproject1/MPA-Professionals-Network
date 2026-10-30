@@ -9,18 +9,15 @@ import { useUiStore } from "../../lib/store";
 
 type Identity = { user_id: string; roles?: string[]; permissions?: string[] };
 type Organization = { id: string; display_name?: string; legal_name?: string; role_code?: string; status?: string };
-type Task = { title: string; detail: string; href: string; roles?: string[]; permissions?: string[]; scopeRoles?: string[]; always?: boolean; icon: typeof Users; group: string };
+type Task = { title: string; detail: string; href: string; roles?: string[]; permissions?: string[]; always?: boolean; icon: typeof Users; group: string };
 const tasks: Task[] = [
  { title: "Member journey", detail: "Profile completion, membership, verification progress and personal requests.", href: "/members", icon: Users, group: "My account" },
  { title: "Professional profile", detail: "Maintain your own professional information and verification evidence.", href: "/profile", icon: FileCheck2, group: "My account" },
  { title: "Mentorship and mentor journey", detail: "Explore mentor and mentee workflows. Mentor eligibility is evaluated from the verified professional profile and mentorship rules, not a platform role.", href: "/mentorship", always: true, icon: Handshake, group: "My account" },
  { title: "Membership review", detail: "Review submitted applications using the existing decision and correction workflow.", href: "/membership", roles: ["reviewer","membership_reviewer","system_admin"], permissions: ["membership.review"], icon: ClipboardCheck, group: "Review queues" },
- { title: "Verification cases", detail: "Review authorized professional evidence, checklists and case decisions.", href: "/verification", roles: ["verification_reviewer","ethics_reviewer","system_admin"], permissions: ["verification.manage"], icon: ShieldCheck, group: "Review queues" },
+ { title: "Verification cases", detail: "Review authorized professional evidence, checklists and case decisions.", href: "/verification", roles: ["verification_reviewer","system_admin"], permissions: ["verification.manage"], icon: ShieldCheck, group: "Review queues" },
  { title: "Independent appeals", detail: "Review verification appeals independently from the original case decision.", href: "/verification", roles: ["appeal_reviewer","system_admin"], permissions: ["verification.manage"], icon: ClipboardCheck, group: "Review queues" },
- { title: "Organization workspace", detail: "Manage applications and organization records within your authorized organization scope.", href: "/organizations", roles: ["organization_representative"], permissions: ["organizations.manage"], scopeRoles: ["organization_admin","organization_owner","owner","admin"], icon: Building2, group: "Organization work" },
- { title: "Recruitment and hiring", detail: "Open job and applicant workflows only for assigned organizations or job teams.", href: "/jobs", roles: [], permissions: ["jobs.manage"], scopeRoles: ["recruiter","hiring_manager","job_manager"], icon: BriefcaseBusiness, group: "Organization work" },
- { title: "Project delivery", detail: "Open project and service work within assigned organization or project scope.", href: "/organizations", roles: [], permissions: ["projects.manage"], scopeRoles: ["project_manager"], icon: Handshake, group: "Organization work" },
- { title: "Read-only organization access", detail: "View organization records without receiving member administration, recruitment or project decision rights.", href: "/organizations", roles: [], permissions: [], scopeRoles: ["read_only","viewer"], icon: Building2, group: "Organization work" },
+ { title: "Organization workspace", detail: "Manage applications and organization records within your authorized organization scope.", href: "/organizations", roles: ["organization_representative"], permissions: ["organizations.manage"], icon: Building2, group: "Organization work" },
  { title: "Finance operations", detail: "Verify payments, record manual receipts, issue vouchers and use finance reports.", href: "/admin/finance", roles: ["finance_officer","system_admin"], permissions: ["finance.view","finance.manage","finance.payment.record"], icon: WalletCards, group: "Platform operations" },
  { title: "Support desk", detail: "Handle support requests and authorized staff-assisted follow-up.", href: "/admin/support", roles: ["supporting_staff","system_admin"], permissions: ["support.manage"], icon: LifeBuoy, group: "Platform operations" },
  { title: "Platform review and moderation", detail: "Open the operational review tools allowed by your current permissions.", href: "/admin", roles: ["reviewer","supporting_staff","admin","system_admin"], permissions: ["reviews.view"], icon: ClipboardCheck, group: "Platform operations" },
@@ -29,8 +26,7 @@ const tasks: Task[] = [
 function allowed(task: Task, identity: Identity, organizations: Organization[]) {
  const roles = identity.roles || [], permissions = identity.permissions || [];
  const platformAccess = Boolean(task.roles?.some(role => roles.includes(role)) || task.permissions?.some(permission => permissions.includes(permission)));
- const scopedAccess = Boolean(task.scopeRoles?.some(role => organizations.some(org => String(org.role_code || "").toLowerCase() === role)));
- return Boolean(task.always) || platformAccess || scopedAccess;
+ return Boolean(task.always) || platformAccess;
 }
 export default function RoleWorkspacesPage() {
  const token = useUiStore(state => state.token), hydrated = useUiStore(state => state.hydrated), hydrateToken = useUiStore(state => state.hydrateToken);

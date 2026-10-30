@@ -67,6 +67,7 @@ export async function getMyMembershipCard(userId){
     membershipNumber:row.membership_number,
     memberName:row.member_name||"MPA Member",
     membershipType:row.membership_type,
+    renewalRequired:Boolean(row.renewal_required),
     status:getMembershipCardStatus(row),
     startDate:row.start_date,
     endDate:row.end_date,

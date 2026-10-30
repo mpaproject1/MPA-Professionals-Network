@@ -83,6 +83,100 @@ export async function createPublicInquiry(input,requestId,identity=null,idempote
   return {...inserted,publicReference:inserted.public_reference,continuationToken:idempotencyKey,replayed:false,nextStep:inquiryNextStep(inserted.status)};
  });
 }
+
+async function requireEligibleJobInterestMember(db,userId){
+ const eligible=(await db.query(`
+  select 1
+  from app_user u
+  join membership_record mr on mr.user_id=u.id
+  where u.id=$1 and u.status='active'
+    and mr.status='active'
+    and mr.start_date<=current_date
+    and (mr.end_date is null or mr.end_date>=current_date)
+  order by mr.end_date desc nulls first
+  limit 1
+ `,[userId])).rows[0];
+ if(!eligible) throw error(403,"A current, active MPA membership is required to submit or track job interest. Check your membership status or application, or contact MPA Support Desk.","MEMBERSHIP_REQUIRED");
+}
+function memberJobInterestPayload(r){
+ return {reference:r.public_reference,inquiryType:"job",hasLinkedJob:false,status:r.status,createdAt:r.created_at,updatedAt:r.updated_at,
+  employerSharingConsent:r.employer_sharing_consent===true,employerSharingScope:r.employer_sharing_scope,
+  employerSharingOrganizationId:r.employer_sharing_organization_id||null,
+  employerSharingFields:Array.isArray(r.employer_sharing_fields)?r.employer_sharing_fields:JSON.parse(r.employer_sharing_fields||"[]"),
+  employerSharingConsentedAt:r.employer_sharing_consented_at||null,employerSharingRevokedAt:r.employer_sharing_revoked_at||null,
+  details:r.details,intent:r.intent,contactName:r.contact_name,contactEmail:r.contact_email,contactPhone:r.contact_phone,
+  nextStep:inquiryNextStep(r.status)};
+}
+export async function createMemberJobInterest(userId,input,requestId,idempotencyKey){
+ if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))
+  throw error(400,"A secure submission key is required. Please retry the submission.","IDEMPOTENCY_KEY_REQUIRED");
+ return withTransaction(async db=>{
+  await requireEligibleJobInterestMember(db,userId);
+  const normalized={type:"job",identityId:userId,contactName:clean(input.contactName,200),contactEmail:clean(input.contactEmail,320),contactPhone:clean(input.contactPhone,80),intent:clean(input.intent,2000)||"I would like to be considered for relevant opportunities.",consent:input.consent===true,
+   details:{targetRole:clean(input.targetRole,500),skills:Array.isArray(input.skills)?input.skills.map(x=>clean(x,120)).filter(Boolean).slice(0,30):[],experience:clean(input.experience,3000),location:clean(input.location,300),workMode:clean(input.workMode,100),availability:clean(input.availability,500)}};
+  if(!normalized.contactName)throw error(400,"Enter your name before submitting the request.","VALIDATION_ERROR");
+  if(!normalized.contactEmail&&!normalized.contactPhone)throw error(400,"Provide an email address or phone number.","VALIDATION_ERROR");
+  if(!normalized.consent)throw error(400,"Consent is required before submitting a job-interest request.","CONSENT_REQUIRED");
+  const idempotencyHash=hashToken(idempotencyKey),fingerprint=hashPayload(normalized);
+  const existing=(await db.query("select * from public_opportunity_inquiry where submission_idempotency_hash=$1 for update",[idempotencyHash])).rows[0];
+  if(existing){
+   if(existing.idempotency_request_hash!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new request before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
+   return {...memberJobInterestPayload(existing),replayed:true};
+  }
+  const continuationSecret=randomBytes(32).toString("base64url");
+  const continuationHash=hashToken(continuationSecret);
+  let inserted=null;
+  for(let attempt=0;attempt<5&&!inserted;attempt++){
+   const serial=(await db.query("select to_char(current_date,'YYYYMMDD') date_value,nextval('application_tracking_reference_seq')::text serial_value")).rows[0];
+   const reference=`MPA-JI-${serial.date_value}-${String(serial.serial_value).padStart(6,"0")}`;
+   inserted=(await db.query(`insert into public_opportunity_inquiry(inquiry_type,public_reference,continuation_token_hash,idempotency_request_hash,submission_idempotency_hash,contact_name,contact_email,contact_phone,intent,consent,app_user_id,details)
+    values('job',$1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10::jsonb)
+    on conflict do nothing returning *`,[reference,continuationHash,fingerprint,idempotencyHash,normalized.contactName,normalized.contactEmail,normalized.contactPhone,normalized.intent,userId,JSON.stringify(normalized.details)])).rows[0];
+   if(!inserted){
+    const replay=(await db.query("select * from public_opportunity_inquiry where submission_idempotency_hash=$1 for update",[idempotencyHash])).rows[0];
+    if(replay){if(replay.idempotency_request_hash!==fingerprint)throw error(409,"This submission key was already used for different information.","IDEMPOTENCY_KEY_CONFLICT");return {...memberJobInterestPayload(replay),replayed:true};}
+   }
+  }
+  if(!inserted)throw error(503,"A request reference could not be generated. Please retry using the same submission.","REFERENCE_GENERATION_FAILED");
+  await audit(db,userId,"job_interest.submitted","public_opportunity_inquiry",inserted.id,requestId,{inquiryType:"job"});
+  return {...memberJobInterestPayload(inserted),replayed:false};
+ });
+}
+export async function listMyMemberJobInterests(userId){
+ const db=getPool();await requireEligibleJobInterestMember(db,userId);
+ return (await db.query(`select i.public_reference reference,i.status,i.created_at,i.updated_at,i.employer_sharing_consent,
+  i.employer_sharing_revoked_at,
+  case when i.status in ('converted','declined','closed') then 'Review the recorded outcome.'
+   when i.employer_sharing_consent=true and i.employer_sharing_revoked_at is null then 'Review sharing history or revoke consent.'
+   else 'Your request remains private unless you explicitly consent to named-employer sharing.' end next_action
+  from public_opportunity_inquiry i where i.app_user_id=$1 and i.inquiry_type='job' and i.job_id is null
+  order by i.updated_at desc limit 100`,[userId])).rows;
+}
+export async function getMyMemberJobInterest(reference,userId){
+ const db=getPool();await requireEligibleJobInterestMember(db,userId);
+ const r=(await db.query("select * from public_opportunity_inquiry where public_reference=$1 and app_user_id=$2 and inquiry_type='job' and job_id is null",[reference,userId])).rows[0];
+ if(!r)throw error(404,"No job-interest request with that reference belongs to your account.","NOT_FOUND");
+ return memberJobInterestPayload(r);
+}
+export async function updateMyMemberJobInterestConsent(reference,userId,input,requestId){
+ return withTransaction(async db=>{
+  await requireEligibleJobInterestMember(db,userId);
+  const r=(await db.query("select * from public_opportunity_inquiry where public_reference=$1 and app_user_id=$2 and inquiry_type='job' and job_id is null for update",[reference,userId])).rows[0];
+  if(!r)throw error(404,"No job-interest request with that reference belongs to your account.","NOT_FOUND");
+  return saveSharingConsentForInquiry(db,r,input,requestId,userId);
+ });
+}
+export async function getMyMemberJobInterestSharingHistory(reference,userId){
+ const db=getPool();await requireEligibleJobInterestMember(db,userId);
+ const inquiry=(await db.query("select id from public_opportunity_inquiry where public_reference=$1 and app_user_id=$2 and inquiry_type='job' and job_id is null",[reference,userId])).rows[0];
+ if(!inquiry)throw error(404,"No job-interest request with that reference belongs to your account.","NOT_FOUND");
+ return (await db.query("select s.id share_id,o.display_name,o.legal_name,s.shared_fields,s.shared_at,s.revoked_at,s.revoke_reason from job_seeker_demand_share s join organization o on o.id=s.organization_id where s.inquiry_id=$1 order by s.shared_at desc",[inquiry.id])).rows.map(row=>({shareId:row.share_id,organizationName:row.display_name||row.legal_name,sharedFields:Array.isArray(row.shared_fields)?row.shared_fields:JSON.parse(row.shared_fields||"[]"),sharedAt:row.shared_at,revokedAt:row.revoked_at,revokeReason:row.revoke_reason,status:row.revoked_at?"revoked":"shared"}));
+}
+export async function searchMemberJobInterestOrganizations(userId,searchTerm){
+ await requireEligibleJobInterestMember(getPool(),userId);
+ return searchPublicSharingOrganizations(searchTerm);
+}
+
 async function getByToken(db,reference,token){
  const r=(await db.query("select i.*,j.title job_title,j.organization_id,mp.user_id mentor_user_id from public_opportunity_inquiry i left join job j on j.id=i.job_id left join mentor_profile mp on mp.user_id=i.preferred_mentor_user_id where i.public_reference=$1 and i.continuation_token_hash=$2",[reference,hashToken(token)])).rows[0];
  if(!r) throw error(404,"Inquiry reference or continuation token is invalid.","NOT_FOUND");

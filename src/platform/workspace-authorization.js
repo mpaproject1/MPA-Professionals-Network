@@ -19,6 +19,10 @@ export function assertMembershipReviewQueueAccess(identity) {
   return assertAccess(identity, MEMBERSHIP_DECISION_ROLES, ["membership.review", "members.view"], "Membership review queue permission required.");
 }
 
+export function assertFinancePaymentQueueAccess(identity) {
+  return assertAccess(identity, ["finance_officer", "system_admin"], ["finance.view", "finance.payment.verify", "finance.payment.reverse", "finance.manage"], "Finance payment queue permission required.");
+}
+
 export function assertPaymentVerificationAccess(identity) {
   return assertAccess(identity, ["finance_officer", "system_admin"], ["finance.payment.verify", "finance.manage"], "Finance payment verification permission required.");
 }

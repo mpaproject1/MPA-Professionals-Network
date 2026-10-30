@@ -32,11 +32,11 @@ Branch: `feat/workstream-3-progress-members-workspace`
 8. registration after successful verification;
 9. registration without a valid token.
 
-The Playwright tests stub HTTP responses to exercise the browser flow and request/response contracts. They are not a substitute for running the backend against PostgreSQL; the security service's real persistence, concurrency and single-use behavior must still be exercised by the complete backend CI suite.
+The Playwright tests stub HTTP responses to exercise the browser flow and request/response contracts. A separate PostgreSQL integration suite now exercises actual challenge issuance, correct and incorrect answers, ten persisted failed attempts, expiry, single-use token consumption, and missing-token rejection against the migrated CI database.
 
 ## Validation status
 
 - Source changes are committed to PR #18.
-- The new Playwright suite and the complete PR Quality workflow have not been executed in this implementation pass.
+- The Playwright suite and PostgreSQL integration tests are authored but have not been executed in this implementation pass. The complete PR Quality workflow has not been run to completion on this head.
 - Do not treat the E2E assertions as passed until an Actions runner actually executes them.
 - No database migration, production database change, deployment, or change to email verification, membership, identity, or authorization behavior was made.

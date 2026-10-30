@@ -10,8 +10,8 @@ export default function NetworkPlusPage() {
           <div className="eyebrow">MPA Professionals Network · Network-Plus</div>
           <h1 className="h1">Build meaningful professional connections.</h1>
           <p className="muted max-w-3xl">
-            Discover verified MPA professionals and build connections around expertise and
-            professional collaboration. Organization and business discovery are being introduced in separate steps.
+            Discover verified MPA professionals and organizations that have completed verification
+            and explicitly opted into Network-Plus discovery. Business discovery remains a separate later increment.
           </p>
         </header>
 

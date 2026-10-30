@@ -130,3 +130,9 @@ export async function searchFinanceOrganizations(identity,q=""){
   const rows=await getPool().query("select id,display_name from organization where display_name ilike $1 order by display_name limit 15",["%"+term+"%"]);
   return rows.rows.map(row=>({organizationId:row.id,label:row.display_name}));
 }
+
+export async function searchFinancePayers(identity,q=""){
+  assertFinance(identity,"finance.view");const term=clean(q,100);if(term.length<2)return [];
+  const rows=await getPool().query("select u.id,u.email,coalesce(nullif(p.display_name,''),concat_ws(' ',p.first_name,p.middle_name,p.last_name),u.email) display_name from app_user u left join person p on p.user_id=u.id where u.status='active' and (u.email ilike $1 or p.display_name ilike $1 or concat_ws(' ',p.first_name,p.middle_name,p.last_name) ilike $1) order by display_name limit 15",["%"+term+"%"]);
+  return rows.rows.map(row=>({userId:row.id,label:row.display_name,email:row.email}));
+}

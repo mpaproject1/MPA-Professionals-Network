@@ -16,7 +16,7 @@ Adds a finance-owned ledger for manual receipts from members, organizations, spo
 Payer type/name/email/phone, optional linked user, organization name, amount/currency, purpose, payment method/date, bank name/reference, external reference, private evidence file, notes, recording actor, verification actor/time/note and voucher state.
 
 ## Important schema limitation
-Organization attribution is preserved as an organization-name snapshot rather than a foreign key because this migration is additive and does not assume one organization table/key contract. User attribution is relational and validated against an active app_user. An organization foreign key should be added only after confirming the canonical organization identity model; no fake organization/user records are created.
+Organization attribution supports an optional foreign key to the canonical organization table, with the display name retained as a historical snapshot. The service validates the selected organization before linking it. User attribution is relational and validated against an active app_user. If no match exists, finance can enter the payer details manually; no fake organization or user records are created.
 
 ## Delivery status
 This is source/schema implementation only. Migration is not applied to any database and no deployment is performed. Run full PR Quality (including migration compatibility, PostgreSQL integration, Biome, TypeScript, build and browser acceptance) before considering ready.

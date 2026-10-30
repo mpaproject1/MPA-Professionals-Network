@@ -540,6 +540,8 @@ const server=http.createServer(async (req,res)=>{
       assertPaymentReversalAccess(identity);
       return ok(res,await membership.reverseMembershipPayment(parts[3],identity.sub,await body(req),requestId),requestId);
     }
+    if(req.method==="GET" && p==="api/v1/finance/payer-search") { const identity=await auth(req); return ok(res,await financeReceipts.searchFinancePayers(identity,query(req.url).get("q")||""),requestId); }
+    if(req.method==="GET" && p==="api/v1/finance/organization-search") { const identity=await auth(req); return ok(res,await financeReceipts.searchFinanceOrganizations(identity,query(req.url).get("q")||""),requestId); }
     if(req.method==="GET" && p==="api/v1/finance/receipts") { const identity=await auth(req),q=query(req.url); return ok(res,await financeReceipts.listManualFinancePayments(identity,{q:q.get("q")||"",status:q.get("status")||"",limit:q.get("limit")||50,offset:q.get("offset")||0}),requestId); }
     if(req.method==="POST" && p==="api/v1/finance/receipts") { const identity=await auth(req); return ok(res,await financeReceipts.recordManualFinancePayment(identity,await body(req),requestId),requestId,201); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/finance/receipts/") && parts[5]==="decision") { const identity=await auth(req); return ok(res,await financeReceipts.decideManualFinancePayment(identity,parts[4],await body(req),requestId),requestId); }

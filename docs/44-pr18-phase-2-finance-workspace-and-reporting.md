@@ -28,7 +28,7 @@ The existing 18 reports are preserved. Five finance reports are added, bringing 
 | Report | Definition |
 | --- | --- |
 | Approved membership payments | Currently succeeded membership transactions only; excludes failed, pending and refunded/reversed transactions. |
-| Failed, refunded and reversed payments | Failed transactions are distinguished from refund/reversal outcomes. Reversal type and reason come from the reversal record. |
+| Failed, refunded and reversed payments | Failed transactions are distinguished from refund/reversal outcomes and successful payments with a disputed reconciliation state. Reversal type and reason come from the reversal record. |
 | Membership collections by currency | Gross verified includes succeeded plus refunded transactions; refunds/reversals are shown separately; net collected equals currently succeeded, non-reversed transactions. |
 | Outstanding membership payments | Approved/payment_pending applications without a currently succeeded, non-reversed linked payment. Amount/currency come from the immutable fee snapshot. |
 | Finance summary by currency | Period summary of collections, failures, refunds/reversals, reconciliation and outstanding balances, with each currency kept separate. |
@@ -47,7 +47,9 @@ The existing payment reconciliation report is also corrected:
 - **Refunds/reversals:** amount from transactions currently `refunded`.
 - **Net collected:** amount from currently `succeeded`, non-reversed transactions. This is not a cross-currency grand total.
 - **Matched:** currently succeeded, non-reversed transactions with latest reconciliation status `matched`.
-- **Unreconciled:** currently succeeded, non-reversed transactions whose latest reconciliation status is not `matched`, including absent reconciliation records.
+- **Unreconciled:** currently succeeded, non-reversed transactions whose latest reconciliation status is `unreconciled` or absent.
+- **Disputed:** currently succeeded, non-reversed transactions whose latest reconciliation status is `disputed`. Refunded/reversed transactions remain in the refund/reversal category rather than being double-counted as disputed.
+- **Written off:** currently succeeded, non-reversed transactions whose latest reconciliation status is `written_off`.
 - **Outstanding:** applications in `approved` or `payment_pending` with no currently succeeded, non-reversed linked payment. A refunded transaction does not settle the balance.
 
 Payment reporting periods use verification/completion timestamps where available, falling back to transaction creation time. Outstanding applications use application creation time. All amount summaries are grouped by currency; no FX conversion or cross-currency summation is inferred.
@@ -67,7 +69,7 @@ Payment reporting periods use verification/completion timestamps where available
 - Finance Officer can discover and execute finance reports but cannot access the member directory.
 - Membership reviewer with generic `reports.view` cannot discover or execute restricted finance reports.
 - Finance report execution is exercised against the disposable PostgreSQL database as part of the report query matrix.
-- Finance report rows are checked for applicant contact identity fields.
+- Finance report rows are checked for applicant contact identity fields. PostgreSQL fixtures verify a matched ETB collection, an unreconciled USD collection, a disputed USD payment, failed and refunded ETB transactions, and outstanding balances across both currencies.
 - Existing PDF/XLSX empty-state, export-format and report-filter tests remain in place.
 - Permission migration tests assert that `finance.view` is registered without assigning it to accounts.
 

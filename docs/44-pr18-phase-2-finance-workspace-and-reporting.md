@@ -69,7 +69,7 @@ Payment reporting periods use verification/completion timestamps where available
 - Finance Officer can discover and execute finance reports but cannot access the member directory.
 - Membership reviewer with generic `reports.view` cannot discover or execute restricted finance reports.
 - Finance report execution is exercised against the disposable PostgreSQL database as part of the report query matrix.
-- Finance report rows are checked for applicant contact identity fields. PostgreSQL fixtures verify a matched ETB collection, an unreconciled USD collection, a disputed USD payment, failed and refunded ETB transactions, and outstanding balances across both currencies.
+- Finance report rows are checked for applicant contact identity fields. Regression coverage also asserts the 5,000-row cap is disclosed rather than silently presenting a potentially incomplete detail export. PostgreSQL fixtures verify a matched ETB collection, an unreconciled USD collection, a disputed USD payment, failed and refunded ETB transactions, and outstanding balances across both currencies.
 - Existing PDF/XLSX empty-state, export-format and report-filter tests remain in place.
 - Permission migration tests assert that `finance.view` is registered without assigning it to accounts.
 

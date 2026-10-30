@@ -779,8 +779,9 @@ export async function addJobTeamMember(jobId,userId,input,requestId){
   const orgMember=(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[j.organization_id,input.userId])).rows[0];
   if(!orgMember) throw error(400,"Job-team members must belong to the organization.","ORGANIZATION_SCOPE");
   if(!["hiring_manager","recruiter","interviewer","approver","observer"].includes(input.roleCode)) throw error(400,"Invalid job-team role.","VALIDATION_ERROR");
+  const reason=String(input.reason||"").trim().slice(0,500); if(reason.length<8)throw error(400,"Provide an assignment reason of at least 8 characters.","AUDIT_REASON_REQUIRED");
   const row=(await db.query("insert into job_team_member(job_id,user_id,role_code,added_by) values($1,$2,$3,$4) on conflict(job_id,user_id,role_code) do update set active=true returning *",[jobId,input.userId,input.roleCode,userId])).rows[0];
-  await audit(db,userId,"job.team_member_added","job_team_member",row.id,requestId,{roleCode:input.roleCode});
+  await audit(db,userId,"job.team_member_added","job_team_member",row.id,requestId,{roleCode:input.roleCode,reason});
   return row;
  });
 }

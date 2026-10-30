@@ -90,11 +90,13 @@ test.describe("Network-Plus discovery acceptance", () => {
   test("organization discovery keeps keyboard focus order and server errors separate from empty results", async ({ page }) => {
     await mockNetworkPlus(page);
     await page.goto("/network-plus/organizations");
+    await expect(page.getByRole("heading", { name: "Verified Community Health Network" })).toBeVisible();
     const backLink = page.getByRole("link", { name: "Back to Network-Plus" });
     await backLink.focus();
     await page.keyboard.press("Tab");
     await expect(page.getByLabel("Organization name or description")).toBeFocused();
 
+    await expect(page.getByRole("heading", { name: "Verified Community Health Network" })).toBeVisible();
     await page.unroute("**/api/v1/network-plus/organizations*");
     await page.route("**/api/v1/network-plus/organizations*", route => route.fulfill({
       status: 503, contentType: "application/json",

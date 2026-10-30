@@ -102,3 +102,20 @@ test("candidate pipeline mutations use the same job-scoped team authorization as
   assert.doesNotMatch(list,/orgRole\(db,j\.organization_id,userId,CANDIDATE_ROLES\)/);
   assert.doesNotMatch(update,/orgRole\(db,j\.organization_id,userId,CANDIDATE_ROLES\)/);
 });
+
+test("applicant progress exposes interview and offer actions without internal reviewer notes or participant identifiers",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const [service,tracking,server]=await Promise.all([
+    readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8"),
+    readFile(new URL("../../web/app/track/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../../server.js",import.meta.url),"utf8")
+  ]);
+  const progress=service.slice(service.indexOf("export async function getMyApplicationProgress"),service.indexOf("export async function listApplicationAttachments"));
+  assert.match(server,/api\/v1\/job-applications\/.*progress/);
+  assert.match(progress,/events:events\.map\(\(\{from_status,to_status,created_at\}\)/);
+  assert.match(progress,/participants:\(interview\.participants\|\|\[\]\)\.map\(\(\{role,response\}\)/);
+  assert.match(tracking,/Confirm interview/);
+  assert.match(tracking,/Accept approved offer/);
+  assert.match(tracking,/Withdraw application/);
+  assert.match(tracking,/job-applications\/.*\/progress/);
+});

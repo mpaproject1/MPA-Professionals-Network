@@ -1,3 +1,11 @@
+function parseBoolean(value, fallback) {
+  if (value === undefined || value === null || String(value).trim() === "") return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  throw new Error("HUMAN_CHALLENGE_REQUIRED must be true or false.");
+}
+
 function firstConfigured(...values) {
   return values.map(value => String(value ?? "").trim()).find(Boolean) ?? "";
 }
@@ -14,7 +22,8 @@ export function loadConfig(env = process.env) {
     bootstrapAdminPassword: firstConfigured(env.BOOTSTRAP_SUPER_ADMIN_PASSWORD, env.BOOTSTRAP_ADMIN_PASSWORD),
     bootstrapAdminName: firstConfigured(env.BOOTSTRAP_ADMIN_NAME) || "System Administrator",
     corsOrigin: env.CORS_ORIGIN ?? "",
-    databaseUrl: firstConfigured(env.DATABASE_URL)
+    databaseUrl: firstConfigured(env.DATABASE_URL),
+    humanChallengeRequired: parseBoolean(env.HUMAN_CHALLENGE_REQUIRED, (env.NODE_ENV ?? "development") === "production")
   };
   if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535) throw new Error("PORT must be a valid TCP port.");
   if (config.nodeEnv === "production" && (!config.jwtSecret || config.jwtSecret.length < 32)) throw new Error("JWT_SECRET must be at least 32 characters in production.");

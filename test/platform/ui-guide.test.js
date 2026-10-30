@@ -6,6 +6,7 @@ test("screen tour uses accessible non-blocking controls and stable semantic targ
  const guide=await readFile(new URL("../../web/components/guide.tsx",import.meta.url),"utf8");
  const css=await readFile(new URL("../../web/app/globals.css",import.meta.url),"utf8");
  const botCss=await readFile(new URL("../../web/components/support-bot.module.css",import.meta.url),"utf8");
+ const bot=await readFile(new URL("../../web/components/support-bot.tsx",import.meta.url),"utf8");
  assert.match(guide,/usePathname\(\)/);
  assert.match(guide,/data-guide-target/);
  assert.match(guide,/Step \{index\+1\} of \{steps\.length\}/);

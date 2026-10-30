@@ -49,7 +49,7 @@ export async function registerOrganization(userId,input,requestId){
 export async function listPublicOrganizations(filters={}) {
  const db=getPool();const args=[];const where=["o.public_visible=true","o.verification_status='verified'"];
  if(filters.q){args.push(`%${String(filters.q).trim()}%`);where.push(`(o.display_name ilike $${args.length} or o.legal_name ilike $${args.length} or coalesce(o.description,'') ilike $${args.length})`);}
- if(filters.organizationType){args.push(String(filters.organizationType));where.push(`o.organization_type=$${args.length}`);}
+ if(filters.organizationType){args.push(String(filters.organizationType));where.push(`lower(o.organization_type)=lower(${args.length})`);}
  if(filters.location){args.push(`%${String(filters.location).trim()}%`);where.push(`(coalesce(ri.label,'') ilike $${args.length} or coalesce(o.address_text,'') ilike $${args.length})`);}
  const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
  const base=` from organization o left join reference_item ri on ri.id=o.geography_reference_item_id where ${where.join(" and ")}`;
@@ -83,6 +83,8 @@ export async function updateNetworkPlusVisibility(orgId,userId,input,requestId){
  return withTransaction(async db=>{
   await orgRole(db,orgId,userId,["owner","administrator"]);
   const org=(await db.query("select id,verification_status,network_plus_visible from organization where id=$1 for update",[orgId])).rows[0];
+  const membership=(await db.query("select role_code from organization_membership where organization_id=$1 and user_id=$2 and role_code in ('owner','administrator') and status='active' for update",[orgId,userId])).rows[0];
+  if(!membership) throw error(403,"Only an active organization owner or administrator can change Network-Plus visibility.","FORBIDDEN");
   if(!org) throw error(404,"Organization not found.","NOT_FOUND");
   if(input.visible&&org.verification_status!=="verified") throw error(409,"Only a verified organization can opt in to Network-Plus discovery.","ORGANIZATION_NOT_VERIFIED");
   const updated=(await db.query("update organization set network_plus_visible=$1,updated_at=now() where id=$2 returning network_plus_visible",[input.visible,orgId])).rows[0];

@@ -547,6 +547,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/finance/receipts/") && parts[5]==="decision") { const identity=await auth(req); return ok(res,await financeReceipts.decideManualFinancePayment(identity,parts[4],await body(req),requestId),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/finance/receipts/") && parts[5]==="reverse") { const identity=await auth(req); return ok(res,await financeReceipts.reverseManualFinancePayment(identity,parts[4],(await body(req)).reason,requestId),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/finance/receipts/") && parts[5]==="voucher") { const identity=await auth(req); return ok(res,await financeReceipts.issueFinancePaymentVoucher(identity,parts[4],requestId),requestId,201); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/finance/membership/payments/") && parts[6]==="voucher") { const identity=await auth(req); return ok(res,await financeReceipts.issueVerifiedMembershipPaymentVoucher(identity,parts[5],requestId),requestId,201); }
     if(req.method==="GET" && p==="api/v1/finance/membership/payments") { const identity=await auth(req); assertFinancePaymentQueueAccess(identity); return ok(res,await membership.listMembershipPaymentsForFinance(),requestId); }
     if(req.method==="GET" && p==="api/v1/review/membership/applications") {
       assertMembershipReviewQueueAccess(identity);

@@ -59,3 +59,11 @@ on conflict(permission_code) do update set area=excluded.area,label=excluded.lab
 
 alter table finance_payment_record add column if not exists organization_id uuid references organization(id) on delete set null;
 create index if not exists finance_payment_record_organization_idx on finance_payment_record(organization_id) where organization_id is not null;
+
+-- A voucher may represent either a general finance receipt or a verified membership payment.
+alter table finance_payment_voucher alter column payment_record_id drop not null;
+alter table finance_payment_voucher add column if not exists payment_transaction_id uuid references payment_transaction(id) on delete restrict;
+alter table finance_payment_voucher add constraint finance_payment_voucher_one_source_check
+  check ((payment_record_id is not null and payment_transaction_id is null) or (payment_record_id is null and payment_transaction_id is not null));
+create unique index if not exists finance_payment_voucher_one_active_membership_idx
+  on finance_payment_voucher(payment_transaction_id) where revoked_at is null and payment_transaction_id is not null;

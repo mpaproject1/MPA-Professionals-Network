@@ -102,10 +102,26 @@ export async function issueFinancePaymentVoucher(identity,id,requestId){
   });
 }
 export async function verifyFinancePaymentVoucher(voucherId,token){
-  const result=await getPool().query(`select v.id,v.voucher_number,v.issued_at,v.revoked_at,p.receipt_number,p.payer_type,p.payer_name,p.organization_name,p.amount,p.currency,p.purpose,p.payment_date,p.payment_method,p.status,p.verified_at
-    from finance_payment_voucher v join finance_payment_record p on p.id=v.payment_record_id where v.id=$1`,[voucherId]);
+  const result=await getPool().query(`select v.id,v.voucher_number,v.issued_at,v.revoked_at,v.verification_token_sha256,
+    coalesce(fr.status,case when pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id) then 'verified' else pt.status end) status,
+    coalesce(fr.receipt_number,pt.purpose_reference,pt.id::text) receipt_number,
+    coalesce(fr.payer_type,'member') payer_type,
+    coalesce(fr.payer_name,nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name),'MPA Member') payer_name,
+    fr.organization_name,coalesce(fr.amount,pt.amount) amount,coalesce(fr.currency,pt.currency) currency,
+    coalesce(fr.purpose,pt.purpose_reference,'Membership payment') purpose,
+    coalesce(fr.payment_date,coalesce(pt.verified_at,pt.completed_at,pt.created_at)::date) payment_date,
+    coalesce(fr.payment_method,pt.channel) payment_method,coalesce(fr.verified_at,pt.verified_at,pt.completed_at) verified_at
+    from finance_payment_voucher v
+    left join finance_payment_record fr on fr.id=v.payment_record_id
+    left join payment_transaction pt on pt.id=v.payment_transaction_id
+    left join membership_application_payment ap on ap.payment_transaction_id=pt.id
+    left join membership_application ma on ma.id=ap.application_id
+    left join person on person.user_id=ma.user_id
+    where v.id=$1`,[voucherId]);
   const row=result.rows[0];
-  if(!row||row.revoked_at||row.status!=="verified"||!token||hash(String(token))!==(await getPool().query("select verification_token_sha256 from finance_payment_voucher where id=$1",[voucherId])).rows[0]?.verification_token_sha256)
+  const supplied=token?Buffer.from(hash(String(token)),"hex"):Buffer.alloc(0);
+  const expected=row?.verification_token_sha256?Buffer.from(String(row.verification_token_sha256).trim(),"hex"):Buffer.alloc(0);
+  if(!row||row.revoked_at||row.status!=="verified"||supplied.length!==32||expected.length!==32||!timingSafeEqual(supplied,expected))
     throw fail(404,"This payment voucher is invalid, revoked or unavailable.","VOUCHER_INVALID");
   return {valid:true,status:"verified",voucherNumber:row.voucher_number,receiptNumber:row.receipt_number,payerName:row.payer_name,payerType:row.payer_type,organizationName:row.organization_name,amount:row.amount,currency:row.currency,purpose:row.purpose,paymentDate:row.payment_date,paymentMethod:row.payment_method,verifiedAt:row.verified_at,issuedAt:row.issued_at};
 }

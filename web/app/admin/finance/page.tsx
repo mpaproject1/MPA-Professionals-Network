@@ -55,6 +55,7 @@ export default function FinanceWorkspacePage() {
   const [summaryGeneratedAt, setSummaryGeneratedAt] = useState("");
   const [canVerify, setCanVerify] = useState(false);
   const [canReverse, setCanReverse] = useState(false);
+  const [canIssueVoucher, setCanIssueVoucher] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -83,6 +84,7 @@ export default function FinanceWorkspacePage() {
       }
       setCanVerify(financeRole || permissions.some(permission => ["finance.payment.verify", "finance.manage"].includes(permission)));
       setCanReverse(financeRole || permissions.some(permission => ["finance.payment.reverse", "finance.manage"].includes(permission)));
+      setCanIssueVoucher(financeRole || permissions.some(permission => ["finance.voucher.issue", "finance.manage"].includes(permission)));
       const payments = await api<Payment[]>("/api/v1/finance/membership/payments", {}, token);
       setRows(Array.isArray(payments) ? payments : []);
       try {
@@ -137,6 +139,19 @@ export default function FinanceWorkspacePage() {
     } finally {
       setBusy("");
     }
+  }
+
+  async function issueMembershipVoucher(payment: Payment) {
+    if (!token || !canIssueVoucher || busy) return;
+    setBusy(payment.payment_id); setError(""); setNotice("");
+    try {
+      const voucher = await api<{token?:string;verificationPath?:string;payment?:unknown;voucherNumber:string;alreadyIssued?:boolean}>("/api/v1/finance/membership/payments/" + payment.payment_id + "/voucher", { method:"POST", body:JSON.stringify({}) }, token);
+      if (voucher.token && voucher.verificationPath) {
+        window.open("/admin/finance/receipts/voucher?data=" + encodeURIComponent(JSON.stringify(voucher)), "_blank", "noopener,noreferrer");
+        setNotice("Verified membership payment voucher prepared. Use Print / Save as PDF in the opened voucher.");
+      } else setNotice("An active voucher already exists. Its one-time QR token cannot be recovered; request an authorized replacement if the original is unavailable.");
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : "Membership payment voucher could not be issued."); }
+    finally { setBusy(""); }
   }
 
   async function reversePayment(event: FormEvent, payment: Payment) {
@@ -209,6 +224,8 @@ export default function FinanceWorkspacePage() {
             <p><span className="muted">Reconciliation</span><br/><b>{payment.reconciliation_status || "Not recorded"}</b></p>
           </div>
           {payment.verification_note && <p className="muted">Payment note: {payment.verification_note}</p>}
+          {canIssueVoucher && payment.payment_status === "succeeded" && !payment.reversed && <button type="button" className="btn btn-primary" disabled={busy === payment.payment_id} onClick={() => void issueMembershipVoucher(payment)}>Issue QR payment voucher</button>}
+
           {payment.reconciliation_note && <p className="muted">Reconciliation note: {payment.reconciliation_note}</p>}
           {payment.reversed && <p className="form-error" role="status">A refund or reversal is already recorded for this payment.</p>}
           {canVerify && payment.payment_status === "pending" && payment.source !== "provider_webhook" && ["manual", "bank_transfer", "cash", "other"].includes(payment.channel) && ["submitted", "in_review", "correction_required", "approved", "payment_pending"].includes(payment.application_status) && <form className="form-stack" onSubmit={event => void verifyPayment(event, payment)}>

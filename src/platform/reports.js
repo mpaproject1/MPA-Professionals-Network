@@ -123,7 +123,7 @@ const REPORT_MEASURES=Object.freeze({
 export async function runReport(identity,id,filters={},requestId){
  const report=REPORTS.find(r=>r.id===id);if(!report)throw fail(404,"Report not found.","REPORT_NOT_FOUND");
  const db=getPool(),scopedRecruitment=await hasRecruitmentReportScope(db,identity);authorize(identity,report,scopedRecruitment);
- const applied=cleanFilters(filters),rows=await fetchRows(db,id,applied,identity),totals={rows:rows.length};
+ const applied=cleanFilters(filters),rows=await fetchRows(db,id,applied,identity),totals={rows:rows.length};if(rows.length>=5000){totals.resultLimit=5000;totals.mayBeTruncated=true;}
  for(const key of REPORT_MEASURES[id]||[])totals[key]=rows.reduce((sum,row)=>sum+(typeof row[key]==="number"?row[key]:Number(row[key]||0)),0);
  if(id==="payment-reconciliation"){
   const a=[applied.from||null,applied.to||null,applied.status,applied.q];

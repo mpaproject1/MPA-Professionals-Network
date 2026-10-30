@@ -26,7 +26,7 @@ test("admin card lookup distinguishes membership number from internal identifier
   assert.match(service,/internal account, payment or application reference, not a membership number/);
   assert.match(service,/No membership record matches that membership ID/);
   assert.match(service,/membershipNumber:row\.membership_number/);
-  assert.match(service,/membershipNumber=\+encodeURIComponent\(row\.membership_number\)/);
+  assert.ok(service.includes('verificationPath:"/membership/verify?membershipNumber="+encodeURIComponent(row.membership_number)'));
   assert.doesNotMatch(service,/verificationPath:\x60\/membership\/verify\?record=/);
 });
 

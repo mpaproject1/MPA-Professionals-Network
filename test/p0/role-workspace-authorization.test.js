@@ -400,3 +400,12 @@ test("finance payment workspace uses a privacy-minimized queue and separate fina
   assert.ok(!membershipUi.includes("verifyPayment"));
   assert.ok(!membershipUi.includes("reversePayment"));
 });
+
+
+test("payment-method configuration is not granted by generic membership management", () => {
+  const policy = read("src/membership/payment-method-policy.js");
+  const methodsPage = read("web/app/admin/membership/payment-methods/page.tsx");
+  assert.ok(policy.includes('permissions.includes("finance.manage")'));
+  assert.ok(!policy.includes("members.manage"));
+  assert.ok(!methodsPage.includes('"members.manage"'));
+});

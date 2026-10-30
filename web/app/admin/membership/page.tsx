@@ -37,7 +37,7 @@ export default function MembershipAdministrationPage() {
           roles.some((role) => ["system_admin", "reviewer", "membership_reviewer"].includes(role)) ||
           permissions.some((permission) => ["membership.review", "members.view"].includes(permission));
         setAccess(allowed ? "allowed" : "denied");
-        setCanManageMethods(roles.includes("system_admin") || roles.includes("finance_officer") || permissions.some((permission) => ["members.manage", "finance.manage"].includes(permission)));
+        setCanManageMethods(roles.includes("system_admin") || roles.includes("finance_officer") || permissions.includes("finance.manage"));
       })
       .catch(() => { if (!cancelled) setAccess("denied"); });
 

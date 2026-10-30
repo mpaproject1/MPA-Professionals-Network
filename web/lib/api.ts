@@ -76,7 +76,7 @@ const FRIENDLY_ERRORS: Record<string,string> = {
   MEMBERSHIP_NOT_ELIGIBLE: "This membership is not currently active, so a card cannot be issued. Check its approval, activation, expiry or suspension status.",
   EMPTY_CARD_SELECTION: "Select at least one eligible member before preparing cards.",
   INVALID_CARD_SELECTION: "Select unique canonical MPA membership numbers. Internal account IDs and record references cannot be used.",
-  CARD_BATCH_LIMIT: "A print batch can contain up to 100 members. Split the selection into smaller batches.";
+  CARD_BATCH_LIMIT: "A print batch can contain up to 100 members. Split the selection into smaller batches.",
   INVALID_JSON: "Some submitted information could not be read. Review the form and try again.",
   PAYLOAD_TOO_LARGE: "The submitted information is too large. Reduce the size and try again.",
   AUTH_NOT_CONFIGURED: "Sign-in is temporarily unavailable. Please contact support.",

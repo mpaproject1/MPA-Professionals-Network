@@ -10,7 +10,7 @@ Adds a finance-owned ledger for manual receipts from members, organizations, spo
 - Vouchers have a random bearer token stored only as SHA-256; the token is returned once at issuance. Public verification requires both voucher id and token and returns limited receipt data. The voucher can represent either a verified general finance receipt or a successful, non-reversed membership payment; the database enforces exactly one source record per voucher.
 - One active voucher per general finance receipt and one active voucher per membership payment are enforced by partial unique indexes. A voucher is not an account, membership card or membership activation.
 - Private bank evidence references the existing private file store. Upload/confirm remains authenticated; the finance record accepts only a private file created by the recording finance user.
-- Every create, decision and voucher issue is audited.
+- Every create, decision, voucher issue/reissue and reversal is audited. Bank-transfer entries require either a receipt evidence file or a bank reference. Duplicate bank references are rejected for the same bank, currency and amount.
 
 ## Fields
 Payer type/name/email/phone, optional linked user, organization name, amount/currency, purpose, payment method/date, bank name/reference, external reference, private evidence file, notes, recording actor, verification actor/time/note and voucher state.

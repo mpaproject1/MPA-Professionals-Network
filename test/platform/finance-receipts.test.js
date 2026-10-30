@@ -11,6 +11,8 @@ test("manual finance receipts keep verification and voucher issuance as separate
   assert.match(source,/verification_token_sha256/);
   assert.match(source,/issueVerifiedMembershipPaymentVoucher/);
   assert.match(source,/timingSafeEqual/);
+  assert.match(source,/DUPLICATE_PAYMENT_REFERENCE/);
+  assert.match(source,/BANK_EVIDENCE_REQUIRED/);
   assert.match(migration,/payer_user_id uuid references app_user/);
   assert.match(migration,/evidence_file_id uuid references file_object/);
   assert.match(migration,/finance_payment_voucher_one_active_idx/);

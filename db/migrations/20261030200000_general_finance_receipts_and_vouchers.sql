@@ -35,7 +35,7 @@ create table if not exists finance_payment_record (
 );
 create index if not exists finance_payment_record_status_date_idx on finance_payment_record(status,payment_date desc,created_at desc);
 create index if not exists finance_payment_record_payer_user_idx on finance_payment_record(payer_user_id) where payer_user_id is not null;
-create index if not exists finance_payment_record_reference_idx on finance_payment_record(bank_reference) where bank_reference is not null;
+create index if not exists finance_payment_record_reference_idx on finance_payment_record(bank_reference) where bank_reference is not null and status <> 'reversed';
 create index if not exists finance_payment_record_evidence_idx on finance_payment_record(evidence_file_id) where evidence_file_id is not null;
 create table if not exists finance_payment_voucher (
   id uuid primary key default gen_random_uuid(),

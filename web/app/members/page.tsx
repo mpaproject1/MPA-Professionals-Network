@@ -317,7 +317,7 @@ export default function MembersWorkspacePage() {
         </ol>
       </section>
 
-      <VolunteerPledgePanel token={token} active={active} />
+      <VolunteerPledgePanel token={token || ""} active={Boolean(hasActiveMembership)} />
 
       <section aria-labelledby="shortcuts-title" className="mb-7">
         <div className="mb-3"><div className="eyebrow">Quick access</div><h2 id="shortcuts-title" data-guide-target="workspace-shortcuts" className="h2">Your workspace</h2></div>

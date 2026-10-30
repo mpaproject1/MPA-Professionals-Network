@@ -59,7 +59,7 @@ test("public video stories require completed engagement, explicit consent, moder
  const withdrawn=await services.withdrawPublicMediaStory(story.id,f.requester,"public-story-withdraw-"+f.suffix);
  assert.equal(withdrawn.moderation_status,"withdrawn");
  assert.equal((await services.listPublicMediaStories("service",f.listing.id)).length,0,"withdrawn consent immediately removes public visibility");
- const audit=(await f.db.query("select action from audit_log where resource_type='public_media_story' and resource_id=$1 order by created_at",[story.id])).rows.map(row=>row.action);
+ const audit=(await f.db.query("select action from audit_log where resource_type='public_media_story' and resource_id=$1 order by occurred_at",[story.id])).rows.map(row=>row.action);
  assert.deepEqual(audit,["public_media_story.submitted","public_media_story.moderated","public_media_story.consent_withdrawn"]);
 });
 

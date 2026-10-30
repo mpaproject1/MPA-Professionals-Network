@@ -31,6 +31,14 @@ export function getMembershipCardStatus(row, now=new Date()) {
   if(row.status!=="active"||String(row.start_date).slice(0,10)>today||(row.end_date&&String(row.end_date).slice(0,10)<today)) return "expired";
   return "active";
 }
+function assertEligible(row){
+  const status=getMembershipCardStatus(row);
+  if(status!=="active") throw fail(409,status==="expired"?"This membership is not currently active. Renew or contact membership support before printing a card.":`This membership is ${status} and cannot be used to issue a card.`,"MEMBERSHIP_NOT_ELIGIBLE");
+}
+function cardPayload(row,cardSettings){
+  const token=tokenFor(row.membership_record_id,row.card_token_version);
+  return {membershipNumber:row.membership_number,memberName:row.member_name||"MPA Member",membershipType:row.membership_type,status:"active",startDate:row.start_date,endDate:row.end_date,verificationPath:"/membership/verify?membershipNumber="+encodeURIComponent(row.membership_number)+"&token="+encodeURIComponent(token),settings:cardSettings};
+}
 async function settings(db=getPool()){
   const row=(await db.query("select header_text,subtitle_text,footer_text,background_style,background_start,background_end,accent_color,text_color,show_membership_type from membership_card_settings where id=1")).rows[0];
   return row||DEFAULT_SETTINGS;
@@ -51,27 +59,25 @@ export async function getMyMembershipCard(userId){
     order by (m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)) desc,m.start_date desc nulls last,m.created_at desc
     limit 1`,[userId]);
   const row=r.rows[0];
-  if(!row) throw fail(404,"No membership record is available for this account.","MEMBERSHIP_NOT_FOUND");
+  if(!row) throw fail(404,"No membership record is available for this account. Complete membership approval and activation first.","MEMBERSHIP_NOT_FOUND");
+  assertEligible(row);
   const cardSettings=await settings(db);
   const token=tokenFor(row.membership_record_id,row.card_token_version);
   return {
-    membershipRecordId:row.membership_record_id,
     membershipNumber:row.membership_number,
     memberName:row.member_name||"MPA Member",
     membershipType:row.membership_type,
-    productCode:row.product_code,
     status:getMembershipCardStatus(row),
-    renewalRequired:Boolean(row.renewal_required),
     startDate:row.start_date,
     endDate:row.end_date,
-    profilePictureFileId:row.profile_picture_file_id,
-    verificationPath:`/membership/verify?record=${encodeURIComponent(row.membership_record_id)}&token=${encodeURIComponent(token)}`,
+    verificationPath:"/membership/verify?membershipNumber="+encodeURIComponent(row.membership_number)+"&token="+encodeURIComponent(token),
     settings:cardSettings
   };
 }
 export async function getMembershipCardForAdmin(membershipNumber,actorId,requestId){
   const number=String(membershipNumber||"").trim().toUpperCase();
-  if(!number||number.length>100||/\p{Cc}/u.test(number)) throw fail(400,"Enter an existing membership ID.","INVALID_MEMBERSHIP_NUMBER");
+  if(!number||number.length>100||/\p{Cc}/u.test(number)) throw fail(400,"Enter the canonical MPA membership ID.","INVALID_MEMBERSHIP_NUMBER");
+  if(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(number)) throw fail(400,"This is an internal account or record reference, not a membership number. Use the human-readable MPA membership ID shown in the member workspace.","WRONG_MEMBERSHIP_IDENTIFIER");
   const db=getPool();
   const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,
       p.name membership_type,p.product_code,
@@ -84,8 +90,9 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
     where upper(m.membership_number)=$1 and m.status<>'pending'
     order by m.start_date desc nulls last,m.created_at desc limit 1`,[number]);
   const row=r.rows[0];
-  if(!row) throw fail(404,"No membership record matches that ID.","MEMBERSHIP_NOT_FOUND");
-  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.card_admin_issued','membership_record',$2,$3,'success',$4)",[actorId,row.membership_record_id,requestId,JSON.stringify({membershipNumber:row.membership_number})]);
+  if(!row) throw fail(404,"No membership record matches that membership ID. Account IDs and application references are not accepted here.","MEMBERSHIP_NOT_FOUND");
+  assertEligible(row);
+  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.card_admin_issued','membership_record',$2,$3,'success',$4)",[actorId,row.membership_record_id,requestId,JSON.stringify({issuedCount:1})]);
   return {
     membershipRecordId:row.membership_record_id,membershipNumber:row.membership_number,
     memberName:row.member_name||"MPA Member",membershipType:row.membership_type,productCode:row.product_code,
@@ -94,6 +101,24 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
     verificationPath:`/membership/verify?record=${encodeURIComponent(row.membership_record_id)}&token=${encodeURIComponent(tokenFor(row.membership_record_id,row.card_token_version))}`,
     settings:await settings(db)
   };
+}
+
+export async function listEligibleMembershipCardsForAdmin({q="",limit=50,offset=0}={}){
+  const search=String(q||"").trim().slice(0,100),pageSize=Math.min(Math.max(Number(limit)||50,1),100),start=Math.max(Number(offset)||0,0),db=getPool();
+  const result=await db.query("select m.membership_number,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name,p.name membership_type,m.start_date,m.end_date from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(person.display_name,'')) like lower('%'||$1||'%')) order by m.membership_number limit $2 offset $3",[search,pageSize,start]);
+  const total=Number((await db.query("select count(*)::int count from membership_record m left join person on person.user_id=m.user_id where m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(person.display_name,'')) like lower('%'||$1||'%'))",[search])).rows[0]?.count||0);
+  return {items:result.rows.map(row=>({membershipNumber:row.membership_number,memberName:row.member_name||"MPA Member",membershipType:row.membership_type,startDate:row.start_date,endDate:row.end_date})),total,limit:pageSize,offset:start,hasMore:start+result.rows.length<total};
+}
+export async function getMembershipCardsForAdmin(membershipNumbers,actorId,requestId){
+  if(!Array.isArray(membershipNumbers)||membershipNumbers.length<1)throw fail(400,"Select at least one eligible member.","EMPTY_CARD_SELECTION");
+  if(membershipNumbers.length>100)throw fail(413,"Select no more than 100 members per print batch.","CARD_BATCH_LIMIT");
+  const numbers=[...new Set(membershipNumbers.map(value=>String(value||"").trim().toUpperCase()).filter(Boolean))];
+  if(numbers.length!==membershipNumbers.length||numbers.some(value=>value.length>100||/\p{Cc}/u.test(value)||/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value)))throw fail(400,"Select unique canonical membership numbers, not internal account or record references.","INVALID_CARD_SELECTION");
+  const db=getPool(),rows=(await db.query("select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where upper(m.membership_number)=any($1::text[]) and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) order by m.membership_number",[numbers])).rows;
+  const byNumber=new Map(rows.map(row=>[String(row.membership_number).toUpperCase(),row])),cardSettings=await settings(db);
+  const cards=rows.map(row=>cardPayload(row,cardSettings)),skipped=numbers.filter(number=>!byNumber.has(number)).map(membershipNumber=>({membershipNumber,reason:"No active eligible membership was found. Check the membership ID or membership status."}));
+  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.cards_batch_generated','membership_card_batch',null,$2,'success',$3)",[actorId,requestId,JSON.stringify({selectedCount:numbers.length,generatedCount:cards.length,skippedCount:skipped.length})]);
+  return {cards,skipped,selectedCount:numbers.length,generatedCount:cards.length,skippedCount:skipped.length};
 }
 export async function setMyProfilePicture(userId,fileObjectId,requestId){
   if(typeof fileObjectId!=="string"||!fileObjectId.trim()) throw fail(400,"A confirmed image file is required.","INVALID_PROFILE_PICTURE");
@@ -171,8 +196,8 @@ export async function rotateMembershipCardVerification(recordId,actorId,requestI
     return {membershipRecordId:row.id,verificationRotated:true};
   });
 }
-export async function verifyMembershipCard(recordId,token){
-  if(typeof recordId!=="string"||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(recordId)||typeof token!=="string") return {valid:false,status:"invalid",message:"This membership ID could not be verified."};
+export async function verifyMembershipCard(identifier,token){
+  if(typeof identifier!=="string"||identifier.length>100||typeof token!=="string") return {valid:false,status:"invalid",message:"This membership ID could not be verified."};
   const db=getPool();
   const row=(await db.query(`select m.id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,
       p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name

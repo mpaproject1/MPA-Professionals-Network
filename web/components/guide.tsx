@@ -13,9 +13,9 @@ function visibleTarget(selector?:string):HTMLElement|null{
  try{return Array.from(document.querySelectorAll<HTMLElement>(selector)).find(el=>{const style=window.getComputedStyle(el);return style.display!=="none"&&style.visibility!=="hidden"&&el.getClientRects().length>0;})||null;}catch{return null;}
 }
 export function GuideLauncher(){
- const pathname=usePathname()||"/";const [guides,setGuides]=useState<Guide[]>([]);const [loaded,setLoaded]=useState(false);
+ const pathname=usePathname()||"/";const [guides,setGuides]=useState<Guide[]>([]);
  const [open,setOpen]=useState(false);const [index,setIndex]=useState(0);const launcherRef=useRef<HTMLButtonElement>(null);const headingRef=useRef<HTMLHeadingElement>(null);
- useEffect(()=>{let cancelled=false;setLoaded(false);api<Guide[]>(`/api/v1/experience/guides?route=${encodeURIComponent(pathname)}`).then(rows=>{if(!cancelled)setGuides(Array.isArray(rows)?rows:[])}).catch(()=>{if(!cancelled)setGuides([])}).finally(()=>{if(!cancelled)setLoaded(true)});return()=>{cancelled=true}},[pathname]);
+ useEffect(()=>{let cancelled=false;api<Guide[]>(`/api/v1/experience/guides?route=${encodeURIComponent(pathname)}`).then(rows=>{if(!cancelled)setGuides(Array.isArray(rows)?rows:[])}).catch(()=>{if(!cancelled)setGuides([])}).finally(()=>{});return()=>{cancelled=true}},[pathname]);
  const guide=useMemo(()=>guides.find(g=>g.route_pattern===pathname)||guides.find(g=>g.route_pattern==="*")||fallback,[guides,pathname]);
  const steps=guide.steps?.length?guide.steps:fallback.steps;const step=steps[Math.min(index,steps.length-1)];
  const close=useCallback(()=>{setOpen(false);window.setTimeout(()=>launcherRef.current?.focus(),0)},[]);

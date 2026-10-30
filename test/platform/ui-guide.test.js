@@ -23,11 +23,14 @@ test("current workspace and membership screens expose every curated tour target 
  const membership=await readFile(new URL("../../web/app/membership/workspace.tsx",import.meta.url),"utf8");
  const payment=await readFile(new URL("../../web/app/membership/payment/page.tsx",import.meta.url),"utf8");
  const shell=await readFile(new URL("../../web/components/shell.tsx",import.meta.url),"utf8");
+ const ui=await readFile(new URL("../../web/components/ui.tsx",import.meta.url),"utf8");
  const guide=await readFile(new URL("../../web/components/guide.tsx",import.meta.url),"utf8");
  for(const target of ["workspace-overview","workspace-progress","workspace-shortcuts","workspace-help"])assert.ok(members.includes('data-guide-target="'+target+'"'),target);
  assert.match(members,/Show me around/);
  assert.ok(membership.includes('data-guide-target="membership-overview"'));
  assert.ok(membership.includes('data-guide-target="membership-application"'));
+ assert.match(ui,/"data-guide-target":guideTarget/);
+ assert.match(ui,/data-guide-target=\{guideTarget\}/);
  assert.match(membership,/Membership guide/);
  for(const target of ["payment-overview","payment-application","payment-submit"])assert.ok(payment.includes('data-guide-target="'+target+'"'),target);
  assert.match(payment,/Payment guide/);

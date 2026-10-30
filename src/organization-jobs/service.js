@@ -2,6 +2,7 @@ import { getPool, withTransaction } from "../platform/db.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
 import { assertOrganizationCapability } from "../platform/identity-policy.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
+import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
 
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
 const ORG_WRITE_ROLES=["owner","administrator","recruiter"];
@@ -57,6 +58,39 @@ export async function listPublicOrganizations(filters={}) {
  return {items:rows.slice(0,limit),limit,offset,total,hasMore:offset+limit<total};
 }
 
+export async function listNetworkPlusOrganizations(viewerId,filters={}) {
+ const db=getPool();
+ const access=await resolveNetworkPlusAccess(db,viewerId);
+ if(!access.eligible) throw error(403,"Network-Plus access is required to discover verified organizations.","NETWORK_PLUS_FORBIDDEN");
+ const args=[];
+ const where=["o.network_plus_visible=true","o.verification_status='verified'"];
+ const term=String(filters.q||"").trim().slice(0,120);
+ if(term){args.push(`%${term}%`);where.push(`(o.display_name ilike ${args.length} or coalesce(o.description,'') ilike ${args.length})`);}
+ if(filters.organizationType){args.push(String(filters.organizationType).trim().slice(0,80));where.push(`o.organization_type=${args.length}`);}
+ const location=String(filters.location||"").trim().slice(0,100);
+ if(location){args.push(`%${location}%`);where.push(`coalesce(ri.label,'') ilike ${args.length}`);}
+ const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
+ const base=` from organization o left join reference_item ri on ri.id=o.geography_reference_item_id where ${where.join(" and ")}`;
+ const total=Number((await db.query(`select count(*)::int count${base}`,args)).rows[0]?.count||0);
+ const rows=(await db.query(`select o.id,o.display_name,o.organization_type,o.description,o.website,ri.label location_label${base} order by o.display_name limit ${limit+1} offset ${offset}`,args)).rows;
+ return {items:rows.slice(0,limit),limit,offset,total,hasMore:offset+limit<total};
+}
+
+export async function updateNetworkPlusVisibility(orgId,userId,input,requestId){
+ if(typeof input.visible!=="boolean") throw error(400,"Choose whether the organization should appear in Network-Plus discovery.","VALIDATION_ERROR");
+ const reason=String(input.reason||"").trim();
+ if(reason.length<8||reason.length>500) throw error(400,"Provide a reason between 8 and 500 characters for this visibility change.","VISIBILITY_REASON_REQUIRED");
+ return withTransaction(async db=>{
+  await orgRole(db,orgId,userId,["owner","administrator"]);
+  const org=(await db.query("select id,verification_status,network_plus_visible from organization where id=$1 for update",[orgId])).rows[0];
+  if(!org) throw error(404,"Organization not found.","NOT_FOUND");
+  if(input.visible&&org.verification_status!=="verified") throw error(409,"Only a verified organization can opt in to Network-Plus discovery.","ORGANIZATION_NOT_VERIFIED");
+  const updated=(await db.query("update organization set network_plus_visible=$1,updated_at=now() where id=$2 returning network_plus_visible",[input.visible,orgId])).rows[0];
+  await audit(db,userId,"organization.network_plus_visibility_updated","organization",orgId,requestId,{networkPlusVisible:updated.network_plus_visible,reason});
+  return {organizationId:orgId,networkPlusVisible:updated.network_plus_visible};
+ });
+}
+
 export async function getPublicOrganizationProfile(orgId){
  const db=getPool();
  const row=(await db.query("select o.id,o.display_name,o.organization_type,o.description,o.website,ri.label location_label,o.created_at from organization o left join reference_item ri on ri.id=o.geography_reference_item_id where o.id=$1 and o.public_visible=true and o.verification_status='verified'",[orgId])).rows[0];
@@ -81,7 +115,7 @@ export async function getOrganization(orgId,viewerId=null){
 }
 
 export async function listMyOrganizations(userId){
- return (await getPool().query(`select o.id,o.legal_name,o.display_name,o.tracking_reference,o.organization_type,o.description,o.website,case when om.role_code in ('owner','administrator') then o.email else null end email,case when om.role_code in ('owner','administrator') then o.phone else null end phone,o.geography_reference_item_id,case when om.role_code in ('owner','administrator') then o.address_text else null end address_text,o.verification_status,o.created_at,o.updated_at,o.public_visible,om.role_code,
+ return (await getPool().query(`select o.id,o.legal_name,o.display_name,o.tracking_reference,o.organization_type,o.description,o.website,case when om.role_code in ('owner','administrator') then o.email else null end email,case when om.role_code in ('owner','administrator') then o.phone else null end phone,o.geography_reference_item_id,case when om.role_code in ('owner','administrator') then o.address_text else null end address_text,case when om.role_code in ('owner','administrator') then o.network_plus_visible else null end network_plus_visible,o.verification_status,o.created_at,o.updated_at,o.public_visible,om.role_code,
    case when om.role_code in ('owner','administrator') then vc.id else null end verification_case_id,case when om.role_code in ('owner','administrator') then vc.status else null end verification_case_status,case when om.role_code in ('owner','administrator') then vc.submitted_at else null end verification_submitted_at,case when om.role_code in ('owner','administrator') then vc.reviewed_at else null end verification_reviewed_at,case when om.role_code in ('owner','administrator') then vc.decision_reason else null end verification_decision_reason,
    case when om.role_code in ('owner','administrator') then coalesce((select jsonb_agg(jsonb_build_object('evidenceType',e.evidence_type,'note',e.note,'createdAt',e.created_at) order by e.created_at desc) from organization_verification_evidence e where e.case_id=vc.id),'[]'::jsonb) else '[]'::jsonb end verification_evidence,
    case when om.role_code in ('owner','administrator') then coalesce((select jsonb_agg(r.evidence_type order by r.sort_order) from organization_verification_requirement r where r.active=true and r.required=true and (r.organization_type=o.organization_type or r.organization_type is null)),'[]'::jsonb) else '[]'::jsonb end required_evidence,

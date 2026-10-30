@@ -552,3 +552,13 @@ button[aria-busy=true]{pointer-events:none}
 @media(prefers-reduced-motion:reduce){.impact-listing-banner *{scroll-behavior:auto!important}}
 
 @media(max-width:700px){.guide-card{bottom:calc(82px + env(safe-area-inset-bottom));max-height:calc(100dvh - 120px);overflow:auto;padding:16px}.guide-card h2{font-size:20px}.guide-help{bottom:calc(82px + env(safe-area-inset-bottom))}}
+
+/* Cross-workstream keyboard focus: component hover/focus rules must not weaken
+   the visible focus indicator for keyboard users. Keep this after legacy
+   component rules so filter and card form styles cannot replace the ring. */
+.filter :is(a,button,input,select,textarea,summary,[role="button"],[tabindex]):focus-visible,
+.card :is(a,button,input,select,textarea,summary,[role="button"],[tabindex]):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: none;
+}

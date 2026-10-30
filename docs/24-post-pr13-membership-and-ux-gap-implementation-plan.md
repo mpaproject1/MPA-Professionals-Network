@@ -321,6 +321,53 @@ Apply across all workstreams:
 - Avoid duplicate CTAs, repeated messages, placeholder statistics, fake testimonials and misleading “complete” labels.
 - Use plain-language labels; keep UUIDs and opaque implementation identifiers out of ordinary user-facing UI.
 
+### Cross-workstream accessibility, responsive and content audit — in progress (2026-10-30)
+
+**Audit boundary:** this is a source-level review of the current integration branch, not a WCAG conformance statement. The reviewed files below are a first pass across shared UI and representative membership, payment, workspace, administration, support and Jobs surfaces. Workstream-specific acceptance remains open until the remaining routes/components and the exact final browser build are tested.
+
+**Current branch and evidence**
+- Branch: `feat/workstream-3-progress-members-workspace`.
+- The plan and source review were performed against the branch at the time of this commit. Recheck the head SHA before treating this audit as current.
+- Shared UI reviewed: `web/app/globals.css`, `web/components/shell.tsx`, `web/components/guide.tsx`, `web/components/support-bot.tsx`, `web/components/support-bot.module.css`.
+- Representative workflow surfaces reviewed: `web/app/members/page.tsx`, `web/app/membership/workspace.tsx`, `web/app/membership/payment/page.tsx`, `web/app/jobs/interest/page.tsx`, `web/app/admin/experience/page.tsx`.
+- Existing plan records for Workstreams 1–3 and the Workstream 8/10/4 implementation notes remain authoritative for their respective scope; this cross-cutting audit does not upgrade their validation status.
+
+**Findings requiring remediation or evidence**
+1. **Focus cascade is inconsistent.** Global CSS defines broad `:focus-visible` rules more than once. Later, more-specific `.filter ...:focus` and `.card label ...:focus` rules use a thinner semi-transparent outline and can override the stronger keyboard-focus treatment. Consolidate focus styling and ensure keyboard-only focus is never reduced by component rules. Verify light/dark themes and every interactive control.
+2. **Contrast is not yet evidenced.** Theme tokens for muted text, borders, status treatments and focus indicators have not been measured across all light/dark/brand surfaces. In particular, the default light muted/border tokens and component-specific status colors need contrast measurements rather than visual assumptions. Add automated token/component contrast checks and manual checks for badges, disabled/selected states, checkboxes and focus rings. Do not mark WCAG AA passed until text contrast is at least 4.5:1 for normal text (3:1 for qualifying large text) and applicable non-text controls/indicators meet 3:1.
+3. **Responsive evidence is incomplete.** The shared shell and support assistant have breakpoint rules, and the `/members` workspace uses responsive grid classes, but no verified browser evidence was available for narrow mobile, tablet, desktop, 200% zoom or text scaling. Check overflow, sticky/mobile navigation, floating controls, dialogs, tables, long references, form controls and keyboard reachability at those sizes.
+4. **Async announcements need a consistent audit.** Some reviewed flows use `role="alert"` and `role="status"`; the membership application modal combines an assertive alert role with `aria-live="assertive"`, which is redundant and risks overly forceful announcements. Review all async submit, upload, payment, review and status transitions; use one appropriate live-region mechanism, reserve assertive announcements for blocking errors, and avoid announcing repeated polling updates.
+5. **Error-to-control association is not yet proven.** Reviewed membership/payment forms include visible labels and some form-level alerts, but the source review did not establish consistent `aria-invalid`, `aria-describedby` and field-level error associations across all workstreams. Add specific field messages and programmatic associations where validation errors occur; retain a concise form-level summary where useful.
+6. **Semantic structure is partially present, not fully accepted.** The workspace uses `main`, labelled `nav`, ordered heading levels and links; the shell has labelled desktop/mobile navigation. Audit every route for one clear page `h1`, correctly nested headings, named landmarks, real links for navigation, buttons for actions, and labels for all inputs. Test dialogs, menus, drawers and focus restoration.
+7. **Status and content review remains route-wide.** Some screens already use text labels alongside badges and icons, but every state must remain understandable without color. Review empty/loading/error/success/pending/rejected/expired states, remove duplicated CTAs or repeated status copy, and ensure progress is based on server-confirmed state. Search all member/admin surfaces for UUIDs, raw tokens and internal enum/implementation terms before declaring content standards complete.
+8. **Small support-assistant text needs review.** The support assistant CSS includes 10–13px labels, notices and transcript text. Check readability at 200% zoom and text scaling, avoid truncation, and enlarge text where it is instructional or required to complete a task. Keep the support assistant from covering primary actions or keyboard focus.
+
+**Workstream coverage register**
+| Workstream | Cross-cutting review status | Required next evidence |
+|---|---|---|
+| 0 — Baseline/contract audit | Existing route/API/permission work is recorded; cross-route accessibility inventory not complete | Route-by-route semantic, keyboard, contrast and content matrix |
+| 1 — Membership application/payment | Representative workspace and payment UI inspected; field associations, live announcements and responsive states not accepted | Complete journey tests at mobile/tablet/desktop, keyboard + screen reader, contrast and error association |
+| 2 — Payment-method administration | Admin experience route and shared form styles in scope; detailed payment-method form not yet audited | Permission-safe form labels/errors, contrast, zoom, table/form responsiveness |
+| 3 — Member workspace/tour | `/members`, shell and guide source inspected; no browser acceptance evidence | All membership states, guide focus/keyboard, narrow widths, zoom and status announcements |
+| 4 — Navigation/landing page | Shared shell inspected; landing page not yet audited | Public/signed-in navigation, duplicate CTA/content audit, mobile menu and focus order |
+| 5 — Account identity/governance | Not yet source-audited in this pass | Account detail/governance semantic, privacy-safe identifiers and responsive evidence |
+| 6 — User-management security | Not yet source-audited in this pass | Confirmation dialogs, one-time credential/recovery errors, focus, announcements and redaction |
+| 7 — Member cards/directory/exports | Card workstream implementation is recorded; print and directory surfaces not yet audited here | Print/PDF, data tables, export selector keyboard/zoom/responsive and status evidence |
+| 8 — Jobs interest | Jobs interest page inspected; complete form/error/async and narrow viewport acceptance pending | Eligible/denied states, field-level errors, request status announcements and responsive tests |
+| 9 — Cross-cutting release gate | Audit initiated; not accepted | Exact-commit automated accessibility, contrast, responsive browser and manual assistive-technology evidence |
+| 10 — Any additional/in-flight workstream on this integration branch | Must be inventoried against the live branch and mapped to its owning routes | Add its own row and evidence before final sign-off |
+
+**Implementation and verification actions**
+- [ ] Consolidate global and component focus styles; remove weaker focus overrides and test every control in light/dark themes.
+- [ ] Measure all text, status, border and focus contrast combinations; adjust tokens/component styles only where needed without changing brand intent.
+- [ ] Add field-level error associations and normalize live-region behavior across asynchronous workflows.
+- [ ] Audit headings, landmarks, labels, button/link semantics, dialog/menu focus, focus restoration and keyboard order on every workstream route.
+- [ ] Add browser viewport coverage for 320/360/390px mobile, tablet, desktop, 200% zoom and text scaling; assert no unintended horizontal overflow or obscured actions.
+- [ ] Add automated accessibility checks to critical routes and retain manual keyboard/screen-reader review for behavior automated tools cannot prove.
+- [ ] Review status copy, duplicate actions, placeholder claims, raw identifiers and empty/error states across member and admin surfaces.
+- [ ] Record exact commit, test commands/results, screenshots or recordings and unresolved exceptions here and in the PR before acceptance.
+
+**Current disposition:** audit started; findings are recorded; no WCAG AA conformance, responsive acceptance or cross-workstream completion is claimed. No migration was applied, no CI was triggered, and no merge or deployment was performed.
 ## 15. Test and evidence requirements
 
 Do not mark a workstream accepted based only on a successful build or visual screenshot. Capture evidence against the exact commit.

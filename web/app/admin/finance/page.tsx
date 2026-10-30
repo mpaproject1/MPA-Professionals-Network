@@ -33,7 +33,7 @@ type Me = { roles?: string[]; permissions?: string[] };
 type FinanceSummaryRow = { Currency: string; "Gross verified": string | number; "Refunds/reversals": string | number; "Net collected": string | number; "Failed amount": string | number; "Matched amount": string | number; "Unreconciled amount": string | number; "Outstanding amount": string | number; "Missing fee amount": number; "Disputed amount": string | number; "Written off amount": string | number; "Disputed payments": number; "Written off payments": number; "Approved payments": number; "Failed payments": number; "Refunded/reversed payments": number; "Outstanding applications": number };
 type FinanceSummary = { rows: FinanceSummaryRow[]; generatedAt: string };
 
-const financeMoneyColumns = new Set(["Gross verified", "Refunds/reversals", "Net collected", "Failed amount", "Matched amount", "Unreconciled amount", "Disputed amount", "Written off amount", "Outstanding amount"]);
+const financeMoneyColumns = new Set(["Gross verified", "Refunds/reversals", "Net collected", "Failed amount", "Matched", "Unreconciled", "Disputed", "Written off", "Outstanding"]);
 
 function financeSummaryValue(label: string, value: string | number) {
   if (label === "Currency") return String(value);

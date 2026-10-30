@@ -208,3 +208,17 @@ test("interview reschedule proposals are persisted, single-pending, auditable an
   assert.match(employerPage,/Accept proposed time/);
   assert.match(employerPage,/Keep original time/);
 });
+
+test("interview schedule changes are offered only to participants and decisions are participant-scoped",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const [service,candidatePage,employerPage]=await Promise.all([
+    readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8"),
+    readFile(new URL("../../web/app/track/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../../web/app/recruitment/page.tsx",import.meta.url),"utf8")
+  ]);
+  assert.match(service,/isParticipant, currentUserRole:/);
+  assert.match(service,/canDecide:isParticipant&&proposal\.proposedBy!==userId/);
+  assert.match(service,/user_id<>\$3/);
+  assert.match(candidatePage,/interview\.isParticipant&&\["scheduled","confirmed"\]/);
+  assert.match(employerPage,/interview\.isParticipant&&\["scheduled","confirmed"\]/);
+});

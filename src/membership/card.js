@@ -79,30 +79,17 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
   if(!number||number.length>100||/\p{Cc}/u.test(number)) throw fail(400,"Enter the canonical MPA membership ID.","INVALID_MEMBERSHIP_NUMBER");
   if(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(number)) throw fail(400,"This is an internal account or record reference, not a membership number. Use the human-readable MPA membership ID shown in the member workspace.","WRONG_MEMBERSHIP_IDENTIFIER");
   const db=getPool();
-  const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,
-      p.name membership_type,p.product_code,
-      coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name,
-      pr.profile_picture_file_id
+  const row=(await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,
+      p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m join membership_product p on p.id=m.membership_product_id
-    join app_user u on u.id=m.user_id
-    left join person on person.user_id=u.id
-    left join professional_profile pr on pr.person_id=person.id
+    join app_user u on u.id=m.user_id left join person on person.user_id=u.id
     where upper(m.membership_number)=$1 and m.status<>'pending'
-    order by m.start_date desc nulls last,m.created_at desc limit 1`,[number]);
-  const row=r.rows[0];
+    order by m.start_date desc nulls last,m.created_at desc limit 1`,[number])).rows[0];
   if(!row) throw fail(404,"No membership record matches that membership ID. Account IDs and application references are not accepted here.","MEMBERSHIP_NOT_FOUND");
   assertEligible(row);
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.card_admin_issued','membership_record',$2,$3,'success',$4)",[actorId,row.membership_record_id,requestId,JSON.stringify({issuedCount:1})]);
-  return {
-    membershipRecordId:row.membership_record_id,membershipNumber:row.membership_number,
-    memberName:row.member_name||"MPA Member",membershipType:row.membership_type,productCode:row.product_code,
-    status:getMembershipCardStatus(row),startDate:row.start_date,endDate:row.end_date,
-    profilePictureFileId:row.profile_picture_file_id,
-    verificationPath:`/membership/verify?record=${encodeURIComponent(row.membership_record_id)}&token=${encodeURIComponent(tokenFor(row.membership_record_id,row.card_token_version))}`,
-    settings:await settings(db)
-  };
+  return cardPayload(row,await settings(db));
 }
-
 export async function listEligibleMembershipCardsForAdmin({q="",limit=50,offset=0}={}){
   const search=String(q||"").trim().slice(0,100),pageSize=Math.min(Math.max(Number(limit)||50,1),100),start=Math.max(Number(offset)||0,0),db=getPool();
   const result=await db.query("select m.membership_number,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name,p.name membership_type,m.start_date,m.end_date from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(person.display_name,'')) like lower('%'||$1||'%')) order by m.membership_number limit $2 offset $3",[search,pageSize,start]);

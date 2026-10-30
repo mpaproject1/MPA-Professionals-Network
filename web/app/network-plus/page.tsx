@@ -1,7 +1,6 @@
 import { ArrowRight, BriefcaseBusiness, Network } from "lucide-react";
 import Link from "next/link";
 import { NetworkPlusAccessGuard } from "../../components/network-plus-access-guard";
-import { Card } from "../../components/ui";
 
 export default function NetworkPlusPage() {
   return (
@@ -17,7 +16,7 @@ export default function NetworkPlusPage() {
         </header>
 
         <section className="grid gap-4 md:grid-cols-2" aria-label="Network-Plus discovery experiences">
-          <Card className="grid content-start gap-3">
+          <section className="card grid content-start gap-3">
             <div className="flex items-center gap-3">
               <span className="grid size-11 place-items-center rounded-xl bg-[var(--surface)]">
                 <Network size={22} aria-hidden="true" />
@@ -35,9 +34,9 @@ export default function NetworkPlusPage() {
             <Link className="btn btn-primary mt-2 w-fit" href="/network">
               Discover members <ArrowRight size={16} aria-hidden="true" />
             </Link>
-          </Card>
+          </section>
 
-          <Card className="grid content-start gap-3">
+          <section className="card grid content-start gap-3">
             <div className="flex items-center gap-3">
               <span className="grid size-11 place-items-center rounded-xl bg-[var(--surface)]">
                 <BriefcaseBusiness size={22} aria-hidden="true" />
@@ -55,7 +54,7 @@ export default function NetworkPlusPage() {
             <p className="text-sm font-semibold text-[var(--muted)]">
               Business listings will appear in a later implementation increment.
             </p>
-          </Card>
+          </section>
         </section>
 
         <p className="muted text-sm">

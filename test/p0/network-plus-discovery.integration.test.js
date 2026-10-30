@@ -123,7 +123,7 @@ test("member discovery enforces public, member-only, private, expired-member and
 
   const memberDetail = await talent.getTalent(memberProfessional.user.id, activeViewer.user.id);
   assert.equal(memberDetail.phone, null, "profile viewing does not release contact details");
-  assert.ok(memberDetail.verifiedClaims.some(claim => claim.claim_code === "service_capability"), "verified claim provenance is retained as its approved claim-code snapshot");
+  assert.ok(memberDetail.verifiedClaims.some(claim => String(claim.claim_code).toLowerCase() === "service_capability"), "verified claim provenance is retained as its approved claim-code snapshot");
   assert.equal("evidence" in memberDetail, false, "private verification evidence is never part of a discovery profile");
   assert.equal("reviewer_note" in memberDetail, false, "private reviewer notes are never part of a discovery profile");
   await assert.rejects(

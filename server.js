@@ -16,6 +16,7 @@ import * as directoryExports from "./src/platform/directory-exports.js";
 import * as emailOperations from "./src/platform/email-operations.js";
 import {resendEmailVerification, verifyEmailToken} from "./src/platform/email-verification.js";
 import * as experience from "./src/platform/experience.js";
+import * as financeReceipts from "./src/platform/finance-receipts.js";
 import {createLogger} from "./src/platform/logger.js";
 import {resolveNetworkPlusAccess} from "./src/platform/network-plus-access.js";
 import * as notifications from "./src/platform/notifications.js";
@@ -177,6 +178,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/jobs/")) { const v=optionalIdentity(req); return ok(res,await organizationJobs.getJob(parts[3],v?.sub||null),requestId); }
     if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/jobs/") && parts[4]==="applications") { const identity=await auth(req); return ok(res,await organizationJobs.listJobApplications(parts[3],identity.sub),requestId); }
 
+    if(req.method==="GET" && parts.length===5 && parts[0]==="api" && parts[1]==="v1" && parts[2]==="public" && parts[3]==="finance-vouchers") { const q=query(req.url); return ok(res,await financeReceipts.verifyFinancePaymentVoucher(parts[4],q.get("token")||""),requestId); }
     if(req.method==="GET" && p==="api/v1/service-announcements") { const q=query(req.url); const viewer=optionalIdentity(req); return ok(res,await servicesMentorship.listPublicServiceAnnouncements(viewer?.sub||null,{limit:q.get("limit")}),requestId); }
     if(req.method==="GET" && p==="api/v1/services") { const q=query(req.url); const viewer=req.headers.authorization?.startsWith("Bearer ")?await auth(req):null; return ok(res,await servicesMentorship.listServices(viewer?.sub||null,{category:q.get("category"),q:q.get("q"),limit:q.get("limit"),offset:q.get("offset")}),requestId); }
 
@@ -538,6 +540,10 @@ const server=http.createServer(async (req,res)=>{
       assertPaymentReversalAccess(identity);
       return ok(res,await membership.reverseMembershipPayment(parts[3],identity.sub,await body(req),requestId),requestId);
     }
+    if(req.method==="GET" && p==="api/v1/finance/receipts") { const identity=await auth(req),q=query(req.url); return ok(res,await financeReceipts.listManualFinancePayments(identity,{q:q.get("q")||"",status:q.get("status")||"",limit:q.get("limit")||50,offset:q.get("offset")||0}),requestId); }
+    if(req.method==="POST" && p==="api/v1/finance/receipts") { const identity=await auth(req); return ok(res,await financeReceipts.recordManualFinancePayment(identity,await body(req),requestId),requestId,201); }
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/finance/receipts/") && parts[5]==="decision") { const identity=await auth(req); return ok(res,await financeReceipts.decideManualFinancePayment(identity,parts[4],await body(req),requestId),requestId); }
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/finance/receipts/") && parts[5]==="voucher") { const identity=await auth(req); return ok(res,await financeReceipts.issueFinancePaymentVoucher(identity,parts[4],requestId),requestId,201); }
     if(req.method==="GET" && p==="api/v1/finance/membership/payments") { const identity=await auth(req); assertFinancePaymentQueueAccess(identity); return ok(res,await membership.listMembershipPaymentsForFinance(),requestId); }
     if(req.method==="GET" && p==="api/v1/review/membership/applications") {
       assertMembershipReviewQueueAccess(identity);

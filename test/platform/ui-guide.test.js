@@ -55,7 +55,7 @@ test("migration disables stale route tours and seeds only audited current route 
  assert.match(service,/CURRENT_GUIDE_KEYS\.has\(current\.guide_key\)/);
  assert.match(service,/where active=true order by sort_order,title/);
  assert.match(service,/listAdminGuides/);
- assert.match(server,/api\\/v1\\/admin\\/experience\\/guides/);
+ assert.ok(server.includes('p==="api/v1/admin/experience/guides"'));
  assert.match(admin,/currentGuideKeys\.has\(guide\.guide_key\)/);
- assert.match(admin,/api\\/v1\\/admin\\/experience\\/guides/);
+ assert.ok(admin.includes('/api/v1/admin/experience/guides'));
 });

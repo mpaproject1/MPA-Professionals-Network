@@ -37,6 +37,11 @@ Create one simple entry point for each account's assigned work while preserving 
 ## Unified entry point
 The new /workspaces page reads /api/v1/me and /api/v1/organizations and links to existing workflow screens. It does not copy queue rows, create business data or replace API authorization. Existing queues and progress remain authoritative in their owning workflows.
 
+## Known gaps that must not be masked
+- The current verification implementation still treats ethics reviewers as eligible for the general professional-verification queue and case decisions. The dedicated ethics/professional-conduct case model and independent queue are not present in the inspected service. Do not interpret the new workspace directory as resolving this boundary; implement a separate authorized ethics-case workflow before enabling Ethics Reviewer operational access.
+- The existing role-specific queue pages do not yet provide a unified, verified task-count/progress contract for every role. Counts must not be fabricated or copied into the overview until authoritative endpoint and report definitions are reconciled.
+- Job-team and project assignment records and their administration have not yet been fully reconciled against the database migrations and services. Organization role codes alone must not be treated as authorization; server-side scope checks remain mandatory.
+
 ## Remaining implementation sequence
 1. Reconcile every role and permission against migrations, services, route middleware and actual scoped assignment tables.
 2. Define read/create/update/decide/export boundaries and sensitivity for each role.

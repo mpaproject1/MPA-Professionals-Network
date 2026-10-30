@@ -94,8 +94,12 @@ export async function issueFinancePaymentVoucher(identity,id,requestId){
     if(!row)throw fail(404,"Finance payment record not found.","NOT_FOUND");
     if(row.status!=="verified")throw fail(409,"A payment voucher can only be issued for a verified payment.","PAYMENT_NOT_VERIFIED");
     const active=(await tx.query("select id,voucher_number from finance_payment_voucher where payment_record_id=$1 and revoked_at is null",[id])).rows[0];
-    if(active)return {voucherId:active.id,voucherNumber:active.voucher_number,alreadyIssued:true,downloadUnavailable:true};
     const token=randomBytes(32).toString("base64url"),voucherNumber="MPA-VCH-"+new Date().getUTCFullYear()+"-"+randomUUID().replaceAll("-","").slice(0,12).toUpperCase();
+    if(active){
+      await tx.query("update finance_payment_voucher set voucher_number=$2,verification_token_sha256=$3,issued_at=now(),issued_by=$4 where id=$1",[active.id,voucherNumber,hash(token),identity.sub]);
+      await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.payment_voucher_reissued','finance_payment_voucher',$2,$3,'success',$4)",[identity.sub,active.id,requestId||null,JSON.stringify({previousVoucherNumber:active.voucher_number,voucherNumber})]);
+      return {voucherId:active.id,voucherNumber,token,verificationPath:"/finance/verify/"+active.id+"?token="+encodeURIComponent(token),issuedAt:new Date().toISOString(),payment:safeReceipt(row),reissued:true};
+    }
     const voucher=(await tx.query("insert into finance_payment_voucher(payment_record_id,voucher_number,verification_token_sha256,issued_by) values($1,$2,$3,$4) returning id,voucher_number,issued_at",[id,voucherNumber,hash(token),identity.sub])).rows[0];
     await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.payment_voucher_issued','finance_payment_voucher',$2,$3,'success',$4)",[identity.sub,voucher.id,requestId||null,JSON.stringify({voucherNumber,paymentRecordId:id})]);
     return {voucherId:voucher.id,voucherNumber:voucher.voucher_number,token,verificationPath:"/finance/verify/"+voucher.id+"?token="+encodeURIComponent(token),issuedAt:voucher.issued_at,payment:safeReceipt(row)};
@@ -166,8 +170,12 @@ export async function issueVerifiedMembershipPaymentVoucher(identity,paymentId,r
       for update of pt`,[paymentId])).rows[0];
     if(!payment)throw fail(409,"Only a successfully verified, non-reversed membership payment can receive a payment voucher.","PAYMENT_NOT_VERIFIED");
     const active=(await tx.query("select id,voucher_number from finance_payment_voucher where payment_transaction_id=$1 and revoked_at is null",[paymentId])).rows[0];
-    if(active)return {voucherId:active.id,voucherNumber:active.voucher_number,alreadyIssued:true,downloadUnavailable:true};
     const token=randomBytes(32).toString("base64url"),voucherNumber="MPA-VCH-"+new Date().getUTCFullYear()+"-"+randomUUID().replaceAll("-","").slice(0,12).toUpperCase();
+    if(active){
+      await tx.query("update finance_payment_voucher set voucher_number=$2,verification_token_sha256=$3,issued_at=now(),issued_by=$4 where id=$1",[active.id,voucherNumber,hash(token),identity.sub]);
+      await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_payment_voucher_reissued','finance_payment_voucher',$2,$3,'success',$4)",[identity.sub,active.id,requestId||null,JSON.stringify({previousVoucherNumber:active.voucher_number,voucherNumber,paymentId})]);
+      return {voucherId:active.id,voucherNumber,token,verificationPath:"/finance/verify/"+active.id+"?token="+encodeURIComponent(token),issuedAt:new Date().toISOString(),payment:{receiptNumber:payment.purpose_reference||payment.id,payerName:payment.payer_name,payerType:"member",amount:payment.amount,currency:payment.currency,purpose:payment.purpose_reference||"Membership payment",paymentDate:payment.paid_at,paymentMethod:payment.channel},reissued:true};
+    }
     const voucher=(await tx.query("insert into finance_payment_voucher(payment_record_id,payment_transaction_id,voucher_number,verification_token_sha256,issued_by) values(null,$1,$2,$3,$4) returning id,voucher_number,issued_at",[paymentId,voucherNumber,hash(token),identity.sub])).rows[0];
     await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_payment_voucher_issued','finance_payment_voucher',$2,$3,'success',$4)",[identity.sub,voucher.id,requestId||null,JSON.stringify({voucherNumber,paymentId})]);
     return {voucherId:voucher.id,voucherNumber:voucher.voucher_number,token,verificationPath:"/finance/verify/"+voucher.id+"?token="+encodeURIComponent(token),issuedAt:voucher.issued_at,payment:{receiptNumber:payment.purpose_reference||payment.id,payerName:payment.payer_name,payerType:"member",amount:payment.amount,currency:payment.currency,purpose:payment.purpose_reference||"Membership payment",paymentDate:payment.paid_at,paymentMethod:payment.channel}};

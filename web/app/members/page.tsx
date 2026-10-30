@@ -2,11 +2,12 @@
 
 import {
   ArrowRight, BriefcaseBusiness, CheckCircle2, Clock3, Compass, FileCheck2,
-  GraduationCap, HelpCircle, RefreshCw, ShieldCheck, UserRound, Users,
+  GraduationCap, RefreshCw, ShieldCheck, UserRound, Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
+import { SupportAction } from "../../components/support-action";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
@@ -333,7 +334,7 @@ export default function MembersWorkspacePage() {
 
       <footer className="flex flex-wrap items-start justify-between gap-4 border-t border-[var(--border)] pt-5">
         <div className="max-w-2xl"><h2 className="font-semibold">Need a hand?</h2><p className="muted mt-1 text-sm">Use the Guide control for the current screen tour, or contact support if a status looks incorrect. Your application, payment and membership activation are separate server-controlled decisions.</p></div>
-        <div className="flex flex-wrap gap-2"><button type="button" data-guide-target="workspace-help" className="btn btn-primary" onClick={()=>window.dispatchEvent(new Event("mpa:open-guide"))}>Show me around</button><Link href="/contact" className="btn btn-ghost"><HelpCircle size={16} /> Get help</Link><Link href="/membership" className="btn btn-ghost">Membership guidance <ArrowRight size={15} /></Link></div>
+        <div className="flex flex-wrap gap-2"><button type="button" data-guide-target="workspace-help" className="btn btn-primary" onClick={()=>window.dispatchEvent(new Event("mpa:open-guide"))}>Show me around</button><SupportAction label="Get help" /><Link href="/membership" className="btn btn-ghost">Membership guidance <ArrowRight size={15} /></Link></div>
       </footer>
     </> : null}
   </main>;

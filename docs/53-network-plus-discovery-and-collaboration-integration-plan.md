@@ -96,14 +96,25 @@ This is a source-level audit, not a claim that all browser journeys or every aut
 - Existing public services that are genuinely community-benefit/pro-bono initiatives need an explicit product decision and clear presentation. Do not assume every current /services record is a volunteer initiative.
 - Network-Plus Business Discovery must be a separate directory and management experience, not merely a renamed /services page.
 
-### 2.4 Public opportunity intake — not a business-collaboration substitute
+### 2.4 Mentorship requests and matching — preserve as a separate relationship type
+
+**Existing source**
+- src/services-mentorship/service.js and src/services-mentorship/operations.js implement a distinct mentorship request, matching, mentor-interest, mutual acceptance, session coordination, feedback and outcome workflow.
+- The operations layer checks current membership and professional identity for mentor eligibility, uses supporting_staff/system_admin for matching operations, records audit events and notifications, and supports participant decisions for proposed sessions.
+- Mentorship request sharing is consent-controlled; eligible mentors receive a minimized request summary rather than participant contact details.
+
+**Reuse decision**
+- Preserve mentorship as its own programme and relationship lifecycle. A mentorship request must not be recast as a commercial service request or business partnership.
+- Reuse common technical patterns where appropriate (idempotency, status transitions, explicit acceptance, notifications, audit and privacy controls), not mentorship-specific tables or statuses as generic business-collaboration records.
+
+### 2.5 Public opportunity intake — not a business-collaboration substitute
 
 - src/platform/public-opportunity.js supports public first-contact mentorship inquiries and inquiries tied to a specific published public vacancy. No-vacancy job interest is separately restricted to eligible active members.
 - Public intake stores contact details and consent; continuation tokens are hashed. Organization users can review job inquiries scoped to their vacancies.
 - docs/33-public-opportunity-intake.md documents this boundary.
 - These are Jobs/Mentorship intake workflows. Do not repurpose them as business-service, supplier or partnership requests.
 
-### 2.5 Navigation and access boundary — current gap
+### 2.6 Navigation and access boundary — current gap
 
 - web/components/shell.tsx currently includes About, Job Portal, Serve-Community, My-Workspace, My-Learning, Mentorship, Membership, Saved and Profile. There is no Network-Plus item.
 - The shell currently loads /api/v1/me and /api/v1/organizations for some navigation decisions. A non-empty organization array or client-side role list is not sufficient proof of Network-Plus eligibility.
@@ -301,6 +312,7 @@ Every increment stays on feat/workstream-3-progress-members-workspace. Re-read t
 - web/app/organizations/page.tsx — organization registration, verification and workspace UI.
 - web/app/services/page.tsx and web/app/services/[id]/page.tsx — current service listing/request/delivery workflows.
 - src/platform/public-opportunity.js — public Jobs/Mentorship intake, not business collaboration.
+- src/services-mentorship/service.js and src/services-mentorship/operations.js — mentorship matching and participant relationship lifecycle.
 - web/app/serve-community/page.tsx — current Serve-Community information architecture requiring separation.
 - docs/33-public-opportunity-intake.md — public intake contract.
 - docs/organization-progress-journey.md — organization workspace progress contract.

@@ -19,7 +19,7 @@ export default function NetworkPlusPage() {
         <section className="grid gap-4 md:grid-cols-2" aria-label="Network-Plus discovery experiences">
           <Card className="grid content-start gap-3">
             <div className="flex items-center gap-3">
-              <span className="grid size-11 place-items-center rounded-xl bg-[var(--surface-muted)]">
+              <span className="grid size-11 place-items-center rounded-xl bg-[var(--surface)]">
                 <Network size={22} aria-hidden="true" />
               </span>
               <div>
@@ -28,9 +28,9 @@ export default function NetworkPlusPage() {
               </div>
             </div>
             <p className="muted">
-              Find MPA professionals with verified expertise, explore professional interests
-              and discover organizations. Profile visibility and contact sharing remain under
-              each owner's control.
+              Find MPA professionals with verified expertise and explore professional interests.
+              Verified organization discovery will be added as a separate view after its visibility
+              rules are reconciled. Profile visibility and contact sharing remain under each owner's control.
             </p>
             <Link className="btn btn-primary mt-2 w-fit" href="/network">
               Discover members <ArrowRight size={16} aria-hidden="true" />

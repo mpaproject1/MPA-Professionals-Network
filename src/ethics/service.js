@@ -19,7 +19,7 @@ async function assertAssigned(db,row,userId,{panel=false}={}){await requireEthic
 function text(value,max){return String(value??"").trim().slice(0,max);}
 function cleanFrameworks(input){if(!Array.isArray(input))return [];const values=[...new Set(input.map(String))];if(values.length>12||values.some(value=>!FRAMEWORKS.has(value)))throw fail(400,"Select valid ethics review frameworks.","VALIDATION_ERROR");return values;}
 export async function createEthicsCase(reporterId,input={},requestId){
- const title=text(input.title,160),summary=text(input.incidentSummary,6000),category=text(input.category,60),subjectId=input.subjectUserId||null,orgId=input.organizationId||null;
+ const title=text(input.title,160),summary=text(input.incidentSummary,6000),category=text(input.category,60),subjectId=input.subjectUserId||null,orgId=input.organizationId||null,subjectName=text(input.subjectName,160)||null,organizationName=text(input.organizationName,180)||null;
  if(title.length<5||summary.length<20||!CATEGORIES.has(category))throw fail(400,"Provide a case title, a clear factual summary and a valid concern category.","VALIDATION_ERROR");
  if(subjectId===reporterId)throw fail(400,"Use the confidential self-report route without naming yourself as the respondent.","VALIDATION_ERROR");
  const frameworks=cleanFrameworks(input.frameworkReferences);
@@ -27,7 +27,7 @@ export async function createEthicsCase(reporterId,input={},requestId){
   if(subjectId&&!(await db.query("select 1 from app_user where id=$1 and status='active'",[subjectId])).rowCount)throw fail(404,"The selected respondent account was not found.","NOT_FOUND");
   if(orgId&&!(await db.query("select 1 from organization where id=$1",[orgId])).rowCount)throw fail(404,"The selected organization was not found.","NOT_FOUND");
   const reference="ETH-"+new Date().toISOString().slice(0,10).replaceAll("-","")+"-"+crypto.randomBytes(4).toString("hex").toUpperCase();
-  const row=(await db.query("insert into ethics_case(case_reference,reporter_user_id,subject_user_id,organization_id,title,category,severity,incident_summary,incident_date,location_text,framework_references,status) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'submitted') returning id,case_reference,status,category,severity,created_at",[reference,reporterId,subjectId,orgId,title,category,SEVERITIES.has(input.severity)?input.severity:"medium",summary,input.incidentDate||null,text(input.locationText,240)||null,JSON.stringify(frameworks)])).rows[0];
+  const row=(await db.query("insert into ethics_case(case_reference,reporter_user_id,subject_user_id,organization_id,subject_name,organization_name,title,category,severity,incident_summary,incident_date,location_text,framework_references,status) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'submitted') returning id,case_reference,status,category,severity,created_at",[reference,reporterId,subjectId,orgId,subjectName,organizationName,title,category,SEVERITIES.has(input.severity)?input.severity:"medium",summary,input.incidentDate||null,text(input.locationText,240)||null,JSON.stringify(frameworks)])).rows[0];
   await event(db,row.id,reporterId,"submitted",{requestId,category,severity:row.severity});
   return row;
  });
@@ -45,7 +45,7 @@ export async function listEthicsCases(userId,filters={}){
  return {items:rows,canAssign:isAdmin};
 }
 export async function getEthicsCase(caseId,userId){
- const db=getPool(),row=(await db.query("select c.*,p.display_name subject_name,rp.display_name reporter_name,o.display_name organization_name from ethics_case c left join person p on p.user_id=c.subject_user_id left join person rp on rp.user_id=c.reporter_user_id left join organization o on o.id=c.organization_id where c.id=$1",[caseId])).rows[0];
+ const db=getPool(),row=(await db.query("select c.*,coalesce(c.subject_name,p.display_name) subject_name,rp.display_name reporter_name,coalesce(c.organization_name,o.display_name) organization_name from ethics_case c left join person p on p.user_id=c.subject_user_id left join person rp on rp.user_id=c.reporter_user_id left join organization o on o.id=c.organization_id where c.id=$1",[caseId])).rows[0];
  if(!row)throw fail(404,"Ethics case not found.","NOT_FOUND");
  const reviewer=await isEthicsReviewer(db,userId),isReporter=row.reporter_user_id===userId,isSubject=row.subject_user_id===userId;
  if(!reviewer&&!isReporter&&!isSubject)throw fail(403,"You are not authorized to view this ethics case.","FORBIDDEN");

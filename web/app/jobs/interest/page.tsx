@@ -24,7 +24,7 @@ export default function JobInterestPage(){
  const [history,setHistory]=useState<ShareHistory[]>([]);
  const [form,setForm]=useState({contactName:"",contactEmail:"",contactPhone:"",targetRole:"",experience:"",location:"",workMode:"",availability:"",intent:""});
  const [skills,setSkills]=useState<string[]>([]),[consent,setConsent]=useState(false);
- const [shareOptIn,setShareOptIn]=useState(false),[organizationSearch,setOrganizationSearch]=useState(""),[organizations,setOrganizations]=useState<Organization[]>([]),[organizationId,setOrganizationId]=useState(""),[shareFields,setShareFields]=useState(["targetRole","skills"]);
+ const [organizationSearch,setOrganizationSearch]=useState(""),[organizations,setOrganizations]=useState<Organization[]>([]),[organizationId,setOrganizationId]=useState(""),[shareFields,setShareFields]=useState(["targetRole","skills"]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[requestKey,setRequestKey]=useState("");
  const load=useCallback(async()=>{
   if(!hydrated)return;
@@ -68,7 +68,6 @@ export default function JobInterestPage(){
    setRequestKey("");setNotice("Your request was submitted. Reference: "+created.reference+". "+created.nextStep);
    setForm({contactName:"",contactEmail:"",contactPhone:"",targetRole:"",experience:"",location:"",workMode:"",availability:"",intent:""});setSkills([]);setConsent(false);
    await load();await openInterest(created.reference);
-   if(shareOptIn&&organizationId){await api("/api/v1/me/job-interests/"+encodeURIComponent(created.reference)+"/sharing-consent",{method:"POST",body:JSON.stringify({employerSharingConsent:true,scope:"named_employer",organizationId,fields:shareFields})},token);}
   }catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Your request could not be submitted.");}
   finally{setBusy(false);}
  }

@@ -378,3 +378,21 @@ test("admin navigation resolves current server roles and separates finance from 
   assert.ok(!membershipPage.includes('"system_admin", "reviewer", "finance_officer"'));
   assert.ok(membershipPage.includes('"membership.review"'));
 });
+
+
+test("finance payment workspace uses a privacy-minimized queue and separate finance API", () => {
+  const server = read("server.js");
+  const service = read("src/membership/service.js");
+  const financeUi = read("web/app/admin/finance/page.tsx");
+  const membershipUi = read("web/app/membership/workspace.tsx");
+  assert.match(server, /api\/v1\/finance\/membership\/payments/);
+  assert.match(server, /assertFinancePaymentQueueAccess\(identity\)/);
+  assert.match(service, /export async function listMembershipPaymentsForFinance/);
+  assert.match(service, /pt\.id payment_id/);
+  assert.doesNotMatch(service.slice(service.indexOf("export async function listMembershipPaymentsForFinance"), service.indexOf("export async function attachApplicationFile")), /u\.email|data_snapshot|attachments/);
+  assert.match(financeUi, /api<Payment\[]>\\("\\/api\\/v1\\/finance\\/membership\\/payments"/);
+  assert.match(financeUi, /api\("\\/api\\/v1\\/payments\\/" \+ payment\.payment_id \+ "\\/verify"/);
+  assert.match(financeUi, /api\("\\/api\\/v1\\/payments\\/" \+ payment\.payment_id \+ "\\/reverse"/);
+  assert.doesNotMatch(membershipUi, /finance_officer|finance\.manage|finance\.view/);
+  assert.doesNotMatch(membershipUi, /verifyPayment|reversePayment/);
+});

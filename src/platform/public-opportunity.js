@@ -21,7 +21,7 @@ async function orgAuthorized(db,jobId,userId){
  return Boolean(r);
 }
 async function mentorAuthorized(db,mentorUserId,userId){
- if(await hasRole(db,userId,["system_admin","admin","supporting_staff"])) return true;
+ if(await hasRole(db,userId,["system_admin","admin","platform_admin","supporting_staff"])) return true;
  return mentorUserId===userId;
 }
 

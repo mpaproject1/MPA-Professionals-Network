@@ -91,7 +91,7 @@ test("direct report execution denies roles excluded from restricted reports",asy
  await assert.rejects(()=>runReport(support,"audit-activity",{},"report-auth-audit"),error=>error.statusCode===403);
 });
 
-test("finance reports reconcile verified, failed, refunded and outstanding amounts by currency",async t=>{
+test("finance reports reconcile verified, failed, refunded, disputed and outstanding amounts by currency",async t=>{
  if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
  const db=getPool(),suffix=randomUUID(),digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
  const product=(await db.query("select id from membership_product where product_code='BASIC'")).rows[0];

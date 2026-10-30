@@ -23,6 +23,7 @@ test("current workspace and membership screens expose every curated tour target 
  const membership=await readFile(new URL("../../web/app/membership/workspace.tsx",import.meta.url),"utf8");
  const payment=await readFile(new URL("../../web/app/membership/payment/page.tsx",import.meta.url),"utf8");
  const shell=await readFile(new URL("../../web/components/shell.tsx",import.meta.url),"utf8");
+ const guide=await readFile(new URL("../../web/components/guide.tsx",import.meta.url),"utf8");
  for(const target of ["workspace-overview","workspace-progress","workspace-shortcuts","workspace-help"])assert.ok(members.includes('data-guide-target="'+target+'"'),target);
  assert.match(members,/Show me around/);
  assert.ok(membership.includes('data-guide-target="membership-overview"'));
@@ -30,7 +31,8 @@ test("current workspace and membership screens expose every curated tour target 
  assert.match(membership,/Membership guide/);
  for(const target of ["payment-overview","payment-application","payment-submit"])assert.ok(payment.includes('data-guide-target="'+target+'"'),target);
  assert.match(payment,/Payment guide/);
- for(const target of ["brand-home","main-navigation","help-control"])assert.ok(shell.includes('data-guide-target="'+target+'"'),target);
+ for(const target of ["brand-home","main-navigation"])assert.ok(shell.includes('data-guide-target="'+target+'"'),target);
+ assert.ok(guide.includes('data-guide-target="help-control"'));
 });
 
 test("migration disables stale route tours and seeds only audited current route guides",async()=>{

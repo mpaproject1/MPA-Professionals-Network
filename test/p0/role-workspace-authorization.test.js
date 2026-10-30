@@ -360,3 +360,15 @@ test("recruiter and project-manager report access is explicitly scoped to organi
   assert.match(reports, /job_team_member jt where jt\.job_id=j\.id and jt\.user_id=\$6 and jt\.active=true/);
   assert.match(reports, /fetchRows\(db,id,applied,identity\)/);
 });
+
+
+test("admin navigation resolves current server roles and separates finance from membership controls", () => {
+  const workspace = read("web/app/admin/admin-workspace.tsx");
+  const overview = read("web/app/admin/page.tsx");
+  assert.match(workspace, /api<\{ roles\?: unknown; permissions\?: unknown \}>\("\\/api\\/v1\\/me"/);
+  assert.match(workspace, /const financeOfficer = Boolean/);
+  assert.match(workspace, /if \(item\.href === "\\/admin\\/membership"\) return membershipReviewer/);
+  assert.match(workspace, /if \(item\.href === "\\/admin\\/reports"\) return membershipReviewer \|\| financeOfficer/);
+  assert.match(overview, /const me = await api<any>\\("\\/api\\/v1\\/me"/);
+  assert.doesNotMatch(overview, /token\.split\\("\\."\\)/);
+});

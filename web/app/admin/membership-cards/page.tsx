@@ -17,8 +17,9 @@ export default function MembershipCardsPage(){
  const [rows,setRows]=useState<Candidate[]>([]),[selected,setSelected]=useState<string[]>([]),[cards,setCards]=useState<Card[]>([]),[batchReference,setBatchReference]=useState("");
  const [search,setSearch]=useState(""),[appliedSearch,setAppliedSearch]=useState("");
  const [loading,setLoading]=useState(true),[generating,setGenerating]=useState(false),[printing,setPrinting]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[skipped,setSkipped]=useState<BatchResult["skipped"]>([]);
- const origin=typeof window==="undefined"?"":window.location.origin;
+ const [origin,setOrigin]=useState("");
  useEffect(()=>{hydrateToken();},[hydrateToken]);
+ useEffect(()=>{setOrigin(window.location.origin);},[]);
  useEffect(()=>{if(!hydrated)return;if(!token){setLoading(false);return;}let cancelled=false;setLoading(true);void api<CandidateResult>("/api/v1/admin/membership-cards/eligible?limit=100&offset=0"+(appliedSearch?"&q="+encodeURIComponent(appliedSearch):""),{},token).then(result=>{if(!cancelled){setRows(result.items);setSelected([]);setCards([]);setBatchReference("");setSkipped([]);setError(result.hasMore?"Showing the first 100 eligible members. Refine the search to select another group; each batch is limited to 100 cards.":"");}}).catch(e=>{if(!cancelled)setError(e instanceof ApiError?e.message:"Could not load eligible membership records.");}).finally(()=>{if(!cancelled)setLoading(false);});return()=>{cancelled=true;};},[hydrated,token,appliedSearch]);
  const allVisibleSelected=useMemo(()=>rows.length>0&&rows.every(row=>selected.includes(row.membershipNumber)),[rows,selected]);
  function searchMembers(e:FormEvent){e.preventDefault();setAppliedSearch(search.trim());setCards([]);setBatchReference("");setSkipped([]);setNotice("");}

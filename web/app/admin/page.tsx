@@ -129,6 +129,7 @@ export default function AdminPage() {
     {title:"Member records",desc:"Import approved member registers, resolve conflicts and export records.",href:"/admin/members",Icon:Users,group:"People & access",access:"admin"},
     {title:"Member catalogue",desc:"Search individual membership records and linked account status.",href:"/admin/members/catalog",Icon:Users,group:"People & access",access:"admin"},
     {title:"Membership operations",desc:"Membership plans, payment review and membership lifecycle controls.",href:"/admin/membership",Icon:ShieldCheck,group:"People & access",access:"admin"},
+    {title:"Membership cards & printing",desc:"View an eligible member card or select up to 100 eligible members for audited, paginated PDF printing.",href:"/admin/membership-cards",Icon:CreditCard,group:"People & access",access:"admin"},
     {title:"Membership payment methods",desc:"Configure bank, Telebirr, cash and other manual payment instructions with finance-only access.",href:"/admin/membership/payment-methods",Icon:CreditCard,group:"People & access",access:"finance"},
     {title:"Serve-Community review",desc:"Moderate shared demand, listings and provider matching.",href:"/admin/marketplace",Icon:ClipboardList,group:"Review & service",access:"staff"},
     {title:"Support desk",desc:"Manage inquiries, handoffs and the support knowledge base.",href:"/admin/support",Icon:MessageSquareText,group:"Review & service",access:"staff"},

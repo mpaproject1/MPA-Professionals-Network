@@ -21,7 +21,7 @@ async function sourceFiles(directory) {
 test("web source has no direct navigation to the legacy /contact route", async () => {
   const files = await sourceFiles(webRoot);
   const violations = [];
-  const directContactNavigation = /\b(?:href\s*=\s*|(?:push|replace)\s*\()\s*["']\/contact["']/g;
+  const directContactNavigation = /(?:\bhref\s*=\s*\{?\s*["']\/contact["']|\b(?:router\.)?(?:push|replace)\s*\(\s*["']\/contact["']|\b(?:window\.)?location(?:\.href)?\s*=\s*["']\/contact["'])/g;
   for (const file of files) {
     if (file === path.join(webRoot, "app/contact/page.tsx")) continue;
     const source = await readFile(file, "utf8");

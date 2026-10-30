@@ -263,7 +263,7 @@ export default function MembersWorkspacePage() {
   ].filter((item) => item.visible);
 
   return <main className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9">
-    <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <header data-guide-target="workspace-overview" className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0"><div className="eyebrow">My MPA workspace</div><h1 className="h1">Welcome back, {name}.</h1><p className="muted max-w-3xl">See where things stand and continue with the next step. Progress reflects account and application records returned by the service, not pages you have opened.</p></div>
       <button id="refresh-workspace" type="button" className="btn btn-ghost shrink-0" onClick={() => void load()} disabled={loading} aria-label="Refresh your workspace status"><RefreshCw size={16} aria-hidden="true" /> {loading ? "Refreshing…" : "Refresh status"}</button>
     </header>
@@ -294,7 +294,7 @@ export default function MembersWorkspacePage() {
         </div>
       </section>
 
-      <section aria-labelledby="progress-title" className="mb-7">
+      <section data-guide-target="workspace-progress" aria-labelledby="progress-title" className="mb-7">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><div className="eyebrow">Your journey</div><h2 id="progress-title" className="h2">Membership progress</h2></div><span className="muted text-sm">{journey.filter((step) => step.state === "complete").length} of {journey.length} steps confirmed</span></div>
         <ol className="grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-5" aria-label="Membership progress steps">
           {journey.map((step, index) => {
@@ -315,7 +315,7 @@ export default function MembersWorkspacePage() {
         </ol>
       </section>
 
-      <section aria-labelledby="shortcuts-title" className="mb-7">
+      <section data-guide-target="workspace-shortcuts" aria-labelledby="shortcuts-title" className="mb-7">
         <div className="mb-3"><div className="eyebrow">Quick access</div><h2 id="shortcuts-title" className="h2">Your workspace</h2></div>
         <nav aria-label="Your workspace shortcuts" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {shortcutItems.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className="group flex min-w-0 items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 transition hover:border-[var(--primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:p-4"><Icon size={20} className="mt-0.5 shrink-0" aria-hidden="true" /><span className="min-w-0"><span className="block font-semibold">{item.label}</span><span className="muted mt-1 block text-sm">{item.detail}</span></span><ArrowRight size={15} className="ml-auto mt-1 shrink-0 opacity-70" aria-hidden="true" /></Link>; })}
@@ -331,9 +331,9 @@ export default function MembersWorkspacePage() {
         </Card>
       </section>
 
-      <footer className="flex flex-wrap items-start justify-between gap-4 border-t border-[var(--border)] pt-5">
+      <footer data-guide-target="workspace-help" className="flex flex-wrap items-start justify-between gap-4 border-t border-[var(--border)] pt-5">
         <div className="max-w-2xl"><h2 className="font-semibold">Need a hand?</h2><p className="muted mt-1 text-sm">Use the Guide control for the current screen tour, or contact support if a status looks incorrect. Your application, payment and membership activation are separate server-controlled decisions.</p></div>
-        <div className="flex flex-wrap gap-2"><Link href="/contact" className="btn btn-ghost"><HelpCircle size={16} /> Get help</Link><Link href="/membership" className="btn btn-ghost">Membership guidance <ArrowRight size={15} /></Link></div>
+        <div className="flex flex-wrap gap-2"><button type="button" className="btn btn-primary" onClick={()=>window.dispatchEvent(new Event("mpa:open-guide"))}>Show me around</button><Link href="/contact" className="btn btn-ghost"><HelpCircle size={16} /> Get help</Link><Link href="/membership" className="btn btn-ghost">Membership guidance <ArrowRight size={15} /></Link></div>
       </footer>
     </> : null}
   </main>;

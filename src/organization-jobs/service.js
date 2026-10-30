@@ -784,6 +784,8 @@ export async function scheduleInterview(applicationId,userId,input,requestId){
   const a=(await db.query("select a.*,j.organization_id from job_application a join job j on j.id=a.job_id where a.id=$1 for update",[applicationId])).rows[0]; if(!a) throw error(404,"Application not found.","NOT_FOUND");
   await jobRole(db,a.job_id,userId,["hiring_manager","recruiter"]);
   const interviewerUserId=input.interviewerUserId||userId;
+  const activeInterviewer=(await db.query("select 1 from app_user where id=$1 and status='active'",[interviewerUserId])).rows[0];
+  if(!activeInterviewer)throw error(400,"Choose an active interviewer assigned to this job or an authorized organization recruiter.","INVALID_INTERVIEWER");
   try{await jobRole(db,a.job_id,interviewerUserId,["hiring_manager","recruiter","interviewer"]);}catch{throw error(400,"Choose an active interviewer assigned to this job or an authorized organization recruiter.","INVALID_INTERVIEWER");}
   if(!["submitted","screening","shortlisted","interview"].includes(a.status)) throw error(409,"Interviews can only be scheduled for an active application in the recruitment pipeline.","INVALID_STATE");
   const start=new Date(input.scheduledStart),end=new Date(input.scheduledEnd); if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())||end<=start) throw error(400,"A valid interview time range is required.","VALIDATION_ERROR");

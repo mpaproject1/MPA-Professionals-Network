@@ -18,7 +18,7 @@ export function GuideLauncher(){
  useEffect(()=>{let cancelled=false;setIndex(0);api<Guide[]>(`/api/v1/experience/guides?route=${encodeURIComponent(pathname)}`).then(rows=>{if(!cancelled)setGuides(Array.isArray(rows)?rows:[])}).catch(()=>{if(!cancelled)setGuides([])});return()=>{cancelled=true}},[pathname]);
  const guide=useMemo(()=>guides.find(g=>g.route_pattern===pathname)||guides.find(g=>g.route_pattern==="*")||fallback,[guides,pathname]);
  const steps=guide.steps?.length?guide.steps:fallback.steps;const step=steps[Math.min(index,steps.length-1)];
- const close=useCallback(()=>{setOpen(false);window.setTimeout(()=>launcherRef.current?.focus(),0)},[]);
+ const close=useCallback(()=>{setOpen(false);window.dispatchEvent(new Event("mpa:guide-closed"));window.setTimeout(()=>launcherRef.current?.focus(),0)},[]);
  const begin=useCallback(()=>{setIndex(0);setOpen(true);window.dispatchEvent(new Event("mpa:close-support"));},[]);
  useEffect(()=>{const start=()=>begin();window.addEventListener("mpa:open-guide",start);return()=>window.removeEventListener("mpa:open-guide",start)},[begin]);
  useEffect(()=>{if(!open)return;const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape"){event.preventDefault();close()}};window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey)},[open,close]);

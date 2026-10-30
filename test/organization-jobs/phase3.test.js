@@ -156,6 +156,6 @@ test("formal applications collect and persist required screening answers across 
   assert.match(service,/screening_answers from job_application_answer/);
   assert.match(page,/screeningQuestions/);
   assert.match(page,/answersFor\(job\.id\)/);
-  assert.match(page,/Complete each required screening question/);
+  assert.match(page,/Answer each required screening question/);
   for(const type of ["text","number","yes_no","single_choice","multiple_choice"]) assert.match(page,new RegExp('question_type==="'+type+'"'));
 });

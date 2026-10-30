@@ -67,17 +67,19 @@ export default function AdminPage() {
         if (cause instanceof Error && errors.length === 1) setError(cause.message);
       }
     };
-    const tasks: Promise<void>[] = [
-      settle("opportunity inquiries", getList<Inquiry>("/api/v1/opportunity-inquiries", "inquiries"), setInquiries),
-    ];
+    const tasks: Promise<void>[] = [];
     try {
       const me = await api<any>("/api/v1/me", {}, token);
       const currentRoles = Array.isArray(me?.roles) ? me.roles.map((role: any) => typeof role === "string" ? role : role?.role_code).filter(Boolean) : [];
       setRoles(currentRoles);
       const currentPermissions = Array.isArray(me?.permissions) ? me.permissions.map((permission: any) => typeof permission === "string" ? permission : permission?.permission_code).filter((permission: unknown): permission is string => typeof permission === "string") : [];
       setPermissions(currentPermissions);
-      setIsPlatformAdmin(currentRoles.includes("system_admin") || currentRoles.includes("admin") || currentRoles.includes("platform_admin"));
-      setCanReviewInquiries(currentRoles.includes("supporting_staff") || currentRoles.includes("system_admin") || currentRoles.includes("admin") || currentRoles.includes("platform_admin"));
+      const platformAdmin = currentRoles.some((role: string) => ["system_admin", "admin", "platform_admin"].includes(role));
+      const mayReviewInquiries = platformAdmin || currentRoles.includes("supporting_staff") || currentPermissions.includes("jobs.review");
+      setIsPlatformAdmin(platformAdmin);
+      setCanReviewInquiries(mayReviewInquiries);
+      if (mayReviewInquiries) tasks.push(settle("opportunity inquiries", getList<Inquiry>("/api/v1/opportunity-inquiries", "inquiries"), setInquiries));
+      else setInquiries([]);
       if (currentRoles.includes("system_admin")) {
         tasks.push(settle("audit history", getList<AuditEvent>("/api/v1/admin/audit-log?limit=100", "items"), setAuditEvents));
       } else { setAuditEvents([]); }

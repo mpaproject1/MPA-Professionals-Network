@@ -3,13 +3,13 @@ import test from "node:test";
 import {
   allowedApplicationTransition,
   allowedCandidateResponse,
+  allowedInterviewStatusTransition,
   canCandidateAcceptOffer,
   canRespondToInterview,
-  allowedInterviewStatusTransition,
-  isValidScreeningAnswer,
   ELIGIBILITY_RULES,
   isAllowedJobPostingScope,
   isEligibleVerifiedClaimForJobs,
+  isValidScreeningAnswer,
   JOB_POSTING_SCOPES
 } from "../../src/organization-jobs/service.js";
 

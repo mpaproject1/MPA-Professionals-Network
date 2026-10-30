@@ -384,6 +384,7 @@ export async function updateApplicationDraft(applicationId,userId,input={},reque
   const a=(await db.query("select * from job_application where id=$1 for update",[applicationId])).rows[0]; if(!a) throw error(404,"Application not found.","NOT_FOUND");
   if(a.applicant_user_id!==userId) throw error(403,"Only the applicant can edit an application draft.","FORBIDDEN");
   if(a.status!=="draft") throw error(409,"Only draft applications can be edited.","INVALID_STATE");
+  if(Array.isArray(input.answers)) await saveScreeningAnswers(db,applicationId,a.job_id,input.answers,false);
   const updated=(await db.query("update job_application set cover_letter=coalesce($1,cover_letter),updated_at=now() where id=$2 returning *",[input.coverLetter??null,applicationId])).rows[0];
   await audit(db,userId,"job.application_draft_updated","job_application",applicationId,requestId,{});
   return updated;
@@ -433,7 +434,7 @@ export async function applyToJob(jobId,userId,input,requestId){
 }
 
 export async function listMyApplications(userId){
- return (await getPool().query("select a.*,j.title,j.visibility,o.display_name organization_name from job_application a join job j on j.id=a.job_id join organization o on o.id=j.organization_id where a.applicant_user_id=$1 order by a.created_at desc",[userId])).rows;
+ return (await getPool().query("select a.*,j.title,j.visibility,o.display_name organization_name,coalesce((select jsonb_agg(jsonb_build_object('questionId',aa.question_id,'answer',aa.answer)) from job_application_answer aa where aa.application_id=a.id),'[]'::jsonb) screening_answers from job_application a join job j on j.id=a.job_id join organization o on o.id=j.organization_id where a.applicant_user_id=$1 order by a.created_at desc",[userId])).rows;
 }
 
 export async function listCandidates(jobId,userId){
@@ -663,15 +664,18 @@ async function jobRole(db,jobId,userId,teamRoles=[]){
  return {job:j,role:team.role_code};
 }
 
-async function saveScreeningAnswers(db,applicationId,jobId,answers=[]){
+async function saveScreeningAnswers(db,applicationId,jobId,answers=[],requireAll=true){
  const questions=(await db.query("select * from job_screening_question where job_id=$1 and active=true order by sort_order",[jobId])).rows;
  const byId=new Map((Array.isArray(answers)?answers:[]).map(a=>[String(a.questionId),a.answer]));
+ const validIds=new Set(questions.map(question=>String(question.id)));
+ if([...byId.keys()].some(id=>!validIds.has(id))) throw error(400,"One or more screening answers do not belong to this vacancy.","INVALID_SCREENING_ANSWER");
+ await db.query("delete from job_application_answer where application_id=$1",[applicationId]);
  for(const q of questions){
    const answer=byId.get(String(q.id));
-   if(q.required && (answer===undefined||answer===null||answer==="")) throw error(400,"Required screening question is unanswered.","SCREENING_REQUIRED");
+   if(requireAll&&q.required && (answer===undefined||answer===null||answer==="")) throw error(400,"Required screening question is unanswered.","SCREENING_REQUIRED");
    if(answer!==undefined){
      let knockout=false;
-     if(q.knockout && q.knockout_operator){
+     if(requireAll&&q.knockout && q.knockout_operator){
        const av=Array.isArray(answer)?answer.map(String):String(answer);
        const kv=Array.isArray(q.knockout_value)?q.knockout_value.map(String):String(q.knockout_value??"");
        if(q.knockout_operator==="equals") knockout=Array.isArray(av)?av.includes(kv):av===kv;

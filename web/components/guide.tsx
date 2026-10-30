@@ -1,8 +1,8 @@
 "use client";
 
+import {usePathname} from "next/navigation";
 import {ChevronLeft,ChevronRight,HelpCircle,PlayCircle,X} from "lucide-react";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
-import {usePathname} from "next/navigation";
 import {api} from "../lib/api";
 
 type Step={target?:string;title:string;text:string};

@@ -127,3 +127,16 @@ test("only open interviews accept participant responses",()=>{
   assert.equal(canRespondToInterview("reschedule_requested"),true);
   for(const status of ["completed","cancelled","no_show","unknown"]) assert.equal(canRespondToInterview(status),false);
 });
+
+test("employer screening and interview forms submit database-supported option values",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const [page,migration]=await Promise.all([
+    readFile(new URL("../../web/app/recruitment/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../../db/migrations/013_comprehensive_job_portal.sql",import.meta.url),"utf8")
+  ]);
+  for(const value of ["text","yes_no","single_choice","multiple_choice","number"]) assert.match(page,new RegExp("value=\""+value+"\""));
+  assert.match(migration,/question_type in \('text','yes_no','single_choice','multiple_choice','number'\)/);
+  assert.match(page,/option value="onsite">On-site/);
+  assert.match(migration,/mode in \('online','onsite','phone'\)/);
+  assert.doesNotMatch(page,/value="single_select"|value="multi_select"|value="boolean"|value="in_person"/);
+});

@@ -37,7 +37,7 @@ A vacancy is a specific employer role with a formal application. General job int
 6. The employer cannot accept an offer on behalf of the candidate. Internal offer approval and candidate acceptance are separate decisions.
 7. Requisition, job, application, interview, offer, hiring and vacancy-outcome events remain separately auditable. A vacancy marked hired is not a substitute for an employment contract or onboarding process.
 8. Non-member consideration remains an explicit human decision, not an automatic eligibility bypass.
-9. No schema migration is justified by the UX changes implemented to date.
+9. The interview reschedule journey requires a forward-only migration because the existing interview record has no persisted proposal/decision history. Migration `20261030110000_job_interview_change_proposals.sql` adds a separate, auditable proposal record and a one-pending-proposal-per-interview constraint. It does not rewrite existing interview data.
 
 ## Implementation changes in this workstream
 
@@ -58,9 +58,9 @@ A vacancy is a specific employer role with a formal application. General job int
 - Verify direct API calls for cross-organization and cross-job access, private attachment reads, notes visibility, interview feedback and offer approval.
 - Exercise complete browser journeys for public visitor, eligible member, ineligible member, non-member inquiry, employer owner, recruiter, hiring manager, interviewer, candidate and authorized reviewer.
 - Verify responsive behavior at narrow mobile widths, keyboard-only navigation, labels/errors/focus, loading/empty/error/success states and duplicate-submit recovery.
-- Remaining source-level gap: Jobs interviews still lack a governed reschedule proposal/confirmation workflow. The current `reschedule_requested` status alone is not a complete proposal record; do not treat it as one or invent proposed times without a persisted, auditable change contract.
+- Verify interview reschedule proposals end to end: participant-only proposal, one pending proposal, overlap checks, other-participant decision, original schedule preservation on decline, participant reconfirmation after acceptance, audit and notifications.
 - Reconcile the job `pending_review` status with the current publication path and moderation policy before changing any lifecycle transition. Do not silently bypass a required review.
-- Verify the candidate-facing visibility of confirmed schedule changes after the employer interview-management workflow is completed.
+- Verify the candidate-facing visibility of confirmed schedule changes and that ordinary interview responses are disabled while a change proposal is pending.
 - Verify that organization recruiting summaries and vacancy outcomes are sourced from persisted records and are correctly scoped.
 - Do not deploy to production or modify production data as part of this workstream.
 

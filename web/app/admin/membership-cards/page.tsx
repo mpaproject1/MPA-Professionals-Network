@@ -1,7 +1,7 @@
 "use client";
+
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties, FormEvent } from "react";
+import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from "react";
 import { OperationStatus } from "../../../components/operation-status";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";

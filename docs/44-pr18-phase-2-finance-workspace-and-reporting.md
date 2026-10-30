@@ -36,7 +36,7 @@ The existing 18 reports are preserved. Five finance reports are added, bringing 
 The existing payment reconciliation report is also corrected:
 - It is restricted to membership-linked transactions.
 - It selects the latest reconciliation record per transaction rather than multiplying rows if reconciliation history has more than one record.
-- Its currency totals separate approved, failed, refunded/reversed and pending amounts instead of summing incompatible transaction states into one misleading figure.
+- Its currency totals separate approved, failed, refunded/reversed, pending (initiated and pending), and cancelled amounts instead of summing incompatible transaction states into one misleading figure.
 
 ## Financial calculation rules
 

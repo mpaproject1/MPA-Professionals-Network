@@ -90,7 +90,7 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
     allowed=applicationShare.rowCount>0;
   }
   if(!allowed){
-    const canReviewVetting=roles.some(role=>["verification_reviewer","ethics_reviewer","appeal_reviewer","system_admin"].includes(role))||permissions.includes("verification.manage");
+    const canReviewVetting=roles.some(role=>["verification_reviewer","appeal_reviewer","system_admin"].includes(role))||permissions.includes("verification.manage");
     const canReviewOrganization=roles.some(role=>["reviewer","system_admin"].includes(role))||permissions.includes("organizations.review");
     const canReviewMembership=roles.some(role=>["reviewer","finance_officer","system_admin"].includes(role))||permissions.some(permission=>["finance.view","finance.manage","members.view","members.manage"].includes(permission));
     if(canReviewOrganization){

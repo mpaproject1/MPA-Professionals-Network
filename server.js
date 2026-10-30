@@ -105,7 +105,7 @@ function optionalIdentity(req){
   if(!req.headers.authorization?.startsWith("Bearer ")) return null;
   try { return verifyToken(req.headers.authorization.slice(7),config.jwtSecret); } catch { return null; }
 }
-const ROLE_PERMISSION={verification_reviewer:"verification.manage",appeal_reviewer:"verification.appeal.review",supporting_staff:"reviews.view",admin:"users.manage"};
+const ROLE_PERMISSION={verification_reviewer:"verification.manage",appeal_reviewer:"verification.appeal.review",supporting_staff:"reviews.view",platform_admin:"users.manage",admin:"users.manage"};
 function anyRole(identity,allowed){
   const roles=Array.isArray(identity.roles)?identity.roles:[];
   const permissions=Array.isArray(identity.permissions)?identity.permissions:[];

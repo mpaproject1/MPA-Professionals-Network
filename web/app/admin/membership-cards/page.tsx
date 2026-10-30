@@ -1,0 +1,47 @@
+"use client";
+import { QRCodeSVG } from "qrcode.react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { OperationStatus } from "../../../components/operation-status";
+import { ApiError, api } from "../../../lib/api";
+import { useUiStore } from "../../../lib/store";
+import { AdminPageHeader } from "../admin-page-header";
+import styles from "./membership-cards.module.css";
+type CardSettings={header_text:string;subtitle_text:string;footer_text:string;background_style:"geometric"|"gradient"|"midnight";background_start:string;background_end:string;accent_color:string;text_color:string;show_membership_type:boolean};
+type Candidate={membershipNumber:string;memberName:string;membershipType:string;startDate:string;endDate:string|null};
+type Card=Candidate&{status:"active";verificationPath:string;settings:CardSettings};
+type CandidateResult={items:Candidate[];total:number;limit:number;offset:number;hasMore:boolean};
+type BatchResult={cards:Card[];skipped:{membershipNumber:string;reason:string}[];selectedCount:number;generatedCount:number;skippedCount:number};
+function dateLabel(value:string|null){if(!value)return "No expiry";const date=new Date(value);return Number.isNaN(date.getTime())?value:date.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"2-digit",timeZone:"UTC"});}
+export default function MembershipCardsPage(){
+ const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated),hydrateToken=useUiStore(s=>s.hydrateToken);
+ const [rows,setRows]=useState<Candidate[]>([]),[selected,setSelected]=useState<string[]>([]),[cards,setCards]=useState<Card[]>([]);
+ const [search,setSearch]=useState(""),[appliedSearch,setAppliedSearch]=useState("");
+ const [loading,setLoading]=useState(true),[generating,setGenerating]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[skipped,setSkipped]=useState<BatchResult["skipped"]>([]);
+ const origin=typeof window==="undefined"?"":window.location.origin;
+ useEffect(()=>{hydrateToken();},[hydrateToken]);
+ useEffect(()=>{if(!hydrated)return;if(!token){setLoading(false);return;}let cancelled=false;setLoading(true);void api<CandidateResult>("/api/v1/admin/membership-cards/eligible?limit=100&offset=0"+(appliedSearch?"&q="+encodeURIComponent(appliedSearch):""),{},token).then(result=>{if(!cancelled){setRows(result.items);setSelected([]);setCards([]);setSkipped([]);setError(result.hasMore?"Showing the first 100 eligible members. Refine the search to select another group; each batch is limited to 100 cards.":"");}}).catch(e=>{if(!cancelled)setError(e instanceof ApiError?e.message:"Could not load eligible membership records.");}).finally(()=>{if(!cancelled)setLoading(false);});return()=>{cancelled=true;};},[hydrated,token,appliedSearch]);
+ const allVisibleSelected=useMemo(()=>rows.length>0&&rows.every(row=>selected.includes(row.membershipNumber)),[rows,selected]);
+ function searchMembers(e:FormEvent){e.preventDefault();setAppliedSearch(search.trim());setCards([]);setSkipped([]);setNotice("");}
+ function toggle(number:string,checked:boolean){setSelected(old=>checked?[...new Set([...old,number])]:old.filter(value=>value!==number));setCards([]);setSkipped([]);}
+ async function generate(){if(!token||!selected.length)return;setGenerating(true);setError("");setNotice("");setCards([]);setSkipped([]);try{const result=await api<BatchResult>("/api/v1/admin/membership-cards/batch",{method:"POST",body:JSON.stringify({membershipNumbers:selected})},token);setCards(result.cards);setSkipped(result.skipped);setNotice(result.generatedCount+" eligible card"+(result.generatedCount===1?"":"s")+" prepared. Review the preview, then print or save as PDF.");if(result.cards.length===0)setNotice("No cards were generated. Review the reasons below and select eligible members.");}catch(e){setError(e instanceof ApiError?e.message:"The batch could not be prepared. Check your access and selection, then try again.");}finally{setGenerating(false);}}
+ if(!hydrated||loading)return <main className={styles.page}><OperationStatus state="loading" title="Loading eligible members" detail="Checking membership records and administrator permissions before showing the selection list." /></main>;
+ if(!token)return <main className={styles.page}><h1>Membership card printing</h1><p>Sign in with an authorized membership administrator account.</p><a href="/login?next=%2Fadmin%2Fmembership-cards">Sign in</a></main>;
+ return <main className={styles.page}>
+  <div className={styles.controls}>
+   <AdminPageHeader eyebrow="Administration · Membership credentials" title="Single and bulk card printing" description="Only currently active memberships appear here. Select up to 100 members, review the exact generated count and print one card per A4 page." actions={<a className="btn btn-ghost" href="/admin/membership-card">Card design settings</a>} />
+   <form className={styles.search} onSubmit={searchMembers}><label htmlFor="member-search">Find by member name or canonical membership ID</label><div><input id="member-search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Name or MPA-2026-1A2B3C4D"/><button type="submit">Search</button></div></form>
+   <div className={styles.selectionBar}><div><strong>{selected.length} selected</strong><span> · Maximum 100 per batch</span></div><button type="button" className={styles.secondary} onClick={()=>setSelected(allVisibleSelected?[]:rows.map(row=>row.membershipNumber))}>{allVisibleSelected?"Clear visible selection":"Select all visible"}</button><button type="button" disabled={!selected.length||generating} onClick={()=>void generate()}>{generating?"Preparing…":"Prepare "+selected.length+" card"+(selected.length===1?"":"s")}</button></div>
+   {error&&<p role="alert" className={styles.error}>{error}</p>}{notice&&<p role="status" className={styles.notice}>{notice}</p>}
+   {rows.length===0?<p className={styles.empty}>No currently eligible memberships match this search. Check the member’s membership status or search by their canonical MPA membership ID. Pending, expired, suspended and revoked memberships cannot be printed.</p>:<div className={styles.tableWrap}><table><thead><tr><th scope="col">Select</th><th scope="col">Member</th><th scope="col">Membership ID</th><th scope="col">Membership type</th><th scope="col">Valid until</th><th scope="col">Single card</th></tr></thead><tbody>{rows.map(row=><tr key={row.membershipNumber}><td><input type="checkbox" aria-label={"Select "+row.memberName+" "+row.membershipNumber} checked={selected.includes(row.membershipNumber)} onChange={e=>toggle(row.membershipNumber,e.target.checked)}/></td><td>{row.memberName}</td><td><strong>{row.membershipNumber}</strong></td><td>{row.membershipType}</td><td>{dateLabel(row.endDate)}</td><td><a href={"/membership/card?membershipNumber="+encodeURIComponent(row.membershipNumber)} target="_blank" rel="noreferrer">View card</a></td></tr>)}</tbody></table></div>}
+  </div>
+  {cards.length>0&&<section className={styles.previewSection} aria-label="Generated card preview">
+   <div className={styles.previewHeader}><div><h2>Review before printing</h2><p>{cards.length} card{cards.length===1?"":"s"} prepared · one card per A4 page · {skipped.length} skipped</p></div><button type="button" onClick={()=>window.print()}>Print / Save PDF</button></div>
+   {skipped.length>0&&<div className={styles.skipped} role="status"><strong>Some selections were not eligible:</strong><ul>{skipped.map(item=><li key={item.membershipNumber}>{item.membershipNumber}: {item.reason}</li>)}</ul></div>}
+   <div className={styles.printStack}>{cards.map(card=><div className={styles.printPage} key={card.membershipNumber}><article className={styles.card} style={{background:"linear-gradient(125deg,"+card.settings.background_start+","+card.settings.background_end+")",color:card.settings.text_color,"--card-accent":card.settings.accent_color} as React.CSSProperties}>
+    <header><span className={styles.logo}><img src="/brand/mpa-logo-light.svg" alt="MPA"/></span><div className={styles.brand}><strong>{card.settings.header_text}</strong><span>{card.settings.subtitle_text}</span></div><b className={styles.status}>ACTIVE</b></header>
+    <div className={styles.cardBody}><div className={styles.identity}><strong>{card.memberName}</strong>{card.settings.show_membership_type&&<span>{card.membershipType}</span>}<small>MEMBERSHIP ID</small><b className={styles.number}>{card.membershipNumber}</b><span className={styles.valid}>VALID FROM <b>{dateLabel(card.startDate)}</b></span><span className={styles.valid}>VALID UNTIL <b>{dateLabel(card.endDate)}</b></span></div><div className={styles.qr}><QRCodeSVG value={origin+card.verificationPath} size={160} level="M" includeMargin={false}/><small>SCAN TO VERIFY</small></div></div>
+    <footer><span>{card.settings.footer_text}</span><b>VERIFY ONLINE</b></footer>
+   </article></div>)}</div>
+  </section>}
+ </main>;
+}

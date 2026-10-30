@@ -143,7 +143,7 @@ test("recruiting interview scheduling validates organization/job-team scope and 
   assert.match(interview, /INVALID_INTERVIEWER/);
   assert.match(interview, /jobRole\(db,a\.job_id,userId,\["hiring_manager","recruiter"\]\)/);
   assert.match(interview, /jobRole\(db,a\.job_id,interviewerUserId,\["hiring_manager","recruiter","interviewer"\]\)/);
-  assert.match(interview, /job_team_member/);
+  assert.match(service, /select role_code from job_team_member where job_id=\\$1 and user_id=\\$2 and active=true/);
   assert.match(interview, /Interviews can only be scheduled for an active application/);
   const notesStart = service.indexOf("export async function listApplicationNotes(");
   const notesEnd = service.indexOf("export async function scheduleInterview(", notesStart);

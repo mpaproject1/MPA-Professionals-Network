@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, api } from "../lib/api";
 import { useUiStore } from "../lib/store";
-import { Card } from "./ui";
 
 type AccessDecision = {
   eligible: boolean;
@@ -68,7 +67,7 @@ export function NetworkPlusAccessGuard({ children }: { children: React.ReactNode
 
   return (
     <main className="mx-auto grid w-full max-w-3xl gap-4 px-4 py-10 sm:px-6" aria-live="polite">
-      <Card>
+      <section className="card">
         {currentState === "checking" ? (
           <>
             <h1 className="h2">Checking Network-Plus access</h1>
@@ -96,7 +95,7 @@ export function NetworkPlusAccessGuard({ children }: { children: React.ReactNode
             <button className="btn btn-primary mt-4" type="button" onClick={() => setAttempt((value) => value + 1)}>Retry access check</button>
           </>
         )}
-      </Card>
+      </section>
     </main>
   );
 }

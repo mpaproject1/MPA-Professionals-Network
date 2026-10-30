@@ -234,6 +234,8 @@ test("interview scheduling restricts interviewer assignment to active authorized
   assert.match(schedule,/select 1 from app_user where id=\$1 and status='active'/);
   assert.match(schedule,/jobRole\(db,a\.job_id,interviewerUserId,\["hiring_manager","recruiter","interviewer"\]\)/);
   assert.doesNotMatch(schedule,/om\.role_code in/);
+  assert.match(schedule,/jp\.user_id=any\(\$1::uuid\[\]\)/);
+  assert.match(schedule,/interviewerUserId,a\.applicant_user_id/);
 });
 
 test("screening answers are validated against question type and configured options",()=>{

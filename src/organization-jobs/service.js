@@ -71,7 +71,7 @@ export async function getOrganization(orgId,viewerId=null){
  // Public visibility applies only to the explicitly limited public-profile projection.
  // Full organization records and membership rosters are private workspace data.
  if(!viewerId) throw error(403,"Sign in with an active organization role to view workspace details.","FORBIDDEN");
- const membership=(await db.query("select om.role_code from organization_membership om where om.organization_id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator','recruiter','read_only')",[orgId,viewerId])).rows[0];
+ const membership=(await db.query("select om.role_code from organization_membership om where om.organization_id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator','recruiter','project_manager','read_only')",[orgId,viewerId])).rows[0];
  if(!membership) throw error(403,"An active member of this organization is required to view its workspace details.","FORBIDDEN");
  if(membership.role_code==="read_only") return {id:org.id,display_name:org.display_name,organization_type:org.organization_type,description:org.description,website:org.website,verification_status:org.verification_status,public_visible:org.public_visible,role_code:membership.role_code,users:[]};
  const users=membership.role_code==="owner"||membership.role_code==="administrator"
@@ -596,24 +596,26 @@ export async function addApplicationAttachment(applicationId,userId,input,reques
 export async function addOrganizationUser(orgId,actorUserId,input,requestId){
  return withTransaction(async db=>{
   await orgRole(db,orgId,actorUserId,["owner","administrator"]);
+  const reason=String(input.reason||"").trim().slice(0,1000); if(reason.length<8)throw error(400,"Provide an assignment reason of at least 8 characters.","AUDIT_REASON_REQUIRED");
   if(!["administrator","recruiter","project_manager","event_manager","finance","read_only"].includes(input.roleCode)) throw error(400,"Choose a supported organization role. Ownership transfer uses a separate controlled workflow.","VALIDATION_ERROR");
   const target=(await db.query("select id from app_user where status='active' and (($1::uuid is not null and id=$1) or ($2::text is not null and lower(email)=lower($2))) order by id limit 1",[input.userId||null,input.email?String(input.email).trim().toLowerCase():null])).rows[0]; if(!target) throw error(404,"No existing MPA account was found for that user ID or email. Ask the person to register before assigning organization access.","NOT_FOUND");
   if(target.id===actorUserId) throw error(409,"You cannot replace your own organization membership assignment through this form.","SELF_ASSIGNMENT");
   const row=(await db.query("insert into organization_membership(organization_id,user_id,role_code,status,invited_by,joined_at) values($1,$2,$3,'active',$4,now()) on conflict(organization_id,user_id) do update set role_code=excluded.role_code,status='active',updated_at=now() returning *",[orgId,target.id,input.roleCode,actorUserId])).rows[0];
-  await audit(db,actorUserId,"organization.user_added","organization_membership",row.id,requestId,{roleCode:input.roleCode});
-  await queueWorkflowEmail(db,input.userId,"organization.membership_added",{category:"organizations",title:"Organization workspace access granted",message:`You were added to an organization workspace with the ${String(input.roleCode).replace(/_/g," ")} role.`,nextAction:"Open the organization workspace to review your access and assigned responsibilities.",actionUrl:"/organizations",eventVersion:row.id},"organization_membership",row.id);
+  await audit(db,actorUserId,"organization.user_added","organization_membership",row.id,requestId,{roleCode:input.roleCode,reason});
+  await queueWorkflowEmail(db,target.id,"organization.membership_added",{category:"organizations",title:"Organization workspace access granted",message:`You were added to an organization workspace with the ${String(input.roleCode).replace(/_/g," ")} role.`,nextAction:"Open the organization workspace to review your access and assigned responsibilities.",actionUrl:"/organizations",eventVersion:row.id},"organization_membership",row.id);
   return row;
  });
 }
 export async function updateOrganizationUser(orgId,actorUserId,userId,input,requestId){
  return withTransaction(async db=>{
   await orgRole(db,orgId,actorUserId,["owner","administrator"]);
+  const reason=String(input.reason||"").trim().slice(0,1000); if(reason.length<8)throw error(400,"Provide an assignment change reason of at least 8 characters.","AUDIT_REASON_REQUIRED");
   const row=(await db.query("select * from organization_membership where organization_id=$1 and user_id=$2 for update",[orgId,userId])).rows[0]; if(!row) throw error(404,"Organization user not found.","NOT_FOUND");
   if(row.role_code==="owner") throw error(403,"The owner role cannot be changed here. Use a dedicated ownership transfer workflow.","FORBIDDEN");
   const role=input.roleCode||row.role_code; if(!["administrator","recruiter","project_manager","event_manager","finance","read_only"].includes(role)) throw error(400,"Choose a supported organization role. Ownership transfer uses a separate controlled workflow.","VALIDATION_ERROR");
   const status=input.status||row.status; if(!["active","suspended","removed"].includes(status)) throw error(400,"Invalid organization user status.","VALIDATION_ERROR");
   const updated=(await db.query("update organization_membership set role_code=$1,status=$2,updated_at=now() where id=$3 returning *",[role,status,row.id])).rows[0];
-  await audit(db,actorUserId,"organization.user_updated","organization_membership",row.id,requestId,{roleCode:role,status});
+  await audit(db,actorUserId,"organization.user_updated","organization_membership",row.id,requestId,{previousRole:row.role_code,previousStatus:row.status,roleCode:role,status,reason});
   await queueWorkflowEmail(db,row.user_id,"organization.membership_updated",{category:"organizations",title:"Organization workspace access updated",message:"Your organization workspace role or access status was updated.",nextAction:status==="active"?"Review your organization workspace access and responsibilities.":"Contact an organization owner if you believe your access was changed in error.",actionUrl:"/organizations",actionRequired:status!=="active",priority:status==="active"?"normal":"high",eventVersion:`${row.id}:${status}:${role}`},"organization_membership",row.id);
   return updated;
  });

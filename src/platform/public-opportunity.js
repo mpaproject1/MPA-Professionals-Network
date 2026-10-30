@@ -256,7 +256,7 @@ export async function searchPublicSharingOrganizations(searchTerm){
  return (await getPool().query("select id,display_name,legal_name from organization where verification_status='verified' and public_visible=true and (display_name ilike $1 or legal_name ilike $1) order by coalesce(display_name,legal_name),id limit 10",[`%${term}%`])).rows;
 }
 
-export async function decideInquiry(inquiryId,userId,input,requestId){
+export async function decideInquiry(inquiryId,userId,input,requestId,idempotencyKey=null){
  return withTransaction(async db=>{
   const r=(await db.query("select i.*,j.organization_id from public_opportunity_inquiry i left join job j on j.id=i.job_id where i.id=$1 for update of i",[inquiryId])).rows[0];
   if(!r) throw error(404,"Inquiry not found.","NOT_FOUND");
@@ -268,8 +268,17 @@ export async function decideInquiry(inquiryId,userId,input,requestId){
   if(!valid.includes(status)) throw error(400,"Invalid inquiry status.","VALIDATION_ERROR");
   const consider=input.considerNonMember===undefined?r.consider_non_member:Boolean(input.considerNonMember);
   const note=clean(input.note,4000);
+  const memberJobInterest=r.inquiry_type==="job"&&!r.job_id;
+  let keyHash=null,payloadHash=null;
+  if(memberJobInterest){
+   if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))throw error(400,"A secure idempotency key is required for this status decision.","IDEMPOTENCY_KEY_REQUIRED");
+   keyHash=hashToken(idempotencyKey);payloadHash=hashPayload({status,considerNonMember:consider,note});
+   const prior=(await db.query("select payload_hash,response from public_opportunity_inquiry_decision_idempotency where inquiry_id=$1 and actor_user_id=$2 and idempotency_key_hash=$3 for update",[inquiryId,userId,keyHash])).rows[0];
+   if(prior){if(prior.payload_hash!==payloadHash)throw error(409,"This status-decision key was already used for different information.","IDEMPOTENCY_KEY_CONFLICT");return prior.response;}
+  }
   const row=(await db.query("update public_opportunity_inquiry set status=$1,consider_non_member=$2,decision_note=$3,decided_by=$4,decided_at=now(),updated_at=now() where id=$5 returning *",[status,consider,note,userId,inquiryId])).rows[0];
   await audit(db,userId,"public_opportunity.inquiry_decision","public_opportunity_inquiry",inquiryId,requestId,{status,considerNonMember:consider});
+  if(memberJobInterest)await db.query("insert into public_opportunity_inquiry_decision_idempotency(inquiry_id,actor_user_id,idempotency_key_hash,payload_hash,response) values($1,$2,$3,$4,$5::jsonb)",[inquiryId,userId,keyHash,payloadHash,JSON.stringify(row)]);
   return row;
  });
 }

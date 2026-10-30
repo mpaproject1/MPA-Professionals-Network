@@ -55,7 +55,7 @@ test.describe("Accessible contextual screen tours",()=>{
   const guidesLoaded=page.waitForResponse(/\/api\/v1\/experience\/guides/);
   await page.goto("/membership/payment");
   await guidesLoaded;
-  await page.getByRole("button",{name:"Show me around this screen"}).click();
+  await page.getByRole("button",{name:"Payment guide"}).click();
   const dialog=page.getByRole("dialog",{name:"Membership payment and receipt"});
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Step 1 of 2");

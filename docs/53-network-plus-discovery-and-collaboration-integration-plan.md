@@ -4,6 +4,7 @@
 **PR:** [#18 — Workstream 3](https://github.com/Jcodestest/MPA-Professionals-Network/pull/18)  
 **Audit baseline:** c05cf51413bb7d1d95c04c5b2f738a0d19a18669 (2026-10-30)  
 **Status:** Source-foundation audit and incremental delivery plan.  
+**Implementation status:** Initial server-side eligibility resolver, authenticated access endpoint, guarded Network-Plus landing/member-discovery routes and conditional top-level navigation are committed on this branch. Runtime and CI validation are still pending; no business schema or commercial listing model has been added. The initial organization entry roles are owner, administrator and project_manager. Recruiter/read_only access remains excluded pending the role-policy decision.  
 **Change control:** This plan authorizes work on the target branch only. It does not authorize a merge, main-branch changes, production deployment or production database changes.
 
 ## 1. Product contract
@@ -109,8 +110,11 @@ This is a source-level audit, not a claim that all browser journeys or every aut
 - /network is an existing verified talent directory, not a Network-Plus landing page. /organizations is a private organization workspace, not organization discovery.
 - Hiding a link is not authorization. Direct URL entry and API calls must be protected server-side.
 
-**Decision**
-- Add Network-Plus as a top-level desktop/mobile destination, visible only after a server-backed eligibility check.
+**Decision and current implementation**
+- Network-Plus is now a top-level desktop/mobile destination, shown only after the shell receives an eligible result from the authenticated server access endpoint.
+- The server resolver checks a current active membership record or an active owner/administrator/project_manager membership in a verified organization. It returns only boolean access context and a safe next action; it does not return organization IDs or private profile data.
+- The Network-Plus landing and existing /network Verified Member Discovery route use a shared access guard. Direct page entry is checked again; the shell's hidden link is not treated as the security boundary.
+- Existing /api/v1/talent behavior has not been broadened or rewritten. Its existing explicit public-profile visibility policy remains intact; the guarded Network-Plus UI requires the new access endpoint.
 - Entry eligibility is either (a) current active MPA membership, or (b) active membership in a verified organization under an approved organization-role policy.
 - A platform role alone, unverified organization, draft registration, expired membership or stale client flag is insufficient.
 - Entry access does not grant authority to publish, edit, accept requests, see private contact details or access another user's records. Each action remains resource- and permission-scoped.
@@ -146,7 +150,7 @@ Business routes above are planned destinations, not permission to create busines
 
 **Exit gate:** no duplicate identity/profile/organization model proposed; each existing route has a documented owner and access policy.
 
-### Increment 1 — Network-Plus eligibility contract and server boundary
+### Increment 1 — Network-Plus eligibility contract and server boundary (implemented; validation pending)
 1. Add a server-owned access resolver checking current membership status/date bounds and active organization-membership records joined to the specific verified organization.
 2. Return only minimal eligibility data: eligible/not eligible, eligible context types and a safe next action. Do not expose private member/organization details for navigation.
 3. Never infer eligibility from local storage, client role claims, a non-empty organization array, a member role alone or a client-provided organization ID.
@@ -156,7 +160,7 @@ Business routes above are planned destinations, not permission to create busines
 
 **Exit gate:** server-side tests prove the access decision; direct URL entry cannot bypass it; public Serve-Community routes remain public.
 
-### Increment 2 — top-level navigation and landing UX
+### Increment 2 — top-level navigation and landing UX (initial implementation committed; validation pending)
 1. Add Network-Plus to desktop and mobile top-level navigation only after the server access result is known.
 2. Do not flash an unauthorized item while access is pending or failed.
 3. Add a landing page with two unmistakable destinations: Verified Member Discovery and Business Discovery.
@@ -301,3 +305,6 @@ Every increment stays on feat/workstream-3-progress-members-workspace. Re-read t
 - docs/33-public-opportunity-intake.md — public intake contract.
 - docs/organization-progress-journey.md — organization workspace progress contract.
 - server.js — API dispatch and authentication boundary.
+- src/platform/network-plus-access.js and test/platform/network-plus-access.test.js — server-owned entry eligibility and focused policy tests.
+- web/components/network-plus-access-guard.tsx, web/app/network/layout.tsx and web/app/network-plus/page.tsx — guarded routes and initial two-experience landing.
+- web/components/shell.tsx — conditional top-level navigation.

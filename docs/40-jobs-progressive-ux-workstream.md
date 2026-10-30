@@ -49,7 +49,6 @@ A vacancy is a specific employer role with a formal application. General job int
 - Formal application screening questions are now rendered from the vacancy detail response; text, number, yes/no, single-choice and multiple-choice answers are persisted with drafts, restored to the applicant, and revalidated by the server at submission. Empty required multi-select answers are rejected.
 - The applicant progress workspace now loads the applicant-owned interview schedule and stage history, supports participant confirmation/decline for open interviews, and supports candidate-owned offer acceptance or withdrawal. Applicant progress omits reviewer event notes and participant user identifiers.
 - Employer screening-question and interview-mode controls now use the exact values supported by the database constraints. Candidate list and mutation access share the same job-scoped hiring-team authorization rule.
-- Candidate list and status-mutation authorization now use the same job-scoped hiring-team check as the existing pipeline read. Organization owner/administrator/recruiter access remains supported; assigned hiring-manager/recruiter team roles can perform the candidate actions permitted by the job-team boundary.
 
 ## Remaining validation gates before calling the workstream complete
 
@@ -58,7 +57,6 @@ A vacancy is a specific employer role with a formal application. General job int
 - Verify direct API calls for cross-organization and cross-job access, private attachment reads, notes visibility, interview feedback and offer approval.
 - Exercise complete browser journeys for public visitor, eligible member, ineligible member, non-member inquiry, employer owner, recruiter, hiring manager, interviewer, candidate and authorized reviewer.
 - Verify responsive behavior at narrow mobile widths, keyboard-only navigation, labels/errors/focus, loading/empty/error/success states and duplicate-submit recovery.
-- Reconcile the job `pending_review` status with the current publication path and moderation policy before changing any lifecycle transition. Do not silently bypass a required review.
 - Remaining source-level gap: the employer recruitment page schedules interviews but does not yet provide a complete interview list, interviewer feedback submission experience, or a governed interview reschedule proposal/confirmation flow. The backend has a feedback service and interview response mechanism, but these do not by themselves complete the stakeholder journey.
 - Reconcile the job `pending_review` status with the current publication path and moderation policy before changing any lifecycle transition. Do not silently bypass a required review.
 - Verify the candidate-facing visibility of confirmed schedule changes after the employer interview-management workflow is completed.

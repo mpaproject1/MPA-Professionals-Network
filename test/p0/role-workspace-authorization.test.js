@@ -414,9 +414,27 @@ test("payment-method configuration is not granted by generic membership manageme
 
 test("phase-one permission migration registers capabilities without assigning them to accounts", () => {
   const migration = read("db/migrations/20261030190000_membership_finance_permission_separation.sql");
-  for (const permission of ["membership.review", "membership.activate", "finance.payment.verify", "finance.payment.reverse"]) {
+  for (const permission of ["membership.review", "membership.activate", "finance.view", "finance.payment.verify", "finance.payment.reverse"]) {
     assert.ok(migration.includes("'" + permission + "'"));
   }
   assert.ok(migration.includes("on conflict(permission_code) do update"));
   assert.ok(!/insert\s+into\s+app_user_permission/i.test(migration));
+});
+
+
+test("finance reporting is separate from membership and payment mutation authority", () => {
+  const reports = read("src/platform/reports.js");
+  const finance = read("web/app/admin/finance/page.tsx");
+  const reportUi = read("web/app/admin/reports/page.tsx");
+  for (const id of ["approved-payments", "failed-reversed-payments", "membership-collections", "outstanding-membership-payments", "finance-summary"]) {
+    assert.ok(reports.includes('id:"' + id + '"'));
+  }
+  assert.ok(reports.includes('permissions.includes("finance.view")'));
+  assert.ok(finance.includes("/api/v1/admin/reports/finance-summary/run"));
+  assert.ok(finance.includes('href="/admin/reports?report=approved-payments"'));
+  assert.ok(reportUi.includes('new URLSearchParams(window.location.search).get("report")'));
+  assert.ok(reports.includes("pt.status in ('succeeded','refunded')"));
+  assert.ok(reports.includes("pt.status='succeeded'"));
+  assert.ok(reports.includes("membership_payment_reversal"));
+  assert.ok(reports.includes("ma.status in ('approved','payment_pending')"));
 });

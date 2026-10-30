@@ -86,7 +86,7 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
     allowed=membership.rowCount>0;
   }
   if(!allowed){
-    const applicationShare=await db.query(`select 1 from job_application_attachment aa join job_application a on a.id=aa.application_id join job j on j.id=a.job_id where aa.file_object_id=$1 and a.applicant_user_id<>$2 and a.status not in ('draft','withdrawn','rejected') and (exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator','recruiter','project_manager')) or exists(select 1 from job_team_member jt where jt.job_id=j.id and jt.user_id=$2 and jt.active=true and jt.role_code in ('hiring_manager','recruiter','interviewer'))) limit 1`,[fileId,userId]);
+    const applicationShare=await db.query(`select 1 from job_application_attachment aa join job_application a on a.id=aa.application_id join job j on j.id=a.job_id where aa.file_object_id=$1 and a.applicant_user_id<>$2 and a.status not in ('draft','withdrawn','rejected') and (exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator','recruiter')) or exists(select 1 from job_team_member jt where jt.job_id=j.id and jt.user_id=$2 and jt.active=true and jt.role_code in ('hiring_manager','recruiter','interviewer'))) limit 1`,[fileId,userId]);
     allowed=applicationShare.rowCount>0;
   }
   if(!allowed){

@@ -210,5 +210,5 @@ jobs:
           node-version: 20
       - name: Apply Biome import organization to the affected file and print the diff
         run: |
-          npx --yes @biomejs/biome@2.2.4 check --formatter-enabled=false --linter-enabled=false --organize-imports-enabled=true --write web/app/admin/membership-cards/page.tsx
+          npx --yes @biomejs/biome@2.2.4 check --write --only=assist/source/organizeImports web/app/admin/membership-cards/page.tsx
           git diff --no-ext-diff -- web/app/admin/membership-cards/page.tsx

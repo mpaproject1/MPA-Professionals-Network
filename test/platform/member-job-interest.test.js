@@ -13,6 +13,8 @@ test("member job-interest requests require current active membership and account
  assert.match(service,/randomBytes\(32\)\.toString\("base64url"\)/);
  assert.match(service,/continuation_token_hash/);
  assert.match(service,/job_interest\.submitted/);
+ assert.match(service,/where public_reference=\$1 and app_user_id=\$2 and inquiry_type='job' and job_id is null/);
+ assert.doesNotMatch(service.slice(service.indexOf("function memberJobInterestPayload"),service.indexOf("export async function createMemberJobInterest")),/continuationToken/);
 });
 
 test("job-interest public token endpoints are closed while mentorship token intake remains separate",async()=>{
@@ -47,5 +49,7 @@ test("status decisions for member job interests require a hashed idempotency key
  assert.match(service,/public_opportunity_inquiry_decision_idempotency/);
  assert.match(service,/public_opportunity\.inquiry_decision/);
  assert.match(service,/IDEMPOTENCY_KEY_REQUIRED/);
+ const server=await readFile(new URL("../../server.js",import.meta.url),"utf8");
+ assert.match(server,/decideInquiry\(parts\[3\],identity\.sub,b,requestId,req\.headers\["x-idempotency-key"\]\)/);
  assert.match(migration,/unique\(inquiry_id,actor_user_id,idempotency_key_hash\)/);
 });

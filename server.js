@@ -39,6 +39,8 @@ import * as servicesMentorship from "./src/services-mentorship/service.js";
 import * as serviceMentorshipSupportCases from "./src/services-mentorship/support-cases.js";
 import * as talent from "./src/talent/service.js";
 import * as verification from "./src/verification/service.js";
+import * as ethics from "./src/ethics/service.js";
+import * as volunteerPledges from "./src/platform/volunteer-pledges.js";
 
 const config=loadConfig();
 const logger=createLogger({level:config.logLevel});
@@ -103,7 +105,7 @@ function optionalIdentity(req){
   if(!req.headers.authorization?.startsWith("Bearer ")) return null;
   try { return verifyToken(req.headers.authorization.slice(7),config.jwtSecret); } catch { return null; }
 }
-const ROLE_PERMISSION={verification_reviewer:"verification.manage",ethics_reviewer:"verification.manage",appeal_reviewer:"verification.manage",organization_admin:"organizations.manage",recruiter:"jobs.manage",project_manager:"jobs.manage",mentor:"mentorship.manage",supporting_staff:"reviews.view",admin:"users.manage"};
+const ROLE_PERMISSION={verification_reviewer:"verification.manage",appeal_reviewer:"verification.manage",organization_admin:"organizations.manage",recruiter:"jobs.manage",project_manager:"jobs.manage",mentor:"mentorship.manage",supporting_staff:"reviews.view",admin:"users.manage"};
 function anyRole(identity,allowed){
   const roles=Array.isArray(identity.roles)?identity.roles:[];
   const permissions=Array.isArray(identity.permissions)?identity.permissions:[];
@@ -586,7 +588,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/reference-requests/") && parts[5]==="review") return ok(res,await verification.reviewReferenceRequest(parts[4],await body(req),identity.sub,requestId),requestId);
     if(req.method==="POST" && p==="api/v1/verification/cases"){
       const b=await body(req);
-      if(b.subjectUserId && b.subjectUserId!==identity.sub) anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]);
+      if(b.subjectUserId && b.subjectUserId!==identity.sub) anyRoleOrPermission(identity,["verification_reviewer","system_admin"],["verification.manage"]);
       else requireRole(identity,"member");
       return ok(res,await verification.createCase(b.subjectUserId||identity.sub,b.programCode,identity.sub,requestId),requestId,201);
     }
@@ -597,7 +599,7 @@ const server=http.createServer(async (req,res)=>{
     }
     if(req.method==="GET" && p==="api/v1/review/verification/appeals") return ok(res,await verification.listAppealsForReview(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/review/verification/cases"){
-      anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]);
+      anyRoleOrPermission(identity,["verification_reviewer","system_admin"],["verification.manage"]);
       const q=query(req.url);
       return ok(res,await verification.listCases({viewerId:identity.sub,status:q.get("status"),programCode:q.get("programCode"),reviewerId:q.get("reviewerId"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
     }
@@ -606,21 +608,21 @@ const server=http.createServer(async (req,res)=>{
       return ok(res,await verification.assignCase(parts[4],b.reviewerId,identity.sub,requestId,b.reason||"Assignment updated"),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="transition"){
-      anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]); const b=await body(req);
+      anyRoleOrPermission(identity,["verification_reviewer","system_admin"],["verification.manage"]); const b=await body(req);
       return ok(res,await verification.transitionCase(parts[4],b.status,identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="claims"){
       const b=await body(req); const c=await verification.getCase(parts[4],identity.sub);
-      if(c.subject_user_id!==identity.sub) anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]);
+      if(c.subject_user_id!==identity.sub) anyRoleOrPermission(identity,["verification_reviewer","system_admin"],["verification.manage"]);
       return ok(res,await verification.addClaim(parts[4],b.claimTypeCode,b.claimedValue,identity.sub,requestId),requestId,201);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="evidence"){
       const b=await body(req); const c=await verification.getCase(parts[4],identity.sub);
-      if(c.subject_user_id!==identity.sub) anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]);
+      if(c.subject_user_id!==identity.sub) anyRoleOrPermission(identity,["verification_reviewer","system_admin"],["verification.manage"]);
       return ok(res,await verification.addEvidence(parts[4],b,identity.sub,requestId),requestId,201);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="decision"){
-      anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]);
+      anyRoleOrPermission(identity,["verification_reviewer","system_admin"],["verification.manage"]);
       return ok(res,await verification.decide(parts[4],await body(req),identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="response") return ok(res,await verification.memberResponse(parts[4],await body(req),identity.sub,requestId),requestId);
@@ -630,11 +632,11 @@ const server=http.createServer(async (req,res)=>{
       return ok(res,await verification.decideAppeal(parts[3],await body(req),identity.sub,requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="claim-status"){
-      anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]); const b=await body(req);
+      anyRoleOrPermission(identity,["verification_reviewer","system_admin"],["verification.manage"]); const b=await body(req);
       return ok(res,await verification.setClaimStatus(b.claimId,b.status,identity.sub,requestId,parts[4]),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/verification/cases/") && parts[5]==="check-results"){
-      anyRoleOrPermission(identity,["verification_reviewer","ethics_reviewer","system_admin"],["verification.manage"]); const b=await body(req);
+      anyRoleOrPermission(identity,["verification_reviewer","system_admin"],["verification.manage"]); const b=await body(req);
       return ok(res,await verification.recordCheckResult(parts[4],b.checklistItemId,b,identity.sub,requestId),requestId);
     }
 

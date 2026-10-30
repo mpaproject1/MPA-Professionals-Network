@@ -147,11 +147,11 @@ export default function FinanceWorkspacePage() {
         <div><h2 className="h2">Payment records</h2><p className="muted">Up to 500 membership payment records, newest and pending items first. Applicant contact details and private application evidence are not included in this queue.</p></div>
         <Badge tone="slate">{rows.length} records returned</Badge>
       </div>
-      {rows.length === 0 ? <OperationStatus state="empty" title="No membership payments in this queue" detail="No matching payment records were returned. Refresh to check the current source records." /> : rows.map(payment => <article key={payment.payment_id} className="case-row" style={{ alignItems: "flex-start" }}>
+      {rows.length === 0 ? <OperationStatus state="info" title="No membership payments in this queue" detail="No matching payment records were returned. Refresh to check the current source records." /> : rows.map(payment => <article key={payment.payment_id} className="case-row" style={{ alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }} className="grid">
           <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
             <div><strong>{payment.product_name || payment.product_code} · {payment.application_type}</strong><p className="muted">Application {payment.tracking_reference || payment.application_id}</p></div>
-            <Badge tone={payment.payment_status === "succeeded" ? "green" : payment.payment_status === "pending" ? "amber" : "slate"}>{payment.payment_status.replaceAll("_", " ")}</Badge>
+            <Badge tone={payment.payment_status === "succeeded" ? "green" : payment.payment_status === "pending" ? "gold" : "slate"}>{payment.payment_status.replaceAll("_", " ")}</Badge>
           </div>
           <div className="grid grid-2">
             <p><span className="muted">Amount</span><br/><b>{payment.currency} {payment.amount}</b></p>

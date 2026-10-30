@@ -12,6 +12,7 @@ import { AdminPageHeader } from "../admin-page-header";
 type Demo = { id: string; case_key: string; title: string; business_area: string; persona: string; description: string; start_path: string; scenario: any; active: boolean };
 type Guide = { id: string; guide_key: string; route_pattern: string; title: string; description: string; steps: any[]; active: boolean };
 type Tab = "guides" | "demos" | "help";
+const currentGuideKeys = new Set(["global-navigation", "member-workspace", "membership-application", "membership-payment"]);
 
 function tokenRoles(token: string) {
   try {
@@ -34,7 +35,6 @@ export default function AdminExperiencePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [failed, setFailed] = useState({ demos: false, guides: false });
-  const currentGuideKeys = new Set(["global-navigation", "member-workspace", "membership-application", "membership-payment"]);
   const [editing, setEditing] = useState<Demo | null>(null);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);

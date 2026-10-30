@@ -45,6 +45,7 @@ test("current workspace and membership screens expose every curated tour target 
 test("migration disables stale route tours and seeds only audited current route guides",async()=>{
  const migration=await readFile(new URL("../../db/migrations/20261030160000_workstream_4_contextual_screen_tours.sql",import.meta.url),"utf8");
  const service=await readFile(new URL("../../src/platform/experience.js",import.meta.url),"utf8");
+ const server=await readFile(new URL("../../server.js",import.meta.url),"utf8");
  const admin=await readFile(new URL("../../web/app/admin/experience/page.tsx",import.meta.url),"utf8");
  assert.match(migration,/set active=false/);
  for(const route of ["'\*'","'/members'","'/membership'","'/membership/payment'"])assert.ok(migration.includes(route),route);
@@ -52,5 +53,9 @@ test("migration disables stale route tours and seeds only audited current route 
  assert.match(migration,/on conflict\(guide_key\) do update/);
  assert.match(service,/GUIDE_RETIRED/);
  assert.match(service,/CURRENT_GUIDE_KEYS\.has\(current\.guide_key\)/);
+ assert.match(service,/where active=true order by sort_order,title/);
+ assert.match(service,/listAdminGuides/);
+ assert.match(server,/api\\/v1\\/admin\\/experience\\/guides/);
  assert.match(admin,/currentGuideKeys\.has\(guide\.guide_key\)/);
+ assert.match(admin,/api\\/v1\\/admin\\/experience\\/guides/);
 });

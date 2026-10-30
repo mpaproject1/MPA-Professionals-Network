@@ -709,7 +709,7 @@ async function jobRole(db,jobId,userId,teamRoles=[]){
  if(!j) throw error(404,"Job not found.","NOT_FOUND");
  const org=(await db.query("select role_code from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[j.organization_id,userId])).rows[0];
  if(org && ["owner","administrator","recruiter"].includes(org.role_code)) return {job:j,role:org.role_code};
- const team=(await db.query("select role_code from job_team_member where job_id=$1 and user_id=$2 and active=true",[jobId,userId])).rows[0];
+ const team=(await db.query("select jt.role_code from job_team_member jt join organization_membership om on om.organization_id=$2 and om.user_id=jt.user_id and om.status='active' where jt.job_id=$1 and jt.user_id=$3 and jt.active=true",[jobId,j.organization_id,userId])).rows[0];
  if(!team || (teamRoles.length && !teamRoles.includes(team.role_code))) throw error(403,"You do not have the required job-team permission.","FORBIDDEN");
  return {job:j,role:team.role_code};
 }
@@ -780,6 +780,20 @@ export async function addJobTeamMember(jobId,userId,input,requestId){
   const row=(await db.query("insert into job_team_member(job_id,user_id,role_code,added_by) values($1,$2,$3,$4) on conflict(job_id,user_id,role_code) do update set active=true returning *",[jobId,input.userId,input.roleCode,userId])).rows[0];
   await audit(db,userId,"job.team_member_added","job_team_member",row.id,requestId,{roleCode:input.roleCode});
   return row;
+ });
+}
+export async function removeJobTeamMember(jobId,userId,teamMemberId,input={},requestId){
+ return withTransaction(async db=>{
+  const job=(await db.query("select organization_id from job where id=$1",[jobId])).rows[0];
+  if(!job)throw error(404,"Job not found.","NOT_FOUND");
+  await orgRole(db,job.organization_id,userId,["owner","administrator","recruiter"]);
+  const member=(await db.query("select * from job_team_member where id=$1 and job_id=$2 and active=true for update",[teamMemberId,jobId])).rows[0];
+  if(!member)throw error(404,"Active job-team assignment not found.","NOT_FOUND");
+  const reason=String(input.reason||"").trim().slice(0,500);
+  if(reason.length<8)throw error(400,"Provide a reason of at least 8 characters to remove a job-team assignment.","AUDIT_REASON_REQUIRED");
+  const updated=(await db.query("update job_team_member set active=false where id=$1 returning id,job_id,user_id,role_code,active",[teamMemberId])).rows[0];
+  await audit(db,userId,"job.team_member_removed","job_team_member",teamMemberId,requestId,{roleCode:member.role_code,reason});
+  return updated;
  });
 }
 export async function listJobTeam(jobId,userId){

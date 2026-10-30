@@ -169,7 +169,7 @@ export default function ServiceMentorshipSupportCasesPage() {
         </Card>
       ) : (
         <Card>
-          <form className="grid grid-2" style={{ gap: 12 }} onSubmit={(event) => { event.preventDefault(); setOffset(0); setAppliedSearch(search.trim()); void load(0, search.trim()); }}>
+          <form className="grid grid-2" style={{ gap: 12 }} onSubmit={(event) => { event.preventDefault(); const nextSearch = search.trim(); const unchanged = offset === 0 && appliedSearch === nextSearch; setOffset(0); setAppliedSearch(nextSearch); if (unchanged) void load(0, nextSearch); }}>
             <label>Case type
               <select value={caseType} onChange={(event) => { setCaseType(event.target.value as CaseType); setOffset(0); setDetails(null); }}>
                 <option value="all">Services and mentorship</option>

@@ -24,7 +24,7 @@ async function account(label) {
 
 async function contact(userId) {
   const db = getPool();
-  return (await db.query("select u.email,p.phone from app_user u join person p on p.user_id=u.id where u.id=$1", [userId])).rows[0];
+  return (await db.query("select u.email,p.phone,p.display_name from app_user u join person p on p.user_id=u.id where u.id=$1", [userId])).rows[0];
 }
 
 async function assignRole(userId, roleCode) {
@@ -185,6 +185,7 @@ test("MPA Support Desk can open only a specific service or mentorship case with 
   const serializedReport = JSON.stringify(providerReport);
   assert.equal(serializedReport.includes(requesterContact.email), false);
   assert.equal(serializedReport.includes(requesterContact.phone), false);
+  assert.equal(serializedReport.includes(requesterContact.display_name), false, "provider impact reports must not disclose participant names");
   assert.equal(serializedReport.includes(requester.id), false, "provider impact report must remain aggregate and identity-free");
 
   const auditRows = await db.query(

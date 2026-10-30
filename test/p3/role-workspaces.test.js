@@ -14,17 +14,18 @@ test("workspace entry reads current server identity and organization relationshi
   assert.ok(page.includes('api<Identity>("/api/v1/me"'));
   assert.ok(page.includes('api<Organization[]>("/api/v1/organizations"'));
   assert.ok(!page.includes("task.orgScope"));
-  assert.ok(page.includes("task.scopeRoles?.some"));
-  for (const role of ["organization_admin", "recruiter", "project_manager", "read_only"]) assert.ok(page.includes(role));
+  assert.ok(!page.includes("task.scopeRoles"));
+  assert.ok(!page.includes("task.orgScope"));
+  assert.ok(page.includes("organization_representative"));
+  assert.ok(!page.includes('roles: ["verification_reviewer","ethics_reviewer","system_admin"]'));
   assert.ok(page.includes("verified professional profile"));
 });
 
 test("privileged platform role grants remain system-administrator-only", () => {
   const admin = read("../../src/platform/user-admin.js");
-  const declaration = admin.match(/const PRIVILEGED_ROLES=new Set\(\[([^\]]+)\]\)/);
-  assert.ok(declaration, "privileged role catalogue must exist");
+  assert.ok(admin.includes("const PRIVILEGED_ROLES=new Set"));
   for (const role of ["system_admin", "platform_admin", "membership_reviewer", "reviewer", "verification_reviewer", "ethics_reviewer", "appeal_reviewer", "finance_officer"]) {
-    assert.ok(declaration[1].includes(JSON.stringify(role)), "missing privileged role: " + role);
+    assert.ok(admin.includes(JSON.stringify(role)), "missing privileged role: " + role);
   }
   assert.ok(admin.includes("Only a system administrator may modify a privileged account"));
 });

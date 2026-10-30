@@ -30,6 +30,8 @@ type Payment = {
   reversed: boolean;
 };
 type Me = { roles?: string[]; permissions?: string[] };
+type FinanceSummaryRow = { Currency: string; "Gross verified": string | number; "Refunds/reversals": string | number; "Net collected": string | number; "Failed amount": string | number; "Matched amount": string | number; "Unreconciled amount": string | number; "Outstanding amount": string | number; "Approved payments": number; "Failed payments": number; "Refunded/reversed payments": number; "Outstanding applications": number };
+type FinanceSummary = { rows: FinanceSummaryRow[]; generatedAt: string };
 
 function dateLabel(value?: string | null) {
   return value ? new Date(value).toLocaleString() : "Not recorded";
@@ -41,6 +43,9 @@ export default function FinanceWorkspacePage() {
   const hydrateToken = useUiStore(state => state.hydrateToken);
   const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "signin">("loading");
   const [rows, setRows] = useState<Payment[]>([]);
+  const [summaryRows, setSummaryRows] = useState<FinanceSummaryRow[]>([]);
+  const [summaryError, setSummaryError] = useState("");
+  const [summaryGeneratedAt, setSummaryGeneratedAt] = useState("");
   const [canVerify, setCanVerify] = useState(false);
   const [canReverse, setCanReverse] = useState(false);
   const [busy, setBusy] = useState("");
@@ -70,6 +75,15 @@ export default function FinanceWorkspacePage() {
       setCanReverse(financeRole || permissions.some(permission => ["finance.payment.reverse", "finance.manage"].includes(permission)));
       const payments = await api<Payment[]>("/api/v1/finance/membership/payments", {}, token);
       setRows(Array.isArray(payments) ? payments : []);
+      try {
+        const summary = await api<FinanceSummary>("/api/v1/admin/reports/finance-summary/run", { method: "POST", body: JSON.stringify({}) }, token);
+        setSummaryRows(Array.isArray(summary.rows) ? summary.rows : []);
+        setSummaryGeneratedAt(summary.generatedAt || "");
+        setSummaryError("");
+      } catch (summaryCause) {
+        setSummaryRows([]);
+        setSummaryError(summaryCause instanceof ApiError ? summaryCause.message : "Finance summary could not be loaded. The payment queue remains available.");
+      }
       setAccess("allowed");
     } catch (cause) {
       setRows([]);
@@ -141,6 +155,25 @@ export default function FinanceWorkspacePage() {
     <AdminPageHeader eyebrow="MPA · Finance operations" title="Membership payment queue" description="Verify eligible payments, review payment exceptions and record authorized reversals. This workspace does not approve or activate membership applications." actions={<button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={busy !== ""}>{busy === "load" ? "Refreshing…" : "Refresh queue"}</button>} />
     {error && <p className="form-error" role="alert">{error}</p>}
     {notice && <p className="form-success" role="status" aria-live="polite">{notice}</p>}
+    <Card>
+      <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <div><h2 className="h2">Finance summary</h2><p className="muted">Current membership-payment position by currency. Generated {dateLabel(summaryGeneratedAt)}. No amounts from different currencies are combined.</p></div>
+        <a className="btn btn-ghost" href="/admin/reports?report=finance-summary">Open finance reports</a>
+      </div>
+      {summaryError ? <OperationStatus state="error" title="Finance summary unavailable" detail={summaryError} /> : summaryRows.length === 0 ? <OperationStatus state="info" title="No finance summary records" detail="No membership payments or outstanding approved applications were found for the current period." /> : <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead><tr>{["Currency", "Gross verified", "Refunds/reversals", "Net collected", "Failed amount", "Matched", "Unreconciled", "Outstanding", "Approved", "Failed", "Refunded/reversed", "Outstanding applications"].map(label => <th key={label} scope="col" style={{ textAlign: "left", padding: 9, borderBottom: "1px solid var(--border, #cbd5e1)" }}>{label}</th>)}</tr></thead>
+          <tbody>{summaryRows.map(row => <tr key={row.Currency}>{[row.Currency,row["Gross verified"],row["Refunds/reversals"],row["Net collected"],row["Failed amount"],row["Matched amount"],row["Unreconciled amount"],row["Outstanding amount"],row["Approved payments"],row["Failed payments"],row["Refunded/reversed payments"],row["Outstanding applications"]].map((value,index) => <td key={index} style={{ padding: 9, borderBottom: "1px solid var(--border, #e2e8f0)", whiteSpace: "nowrap" }}>{index===0?String(value):Number(value||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>)}</tr>)}</tbody>
+        </table>
+      </div>}
+      <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+        <a className="btn btn-ghost" href="/admin/reports?report=approved-payments">Approved payments</a>
+        <a className="btn btn-ghost" href="/admin/reports?report=failed-reversed-payments">Failed and refunded/reversed</a>
+        <a className="btn btn-ghost" href="/admin/reports?report=membership-collections">Membership collections</a>
+        <a className="btn btn-ghost" href="/admin/reports?report=outstanding-membership-payments">Outstanding payments</a>
+        <a className="btn btn-ghost" href="/admin/reports?report=payment-reconciliation">Payment reconciliation</a>
+      </div>
+    </Card>
     <Card>
       <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
         <div><h2 className="h2">Payment records</h2><p className="muted">Up to 500 membership payment records, newest and pending items first. Applicant contact details and private application evidence are not included in this queue.</p></div>

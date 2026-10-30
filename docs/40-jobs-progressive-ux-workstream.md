@@ -61,6 +61,8 @@ A vacancy is a specific employer role with a formal application. General job int
 - Verify interview reschedule proposals end to end: participant-only proposal, one pending proposal, overlap checks, other-participant decision, original schedule preservation on decline, participant reconfirmation after acceptance, audit and notifications.
 - Reconcile the job `pending_review` status with the current publication path and moderation policy before changing any lifecycle transition. Do not silently bypass a required review.
 - Verify the candidate-facing visibility of confirmed schedule changes and that ordinary interview responses are disabled while a change proposal is pending.
+- Admin governance gap: the schema includes `pending_review`, but `publishJob()` currently publishes directly after organization verification and role/completeness checks; there is no dedicated job moderation queue. Do not add a mandatory review gate until the policy owner confirms whether verified organizations may self-publish or MPA must approve every vacancy.
+- Role-contract gap: `project_manager` receives some employer job notifications and is mapped to `jobs.manage` in the HTTP permission map, but job service candidate and publishing authorization does not grant that organization role. Do not broaden candidate-data access by assumption; reconcile this role and its intended actions explicitly.
 - Verify that organization recruiting summaries and vacancy outcomes are sourced from persisted records and are correctly scoped.
 - Do not deploy to production or modify production data as part of this workstream.
 

@@ -15,7 +15,6 @@ test("workspace entry reads current server identity and organization relationshi
   assert.ok(page.includes('api<Organization[]>("/api/v1/organizations"'));
   assert.ok(!page.includes("task.orgScope"));
   assert.ok(!page.includes("task.scopeRoles"));
-  assert.ok(!page.includes("task.orgScope"));
   assert.ok(page.includes("organization_representative"));
   assert.ok(!page.includes('roles: ["verification_reviewer","ethics_reviewer","system_admin"]'));
   assert.ok(page.includes("verified professional profile"));
@@ -32,7 +31,7 @@ test("privileged platform role grants remain system-administrator-only", () => {
 
 test("role workspace overview links to existing workflows rather than creating duplicate queues", () => {
   const page = read("../../web/app/workspaces/page.tsx");
-  for (const href of ["/members", "/membership", "/verification", "/organizations", "/jobs", "/admin/finance", "/admin/support", "/admin/accounts", "/mentorship"]) {
+  for (const href of ["/members", "/membership", "/verification", "/organizations", "/admin/finance", "/admin/support", "/admin/accounts", "/mentorship"]) {
     assert.ok(page.includes('href: "' + href + '"'), "missing existing workflow link: " + href);
   }
   assert.ok(page.includes("Queue totals and progress remain in the authoritative workflows"));

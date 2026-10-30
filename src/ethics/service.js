@@ -33,7 +33,7 @@ export async function createEthicsCase(reporterId,input={},requestId){
  });
 }
 export async function listMyEthicsCases(userId){
- return (await getPool().query("select id,case_reference,title,category,status,created_at,updated_at,decision,decided_at from ethics_case where reporter_user_id=$1 or subject_user_id=$1 order by created_at desc limit 100",[userId])).rows;
+ return (await getPool().query("select id,case_reference,title,category,status,created_at,updated_at,decision,decided_at,case when subject_user_id=$1 then 'respondent' else 'reporter' end relationship,incident_summary,incident_date,location_text,respondent_response_submitted_at from ethics_case where reporter_user_id=$1 or subject_user_id=$1 order by created_at desc limit 100",[userId])).rows;
 }
 export async function listEthicsCases(userId,filters={}){
  const db=getPool();await requireEthicsReviewer(db,userId);const userRoles=await roles(db,userId);const isAdmin=userRoles.includes("system_admin");
@@ -56,8 +56,19 @@ export async function getEthicsCase(caseId,userId){
   reviewer?db.query("select reviewer_id,reason,resolution,created_at from ethics_case_conflict where case_id=$1",[caseId]):Promise.resolve({rows:[]}),
   reviewer?db.query("select pm.reviewer_id,pm.active,p.display_name from ethics_case_panel_member pm left join person p on p.user_id=pm.reviewer_id where pm.case_id=$1 order by pm.created_at",[caseId]):Promise.resolve({rows:[]})
  ]);
- if(!reviewer)return {id:row.id,case_reference:row.case_reference,title:row.title,status:row.status,created_at:row.created_at,updated_at:row.updated_at,decision:row.decision,decision_reason:row.decision_reason,outcome_summary:row.outcome_summary};
+ if(!reviewer){const safe={id:row.id,case_reference:row.case_reference,title:row.title,category:row.category,status:row.status,created_at:row.created_at,updated_at:row.updated_at,decision:row.decision,decision_reason:row.decision_reason,outcome_summary:row.outcome_summary};return isSubject?{...safe,incident_summary:row.incident_summary,incident_date:row.incident_date,location_text:row.location_text,respondent_response:row.respondent_response,respondent_response_submitted_at:row.respondent_response_submitted_at}:safe;}
  return {...row,reviews:reviews.rows,events:events.rows,conflicts:conflicts.rows,panel:panel.rows};
+}
+export async function submitEthicsRespondentResponse(caseId,userId,input={},requestId){
+ return withTransaction(async db=>{
+  const row=await caseForUpdate(db,caseId);
+  if(row.subject_user_id!==userId)throw fail(403,"Only the named respondent may submit a response to this case.","FORBIDDEN");
+  if(row.status!=="respondent_response")throw fail(409,"A respondent response has not been requested or the response window is closed.","INVALID_STATE");
+  const response=text(input.response,6000);if(response.length<20)throw fail(400,"Provide a substantive response of at least 20 characters.","VALIDATION_ERROR");
+  await db.query("update ethics_case set respondent_response=$1,respondent_response_submitted_at=now(),updated_at=now() where id=$2",[response,caseId]);
+  await event(db,caseId,userId,"respondent_response_submitted",{requestId});
+  return {caseId,status:"response_submitted",submittedAt:new Date().toISOString()};
+ });
 }
 export async function assignEthicsCase(caseId,reviewerId,actorId,reason,requestId){
  return withTransaction(async db=>{
@@ -87,10 +98,10 @@ export async function updateEthicsCase(caseId,input,actorId,requestId){
  return withTransaction(async db=>{
   const row=await caseForUpdate(db,caseId);await assertAssigned(db,row,actorId);
   if(["decided","referred","closed","withdrawn"].includes(row.status))throw fail(409,"This ethics case is closed to editing.","INVALID_STATE");
-  const fields={title:input.title===undefined?row.title:text(input.title,160),category:input.category===undefined?row.category:text(input.category,60),severity:input.severity===undefined?row.severity:text(input.severity,20),incidentSummary:input.incidentSummary===undefined?row.incident_summary:text(input.incidentSummary,6000),incidentDate:input.incidentDate===undefined?row.incident_date:input.incidentDate,locationText:input.locationText===undefined?row.location_text:text(input.locationText,240),frameworks:input.frameworkReferences===undefined?row.framework_references:cleanFrameworks(input.frameworkReferences),triageNotes:input.triageNotes===undefined?row.triage_notes:text(input.triageNotes,6000),reviewerAssessment:input.reviewerAssessment===undefined?row.reviewer_assessment:text(input.reviewerAssessment,6000),respondentResponse:input.respondentResponse===undefined?row.respondent_response:text(input.respondentResponse,6000),findings:input.findings===undefined?row.findings:text(input.findings,6000)};
+  const fields={title:input.title===undefined?row.title:text(input.title,160),category:input.category===undefined?row.category:text(input.category,60),severity:input.severity===undefined?row.severity:text(input.severity,20),incidentSummary:input.incidentSummary===undefined?row.incident_summary:text(input.incidentSummary,6000),incidentDate:input.incidentDate===undefined?row.incident_date:input.incidentDate,locationText:input.locationText===undefined?row.location_text:text(input.locationText,240),frameworks:input.frameworkReferences===undefined?row.framework_references:cleanFrameworks(input.frameworkReferences),triageNotes:input.triageNotes===undefined?row.triage_notes:text(input.triageNotes,6000),reviewerAssessment:input.reviewerAssessment===undefined?row.reviewer_assessment:text(input.reviewerAssessment,6000),findings:input.findings===undefined?row.findings:text(input.findings,6000)};
   if(fields.title.length<5||fields.incidentSummary.length<20||!CATEGORIES.has(fields.category)||!SEVERITIES.has(fields.severity))throw fail(400,"Check the case title, category, severity and factual summary.","VALIDATION_ERROR");
   const nextStatus=input.status===undefined?row.status:text(input.status,30);const transitions={submitted:["triage","withdrawn"],triage:["investigation","closed"],investigation:["respondent_response","panel_review","decision_pending","referred","closed"],respondent_response:["investigation","panel_review","decision_pending"],panel_review:["investigation","decision_pending"],decision_pending:["investigation"]};if(!STATUSES.has(nextStatus)||["decided","referred","closed","withdrawn"].includes(nextStatus)||(nextStatus!==row.status&&!(transitions[row.status]||[]).includes(nextStatus)))throw fail(400,"Choose a valid next workflow status; review stages cannot be skipped.","INVALID_STATE");
-  const updated=(await db.query("update ethics_case set title=$1,category=$2,severity=$3,incident_summary=$4,incident_date=$5,location_text=$6,framework_references=$7,triage_notes=$8,reviewer_assessment=$9,respondent_response=$10,findings=$11,status=$12,updated_at=now() where id=$13 returning id,case_reference,status,updated_at",[fields.title,fields.category,fields.severity,fields.incidentSummary,fields.incidentDate,fields.locationText,JSON.stringify(fields.frameworks),fields.triageNotes,fields.reviewerAssessment,fields.respondentResponse,fields.findings,nextStatus,caseId])).rows[0];
+  const updated=(await db.query("update ethics_case set title=$1,category=$2,severity=$3,incident_summary=$4,incident_date=$5,location_text=$6,framework_references=$7,triage_notes=$8,reviewer_assessment=$9,findings=$10,status=$11,updated_at=now() where id=$12 returning id,case_reference,status,updated_at",[fields.title,fields.category,fields.severity,fields.incidentSummary,fields.incidentDate,fields.locationText,JSON.stringify(fields.frameworks),fields.triageNotes,fields.reviewerAssessment,fields.findings,nextStatus,caseId])).rows[0];
   await event(db,caseId,actorId,"reviewer_updated",{requestId,status:nextStatus,category:fields.category,severity:fields.severity});
   return updated;
  });

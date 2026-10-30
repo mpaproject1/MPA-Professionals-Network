@@ -1,0 +1,39 @@
+# Workstream 8 — Membership card issuance and bulk printing
+
+## Source of truth and identifier contract
+
+Membership cards are rendered on demand from `membership_record`; there is no separate card row that must be created before a member can view or print a card. Membership eligibility is checked against the record status and its start/end dates at the time the card data is requested.
+
+- The member-facing identifier is `membership_record.membership_number` (the canonical MPA membership number).
+- `app_user.id`, `membership_record.id`, account references, application references and payment references are not membership numbers.
+- Administrator lookup accepts `membershipNumber` and rejects UUID-shaped internal references and MPA payment/application reference prefixes with an actionable error.
+- New QR URLs use the canonical membership number plus the existing signed, versioned verification token. Existing QR URLs that contain the legacy record identifier remain verifiable.
+
+## Eligibility and access
+
+- A member can load their own card only when the backend finds their membership record and confirms that it is active, started and not past its end date.
+- Administrator single-card lookup, candidate listing, batch preparation and print-request recording require `system_admin` or `reviewer`, or `members.view` / `members.manage` permission. The service independently checks eligibility; an account role is not membership evidence.
+- Bulk selection is revalidated server-side at generation time. A selected member who is missing or no longer eligible is returned in the skipped list with a reason.
+- A batch is limited to 100 unique canonical membership numbers.
+
+## Card data and privacy
+
+The card payload includes only member name, canonical membership number, membership type, validity dates, active-at-issuance status, card branding and a signed verification path. It does not return or print internal UUIDs, account references, recovery email, contact phone, private address, payment evidence or profile-photo file identifiers.
+
+The QR code contains the verification URL, not a printed internal record UUID. Online verification resolves the canonical membership number and checks the current record status. A printed card is not proof of current status after expiry, suspension or revocation.
+
+## Single and bulk workflows
+
+- Member workspace: **View / print membership ID** loads the signed-in member's own backend-confirmed card.
+- Administrator catalogue: **View card** opens a selected eligible member by canonical membership number.
+- Administrator workspace: **Membership cards & printing** supports name/number search, select visible members, a selected-count preview, a server-generated card preview, skipped-member reasons and print/save-to-PDF.
+- Bulk output uses one card centered on each A4 page with explicit page breaks. The browser's print dialog can print or save the paginated output as PDF.
+- The print action records a print request against the same administrator-generated batch reference. It does not claim that the user completed the physical print or saved the PDF.
+
+## Audit and validation
+
+Batch generation and print requests are recorded in `audit_log` with the actor, batch reference and aggregate selected/generated/skipped counts. Member names, membership numbers and other personal details are not copied into batch audit metadata.
+
+Backend contract tests cover eligibility, identifier separation, authorization routes, the 100-card cap, minimal payload fields, audit events and QR compatibility. Browser acceptance selects two fixture members, prepares and requests printing, creates an A4 PDF through Chromium, then independently parses it with `pypdf` to verify page count, A4 page dimensions, member names, membership numbers, QR label and absence of internal UUIDs or contact/payment data.
+
+No production migration or deployment is required for this workstream.

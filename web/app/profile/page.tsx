@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
+import { SupportAction } from "../../components/support-action";
 import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
@@ -458,7 +459,7 @@ export default function Profile() {
         <div className="eyebrow">{isOrganizationAccount ? "Organization workspace" : "Account access"}</div>
         <h1 className="h1">{isOrganizationAccount ? "This account uses an organization profile." : "A professional profile isn't available for this account."}</h1>
         <p className="muted">{isOrganizationAccount ? "Professional directory profiles are separate from organization profiles. This account cannot access or edit a professional profile. Open the organization workspace to manage organizations you are authorized to access." : "Your current account role does not include professional-profile access. No profile information was changed. If you need a professional profile, sign in with a member/professional account or contact MPA Support Desk."}</p>
-        <p>{isOrganizationAccount ? <a className="btn btn-primary" href="/organizations">Open organization workspace</a> : <a className="btn btn-ghost" href="/dashboard">Return to dashboard</a>}</p>
+        <p>{isOrganizationAccount ? <a className="btn btn-primary" href="/organizations">Open organization workspace</a> : <span className="row" style={{flexWrap:"wrap"}}><a className="btn btn-ghost" href="/dashboard">Return to dashboard</a><SupportAction label="Contact MPA Support" /></span>}</p>
       </Card>
     </div>
   );

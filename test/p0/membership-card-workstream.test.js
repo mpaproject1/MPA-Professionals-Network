@@ -37,6 +37,9 @@ test("bulk issuance is permission-gated, bounded, eligibility-filtered and audit
   assert.match(service,/membershipNumbers\.length>100/);
   assert.match(service,/m\.status='active' and m\.start_date<=current_date and \(m\.end_date is null or m\.end_date>=current_date\)/);
   assert.match(service,/membership\.cards_batch_generated/);
+  assert.match(service,/membership\.cards_batch_print_requested/);
+  assert.match(service,/metadata->>\x27batchReference\x27=\$2/);
+  assert.match(server,/api\\/v1\\/admin\\/membership-cards\\/print/);
   assert.match(service,/selectedCount:numbers\.length,generatedCount:cards\.length,skippedCount:skipped\.length/);
   assert.match(service,/No active eligible membership was found/);
 });

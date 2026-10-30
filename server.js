@@ -18,6 +18,7 @@ import {resendEmailVerification, verifyEmailToken} from "./src/platform/email-ve
 import * as experience from "./src/platform/experience.js";
 import {createLogger} from "./src/platform/logger.js";
 import * as notifications from "./src/platform/notifications.js";
+import {resolveNetworkPlusAccess} from "./src/platform/network-plus-access.js";
 import {authorizePrivateUpload, confirmPrivateUpload, MAX_PRIVATE_UPLOAD_BYTES, readAuthorizedPrivateFile, receivePrivateUpload} from "./src/platform/private-file-storage.js";
 import * as publicOpportunity from "./src/platform/public-opportunity.js";
 import * as referencePortfolio from "./src/platform/reference-portfolio.js";
@@ -304,6 +305,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/marketplace-demand/topics") { const q=query(req.url); return ok(res,await marketplaceDemand.listPublishedTopics({type:q.get("type"),q:q.get("q"),limit:q.get("limit")}),requestId); }
      if(req.method==="GET" && p==="api/v1/organization-mentorship-offers") { const viewer=req.headers.authorization?.startsWith("Bearer ")?await auth(req):null; return ok(res,await organizationMentorshipOffers.listOrganizationMentorshipOffers(viewer?.sub||null),requestId); }
     const identity=await auth(req);
+    if(req.method==="GET" && p==="api/v1/network-plus/access") return ok(res,await resolveNetworkPlusAccess(getPool(),identity.sub),requestId);
     if(req.method==="POST" && p==="api/v1/admin/experience/demo-cases") { return ok(res,await experience.createDemoCase(identity.sub,await body(req),requestId),requestId,201); }
     if(req.method==="PATCH" && parts.length===6 && p.startsWith("api/v1/admin/experience/demo-cases/")) { return ok(res,await experience.updateDemoCase(parts[5],identity.sub,await body(req),requestId),requestId); }
     if(req.method==="POST" && p==="api/v1/admin/experience/guides") { return ok(res,await experience.createGuide(identity.sub,await body(req),requestId),requestId,201); }

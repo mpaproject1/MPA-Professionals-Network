@@ -42,6 +42,7 @@ export default function Register(){
  const [kind,setKind]=useState<AccountKind>("professional");
  const [termsAccepted,setTermsAccepted]=useState(false);
  const [challenge,setChallenge]=useState<{id:string;question:string;expiresAt:string}|null>(null);
+ const [challengeRequired,setChallengeRequired]=useState(true);
  const [challengeAnswer,setChallengeAnswer]=useState("");
  const [challengeBusy,setChallengeBusy]=useState(false);
  const [challengeError,setChallengeError]=useState("");
@@ -62,8 +63,10 @@ export default function Register(){
   challengeRequestInFlight.current=true;
   setChallengeBusy(true);setChallengeError("");setChallengeAnswer("");setChallenge(null);
   try{
-   const next=await api<{id:string;question:string;expiresAt:string}>("/api/v1/auth/human-challenge");
-   setChallenge(next);
+   const next=await api<{required?:boolean;id?:string;question?:string;expiresAt?:string}>("/api/v1/auth/human-challenge");
+   const required=next.required!==false;
+   setChallengeRequired(required);
+   setChallenge(required&&next.id&&next.question&&next.expiresAt?{id:next.id,question:next.question,expiresAt:next.expiresAt}:null);
   }catch(err){
    const failure=err as {status?:number;requestId?:string};
    const reference=failure.requestId ? " Reference: "+failure.requestId : "";
@@ -148,8 +151,11 @@ export default function Register(){
   if(kind==="organization"&&(!form.orgLegalName.trim()||!form.orgDisplayName.trim()||!form.orgType.trim()||!form.orgAddress.trim()||!form.orgEmail.trim()||!form.orgPhone.trim())){setError("Complete the required organization name, type, address, work email and contact phone fields.");return;}
   setBusy(true);
   try{
-   if(!challenge)throw new Error("Load a new human check before registering.");
-   const proof=await api<{token:string}>("/api/v1/auth/human-challenge/verify",{method:"POST",body:JSON.stringify({id:challenge.id,answer:challengeAnswer})});
+   const proof=challengeRequired
+    ? challenge
+      ? await api<{token:string}>("/api/v1/auth/human-challenge/verify",{method:"POST",body:JSON.stringify({id:challenge.id,answer:challengeAnswer})})
+      : (()=>{throw new Error("Load a new human check before registering.");})()
+    : {token:""};
    const organizationDraftSaved=kind!=="organization"||writeOrganizationDraft();
    setDraftWarning(kind==="organization"&&!organizationDraftSaved);
    const representativeName=[form.firstName,form.middleName,form.lastName].map(x=>x.trim()).filter(Boolean).join(" ");
@@ -188,8 +194,8 @@ export default function Register(){
   {kind==="organization"&&<p className="muted">Your organization details are saved locally on this device as you edit. Saving a draft does not create an account or submit an organization application. You must be online and complete a fresh human check to create the representative account.</p>}
   <fieldset className="form-category grid" style={{gap:12}}><legend>3. Secure your account</legend><div className="form-grid"><label>Password<input required minLength={10} type="password" autoComplete="new-password" value={form.password} onChange={e=>set("password",e.target.value)}/></label><label>Confirm password<input required minLength={10} type="password" autoComplete="new-password" value={form.passwordConfirm} onChange={e=>set("passwordConfirm",e.target.value)}/></label></div><p className="muted">Use at least 10 characters. If you already have an account, sign in instead of registering again.</p></fieldset>
   <fieldset className="form-category grid" style={{gap:12}}><legend>4. Terms and security check</legend><div className="form-stack" style={{border:"1px solid var(--border)",borderRadius:12,padding:14}}><label style={{display:"flex",alignItems:"flex-start",gap:10,fontWeight:500}}><input type="checkbox" required checked={termsAccepted} onChange={e=>setTermsAccepted(e.target.checked)} style={{width:18,height:18,marginTop:2,flex:"0 0 auto"}}/><span>I agree to the <a href="/terms" target="_blank" rel="noreferrer" style={{color:"var(--primary)",textDecoration:"underline"}}>Terms of Use</a> and acknowledge that I have read the <a href="/privacy" target="_blank" rel="noreferrer" style={{color:"var(--primary)",textDecoration:"underline"}}>Privacy Notice</a>. Optional cookies and analytics are controlled separately in Privacy Preferences.</span></label></div></fieldset>
-  <section className="form-stack" aria-label="Human verification" style={{border:"1px solid var(--border)",borderRadius:12,padding:14}}><b>Verify you are human</b><p className="muted">This quick check helps protect accounts from automated sign-ups. Your registration details stay on this page if the check needs to be retried.</p>{challenge?<label>{challenge.question}<input required inputMode="numeric" value={challengeAnswer} onChange={e=>setChallengeAnswer(e.target.value)} autoComplete="off" placeholder="Enter your answer" aria-describedby={challengeError?"human-check-error":undefined}/></label>:<p className="muted" aria-live="polite" aria-atomic="true">{challengeBusy?"Loading a secure human check…":"The human check isn't ready yet. You can try again below."}</p>}{challengeError&&<div id="human-check-error" className="form-error" role="alert" aria-live="polite" aria-atomic="true">{challengeError}</div>}<button type="button" className="btn btn-ghost" onClick={()=>void loadChallenge()} disabled={challengeBusy||busy}><RefreshCw size={16}/>{challengeBusy?"Loading…":challenge?"Get a new question":"Try again"}</button></section>
+  {challengeRequired&&<section className="form-stack" aria-label="Human verification" style={{border:"1px solid var(--border)",borderRadius:12,padding:14}}><b>Verify you are human</b><p className="muted">This quick check helps protect accounts from automated sign-ups. Your registration details stay on this page if the check needs to be retried.</p>{challenge?<label>{challenge.question}<input required inputMode="numeric" value={challengeAnswer} onChange={e=>setChallengeAnswer(e.target.value)} autoComplete="off" placeholder="Enter your answer" aria-describedby={challengeError?"human-check-error":undefined}/></label>:<p className="muted" aria-live="polite" aria-atomic="true">{challengeBusy?"Loading a secure human check…":"The human check isn't ready yet. You can try again below."}</p>}{challengeError&&<div id="human-check-error" className="form-error" role="alert" aria-live="polite" aria-atomic="true">{challengeError}</div>}<button type="button" className="btn btn-ghost" onClick={()=>void loadChallenge()} disabled={challengeBusy||busy}><RefreshCw size={16}/>{challengeBusy?"Loading…":challenge?"Get a new question":"Try again"}</button></section>}
   {draftWarning&&kind==="organization"&&<div className="form-error" aria-live="polite" aria-atomic="true">This browser could not save your organization details for the verification step. You can continue creating the representative account, but keep these details available to re-enter after verification.</div>}
-  {error&&<div className="form-error" role="alert">{error}</div>}<button type="submit" className="btn btn-primary" disabled={busy||!challenge}>{busy?"Creating your account securely…":kind==="professional"?"Create professional account":"Create representative account and continue"} <ArrowRight size={16}/></button>
+  {error&&<div className="form-error" role="alert">{error}</div>}<button type="submit" className="btn btn-primary" disabled={busy||(challengeRequired&&!challenge)}>{busy?"Creating your account securely…":kind==="professional"?"Create professional account":"Create representative account and continue"} <ArrowRight size={16}/></button>
  </fieldset></form><div className="auth-links"><a href="/login">Already have an account? Login</a><a href="/cookies">Cookie Policy</a><a href="/community-guidelines">Community Guidelines</a></div></Card></div>;
 }

@@ -36,7 +36,7 @@ export function GuideLauncher(){
     <h2 id="guide-title" ref={headingRef} tabIndex={-1}>{step?.title||guide.title}</h2>
     <p id="guide-description" className="muted">{step?.text||guide.description}</p>
     {!targetExists&&step?.target?<p className="guide-fallback" role="status">That control is not visible in this layout. You can continue using this explanation; no page controls are blocked.</p>:null}
-    <div className="guide-progress" aria-hidden="true">{steps.map((item,i)=><span key={i} className={i<=index?"done":""}/>)}</div>
+    <div className="guide-progress" aria-hidden="true">{steps.map((_,i)=><span key={i} className={i<=index?"done":""}/>)}</div>
     <div className="row" style={{marginTop:16,flexWrap:"wrap"}}>
      <button type="button" className="btn btn-ghost" disabled={index===0} onClick={()=>setIndex(value=>Math.max(0,value-1))}><ChevronLeft size={16}/> Back</button>
      <div className="row" style={{gap:8}}>

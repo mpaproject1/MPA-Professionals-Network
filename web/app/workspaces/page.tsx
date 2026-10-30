@@ -16,7 +16,7 @@ const tasks: Task[] = [
  { title: "Professional profile", detail: "Maintain your own professional information and verification evidence.", href: "/profile", always: true, icon: FileCheck2, group: "My account" },
  { title: "Mentorship and mentor journey", detail: "Explore mentor and mentee workflows. Mentor eligibility is based on verified professional profile criteria, not a platform role.", href: "/mentorship", always: true, icon: Handshake, group: "My account" },
  { title: "Submit an ethics concern", detail: "Submit and track a confidential professional ethics or conduct concern.", href: "/ethics", always: true, icon: HandHeart, group: "My account" },
- { title: "Membership review", detail: "Review submitted applications, corrections and authorized membership decisions.", href: "/membership", roles: ["reviewer","membership_reviewer","system_admin"], permissions: ["membership.review"], icon: ClipboardCheck, group: "Review queues" },
+ { title: "Membership review", detail: "Review submitted applications, corrections and authorized membership decisions.", href: "/admin/membership", roles: ["reviewer","membership_reviewer","system_admin"], permissions: ["membership.review"], icon: ClipboardCheck, group: "Review queues" },
  { title: "Professional verification", detail: "Review assigned professional evidence, checklist results and verification decisions.", href: "/verification", roles: ["verification_reviewer","system_admin"], permissions: ["verification.manage"], icon: ShieldCheck, group: "Review queues" },
  { title: "Independent verification appeals", detail: "Review verification appeals independently from the original case decision.", href: "/verification", roles: ["appeal_reviewer","system_admin"], icon: ClipboardCheck, group: "Review queues" },
  { title: "Ethics and professional conduct", detail: "Handle confidential ethics cases, conflict declarations, independent panel reviews and outcomes.", href: "/admin/ethics", roles: ["ethics_reviewer","system_admin"], permissions: ["ethics.case.review"], icon: ShieldCheck, group: "Review queues" },
@@ -46,8 +46,8 @@ export default function RoleWorkspacesPage() {
   if (!token) { setIdentity(null); setOrganizations([]); setJobAssignments([]); return; }
   setLoading(true); setError("");
   try {
-   const [me, orgs] = await Promise.all([api<Identity>("/api/v1/me",{},token),api<Organization[]>("/api/v1/organizations",{},token)]);
-   setIdentity(me); setOrganizations(Array.isArray(orgs) ? orgs.filter(org => !["inactive","revoked"].includes(String(org.status))) : []);
+   const [me, orgs, jobs] = await Promise.all([api<Identity>("/api/v1/me",{},token),api<Organization[]>("/api/v1/organizations",{},token),api<JobAssignment[]>("/api/v1/me/job-assignments",{},token)]);
+   setIdentity(me); setOrganizations(Array.isArray(orgs) ? orgs.filter(org => !["inactive","revoked"].includes(String(org.status))) : []); setJobAssignments(Array.isArray(jobs) ? jobs : []);
   } catch (cause) { setIdentity(null); setOrganizations([]); setJobAssignments([]); setError(cause instanceof Error ? cause.message : "Role and organization access could not be loaded."); }
   finally { setLoading(false); }
  },[token]);

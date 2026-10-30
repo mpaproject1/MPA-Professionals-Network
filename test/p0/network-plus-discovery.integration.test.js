@@ -10,7 +10,7 @@ import * as verification from "../../src/verification/service.js";
 
 function accountInput(label, accountType = "professional") {
   const suffix = randomUUID();
-  const digits = suffix.replace(/\\D/g, "").slice(0, 8).padEnd(8, "7");
+  const digits = suffix.replace(/\D/g, "").slice(0, 8).padEnd(8, "7");
   return {
     email: `network-plus-${label}-${suffix}@example.test`,
     password: "NetworkPlusPrivacyPassword!2026",

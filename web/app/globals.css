@@ -562,3 +562,7 @@ button[aria-busy=true]{pointer-events:none}
   outline-offset: 3px;
   box-shadow: none;
 }
+
+@media print {
+  html, body { background: #fff !important; }
+}

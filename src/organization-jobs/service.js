@@ -465,7 +465,7 @@ export async function updateCandidate(jobId,applicationId,userId,input,requestId
   return withTransaction(async db=>{
     const j=(await db.query("select organization_id,title from job where id=$1",[jobId])).rows[0];
     if(!j) throw error(404,"Job not found.","NOT_FOUND");
-    await orgRole(db,j.organization_id,userId,CANDIDATE_ROLES);
+    await jobRole(db,jobId,userId,["hiring_manager","recruiter"]);
     const a=(await db.query("select * from job_application where id=$1 and job_id=$2 for update",[applicationId,jobId])).rows[0];
     if(!a) throw error(404,"Application not found.","NOT_FOUND");
     if(input.status==="accepted") throw error(403,"The candidate must accept an offer; the organization cannot accept it on the candidate's behalf.","CANDIDATE_ACTION_REQUIRED");

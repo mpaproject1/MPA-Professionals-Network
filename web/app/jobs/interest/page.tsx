@@ -24,7 +24,7 @@ export default function JobInterestPage(){
  const [history,setHistory]=useState<ShareHistory[]>([]);
  const [form,setForm]=useState({contactName:"",contactEmail:"",contactPhone:"",targetRole:"",experience:"",location:"",workMode:"",availability:"",intent:""});
  const [skills,setSkills]=useState<string[]>([]),[consent,setConsent]=useState(false);
- const [organizationSearch,setOrganizationSearch]=useState(""),[organizations,setOrganizations]=useState<Organization[]>([]),[organizationId,setOrganizationId]=useState(""),[shareFields,setShareFields]=useState(["targetRole","skills"]);
+ const [shareOptIn,setShareOptIn]=useState(false),[organizationSearch,setOrganizationSearch]=useState(""),[organizations,setOrganizations]=useState<Organization[]>([]),[organizationId,setOrganizationId]=useState(""),[shareFields,setShareFields]=useState(["targetRole","skills"]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[requestKey,setRequestKey]=useState(""),[submissionUncertain,setSubmissionUncertain]=useState(false);
  const load=useCallback(async()=>{
   if(!hydrated)return;

@@ -11,6 +11,7 @@ import styles from "./admin-workspace.module.css";
 type Destination = { href: string; label: string; description: string; icon: typeof Activity; exact?: boolean };
 const destinations: Destination[] = [
   { href: "/admin", label: "Overview", description: "Review and administration", icon: Activity, exact: true },
+  { href: "/admin/finance", label: "Finance payments", description: "Verify membership payments and record authorized reversals", icon: CreditCard },
   { href: "/admin/accounts", label: "Account and Team", description: "Account catalogue, roles and access actions", icon: Users },
   { href: "/admin/account-governance", label: "Account governance", description: "Account references, membership history and authorized organization relationships", icon: ShieldCheck },
   { href: "/admin/experience", label: "Help, guides and demos", description: "Contextual guides, training scenarios and support resources", icon: BookOpenCheck },
@@ -70,12 +71,14 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     const platformAdmin = Boolean(roles?.some((role) => ["system_admin", "admin", "platform_admin"].includes(role)));
     const membershipReviewer = Boolean(roles?.some((role) => ["reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
     const financeOfficer = Boolean(roles?.includes("finance_officer"));
+    const financeAccess = Boolean(financeOfficer || permissions.some((permission) => ["finance.view", "finance.payment.verify", "finance.payment.reverse", "finance.manage"].includes(permission)));
     const financeConfig = Boolean(financeOfficer || permissions.some((permission) => ["members.manage", "finance.manage"].includes(permission)));
     const supportStaff = Boolean(roles?.includes("supporting_staff"));
     if (platformAdmin) return destinations;
     return destinations.filter((item) => {
       if (["/admin/accounts", "/admin/account-governance", "/admin/experience", "/admin/members", "/admin/members/catalog", "/admin/membership-card", "/admin/reference-portfolio"].includes(item.href)) return false;
       if (item.href === "/admin/membership") return membershipReviewer;
+      if (item.href === "/admin/finance") return financeAccess;
       if (item.href === "/admin/membership/payment-methods") return financeConfig;
       if (item.href === "/admin/reports") return reportIds.length > 0;
       if (item.href === "/admin/organizations") return roles?.some((role) => ["reviewer", "organization_admin"].includes(role)) === true;

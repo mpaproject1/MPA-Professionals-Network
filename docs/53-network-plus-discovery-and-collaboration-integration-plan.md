@@ -3,8 +3,9 @@
 **Target branch:** feat/workstream-3-progress-members-workspace  
 **PR:** [#18 — Workstream 3](https://github.com/Jcodestest/MPA-Professionals-Network/pull/18)  
 **Audit baseline:** c05cf51413bb7d1d95c04c5b2f738a0d19a18669 (2026-10-30)  
+**Implementation baseline:** 6a9f65d095f897048b1961777813d8e0367c6ea8 (2026-10-30)  
 **Status:** Source-foundation audit and incremental delivery plan.  
-**Implementation status:** Initial server-side eligibility resolver, authenticated access endpoint, guarded Network-Plus landing/member-discovery routes and conditional top-level navigation are committed on this branch. Runtime and CI validation are still pending; no business schema or commercial listing model has been added. The initial organization entry roles are owner, administrator and project_manager. Recruiter/read_only access remains excluded pending the role-policy decision.  
+**Implementation status:** Increments 0–3 have source changes on this branch: canonical talent discovery is retained; Network-Plus eligibility is server-resolved; navigation is bound to the current session token; `/network` is labelled as Verified Member Discovery with a return path; and `/network-plus/organizations` is a separate read-only directory backed by canonical verified organization records. Organization visibility uses a new explicit `organization.network_plus_visible` opt-in (default false), independent of the existing `public_visible` behavior. Owner/administrator controls are audited. Focused unit, source-contract and PostgreSQL integration tests have been added. Runtime, migration-compatibility, browser and CI validation remain pending; no business or commercial listing model has been added. Organization entry roles remain owner, administrator and project_manager; recruiter/read_only access remains excluded.  
 **Change control:** This plan authorizes work on the target branch only. It does not authorize a merge, main-branch changes, production deployment or production database changes.
 
 ## 1. Product contract
@@ -66,12 +67,12 @@ This is a source-level audit, not a claim that all browser journeys or every aut
 
 **Reuse decision**
 - Reuse canonical organization, organization_membership, verification case/evidence and organization-scoped authorization.
-- Add a separate discovery read experience later, exposing only approved fields for organizations that satisfy an explicit visibility policy.
+- Add a separate read-only discovery experience backed by canonical organization rows. `network_plus_visible` is a dedicated opt-in, defaults to false, and is independent of `public_visible`; the directory projection exposes only id, display name, type, approved description, website and broad location.
 - Reuse the existing organization workspace ownership and permissions for future organization business/service management.
 - Do not repurpose GET /api/v1/organizations as a directory; it is the signed-in user's private organization list.
 
 **Validation still required**
-- Confirm organization verification states and whether verified organizations must opt in to Network-Plus discovery.
+- Verified organizations must explicitly opt in through `network_plus_visible`; existing organizations are not backfilled and remain hidden until an owner/administrator opts in.
 - Define which active organization roles may discover, submit requests, publish listings and manage collaboration records.
 - Test multi-organization accounts and organization-scoped ownership checks.
 
@@ -159,7 +160,8 @@ Business routes above are planned destinations, not permission to create busines
 5. Record existing records/lifecycles that must remain unchanged.
 6. Keep unresolved assumptions explicit; do not silently infer product policy.
 
-**Exit gate:** no duplicate identity/profile/organization model proposed; each existing route has a documented owner and access policy.
+**Exit gate:** no duplicate identity/profile/organization model proposed; each existing route has a documented owner and access policy.  
+**Implementation record:** the audit mapped canonical `app_user`/`person`/`professional_profile`/`membership_record`/`verification_claim`, `organization`/`organization_membership`/`organization_verification_case`/evidence, and the separate `talent_inquiry` lifecycle. Private `GET /api/v1/organizations` remains workspace-only; Network-Plus uses a new explicit read endpoint and a bounded projection. No new identity or organization table is introduced.
 
 ### Increment 1 — Network-Plus eligibility contract and server boundary (implemented; validation pending)
 1. Add a server-owned access resolver checking current membership status/date bounds and active organization-membership records joined to the specific verified organization.
@@ -169,7 +171,8 @@ Business routes above are planned destinations, not permission to create busines
 5. Keep action authorization separate: entry is not permission to publish, manage an organization, accept requests or view private contact data.
 6. Test signed-out, active member, expired/inactive member, organization owner/admin/project_manager, inactive organization membership, unverified organization, multiple organization memberships, unrelated platform roles and stale sessions.
 
-**Exit gate:** server-side tests prove the access decision; direct URL entry cannot bypass it; public Serve-Community routes remain public.
+**Exit gate:** server-side tests prove the access decision; direct URL entry cannot bypass it; public Serve-Community routes remain public.  
+**Implementation record:** the resolver continues to require current membership dates or an active owner/administrator/project_manager membership joined to a verified organization. The organization directory service repeats the eligibility check before querying. Recruiter/read_only and platform-role-only contexts remain denied. Unit and integration coverage has been added; final CI evidence is pending.
 
 ### Increment 2 — top-level navigation and landing UX (initial implementation committed; validation pending)
 1. Add Network-Plus to desktop and mobile top-level navigation only after the server access result is known.
@@ -179,7 +182,8 @@ Business routes above are planned destinations, not permission to create busines
 5. Keep private organization management separate from organization discovery.
 6. Preserve Jobs, Mentorship, Membership, Serve-Community and Home/logo behavior.
 
-**Exit gate:** desktop/tablet/narrow-mobile browser tests, keyboard/focus checks and no navigation regressions.
+**Exit gate:** desktop/tablet/narrow-mobile browser tests, keyboard/focus checks and no navigation regressions.  
+**Implementation record:** the navigation eligibility state is associated with the exact current token so a previous session's positive result cannot flash after a token change. The landing page links to member and organization discovery separately; browser/accessibility validation remains pending.
 
 ### Increment 3 — Verified Member Discovery reconciliation
 1. Reuse existing talent search, profile and inquiry foundations.
@@ -189,7 +193,8 @@ Business routes above are planned destinations, not permission to create busines
 5. Preserve opt-in visibility, verified-claim provenance, contact-release consent, inquiry idempotency and participant scoping.
 6. Add privacy tests for public, member-only, private, expired-member and organization-context viewers.
 
-**Exit gate:** existing talent tests remain green; organization discovery tests prove visibility and authorization; no duplicate identity storage.
+**Exit gate:** existing talent tests remain green; organization discovery tests prove visibility and authorization; no duplicate identity storage.  
+**Implementation record:** `/network` reuses the existing talent API, profile, saved-search, inquiry, idempotency and consent paths and now has a clear Network-Plus return link. `/network-plus/organizations` uses a separate result type, filters and authenticated API. Organization visibility is `network_plus_visible=false` by default; only an active verified organization with explicit opt-in is returned. Owners/administrators can opt in/out from their existing private workspace with a reason and audit event. The directory never consumes `listMyOrganizations()` and never returns legal name, email, phone, street address, verification evidence, reviewer notes or membership roster. Integration coverage includes public/member-only/private profiles, expired members, organization-context viewers, contact release, inquiry replay/conflict, participant scoping, organization opt-in, role eligibility and opt-out.
 
 ### Increment 4 — Business Discovery domain design (no schema yet)
 1. Define ownership for individual member-owned businesses, organization-owned businesses and any joint ownership.
@@ -294,7 +299,7 @@ Every increment stays on feat/workstream-3-progress-members-workspace. Re-read t
 
 ## 8. Product/governance decisions still open
 
-- Whether all verified organizations or only opted-in organizations appear in Network-Plus.
+- Resolved for this increment: only verified organizations with explicit `network_plus_visible=true` opt-in appear. Existing records default to false; no backfill is performed.
 - Whether organization read_only members can enter and exactly what they can see.
 - Whether recruiter is eligible for discovery only and whether it has any business/service authority.
 - Evidence and review standards for member-owned and organization-owned businesses.
@@ -320,3 +325,17 @@ Every increment stays on feat/workstream-3-progress-members-workspace. Re-read t
 - src/platform/network-plus-access.js and test/platform/network-plus-access.test.js — server-owned entry eligibility and focused policy tests.
 - web/components/network-plus-access-guard.tsx, web/app/network/layout.tsx and web/app/network-plus/page.tsx — guarded routes and initial two-experience landing.
 - web/components/shell.tsx — conditional top-level navigation.
+
+
+## 10. Increment 0–3 implementation file map and validation status
+
+| Area | Implementation | Regression coverage |
+|---|---|---|
+| Schema | `db/migrations/20261030220000_network_plus_organization_visibility.sql` adds one opt-in boolean to canonical `organization`; no new identity table or backfill | Migration compatibility remains to be run |
+| Eligibility | `src/platform/network-plus-access.js` remains the server-owned entry resolver; `src/organization-jobs/service.js` enforces it again for organization discovery | `test/platform/network-plus-access.test.js`; PostgreSQL integration tests |
+| Organization visibility | `updateNetworkPlusVisibility` limits changes to owner/administrator, requires verified status for opt-in, requires a reason and writes an audit event | `test/p0/network-plus-discovery.integration.test.js`; source-contract assertions |
+| Organization directory | `GET /api/v1/network-plus/organizations` returns a bounded safe projection from canonical organization rows | `test/platform/network-plus-discovery-contract.test.js`; PostgreSQL integration tests |
+| Member discovery | Existing talent service/API remains authoritative; no parallel profile, claim, inquiry or identity model | `test/p0/network-plus-discovery.integration.test.js` |
+| Navigation and UX | `/network`, `/network-plus`, `/network-plus/organizations`, organization workspace visibility control and token-bound navigation | Source-contract tests; browser and accessibility acceptance remain pending |
+
+**Validation boundary:** no CI workflow, production deployment, production migration or live data mutation is authorized by this implementation record. The integration tests require the disposable PostgreSQL database configured by PR Quality. They have been added but have not yet been executed. Complete PR Quality, migration compatibility, frontend build/type checks, browser journeys, responsive checks and accessibility checks are the final validation gate.

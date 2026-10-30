@@ -455,6 +455,7 @@ const APPLICATION_TRANSITIONS={
 };
 export function allowedApplicationTransition(from,to){ return (APPLICATION_TRANSITIONS[from]||[]).includes(to); }
 export function allowedCandidateResponse(from,to){ return from==="offer"&&to==="accepted" || ["submitted","screening","shortlisted","interview","offer","accepted"].includes(from)&&to==="withdrawn"; }
+export function canRespondToInterview(status){ return ["scheduled","confirmed","reschedule_requested"].includes(status); }
 
 export async function updateCandidate(jobId,applicationId,userId,input,requestId){
   return withTransaction(async db=>{
@@ -798,7 +799,7 @@ export async function respondInterview(interviewId,userId,status,requestId){
  return withTransaction(async db=>{
   const p=(await db.query("select jp.*,ji.application_id,ji.status interview_status,j.organization_id,a.applicant_user_id,j.title job_title from job_interview_participant jp join job_interview ji on ji.id=jp.interview_id join job_application a on a.id=ji.application_id join job j on j.id=a.job_id where jp.interview_id=$1 and jp.user_id=$2",[interviewId,userId])).rows[0];
   if(!p) throw error(403,"You are not an interview participant.","FORBIDDEN");
-  if(!["scheduled","confirmed","reschedule_requested"].includes(p.interview_status)) throw error(409,"This interview is no longer accepting participant responses.","INVALID_STATE");
+  if(!canRespondToInterview(p.interview_status)) throw error(409,"This interview is no longer accepting participant responses.","INVALID_STATE");
   if(!["accepted","declined"].includes(status)) throw error(400,"Invalid interview response.","VALIDATION_ERROR");
   const row=(await db.query("update job_interview_participant set response_status=$1 where interview_id=$2 and user_id=$3 returning *",[status,interviewId,userId])).rows[0];
   await audit(db,userId,"job.interview_response","job_interview",interviewId,requestId,{status});

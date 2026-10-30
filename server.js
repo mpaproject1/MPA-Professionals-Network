@@ -29,8 +29,8 @@ import * as serveCommunityImpactReports from "./src/platform/serve-community-imp
 import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
 import * as supportBot from "./src/platform/support-bot.js";
 import * as userAdmin from "./src/platform/user-admin.js";
-import {assertMembershipActivationAccess,assertMembershipReviewAccess,assertMembershipReviewQueueAccess,assertPaymentReversalAccess,assertPaymentVerificationAccess} from "./src/platform/workspace-authorization.js";
 import {beginAdminPasskeyAuthentication, beginAdminPasskeyRegistration, finishAdminPasskeyAuthentication, finishAdminPasskeyRegistration, listAdminPasskeys, recoverAdminPasskey, revokeAdminPasskey} from "./src/platform/webauthn.js";
+import {assertMembershipActivationAccess,assertMembershipReviewAccess,assertMembershipReviewQueueAccess,assertPaymentReversalAccess,assertPaymentVerificationAccess} from "./src/platform/workspace-authorization.js";
 import * as marketplaceDemand from "./src/services-mentorship/demand.js";
 import * as mentorshipOperations from "./src/services-mentorship/operations.js";
 import * as organizationMentorshipOffers from "./src/services-mentorship/organization-offers.js";

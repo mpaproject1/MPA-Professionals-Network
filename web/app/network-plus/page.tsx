@@ -11,8 +11,8 @@ export default function NetworkPlusPage() {
           <div className="eyebrow">MPA Professionals Network · Network-Plus</div>
           <h1 className="h1">Build meaningful professional connections.</h1>
           <p className="muted max-w-3xl">
-            Discover verified professionals and organizations, then connect around expertise,
-            professional services and opportunities to collaborate.
+            Discover verified MPA professionals and build connections around expertise and
+            professional collaboration. Organization and business discovery are being introduced in separate steps.
           </p>
         </header>
 
@@ -39,7 +39,7 @@ export default function NetworkPlusPage() {
 
           <Card className="grid content-start gap-3">
             <div className="flex items-center gap-3">
-              <span className="grid size-11 place-items-center rounded-xl bg-[var(--surface-muted)]">
+              <span className="grid size-11 place-items-center rounded-xl bg-[var(--surface)]">
                 <BriefcaseBusiness size={22} aria-hidden="true" />
               </span>
               <div>

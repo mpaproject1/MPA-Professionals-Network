@@ -118,7 +118,7 @@ test("finance reports reconcile verified, failed, refunded, disputed and outstan
   const usdApproved=await application("USD-APPROVED","approved",50,"USD");
   const usdDisputed=await application("USD-DISPUTED","approved",25,"USD");
   const usdWrittenOff=await application("USD-WRITTEN-OFF","approved",10,"USD");
-  const etbOutstanding=await application("ETB-OUTSTANDING","approved",1200,"ETB");
+  await application("ETB-OUTSTANDING","approved",1200,"ETB");
   const approvedEtbPayment=await payment(etbApproved,"succeeded",1000,"ETB","approved-etb");
   await db.query("insert into payment_reconciliation(payment_transaction_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,'matched',$2,now(),'Finance report fixture')",[approvedEtbPayment,userId]);
   await payment(etbFailed,"failed",200,"ETB","failed-etb");

@@ -117,6 +117,7 @@ test("finance reports reconcile verified, failed, refunded and outstanding amoun
   const etbRefunded=await application("ETB-REFUNDED","payment_pending",300,"ETB");
   const usdApproved=await application("USD-APPROVED","approved",50,"USD");
   const usdDisputed=await application("USD-DISPUTED","approved",25,"USD");
+  const usdWrittenOff=await application("USD-WRITTEN-OFF","approved",10,"USD");
   const etbOutstanding=await application("ETB-OUTSTANDING","approved",1200,"ETB");
   const approvedEtbPayment=await payment(etbApproved,"succeeded",1000,"ETB","approved-etb");
   await db.query("insert into payment_reconciliation(payment_transaction_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,'matched',$2,now(),'Finance report fixture')",[approvedEtbPayment,userId]);
@@ -127,10 +128,12 @@ test("finance reports reconcile verified, failed, refunded and outstanding amoun
   await payment(usdApproved,"succeeded",50,"USD","approved-usd");
   const disputedPayment=await payment(usdDisputed,"succeeded",25,"USD","disputed-usd");
   await db.query("insert into payment_reconciliation(payment_transaction_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,'disputed',$2,now(),'Finance report dispute fixture')",[disputedPayment,userId]);
+  const writtenOffPayment=await payment(usdWrittenOff,"succeeded",10,"USD","written-off-usd");
+  await db.query("insert into payment_reconciliation(payment_transaction_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,'written_off',$2,now(),'Finance report write-off fixture')",[writtenOffPayment,userId]);
   const finance={sub:userId,roles:["finance_officer"],permissions:[]};
   const filters={q:marker};
   const approved=await runReport(finance,"approved-payments",filters,randomUUID());
-  assert.equal(approved.rows.length,3);
+  assert.equal(approved.rows.length,4);
   assert.deepEqual(new Set(approved.rows.map(row=>row.Currency)),new Set(["ETB","USD"]));
   const exceptions=await runReport(finance,"failed-reversed-payments",filters,randomUUID());
   assert.equal(exceptions.rows.length,3);
@@ -142,7 +145,7 @@ test("finance reports reconcile verified, failed, refunded and outstanding amoun
   assert.equal(Number(etbCollections["Gross verified"]),1300);
   assert.equal(Number(etbCollections["Refunds and reversals"]),300);
   assert.equal(Number(etbCollections["Net collected"]),1000);
-  assert.equal(Number(collections.rows.find(row=>row.Currency==="USD")["Net collected"]),75);
+  assert.equal(Number(collections.rows.find(row=>row.Currency==="USD")["Net collected"]),85);
   const outstanding=await runReport(finance,"outstanding-membership-payments",filters,randomUUID());
   assert.equal(outstanding.rows.length,3,"failed and refunded applications remain outstanding until a new successful payment");
   assert.ok(outstanding.rows.some(row=>row["Application reference"]===marker+"-ETB-OUTSTANDING"));
@@ -159,11 +162,12 @@ test("finance reports reconcile verified, failed, refunded and outstanding amoun
   assert.equal(Number(etb["Approved payments"]),1);
   assert.equal(Number(etb["Failed payments"]),1);
   assert.equal(Number(etb["Refunded/reversed payments"]),1);
-  assert.equal(Number(usd["Net collected"]),75);
+  assert.equal(Number(usd["Net collected"]),85);
   assert.equal(Number(usd["Unreconciled amount"]),50);
   assert.equal(Number(usd["Disputed amount"]),25);
   assert.equal(Number(usd["Disputed payments"]),1);
-  assert.equal(Number(usd["Written off amount"]),0);
+  assert.equal(Number(usd["Written off amount"]),10);
+  assert.equal(Number(usd["Written off payments"]),1);
   assert.equal(Number(usd["Outstanding amount"]),0);
  }finally{
   if(paymentIds.length)await db.query("delete from payment_reconciliation where payment_transaction_id=any($1::uuid[])",[paymentIds]);

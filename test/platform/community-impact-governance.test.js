@@ -34,6 +34,7 @@ test("Offline-project attribution is evidence-backed and does not infer the staf
 test("Claim-to-detection reconciliation is reviewer-controlled and rejects fuzzy or cross-person merges",()=>{
  assert.match(service,/reconcileClaimCandidate/);
  assert.match(service,/no fuzzy or cross-person merge is allowed/i);
+ assert.match(service,/attribution_status!=="confirmed"/);
  assert.match(migration,/unique\(claim_id\)/);
  assert.match(migration,/unique\(candidate_id\)/);
 });

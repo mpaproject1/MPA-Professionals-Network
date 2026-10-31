@@ -84,7 +84,7 @@ test.describe("Workstream 5 homepage and navigation acceptance", () => {
     await expect(page.getByRole("link", { name: "Network", exact: true })).toHaveCount(0);
     await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Serve-Community", exact: true }).click();
     await expect(page).toHaveURL(/\/serve-community$/);
-    await expect(page.getByRole("heading", { name: /Serve-Community\. More ways to contribute/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Good work grows/i })).toBeVisible();
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "/serve-community");
     await page.goto("/marketplace");
     await expect(page).toHaveURL(/\/serve-community$/);

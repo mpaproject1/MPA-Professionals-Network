@@ -35,7 +35,7 @@ test("Score ledger, policies and source links are immutable and duplicate-resist
  assert.match(migration,/community_impact_score_ledger_immutable/);
  assert.match(migration,/idempotency_key text not null unique/);
  assert.match(migration,/reverses_entry_id uuid/);
- assert.match(sourceMigration,/unique\(source_system,source_type,source_record_id,subject_user_id\)/);
+ assert.match(sourceMigration,/unique\(source_system,source_type,source_record_id,subject_user_id\)/);assert.match(service,/historicalClaimFingerprint/);assert.match(service,/SCORE_DUPLICATE_HISTORICAL_SOURCE/);
  assert.match(sourceMigration,/unique references community_impact_claim/);
  assert.match(service,/already_recorded/);
  assert.match(service,/reverseEntry/);
@@ -79,6 +79,7 @@ test("Member score view is private and administrator score operations are separa
  assert.match(checker,/20261101200000_community_impact_score_outcome_maturity_rule\.sql/);
  assert.match(checker,/20261101210000_community_impact_score_recipient_confirmation_rules\.sql/);
  assert.match(checker,/20261101220000_community_impact_score_recipient_confirmation_scope\.sql/);
+ assert.match(checker,/20261101230000_community_impact_score_historical_dedup\.sql/);
  assert.match(checker,/20261101210000_community_impact_score_recipient_confirmation_rules\.sql/);
  assert.match(checker,/20261101220000_community_impact_score_recipient_confirmation_scope\.sql/);
 });

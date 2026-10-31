@@ -72,7 +72,7 @@ Participant visibility is enforced by participant rows and consent status. An un
 
 ### Support policy
 
-The `network_plus_support` role is registered as privileged and must be assigned through the existing system-administrator role-governance workflow. `system_admin` is also permitted. Support access is read-only and requires both a support case reference and an access reason on each list/detail request. Each support list/detail read writes an audit entry tied to the request. Support cannot accept, decline, withdraw, edit terms, invite participants or update a collaboration workspace. Moderators and business verification reviewers do not receive request access by virtue of their moderation role.
+The `network_plus_support` role is registered as privileged and must be assigned through the existing system-administrator role-governance workflow. A system administrator must separately grant access for one request, one support user and one support-case reference, with an expiry no later than 72 hours. Every support read must repeat the case reference and a meaningful access reason; the grant is checked against the request and current user. Support access is read-only. Each list/detail read writes an audit entry tied to the request. Support cannot accept, decline, withdraw, edit terms, invite participants or update a collaboration workspace. Moderators and business verification reviewers do not receive request access by virtue of their moderation role.
 
 ## 5. Schema and integrity
 
@@ -104,6 +104,8 @@ All routes are authenticated by the existing API dispatcher; domain functions re
 | POST | `/api/v1/network-plus/requests/:id/workspace/milestones` | Create milestone; requires idempotency key |
 | PATCH | `/api/v1/network-plus/requests/:id/workspace/milestones/:milestoneId` | Update milestone state/owner/due date |
 | POST | `/api/v1/network-plus/requests/:id/workspace/events` | Add update/blocker/decision/outcome; requires idempotency key |
+| POST | `/api/v1/admin/network-plus/requests/:id/support-access` | System-admin-only, expiring, request/case/user-scoped support grant |
+| DELETE | `/api/v1/admin/network-plus/requests/:id/support-access/:grantId` | Revoke a support grant |
 
 Creation, list/detail, submission, transition and participant-invite operations use persistent rate limits. Request creation and state transitions use advisory locks plus persisted fingerprints so a repeated key with identical content returns the existing result; reuse with different content returns a conflict. Milestone/event creation follows the same safe-retry contract.
 

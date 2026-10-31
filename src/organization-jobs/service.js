@@ -470,7 +470,7 @@ export async function updateApplicationDraft(applicationId,userId,input={},reque
   if(a.applicant_user_id!==userId) throw error(403,"Only the applicant can edit an application draft.","FORBIDDEN");
   if(a.status!=="draft") throw error(409,"Only draft applications can be edited.","INVALID_STATE");
   if(Array.isArray(input.answers)) await saveScreeningAnswers(db,applicationId,a.job_id,input.answers,false);
-  const updated=(await db.query("update job_application set cover_letter=coalesce($1,cover_letter),updated_at=now() where id=$2 returning *",[input.coverLetter??null,applicationId])).rows[0];
+  const updated=(await db.query("update job_application set cover_letter=coalesce($1,cover_letter),referral_code=coalesce($2,referral_code),updated_at=now() where id=$3 returning *",[input.coverLetter??null,input.referralCode?String(input.referralCode).trim().toUpperCase():null,applicationId])).rows[0];
   await audit(db,userId,"job.application_draft_updated","job_application",applicationId,requestId,{});
   return updated;
  });

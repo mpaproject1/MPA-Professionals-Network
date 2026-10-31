@@ -84,7 +84,7 @@ export default function NetworkPlusRequestsPage(){
  async function addMilestone(){
   if(!selected||!milestoneTitle.trim())return;
   setSaving(true);setError("");
-  try{await api("/api/v1/network-plus/requests/"+selected.id+"/workspace/milestones",{method:"POST",body:JSON.stringify({title:milestoneTitle,dueAt:milestoneDue||undefined})},token);setMilestoneTitle("");setMilestoneDue("");const ws=await api<any>("/api/v1/network-plus/requests/"+selected.id+"/workspace",{},token);setWorkspaceData(ws);}
+  try{await api("/api/v1/network-plus/requests/"+selected.id+"/workspace/milestones",{method:"POST",headers:{"X-Idempotency-Key":key()},body:JSON.stringify({title:milestoneTitle,dueAt:milestoneDue||undefined})},token);setMilestoneTitle("");setMilestoneDue("");const ws=await api<any>("/api/v1/network-plus/requests/"+selected.id+"/workspace",{},token);setWorkspaceData(ws);}
   catch(e){setError(e instanceof ApiError?e.message:"The milestone could not be saved.");}
   finally{setSaving(false);}
  }

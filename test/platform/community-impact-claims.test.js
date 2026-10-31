@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,service,server,privateFiles,compatibility,claimPage,reviewPage,adminWorkspace,retentionMigration]=await Promise.all([
+const [migration,service,server,privateFiles,compatibility,claimPage,reviewPage,adminWorkspace,retentionMigration,uploadHelper]=await Promise.all([
  read("../../db/migrations/20261031180000_community_impact_manual_claims.sql"),
  read("../../src/platform/community-impact-claims.js"),
  read("../../server.js"),
@@ -11,7 +11,8 @@ const [migration,service,server,privateFiles,compatibility,claimPage,reviewPage,
  read("../../web/app/community-impact/claims/page.tsx"),
  read("../../web/app/admin/community-impact/claims/page.tsx"),
  read("../../web/app/admin/admin-workspace.tsx"),
- read("../../db/migrations/20261031170000_community_impact_retention_policy.sql")
+ read("../../db/migrations/20261031170000_community_impact_retention_policy.sql"),
+ read("../../web/lib/private-upload.ts")
 ]);
 test("Increment 3 creates separate private claim, evidence, assignment, decision, appeal and event records",()=>{
  for(const table of ["community_impact_claim","community_impact_claim_evidence","community_impact_claim_assignment","community_impact_claim_decision","community_impact_claim_appeal","community_impact_claim_event"])assert.match(migration,new RegExp("create table if not exists "+table,"i"));
@@ -35,7 +36,7 @@ test("claimants can create, edit, submit, attach private evidence, clarify, with
  assert.match(service,/where c\.claimant_user_id=\$1/);
  assert.match(service,/ownedClaim\(tx,claimId,userId/);
  assert.match(service,/evidence<1/);
- assert.match(service,/Only your own confirmed private upload/);
+ assert.match(service,/Only your own confirmed claim-scoped private upload/);
  assert.match(service,/public_requested/);
  assert.match(service,/COMMUNITY_IMPACT_CLAIM_PUBLIC_CONSENT_REQUIRED/);
 });
@@ -53,12 +54,15 @@ test("private claim evidence downloads are scoped to claimant or assigned review
  assert.match(privateFiles,/assigned_reviewer/);
  assert.match(privateFiles,/assigned_appeal_reviewer/);
  assert.match(privateFiles,/claimant_user_id===userId/);
+ assert.match(privateFiles,/community_impact_claim_evidence/);
+ assert.match(uploadHelper,/purposeReferenceId/);
+ assert.match(migration,/purpose_reference_id uuid references community_impact_claim/);
 });
 test("claim and appeal APIs authenticate every operation",()=>{
  for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","/decision","/assign"])assert.ok(server.includes(route),route);
 });
 test("member and reviewer screens preserve private-by-default evidence boundaries",()=>{
- assert.match(claimPage,/Private draft/);
+ assert.match(claimPage,/private draft/i);
  assert.match(claimPage,/not required/);
  assert.match(claimPage,/uploadPrivateFile/);
  assert.match(claimPage,/downloadPrivateFile/);

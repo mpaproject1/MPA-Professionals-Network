@@ -94,3 +94,8 @@ This document is an acceptance contract, not evidence that visual regression, ma
 - The primary action returns members to `#discover` to explore current approved initiatives. The showcase remains informational; it does not bypass eligibility, membership, consent, review or application workflows.
 - Responsive layout: three cards on wide screens, two on tablet and one on mobile; full-width call to action on narrow screens. Loading, retry/error and no-reportable-project states are included.
 - Added browser acceptance coverage for section placement, endpoint request, discovery link and mobile horizontal overflow. Execution remains part of the full PR Quality/browser validation gate.
+
+ 
+### Offline completed-project portfolio presentation
+
+The About and Serve-Community Completed Projects sections use the same public endpoint and can render approved offline project stories alongside platform-completed initiatives. Offline cards may show a public story, location, consent-cleared photographs with alt text, linked video, and only the beneficiary/outcome values approved for public display. Platform member participation counts remain a separate measure and are never substituted for beneficiary counts. Cards use responsive media grids and preserve the existing mobile single-column layout.

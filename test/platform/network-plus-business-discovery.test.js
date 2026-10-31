@@ -37,6 +37,8 @@ test("ownership requires one canonical owner party, explicit consent and scoped 
   assert.match(service, /revokeBusinessAccess/);
   assert.match(service, /DUPLICATE_BUSINESS/);
   assert.match(service, /pg_advisory_xact_lock/);
+  assert.match(service, /om\\.role_code===\x27project_manager\x27/);
+  assert.match(service, /visibleAudiences/);
   assert.match(service, /PUBLIC_CONTACT_DETAILS_FORBIDDEN/);
   assert.match(service, /INVALID_GEOGRAPHY_REFERENCE/);
 });

@@ -303,3 +303,16 @@ The action-center event/recipient mapping and acceptance boundary are defined in
 - Do not relabel completed member participation as beneficiaries, impact achieved, jobs created, or other outcome measures. A future outcome/beneficiary claim requires a dedicated source record, definition, validation/approval workflow and privacy review.
 - The route is public-read only and rate-limited; it does not mutate initiative, participation, membership or audit records.
 - Acceptance: test published/in-progress/completed initiative states, completed/non-completed participation, duplicate participant counting, fewer-than-five suppression, verified/public organization filtering, absence of personal data, and rate limiting. Browser rendering and API integration tests remain required before release.
+
+## Staff-entered offline completed projects
+
+- `GET /api/v1/admin/serve-community/offline-projects` — Admin, system_admin and supporting_staff (or explicit `serve_community.projects.manage`) only; returns private staff records.
+- `POST /api/v1/admin/serve-community/offline-projects` — creates a private draft. Required: title, category, concise public summary, public story, completion date, location/region, delivery mode, activities delivered and outputs delivered. Optional beneficiary counts require a definition, counting method and evidence summary together; optional outcome measures require numeric value, unit, methodology and evidence summary.
+- `PATCH /api/v1/admin/serve-community/offline-projects/{id}` — edits only draft/rejected records. Approved records cannot be silently edited; correction requires a separately designed reviewable correction workflow.
+- `PATCH /api/v1/admin/serve-community/offline-projects/{id}/submit` — submits a record after media-rights confirmation. Submission never publishes.
+- `PATCH /api/v1/admin/serve-community/offline-projects/{id}/review` — system_admin/admin or explicit `serve_community.projects.approve` only; supports approve, reject and archive. Creator self-approval is forbidden. Approval is the only action that makes the record public.
+- Public image links: up to 8 HTTPS URLs, each with matching descriptive alt text. Video links: up to 3 HTTPS YouTube/Vimeo URLs. Staff must record permission/consent scope and restrictions. Private-drive links, personal contact details, beneficiary identities and private evidence URLs must not be placed in public fields.
+- Beneficiary counts and outcome metrics are distinct from MPA member participation records. No value is inferred. Public output includes only approved public-safe metric labels/values/units; internal methodology and evidence summaries remain staff/reviewer-only.
+- Offline records are stored in `serve_community_offline_project`, separately from `serve_community_initiative` and `serve_community_participation`. They are merged into the same public completed-project endpoint, without manufacturing participation rows or altering historical initiative records.
+- Migration: `20261031140000_serve_community_offline_completed_projects.sql`. Review history is append-only. No user permissions are automatically assigned.
+- Acceptance remains pending until migration compatibility, PostgreSQL service tests, role-negative tests, TypeScript/build, public media rendering, accessibility and browser tests pass at the exact PR head.

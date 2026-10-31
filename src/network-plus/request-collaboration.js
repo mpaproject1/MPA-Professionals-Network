@@ -356,6 +356,8 @@ export async function updateNetworkPlusWorkspaceMilestone(requestId,milestoneId,
     const updated=(await db.query("update network_plus_collaboration_milestone set status=$1,owner_user_id=$2,due_at=$3,description=$4,updated_at=now() where id=$5 returning *",[status,owner,dueAt,description,milestoneId])).rows[0];
     await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body,metadata) values($1,$2,'milestone',$3,$4,$5)",[ws.id,userId,"Milestone updated",updated.title+" is now "+status.replaceAll("_"," ")+".",{milestoneId,status}]);
     await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'collaboration.milestone_updated','network_plus_collaboration_workspace',$2,$3,'success',$4)",[userId,ws.id,requestIdHeader,{milestoneId,status}]);
+    const others=(await db.query("select user_id from network_plus_request_participant where request_id=$1 and user_id<>$2 and consent_status=$3",[requestId,userId,"accepted"])).rows;
+    for(const other of others)await notify(db,other.user_id,"network_plus.collaboration.milestone_updated",requestId,"A collaboration milestone was updated: "+updated.title);
     return updated;
   });
 }

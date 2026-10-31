@@ -6,8 +6,8 @@ import { assertOrganizationCapability, hasCurrentActiveMembership, hasProfession
 
 const MEMBER_OWNER_ROLES = ["member", "professional"];
 const ORG_OWNER_ROLES = ["owner", "administrator"];
-const BUSINESS_REVIEW_ROLES = ["verification_reviewer", "system_admin"];
-const LISTING_REVIEW_ROLES = ["supporting_staff", "system_admin"];
+const BUSINESS_REVIEW_ROLES = ["business_verification_reviewer", "system_admin"];
+const LISTING_REVIEW_ROLES = ["business_moderator", "system_admin"];
 const CATEGORIES = new Set(["professional_services","consulting","technology","design","education","healthcare","legal","finance","construction","trade","manufacturing","other"]);
 const MODIFIABLE = new Set(["displayName","tradingName","description","website","locationLabel"]);
 const LISTING_MODIFIABLE = new Set(["title","summary","description","serviceCategory","audience","deliveryMode","locationLabel","capacity","pricingModel","priceAmount","currency","availability","credentials"]);

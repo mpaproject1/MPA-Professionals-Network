@@ -29,6 +29,7 @@ test("governance actions deny an authenticated account without the specific perm
   ()=>governance.declareReviewerConflict(userId,id,{conflictType:"other",declaration:"This is a valid test conflict declaration."}),
   ()=>governance.proposeContributionAssessment(userId,id,{evidenceReferences:[randomUUID()],category:"community_care",contributionType:"project_delivery",contributionRole:"contributor",evidenceQuality:"adequate",outcomeMaturity:"output",attributionShare:100,riskLevel:"standard",rationale:"This is a valid test assessment rationale."}),
   ()=>governance.secondReviewAssessment(userId,id,{decision:"approved",rationale:"This is a valid test second-review rationale."}),
+  ()=>governance.listPendingContributionAssessments(userId),
   ()=>governance.evaluateRetention(userId,{limit:1})
  ];
  for(const action of actions)await assert.rejects(action,forbidden);

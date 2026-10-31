@@ -115,8 +115,8 @@ Added `test/platform/network-plus-business-discovery.test.js` for schema/source/
 - [ ] Execute migration compatibility on disposable PostgreSQL and confirm rollback.
 - [ ] Add/run seeded PostgreSQL integration tests for individual, organization and joint ownership; duplicate owner/idempotency conflicts; cross-organization access; delegated project-manager capability; expired/revoked delegation.
 - [ ] Add/run API tests for signed-out, expired membership, verified/unverified organization, direct endpoint access, field-level audience, private evidence isolation, self-review and unauthorized moderation.
-- [ ] Add reviewer-authorized private evidence download/access. The current reviewer evidence endpoint returns metadata only; it does not grant evidence-file download. Keep private-file access closed until a separate reviewer-scoped authorization path is implemented and tested.
-- [ ] Validate role/permission catalogue provisioning for `business.verify` and `business.moderate`; code accepts explicit permissions but this increment does not silently grant them to users.
+- [ ] Execute and test reviewer-authorized private evidence download through the existing `GET /api/v1/files/:id` route. The private-file service now allows only an independent `verification_reviewer` / `system_admin` or explicit `business.verify` permission to read evidence attached to a submitted/under-review case, and rejects the case submitter. Validate the negative cases with PostgreSQL fixtures.
+- [ ] Confirm the two system-only permission catalogue entries `business.verify` and `business.moderate` are present after migration and verify authorized reviewer assignment through the existing permission governance workflow. The migration does not grant either permission to any user.
 - [ ] Run backend tests, Biome, TypeScript, production build and browser acceptance after all implementation fixes are ready.
 - [ ] Complete manual privacy, accessibility and responsive checks before public release.
 

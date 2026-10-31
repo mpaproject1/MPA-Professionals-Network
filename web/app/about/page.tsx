@@ -57,8 +57,14 @@ function CompletedProjects() {
                 <div className={styles.projectMeta}><span>{categoryLabels[project.category] || "Community initiative"}</span><span className={styles.completedMark}><ShieldCheck size={14} aria-hidden="true" /> Completed</span></div>
                 <h3>{project.title}</h3>
                 <p>{project.summary}</p>
-                <div className={styles.projectCount}><Users size={18} aria-hidden="true" /><strong>{project.completedMemberParticipations.toLocaleString()}</strong><span>members with completed participation records</span></div>
-                {project.completedAt ? <p className={styles.projectDate}>Recorded {new Date(project.completedAt).toLocaleDateString()}</p> : null}
+                {project.publicStory ? <p>{project.publicStory}</p> : null}
+                {project.locationLabel ? <p className={styles.projectDate}>{project.locationLabel}</p> : null}
+                {project.imageUrls?.length ? <div className={styles.projectMedia}>{project.imageUrls.map((url, index) => <a key={url} href={url} target="_blank" rel="noreferrer"><img src={url} alt={project.imageAltText?.[index] || "Completed project photograph"} loading="lazy" /></a>)}</div> : null}
+                {project.videoUrls?.length ? <div className={styles.projectVideos}>{project.videoUrls.map(url => <a key={url} href={url} target="_blank" rel="noreferrer">Watch project video <ArrowRight size={14} aria-hidden="true" /></a>)}</div> : null}
+                {project.completedMemberParticipations !== undefined ? <div className={styles.projectCount}><Users size={18} aria-hidden="true" /><strong>{project.completedMemberParticipations.toLocaleString()}</strong><span>members with completed participation records</span></div> : null}
+                {project.beneficiaryCount !== undefined && project.beneficiaryCount !== null ? <div className={styles.projectCount}><Users size={18} aria-hidden="true" /><strong>{project.beneficiaryCount.toLocaleString()}</strong><span>{project.beneficiaryDefinition || "beneficiaries reached (reported)"}</span></div> : null}
+                {project.outcomeMetrics?.length ? <ul className={styles.projectOutcomes}>{project.outcomeMetrics.map(metric => <li key={metric.label}><strong>{metric.value} {metric.unit}</strong><span>{metric.label}</span></li>)}</ul> : null}
+                {project.completedAt ? <p className={styles.projectDate}>Completed {new Date(project.completedAt).toLocaleDateString()}</p> : null}
               </article>
             ))}
           </div>

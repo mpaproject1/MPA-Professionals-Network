@@ -43,7 +43,7 @@ test("public projection excludes internal evidence summaries and staff-only meta
  assert.match(fn,/status='approved' and public_visible=true/);
  assert.match(fn,/map\(\(\{label,value,unit\}\)=>\(\{label,value,unit\}\)\)/);
  assert.doesNotMatch(fn,/beneficiaryCountEvidence|beneficiary_count_evidence|methodology:r/);
- assert.match(fn,/source:"offline_staff_record"/);
+ assert.match(fn,/source:"offline_staff_record"/);assert.match(fn,/Number\(r\.beneficiary_count\)>=5\?r\.beneficiary_count:null/);
 });
 test("API exposes staff draft, update, submit, independent review and unified public feed",()=>{
  for(const route of ["api/v1/admin/serve-community/offline-projects","api/v1/public/serve-community/completed-projects"])assert.ok(server.includes(route));

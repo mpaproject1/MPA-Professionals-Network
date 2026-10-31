@@ -46,7 +46,8 @@ const migrationNames = [
   "20261031230000_referral_retention_snapshots.sql",
   "20261101090000_community_impact_governance_completion.sql",
   "20261101110000_community_impact_unified_score.sql",
-  "20261101120000_community_impact_score_source_adapters.sql"
+  "20261101120000_community_impact_score_source_adapters.sql",
+  "20261101130000_community_impact_score_history_guards.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -672,8 +673,8 @@ try {
 
   const scoreTables=await client.query("select count(*)::int count from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_score_policy_version","community_impact_score_active_policy","community_impact_score_policy_event","community_impact_score_ledger","community_impact_score_recalculation","community_impact_score_adjustment_event","community_impact_score_source_link","community_impact_score_source_link_event"]]);
   if(scoreTables.rows[0].count!==8)throw new Error("Unified score migration did not create all eight policy, ledger, recalculation and source-link tables.");
-  const scoreTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_score_ledger_immutable","trg_community_impact_score_policy_immutable","trg_community_impact_score_source_link_immutable"]]);
-  if(scoreTriggers.rows[0].count!==3)throw new Error("Unified score append-only and policy immutability triggers are incomplete.");
+  const scoreTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_score_ledger_immutable","trg_community_impact_score_policy_immutable","trg_community_impact_score_source_link_immutable","trg_community_impact_score_policy_event_immutable","trg_community_impact_score_recalculation_immutable","trg_community_impact_score_adjustment_event_immutable","trg_community_impact_score_source_link_event_immutable"]]);
+  if(scoreTriggers.rows[0].count!==7)throw new Error("Unified score append-only and policy immutability triggers are incomplete.");
   const initialScorePolicy=await client.query("select p.version,p.status,p.evaluation_only,p.public_score_enabled,p.policy->'dimensions' dimensions from community_impact_score_active_policy a join community_impact_score_policy_version p on p.id=a.policy_version_id where a.singleton=true");
   if(initialScorePolicy.rowCount!==1||initialScorePolicy.rows[0].version!==1||initialScorePolicy.rows[0].status!=="active"||initialScorePolicy.rows[0].evaluation_only!==true||initialScorePolicy.rows[0].public_score_enabled!==false)throw new Error("The initial docs/62 score policy must be active for evaluation only and remain unpublished.");
   const weights=initialScorePolicy.rows[0].dimensions.map(x=>Number(x.weight)).sort((a,b)=>b-a).join(",");

@@ -29,6 +29,9 @@ test("Increment 3 creates separate private claim, evidence, assignment, decision
  assert.match(migration,/beneficiary_count_method/);
  assert.match(migration,/sustained_impact_summary/);
  assert.match(migration,/location_summary/);
+ assert.match(migration,/evidence_url text/);
+ assert.match(migration,/video/);
+ assert.match(migration,/url/);
 });
 test("claim collection requires an active MPA retention schedule and never assumes membership",()=>{
  assert.match(service,/activeRetention\(db,"claim_metadata"\)/);
@@ -41,7 +44,7 @@ test("claim collection requires an active MPA retention schedule and never assum
  assert.match(migration,/Non-member identity assurance is outside this increment/);
 });
 test("claimants can create, edit, submit, attach private evidence, clarify, withdraw and appeal only their own records",()=>{
- for(const method of ["createClaim","updateMyClaim","attachClaimEvidence","removeClaimEvidence","submitMyClaim","respondToClarification","withdrawMyClaim","submitClaimAppeal","getMyClaim"])assert.match(service,new RegExp("export async function "+method));
+ for(const method of ["createClaim","updateMyClaim","attachClaimEvidence","attachClaimEvidenceUrl","removeClaimEvidence","submitMyClaim","respondToClarification","withdrawMyClaim","submitClaimAppeal","getMyClaim"])assert.match(service,new RegExp("export async function "+method));
  assert.match(service,/where c\.claimant_user_id=\$1/);
  assert.match(service,/ownedClaim\(tx,claimId,userId/);
  assert.match(service,/evidence<1/);
@@ -50,6 +53,8 @@ test("claimants can create, edit, submit, attach private evidence, clarify, with
  assert.match(service,/evidence_removed/);
  assert.match(migration,/evidence_removed/);
  assert.match(service,/public_requested/);
+ assert.match(service,/safeEvidenceUrl/);
+ assert.match(service,/host.endsWith/);
  assert.match(service,/COMMUNITY_IMPACT_CLAIM_PUBLIC_CONSENT_REQUIRED/);
 });
 test("review and appeal actions require assignment, separate permissions and independent decision-makers",()=>{
@@ -75,13 +80,15 @@ test("private claim evidence downloads are scoped to claimant or assigned review
  assert.match(migration,/purpose_reference_id uuid references community_impact_claim/);
 });
 test("claim and appeal APIs authenticate every operation",()=>{
- for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","parts[6]===\"evidence\"" ,"parts[6]===\"decision\"","parts[6]===\"assign\""])assert.ok(server.includes(route),route);
+ for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","parts[6]===\"evidence\"","attachClaimEvidenceUrl" ,"parts[6]===\"decision\"","parts[6]===\"assign\""])assert.ok(server.includes(route),route);
 });
 test("member and reviewer screens preserve private-by-default evidence boundaries",()=>{
  assert.match(claimPage,/private draft/i);
  assert.match(claimPage,/mentorship_knowledge_sharing/);
  assert.match(claimPage,/sustainedImpactSummary/);
  assert.match(claimPage,/beneficiaryCountMethod/);
+ assert.match(claimPage,/External evidence URL/);
+ assert.match(claimPage,/Attach private evidence link/);
  assert.match(claimPage,/not required/);
  assert.match(claimPage,/uploadPrivateFile/);
  assert.match(claimPage,/downloadPrivateFile/);
@@ -90,6 +97,7 @@ test("member and reviewer screens preserve private-by-default evidence boundarie
  assert.match(reviewPage,/assigned reviewer only/);
  assert.match(reviewPage,/Request clarification/);
  assert.match(reviewPage,/Overturn original decision/);
+ assert.match(reviewPage,/Open private evidence link/);
  assert.match(adminWorkspace,/Impact claim review/);
 });
 test("retention migration has valid hash constraint and immutable policy version fields",()=>{

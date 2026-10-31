@@ -687,7 +687,7 @@ try {
   const weights=initialScorePolicy.rows[0].dimensions.map(x=>Number(x.weight)).sort((a,b)=>b-a).join(",");
   const scorePolicyConfig=await client.query("select policy->'calculation'->'evidenceQualityRank' evidence_ranks,policy->'calculation'->'outcomeMaturityRank' outcome_ranks,policy->'calculation'->>'rounding' rounding from community_impact_score_policy_version where version=4");
   if(!scorePolicyConfig.rows[0]?.evidence_ranks||!scorePolicyConfig.rows[0]?.outcome_ranks||scorePolicyConfig.rows[0]?.rounding!=="4dp")throw new Error("Initial active score policy must configure evidence quality, outcome maturity and rounding scales.");
-  const scoreRubrics=await client.query("select policy->'dimensions'->0->'criteria' criteria,policy->'calculation'->'modifiers' modifiers,policy->'calculation'->'decayRules' decay_rules from community_impact_score_policy_version where version=3");
+  const scoreRubrics=await client.query("select policy->'dimensions'->0->'criteria' criteria,policy->'calculation'->'modifiers' modifiers,policy->'calculation'->'decayRules' decay_rules from community_impact_score_policy_version where version=4");
   if(!Array.isArray(scoreRubrics.rows[0]?.criteria)||!Array.isArray(scoreRubrics.rows[0]?.modifiers)||!Array.isArray(scoreRubrics.rows[0]?.decay_rules))throw new Error("Initial score policy must store rubric criteria, modifiers and decay rules as policy data.");
   const outcomeRule=await client.query("select policy->'dimensions'->0->'measurementRules'->>'minimumOutcomeMaturity' minimum_outcome from community_impact_score_policy_version where version=4");
   if(outcomeRule.rows[0]?.minimum_outcome!=="outcome")throw new Error("Measurable outcomes dimension must require outcome-level maturity.");

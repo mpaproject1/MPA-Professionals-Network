@@ -288,7 +288,7 @@ export async function moderateProfessionalServiceListing(listingId,userId,input,
     const row=(await db.query("select * from network_plus_service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row)fail(404,"Professional service listing not found.","NOT_FOUND");
     if(row.created_by===userId||row.submitted_by===userId)fail(403,"A listing creator or submitter cannot moderate their own listing.","SELF_REVIEW_FORBIDDEN");
-    if(row.status!=="pending_review")fail(409,"Only a listing awaiting moderation can receive this decision.","INVALID_STATE");
+    if(status==="suspended" ? !["published","paused","pending_review"].includes(row.status) : !["pending_review","suspended"].includes(row.status))fail(409,"This listing is not in a state eligible for the requested moderation decision.","INVALID_STATE");
     if(status==="published")await assertBusinessPublishable(db,row.business_id);
     const updated=(await db.query(`update network_plus_service_listing set status=$1,moderation_reason=$2,reviewed_by=$3,reviewed_at=now(),
       published_at=case when $1='published' then now() else published_at end,
@@ -424,7 +424,7 @@ export async function reviewBusinessModeration(businessId,userId,input,requestId
     const row=(await db.query("select * from network_plus_business where id=$1 for update",[businessId])).rows[0];
     if(!row)fail(404,"Business not found.","NOT_FOUND");
     if(row.created_by===userId||row.moderation_submitted_by===userId)fail(403,"A business creator or submitter cannot moderate their own business profile.","SELF_REVIEW_FORBIDDEN");
-    if(row.moderation_status!=="pending_review")fail(409,"Business profile is not awaiting moderation.","INVALID_STATE");
+    if(status!=="suspended"&&row.moderation_status!=="pending_review")fail(409,"Business profile is not awaiting moderation.","INVALID_STATE");
     if(status==="approved"&&row.verification_status!=="verified")fail(409,"Only a verified business profile can be approved for publication.","BUSINESS_NOT_VERIFIED");
     const updated=(await db.query("update network_plus_business set moderation_status=$1,publication_status=case when $1='suspended' then 'suspended' when $1='approved' then 'published' else 'draft' end,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];
     await audit(db,userId,"network_plus.business_profile_moderated","network_plus_business",businessId,requestId,{status,reason});

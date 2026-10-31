@@ -57,7 +57,7 @@ const FRIENDLY_ERRORS: Record<string,string> = {
   MEMBERSHIP_REQUIRED: "A current active MPA membership is required for this action. Check your membership status or application, or contact MPA Support Desk.",
   PROFESSIONAL_PROFILE_FORBIDDEN: "This account uses an organization profile. Open the organization workspace instead of the professional profile.",
   APPLICATION_NOT_APPROVED: "The membership application must be approved before its payment can be verified. No activation has occurred.",
-  CONSENT_REQUIRED: "The applicant has not granted current employer-sharing consent. No employer sharing was completed.",
+  CONSENT_REQUIRED: "The required consent has not been granted. No sharing or participation action was completed.",
   CONSENT_FIELD_MISMATCH: "The selected fields exceed the applicant's sharing consent. No data was shared.",
   ORGANIZATION_NOT_ELIGIBLE: "Only verified, visible organizations can receive job-seeker demand through this workflow.",
   OTHER_VALUE_REQUIRED: "You selected Other. Enter the value in the custom field that appeared below the selection.",

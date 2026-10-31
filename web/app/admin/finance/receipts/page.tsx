@@ -3,7 +3,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { OperationStatus } from "../../../../components/operation-status";
 import { Badge, Card } from "../../../../components/ui";
-import { api, ApiError } from "../../../../lib/api";
+import { ApiError, api } from "../../../../lib/api";
 import { useUiStore } from "../../../../lib/store";
 import { AdminPageHeader } from "../../admin-page-header";
 

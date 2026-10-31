@@ -13,7 +13,8 @@ test("full organization detail is private to an active member of that organizati
   assert.match(service, /if\(!viewerId\) throw error\(403/);
   assert.match(service, /organization_membership om where om\.organization_id=\$1 and om\.user_id=\$2 and om\.status='active'/);
   assert.match(service, /export async function getPublicOrganizationProfile\(orgId\)/);
-  assert.match(service, /return \{\.\.\.org,users\}/);
+  assert.match(service, /if\(\["read_only","project_manager"\]\.includes\(membership\.role_code\)\) return \{id:org\.id/);
+  assert.match(service, /return \{\.\.\.org,role_code:membership\.role_code,users\}/);
 });
 
 test("reviewer queue derives scope from the authenticated viewer, not a caller-supplied reviewerId", () => {
@@ -143,7 +144,7 @@ test("recruiting interview scheduling validates organization/job-team scope and 
   assert.match(interview, /INVALID_INTERVIEWER/);
   assert.match(interview, /jobRole\(db,a\.job_id,userId,\["hiring_manager","recruiter"\]\)/);
   assert.match(interview, /jobRole\(db,a\.job_id,interviewerUserId,\["hiring_manager","recruiter","interviewer"\]\)/);
-  assert.match(service, /select role_code from job_team_member where job_id=\$1 and user_id=\$2 and active=true/);
+  assert.match(service, /select jt\.role_code from job_team_member jt join organization_membership om on om\.organization_id=\$2 and om\.user_id=jt\.user_id and om\.status='active' where jt\.job_id=\$1 and jt\.user_id=\$3 and jt\.active=true/);
   assert.match(interview, /Interviews can only be scheduled for an active application/);
   const notesStart = service.indexOf("export async function listApplicationNotes(");
   const notesEnd = service.indexOf("export async function scheduleInterview(", notesStart);
@@ -251,7 +252,7 @@ test("Employer recruitment workspace keeps vacancy and applicant views organizat
 test("verification.manage permission is accepted consistently by reviewer routes and decision service", () => {
   const server = read("server.js");
   const service = read("src/verification/service.js");
-  assert.match(server, /anyRoleOrPermission\(identity,\["verification_reviewer","ethics_reviewer","system_admin"\],\["verification\.manage"\]\)/);
+  assert.match(server, /anyRoleOrPermission\(identity,\["verification_reviewer","system_admin"\],\["verification\.manage"\]\)/);
   assert.match(service, /permission_code='verification\.manage'/);
 });
 
@@ -277,7 +278,7 @@ test("CV storage remains private by default and sharing is limited to the applic
   assert.match(talent, /talent\.cv_sharing_revoked/);
   assert.match(server, /api\/v1\/me\/cv\/share/);
   assert.match(files, /job_application_attachment aa join job_application a on a\.id=aa\.application_id join job j on j\.id=a\.job_id/);
-  assert.match(files, /om\.role_code in \('owner','administrator','recruiter','project_manager'\)/);
+  assert.match(files, /om\.role_code in \('owner','administrator','recruiter'\)/);
   assert.match(files, /jt\.active=true/);
   assert.match(files, /jt\.role_code in \('hiring_manager','recruiter','interviewer'\)/);
   assert.match(migration, /cv_file_id uuid references file_object\(id\)/);

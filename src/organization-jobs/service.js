@@ -5,7 +5,7 @@ import { nextTrackingReference } from "../platform/tracking-reference.js";
 import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
 
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
-const ORG_WRITE_ROLES=["owner","administrator","recruiter"];
+const ORG_WRITE_ROLES=["owner","administrator","recruiter","project_manager"];
 const CANDIDATE_ROLES=["owner","administrator","recruiter"];
 
 async function audit(db,actor,action,type,id,requestId,metadata={}){ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,metadata]); }
@@ -667,7 +667,7 @@ export async function updateOrganizationUser(orgId,actorUserId,userId,input,requ
  });
 }
 export async function listOrganizationUsers(orgId,actorUserId){
- const db=getPool(); await orgRole(db,orgId,actorUserId,["owner","administrator","recruiter"]);
+ const db=getPool(); await orgRole(db,orgId,actorUserId,["owner","administrator"]);
  return (await db.query("select om.user_id,om.role_code,om.status,om.joined_at,p.display_name,u.email from organization_membership om join app_user u on u.id=om.user_id left join person p on p.user_id=u.id where om.organization_id=$1 and om.status='active' order by om.created_at",[orgId])).rows;
 }
 

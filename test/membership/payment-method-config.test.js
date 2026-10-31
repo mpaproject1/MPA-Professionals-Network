@@ -20,9 +20,9 @@ const bank = {
 test("only explicit admin/finance role or permission can manage payment methods", () => {
   for (const identity of [
     { roles: ["system_admin"] }, { roles: ["finance_officer"] },
-    { permissions: ["members.manage"] }, { permissions: ["finance.manage"] },
+    { permissions: ["finance.manage"] },
   ]) assert.equal(canManageMembershipPaymentMethods(identity), true);
-  for (const identity of [{ roles: ["member"] }, { roles: ["reviewer"] }, {}]) {
+  for (const identity of [{ roles: ["member"] }, { roles: ["reviewer"] }, { permissions: ["members.manage"] }, {}]) {
     assert.equal(canManageMembershipPaymentMethods(identity), false);
     assert.throws(() => assertMembershipPaymentMethodAdmin(identity), error => error.statusCode === 403 && error.code === "FORBIDDEN");
   }

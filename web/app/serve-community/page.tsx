@@ -1,6 +1,7 @@
 "use client";
 import {ArrowRight,BriefcaseBusiness,GraduationCap,LockKeyhole,Search,Users,Workflow} from "lucide-react";
 import Link from "next/link";
+import {SupportAction} from "../../components/support-action";
 import {Card} from "../../components/ui";
 
 const primaryPathways=[
@@ -41,6 +42,6 @@ export default function ServeCommunityPage(){return <main className="mx-auto gri
  </section>
  <section className="marketplace-trust grid" style={{gap:10}}>
   <div className="row" style={{gap:12,alignItems:"flex-start"}}><LockKeyhole size={23}/><div className="grid" style={{gap:6}}><h2 className="h2">Your privacy stays in your control</h2><p className="muted">A public listing is not a private agreement. Requests, applications, mentor proposals and introductions use their own workflows. Review the details and next step before submitting.</p></div></div>
-  <div className="row" style={{gap:10,flexWrap:"wrap"}}><Link className="text-link" href="/privacy">Privacy information</Link><Link className="text-link" href="/community-guidelines">Community guidelines</Link><Link className="text-link" href="/contact">Contact support</Link></div>
+  <div className="row" style={{gap:10,flexWrap:"wrap"}}><Link className="text-link" href="/privacy">Privacy information</Link><Link className="text-link" href="/community-guidelines">Community guidelines</Link><SupportAction label="Contact support" className="text-link" /></div>
  </section>
 </main>}

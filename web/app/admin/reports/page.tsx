@@ -10,7 +10,7 @@ import {AdminPageHeader} from "../admin-page-header";
 import styles from "./reports.module.css";
 
 type Report={id:string;title:string;description:string;category:string;scope:string;sensitive:boolean;columns:string[];definition:string;formats:string[]};
-type Result={report:Report;filters:{from:string;to:string;status:string;q:string;groupBy?:string};generatedAt:string;rows:Record<string,unknown>[];totals:Record<string,number|string>};
+type Result={report:Report;filters:{from:string;to:string;status:string;q:string;groupBy?:string};generatedAt:string;rows:Record<string,unknown>[];totals:Record<string,number|string|boolean>};
 type SavedView={id:string;report_id:string;reportTitle:string;name:string;filters:{from:string;to:string;status:string;q:string;groupBy?:string};updated_at:string};
 async function downloadReport(path:string,token:string){const response=await fetch(path,{headers:{Authorization:`Bearer ${token}`},cache:"no-store"});if(!response.ok){let message="Export failed. Please retry.";try{const b=await response.json();message=b?.error?.message||message;}catch{}throw new Error(message);}const blob=await response.blob();if(blob.size===0)throw new Error("The report export was empty. No file was downloaded; retry the export or contact support if it repeats.");const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=response.headers.get("content-disposition")?.match(/filename="?([^";]+)"?/)?.[1]||"mpa-report";document.body.appendChild(a);a.click();a.remove();window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
 export default function AdminReportsPage(){

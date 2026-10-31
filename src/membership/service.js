@@ -717,7 +717,7 @@ export async function listApplicationsForReview(){
 
 export async function listMembershipPaymentsForFinance(){
  const db=getPool();
- const result=await db.query(\`select pt.id payment_id,pt.status payment_status,pt.amount,pt.currency,pt.channel,pt.source,pt.purpose_reference,
+ const result=await db.query(`select pt.id payment_id,pt.status payment_status,pt.amount,pt.currency,pt.channel,pt.source,pt.purpose_reference,
    pt.request_payload->>'reference' payment_reference,pt.created_at,pt.verified_at,pt.verification_note,
    ma.id application_id,ma.tracking_reference,ma.application_type,ma.status application_status,
    mp.product_code,mp.name product_name,pr.reconciliation_status,pr.note reconciliation_note,
@@ -729,7 +729,7 @@ export async function listMembershipPaymentsForFinance(){
   left join payment_reconciliation pr on pr.payment_transaction_id=pt.id
   where pt.status in ('pending','succeeded','failed','refunded')
   order by case when pt.status='pending' then 0 else 1 end,pt.created_at desc
-  limit 500\`);
+  limit 500`);
  return result.rows;
 }
 

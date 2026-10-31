@@ -37,5 +37,5 @@ test("role workspace overview links to existing workflows rather than creating d
   for (const href of ["/members", "/admin/membership", "/verification", "/organizations", "/organizations/workspace", "/recruitment", "/admin/ethics", "/ethics", "/admin/finance", "/admin/support", "/admin/accounts", "/mentorship"]) {
     assert.ok(page.includes('href: "' + href + '"'), "missing existing workflow link: " + href);
   }
-  assert.ok(page.includes("Queue totals and progress remain in the authoritative workflows"));
+  assert.ok(page.includes("Queue totals and progress remain in the authoritative workflow screens"));
 });

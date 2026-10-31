@@ -31,7 +31,7 @@ test("account creation is never queued or auto-replayed as offline synchronizati
   const draftWriter = source.match(/function writeOrganizationDraft\([\s\S]*?\n \}\n\n function applyOrganizationDraft/);
   assert.ok(draftWriter, "draft persistence function should be separable from submission");
   assert.doesNotMatch(draftWriter[0], /api<|fetch\(|navigator\.serviceWorker|Background Sync/i);
-  assert.match(source, /if\(!challenge\)throw new Error\("Load a new human check before registering\."\)/);
+  assert.match(source, /if\(challengeRequired&&!challenge\)throw new Error\("Load a new human check before registering\."\)/);
   assert.match(source, /api<any>\("\/api\/v1\/auth\/register"/);
   assert.match(source, /Saving a draft does not create an account or submit an organization application/);
 });

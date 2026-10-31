@@ -605,6 +605,7 @@ export async function respondToJobApplication(applicationId,userId,input,request
       if(a.offer_approval_status==="rejected") throw error(409,"The offer was not approved.","OFFER_REJECTED");
       const row=(await db.query("update job_application set status='accepted',offer_responded_at=now(),updated_at=now() where id=$1 returning *",[applicationId])).rows[0];
       await db.query("insert into job_application_event(application_id,actor_user_id,from_status,to_status,note) values($1,$2,'offer','accepted',$3)",[applicationId,userId,input.note||null]);
+      await memberReferrals.recordJobApplicationStage(db,applicationId,"accepted",userId);
       await audit(db,userId,"job.offer_accepted","job_application",applicationId,requestId);
       const employers=(await db.query("select om.user_id from organization_membership om join app_user u on u.id=om.user_id where om.organization_id=$1 and om.status='active' and u.status='active' and om.role_code=any($2::text[])",[a.organization_id,["owner","administrator","recruiter"]])).rows;
       for(const employer of employers)await queueWorkflowEmail(db,employer.user_id,"employer.candidate_update",{notificationEventCode:"job.offer_accepted",category:"recruitment",title:"Candidate accepted offer",audience:"employer",status:"accepted",message:"The candidate accepted the employment offer.",nextAction:"Update the candidate pipeline and prepare any authorized onboarding steps.",actionUrl:"/recruitment",reviewerQueue:true,actionRequired:true,priority:"high"},"job_application",applicationId);

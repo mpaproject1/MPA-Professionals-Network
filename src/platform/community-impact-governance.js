@@ -227,6 +227,12 @@ export async function proposeContributionAssessment(userId,claimId,input,request
   return row;
  });
 }
+export async function listPendingContributionAssessments(actorUserId){
+ await permission(getPool(),actorUserId,"community_impact.claim.second_review");
+ const rows=await getPool().query("select a.id,a.claim_id,a.reviewer_user_id,a.category,a.contribution_type,a.contribution_role,a.evidence_quality,a.outcome_maturity,a.attribution_share,a.risk_level,a.rationale,a.created_at,c.claimant_user_id,c.status claim_status from community_impact_contribution_assessment a join community_impact_claim c on c.id=a.claim_id where a.status='pending_second_review' order by a.created_at limit 100");
+ return {items:rows.rows};
+}
+
 export async function secondReviewAssessment(userId,assessmentId,input,requestId){
  await permission(getPool(),userId,"community_impact.claim.second_review");
  const decision=String(input?.decision||"");if(!["approved","rejected"].includes(decision))fail(400,"Choose approved or rejected.","INVALID_DECISION");

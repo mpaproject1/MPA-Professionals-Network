@@ -67,7 +67,7 @@ test("private claim evidence downloads are scoped to claimant or assigned review
  assert.match(migration,/purpose_reference_id uuid references community_impact_claim/);
 });
 test("claim and appeal APIs authenticate every operation",()=>{
- for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","parts[6]===\"evidence\"","/decision","/assign"])assert.ok(server.includes(route),route);
+ for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","parts[6]===\"evidence\"" ,"parts[6]===\"decision\"","parts[6]===\"assign\""])assert.ok(server.includes(route),route);
 });
 test("member and reviewer screens preserve private-by-default evidence boundaries",()=>{
  assert.match(claimPage,/private draft/i);

@@ -423,3 +423,340 @@ Do not introduce a new migration until the current schema and source-record keys
 7. Confirm whether any score should be visible before a minimum number of verified records exists.
 
 **Implementation boundary:** This commit documents the proposed design only. It does not add database migrations, API routes, UI, background jobs, scoring calculations, permissions, or production changes. Those belong in separately reviewed increments after the decisions above and the branch-level re-audit are complete.
+
+
+---
+
+# Delivery record — Increment 0 and Increment 1
+
+**Audit/update baseline:** branch `feat/workstream-3-progress-members-workspace`, HEAD `afdffb401a981d65769692b3463b3d389c5b8ec4` (parent `557e03a7048fc94e863decc8347fd1e33ba28016`), audited 2026-10-31.  
+**Scope of this delivery:** source re-audit and architecture/data-contract documentation only. No migrations, application code, API routes, UI, background jobs, role grants, or production operations were performed.
+
+## Increment 0 — Re-audit and architecture freeze
+
+<badge>Source review completed</badge>
+
+### 0.1 Audit evidence and branch baseline
+
+The target branch was re-fetched before the audit. The branch HEAD at the start of this work was `afdffb401a981d65769692b3463b3d389c5b8ec4`. The inspected source and document revisions were:
+
+| Area | Inspected source | Blob SHA |
+|---|---|---|
+| Profile and professional profile | `web/app/profile/page.tsx` | `362e1b12c7b55cb43a1bb7e32882996095ae4cdf` |
+| Member workspace | `web/app/members/page.tsx` | `cc30936fb7bf4e742361d94fc9066184f1068086` |
+| Initiatives and participation | `src/platform/serve-community-initiatives.js` | `35a2568707bb089b33225fbf26c195dd4d437b7c` |
+| Offline completed projects | `src/platform/serve-community-offline-projects.js` | `bb6ae9b6a6e8ee8ffb6b22d69e492338b06c77bc` |
+| Existing impact reports | `src/platform/serve-community-impact-reports.js` | `95e9c9f6c9baea01437f080e9d6971b1e5aadbe7` |
+| Professional verification | `src/verification/service.js` | `336da71de573eda07484952fe194857c6f74cb72` |
+| Ethics cases | `src/ethics/service.js` | `8093b75d48ab65f5aeea411f6d3cf68d48b85c3d` |
+| Initiative schema | `db/migrations/20261031130000_serve_community_initiatives.sql` | `d3b3b4618c36fc830f8ebe2f716e86cf705a7617` |
+| Offline-project schema | `db/migrations/20261031140000_serve_community_offline_completed_projects.sql` | `4130d40d82e9c54f69131a10723c94b51c82d11f` |
+| Network-Plus outcome proof | `db/migrations/20261025150000_serve_community_g6_outcome_proof.sql` | `0d2750e381885ca96fec8e5cf4264536ff821631` |
+| Request/collaboration contract | `docs/60-network-plus-increment-6-request-collaboration-implementation.md` | inspected at this baseline |
+| Source integration plan | `docs/53-network-plus-discovery-and-collaboration-integration-plan.md` | inspected at this baseline |
+| Existing impact data contract | `docs/serve-community-impact-data-contract.md` | inspected at this baseline |
+| Role workspace contract | `docs/56-phase-3-unified-role-workspaces.md` | inspected at this baseline |
+| Serve-Community workflow record | `docs/61-network-plus-increment-7-serve-community-ux.md` | `baf2d7440abfe99698d2236ac751c930b0902502` |
+| Member workspace regression test | `test/p1/members-progress-workspace.test.js` | `7311482fd11f842d989ba7929877f3050480d5c0` |
+
+This was a source and migration inspection. It was not a fresh runtime test, a complete route-by-route API authorization test, a disposable-database migration rehearsal, or an accessibility sign-off. Those remain separate validation gates.
+
+### 0.2 Source-to-impact mapping and exact gaps
+
+| Existing source | What it authoritatively records today | Proposed impact integration | Gap / restriction |
+|---|---|---|---|
+| Canonical identity: `app_user`, `person`, `professional_profile` and existing profile services | Account/person identity, professional profile, experience, profile completion and visibility preferences | Reference the canonical person/user IDs; show an optional impact section on the existing profile | No impact contribution portfolio or score is present in the inspected profile page. Do not create a second person or profile model. |
+| `web/app/profile/page.tsx` | Professional identity and talent visibility are separately controlled; private verification evidence is not directory content | Read profile identity and disclosure settings; add independent impact visibility preferences later | Existing talent visibility settings do not grant public consent for impact stories, media, outcomes or beneficiary information. Separate consent is required. |
+| `web/app/members/page.tsx` | Server-backed membership application, payment, review, activation/history, tracking and notification progress | Link to a distinct Community Impact workspace; do not treat membership progress as contribution progress | The page is explicitly a membership journey. No impact score, claim, achievement or contribution tracking exists there. Preserve payment, review and activation as separate states. |
+| `serve_community_initiative` and `serve_community_initiative_event` | Initiative owner, organization, category, lifecycle, moderation and append-only events | Source project/initiative identity and approved public metadata; one impact contribution per attributable person and eligible completed activity | Initiative completion is not automatically an individual's verified outcome. The current source category list is fixed to education, community care, digital inclusion, environment, livelihoods, accessibility and other. No person-level impact attribution ledger exists. |
+| `serve_community_participation`, consent and participation event tables | Private participant application, status, participant identity, idempotency, explicit consent and append-only lifecycle/consent history | Candidate source for a participant's role and completion claim, after participant/source-owner confirmation | Participation currently requires current active membership and affirmative participation plus contact-sharing consent. Do not weaken this requirement for participation. Do not copy it into historical/off-platform impact claims. Participant name/email is coordination-only and not public. A completed status alone is insufficient evidence of personal outcomes. |
+| `serve_community_offline_project` and event table | Staff-entered offline project summary/story, category, completion date, activity/output, optional evidenced beneficiary count, outcome metrics, media links/alt text, consent, source reference, approval and audit history | Reuse approved project as a project-level source; create separate contributor-attribution records only when the staff workflow can substantiate individual roles | Existing categories are the same six named categories plus other. Staff roles with `serve_community.projects.manage` may create/edit/submit; approval is separately permissioned through `serve_community.projects.approve`. Creator/last editor self-approval is blocked. No normalized contributor-to-project attribution is present in the inspected migration. |
+| Public offline project projection | Approved and `public_visible=true` project records; public text rejects direct contact data; media must be safe public HTTPS, videos YouTube/Vimeo, alt text is required | Reuse approved public project story/media only when the relevant media/story consent covers this use | Project-level consent is not proof that every depicted person consented. No private evidence, staff notes, contact details or unapproved media may flow to a public member portfolio. |
+| `src/platform/serve-community-impact-reports.js` | Existing service-listing aggregate metrics and governance reports; listing owner/authorized organization manager/governance access; audit logging; suppression for groups below five | Reuse aggregation and privacy suppression patterns for future aggregate reporting | This is not an individual contribution ledger or a personal impact score. It measures listing interest, pledges, requests, completion and related decisions. It must not be repurposed as a personal score. |
+| Network-Plus service/request and G6 outcome-proof records | Existing listing, request, milestone/delivery, completion evidence, provider completion submission and requester outcome acceptance/dispute; paid-work finance checks remain distinct | Candidate future source for a verified service contribution only after the request is completed, evidence conditions are met, requester outcome is accepted (or explicitly authorized resolution exists), and contributor attribution is confirmed | Interest, pledge, notification, submitted delivery, provider completion claim or disputed request is not a verified outcome. Keep commercial Network-Plus records separate from Serve-Community initiatives. |
+| Network-Plus Increment 6 request/collaboration | Typed intents (service, supplier, referral, expertise, partnership, collaboration), explicit recipient acceptance, request history and engagement workspace rules | Candidate source for accepted and later completed collaborations, with participant-specific role attribution | Acceptance creates an engagement/workspace, not a completed impact result. Referral does not automatically create a workspace. A completed status alone must not bypass evidence, counterpart confirmation, dispute state or finance checks where applicable. |
+| Mentorship workflow (documented in the source integration plan) | Distinct mentorship request, mutual acceptance, session coordination, feedback and outcome process; consent-controlled sharing | Candidate source after the engagement has reached its actual completion gate and participant attribution/consent are verified | A request, match, scheduled session or attendance signal is not by itself a verified outcome. Do not copy mentorship tables or treat mentor eligibility as a generic impact reviewer role. |
+| `src/verification/service.js` | Professional verification cases, claim/evidence/checklist decisions, assigned reviewers, case audit and separate appeal reviewer access | Reuse technical patterns for private evidence, assignment, reviewer scoping, independent appeals and audit where domain-compatible | Its member verification entry/evidence path requires active membership. It is not the non-member community-contribution claim service. Do not use professional verification decisions as automatic impact approval or share its confidential evidence with public profiles. |
+| `src/ethics/service.js` | Confidential ethics case lifecycle, assigned ethics reviewers/panel, conflict declarations/recusal and restricted case access | Reuse generic conflict-of-interest and audit design principles only | Ethics cases are highly sensitive and a separate domain. Do not link ethics evidence or findings to impact achievements, expose ethics reviewers to impact claims by default, or reuse ethics-case permissions as impact permissions. |
+| Existing permissions and role workspaces | Platform roles, explicit permissions, organization-scoped membership, reviewer assignment patterns and server-side authorization | Add a narrowly scoped impact-review capability and impact-specific policy administration after approval | A generic reviewer/platform role must not imply unrestricted impact evidence access. Organization owners can attest only to records within their organization/source scope. |
+
+### 0.3 Privacy and authorization decisions
+
+**Confirmed architecture decisions**
+
+1. A contribution claim is owned by a canonical person/account. Organization attribution is a separate relationship and does not replace the individual contributor.
+2. The claimant may view and manage their own draft, evidence submission, clarification response, withdrawal and appeal. They cannot verify their own claim.
+3. A source owner/coordinator may confirm facts in the source workflow but cannot approve an impact claim they created, materially edited, or have a declared conflict with.
+4. Offline-project editors may enter project facts under the existing `serve_community.projects.manage` permission. Approval remains a separate `serve_community.projects.approve` decision. The existing self-review prohibition must remain.
+5. An impact reviewer must have an impact-specific role/permission and an assigned claim. A reviewer must not receive unrelated membership, professional verification, ethics, finance or organization-wide access.
+6. An appeal reviewer must be independent of the original decision-maker and must receive only the scope needed for the appeal.
+7. Organization representatives may attest only to the relevant organization/project records under a current active organization relationship. A platform role alone does not grant access to an arbitrary organization's records.
+8. Public output is a separate projection of verified, explicitly approved fields. Private evidence, contact information, beneficiary identities, reviewer notes, risk signals and internal claim states are excluded.
+9. The existing small-group suppression threshold of five is a minimum privacy baseline for aggregates. It does not authorize publication of individual-level beneficiary details.
+
+**Non-member identity assurance — gap and proposed policy**
+
+The inspected professional-verification path requires active membership; the inspected initiative participation path also requires active membership. No verified, general-purpose external/non-member community-impact claim identity flow was found in the reviewed sources.
+
+Therefore, non-member claims are **not implementation-ready**. Before enabling them, define a separate claim-only identity assurance flow:
+- require a verified account/session and control of the account's contact channel;
+- verify identity to a risk-proportionate standard before attributing a claim to a real person or publishing it;
+- keep identity documents and verification outcomes separate from contribution evidence and public profile data;
+- never create membership or member privileges as a side effect;
+- support correction, impersonation reporting, account recovery and appeal;
+- do not accept an anonymous public claim as a verified achievement.
+
+The exact identity proof standard, provider, lawful basis, access controls and retention period require policy approval. Do not assume professional membership verification is available to non-members.
+
+**Evidence retention — gap and proposed hold point**
+
+No impact-specific evidence retention schedule or deletion policy was identified in the inspected impact source services and migrations. Existing append-only audit/event history does not define how long uploaded evidence, identity documents, media consent artifacts or rejected claims should be retained.
+
+Before the first evidence migration/API is implemented, approve a retention schedule by data class (claim metadata, identity assurance artifacts, raw evidence, public media/consent, reviewer notes, audit events and score ledger), with legal hold, appeal window, withdrawal, deletion/anonymization and backup-expiry behavior. Until then, do not invent a retention duration or silently retain all uploads indefinitely.
+
+**Score governance — gap and proposed hold point**
+
+No live Community Impact Score, approved score policy, score ledger or award threshold was found in the inspected foundations. The weights earlier in this proposal are illustrative only. Score policy requires named governance ownership, versioning, public explanation, conflict checks, fairness review, appeal/correction and explicit approval before any calculation is enabled.
+
+### 0.4 Increment 0 exit assessment
+
+- [x] Re-fetched the target branch and recorded the exact audit baseline.
+- [x] Inspected profile, member workspace, initiatives/participation, offline projects, impact reports, requests/collaboration, verification, ethics, relevant migrations and existing design/role contracts.
+- [x] Produced the source-to-impact mapping and identified the exact reuse boundaries and gaps above.
+- [x] Defined the proposed privacy and reviewer permission boundaries.
+- [x] Identified non-member identity assurance, evidence retention and score governance as policy gaps rather than inventing implementation assumptions.
+- [x] No duplicate person, profile, organization, initiative, participation, request, delivery, outcome or membership business record is proposed.
+- [ ] Formal project-owner approval of the policy decisions listed in section 16 is still required.
+- [ ] Runtime/API authorization, migration rehearsal, retention/legal review and accessibility validation remain future gates.
+
+**Increment 0 status: source audit and architecture proposal complete; architecture freeze is conditional, not formally approved.** The technical data flow and permission boundary are documented, but policy decisions requiring project-owner/governance approval remain open. Do not represent the architecture as formally approved until those decisions are recorded.
+
+## Increment 1 — Taxonomy and source-link contract
+
+<badge>Contract drafted</badge>
+
+### 1.1 Canonical category contract
+
+Use stable canonical codes in the impact layer. Existing source category values remain unchanged; mappings are explicit and reversible.
+
+| Canonical code | Display label | Existing source values / allowed source mapping |
+|---|---|---|
+| `education_skills` | Education and skills | Serve-Community `education` |
+| `community_care` | Community care and wellbeing | `community_care` |
+| `digital_inclusion` | Digital inclusion | `digital_inclusion` |
+| `environment_sustainability` | Environment and sustainability | `environment` |
+| `livelihoods_economic_opportunity` | Livelihoods and economic opportunity | `livelihoods` |
+| `accessibility_inclusion` | Accessibility and inclusion | `accessibility` |
+| `mentorship_knowledge_sharing` | Mentorship and knowledge sharing | Explicit mapping from approved mentorship engagement types; no new source category value |
+| `professional_pro_bono_service` | Professional and pro-bono service | Approved Serve-Community service classification or verified pro-bono service completion |
+| `employment_referral` | Employment and referral | Verified Jobs/referral outcome source only |
+| `partnership_capacity_building` | Partnership and organizational capacity | Accepted and completed Network-Plus partnership/collaboration source |
+| `other_review_required` | Other (review required) | Existing source `other`; requires reviewer-selected canonical mapping before score eligibility |
+
+The mapping must be stored/versioned in the impact domain, not implemented by changing existing source constraints or rewriting legacy category columns. Preserve source-native category for display/audit and store canonical category separately. Category changes require a reason and append-only mapping history.
+
+### 1.2 Contribution type and role vocabularies
+
+Contribution type is independent of category:
+
+- `initiative_participation`
+- `offline_project_delivery`
+- `mentorship_engagement`
+- `professional_service_delivery`
+- `knowledge_resource`
+- `employment_referral_outcome`
+- `partnership_delivery`
+- `collaboration_delivery`
+- `other_approved`
+
+Controlled contributor roles:
+
+- `lead`
+- `co_lead`
+- `delivery_contributor`
+- `mentor`
+- `subject_expert`
+- `organizer_coordinator`
+- `partner_representative`
+- `referrer`
+- `resource_contributor`
+- `other_review_required`
+
+A contributor's role is a claim that must be confirmed by the source owner, counterpart, or reviewer using evidence appropriate to the source type. A project-wide beneficiary/output/outcome value must not be copied in full to each individual contributor without an approved attribution rule. Role changes are versioned and auditable.
+
+### 1.3 Outcome maturity and evidence classes
+
+Outcome maturity is not a contribution type or a score:
+
+| Maturity | Definition | Example | Scoring eligibility |
+|---|---|---|---|
+| `activity` | Work performed | Volunteer hours, sessions delivered | Not automatically eligible |
+| `output` | Direct product/service delivered | Training sessions, completed report, devices distributed | Eligible only under an approved rubric and verified delivery |
+| `outcome` | Observable change for people/organizations | Skills assessment improvement, service access improved | Eligible only with defined measurement and corroboration |
+| `sustained_impact` | Change maintained over a stated follow-up period | Continued employment, durable accessibility improvement | Requires follow-up evidence and approved measurement period |
+
+Evidence classes:
+
+- `system_source_record` — immutable reference to an authoritative application record/event;
+- `private_document` — access-controlled document or file object;
+- `public_media` — image/video/URL specifically approved for public use;
+- `counterparty_attestation` — confirmation from an authorized recipient, partner or coordinator;
+- `measurement_record` — baseline, metric definition, period, method, source and result;
+- `official_reference` — verifiable external institutional reference;
+- `claimant_statement` — self-reported narrative, always labeled as such and never sufficient alone for verified status.
+
+Evidence quality/provenance labels must be separate from claim lifecycle status. Public media consent is separate from evidence validity and from consent to attribute an individual by name.
+
+### 1.4 Contribution lifecycle
+
+The impact lifecycle is independent of source-workflow lifecycle:
+
+`detected → attribution_pending → submitted → under_review → verified`
+
+Alternative transitions:
+
+- `detected` → `dismissed` when the candidate source event is ineligible or a duplicate;
+- `attribution_pending` → `claimed` by the identified contributor, then `submitted`;
+- `submitted` / `under_review` → `clarification_requested` → `submitted`;
+- `submitted` / `under_review` → `declined` with a reason;
+- claimant may `withdrawn` before final verification, preserving the event history;
+- `verified` → `revoked` only through an authorized, reasoned review/reversal;
+- any eligible record may be `archived` for display/lifecycle purposes without erasing audit history.
+
+Only `verified` records can be considered by a separately approved score policy. `verified` does not imply `public`: publication consent and field-level visibility are separate. A correction after verification creates a new version/decision and, where necessary, a score-ledger reversal/recalculation; it does not overwrite the prior decision.
+
+### 1.5 Visibility contract
+
+Use three primary visibility classes plus field-level consent:
+
+- `private`: claimant and specifically authorized reviewers/source actors only;
+- `members`: approved summary visible to authenticated eligible members under server-side access rules;
+- `public`: only verified, moderated, explicitly consented fields in the public profile projection.
+
+Evidence files, identity assurance artifacts, reviewer notes, private source records, beneficiary identities, contact details, risk flags and appeals remain private regardless of the summary's visibility. Public visibility is opt-in, revocable, and must not affect verification or score eligibility. A public media permission is not inferred from an internal project record's general consent flag without confirming that the consent covers this specific publication and subject.
+
+### 1.6 Source-link and idempotency contract
+
+The impact contribution is a projection/verification record over a source business record, not a replacement source record.
+
+Proposed source identity fields:
+
+- `source_system`: controlled domain identifier (for example `serve_community`, `network_plus`, `mentorship`, `jobs`, `manual_claim`);
+- `source_type`: controlled record type (initiative participation, offline project, service request, mentorship engagement, etc.);
+- `source_record_id`: canonical source record identifier, nullable only for a manual claim;
+- `source_event_code`: the qualifying source event or completion gate;
+- `contributor_person_id`: canonical person identity to whom this contribution is attributed;
+- `attribution_version`: incremented when the confirmed role/attribution changes;
+- `source_event_version` or immutable event reference where the source has versioned events;
+- `idempotency_key` and request fingerprint for claim/source ingestion retries.
+
+Recommended uniqueness rule for system-derived records: one active contribution for the tuple `(source_system, source_type, source_record_id, source_event_code, contributor_person_id)`, with a documented exception/version strategy if the source supports genuinely distinct contribution units. The exact constraint must be validated against source cardinality before migration.
+
+Manual claims have no source record ID. They must use a generated claim idempotency key, claimant identity and normalized duplicate-review metadata. Similarity matching may flag possible duplicates for a human; it must never auto-merge or auto-reject claims based only on fuzzy text matching.
+
+On source event replay:
+1. resolve the canonical source event and person attribution;
+2. find the matching source key;
+3. return/update the existing contribution according to allowed transition/version rules;
+4. append an ingestion/audit event;
+5. never create a second score event for the same verified contribution and score-policy version.
+
+A member claim matching a system record is reconciled by an authorized, auditable link/merge operation. Preserve both provenance histories and claimant evidence. Do not delete either source record.
+
+### 1.7 Source readiness matrix
+
+| Source | Qualifying candidate event | Required verification before impact status | Increment 1 disposition |
+|---|---|---|---|
+| Initiative participation | Existing participation reaches `completed` | Source initiative is valid; participant identity and role confirmed; completion accepted by authorized owner; no withdrawal/consent conflict; outcome claims separately evidenced | Map as candidate; no automatic points |
+| Offline completed project | Staff project reaches `approved` and public-visible where public display is requested | Staff entry and independent approval; named contributor attribution and role evidence; media/beneficiary consent scope checked | Project record reusable; individual attribution is a schema/workflow gap |
+| Network-Plus service request | Request is completed and required requester outcome acceptance/evidence gates pass | Delivery evidence, requester acceptance or authorized resolution, no unresolved dispute, required finance checks, contributor identity/role | Candidate only after source-specific gate; no inference from interest/pledge/acceptance |
+| Network-Plus collaboration | Engagement reaches completed with recorded outcome | Both-party/authorized outcome confirmation and attributable roles; preserve agreement/workspace history | Candidate only after lifecycle evidence is runtime-validated |
+| Mentorship | Existing engagement/session workflow reaches its actual completion/outcome gate | Participant confirmation or approved coordinator evidence; consent and confidentiality respected | Candidate; inspect exact runtime source and schema before adapter |
+| Jobs/referrals | A hiring/referral outcome is authoritatively confirmed | Minimize candidate/employer data; verify outcome and referrer attribution without exposing confidential recruitment data | Deferred until authoritative event and privacy contract are mapped |
+| Manual/offline claim | Claimant submits a contribution not represented by a source record | Identity assurance, evidence threshold, independent review and conflict checks | Supported as a separate claim path after non-member identity policy is approved |
+
+### 1.8 Proposed storage/API contract (design only)
+
+The migration plan should be additive and source-reference based. Proposed logical records (final names and constraints to be confirmed against the full schema before migration):
+
+- `community_impact_contribution`: canonical person, optional organization attribution, taxonomy, role, lifecycle, source key, visibility and timestamps;
+- `community_impact_evidence`: private file/reference metadata, evidence class, consent/rights, integrity, access and review state;
+- `community_impact_decision_event`: append-only assignment, clarification, verification, decline, appeal and revocation history;
+- `community_impact_attribution`: source project/request to person role and confirmation provenance, where the source schema cannot express it;
+- `community_impact_category_mapping`: versioned source-native to canonical category mapping;
+- `community_impact_ingestion_event`: source event idempotency/fingerprint and processing outcome;
+- future `community_impact_score_ledger` and `community_impact_policy_version`: **not part of Increment 1 implementation**; only after score governance approval.
+
+API contract (route names illustrative; align with existing router conventions):
+- claimant: create/update draft, submit claim, list own claims, attach/remove evidence while allowed, respond to clarification, withdraw, request appeal;
+- source adapter: idempotently ingest eligible source event and resolve contributor attribution;
+- source owner/coordinator: confirm or dispute source facts within their scope;
+- reviewer: list assigned claims, retrieve permitted evidence, assign/reassign where authorized, request clarification, verify/decline/revoke with reason;
+- appeal reviewer: retrieve assigned appeal with original decision and evidence needed for independent review;
+- public projection: retrieve only verified, public-consented fields;
+- taxonomy/policy administration: separately permissioned and audited.
+
+Every route must enforce object ownership, organization scope, assignment, consent and state transition server-side. A public projection must be a purpose-built allowlist, not serialization of an internal contribution/evidence row.
+
+### 1.9 Migration and implementation constraints
+
+Before creating the first migration:
+- inspect the complete existing table definitions, constraints, indexes, file-object access model, event tables, deletion behavior and migration conventions at the then-current branch HEAD;
+- validate source cardinality and contributor attribution for every source adapter;
+- confirm whether canonical `person` identity is one-to-one with `app_user` for all supported claimant types;
+- decide how non-member claim-only accounts are authenticated and verified;
+- approve evidence retention and deletion/anonymization rules;
+- approve role/permission seed semantics without auto-assigning privileged roles;
+- choose foreign-key deletion behavior that preserves audit/provenance and does not orphan records;
+- design indexes for contributor timeline, reviewer queue, source-key lookup, status/date and category/date based on expected queries;
+- prove idempotency under concurrent retries and replay;
+- plan migration rollback and ensure no legacy data backfill or source-table mutation is necessary.
+
+No schema migration should modify the existing initiative/participation, offline project, membership, verification, ethics, Network-Plus request, mentorship or Jobs lifecycle tables merely to make the impact layer easier. Add only the minimum source attribution reference/adapter needed after a documented gap is confirmed.
+
+### 1.10 Increment 1 acceptance criteria
+
+- [x] Canonical categories and explicit source mappings are documented without changing existing category values.
+- [x] Contribution types, roles, outcome maturity, evidence classes, lifecycle and visibility are defined.
+- [x] Source-link key, idempotency, replay and duplicate reconciliation rules are documented.
+- [x] Source readiness matrix distinguishes project/engagement completion from verified individual outcome.
+- [x] Proposed logical records and API boundaries are documented without creating migrations or routes.
+- [ ] Project owner approves taxonomy, category mapping and contribution/role vocabulary.
+- [ ] Project owner/privacy governance approves non-member identity assurance, retention and visibility defaults.
+- [ ] Database/schema owner confirms source cardinality, canonical person mapping, attribution gaps and exact uniqueness constraints.
+- [ ] API/security review approves role/permission matrix and evidence access contract.
+- [ ] A migration plan is reviewed and approved before implementation.
+
+**Increment 1 status: contract drafted and source mapping documented; formal review/approval gates remain open.** No migration or implementation should begin until the unchecked acceptance items are resolved.
+
+## Consolidated role/action matrix (proposed)
+
+| Actor | Create/submit | Confirm source facts | Verify impact | View private evidence | Appeal decision | Publish public summary |
+|---|---|---|---|---|---|---|
+| Claimant/contributor | Own claim only | Confirm own attribution | No | Own evidence only | Submit own appeal | Consent to specific fields; cannot self-publish unverified claim |
+| Source owner/coordinator | No impact decision | Within own source scope | No | Only source evidence already authorized to them | No | No independent publication authority |
+| Offline project editor (`serve_community.projects.manage`) | Existing offline project record only | Enter project facts/media/consent | No | Existing staff scope | No | Cannot publish/approve own record |
+| Offline project approver (`serve_community.projects.approve`) | No | Review source project | Existing project approval only, not automatically impact approval | Project evidence as authorized | No impact appeal unless separately assigned | Existing approved-project projection only |
+| Impact reviewer (new scoped permission/role, proposed) | No | May request source confirmation | Assigned impact claim only | Assigned claim evidence only | No, if original decision-maker | No |
+| Independent impact appeal reviewer (new scoped permission/role, proposed) | No | As needed for appeal | Reconsider appeal only | Appeal-scoped evidence | Yes, independently | No |
+| Impact policy administrator (new scoped permission, proposed) | No | No | No | No raw evidence by default | No | Manages taxonomy/policy configuration with approval/audit |
+| Organization owner/administrator | No | Only their organization's source records | No by default | Source-scope only | No | No unilateral verification or publication |
+| System administrator | No ordinary claim action | No ordinary attestation | Only if explicitly assigned/authorized and conflict-free | Exceptional audited access | Only if independently assigned and not conflicted | No bypass of consent/moderation |
+
+A generic `admin`, `reviewer`, `supporting_staff`, `verification_reviewer` or `ethics_reviewer` role must not silently inherit impact permissions. Role grants are explicit, least-privilege, audited and subject to assignment/conflict checks.
+
+## Updated increment tracker
+
+| Increment | Status | Evidence / next gate |
+|---|---|---|
+| 0 — Re-audit and architecture freeze | Source audit complete; formal freeze pending | This delivery record; project-owner approval and policy decisions still required |
+| 1 — Taxonomy and source-link contract | Contract drafted; approval pending | This delivery record; schema/API/privacy review still required |
+| 2 — Automatic detection and attribution | Not started | Begin only after Increment 1 approval and source event/cardinality validation |
+| 3 — Manual claims and evidence | Not started | Depends on non-member identity assurance, evidence model and retention policy |
+| 4 — Reviewer operations | Not started | Depends on scoped permission/assignment/conflict/appeal policy |
+| 5 — Score ledger and explanations | Not started | Depends on score governance and approved rubric; no score calculation before approval |
+| 6 — Member workspace and profile | Not started | Depends on stable APIs, privacy projections and consent controls |
+| 7 — Prompts, recognition and discovery | Not started | Depends on rate-limit, notification, recognition governance and opt-in policies |
+| 8 — Operational readiness | Not started | Security, monitoring, retention, support, migration and rollback readiness |
+
+**Change-control note:** This delivery updates the design and progress record only. It does not claim that Increment 0 has formal governance approval or that Increment 1 has passed its approval gates. Keep subsequent implementation on this branch and preserve the existing source workflows and protections.

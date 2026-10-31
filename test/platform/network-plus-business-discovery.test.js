@@ -3,11 +3,12 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
-const [migration, service, server, compatibility] = await Promise.all([
+const [migration, service, server, compatibility, privateFiles] = await Promise.all([
   read("../../db/migrations/20261031110000_network_plus_business_discovery.sql"),
   read("../../src/network-plus/business-discovery.js"),
   read("../../server.js"),
   read("../../scripts/check-new-migration-compatibility.js"),
+  read("../../src/platform/private-file-storage.js"),
 ]);
 
 test("Increment 5 adds a separate business domain without duplicating canonical identities or rewriting legacy services", () => {
@@ -74,4 +75,12 @@ test("disposable migration compatibility checks include the Increment 5 migratio
   assert.match(compatibility, /ux_network_plus_business_idempotency_hash/);
   assert.match(compatibility, /ux_network_plus_service_idempotency_hash/);
   assert.match(compatibility, /network_plus_business_verification_case/);
+});
+
+test("private business verification evidence is readable only by an independent authorized reviewer", () => {
+  assert.match(service, /file\.visibility!==\"private\"\|\|file\.created_by!==userId/);
+  assert.match(service, /listBusinessVerificationEvidence/);
+  assert.match(privateFiles, /network_plus_business_verification_evidence e join network_plus_business_verification_case c/);
+  assert.match(privateFiles, /c\.submitted_by<>\$2/);
+  assert.match(privateFiles, /permissions\.includes\(\"business\.verify\"\)/);
 });

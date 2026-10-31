@@ -1179,3 +1179,15 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 /* Semantic lifecycle badge tones */
 .badge-blue { background:var(--info-bg); color:var(--info); border-color:color-mix(in srgb,var(--info) 32%,var(--border)); }
 .badge-red { background:var(--danger-bg); color:var(--danger); border-color:color-mix(in srgb,var(--danger) 32%,var(--border)); }
+
+
+/* Final touch-target and nested-surface normalization */
+.icon-btn { min-width:44px; min-height:44px; width:44px; height:44px; }
+.card .membership-progress,.card .case-row {
+  border:0;
+  background:var(--surface-muted);
+  box-shadow:none;
+}
+@media(max-width:600px) {
+  .top-actions .icon-btn { min-width:44px; min-height:44px; }
+}

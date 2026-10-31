@@ -32,6 +32,16 @@ The canonical CSS custom properties live in `web/app/globals.css`; Tailwind alia
 - Shadows: low-contrast navy-tinted elevation; dark theme uses a deeper navy shadow, not black card fills.
 - Shared `.card`, `.btn`, `.badge`, `.icon-btn`, inputs, `.operation-status` and navigation styles must consume tokens rather than introduce a new palette per workspace.
 
+## Source-level route coverage
+
+The shared root layout and global design tokens were checked against the current workspace entry pages:
+- Network-Plus and role workspaces: `/network-plus`, `/workspaces`.
+- Member and organization context: `/profile`, `/organizations`.
+- Opportunity and relationship journeys: `/jobs`, `/mentorship`, `/serve-community`.
+- Governance and money workflows: `/membership`, `/admin`, `/admin/finance`.
+
+These routes inherit the shared root typography, token palette, form controls, navigation and responsive shell. Page-specific modules that define their own hero treatments are aligned with the same tokens where identified. This is a source-level consistency pass; it does not replace the rendered page-by-page review in the validation gate.
+
 ## Workspace consistency requirements
 
 | Workspace | Page-level UX consistency checks |

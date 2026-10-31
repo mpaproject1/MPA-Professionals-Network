@@ -212,13 +212,20 @@ export async function listMyBusinesses(userId) {
     b.verification_status,b.moderation_status,b.publication_status,b.created_at,b.updated_at
     from network_plus_business b join network_plus_business_ownership bo on bo.business_id=b.id
     where bo.status='active' and bo.consent_status='accepted'
-      and ((bo.owner_type='member' and bo.owner_user_id=$1) or
-        (bo.owner_type='organization' and exists(select 1 from organization_membership om where om.organization_id=bo.owner_organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[]))))
+      and ((bo.owner_type='member' and bo.owner_user_id=$1
+            and exists(select 1 from membership_record mr where mr.user_id=$1 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))
+            and exists(select 1 from app_user_role ur join app_role ar on ar.id=ur.role_id where ur.user_id=$1 and ar.role_code=any(array['member','professional']::text[])))
+        or (bo.owner_type='organization' and exists(select 1 from organization_membership om where om.organization_id=bo.owner_organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[]))))
     union
     select distinct b.id,b.business_kind,b.display_name,b.trading_name,b.description,b.website,b.location_label,
       b.verification_status,b.moderation_status,b.publication_status,b.created_at,b.updated_at
     from network_plus_business b join network_plus_business_access a on a.business_id=b.id
     where a.user_id=$1 and a.revoked_at is null and (a.expires_at is null or a.expires_at>now())
+      and (exists(select 1 from network_plus_business_ownership bo join organization_membership om on om.organization_id=bo.owner_organization_id
+            where bo.business_id=b.id and bo.owner_type='organization' and bo.owner_role='primary_owner' and bo.status='active'
+              and om.user_id=$1 and om.status='active' and om.role_code='project_manager')
+        or (not exists(select 1 from network_plus_business_ownership bo where bo.business_id=b.id and bo.owner_type='organization' and bo.owner_role='primary_owner' and bo.status='active')
+          and exists(select 1 from membership_record mr where mr.user_id=$1 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))))
     order by created_at desc`,[userId,ORG_OWNER_ROLES])).rows;
 }
 export async function updateBusiness(businessId,userId,input,requestId) {

@@ -49,7 +49,7 @@ async function hasSupportRole(db,userId) {
 }
 async function assertSupport(db,userId,reason,ticket) {
   if(!await hasSupportRole(db,userId))fail(403,"Authorized Network-Plus support staff only.","SUPPORT_FORBIDDEN");
-  if(!reason||!ticket)fail(400,"Support access requires a recorded reason and support case reference.","SUPPORT_REASON_REQUIRED");
+  if(typeof reason!=="string"||reason.trim().length<8||reason.trim().length>500||typeof ticket!=="string"||ticket.trim().length<6||ticket.trim().length>120)fail(400,"Support access requires a meaningful reason and a valid support case reference.","SUPPORT_REASON_REQUIRED");
 }
 async function notify(db,userId,event,requestId,message) {
   await createInAppNotification(db,userId,event,"network_plus_request",requestId,{message,nextAction:"Open Network-Plus requests to review the update."});
@@ -174,14 +174,14 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
     return updated;
   });
 }
-export async function listNetworkPlusRequests(userId,{status,intent,limit=30,offset=0,supportReason,supportTicket}={}) {
+export async function listNetworkPlusRequests(userId,{status,intent,limit=30,offset=0,supportReason,supportTicket,supportRequestId}={}) {
   return withTransaction(async db=>{
     let support=false;
-    if(supportReason||supportTicket){await assertSupport(db,userId,supportReason,supportTicket);support=true;} else await assertEntry(db,userId);
+    if(supportReason||supportTicket){await assertSupport(db,userId,supportReason,supportTicket);if(!supportRequestId)fail(400,"Support access must be scoped to one request record.","SUPPORT_SCOPE_REQUIRED");support=true;} else await assertEntry(db,userId);
     const rows=(await db.query(`select r.id,r.intent,r.status,r.subject,r.summary,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id,r.business_id,r.service_listing_id,r.version,r.created_at,r.updated_at
       from network_plus_request r where (${support} or exists(select 1 from network_plus_request_participant p where p.request_id=r.id and p.user_id=$1 and p.consent_status<>'revoked' and (p.participant_role<>'additional_participant' or p.consent_status='accepted')))
-      and ($2::text is null or r.status=$2) and ($3::text is null or r.intent=$3)
-      order by r.updated_at desc limit $4 offset $5`,[userId,status||null,intent||null,Math.min(100,Math.max(1,Number(limit)||30)),Math.max(0,Number(offset)||0)])).rows;
+      and ($2::text is null or r.status=$2) and ($3::text is null or r.intent=$3) and ($4::uuid is null or r.id=$4::uuid)
+      order by r.updated_at desc limit $5 offset $6`,[userId,status||null,intent||null,supportRequestId||null,Math.min(100,Math.max(1,Number(limit)||30)),Math.max(0,Number(offset)||0)])).rows;
     if(support) for(const row of rows) await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_list","network_plus_request",row.id,"success",{reason:supportReason,ticket:supportTicket}]);
     return rows;
   });

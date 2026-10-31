@@ -84,7 +84,9 @@ async function assertBusinessOwner(db,businessId,userId,capability="business.man
   const owned=(await db.query(`select bo.id,bo.owner_type,bo.owner_role,bo.consent_status,bo.owner_organization_id
     from network_plus_business_ownership bo
     where bo.business_id=$1 and bo.status='active' and bo.consent_status='accepted'
-      and ((bo.owner_type='member' and bo.owner_user_id=$2)
+      and ((bo.owner_type='member' and bo.owner_user_id=$2
+          and exists(select 1 from membership_record mr where mr.user_id=bo.owner_user_id and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))
+          and exists(select 1 from app_user_role ur join app_role ar on ar.id=ur.role_id where ur.user_id=bo.owner_user_id and ar.role_code=any(array['member','professional']::text[])))
         or (bo.owner_type='organization' and exists(
           select 1 from organization_membership om where om.organization_id=bo.owner_organization_id
             and om.user_id=$2 and om.status='active' and om.role_code=any($3::text[])
@@ -443,7 +445,7 @@ export async function addBusinessVerificationEvidence(businessId,userId,input,re
   if(!fileId)fail(400,"Choose a private uploaded evidence file.","VALIDATION_ERROR");
   return withTransaction(async db=>{
     await assertBusinessOwner(db,businessId,userId);
-    const file=(await db.query("select id,visibility,created_by from file_object where id=$1",[fileId])).rows[0];
+    const file=(await db.query("select f.id,f.visibility,f.created_by from file_object f join private_upload_session s on s.file_object_id=f.id and s.status='confirmed' where f.id=$1",[fileId])).rows[0];
     if(!file||file.visibility!=="private"||file.created_by!==userId)fail(403,"Only a private file uploaded by the current authorized owner can be attached as business evidence.","EVIDENCE_FILE_FORBIDDEN");
     let verificationCase=(await db.query("select id from network_plus_business_verification_case where business_id=$1 and status='draft' order by created_at desc limit 1 for update",[businessId])).rows[0];
     if(!verificationCase)verificationCase=(await db.query("insert into network_plus_business_verification_case(business_id,status,submitted_by) values($1,'draft',$2) returning id",[businessId,userId])).rows[0];

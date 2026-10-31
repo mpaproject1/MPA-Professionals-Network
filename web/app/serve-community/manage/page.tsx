@@ -5,6 +5,7 @@ import type {FormEvent} from "react";
 import {useCallback,useEffect,useState} from "react";
 import {api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
+
 type Initiative={id:string;title:string;category:string;summary:string;description:string;delivery_mode:string;location_label:string|null;capacity:number|null;eligibility:string|null;expected_commitment:string|null;status:string;review_reason:string|null;created_at:string};
 type Application={id:string;participant_user_id:string;status:string;application_note:string|null;availability_note:string|null;applicant_name:string;applicant_email:string|null;created_at:string};
 const categories=[["education","Education"],["community_care","Community care"],["digital_inclusion","Digital inclusion"],["environment","Environment"],["livelihoods","Livelihoods"],["accessibility","Accessibility"],["other","Other"]];

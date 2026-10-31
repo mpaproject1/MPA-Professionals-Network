@@ -54,6 +54,12 @@ export async function captureEmploymentApplication(db,jobId,referredUserId,appli
  if(row)await event(db,row.id,"application_submitted","attributed","application_submitted",referredUserId,{jobId});
  return row;
 }
+export async function recordMembershipMilestone(db,referredUserId,eventCode,actorUserId){
+ const allowed={membership_application_submitted:"membership_application_submitted",membership_approved:"membership_approved",membership_declined:"membership_declined"};
+ const next=allowed[eventCode];if(!next)return;
+ const rows=(await db.query("select id,status from member_referral_attribution where referral_type='membership' and referred_user_id=$1 for update",[referredUserId])).rows;
+ for(const row of rows){if(row.status===next)continue;await db.query("update member_referral_attribution set status=$1,updated_at=now() where id=$2",[next,row.id]);await event(db,row.id,next,row.status,next,actorUserId);}
+}
 export async function recordMembershipActivated(db,referredUserId,actorUserId){
  const rows=(await db.query("select id,status from member_referral_attribution where referral_type='membership' and referred_user_id=$1 for update",[referredUserId])).rows;
  for(const row of rows){if(row.status==="membership_activated")continue;await db.query("update member_referral_attribution set status='membership_activated',updated_at=now() where id=$1",[row.id]);await event(db,row.id,"membership_activated",row.status,"membership_activated",actorUserId);}
@@ -114,7 +120,7 @@ export async function verifyEmploymentReferral(identity,attributionId,input,requ
 }
 export async function proposeReferralScorePolicy(identity,points,reason){
  if(!identity.roles?.includes("system_admin"))fail(403,"Only a system administrator can propose a referral scoring policy.","FORBIDDEN");
- const allowed=["registered","membership_activated","shortlisted","interview","offer_accepted","employment_verified"];
+ const allowed=["registered","membership_application_submitted","membership_approved","membership_activated","shortlisted","interview","offer_accepted","employment_verified"];
  if(!points||typeof points!=="object"||Array.isArray(points)||Object.keys(points).some(k=>!allowed.includes(k))||Object.values(points).some(v=>!Number.isInteger(v)||v<0||v>10000))fail(400,"Provide non-negative integer points for supported referral milestones.","INVALID_SCORING_POLICY");
  if(String(reason||"").trim().length<12)fail(400,"Explain the policy reason (at least 12 characters).","POLICY_REASON_REQUIRED");
  return withTransaction(async db=>{

@@ -33,7 +33,7 @@ test("employment attribution attaches to formal applications and verified hiring
 test("referral scoring requires an independently approved active policy",()=>{
  assert.ok(migration.includes("member_referral_score_policy"));
  assert.ok(migration.includes("member_referral_score_ledger"));
- assert.ok(service.includes("approved_by<>created_by"));
+ assert.ok(service.includes("row.created_by===identity.sub"));
  assert.ok(service.includes("status='active'"));
 });
 test("member and admin APIs are exposed",()=>{

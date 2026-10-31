@@ -14,6 +14,7 @@ create table if not exists network_plus_business (
   location_label text,
   verification_status text not null default 'unverified'
     check (verification_status in ('unverified','submitted','under_review','changes_requested','verified','rejected','suspended','expired')),
+  moderation_submitted_by uuid references app_user(id) on delete restrict,
   moderation_status text not null default 'not_submitted'
     check (moderation_status in ('not_submitted','pending_review','approved','rejected','suspended')),
   publication_status text not null default 'draft'
@@ -135,6 +136,7 @@ create table if not exists network_plus_service_listing (
   status text not null default 'draft'
     check (status in ('draft','pending_review','changes_requested','published','paused','suspended','rejected','archived')),
   moderation_reason text,
+  submitted_by uuid references app_user(id) on delete restrict,
   reviewed_by uuid references app_user(id) on delete restrict,
   reviewed_at timestamptz,
   published_at timestamptz,

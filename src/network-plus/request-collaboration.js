@@ -147,7 +147,7 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
       disputed_at=case when $1='disputed' then now() else disputed_at end,closed_at=case when $1='closed' then now() else closed_at end,
       version=version+1,updated_at=now() where id=$2 returning *`,[to,requestId])).rows[0];
     await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version},idempotencyHash,requestFingerprint);
-    if(["disputed","completed","closed"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to; await db.query("update network_plus_collaboration_workspace 0",[nextWorkspaceStatus,requestId,"completed","closed"]); }
+    if(["disputed","completed","closed"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to; await db.query("update network_plus_collaboration_workspace set status=$1,completed_at=case when $1=$3 then coalesce(completed_at,now()) else completed_at end,closed_at=case when $1=$4 then coalesce(closed_at,now()) else closed_at end,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId,"completed","closed"]); }
     if(to==="accepted") {
       if(row.recipient_user_id && row.recipient_user_id!==userId)fail(403,"Only the intended recipient may accept this request.","RECIPIENT_AUTHORITY_REQUIRED");
       if(row.recipient_user_id) { const currentMember=(await db.query("select 1 from membership_record where user_id=$1 and status=$2 and start_date<=current_date and (end_date is null or end_date>=current_date)",[userId,"active"])).rowCount>0; if(!currentMember)fail(403,"The intended recipient must retain active membership to accept.","RECIPIENT_AUTHORITY_REQUIRED"); }

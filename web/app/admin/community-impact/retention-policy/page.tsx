@@ -5,7 +5,7 @@ import {useUiStore} from "../../../../lib/store";
 import {AdminPageHeader} from "../../admin-page-header";
 type DataClass="claim_metadata"|"identity_assurance_artifacts"|"raw_evidence"|"consent_and_rights_records"|"reviewer_notes"|"referral_attribution_records"|"audit_events"|"score_ledger";
 type Rule={retentionDays:string;graceDays:string;retentionStart:string;expiryAction:string};
-type PolicyItem={id:string;version:number;status:string;policy:{dataClasses:Record<DataClass,{retentionDays:number;graceDays:number;retentionStart:string;expiryAction:string}>};rationale:string;change_summary:string;created_by:string;approved_by?:string|null;approval_reference?:string|null};
+type PolicyItem={id:string;version:number;status:string;policy:{dataClasses:Partial<Record<DataClass,{retentionDays:number;graceDays:number;retentionStart:string;expiryAction:string}>>};rationale:string;change_summary:string;created_by:string;approved_by?:string|null;approval_reference?:string|null};
 type Governance={active:PolicyItem|null;items:PolicyItem[];enforcement:string};
 const classes:{key:DataClass;label:string;description:string}[]=[
  {key:"claim_metadata",label:"Claim metadata",description:"Claim descriptions, categories, dates and workflow metadata"},
@@ -28,7 +28,7 @@ export default function CommunityImpactRetentionPage(){
  const [approvalReference,setApprovalReference]=useState(""),[approvalReason,setApprovalReason]=useState(""),[activationReason,setActivationReason]=useState("");
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  useEffect(()=>{if(!hydrated)hydrateToken()},[hydrated,hydrateToken]);
- const load=useCallback(async()=>{if(!token)return;setLoading(true);setError("");try{const result=await api<Governance>("/api/v1/admin/community-impact/retention-policy",{},token);setData(result);if(result.active?.policy?.dataClasses){setRules(Object.fromEntries(classes.map(({key})=>{const item=result.active!.policy.dataClasses[key];return [key,{retentionDays:String(item.retentionDays),graceDays:String(item.graceDays),retentionStart:item.retentionStart,expiryAction:item.expiryAction}]})) as Record<DataClass,Rule>);}}catch(e){setError(e instanceof Error?e.message:"Retention policy governance could not be loaded.");}finally{setLoading(false)}},[token]);
+ const load=useCallback(async()=>{if(!token)return;setLoading(true);setError("");try{const result=await api<Governance>("/api/v1/admin/community-impact/retention-policy",{},token);setData(result);if(result.active?.policy?.dataClasses){setRules(Object.fromEntries(classes.map(({key})=>{const item=result.active!.policy.dataClasses[key];return [key,item?{retentionDays:String(item.retentionDays),graceDays:String(item.graceDays),retentionStart:item.retentionStart,expiryAction:item.expiryAction}:emptyRule()]})) as Record<DataClass,Rule>);}}catch(e){setError(e instanceof Error?e.message:"Retention policy governance could not be loaded.");}finally{setLoading(false)}},[token]);
  useEffect(()=>{if(hydrated&&token)void load()},[hydrated,token,load]);
  const pending=useMemo(()=>data?.items.filter(item=>item.status==="in_review")||[],[data]);
  const approved=useMemo(()=>data?.items.filter(item=>item.status==="approved")||[],[data]);
@@ -60,7 +60,7 @@ export default function CommunityImpactRetentionPage(){
    <div><h2 className="h2">Current enforcement state</h2><p className="muted">No retention duration is assumed. Automated expiry is not enabled by this policy registry.</p></div>
    <p><strong>Active policy:</strong> {data?.active?"Version "+data.active.version:"No approved policy activated"}</p>
    <p><strong>Evidence deletion:</strong> Not enabled — policy snapshots are now captured for claims and evidence, but expiry execution, legal-hold enforcement, backup expiry and validated deletion/anonymization remain a separate release gate.</p>
-   {data?.active?.policy?.dataClasses?<div className="grid" style={{gap:6}}><h3>Active policy schedule</h3>{classes.map(({key,label:classLabel})=>{const item=data.active!.policy.dataClasses[key];return <p key={key}><strong>{classLabel}:</strong> {item.retentionDays} days + {item.graceDays} grace days · {label(item.retentionStart)} · {label(item.expiryAction)}</p>})}</div>:null}
+   {data?.active?.policy?.dataClasses?<div className="grid" style={{gap:6}}><h3>Active policy schedule</h3>{classes.map(({key,label:classLabel})=>{const item=data.active!.policy.dataClasses[key];return <p key={key}><strong>{classLabel}:</strong> {item?`${item.retentionDays} days + ${item.graceDays} grace days · ${label(item.retentionStart)} · ${label(item.expiryAction)}`:"Not defined in this older policy version; propose an updated policy before referral retention can be governed."}</p>})}</div>:null}
    <button type="button" className="btn btn-ghost" onClick={()=>void load()} disabled={loading||busy}>{loading?"Refreshing…":"Refresh policy status"}</button>
   </section>
   <section className="card grid" style={{gap:14}}>

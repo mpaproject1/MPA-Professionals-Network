@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { withTransaction } from "../platform/db.js";
-import { createInAppNotification } from "../platform/notifications.js";
-import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
 import { policyError } from "../platform/identity-policy.js";
+import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
+import { createInAppNotification } from "../platform/notifications.js";
 
 const INTENTS = new Set(["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request"]);
 const SUPPORT_ROLES = new Set(["network_plus_support","system_admin"]);

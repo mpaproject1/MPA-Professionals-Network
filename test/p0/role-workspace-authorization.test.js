@@ -309,11 +309,12 @@ test("Serve-Community routes discovery into existing private workflows with comp
   const mentorship = read("web/app/mentorship/page.tsx");
   const demand = read("web/app/service-demand/page.tsx");
   const lifecycle = read("src/services-mentorship/service.js");
-  assert.match(marketplace, /href:"\/services"/);
-  assert.match(marketplace, /href:"\/mentorship"/);
-  assert.match(marketplace, /href:"\/service-demand"/);
-  assert.match(marketplace, /href:"\/jobs"/);
-  assert.match(marketplace, /A public listing is not a private agreement/);
+  assert.match(marketplace, /api\/v1\/serve-community\/initiatives/);
+  assert.match(marketplace, /api\/v1\/public\/serve-community\/completed-projects/);
+  assert.match(marketplace, /href="\/network-plus"/);
+  assert.doesNotMatch(marketplace, /href="\/(?:services|service-demand|mentorship)"/);
+  assert.match(services, /api\/v1\/network-plus\/services/);
+  assert.match(demand, /api\/v1\/service-demand/);
   assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);
   assert.match(shell, /const primaryHrefs=token\?\["\/about","\/jobs","\/network-plus","\/serve-community","\/members","\/learning"\]:\["\/about","\/jobs","\/serve-community"\]/);
   assert.match(shell, /const desktopPrimary=visibleNav\.filter\(\(\[href\]\)=>primaryHrefs\.includes\(href\)\)/);

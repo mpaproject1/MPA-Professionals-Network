@@ -131,6 +131,14 @@ async function assertIndependentBusinessReviewer(db,businessId,userId) {
     limit 1`,[businessId,userId,ORG_OWNER_ROLES])).rowCount>0;
   if(conflict)fail(403,"A business owner, co-owner or delegated manager cannot review or moderate that business.","BUSINESS_REVIEW_CONFLICT");
 }
+async function transitionBusinessListings(db,businessId,actorUserId,fromStatuses,toStatus,requestId,reason,eventCode) {
+  const rows=(await db.query("select id,status from network_plus_service_listing where business_id=$1 and status=any($2::text[]) for update",[businessId,fromStatuses])).rows;
+  for(const row of rows){
+    await db.query("update network_plus_service_listing set status=$1,suspended_at=case when $1='suspended' then now() else suspended_at end,suspension_reason=case when $1='suspended' then $2 else suspension_reason end,updated_at=now() where id=$3",[toStatus,reason||null,row.id]);
+    await audit(db,actorUserId,eventCode,"network_plus_service_listing",row.id,requestId,{businessId,from:row.status,to:toStatus,reason:reason||null});
+  }
+  return rows.length;
+}
 async function audit(db,actor,action,type,id,requestId,metadata={}) {
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,metadata]);
   if(type==="network_plus_business")await db.query("insert into network_plus_business_event(business_id,actor_user_id,event_code,from_status,to_status,reason,request_id,metadata) values($1,$2,$3,$4,$5,$6,$7,$8)",[id,actor,action,metadata.from||null,metadata.to||metadata.status||null,metadata.reason||null,requestId,metadata]);
@@ -270,7 +278,7 @@ export async function reviewBusinessVerification(businessId,userId,input,request
     const updated=(await db.query(`update network_plus_business_verification_case set status=$1,reviewer_user_id=$2,decision_reason=$3,reviewed_at=now(),expires_at=$4,updated_at=now() where id=$5 returning *`,[status,userId,reason,expiry,open.id])).rows[0];
     await db.query(`update network_plus_business set verification_status=$1,verified_at=case when $1='verified' then now() else null end,
       verification_expires_at=$2,verified_by=$3,publication_status=case when $1='suspended' then 'suspended' when $1='verified' then publication_status else 'paused' end,updated_at=now() where id=$4`,[status==="appealed"?"under_review":status,expiry,userId,businessId]);
-    if(status==="suspended")await db.query("update network_plus_service_listing set status=$2,suspended_at=now(),suspension_reason=$3,updated_at=now() where business_id=$1 and status=any($4::text[])",[businessId,"suspended",reason,["published","paused","pending_review"]]);
+    if(status==="suspended")await transitionBusinessListings(db,businessId,userId,["published","paused","pending_review"],"suspended",requestId,reason,"network_plus.listing_suspended_by_business_moderation");
     await audit(db,userId,"network_plus.business_verification_decided","network_plus_business",businessId,requestId,{caseId:open.id,status,reason,expiresAt:expiry?.toISOString()||null});
     await notifyOwners(db,businessId,"network_plus.business_verification_decided",{message:"A decision was recorded for the business verification case.",nextAction:status==="verified"?"Continue to listing moderation and publication.":"Review the decision reason and provide any requested clarification.",actionUrl:"/network-plus/businesses/"+businessId,status,eventVersion:updated.updated_at});
     return updated;
@@ -412,7 +420,7 @@ export async function addBusinessOwner(businessId,userId,input,requestId) {
     if(!row)fail(409,"This owner party is already associated with the business.","DUPLICATE_OWNER");
     if(business.publication_status==="published"){
       await db.query("update network_plus_business set publication_status=$2,updated_at=now() where id=$1",[businessId,"paused"]);
-      await db.query("update network_plus_service_listing set status=$2,updated_at=now() where business_id=$1 and status=$3",[businessId,"paused","published"]);
+      await transitionBusinessListings(db,businessId,userId,["published"],"paused",requestId,"Joint owner invitation pending","network_plus.listing_paused_for_ownership_consent");
       await audit(db,userId,"network_plus.business_paused_for_ownership_consent","network_plus_business",businessId,requestId,{from:"published",to:"paused"});
     }
     await audit(db,userId,"network_plus.business_co_owner_invited","network_plus_business_ownership",row.id,requestId,{businessId,ownerType});
@@ -485,7 +493,7 @@ export async function reviewBusinessModeration(businessId,userId,input,requestId
     if(status!=="suspended"&&row.moderation_status!=="pending_review"&&!(status==="approved"&&row.publication_status==="suspended"))fail(409,"Business profile is not awaiting moderation or eligible for reinstatement.","INVALID_STATE");
     if(status==="approved")await assertBusinessPublishable(db,businessId,{requireModeration:false,allowSuspended:true});
     const updated=(await db.query("update network_plus_business set moderation_status=$1,publication_status=case when $1='suspended' then 'suspended' when $1='approved' then 'published' else 'draft' end,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];
-    if(status==="suspended")await db.query("update network_plus_service_listing set status=$2,suspended_at=now(),suspension_reason=$3,updated_at=now() where business_id=$1 and status=any($4::text[])",[businessId,"suspended",reason,["published","paused","pending_review"]]);
+    if(status==="suspended")await transitionBusinessListings(db,businessId,userId,["published","paused","pending_review"],"suspended",requestId,reason,"network_plus.listing_suspended_by_business_verification");
     await audit(db,userId,"network_plus.business_profile_moderated","network_plus_business",businessId,requestId,{status,reason});
     await notifyOwners(db,businessId,"network_plus.business_profile_moderation_decided",{message:"A moderation decision was recorded for your business profile.",nextAction:status==="approved"?"Your approved business profile is now discoverable by eligible Network-Plus members.":"Review the decision reason and make any requested corrections.",status,eventVersion:updated.updated_at});
     return updated;

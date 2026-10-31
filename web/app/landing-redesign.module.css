@@ -531,3 +531,33 @@
 }
 :global(.dark) .loginCta { color: var(--brand-lemon); }
 :global(.dark) .finalPrimary { background: var(--brand-lemon); color: var(--brand-navy-deep); }
+
+
+/* Keep dark landing surfaces visibly blue-navy rather than black/charcoal. */
+:global(.dark) .finalCta {
+  background: linear-gradient(125deg, var(--bg), var(--surface));
+  border-color: var(--border);
+}
+:global(.dark) .portalCard,
+:global(.dark) .announcement,
+:global(.dark) .heroVisual {
+  background-color: var(--surface);
+  border-color: var(--border);
+}
+:global(.dark) .portalCard { box-shadow: var(--shadow); }
+:global(.dark) .announcement { background-image: none; }
+:global(.dark) .heroVisual { box-shadow: var(--shadow-raised); }
+:global(.dark) .quickStart {
+  background: var(--surface-raised);
+  border-color: var(--border);
+  color: var(--text);
+}
+:global(.dark) .quickText strong,
+:global(.dark) .visualTopline strong,
+:global(.dark) .portalCard h3,
+:global(.dark) .announcementCopy h2 { color: var(--text); }
+:global(.dark) .quickText small,
+:global(.dark) .visualTopline small,
+:global(.dark) .visualFootnote,
+:global(.dark) .portalCard p,
+:global(.dark) .announcementCopy > p:last-child { color: var(--muted); }

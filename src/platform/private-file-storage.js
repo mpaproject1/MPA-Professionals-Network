@@ -82,6 +82,17 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
   const f=r.rows[0]; if(!f) throw fail(404,"Private file not found.","NOT_FOUND");
   let allowed=f.created_by===userId;
   if(!allowed){
+    const businessOwnerEvidence=await db.query(`select 1 from network_plus_business_verification_evidence e
+      join network_plus_business_verification_case vc on vc.id=e.case_id
+      join network_plus_business_ownership bo on bo.business_id=vc.business_id
+      where e.file_object_id=$1 and bo.status='active' and bo.consent_status='accepted'
+        and ((bo.owner_type='member' and bo.owner_user_id=$2)
+          or (bo.owner_type='organization' and exists(select 1 from organization_membership om
+            where om.organization_id=bo.owner_organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator'))))
+      limit 1`,[fileId,userId]);
+    allowed=businessOwnerEvidence.rowCount>0;
+  }
+  if(!allowed){
     const membership=await db.query(`select 1 from organization_verification_evidence e join organization_verification_case c on c.id=e.case_id join organization_membership om on om.organization_id=c.organization_id and om.user_id=$1 and om.status='active' and om.role_code in ('owner','administrator') where e.file_object_id=$2 limit 1`,[userId,fileId]);
     allowed=membership.rowCount>0;
   }

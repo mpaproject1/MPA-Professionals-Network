@@ -38,3 +38,6 @@
 
 /* Support Desk custom controls match the shared 44px action rhythm. */
 .primary,.secondary{min-height:44px;padding:11px 15px;border-radius:10px;font-size:13px;font-weight:600}
+
+.primary{background:var(--brand-lemon);color:var(--brand-navy-deep);border:1px solid var(--brand-lemon)}
+.primary:hover{background:#e8f16d;border-color:#e8f16d}

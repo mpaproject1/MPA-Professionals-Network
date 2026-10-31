@@ -39,7 +39,7 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     await page.getByLabel("Find a verified member recipient").fill("Recipient");
     await page.route("**/api/v1/talent?q=*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[{user_id:"recipient-1",display_name:"Recipient Professional",professional_title:"Architect"}]}})}));
     await page.getByRole("button",{name:"Search members"}).click();
-    await page.getByRole("combobox").filter({has:page.locator("option", {hasText:"Recipient Professional"})}).selectOption("recipient-1");
+    await page.getByLabel("Member recipient").selectOption("recipient-1");
     await page.getByLabel("Subject").fill("Website accessibility review");
     await page.getByLabel("Request summary").fill("Request an accessibility review of our public website.");
     await page.getByLabel("Scope").fill("Review the public website against WCAG AA.");

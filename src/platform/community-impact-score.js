@@ -6,7 +6,7 @@ const fail=(status,message,code="COMMUNITY_IMPACT_SCORE_ERROR")=>{throw policyEr
 const clean=(value,min,max,label)=>{const v=String(value??"").trim();if(v.length<min||v.length>max)fail(400,label+" must be between "+min+" and "+max+" characters.","VALIDATION_ERROR");return v};
 async function permission(db,userId,code){const q=await db.query("select exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code='system_admin') or exists(select 1 from app_user_permission where user_id=$1 and permission_code=$2) allowed",[userId,code]);if(!q.rows[0]?.allowed)fail(403,"The required Community Impact score permission is required.","FORBIDDEN")}
 const hash=value=>createHash("sha256").update(value).digest("hex");
-function sourceType(claim){
+function classifyClaimSource(claim){
  const t=claim.contribution_type,c=claim.category;
  if(t==="initiative_participation")return "serve_community_participation";
  if(t==="project_delivery")return "offline_completed_project";
@@ -49,7 +49,7 @@ export async function linkVerifiedSource(actor,claimId,input){
   const claim=(await tx.query("select * from community_impact_claim where id=$1 for update",[claimId])).rows[0];if(!claim)fail(404,"Contribution claim not found.","NOT_FOUND");
   if(claim.status!=="verified"||claim.current_decision_code!=="verified")fail(409,"Only a verified claim can be linked to a scoring source.","SCORE_SOURCE_NOT_VERIFIED");
   const assessment=(await tx.query("select id from community_impact_contribution_assessment where claim_id=$1 and status='approved' order by approved_at desc nulls last,created_at desc limit 1",[claimId])).rows[0];if(!assessment)fail(409,"An approved reviewer assessment is required before source reconciliation.","SCORE_ASSESSMENT_REQUIRED");
-  const expected=sourceType(claim);
+  const expected=classifyClaimSource(claim);
   if(sourceType!==expected&&!(sourceType==="network_plus_collaboration"&&claim.contribution_type==="partnership")&&!(sourceType==="network_plus_partnership"&&claim.contribution_type==="partnership"))fail(409,"The selected source family does not match the reviewed contribution type.","SCORE_SOURCE_TYPE_MISMATCH");
   const snapshot=await verifySource(tx,sourceType,sourceRecordId,claim.claimant_user_id,claim);
   const row=(await tx.query("insert into community_impact_score_source_link(claim_id,subject_user_id,source_system,source_type,source_record_id,source_snapshot,linked_by,rationale) values($1,$2,$3,$4,$5,$6,$7,$8) on conflict(claim_id) do nothing returning id",[claimId,claim.claimant_user_id,sourceType==="historical_contribution"?"community_impact_claim":sourceType==="serve_community_participation"||sourceType==="offline_completed_project"?"serve_community":sourceType==="employment_referral"?"member_referrals":sourceType==="mentorship"?"mentorship":sourceType==="professional_service"?"services":"network_plus",sourceType,sourceRecordId,snapshot,actor,rationale])).rows[0];
@@ -65,7 +65,7 @@ async function scoreClaim(tx,actorUserId,claimId,rationale,policy,recalcId){
  const assessment=(await tx.query("select * from community_impact_contribution_assessment where claim_id=$1 and status='approved' order by approved_at desc nulls last,created_at desc limit 1 for update",[claimId])).rows[0];
  if(!assessment||!assessment.approved_at)fail(409,"An approved reviewer assessment is required before scoring.","SCORE_ASSESSMENT_REQUIRED");
  const sourceLink=(await tx.query("select * from community_impact_score_source_link where claim_id=$1 and subject_user_id=$2",[claimId,claim.claimant_user_id])).rows[0];
- const source=sourceLink?.source_type||sourceType(claim),calc=policy.policy.calculation;
+ const source=sourceLink?.source_type||classifyClaimSource(claim),calc=policy.policy.calculation;
  if(!sourceLink&&source!=="historical_contribution")fail(409,"A reviewer must link this verified claim to its exact authoritative source record before scoring.","SCORE_SOURCE_LINK_REQUIRED");
  if(!calc.eligibleSourceTypes.includes(source))fail(409,"This contribution source is not enabled by the active scoring policy.","SCORE_SOURCE_NOT_ELIGIBLE");
  const verifiedSource=sourceLink?await verifySource(tx,source,sourceLink.source_record_id,claim.claimant_user_id,claim):{id:claim.id,claimStatus:"verified"};
@@ -87,9 +87,11 @@ async function scoreClaim(tx,actorUserId,claimId,rationale,policy,recalcId){
  const share=Number(assessment.attribution_share);if(!Number.isFinite(share)||share<=0||share>100)fail(409,"The reviewer attribution share is invalid.","SCORE_ATTRIBUTION_SHARE_INVALID");
  let points=weighted*Number(calc.basePoints)*roleFactor*(share/100);
  const categoryCap=calc.categoryCaps?.[assessment.category],sourceCap=calc.sourceCaps?.[source];
- if(Number.isFinite(Number(categoryCap)))points=Math.min(points,Number(categoryCap));
- if(Number.isFinite(Number(sourceCap)))points=Math.min(points,Number(sourceCap));
- if(!Number.isFinite(points)||points<=0)fail(409,"The calculated score is not a positive eligible value.","SCORE_CALCULATION_INVALID");
+ if(Number.isFinite(Number(categoryCap))){const used=Number((await tx.query("select coalesce(sum(points),0)::numeric total from community_impact_score_ledger where subject_user_id=$1 and explanation->>'category'=$2",[claim.claimant_user_id,assessment.category])).rows[0].total);points=Math.min(points,Math.max(0,Number(categoryCap)-used))}
+ if(Number.isFinite(Number(sourceCap))){const used=Number((await tx.query("select coalesce(sum(points),0)::numeric total from community_impact_score_ledger where subject_user_id=$1 and source_type=$2",[claim.claimant_user_id,source])).rows[0].total);points=Math.min(points,Math.max(0,Number(sourceCap)-used))}
+ const periodCap=calc.periodCaps?.[source];if(periodCap&&Number.isFinite(Number(periodCap.points))&&Number.isFinite(Number(periodCap.windowDays))&&Number(periodCap.windowDays)>0){const used=Number((await tx.query("select coalesce(sum(points),0)::numeric total from community_impact_score_ledger where subject_user_id=$1 and source_type=$2 and created_at>=now()-($3::text||' days')::interval",[claim.claimant_user_id,source,String(periodCap.windowDays)])).rows[0].total);points=Math.min(points,Math.max(0,Number(periodCap.points)-used))}
+ for(const rule of Array.isArray(calc.diminishingReturns)?calc.diminishingReturns:[]){if(rule.sourceType===source&&Number.isFinite(Number(rule.afterCount))&&Number.isFinite(Number(rule.factor))&&Number(rule.factor)>=0&&Number(rule.factor)<=1){const count=Number((await tx.query("select count(*)::int count from community_impact_score_ledger where subject_user_id=$1 and source_type=$2 and entry_type='award'",[claim.claimant_user_id,source])).rows[0].count);if(count>=Number(rule.afterCount))points*=Number(rule.factor)}}
+ if(!Number.isFinite(points)||points<=0)fail(409,"The calculated score is not a positive eligible value after configured caps and diminishing returns.","SCORE_CALCULATION_INVALID");
  points=Number(points.toFixed(4));
  const sourceRecord=sourceLink?.source_record_id||candidateLink?.source_record_id||claim.id,sourceSystem=sourceLink?.source_system||candidateLink?.source_system||"community_impact_claim";
  const idempotency=hash(["award",claim.claimant_user_id,source,sourceRecord,policy.id,assessment.id].join(":"));
@@ -155,7 +157,7 @@ export async function reverseScoreEntry(actor,entryId,input){
  await permission(getPool(),actor,"community_impact.score.reverse");
  const reason=clean(input?.rationale,12,2000,"Reversal rationale"),code=clean(input?.reasonCode,3,80,"Reversal reason code");
  return withTransaction(async tx=>{
-  const entry=(await tx.query("select * from community_impact_score_ledger where id=$1 for update",[entryId])).rows[0];if(!entry||entry.entry_type==="reversal")fail(404,"Award ledger entry not found.","NOT_FOUND");
+  const entry=(await tx.query("select * from community_impact_score_ledger where id=$1 for update",[entryId])).rows[0];if(!entry||entry.entry_type!=="award")fail(404,"Award ledger entry not found.","NOT_FOUND");
   const prior=(await tx.query("select 1 from community_impact_score_ledger where reverses_entry_id=$1",[entryId])).rowCount;if(prior)fail(409,"This ledger award has already been reversed.","ALREADY_REVERSED");
   const reversal=await reverseEntry(tx,actor,entry,reason,code);return {originalEntryId:entryId,reversalEntryId:reversal.id,reversedPoints:Math.abs(Number(entry.points))};
  });

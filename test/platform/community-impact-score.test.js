@@ -10,12 +10,16 @@ const [migration,sourceMigration,service,server,member,admin,governance,checker]
  read("../../web/app/community-impact/score/page.tsx"),
  read("../../web/app/admin/community-impact/scoring/page.tsx"),
  read("../../web/app/admin/community-impact/governance/page.tsx"),
- read("../../scripts/check-new-migration-compatibility.js")
+ read("../../scripts/check-new-migration-compatibility.js"),
+ read("../../db/migrations/20261101160000_community_impact_score_policy_rubric_config.sql")
 ]);
 test("Initial active evaluation policy matches the approved five-dimension baseline and is not public",()=>{
  assert.match(migration,/"weight":30/);assert.match(migration,/"weight":25/);assert.match(migration,/"weight":20/);assert.match(migration,/"weight":15/);assert.match(migration,/"weight":10/);
  assert.match(migration,/'active',true,false/);assert.match(migration,/docs\/62-community-impact-and-recognition-design\.md/);
  assert.match(migration,/public_score_enabled=false/);
+ assert.match(rubricMigration,/evidenceQualityRank/);
+ assert.match(rubricMigration,/outcomeMaturityRank/);
+ assert.match(rubricMigration,/status='superseded'/);
  assert.match(service,/exactly the five approved dimensions/);
  assert.match(service,/weights must total exactly 100%/);
  assert.match(service,/policy\.dimensions/);
@@ -61,4 +65,5 @@ test("Member score view is private and administrator score operations are separa
  assert.match(server,/communityImpactScore\.reverseScoreEntry/);
  assert.match(checker,/20261101110000_community_impact_unified_score\.sql/);
  assert.match(checker,/20261101120000_community_impact_score_source_adapters\.sql/);
+ assert.match(checker,/20261101160000_community_impact_score_policy_rubric_config\.sql/);
 });

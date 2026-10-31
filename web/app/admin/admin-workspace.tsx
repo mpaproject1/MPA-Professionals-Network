@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BookOpenCheck, Building2, ClipboardList, CreditCard, FileBarChart, Fingerprint, Mail, MessageSquareText, ShieldCheck, Users, Scale } from "lucide-react";
+import { Activity, BookOpenCheck, Building2, ClipboardList, CreditCard, FileBarChart, Fingerprint, Mail, MessageSquareText, Scale, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";

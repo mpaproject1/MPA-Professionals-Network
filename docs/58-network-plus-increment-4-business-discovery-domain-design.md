@@ -2,7 +2,7 @@
 
 **Branch:** `feat/workstream-3-progress-members-workspace`  
 **Plan:** [docs/53-network-plus-discovery-and-collaboration-integration-plan.md](53-network-plus-discovery-and-collaboration-integration-plan.md)  
-**Design status:** complete draft for product/data-contract review; **not approved for schema implementation**  
+**Design status:** project-owner approved on 2026-10-31 as the implementation contract for Increment 5; Increment 4 remains design-only  
 **Scope:** domain definitions, policy boundaries, reuse decisions, record classification and rollback strategy. No schema, migration, API, UI or data conversion is introduced by this increment.
 
 ## 1. Product boundary and invariants
@@ -57,7 +57,7 @@ Ownership transfer is a reviewed, auditable process: proposed transfer → evide
 
 ## 3. Ownership and organization-role matrix
 
-The following is the proposed minimum policy. It is intentionally stricter than the broad organization-resource role set used by some existing workflows. It must be agreed before implementation.
+The following is the proposed minimum policy. It is intentionally stricter than the broad organization-resource role set used by some existing workflows. It is the approved minimum policy direction for implementation; jurisdiction-specific legal/compliance rules remain configurable and must be finalized before affected listings are published.
 
 | Action | Individual owner | Joint co-owner | Organization owner/admin | Project manager | Recruiter | Read-only |
 |---|---:|---:|---:|---:|---:|---:|
@@ -242,7 +242,7 @@ The repository already has substantial service workflow primitives. Reuse is con
 | Jobs/public opportunity intake | Do not repurpose job applications or public intake as business requests. |
 | Serve-Community interest, pledge, impact and outcome reporting | Keep separate. Do not convert commercial requests into volunteer participation or impact claims. |
 
-**Important source caveat:** current service code has different provider-side behavior for individual and organization listings, and generic organization resource roles are broader than the proposed Business Discovery matrix. The future implementation must introduce a narrow business-specific capability check rather than silently inheriting recruiter/read_only permissions or treating every existing service permission as approved.
+**Important source caveat:** current service code has different provider-side behavior for individual and organization listings, and generic organization resource roles are broader than the proposed Business Discovery matrix. The approved implementation contract requires a narrow business-specific capability check rather than silently inheriting recruiter/read_only permissions or treating every existing service permission as approved.
 
 ## 10. Existing-record classification — no bulk conversion
 
@@ -263,7 +263,7 @@ Classification record should capture source record ID/type, current owner, curre
 
 No migration is part of Increment 4.
 
-When a later implementation is approved:
+For Increment 5 and later implementation, subject to the separate release gates:
 
 1. Freeze the reviewed source baseline and export a read-only classification inventory; do not mutate production data.
 2. Implement additive structures and adapters only after the product contract and role matrix are approved. Avoid destructive renames, table rewrites or default visibility changes.
@@ -275,24 +275,28 @@ When a later implementation is approved:
 8. Roll back by disabling the feature flag/projection and restoring the previous read path. Do not delete new audit history or reverse financial/contract events; resolve any in-flight requests under a documented continuity plan.
 9. Production migration/deployment requires a separate explicit authorization and tested backup/restore plan.
 
-## 12. Exit gate and review checklist
+## 12. Approval record and remaining release gates
 
-Increment 4 is ready to exit only after reviewers agree on all of the following:
+**Project-owner decision (2026-10-31): APPROVED.** The owner approved this domain contract as the basis for Increment 5 implementation. The approval covers:
 
-- [ ] Individual, organization and joint ownership definitions and transfer/consent rules.
-- [ ] Organization role matrix, including explicit business-scoped project-manager delegation and recruiter/read-only exclusions.
-- [ ] Business verification evidence, reviewer authority, validity, revalidation, suspension and appeal policy.
-- [ ] Taxonomy, audience, delivery, geography, capacity, pricing/currency, credentials and availability contract.
-- [ ] Commercial listing lifecycle distinct from Serve-Community impact lifecycle.
-- [ ] Seven typed request contracts and their acceptance/withdrawal/dispute/completion rules.
-- [ ] Consent purposes, notification routing, audit requirements and idempotency behavior.
-- [ ] Exact reuse boundary for service request/delivery primitives versus new typed request domains.
-- [ ] Existing-record classification rules, owner confirmation, exception handling and rollback.
-- [ ] Legal/compliance review for regulated services, privacy, consumer disclosures, referral consent and record retention in target jurisdictions.
+- [x] Individual, organization and joint ownership definitions and transfer/consent rules.
+- [x] Organization role matrix, including explicit business-scoped project-manager delegation and recruiter/read-only exclusions.
+- [x] Business verification evidence categories, reviewer separation, validity/revalidation, suspension and appeal model.
+- [x] Taxonomy, audience, delivery, geography, capacity, pricing/currency, credentials and availability contract.
+- [x] Commercial listing lifecycle distinct from Serve-Community impact lifecycle.
+- [x] Seven typed request contracts and their acceptance/withdrawal/dispute/completion rules.
+- [x] Consent purposes, notification routing, audit requirements and idempotency behavior.
+- [x] Exact reuse boundary for service request/delivery primitives versus new typed request domains.
+- [x] Existing-record classification rules, owner confirmation, exception handling and rollback.
 
-**Exit status: NOT YET APPROVED.** This document completes the design draft and records a proposed contract. Product/data reviewers must agree the ownership and role matrix and classification policy before any business schema or migration is proposed.
+**Still required before public launch of affected categories:**
+- [ ] Jurisdiction-specific legal/compliance review for regulated services, privacy, consumer disclosures, referral consent and record retention.
+- [ ] Approved evidence-retention schedule and operational reviewer authority assignment.
+- [ ] Separate schema/API/privacy review and migration compatibility validation in Increment 5.
 
-## 13. Explicit non-goals for this increment
+The project-owner approval authorizes proceeding to Increment 5 design and additive schema implementation on the target branch. It does not assert that legal requirements have been independently reviewed, does not authorize automatic conversion of existing records, and does not authorize production migration/deployment.
+
+## 13. Explicit non-goals for Increment 4
 
 - No business/business-owner/listing/request tables or columns.
 - No migrations, seed data, API endpoints, UI routes or permission grants.

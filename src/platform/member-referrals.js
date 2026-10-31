@@ -49,7 +49,8 @@ export async function captureMembershipRegistration(db,referredUserId,code,statu
  if(!code)return null;
  const ref=await codeRow(db,code);
  if(ref.member_user_id===referredUserId)fail(400,"You cannot use your own referral code.","SELF_REFERRAL");
- const row=(await db.query("insert into member_referral_attribution(referral_type,referrer_user_id,referred_user_id,referral_code_id,status,status_visibility_consent) values('membership',$1,$2,$3,'registered',$4) on conflict(referred_user_id) where referral_type='membership' do nothing returning id,status",[ref.member_user_id,referredUserId,ref.id,statusVisibilityConsent===true])).rows[0];
+ const retention=await retentionSnapshot(db,"referral_attribution_records");
+ const row=(await db.query("insert into member_referral_attribution(referral_type,referrer_user_id,referred_user_id,referral_code_id,status,status_visibility_consent,retention_policy_version_id,retention_policy_snapshot) values('membership',$1,$2,$3,'registered',$4,$5,$6) on conflict(referred_user_id) where referral_type='membership' do nothing returning id,status",[ref.member_user_id,referredUserId,ref.id,statusVisibilityConsent===true,retention.versionId,retention.snapshot?JSON.stringify(retention.snapshot):null])).rows[0];
  if(row)await event(db,row.id,"registered","attributed","registered",referredUserId);
  return row;
 }
@@ -57,7 +58,8 @@ export async function captureEmploymentApplication(db,jobId,referredUserId,appli
  if(!code)return null;
  const ref=await codeRow(db,code);
  if(ref.member_user_id===referredUserId)fail(400,"You cannot refer yourself to a job.","SELF_REFERRAL");
- const row=(await db.query("insert into member_referral_attribution(referral_type,referrer_user_id,referred_user_id,job_id,job_application_id,referral_code_id,status,status_visibility_consent) values('employment',$1,$2,$3,$4,$5,'application_submitted',$6) on conflict(job_application_id) where referral_type='employment' and job_application_id is not null do nothing returning id,status",[ref.member_user_id,referredUserId,jobId,applicationId,ref.id,statusVisibilityConsent===true])).rows[0];
+ const retention=await retentionSnapshot(db,"referral_attribution_records");
+ const row=(await db.query("insert into member_referral_attribution(referral_type,referrer_user_id,referred_user_id,job_id,job_application_id,referral_code_id,status,status_visibility_consent,retention_policy_version_id,retention_policy_snapshot) values('employment',$1,$2,$3,$4,$5,'application_submitted',$6,$7,$8) on conflict(job_application_id) where referral_type='employment' and job_application_id is not null do nothing returning id,status",[ref.member_user_id,referredUserId,jobId,applicationId,ref.id,statusVisibilityConsent===true,retention.versionId,retention.snapshot?JSON.stringify(retention.snapshot):null])).rows[0];
  if(row)await event(db,row.id,"application_submitted","attributed","application_submitted",referredUserId,{jobId});
  return row;
 }

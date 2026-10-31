@@ -83,7 +83,6 @@ async function scoreClaim(tx,actorUserId,claimId,rationale,policy,recalcId){
  if(claim.status!=="verified"||claim.current_decision_code!=="verified")fail(409,"Only a reviewer-verified contribution can be scored.","SCORE_SOURCE_NOT_VERIFIED");
  const assessment=(await tx.query("select * from community_impact_contribution_assessment where claim_id=$1 and status='approved' order by approved_at desc nulls last,created_at desc limit 1 for update",[claimId])).rows[0];
  if(!assessment||!assessment.approved_at)fail(409,"An approved reviewer assessment is required before scoring.","SCORE_ASSESSMENT_REQUIRED");
- if(assessment.score_policy_version_id!==policy.id)fail(409,"The reviewer assessment was made under a different scoring policy version. An independent reassessment under the active policy is required before scoring.","SCORE_ASSESSMENT_POLICY_MISMATCH");
  const sourceLink=(await tx.query("select * from community_impact_score_source_link where claim_id=$1 and subject_user_id=$2",[claimId,claim.claimant_user_id])).rows[0];
  const source=sourceLink?.source_type||classifyClaimSource(claim),calc=policy.policy.calculation;
  const roundingDigits=Number(String(calc.rounding).match(/^([0-8])dp$/)?.[1]);

@@ -99,11 +99,13 @@ export async function listMyDetectedContributions(userId,options={}){
 }
 export async function confirmMyDetectedAttribution(candidateId,userId,requestId){
  return withTransaction(async tx=>{
-  const row=(await tx.query("select * from community_impact_detection_candidate where id=$1 for update",[candidateId])).rows[0];
+  const row=(await tx.query("select c.*,pv.rules policy_rules from community_impact_detection_candidate c join community_impact_detection_policy_version pv on pv.id=c.policy_version_id where c.id=$1 for update of c",[candidateId])).rows[0];
   if(!row||row.contributor_user_id!==userId)fail(404,"Detected contribution not found.","NOT_FOUND");
   if(row.source_type!=="initiative_participation"||row.attribution_status!=="pending_confirmation"||row.detection_status!=="detected")fail(409,"This attribution cannot be confirmed in its current state.","INVALID_ATTRIBUTION_STATE");
-  const current=(await tx.query("select 1 from serve_community_participation p join serve_community_initiative i on i.id=p.initiative_id join serve_community_participation_event e on e.participation_id=p.id where p.id=$1 and p.participant_user_id=$2 and p.status='completed' and i.status='completed' and e.id=$3 and e.event_code='completed' limit 1",[row.source_record_id,userId,row.source_event_id])).rowCount>0;
-  if(!current)fail(409,"The source completion is no longer eligible; request reconciliation.","SOURCE_NO_LONGER_ELIGIBLE");
+  const current=(await tx.query("select p.participant_user_id,p.status source_status,i.status parent_status,e.event_code from serve_community_participation p join serve_community_initiative i on i.id=p.initiative_id join serve_community_participation_event e on e.participation_id=p.id where p.id=$1 and e.id=$2 limit 1",[row.source_record_id,row.source_event_id])).rows[0];
+  const rules=row.policy_rules||{};
+  const eligible=!!current&&current.participant_user_id===userId&&Array.isArray(rules.sourceStatuses)&&rules.sourceStatuses.includes(current.source_status)&&Array.isArray(rules.parentStatuses)&&rules.parentStatuses.includes(current.parent_status)&&Array.isArray(rules.sourceEventCodes)&&rules.sourceEventCodes.includes(current.event_code);
+  if(!eligible)fail(409,"The source completion is no longer eligible; request reconciliation.","SOURCE_NO_LONGER_ELIGIBLE");
   const updated=(await tx.query("update community_impact_detection_candidate set attribution_status='confirmed',updated_at=now() where id=$1 and attribution_status='pending_confirmation' returning *",[candidateId])).rows[0];
   await tx.query("insert into community_impact_detection_candidate_event(candidate_id,actor_user_id,event_code,reason,metadata) values($1,$2,'attribution_confirmed','Contributor confirmed the proposed source attribution.',$3)",[candidateId,userId,{requestId:requestId||null}]);
   await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'community_impact.attribution_confirmed','community_impact_detection_candidate',$2,$3,'success',$4)",[userId,candidateId,requestId||null,{sourceType:row.source_type}]);

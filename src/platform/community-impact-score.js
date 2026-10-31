@@ -38,6 +38,15 @@ function validatePolicy(policy){
 }
 async function activePolicy(db){const row=(await db.query("select p.* from community_impact_score_active_policy a join community_impact_score_policy_version p on p.id=a.policy_version_id where a.singleton=true")).rows[0];if(!row)fail(409,"No active Community Impact score policy is configured.","SCORE_POLICY_MISSING");validatePolicy(row.policy);return row}
 const SCORE_SOURCE_TYPES=new Set(["serve_community_participation","offline_completed_project","mentorship","professional_service","employment_referral","network_plus_collaboration","network_plus_partnership","historical_contribution"]);
+function safeSourceSnapshot(sourceType,row){
+ if(sourceType==="employment_referral")return {status:row.status,referralType:"employment",jobOutcomeVerified:row.status==="employment_verified"};
+ if(sourceType==="mentorship")return {status:row.status,coordinationStatus:row.coordination_status,contributorRole:"mentor"};
+ if(sourceType==="professional_service")return {status:row.status,providerCompletionRecorded:Boolean(row.provider_completed_at),requesterAccepted:Boolean(row.requester_accepted_at),pricingModel:row.pricing_model};
+ if(sourceType==="network_plus_collaboration"||sourceType==="network_plus_partnership")return {status:row.status,intent:row.intent,participantConsent:row.consent_status};
+ if(sourceType==="serve_community_participation")return {status:row.detection_status,attributionStatus:row.attribution_status,confidence:row.confidence};
+ if(sourceType==="offline_completed_project")return {status:row.detection_status,attributionStatus:row.attribution_status,attributionDecision:row.status,contributorConfirmed:Boolean(row.contributor_confirmed_at),attributionShare:Number(row.attribution_share)};
+ return {claimStatus:row.claimStatus||"verified",source:"reviewer_verified_historical_claim"};
+}
 async function verifySource(db,sourceType,sourceRecordId,subjectUserId,claim){
  let row;
  if(sourceType==="serve_community_participation")row=(await db.query("select id,source_system,source_type,source_record_id,source_event_id,contributor_user_id,attribution_status,detection_status,confidence from community_impact_detection_candidate where id=$1 and source_type='initiative_participation' and contributor_user_id=$2 and attribution_status='confirmed' and detection_status='detected'",[sourceRecordId,subjectUserId])).rows[0];
@@ -61,7 +70,7 @@ export async function linkVerifiedSource(actor,claimId,input){
   const expected=classifyClaimSource(claim);
   if(sourceType==="historical_contribution"&&sourceRecordId!==claim.id)fail(409,"Historical contribution source reference must match the verified claim ID.","SCORE_SOURCE_REFERENCE_MISMATCH");
   if(sourceType!==expected&&!(sourceType==="network_plus_collaboration"&&claim.contribution_type==="partnership")&&!(sourceType==="network_plus_partnership"&&claim.contribution_type==="partnership"))fail(409,"The selected source family does not match the reviewed contribution type.","SCORE_SOURCE_TYPE_MISMATCH");
-  const snapshot=await verifySource(tx,sourceType,sourceRecordId,claim.claimant_user_id,claim);
+  const verifiedSnapshot=await verifySource(tx,sourceType,sourceRecordId,claim.claimant_user_id,claim),snapshot=safeSourceSnapshot(sourceType,verifiedSnapshot);
   const row=(await tx.query("insert into community_impact_score_source_link(claim_id,subject_user_id,source_system,source_type,source_record_id,source_snapshot,linked_by,rationale) values($1,$2,$3,$4,$5,$6,$7,$8) on conflict(claim_id) do nothing returning id",[claimId,claim.claimant_user_id,sourceType==="historical_contribution"?"community_impact_claim":sourceType==="serve_community_participation"||sourceType==="offline_completed_project"?"serve_community":sourceType==="employment_referral"?"member_referrals":sourceType==="mentorship"?"mentorship":sourceType==="professional_service"?"services":"network_plus",sourceType,sourceRecordId,snapshot,actor,rationale])).rows[0];
   if(!row){const existing=(await tx.query("select id,source_type,source_record_id from community_impact_score_source_link where claim_id=$1",[claimId])).rows[0];if(existing?.source_type===sourceType&&existing?.source_record_id===sourceRecordId)return {...existing,status:"already_linked"};fail(409,"This verified claim is already linked to a different source record. Use a new independently reviewed claim for correction.","SCORE_SOURCE_ALREADY_LINKED")}
   await tx.query("insert into community_impact_score_source_link_event(source_link_id,actor_user_id,event_code,rationale,metadata) values($1,$2,'linked',$3,$4)",[row.id,actor,rationale,{sourceType,sourceRecordId,assessmentId:assessment.id}]);
@@ -79,7 +88,7 @@ async function scoreClaim(tx,actorUserId,claimId,rationale,policy,recalcId){
  const roundingDigits=Number(String(calc.rounding).match(/^([0-8])dp$/)?.[1]);
  if(!sourceLink&&source!=="historical_contribution")fail(409,"A reviewer must link this verified claim to its exact authoritative source record before scoring.","SCORE_SOURCE_LINK_REQUIRED");
  if(!calc.eligibleSourceTypes.includes(source))fail(409,"This contribution source is not enabled by the active scoring policy.","SCORE_SOURCE_NOT_ELIGIBLE");
- const verifiedSource=sourceLink?await verifySource(tx,source,sourceLink.source_record_id,claim.claimant_user_id,claim):{id:claim.id,claimStatus:"verified"};
+ const verifiedSource=sourceLink?safeSourceSnapshot(source,await verifySource(tx,source,sourceLink.source_record_id,claim.claimant_user_id,claim)):{claimStatus:"verified"};
  const qualityRank=Number(calc.evidenceQualityRank[assessment.evidence_quality]),minimumQuality=Math.max(...policy.policy.dimensions.map(d=>Number(calc.evidenceQualityRank[d.minimumEvidenceQuality||calc.minimumEvidenceQuality])));
  if(!Number.isFinite(qualityRank)||!Number.isFinite(minimumQuality)||qualityRank<minimumQuality)fail(409,"Evidence quality does not meet the active score policy threshold for every scoring dimension.","SCORE_EVIDENCE_THRESHOLD");
  const maturityRank=Number(calc.outcomeMaturityRank[assessment.outcome_maturity]),minimumMaturity=Number(calc.outcomeMaturityRank[calc.minimumOutcomeMaturity]);
@@ -117,7 +126,7 @@ export async function getActiveScorePolicy(){const row=await activePolicy(getPoo
 export async function getMyScore(userId){
  const db=getPool(),policy=await activePolicy(db);
  const totals=(await db.query("select coalesce(sum(points),0)::numeric(14,4) total,count(*) filter(where points>0)::int awards,count(*) filter(where points<0)::int reversals from community_impact_score_ledger where subject_user_id=$1",[userId])).rows[0];
- const rows=(await db.query("select id,source_type,source_record_id,entry_type,points,explanation,created_at from community_impact_score_ledger where subject_user_id=$1 order by created_at desc limit 100",[userId])).rows;
+ const rows=(await db.query("select id,source_type,entry_type,points,explanation,created_at from community_impact_score_ledger where subject_user_id=$1 order by created_at desc limit 100",[userId])).rows;
  return {score:Number(totals.total),awards:totals.awards,reversals:totals.reversals,policyVersion:policy.version,dimensions:policy.policy.dimensions,evaluationOnly:policy.evaluation_only,publicScoreEnabled:policy.public_score_enabled,publicationStatus:"private_evaluation",items:rows};
 }
 export async function listScorePolicies(actor){const db=getPool();await permission(db,actor,"community_impact.score.policy.manage").catch(async error=>{if(error.code!=="FORBIDDEN")throw error;await permission(db,actor,"community_impact.score.policy.approve")});const rows=await db.query("select id,version,status,evaluation_only,public_score_enabled,rationale,change_summary,created_by,approved_by,approval_reference,effective_at,created_at,policy from community_impact_score_policy_version order by version desc");return {items:rows.rows}}

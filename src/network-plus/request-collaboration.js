@@ -160,9 +160,8 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader) {
 }
 export async function listNetworkPlusRequests(userId,{status,intent,limit=30,offset=0,supportReason,supportTicket}={}) {
   return withTransaction(async db=>{
-    await assertEntry(db,userId);
     let support=false;
-    if(supportReason||supportTicket){await assertSupport(db,userId,supportReason,supportTicket);support=true;}
+    if(supportReason||supportTicket){await assertSupport(db,userId,supportReason,supportTicket);support=true;} else await assertEntry(db,userId);
     const rows=(await db.query(`select r.id,r.intent,r.status,r.subject,r.summary,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id,r.business_id,r.service_listing_id,r.version,r.created_at,r.updated_at
       from network_plus_request r where (${support} or exists(select 1 from network_plus_request_participant p where p.request_id=r.id and p.user_id=$1 and p.consent_status<>'revoked'))
       and ($2::text is null or r.status=$2) and ($3::text is null or r.intent=$3)
@@ -172,11 +171,10 @@ export async function listNetworkPlusRequests(userId,{status,intent,limit=30,off
 }
 export async function getNetworkPlusRequest(requestId,userId,{supportReason,supportTicket}={}) {
   return withTransaction(async db=>{
-    await assertEntry(db,userId);
     const row=(await db.query("select * from network_plus_request where id=$1",[requestId])).rows[0];
     if(!row)fail(404,"Request not found.","NOT_FOUND");
     const isParticipant=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status<>'revoked'",[requestId,userId])).rowCount>0;
-    if(!isParticipant)await assertSupport(db,userId,supportReason,supportTicket);
+    if(isParticipant) await assertEntry(db,userId); else { await assertSupport(db,userId,supportReason,supportTicket); await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_read","network_plus_request",requestId,"success",{reason:supportReason,ticket:supportTicket}]); }
     const participants=(await db.query("select user_id,participant_role,consent_status,consented_at from network_plus_request_participant where request_id=$1 and consent_status<>'revoked'",[requestId])).rows;
     const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 order by created_at",[requestId])).rows;
     const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;
@@ -187,7 +185,9 @@ export async function addNetworkPlusRequestParticipant(requestId,userId,input,re
   const target=input?.userId;
   if(!target||target===userId)fail(400,"Choose another participant.","INVALID_PARTICIPANT");
   return withTransaction(async db=>{
+    await assertEntry(db,userId);
     await participant(db,requestId,userId);
+    await assertEntry(db,target);
     const request=(await db.query("select status,requester_user_id from network_plus_request where id=$1 for update",[requestId])).rows[0];
     if(!["accepted","in_progress"].includes(request.status))fail(409,"Additional participants can join only an accepted engagement.","ACCEPTANCE_REQUIRED");
     await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) values($1,$2,'additional_participant','pending',$3) on conflict(request_id,user_id) do nothing",[requestId,target,userId]);
@@ -199,6 +199,7 @@ export async function addNetworkPlusRequestParticipant(requestId,userId,input,re
 export async function respondNetworkPlusParticipant(requestId,userId,decision,requestIdHeader) {
   if(!["accept","decline"].includes(decision))fail(400,"Choose accept or decline.","INVALID_DECISION");
   return withTransaction(async db=>{
+    await assertEntry(db,userId);
     const p=(await db.query("select * from network_plus_request_participant where request_id=$1 and user_id=$2 for update",[requestId,userId])).rows[0];
     if(!p||p.participant_role!=="additional_participant"||p.consent_status!=="pending")fail(404,"Invitation not found.","NOT_FOUND");
     await db.query("update network_plus_request_participant set consent_status=$1,consented_at=case when $1='accepted' then now() else consented_at end where request_id=$2 and user_id=$3",[decision==="accept"?"accepted":"declined",requestId,userId]);

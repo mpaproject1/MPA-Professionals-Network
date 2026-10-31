@@ -1,7 +1,6 @@
 "use client";
-import { useEffect,useState } from "react";
 import { useParams,useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { api } from "../../../../lib/api";
 type Verification={valid:boolean;status:string;voucherNumber:string;receiptNumber:string;payerName:string;amount:string;currency:string;purpose:string;paymentDate:string;paymentMethod:string;verifiedAt:string};
 function VerifyContent(){const params=useParams<{id:string}>(),search=useSearchParams();const [data,setData]=useState<Verification|null>(null),[error,setError]=useState("Checking voucher…");useEffect(()=>{const token=search.get("token")||"";api<Verification>("/api/v1/public/finance-vouchers/"+encodeURIComponent(params.id)+"?token="+encodeURIComponent(token)).then(v=>{setData(v);setError("");}).catch(()=>{setData(null);setError("This payment voucher is invalid, revoked or unavailable.");});},[params.id,search]);return <main className="container" style={{maxWidth:680,padding:24}}><article className="card"><h1 className="h1">MPA payment voucher verification</h1>{data?<><p className="form-success" role="status">Verified payment receipt</p><p><b>{data.voucherNumber}</b></p><p>Receipt: {data.receiptNumber}</p><p>Payer: {data.payerName}</p><p>Amount: {data.currency} {data.amount}</p><p>Purpose: {data.purpose}</p><p>Payment date: {data.paymentDate}</p><p>Method: {data.paymentMethod}</p><p>Verified: {new Date(data.verifiedAt).toLocaleString()}</p></>:<p role="status">{error}</p>}<p className="muted">This verifies a payment receipt only. It does not confirm membership approval or activation.</p></article></main>}

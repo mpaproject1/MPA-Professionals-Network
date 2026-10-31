@@ -16,7 +16,7 @@ export default function CommunityImpactGovernancePage(){
  const [decision,setDecision]=useState<Record<string,string>>({}),[reason,setReason]=useState<Record<string,string>>({}),[rationale,setRationale]=useState<Record<string,string>>({});
  const [reviewer,setReviewer]=useState<Record<string,string>>({}),[assessment,setAssessment]=useState<Record<string,string>>({});
  const [proposal,setProposal]=useState({candidateId:"",contributorUserId:"",contributionRole:"contributor",attributionShare:"100",rationale:""}),[evidenceFiles,setEvidenceFiles]=useState<File[]>([]);
- const [policy,setPolicy]=useState({sourceType:"offline_completed_project",rules:'{"enabled":true,"sourceEventCodes":["completed"],"categoryMap":{"community_service":"community_care"}}',rationale:""});
+ const [policy,setPolicy]=useState({sourceType:"offline_completed_project",rules:'{"enabled":true,"sourceEventCodes":["approve"],"sourceStatuses":["approved"],"parentStatuses":[],"attributionMode":"unattributed_until_evidenced","confidence":0,"requireContributorConfirmation":true,"defaultRole":null,"categoryMap":{"education":"education_skills","community_care":"community_care","digital_inclusion":"digital_inclusion","environment":"environment_sustainability","livelihoods":"livelihoods_economic_opportunity","accessibility":"accessibility_inclusion","other":"other_review_required"}}',rationale:""});
  const [approval,setApproval]=useState<Record<string,string>>({}),[activation,setActivation]=useState<Record<string,string>>({});
  const [conflict,setConflict]=useState<Record<string,{type:string;declaration:string}>>({});
  const [assess,setAssess]=useState<Record<string,{category:string;type:string;role:string;quality:string;maturity:string;share:string;risk:string;rationale:string}>>({});

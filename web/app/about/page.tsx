@@ -44,7 +44,7 @@ function CompletedProjects() {
   return (
     <section className={styles.portfolio} aria-labelledby="completed-projects-title">
       <div className={styles.sectionHeading}>
-        <p className={styles.eyebrow}>Evidence from the platform</p>
+        <p className={styles.eyebrow}>Platform records and reviewed offline work</p>
         <h2 id="completed-projects-title">Completed Projects</h2>
         <p>Explore platform initiatives and staff-reviewed projects delivered offline. Participation counts, beneficiary figures and outcome measures are shown only under their separate evidence and review rules.</p>
       </div>
@@ -69,7 +69,7 @@ function CompletedProjects() {
             ))}
           </div>
           <p className={styles.measurementNote}>{portfolio.measurementNote}</p>
-        </> : <div className={styles.portfolioState} role="status"><ChartNoAxesCombined size={24} aria-hidden="true" /><h3>No reportable completed projects yet</h3><p>Completed initiatives will appear here when completion and member participation records meet the platform’s privacy reporting threshold. Small groups are withheld.</p></div>}
+        </> : <div className={styles.portfolioState} role="status"><ChartNoAxesCombined size={24} aria-hidden="true" /><h3>No reportable completed projects yet</h3><p>Approved platform initiatives that meet the privacy reporting threshold and independently reviewed offline project records will appear here.</p></div>}
     </section>
   );
 }

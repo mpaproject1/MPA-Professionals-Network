@@ -28,11 +28,16 @@ async function assertPermission(db,userId,permission){
  const grants=await db.query("select permission_code from app_user_permission where user_id=$1 and permission_code=$2",[userId,permission]);
  if(!result.rows.some(row=>row.role_code==="system_admin")&&!grants.rowCount)fail(403,"The required Community Impact retention-policy permission is required.","COMMUNITY_IMPACT_RETENTION_FORBIDDEN");
 }
+async function assertAnyPolicyPermission(db,userId){
+ const roles=await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId]);
+ const grants=await db.query("select permission_code from app_user_permission where user_id=$1 and permission_code=any($2::text[])",[userId,["community_impact.retention.manage","community_impact.retention.approve"]]);
+ if(!roles.rows.some(row=>row.role_code==="system_admin")&&!grants.rowCount)fail(403,"A Community Impact retention-policy permission is required.","COMMUNITY_IMPACT_RETENTION_FORBIDDEN");
+}
 async function audit(db,actor,action,id,requestId,metadata={}){
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'community_impact_retention_policy',$3,$4,'success',$5)",[actor,action,id,requestId,JSON.stringify(metadata)]);
 }
 export async function getRetentionPolicyGovernance(actorUserId){
- const db=getPool();await assertPermission(db,actorUserId,"community_impact.retention.manage");
+ const db=getPool();await assertAnyPolicyPermission(db,actorUserId);
  const [active,proposals]=await Promise.all([
   db.query("select p.id,p.version,p.policy,p.approval_reference,p.approved_by,p.approved_at,p.activated_at,a.activated_by,a.activated_at as pointer_activated_at from community_impact_retention_active_policy a join community_impact_retention_policy_version p on p.id=a.policy_version_id"),
   db.query("select id,version,status,policy,rationale,change_summary,created_by,created_at,approved_by,approved_at,approval_reference,activated_at from community_impact_retention_policy_version order by version desc limit 50")
@@ -43,6 +48,7 @@ export async function proposeRetentionPolicy(actorUserId,input,requestId){
  const db=getPool();await assertPermission(db,actorUserId,"community_impact.retention.manage");
  const policy=validatePolicy(input?.policy),rationale=cleanText(input?.rationale,12,2000,"Rationale"),changeSummary=cleanText(input?.changeSummary,8,1000,"Change summary");
  return withTransaction(async tx=>{
+  await tx.query("select pg_advisory_xact_lock(hashtext('community_impact_retention_policy_version'))");
   const next=await tx.query("select coalesce(max(version),0)+1 version from community_impact_retention_policy_version");
   const row=(await tx.query("insert into community_impact_retention_policy_version(version,status,policy,rationale,change_summary,created_by) values($1,'in_review',$2,$3,$4,$5) returning id,version,status,policy,rationale,change_summary,created_by,created_at",[next.rows[0].version,policy,rationale,changeSummary,actorUserId])).rows[0];
   await tx.query("insert into community_impact_retention_policy_event(policy_version_id,actor_user_id,event_code,reason,request_id,metadata) values($1,$2,'proposed',$3,$4,$5)",[row.id,actorUserId,rationale,requestId,{version:row.version,dataClasses:DATA_CLASSES}]);
@@ -71,6 +77,7 @@ export async function activateRetentionPolicy(actorUserId,policyId,reason,reques
   const row=(await tx.query("select * from community_impact_retention_policy_version where id=$1 for update",[policyId])).rows[0];
   if(!row)fail(404,"Retention policy was not found.","NOT_FOUND");
   if(row.status!=="approved")fail(409,"Only an independently approved policy can be activated.","INVALID_STATE");
+  if(row.created_by===actorUserId)fail(403,"The policy proposer cannot activate their own retention policy.","COMMUNITY_IMPACT_RETENTION_SELF_ACTIVATION");
   const prior=(await tx.query("select policy_version_id from community_impact_retention_active_policy where singleton=true for update")).rows[0];
   if(prior){
    await tx.query("update community_impact_retention_policy_version set status='superseded' where id=$1 and status='active'",[prior.policy_version_id]);

@@ -211,7 +211,7 @@ export async function updateBusiness(businessId,userId,input,requestId) {
     }
     const row=(await db.query(`update network_plus_business set display_name=$1,trading_name=$2,description=$3,website=$4,location_label=$5,
       verification_status=case when verification_status='verified' then 'submitted' else verification_status end,
-      moderation_status=case when moderation_status='approved' then 'pending_review' else moderation_status end,
+      moderation_status=case when moderation_status='approved' then 'not_submitted' else moderation_status end,
       publication_status=case when publication_status='published' then 'paused' else publication_status end,updated_at=now()
       where id=$6 returning *`,[next.displayName,next.tradingName,next.description,next.website,next.locationLabel,businessId])).rows[0];
     await audit(db,userId,"network_plus.business_updated","network_plus_business",businessId,requestId,{fields:entries.map(([key])=>key)});
@@ -471,7 +471,7 @@ export async function changeBusinessPublicationStatus(businessId,userId,status,r
   if(!["paused","published","archived"].includes(status))fail(400,"Unsupported business publication status.","VALIDATION_ERROR");
   return withTransaction(async db=>{
     const {business}=await assertBusinessOwner(db,businessId,userId);
-    if(status==="published"&&(business.verification_status!=="verified"||business.moderation_status!=="approved"))fail(409,"Business must be verified and approved before publication.","BUSINESS_NOT_PUBLISHABLE");
+    if(status==="published")await assertBusinessPublishable(db,businessId);
     if(business.publication_status==="suspended")fail(409,"Only an independent moderator can clear a business suspension.","MODERATION_CLEARANCE_REQUIRED");
     const updated=(await db.query("update network_plus_business set publication_status=$1,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];
     await audit(db,userId,"network_plus.business_publication_changed","network_plus_business",businessId,requestId,{from:business.publication_status,to:status,reason:String(reason||"").trim().slice(0,500)||null});

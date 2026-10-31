@@ -33,6 +33,12 @@ function publicText(value,max,field,{min=1}={}) {
   if(patterns.some(pattern=>pattern.test(v))||phones.some(phone=>phone.replace(/\\D/g,"").length>=9))fail(400,"Remove personal contact details and direct-contact links from public profile/listing text. Use the approved website field instead.","PUBLIC_CONTACT_DETAILS_FORBIDDEN");
   return v;
 }
+async function validateGeographyReference(db,id) {
+  if(!id)return null;
+  const valid=(await db.query("select ri.id from reference_item ri join reference_dataset_version rv on rv.id=ri.dataset_version_id join reference_dataset rd on rd.id=rv.dataset_id where ri.id=$1 and rd.domain='geography' and rv.status='published' and ri.active=true",[id])).rows[0];
+  if(!valid)fail(400,"Choose a location from the published geography reference list.","INVALID_GEOGRAPHY_REFERENCE");
+  return id;
+}
 function normalizeBusinessInput(input) {
   return {
     businessKind:input.businessKind,
@@ -153,6 +159,7 @@ export async function createBusiness(userId,input,requestId,idempotencyKey) {
       if(existing.request_fingerprint!==payloadFingerprint)fail(409,"This submission key was already used for different business details.","IDEMPOTENCY_CONFLICT");
       return {...existing,idempotent:true};
     }
+    await validateGeographyReference(db,normalized.geographyReferenceItemId);
     const ownerIdentity=ownerType==="member"?userId:organizationId;
     const duplicateKey=ownerType+":"+ownerIdentity+":"+normalized.displayName.toLowerCase();
     await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[duplicateKey]);

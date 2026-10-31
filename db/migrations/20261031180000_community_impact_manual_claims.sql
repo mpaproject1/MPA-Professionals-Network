@@ -190,7 +190,7 @@ drop trigger if exists trg_community_impact_claim_appeal_guard on community_impa
 create trigger trg_community_impact_claim_appeal_guard before update or delete on community_impact_claim_appeal for each row execute function community_impact_claim_appeal_guard();
 create or replace function community_impact_claim_evidence_guard() returns trigger language plpgsql as $ci$
 begin
- if TG_OP='DELETE' then raise exception 'Community Impact evidence references cannot be deleted outside approved retention processing'; end if;
+ if TG_OP='DELETE' then if current_setting('app.community_impact_retention_processing',true)='on' then return OLD; end if; raise exception 'Community Impact evidence references can only be deleted by the approved retention processor'; end if;
  if NEW.id is distinct from OLD.id or NEW.claim_id is distinct from OLD.claim_id
   or NEW.file_object_id is distinct from OLD.file_object_id or NEW.evidence_url is distinct from OLD.evidence_url
   or NEW.evidence_type is distinct from OLD.evidence_type or NEW.label is distinct from OLD.label

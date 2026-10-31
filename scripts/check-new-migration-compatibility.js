@@ -411,7 +411,27 @@ try {
     ["professional_profile","cv_file_id","file_object","id"],
     ["support_conversation_workflow","conversation_id","support_conversation","id"],
     ["support_conversation_workflow","escalated_by","app_user","id"],
-    ["support_conversation_workflow","updated_by","app_user","id"]
+    ["support_conversation_workflow","updated_by","app_user","id"],
+    ["serve_community_initiative","owner_user_id","app_user","id"],
+    ["serve_community_initiative","owner_organization_id","organization","id"],
+    ["serve_community_initiative","created_by","app_user","id"],
+    ["serve_community_initiative","submitted_by","app_user","id"],
+    ["serve_community_initiative","reviewed_by","app_user","id"],
+    ["serve_community_initiative_event","initiative_id","serve_community_initiative","id"],
+    ["serve_community_initiative_event","actor_user_id","app_user","id"],
+    ["serve_community_participation","initiative_id","serve_community_initiative","id"],
+    ["serve_community_participation","participant_user_id","app_user","id"],
+    ["serve_community_participation","decided_by","app_user","id"],
+    ["serve_community_participation_consent_event","participation_id","serve_community_participation","id"],
+    ["serve_community_participation_consent_event","actor_user_id","app_user","id"],
+    ["serve_community_participation_event","participation_id","serve_community_participation","id"],
+    ["serve_community_participation_event","actor_user_id","app_user","id"],
+    ["serve_community_legacy_classification","service_listing_id","service_listing","id"],
+    ["serve_community_legacy_classification","initiative_id","serve_community_initiative","id"],
+    ["serve_community_legacy_classification","proposed_by","app_user","id"],
+    ["serve_community_legacy_classification","reviewed_by","app_user","id"],
+    ["serve_community_legacy_classification_event","classification_id","serve_community_legacy_classification","id"],
+    ["serve_community_legacy_classification_event","actor_user_id","app_user","id"]
   ];
   const fkErrors = [];
   for (const [table,column,targetTable,targetColumn] of requiredForeignKeys) {
@@ -464,7 +484,7 @@ try {
     "ux_network_plus_request_event_idempotency",
     "ux_network_plus_collaboration_event_idempotency",
     "ux_network_plus_collaboration_milestone_idempotency",
-    "ux_serve_community_initiative_idempotency_hash","ux_serve_community_participation_idempotency_hash","ux_serve_community_participation_active"
+    "ux_serve_community_initiative_idempotency_hash","ux_serve_community_participation_idempotency_hash","ux_serve_community_participation_active","ux_serve_community_legacy_classification_initiative"
   ];
   for (const name of requiredUniqueIndexes) {
     const row = (await client.query(

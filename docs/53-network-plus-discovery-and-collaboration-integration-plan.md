@@ -368,3 +368,12 @@ The owner approved the Serve-Community classification policy: only explicitly re
 The first public UX prototype is recorded in [docs/61-network-plus-increment-7-serve-community-ux.md](61-network-plus-increment-7-serve-community-ux.md). The public page has been separated from commercial services, Mentorship, Jobs and organization workspace navigation. It includes an interactive search/category filter and accessible sample concept detail dialog. Every sample is visibly labelled as preview-only and cannot be mistaken for a live approved initiative.
 
 **Increment 7 remains IN PROGRESS, NOT PASSED.** The source audit found no public approved-initiative inventory or public volunteer participation API. The existing volunteer-pledge endpoints are private member-owned pledge management; marketplace-demand topics include service and mentorship demand; service impact reports are owner/governance reports. None is silently reused as a public initiative directory. A distinct approved initiative lifecycle, public projection, consent-based participation and audited reversible legacy classification remain required. The UX prototype does not claim to deliver these backend capabilities.
+
+
+## 13. Increment 7 backend and workflow implementation (2026-10-31)
+
+The distinct Serve-Community initiative and consent-based participation domain has now been implemented on this branch. The implementation includes an additive migration, append-only initiative/participation/consent/classification histories, independent reviewer authorization, owner proposal/edit/submit flows, published-only public discovery, private owner participation decisions, participant withdrawal, and explicit reversible legacy service classification. The public directory now reads the approved-only API instead of illustrative cards. Owner and moderator workspaces are available at `/serve-community/manage` and `/admin/serve-community`.
+
+The legacy classification flow is deliberately opt-in and owner-originated. No service listing was converted or hidden. A legacy service can only be linked to a separately created initiative after owner proposal and independent reviewer approval; reversal changes only the mapping history and never mutates the source service listing.
+
+**Validation remains pending on the exact implementation head.** Do not merge or deploy until the migration compatibility rollback check, backend test suite, type/lint checks, production build and Playwright acceptance all pass. PR #18 remains draft.

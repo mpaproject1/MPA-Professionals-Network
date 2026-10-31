@@ -47,9 +47,11 @@ async function hasSupportRole(db,userId) {
   const roles=(await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId])).rows.map(x=>x.role_code);
   return roles.some(x=>SUPPORT_ROLES.has(x));
 }
-async function assertSupport(db,userId,reason,ticket) {
+async function assertSupport(db,userId,requestId,reason,ticket) {
   if(!await hasSupportRole(db,userId))fail(403,"Authorized Network-Plus support staff only.","SUPPORT_FORBIDDEN");
   if(typeof reason!=="string"||reason.trim().length<8||reason.trim().length>500||typeof ticket!=="string"||ticket.trim().length<6||ticket.trim().length>120)fail(400,"Support access requires a meaningful reason and a valid support case reference.","SUPPORT_REASON_REQUIRED");
+  const grant=(await db.query("select id from network_plus_request_support_grant where request_id=$1 and support_user_id=$2 and support_case_reference=$3 and revoked_at is null and expires_at>now()",[requestId,userId,ticket.trim()])).rows[0];
+  if(!grant)fail(403,"No active support grant exists for this request and case reference.","SUPPORT_GRANT_REQUIRED");
 }
 async function notify(db,userId,event,requestId,message) {
   await createInAppNotification(db,userId,event,"network_plus_request",requestId,{message,nextAction:"Open Network-Plus requests to review the update."});
@@ -177,7 +179,7 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
 export async function listNetworkPlusRequests(userId,{status,intent,limit=30,offset=0,supportReason,supportTicket,supportRequestId}={}) {
   return withTransaction(async db=>{
     let support=false;
-    if(supportReason||supportTicket){await assertSupport(db,userId,supportReason,supportTicket);if(!supportRequestId)fail(400,"Support access must be scoped to one request record.","SUPPORT_SCOPE_REQUIRED");support=true;} else await assertEntry(db,userId);
+    if(supportReason||supportTicket){if(!supportRequestId)fail(400,"Support access must be scoped to one request record.","SUPPORT_SCOPE_REQUIRED");await assertSupport(db,userId,supportRequestId,supportReason,supportTicket);support=true;} else await assertEntry(db,userId);
     const rows=(await db.query(`select r.id,r.intent,r.status,r.subject,r.summary,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id,r.business_id,r.service_listing_id,r.version,r.created_at,r.updated_at
       from network_plus_request r where (${support} or exists(select 1 from network_plus_request_participant p where p.request_id=r.id and p.user_id=$1 and p.consent_status<>'revoked' and (p.participant_role<>'additional_participant' or p.consent_status='accepted')))
       and ($2::text is null or r.status=$2) and ($3::text is null or r.intent=$3) and ($4::uuid is null or r.id=$4::uuid)
@@ -186,12 +188,36 @@ export async function listNetworkPlusRequests(userId,{status,intent,limit=30,off
     return rows;
   });
 }
+export async function grantNetworkPlusSupportAccess(requestId,actorUserId,input,requestIdHeader) {
+  return withTransaction(async db=>{
+    const roles=(await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[actorUserId])).rows.map(row=>row.role_code);
+    if(!roles.includes("system_admin"))fail(403,"Only a system administrator may grant request support access.","SUPPORT_GRANT_FORBIDDEN");
+    const targetUserId=input?.supportUserId, ticket=clean(input?.supportCaseReference,120,"Support case reference",6), reason=clean(input?.reason,500,"Grant reason",8);
+    const targetRoles=(await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[targetUserId])).rows.map(row=>row.role_code);
+    if(!targetRoles.includes("network_plus_support")&&!targetRoles.includes("system_admin"))fail(403,"The support user must hold the privileged Network-Plus support role.","SUPPORT_FORBIDDEN");
+    const expiresAt=new Date(input?.expiresAt);
+    if(!Number.isFinite(expiresAt.getTime())||expiresAt<=new Date()||expiresAt.getTime()>Date.now()+72*60*60*1000)fail(400,"Support access must expire within the next 72 hours.","INVALID_SUPPORT_EXPIRY");
+    const grant=(await db.query("insert into network_plus_request_support_grant(request_id,support_user_id,support_case_reference,granted_by,grant_reason,expires_at) values($1,$2,$3,$4,$5,$6) on conflict(request_id,support_user_id,support_case_reference) do update set granted_by=excluded.granted_by,grant_reason=excluded.grant_reason,expires_at=excluded.expires_at,revoked_at=null returning *",[requestId,targetUserId,ticket,actorUserId,reason,expiresAt])).rows[0];
+    await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,$6,$7)",[actorUserId,"network_plus.request.support_granted","network_plus_request",requestId,requestIdHeader,"success",{supportUserId:targetUserId,ticket,reason,expiresAt}]);
+    return grant;
+  });
+}
+export async function revokeNetworkPlusSupportAccess(requestId,grantId,actorUserId,requestIdHeader) {
+  return withTransaction(async db=>{
+    const roles=(await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[actorUserId])).rows.map(row=>row.role_code);
+    if(!roles.includes("system_admin"))fail(403,"Only a system administrator may revoke request support access.","SUPPORT_GRANT_FORBIDDEN");
+    const grant=(await db.query("update network_plus_request_support_grant set revoked_at=now() where id=$1 and request_id=$2 and revoked_at is null returning *",[grantId,requestId])).rows[0];
+    if(!grant)fail(404,"Support grant not found.","NOT_FOUND");
+    await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,$6,$7)",[actorUserId,"network_plus.request.support_revoked","network_plus_request",requestId,requestIdHeader,"success",{grantId:grant.id,supportUserId:grant.support_user_id}]);
+    return {id:grant.id,revoked:true};
+  });
+}
 export async function getNetworkPlusRequest(requestId,userId,{supportReason,supportTicket}={}) {
   return withTransaction(async db=>{
     const row=(await db.query("select * from network_plus_request where id=$1",[requestId])).rows[0];
     if(!row)fail(404,"Request not found.","NOT_FOUND");
     const isParticipant=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status<>'revoked' and (participant_role<>'additional_participant' or consent_status='accepted')",[requestId,userId])).rowCount>0;
-    if(isParticipant) await assertEntry(db,userId); else { if(!await hasSupportRole(db,userId))fail(404,"Request not found.","NOT_FOUND"); await assertSupport(db,userId,supportReason,supportTicket); await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_read","network_plus_request",requestId,"success",{reason:supportReason,ticket:supportTicket}]); }
+    if(isParticipant) await assertEntry(db,userId); else { if(!await hasSupportRole(db,userId))fail(404,"Request not found.","NOT_FOUND"); await assertSupport(db,userId,requestId,supportReason,supportTicket); await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_read","network_plus_request",requestId,"success",{reason:supportReason,ticket:supportTicket}]); }
     const participants=(await db.query("select user_id,participant_role,consent_status,consented_at from network_plus_request_participant where request_id=$1 and consent_status<>'revoked'",[requestId])).rows;
     const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 order by created_at",[requestId])).rows;
     const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;

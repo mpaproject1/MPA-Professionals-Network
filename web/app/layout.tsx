@@ -1,8 +1,9 @@
+import "./globals.css";
 import type {Metadata} from "next";
 import { Inter, Manrope, Noto_Sans_Ethiopic } from "next/font/google";
 import {Providers} from "../components/providers";
 import {Shell} from "../components/shell";
-import "./globals.css";
+
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap", variable: "--font-inter" });
 const manrope = Manrope({ subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap", variable: "--font-manrope" });
 const notoEthiopic = Noto_Sans_Ethiopic({ subsets: ["ethiopic"], weight: ["400", "500", "600", "700"], display: "swap", variable: "--font-ethiopic" });

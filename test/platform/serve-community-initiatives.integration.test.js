@@ -4,8 +4,8 @@ import test from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import {closePool,getPool} from "../../src/platform/db.js";
-import * as services from "../../src/services-mentorship/service.js";
 import * as initiatives from "../../src/platform/serve-community-initiatives.js";
+import * as services from "../../src/services-mentorship/service.js";
 
 test.after(async()=>{await closePool()});
 function identity(suffix){const digits=suffix.replace(/[^0-9a-f]/gi,"").slice(0,8).split("").map(character=>String(parseInt(character,16)%10)).join("");return {email:`serve-i7-${suffix}@example.test`,password:"ServeCommunityI7Password!2026",firstName:"Serve",lastName:`Initiative${suffix.slice(0,8)}`,phone:`06${digits}`}}

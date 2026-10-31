@@ -151,9 +151,10 @@ export default function Register(){
   if(kind==="organization"&&(!form.orgLegalName.trim()||!form.orgDisplayName.trim()||!form.orgType.trim()||!form.orgAddress.trim()||!form.orgEmail.trim()||!form.orgPhone.trim())){setError("Complete the required organization name, type, address, work email and contact phone fields.");return;}
   setBusy(true);
   try{
-   if(challengeRequired&&!challenge)throw new Error("Load a new human check before registering.");
+   const currentChallenge=challenge;
+   if(challengeRequired&&!currentChallenge)throw new Error("Load a new human check before registering.");
    const proof=challengeRequired
-    ? await api<{token:string}>("/api/v1/auth/human-challenge/verify",{method:"POST",body:JSON.stringify({id:challenge.id,answer:challengeAnswer})})
+    ? await api<{token:string}>("/api/v1/auth/human-challenge/verify",{method:"POST",body:JSON.stringify({id:currentChallenge!.id,answer:challengeAnswer})})
     : {token:""};
    const organizationDraftSaved=kind!=="organization"||writeOrganizationDraft();
    setDraftWarning(kind==="organization"&&!organizationDraftSaved);

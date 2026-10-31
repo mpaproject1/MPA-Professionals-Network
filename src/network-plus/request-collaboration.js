@@ -23,10 +23,13 @@ function safeTerms(intent,raw) {
     t.timeline=object(t.timeline,"Timeline");
   }
   if(intent==="service_request") {
-    if(t.scope!==undefined)t.scope=clean(t.scope,5000,"Scope");
-    if(t.deliverables!==undefined&&(!Array.isArray(t.deliverables)||t.deliverables.length>50))fail(400,"Deliverables must be a list of at most 50 items.","VALIDATION_ERROR");
-    if(t.pricing!==undefined)t.pricing=object(t.pricing,"Pricing/quotation");
-    if(t.schedule!==undefined)t.schedule=object(t.schedule,"Schedule");
+    t.scope=clean(t.scope,5000,"Scope",3);
+    if(!Array.isArray(t.deliverables)||t.deliverables.length<1||t.deliverables.length>50)fail(400,"Service requests require 1–50 deliverables.","TERMS_INCOMPLETE");
+    t.deliverables=t.deliverables.map(v=>clean(v,500,"Deliverable",2));
+    t.pricing=object(t.pricing,"Pricing/quotation");
+    if(!t.pricing.proposal)fail(400,"Provide a fixed quotation, rate or quote request.","TERMS_INCOMPLETE");
+    t.schedule=object(t.schedule,"Schedule");
+    if(!t.schedule.requested)fail(400,"Provide a proposed schedule or state that it is to be agreed.","TERMS_INCOMPLETE");
     if(t.completionEvidence!==undefined&&(!Array.isArray(t.completionEvidence)||t.completionEvidence.length>30))fail(400,"Completion evidence must be a list.","VALIDATION_ERROR");
   }
   return t;

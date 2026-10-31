@@ -30,6 +30,7 @@ import {enforcePersistentRateLimit, issueHumanChallenge, verifyHumanChallenge} f
 import * as serveCommunityImpactReports from "./src/platform/serve-community-impact-reports.js";
 import * as serveCommunityInitiatives from "./src/platform/serve-community-initiatives.js";
 import * as serveCommunityOfflineProjects from "./src/platform/serve-community-offline-projects.js";
+import * as communityImpactDetection from "./src/platform/community-impact-detection.js";
 import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
 import * as supportBot from "./src/platform/support-bot.js";
 import * as userAdmin from "./src/platform/user-admin.js";
@@ -186,6 +187,11 @@ const server=http.createServer(async (req,res)=>{
 
     if(req.method==="GET" && parts.length===5 && parts[0]==="api" && parts[1]==="v1" && parts[2]==="public" && parts[3]==="finance-vouchers") { const q=query(req.url); return ok(res,await financeReceipts.verifyFinancePaymentVoucher(parts[4],q.get("token")||""),requestId); }
 
+    if(req.method==="GET" && p==="api/v1/me/community-impact/detected") { const identity=await auth(req); return ok(res,await communityImpactDetection.listMyDetectedContributions(identity.sub,{limit:query(req.url).get("limit")}),requestId); }
+    if(req.method==="POST" && parts.length===7 && parts[6]==="confirm" && p.startsWith("api/v1/me/community-impact/detected/")) { const identity=await auth(req); return ok(res,await communityImpactDetection.confirmMyDetectedAttribution(parts[5],identity.sub,requestId),requestId); }
+    if(req.method==="POST" && parts.length===7 && parts[6]==="dispute" && p.startsWith("api/v1/me/community-impact/detected/")) { const identity=await auth(req); const b=await body(req); return ok(res,await communityImpactDetection.disputeMyDetectedAttribution(parts[5],identity.sub,b.reason,requestId),requestId); }
+    if(req.method==="GET" && p==="api/v1/admin/community-impact/detection/candidates") { const identity=await auth(req); return ok(res,await communityImpactDetection.listDetectionCandidates(identity.sub,{limit:query(req.url).get("limit"),offset:query(req.url).get("offset")}),requestId); }
+    if(req.method==="POST" && p==="api/v1/admin/community-impact/detection/scan") { const identity=await auth(req); return ok(res,await communityImpactDetection.scanDetectionSources(identity.sub,requestId,{limit:(await body(req)).limit}),requestId); }
     if(req.method==="GET" && p==="api/v1/public/serve-community/completed-projects") { await enforcePersistentRateLimit(req,"serve-community-completed-portfolio",30,60000); publicRateLimit(req,"serve-community-completed-portfolio",30,60000); const platform=await serveCommunityInitiatives.listPublicCompletedProjects(); const offline=await serveCommunityOfflineProjects.listPublicOfflineProjects(); return ok(res,{...platform,items:[...platform.items,...offline].sort((a,b)=>new Date(b.completedAt)-new Date(a.completedAt)).slice(0,12),measurementNote:platform.measurementNote+" Offline projects are staff-entered records; beneficiary and outcome figures appear only when supplied with methodology/evidence and independently approved. Offline records are not platform participation records."},requestId); }
     if(req.method==="GET" && p==="api/v1/admin/serve-community/offline-projects") { const identity=await auth(req); return ok(res,await serveCommunityOfflineProjects.listStaffProjects(identity.sub,{limit:query(req.url).get("limit"),offset:query(req.url).get("offset")}),requestId); }
     if(req.method==="POST" && p==="api/v1/admin/serve-community/offline-projects") { const identity=await auth(req); return ok(res,await serveCommunityOfflineProjects.createStaffProject(identity.sub,await body(req),requestId),requestId,201); }

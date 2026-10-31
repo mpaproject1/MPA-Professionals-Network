@@ -36,7 +36,7 @@ test("media links require HTTPS, bounded counts, approved video hosts and matchi
  assert.match(service,/u\.protocol!=="https:"/);assert.match(service,/UNSUPPORTED_VIDEO_HOST/);assert.match(service,/privateQuery/);
  assert.match(service,/listUrls\(input\.imageUrls,"image",8\)/);assert.match(service,/listUrls\(input\.videoUrls,"video",3\)/);
  assert.ok(service.includes("alt.length!==imageUrls.length"));assert.match(service,/consent_confirmed/);
- assert.match(staffPage,/consentConfirmed/);assert.match(staffPage,/imageAltText/);assert.match(staffPage,/YouTube\/Vimeo/);
+ assert.match(staffPage,/consentConfirmed/);assert.match(staffPage,/Add outcome measure/);assert.match(staffPage,/Measurement method/);assert.match(staffPage,/imageAltText/);assert.match(staffPage,/YouTube\/Vimeo/);
 });
 test("public projection excludes internal evidence summaries and staff-only metadata",()=>{
  const fn=service.slice(service.indexOf("export async function listPublicOfflineProjects"));

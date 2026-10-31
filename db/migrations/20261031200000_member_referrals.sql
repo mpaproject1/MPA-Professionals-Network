@@ -67,7 +67,7 @@ create table if not exists member_referral_score_ledger (
  points integer not null check(points between 0 and 100000),
  policy_id uuid not null references member_referral_score_policy(id) on delete restrict,
  created_at timestamptz not null default now(),
- unique(attribution_id,event_code,policy_id)
+ unique(attribution_id,event_code)
 );
 create or replace function prevent_member_referral_history_mutation() returns trigger language plpgsql as $$
 begin raise exception 'Referral event and score ledger history is immutable' using errcode='23514'; end; $$;

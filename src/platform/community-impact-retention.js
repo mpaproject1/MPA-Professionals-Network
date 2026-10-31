@@ -1,3 +1,4 @@
+import {createHash} from "node:crypto";
 import {getPool,withTransaction} from "./db.js";
 import {policyError} from "./identity-policy.js";
 
@@ -47,11 +48,11 @@ export async function getRetentionPolicyGovernance(actorUserId){
 }
 export async function proposeRetentionPolicy(actorUserId,input,requestId){
  const db=getPool();await assertPermission(db,actorUserId,"community_impact.retention.manage");
- const policy=validatePolicy(input?.policy),rationale=cleanText(input?.rationale,12,2000,"Rationale"),changeSummary=cleanText(input?.changeSummary,8,1000,"Change summary");
+ const policy=validatePolicy(input?.policy),policyHash=createHash("sha256").update(JSON.stringify(policy)).digest("hex"),rationale=cleanText(input?.rationale,12,2000,"Rationale"),changeSummary=cleanText(input?.changeSummary,8,1000,"Change summary");
  return withTransaction(async tx=>{
   await tx.query("select pg_advisory_xact_lock(hashtextextended('community_impact_retention_policy_version',0))");
   const next=await tx.query("select coalesce(max(version),0)+1 version from community_impact_retention_policy_version");
-  const row=(await tx.query("insert into community_impact_retention_policy_version(version,status,policy,rationale,change_summary,created_by) values($1,'in_review',$2,$3,$4,$5) returning id,version,status,policy,rationale,change_summary,created_by,created_at",[next.rows[0].version,policy,rationale,changeSummary,actorUserId])).rows[0];
+  const row=(await tx.query("insert into community_impact_retention_policy_version(version,schema_version,policy_hash,status,policy,rationale,change_summary,created_by) values($1,1,$2,'in_review',$3,$4,$5,$6) returning id,version,schema_version,policy_hash,status,policy,rationale,change_summary,created_by,created_at",[next.rows[0].version,policyHash,policy,rationale,changeSummary,actorUserId])).rows[0];
   await tx.query("insert into community_impact_retention_policy_event(policy_version_id,actor_user_id,event_code,reason,request_id,metadata) values($1,$2,'proposed',$3,$4,$5)",[row.id,actorUserId,rationale,requestId,{version:row.version,dataClasses:DATA_CLASSES}]);
   await audit(tx,actorUserId,"community_impact.retention_policy_proposed",row.id,requestId,{version:row.version});
   return row;

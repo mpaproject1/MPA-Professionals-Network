@@ -188,6 +188,29 @@ begin
 end; $ci$;
 drop trigger if exists trg_community_impact_claim_appeal_guard on community_impact_claim_appeal;
 create trigger trg_community_impact_claim_appeal_guard before update or delete on community_impact_claim_appeal for each row execute function community_impact_claim_appeal_guard();
+create or replace function community_impact_claim_evidence_guard() returns trigger language plpgsql as $ci$
+begin
+ if TG_OP='DELETE' then raise exception 'Community Impact evidence references cannot be deleted outside approved retention processing'; end if;
+ if NEW.id is distinct from OLD.id or NEW.claim_id is distinct from OLD.claim_id
+  or NEW.file_object_id is distinct from OLD.file_object_id or NEW.evidence_url is distinct from OLD.evidence_url
+  or NEW.evidence_type is distinct from OLD.evidence_type or NEW.label is distinct from OLD.label
+  or NEW.description is distinct from OLD.description or NEW.source_date is distinct from OLD.source_date
+  or NEW.uploaded_by is distinct from OLD.uploaded_by
+  or NEW.retention_policy_version_id is distinct from OLD.retention_policy_version_id
+  or NEW.retention_rule_snapshot is distinct from OLD.retention_rule_snapshot or NEW.created_at is distinct from OLD.created_at then
+  raise exception 'Community Impact evidence content and retention provenance are immutable';
+ end if;
+ if OLD.removed_at is not null then raise exception 'Detached Community Impact evidence cannot be reactivated or modified'; end if;
+ if NEW.removed_at is not null and (NEW.removed_by is null or length(trim(coalesce(NEW.removal_reason,'')))<8) then
+  raise exception 'Evidence detachment requires an actor and a reason';
+ end if;
+ if NEW.removed_at is null and (NEW.removed_by is not null or NEW.removal_reason is not null) then
+  raise exception 'Evidence removal metadata must be set together';
+ end if;
+ return NEW;
+end; $ci$;
+drop trigger if exists trg_community_impact_claim_evidence_guard on community_impact_claim_evidence;
+create trigger trg_community_impact_claim_evidence_guard before update or delete on community_impact_claim_evidence for each row execute function community_impact_claim_evidence_guard();
 create or replace function community_impact_claim_event_immutable() returns trigger language plpgsql as $$ begin raise exception 'Community Impact claim history is append-only'; end; $$;
 drop trigger if exists trg_community_impact_claim_event_immutable on community_impact_claim_event;
 create trigger trg_community_impact_claim_event_immutable before update or delete on community_impact_claim_event for each row execute function community_impact_claim_event_immutable();

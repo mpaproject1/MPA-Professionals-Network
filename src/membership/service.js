@@ -103,7 +103,7 @@ export async function register(input,requestId){
     if(identity.rows.length) throw httpError(409,"An existing account or identity matches these details. Sign in or contact membership support instead of creating a duplicate.","IDENTITY_CONFLICT");
     const registrationReference=await nextTrackingReference(db,"membership");
     const user=(await db.query("insert into app_user(username,email,password_hash,status,registration_reference,account_type) values($1,$2,$3,'active',$4,$5) returning id,email,username,registration_reference,account_type",[email,email,hashPassword(input.password),registrationReference,accountType])).rows[0];
-    await memberReferrals.captureMembershipRegistration(db,user.id,input.referralCode,input.referralStatusConsent===true);
+    if(accountType==="professional") await memberReferrals.captureMembershipRegistration(db,user.id,input.referralCode,input.referralStatusConsent===true);
     const p=(await db.query(`insert into person(user_id,first_name,middle_name,last_name,display_name,phone,date_of_birth,sex,nationality)
       values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id,user_id,first_name,middle_name,last_name,display_name,phone,date_of_birth,sex,nationality`,
       [user.id,person.firstName,person.middleName,person.lastName,person.displayName,person.phone,person.dateOfBirth,person.sex,person.nationality])).rows[0];

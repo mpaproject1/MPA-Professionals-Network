@@ -80,6 +80,7 @@ test.describe("registration human verification", () => {
       }
     });
     await page.goto("/register");
+    await completeRegistrationForm(page);
     await page.getByRole("textbox", { name: /Confirm you are human/ }).fill("10");
     await page.getByRole("button", { name: /Create professional account/i }).click();
     await expect.poll(() => verifications).toBe(1);
@@ -100,6 +101,7 @@ test.describe("registration human verification", () => {
       }
     });
     await page.goto("/register");
+    await completeRegistrationForm(page);
     await page.getByRole("textbox", { name: /Confirm you are human/ }).fill("11");
     await page.getByRole("button", { name: /Create professional account/i }).click();
     await expect.poll(() => verifications).toBe(1);
@@ -177,9 +179,14 @@ test.describe("registration human verification", () => {
   test("the refresh action supports at least ten consecutive challenge refreshes", async ({ page }) => {
     const issued = await stubChallenge(page);
     await page.goto("/register");
+    const refresh = page.getByRole("button", { name: "Refresh human verification challenge" });
+    await expect(page.getByRole("region", { name: "Human verification" })).toBeVisible();
+    await expect(refresh).toBeEnabled();
     for (let retry = 0; retry < 10; retry += 1) {
-      await page.getByRole("button", { name: "Refresh human verification challenge" }).click();
-      await expect(page.getByRole("button", { name: "Refresh human verification challenge" })).toBeEnabled();
+      const before = issued.issued();
+      await refresh.click();
+      await expect.poll(() => issued.issued()).toBe(before + 1);
+      await expect(refresh).toBeEnabled();
     }
     expect(issued.issued()).toBe(11);
   });

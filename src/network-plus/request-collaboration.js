@@ -249,6 +249,12 @@ export async function revokeNetworkPlusSupportAccess(requestId,grantId,actorUser
     return {id:grant.id,revoked:true};
   });
 }
+export async function listNetworkPlusParticipantInvitations(userId) {
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    return (await db.query("select r.id,r.intent,r.subject,r.created_at,p.created_at invited_at from network_plus_request_participant p join network_plus_request r on r.id=p.request_id where p.user_id=$1 and p.participant_role='additional_participant' and p.consent_status='pending' and r.status in ('accepted','in_progress') order by p.created_at desc limit 50",[userId])).rows;
+  });
+}
 export async function getNetworkPlusRequest(requestId,userId,{supportReason,supportTicket}={}) {
   return withTransaction(async db=>{
     const row=(await db.query("select * from network_plus_request where id=$1",[requestId])).rows[0];

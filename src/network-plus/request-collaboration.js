@@ -10,6 +10,7 @@ const hash = value => createHash("sha256").update(String(value)).digest("hex");
 function fail(status,message,code="REQUEST_RULE"){ throw policyError(status,message,code); }
 function clean(value,max,label,min=1) { const s=String(value??"").trim(); if(s.length<min||s.length>max)fail(400,`${label} must be between ${min} and ${max} characters.`,"VALIDATION_ERROR"); return s; }
 function object(value,label) { if(value===undefined||value===null)return {}; if(typeof value!=="object"||Array.isArray(value))fail(400,`${label} must be an object.`,"VALIDATION_ERROR"); return value; }
+function assertNoContactFields(value) { if(Array.isArray(value)){for(const item of value)assertNoContactFields(item);return;} if(value&&typeof value==="object")for(const [key,child] of Object.entries(value)){ if(/email|phone|mobile|whatsapp|telegram|contact/i.test(key))fail(400,"Do not include private contact details in request content. Use the separate consent-controlled contact release workflow.","CONTACT_DETAILS_FORBIDDEN"); assertNoContactFields(child); } }
 function safeTerms(intent,raw) {
   const t=object(raw,"Terms");
   if(intent==="partnership_proposal"||intent==="collaboration_request") {
@@ -75,7 +76,7 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
   const intent=input.intent;
   if(!INTENTS.has(intent))fail(400,"Choose a supported request intent.","INVALID_INTENT");
   const subject=clean(input.subject,180,"Subject",3), summary=clean(input.summary,500,"Summary",10);
-  const details=object(input.details,"Request details"), terms=safeTerms(intent,input.terms);
+  const details=object(input.details,"Request details"); assertNoContactFields(details); const terms=safeTerms(intent,input.terms);
   if(input.recipientUserId===userId)fail(400,"You cannot send a request to yourself.","INVALID_RECIPIENT");
   if(Boolean(input.recipientUserId)===Boolean(input.recipientOrganizationId))fail(400,"Choose exactly one recipient user or organization.","INVALID_RECIPIENT");
   const fingerprint=hash(JSON.stringify({intent,subject,summary,details,terms,recipientUserId:input.recipientUserId||null,recipientOrganizationId:input.recipientOrganizationId||null,businessId:input.businessId||null,serviceListingId:input.serviceListingId||null}));
@@ -91,7 +92,7 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
       const reps=(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code in ('owner','administrator')",[org.id])).rows;
       if(!reps.length)fail(409,"Recipient organization has no active authorized representative.","RECIPIENT_UNAVAILABLE");
     } else {
-      const eligible=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[recipientUserId])).rowCount>0;
+      const eligible=(await db.query("select 1 from app_user u join membership_record m on m.user_id=u.id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) join verification_visibility vv on vv.user_id=u.id and vv.directory_visible=true join person p on p.user_id=u.id join professional_profile pp on pp.person_id=p.id and pp.directory_visibility in ('members','public') where u.id=$1 and exists(select 1 from verification_claim vc join verification_case c on c.id=vc.case_id where c.subject_user_id=u.id and vc.status='verified' and lower(vc.claim_code_snapshot)=any($2::text[]))",[recipientUserId,["professional_certification","education","employment","experience","service_capability"]])).rowCount>0;
       if(!eligible)fail(404,"Recipient not found or not eligible for Network-Plus requests.","RECIPIENT_NOT_FOUND");
     }
     if(input.serviceListingId) {

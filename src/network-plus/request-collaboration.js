@@ -86,7 +86,7 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
   const subject=clean(input.subject,180,"Subject",3), summary=clean(input.summary,500,"Summary",10);
   const details=object(input.details,"Request details"); assertNoContactFields(details); const terms=safeTerms(intent,input.terms);
   if(input.recipientUserId===userId)fail(400,"You cannot send a request to yourself.","INVALID_RECIPIENT");
-  if(Boolean(input.recipientUserId)===Boolean(input.recipientOrganizationId))fail(400,"Choose exactly one recipient user or organization.","INVALID_RECIPIENT");
+  if(!input.businessId&&!input.serviceListingId&&Boolean(input.recipientUserId)===Boolean(input.recipientOrganizationId))fail(400,"Choose exactly one recipient user or organization, or select a published business/service listing.","INVALID_RECIPIENT");
   const fingerprint=hash(JSON.stringify({intent,subject,summary,details,terms,recipientUserId:input.recipientUserId||null,recipientOrganizationId:input.recipientOrganizationId||null,businessId:input.businessId||null,serviceListingId:input.serviceListingId||null}));
   return withTransaction(async db=>{
     await assertEntry(db,userId);

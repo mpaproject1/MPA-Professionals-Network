@@ -93,11 +93,14 @@ create table if not exists network_plus_collaboration_milestone (
   status text not null default 'not_started' check (status in ('not_started','in_progress','blocked','completed','cancelled')),
   completion_evidence jsonb not null default '[]'::jsonb,
   created_by uuid not null references app_user(id) on delete restrict,
+  idempotency_hash text,
+  request_fingerprint text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (jsonb_typeof(completion_evidence)='array')
 );
 create index if not exists ix_network_plus_milestone_workspace on network_plus_collaboration_milestone(workspace_id,status,due_at);
+create unique index if not exists ux_network_plus_collaboration_milestone_idempotency on network_plus_collaboration_milestone(workspace_id,created_by,idempotency_hash) where idempotency_hash is not null;
 create table if not exists network_plus_collaboration_event (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references network_plus_collaboration_workspace(id) on delete restrict,

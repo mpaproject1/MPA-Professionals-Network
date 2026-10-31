@@ -371,6 +371,8 @@ export async function addNetworkPlusWorkspaceEvent(requestId,userId,input,reques
     if(prior){if(prior.request_fingerprint!==fingerprint)fail(409,"This update key was used for different content.","IDEMPOTENCY_CONFLICT");return prior;}
     const row=(await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body,metadata,idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[ws.id,userId,eventType,title,body,metadata,keyHash,fingerprint])).rows[0];
     await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'network_plus_collaboration_workspace',$3,$4,'success',$5)",[userId,`collaboration.${eventType}`,ws.id,requestIdHeader,{requestId}]);
+    const others=(await db.query("select user_id from network_plus_request_participant where request_id=$1 and user_id<>$2 and consent_status=$3",[requestId,userId,"accepted"])).rows;
+    for(const other of others)await notify(db,other.user_id,"network_plus.collaboration."+eventType,requestId,"A collaboration workspace update was recorded: "+title);
     return row;
   });
 }

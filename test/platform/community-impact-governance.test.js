@@ -29,6 +29,8 @@ test("Offline-project attribution is evidence-backed and does not infer the staf
  assert.match(service,/assignOfflineAttribution/);
  assert.match(service,/CONTRIBUTOR_CONFIRMATION_REQUIRED/);
  assert.match(service,/Combined contributor shares cannot exceed 100 percent/);
+ assert.match(service,/select \\* from community_impact_detection_candidate where id=\\$1 and source_type='offline_completed_project'.*for update/s);
+ assert.match(service,/select coalesce\\(sum\\(attribution_share\\),0\\)::numeric total from community_impact_offline_attribution where candidate_id=\\$1/);
  assert.match(service,/community_impact.offline_attribution.review/);
 });
 test("Claim-to-detection reconciliation is reviewer-controlled and rejects fuzzy or cross-person merges",()=>{

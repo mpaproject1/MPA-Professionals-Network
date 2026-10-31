@@ -178,11 +178,16 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
     await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version},idempotencyHash,requestFingerprint);
     if(["disputed","completed","closed"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to; await db.query("update network_plus_collaboration_workspace set status=$1,completed_at=case when $1=$3 then coalesce(completed_at,now()) else completed_at end,closed_at=case when $1=$4 then coalesce(closed_at,now()) else closed_at end,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId,"completed","closed"]); }
     if(to==="accepted") {
-      if(row.recipient_user_id && row.recipient_user_id!==userId)fail(403,"Only the intended recipient may accept this request.","RECIPIENT_AUTHORITY_REQUIRED");
-      if(row.recipient_user_id) { const currentMember=(await db.query("select 1 from membership_record where user_id=$1 and status=$2 and start_date<=current_date and (end_date is null or end_date>=current_date)",[userId,"active"])).rowCount>0; if(!currentMember)fail(403,"The intended recipient must retain active membership to accept.","RECIPIENT_AUTHORITY_REQUIRED"); }
-      if(row.recipient_organization_id) {
-        const currentRep=(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code in ('owner','administrator')",[row.recipient_organization_id,userId])).rowCount>0;
-        if(!currentRep)fail(403,"Only a current active owner or administrator of the recipient organization may accept.","RECIPIENT_AUTHORITY_REQUIRED");
+      if(row.business_id) {
+        const authorized=(await db.query("select 1 from network_plus_business_ownership bo where bo.business_id=$1 and bo.status='active' and bo.consent_status='accepted' and ((bo.owner_type='member' and bo.owner_user_id=$2) or (bo.owner_type='organization' and exists(select 1 from organization_membership om where om.organization_id=bo.owner_organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator')))) union all select 1 from network_plus_business_access a where a.business_id=$1 and a.user_id=$2 and a.capability_code='business.respond_requests' and a.revoked_at is null and (a.expires_at is null or a.expires_at>now()) limit 1",[row.business_id,userId])).rowCount>0;
+        if(!authorized)fail(403,"Only a current business owner or explicitly delegated request manager may accept this request.","RECIPIENT_AUTHORITY_REQUIRED");
+      } else {
+        if(row.recipient_user_id && row.recipient_user_id!==userId)fail(403,"Only the intended recipient may accept this request.","RECIPIENT_AUTHORITY_REQUIRED");
+        if(row.recipient_user_id) { const currentMember=(await db.query("select 1 from membership_record where user_id=$1 and status=$2 and start_date<=current_date and (end_date is null or end_date>=current_date)",[userId,"active"])).rowCount>0; if(!currentMember)fail(403,"The intended recipient must retain active membership to accept.","RECIPIENT_AUTHORITY_REQUIRED"); }
+        if(row.recipient_organization_id) {
+          const currentRep=(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code in ('owner','administrator')",[row.recipient_organization_id,userId])).rowCount>0;
+          if(!currentRep)fail(403,"Only a current active owner or administrator of the recipient organization may accept.","RECIPIENT_AUTHORITY_REQUIRED");
+        }
       }
       await db.query("update network_plus_request_participant set consent_status='accepted',consented_at=now() where request_id=$1 and user_id=$2 and participant_role='recipient_representative'",[requestId,userId]);
       if(!["service_request","supplier_inquiry","expertise_request","partnership_proposal","collaboration_request"].includes(row.intent)) {

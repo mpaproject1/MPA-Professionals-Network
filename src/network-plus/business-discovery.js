@@ -378,7 +378,8 @@ export async function addBusinessOwner(businessId,userId,input,requestId) {
     if(!owner||owner.owner_role!=="primary_owner")fail(403,"Only the accountable primary owner can invite co-owners.","OWNERSHIP_FORBIDDEN");
     if(business.business_kind!=="joint")fail(409,"Additional owners are supported only for joint businesses.","JOINT_OWNERSHIP_REQUIRED");
     if(ownerType==="member"){
-      if(!(await hasCurrentActiveMembership(db,ownerUserId))||!(await hasProfessionalIdentity(db,ownerUserId)))fail(409,"The proposed member co-owner must have an active professional membership.","OWNER_NOT_ELIGIBLE");
+      const target=(await db.query("select status from app_user where id=$1",[ownerUserId])).rows[0];
+      if(!target||target.status!=="active"||!(await hasCurrentActiveMembership(db,ownerUserId))||!(await hasProfessionalIdentity(db,ownerUserId)))fail(409,"The proposed member co-owner must be an active account with current professional membership.","OWNER_NOT_ELIGIBLE");
       if(ownerUserId===userId)fail(409,"The primary owner is already recorded.","DUPLICATE_OWNER");
     }else await assertOrganizationCapability(db,organizationId,userId,ORG_OWNER_ROLES);
     const exists=(await db.query("select 1 from network_plus_business_ownership where business_id=$1 and status in ('pending','active') and ((owner_type='member' and owner_user_id=$2) or (owner_type='organization' and owner_organization_id=$3))",[businessId,ownerUserId,organizationId])).rowCount;

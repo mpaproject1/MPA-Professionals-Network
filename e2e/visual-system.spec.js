@@ -26,6 +26,7 @@ async function readContrastPairs(page) {
       brandNavy: tokens.getPropertyValue("--brand-navy").trim(),
       brandLemon: tokens.getPropertyValue("--brand-lemon").trim(),
       primaryLinkColor: tokens.getPropertyValue("--primary").trim(),
+      primaryLinkContrast: ratio(tokens.getPropertyValue("--primary").trim(), surface),
       textOnSurface: ratio(text, surface),
       mutedOnSurface: ratio(muted, surface),
       primaryActionText: ratio(tokens.getPropertyValue("--brand-navy-deep").trim(), tokens.getPropertyValue("--brand-lemon").trim()),
@@ -48,6 +49,7 @@ test.describe("MPA shared visual system", () => {
     expect(light.textOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(light.mutedOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(light.primaryActionText).toBeGreaterThanOrEqual(4.5);
+    expect(light.primaryLinkContrast).toBeGreaterThanOrEqual(4.5);
     expect(light.successStatus).toBeGreaterThanOrEqual(4.5);
     expect(light.warningStatus).toBeGreaterThanOrEqual(4.5);
     expect(light.dangerStatus).toBeGreaterThanOrEqual(4.5);
@@ -66,6 +68,7 @@ test.describe("MPA shared visual system", () => {
     expect(dark.textOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(dark.mutedOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(dark.primaryActionText).toBeGreaterThanOrEqual(4.5);
+    expect(dark.primaryLinkContrast).toBeGreaterThanOrEqual(4.5);
     expect(dark.successStatus).toBeGreaterThanOrEqual(4.5);
     expect(dark.warningStatus).toBeGreaterThanOrEqual(4.5);
     expect(dark.dangerStatus).toBeGreaterThanOrEqual(4.5);

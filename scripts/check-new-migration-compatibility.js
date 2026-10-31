@@ -57,7 +57,9 @@ const migrationNames = [
   "20261101200000_community_impact_score_outcome_maturity_rule.sql",
   "20261101210000_community_impact_score_recipient_confirmation_rules.sql",
   "20261101220000_community_impact_score_recipient_confirmation_scope.sql",
-  "20261101230000_community_impact_score_historical_dedup.sql"
+  "20261101230000_community_impact_score_historical_dedup.sql",
+  "20261101240000_community_impact_recognition_and_engagement.sql",
+  "20261101250000_community_impact_recognition_program_governance.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -92,6 +94,9 @@ const requiredColumns = [
   ["verification_reference_request", "requested_at", "timestamptz"],
   ["verification_case", "id", "uuid"],
   ["professional_profile", "id", "uuid"],
+  ["community_impact_recognition_program", "id", "uuid"],
+  ["community_impact_recognition_nomination", "id", "uuid"],
+  ["community_impact_achievement_award", "id", "uuid"],
   ["support_conversation", "id", "uuid"],
   ["service_listing", "completion_evidence_policy", "text"],
   ["service_listing", "fulfilment_rule", "text"],

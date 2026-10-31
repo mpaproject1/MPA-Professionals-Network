@@ -3,7 +3,7 @@ import {useCallback,useEffect,useMemo,useState} from "react";
 import {api} from "../../../../lib/api";
 import {useUiStore} from "../../../../lib/store";
 import {AdminPageHeader} from "../../admin-page-header";
-type DataClass="claim_metadata"|"identity_assurance_artifacts"|"raw_evidence"|"consent_and_rights_records"|"reviewer_notes"|"audit_events"|"score_ledger";
+type DataClass="claim_metadata"|"identity_assurance_artifacts"|"raw_evidence"|"consent_and_rights_records"|"reviewer_notes"|"referral_attribution_records"|"audit_events"|"score_ledger";
 type Rule={retentionDays:string;graceDays:string;retentionStart:string;expiryAction:string};
 type PolicyItem={id:string;version:number;status:string;policy:{dataClasses:Record<DataClass,{retentionDays:number;graceDays:number;retentionStart:string;expiryAction:string}>};rationale:string;change_summary:string;created_by:string;approved_by?:string|null;approval_reference?:string|null};
 type Governance={active:PolicyItem|null;items:PolicyItem[];enforcement:string};
@@ -13,6 +13,7 @@ const classes:{key:DataClass;label:string;description:string}[]=[
  {key:"raw_evidence",label:"Raw evidence",description:"Private uploaded documents, images and other source evidence"},
  {key:"consent_and_rights_records",label:"Consent and rights records",description:"Consent, media rights and permitted-use records"},
  {key:"reviewer_notes",label:"Reviewer notes",description:"Internal review rationale and clarification history"},
+ {key:"referral_attribution_records",label:"Referral attribution records",description:"Member referral codes, membership/job attribution and referral milestone metadata"},
  {key:"audit_events",label:"Audit events",description:"Security, access and decision audit history"},
  {key:"score_ledger",label:"Score ledger",description:"Scoring inputs, adjustments and reversal provenance"}
 ];

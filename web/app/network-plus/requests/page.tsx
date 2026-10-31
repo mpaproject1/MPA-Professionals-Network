@@ -77,7 +77,7 @@ export default function NetworkPlusRequestsPage(){
  async function workspaceEvent(){
   if(!selected||!updateTitle.trim()||!updateBody.trim())return;
   setSaving(true);setError("");
-  try{await api("/api/v1/network-plus/requests/"+selected.id+"/workspace/events",{method:"POST",body:JSON.stringify({eventType:updateType,title:updateTitle,body:updateBody})},token);setUpdateTitle("");setUpdateBody("");const ws=await api<any>("/api/v1/network-plus/requests/"+selected.id+"/workspace",{},token);setWorkspaceData(ws);}
+  try{await api("/api/v1/network-plus/requests/"+selected.id+"/workspace/events",{method:"POST",headers:{"X-Idempotency-Key":key()},body:JSON.stringify({eventType:updateType,title:updateTitle,body:updateBody})},token);setUpdateTitle("");setUpdateBody("");const ws=await api<any>("/api/v1/network-plus/requests/"+selected.id+"/workspace",{},token);setWorkspaceData(ws);}
   catch(e){setError(e instanceof ApiError?e.message:"The update could not be saved.");}
   finally{setSaving(false);}
  }

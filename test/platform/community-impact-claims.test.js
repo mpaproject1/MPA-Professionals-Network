@@ -38,6 +38,7 @@ test("claimants can create, edit, submit, attach private evidence, clarify, with
  assert.match(service,/evidence<1/);
  assert.match(service,/Only your own confirmed claim-scoped private upload/);
  assert.match(service,/bytesDeleted:false/);
+ assert.match(service,/evidence_removed/);
  assert.match(migration,/evidence_removed/);
  assert.match(service,/public_requested/);
  assert.match(service,/COMMUNITY_IMPACT_CLAIM_PUBLIC_CONSENT_REQUIRED/);
@@ -64,7 +65,7 @@ test("private claim evidence downloads are scoped to claimant or assigned review
  assert.match(migration,/purpose_reference_id uuid references community_impact_claim/);
 });
 test("claim and appeal APIs authenticate every operation",()=>{
- for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","/evidence/","evidence_removed","/decision","/assign"])assert.ok(server.includes(route),route);
+ for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","/evidence/","/decision","/assign"])assert.ok(server.includes(route),route);
 });
 test("member and reviewer screens preserve private-by-default evidence boundaries",()=>{
  assert.match(claimPage,/private draft/i);

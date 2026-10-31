@@ -193,7 +193,7 @@ export async function updateBusiness(businessId,userId,input,requestId) {
     const next={displayName:business.display_name,tradingName:business.trading_name,description:business.description,website:business.website,locationLabel:business.location_label};
     for(const [key,value] of entries){
       if(key==="website")next.website=safeWebsite(value);
-      else next[key]=key==="tradingName"||key==="locationLabel"?text(value,160,key,{optional:true}):key==="displayName"?text(value,160,key,{min:2}):text(value,5000,key,{min:20});
+      else next[key]=key==="tradingName"||key==="locationLabel"?text(value,160,key,{optional:true}):key==="displayName"?text(value,160,key,{min:2}):publicText(value,5000,key,{min:20});
     }
     const row=(await db.query(`update network_plus_business set display_name=$1,trading_name=$2,description=$3,website=$4,location_label=$5,
       verification_status=case when verification_status='verified' then 'submitted' else verification_status end,

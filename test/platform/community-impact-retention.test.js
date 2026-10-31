@@ -20,7 +20,10 @@ test("retention configuration covers separate data classes and explicit expiry s
  for(const action of ["hard_delete","anonymize","restrict_access","retain_minimal"])assert.ok(service.includes('"'+action+'"'),action);
  assert.match(service,/retentionDays:integer\(item\.retentionDays/);
  assert.match(service,/graceDays:integer\(item\.graceDays/);
- assert.match(service,/legalHoldBehavior:"pause_and_preserve"/);\n assert.match(service,/audit_events.*hard_delete/);\n assert.match(service,/score_ledger.*hard_delete/);\n assert.match(service,/COMMUNITY_IMPACT_RETENTION_AUDIT_PRESERVATION/);
+ assert.match(service,/legalHoldBehavior:"pause_and_preserve"/);
+ assert.match(service,/audit_events.*hard_delete/);
+ assert.match(service,/score_ledger.*hard_delete/);
+ assert.match(service,/COMMUNITY_IMPACT_RETENTION_AUDIT_PRESERVATION/);
 });
 test("policy proposals require separate authorization, independent approval and explicit activation",()=>{
  assert.match(service,/community_impact\.retention\.manage/);

@@ -6,6 +6,11 @@ const DATA_CLASSES=["claim_metadata","identity_assurance_artifacts","raw_evidenc
 const EXPIRY_ACTIONS=new Set(["hard_delete","anonymize","restrict_access","retain_minimal"]);
 const RETENTION_STARTS=new Set(["created_at","last_activity_at","case_closed_at","decision_finalized_at","consent_withdrawn_at"]);
 function fail(status,message,code="COMMUNITY_IMPACT_RETENTION_ERROR"){throw policyError(status,message,code)}
+function stableJson(value){
+ if(Array.isArray(value))return "["+value.map(stableJson).join(",")+"]";
+ if(value&&typeof value==="object")return "{"+Object.keys(value).sort().map(key=>JSON.stringify(key)+":"+stableJson(value[key])).join(",")+"}";
+ return JSON.stringify(value);
+}
 function cleanText(value,min,max,label){const text=String(value??"").trim();if(text.length<min||text.length>max)fail(400,label+" must be between "+min+" and "+max+" characters.","COMMUNITY_IMPACT_RETENTION_INVALID");return text}
 function integer(value,min,max,label){if(!Number.isSafeInteger(value)||value<min||value>max)fail(400,label+" must be an integer between "+min+" and "+max+".","COMMUNITY_IMPACT_RETENTION_INVALID");return value}
 function validatePolicy(input){
@@ -41,19 +46,19 @@ async function audit(db,actor,action,id,requestId,metadata={}){
 export async function getRetentionPolicyGovernance(actorUserId){
  const db=getPool();await assertAnyPolicyPermission(db,actorUserId);
  const [active,proposals]=await Promise.all([
-  db.query("select p.id,p.version,p.policy,p.approval_reference,p.approved_by,p.approved_at,p.activated_at,a.activated_by,a.activated_at as pointer_activated_at from community_impact_retention_active_policy a join community_impact_retention_policy_version p on p.id=a.policy_version_id"),
-  db.query("select id,version,status,policy,rationale,change_summary,created_by,created_at,approved_by,approved_at,approval_reference,activated_at from community_impact_retention_policy_version order by version desc limit 50")
+  db.query("select p.id,p.version,p.schema_version,p.policy_hash,p.policy,p.approval_reference,p.approved_by,p.approved_at,p.activated_at,a.activated_by,a.activated_at as pointer_activated_at from community_impact_retention_active_policy a join community_impact_retention_policy_version p on p.id=a.policy_version_id"),
+  db.query("select id,version,schema_version,policy_hash,status,policy,rationale,change_summary,created_by,created_at,approved_by,approved_at,approval_reference,activated_at from community_impact_retention_policy_version order by version desc limit 50")
  ]);
  return {active:active.rows[0]||null,items:proposals.rows,dataClasses:DATA_CLASSES,expiryActions:[...EXPIRY_ACTIONS],retentionStarts:[...RETENTION_STARTS],enforcement:"inactive_until_approved_policy_and_evidence_integration"};
 }
 export async function proposeRetentionPolicy(actorUserId,input,requestId){
  const db=getPool();await assertPermission(db,actorUserId,"community_impact.retention.manage");
- const policy=validatePolicy(input?.policy),policyHash=createHash("sha256").update(JSON.stringify(policy)).digest("hex"),rationale=cleanText(input?.rationale,12,2000,"Rationale"),changeSummary=cleanText(input?.changeSummary,8,1000,"Change summary");
+ const policy=validatePolicy(input?.policy),policyHash=createHash("sha256").update(stableJson(policy)).digest("hex"),rationale=cleanText(input?.rationale,12,2000,"Rationale"),changeSummary=cleanText(input?.changeSummary,8,1000,"Change summary");
  return withTransaction(async tx=>{
   await tx.query("select pg_advisory_xact_lock(hashtextextended('community_impact_retention_policy_version',0))");
   const next=await tx.query("select coalesce(max(version),0)+1 version from community_impact_retention_policy_version");
   const row=(await tx.query("insert into community_impact_retention_policy_version(version,schema_version,policy_hash,status,policy,rationale,change_summary,created_by) values($1,1,$2,'in_review',$3,$4,$5,$6) returning id,version,schema_version,policy_hash,status,policy,rationale,change_summary,created_by,created_at",[next.rows[0].version,policyHash,policy,rationale,changeSummary,actorUserId])).rows[0];
-  await tx.query("insert into community_impact_retention_policy_event(policy_version_id,actor_user_id,event_code,reason,request_id,metadata) values($1,$2,'proposed',$3,$4,$5)",[row.id,actorUserId,rationale,requestId,{version:row.version,dataClasses:DATA_CLASSES}]);
+  await tx.query("insert into community_impact_retention_policy_event(policy_version_id,actor_user_id,event_code,reason,request_id,metadata) values($1,$2,'proposed',$3,$4,$5)",[row.id,actorUserId,rationale,requestId,{version:row.version,schemaVersion:row.schema_version,policyHash:row.policy_hash,dataClasses:DATA_CLASSES}]);
   await audit(tx,actorUserId,"community_impact.retention_policy_proposed",row.id,requestId,{version:row.version});
   return row;
  });

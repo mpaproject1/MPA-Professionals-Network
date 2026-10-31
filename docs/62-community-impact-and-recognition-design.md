@@ -928,4 +928,43 @@ Admin scan and queue access require system_admin or the explicit system-only com
 
 **Approval boundary:** This is approval of the initial policy approach and baseline for design/evaluation. It is not approval to enable public scoring, deploy detection adapters, create migrations, assign reviewer permissions or change production data. Those require the relevant increment's schema, security, privacy, fairness and operational gates.
 
-**Progress:** Policy configurability, reviewer case-level adjustments and automatic detection/attribution governance are now specified. Increment 2's implementation remains not started.
+**Progress:** Policy configurability, reviewer case-level adjustments and automatic detection/attribution governance are now specified. Increment 2 implementation is committed on this branch; acceptance remains pending runtime, disposable-database, CI and security validation.
+
+
+## CI root-cause audit and remediation — run 41208799114 (2026-10-31)
+
+**Audited revision:** `ffe32ec225d64956cd494566f48d945ba74f5f59`  
+**Workflow:** [PR Quality run 41208799114](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41208799114)  
+**Result:** Four jobs failed. The failures were traced to multiple independent defects plus dependent reports; the backend test suite and browser acceptance did not run because earlier steps failed.
+
+### Root-cause classification
+
+| CI job | Root cause | Relationship / impact |
+|---|---|---|
+| TypeScript type check | Literal backslash-n sequences had been committed into `web/app/network-plus/requests/page.tsx` between declarations and hook calls | Primary TS parse failure; same malformed source also caused the Next.js parser failure |
+| Lint (Biome) | The same malformed request-page source and over-escaped regular-expression literals / an unclosed expression in `src/network-plus/business-discovery.js` | Independent JavaScript parse failure in addition to the request-page parse failure; repeated diagnostics were cascades, not separate defects |
+| Lint (Biome) | Missing explicit button types, unsorted imports, and duplicate `CONSENT_REQUIRED` keys in the client error-message map | Independent lint failures. Duplicate-key repair keeps the server error code unchanged and uses a neutral message valid for both consent contexts |
+| Backend tests / disposable PostgreSQL | The new Community Impact migration opened the candidate-guard function with `as $` and closed it with `$;` instead of dollar-quoted `$$` delimiters | Independent SQL syntax failure during the legacy-schema upgrade; later migration checks and all backend tests were skipped |
+| Next.js build | Incorrect relative imports in the two Serve-Community admin pages | Independent module-resolution failures, not consequences of the request-page parse error |
+| Next.js build | Google-hosted font requests failed during build | Environment/network warning observed before the compile errors. It is not yet established as a fatal blocker; re-evaluate after source compilation succeeds |
+
+### Remediation applied on this branch
+
+- Corrected the Community Impact candidate-guard SQL function delimiters; no schema semantics, constraints, triggers or source records were weakened.
+- Corrected the Network-Plus business-discovery regular expressions and the malformed ownership predicate while preserving public-contact filtering and ownership authorization.
+- Replaced the three literal escaped line breaks in the Network-Plus request page with actual source line breaks. Added explicit button types while retaining the draft form's submit behavior.
+- Corrected the two Serve-Community admin module paths to resolve to the existing shared API/store modules.
+- Applied Biome import ordering and explicit form/button semantics to the affected pages and test files.
+- Removed the duplicate client-side consent-message key without changing the server's `CONSENT_REQUIRED` code or consent enforcement.
+
+### Validation still required
+
+The remediation commits are source changes only. The latest branch revision must pass the complete PR Quality workflow. Specifically verify:
+1. TypeScript and Biome report no parse, lint or accessibility errors.
+2. The legacy-schema upgrade completes on its isolated disposable PostgreSQL database.
+3. All repository migrations and rollback-only compatibility checks complete.
+4. Every backend test file executes and passes.
+5. Next.js production build, browser acceptance and membership-card PDF checks complete.
+6. The build no longer depends on a successful external font download, or the font-download issue is independently shown not to block compilation.
+
+**Safety boundary:** No production migration, deployment, data mutation, permission assignment, merge or main-branch change was performed. Keep PR #18 in draft until all validation gates pass. Do not treat this remediation as proof of runtime or database acceptance.

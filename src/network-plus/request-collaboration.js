@@ -94,28 +94,52 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
     const prior=(await db.query("select id,request_fingerprint from network_plus_request where requester_user_id=$1 and idempotency_hash=$2",[userId,hash(idempotencyKey)])).rows[0];
     if(prior){if(prior.request_fingerprint!==fingerprint)fail(409,"This idempotency key was already used for different request content.","IDEMPOTENCY_CONFLICT");return (await db.query("select * from network_plus_request where id=$1",[prior.id])).rows[0];}
     let recipientUserId=input.recipientUserId||null;
-    if(input.recipientOrganizationId) {
-      const org=(await db.query("select id,verification_status from organization where id=$1",[input.recipientOrganizationId])).rows[0];
-      if(!org||org.verification_status!=="verified")fail(404,"Recipient organization not found.","RECIPIENT_NOT_FOUND");
-      const reps=(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code in ('owner','administrator')",[org.id])).rows;
-      if(!reps.length)fail(409,"Recipient organization has no active authorized representative.","RECIPIENT_UNAVAILABLE");
-    } else {
-      const eligible=(await db.query("select 1 from app_user u join membership_record m on m.user_id=u.id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) join verification_visibility vv on vv.user_id=u.id and vv.directory_visible=true join person p on p.user_id=u.id join professional_profile pp on pp.person_id=p.id and pp.directory_visibility in ('members','public') where u.id=$1 and exists(select 1 from verification_claim vc join verification_case c on c.id=vc.case_id where c.subject_user_id=u.id and vc.status='verified' and lower(vc.claim_code_snapshot)=any($2::text[]))",[recipientUserId,["professional_certification","education","employment","experience","service_capability"]])).rowCount>0;
-      if(!eligible)fail(404,"Recipient not found or not eligible for Network-Plus requests.","RECIPIENT_NOT_FOUND");
-    }
+    let recipientOrganizationId=input.recipientOrganizationId||null;
     if(input.serviceListingId) {
-      const listing=(await db.query("select id,business_id from network_plus_service_listing where id=$1 and status='published'",[input.serviceListingId])).rows[0];
-      if(!listing)fail(404,"Published service listing not found.","SERVICE_NOT_FOUND");
+      const listing=(await db.query("select s.id,s.business_id from network_plus_service_listing s join network_plus_business b on b.id=s.business_id where s.id=$1 and s.status='published' and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published'",[input.serviceListingId])).rows[0];
+      if(!listing)fail(404,"Published verified service listing not found.","SERVICE_NOT_FOUND");
       if(input.businessId&&input.businessId!==listing.business_id)fail(400,"Service listing does not belong to the selected business.","BUSINESS_LISTING_MISMATCH");
       input.businessId=listing.business_id;
     }
+    if(input.businessId) {
+      const owner=(await db.query("select bo.owner_type,bo.owner_user_id,bo.owner_organization_id from network_plus_business_ownership bo join network_plus_business b on b.id=bo.business_id where bo.business_id=$1 and bo.owner_role='primary_owner' and bo.status='active' and bo.consent_status='accepted' and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published'",[input.businessId])).rows[0];
+      if(!owner)fail(404,"Published verified business not found.","BUSINESS_NOT_FOUND");
+      if(owner.owner_type==="member") {
+        if(recipientUserId&&recipientUserId!==owner.owner_user_id)fail(400,"The selected recipient does not own this business.","RECIPIENT_BUSINESS_MISMATCH");
+        if(recipientOrganizationId)fail(400,"A member-owned business cannot be addressed to an unrelated organization.","RECIPIENT_BUSINESS_MISMATCH");
+        recipientUserId=owner.owner_user_id;recipientOrganizationId=null;
+      } else {
+        if(recipientUserId)fail(400,"An organization-owned business must be addressed to its owner organization.","RECIPIENT_BUSINESS_MISMATCH");
+        if(recipientOrganizationId&&recipientOrganizationId!==owner.owner_organization_id)fail(400,"The selected recipient organization does not own this business.","RECIPIENT_BUSINESS_MISMATCH");
+        recipientOrganizationId=owner.owner_organization_id;recipientUserId=null;
+      }
+    } else if(Boolean(recipientUserId)===Boolean(recipientOrganizationId)) {
+      fail(400,"Choose exactly one recipient user or organization.","INVALID_RECIPIENT");
+    }
+    if(recipientUserId===userId)fail(400,"You cannot send a request to yourself.","INVALID_RECIPIENT");
+    if(recipientOrganizationId) {
+      const org=(await db.query("select id,verification_status from organization where id=$1",[recipientOrganizationId])).rows[0];
+      if(!org||org.verification_status!=="verified")fail(404,"Recipient organization not found.","RECIPIENT_NOT_FOUND");
+      const reps=(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code in ('owner','administrator')",[org.id])).rows;
+      if(!reps.length)fail(409,"Recipient organization has no active authorized representative.","RECIPIENT_UNAVAILABLE");
+    } else if(input.businessId) {
+      const activeOwner=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[recipientUserId])).rowCount>0;
+      if(!activeOwner)fail(409,"The business owner must retain active membership to receive requests.","RECIPIENT_UNAVAILABLE");
+    } else {
+      const eligible=(await db.query("select 1 from app_user u join membership_record m on m.user_id=u.id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) join verification_visibility vv on vv.user_id=u.id and vv.directory_visible=true join person p on p.user_id=u.id join professional_profile pp on pp.person_id=p.id and pp.directory_visibility in ('members','public') where u.id=$1 and exists(select 1 from verification_claim vc join verification_case c on c.id=vc.case_id where c.subject_user_id=u.id and vc.status='verified' and lower(vc.claim_code_snapshot)=any($2::text[]))",[recipientUserId,["professional_certification","education","employment","experience","service_capability"]])).rowCount>0;
+      if(!eligible)fail(404,"Verified professional not found or not accepting directory contact.","RECIPIENT_NOT_FOUND");
+    }
     const created=(await db.query(`insert into network_plus_request(intent,status,requester_user_id,recipient_user_id,recipient_organization_id,business_id,service_listing_id,subject,summary,request_details,terms,idempotency_hash,request_fingerprint)
-      values($1,'draft',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,[intent,userId,recipientUserId,input.recipientOrganizationId||null,input.businessId||null,input.serviceListingId||null,subject,summary,details,terms,hash(idempotencyKey),fingerprint])).rows[0];
+      values($1,'draft',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,[intent,userId,recipientUserId,recipientOrganizationId||null,input.businessId||null,input.serviceListingId||null,subject,summary,details,terms,hash(idempotencyKey),fingerprint])).rows[0];
     await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,consented_at,added_by) values($1,$2,'requester','accepted',now(),$2)",[created.id,userId]);
     if(recipientUserId) await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) values($1,$2,'recipient_representative','pending',$3)",[created.id,recipientUserId,userId]);
     else await db.query(`insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by)
       select $1,om.user_id,'recipient_representative','pending',$2 from organization_membership om
-      where om.organization_id=$3 and om.status='active' and om.role_code in ('owner','administrator')`,[created.id,userId,input.recipientOrganizationId]);
+      where om.organization_id=$3 and om.status='active' and om.role_code in ('owner','administrator')`,[created.id,userId,recipientOrganizationId]);
+    if(input.businessId) {
+      await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) select $1,bo.owner_user_id,'recipient_representative','pending',$2 from network_plus_business_ownership bo join membership_record mr on mr.user_id=bo.owner_user_id and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date) where bo.business_id=$3 and bo.owner_type='member' and bo.status='active' and bo.consent_status='accepted' on conflict(request_id,user_id) do nothing",[created.id,userId,input.businessId]);
+      await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) select $1,a.user_id,'recipient_representative','pending',$2 from network_plus_business_access a where a.business_id=$3 and a.capability_code='business.respond_requests' and a.revoked_at is null and (a.expires_at is null or a.expires_at>now()) and (exists(select 1 from membership_record mr where mr.user_id=a.user_id and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date)) or exists(select 1 from organization_membership om where om.user_id=a.user_id and om.status='active')) on conflict(request_id,user_id) do nothing",[created.id,userId,input.businessId]);
+    }
     await audit(db,created.id,userId,"request.created",null,"draft",requestIdHeader,{intent});
     return created;
   });

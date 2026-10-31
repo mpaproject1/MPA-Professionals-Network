@@ -2,7 +2,7 @@
 
 import {ArrowRight,BookOpen,CheckCircle2,Clock3,Compass,Filter,Globe2,HeartHandshake,Leaf,MapPin,Search,ShieldCheck,Sparkles,Users,X} from "lucide-react";
 import Link from "next/link";
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {SupportAction} from "../../components/support-action";
 
 type InitiativeCategory="All"|"Education"|"Community care"|"Digital inclusion";
@@ -20,8 +20,9 @@ export default function ServeCommunityPage(){
  const [category,setCategory]=useState<InitiativeCategory>("All");
  const [query,setQuery]=useState("");
  const [selected,setSelected]=useState<Initiative|null>(null);
+ const closeButtonRef=useRef<HTMLButtonElement>(null);
  const filtered=useMemo(()=>initiatives.filter(item=>(category==="All"||item.category===category)&&(!query.trim()||[item.title,item.summary,item.category,item.focus].join(" ").toLowerCase().includes(query.trim().toLowerCase()))),[category,query]);
- useEffect(()=>{if(!selected)return;const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape")setSelected(null)};window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey)},[selected]);
+ useEffect(()=>{if(!selected)return;const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;closeButtonRef.current?.focus();const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape"){setSelected(null);return;}if(event.key!=="Tab")return;const dialog=document.querySelector<HTMLElement>(".sc-modal");const controls=dialog?Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]),a[href],input:not([disabled]),[tabindex]:not([tabindex="-1"])')):[];if(!controls.length)return;const first=controls[0],last=controls[controls.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}};window.addEventListener("keydown",onKey);return()=>{window.removeEventListener("keydown",onKey);previous?.focus();}},[selected]);
  return <main className="serve-community-page">
   <section className="sc-hero">
    <div className="sc-hero-copy">
@@ -55,7 +56,7 @@ export default function ServeCommunityPage(){
    </div>
    <div className="sc-preview-notice" role="note"><InfoIcon/><p><strong>Preview content — not live opportunities.</strong> These sample programme cards demonstrate the intended experience. No initiative is currently being advertised or accepting registrations through this preview. Live cards will be populated only from reviewed and approved community initiatives.</p></div>
    <div className="sc-toolbar">
-    <label className="sc-search"><Search size={18}/><span className="sr-only">Search sample initiatives</span><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search causes, skills or themes…" /></label>
+    <label className="sc-search"><Search size={18}/><span className="sr-only">Search sample initiatives</span><input aria-label="Search sample initiatives" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search causes, skills or themes…" /></label>
     <div className="sc-filter-label"><Filter size={16}/> Explore by focus</div>
     <div className="sc-category-tabs" role="group" aria-label="Filter initiatives by category">{categories.map(item=><button key={item} type="button" aria-pressed={category===item} className={category===item?"active":""} onClick={()=>setCategory(item)}>{item}</button>)}</div>
    </div>
@@ -75,7 +76,7 @@ export default function ServeCommunityPage(){
    <Link className="btn btn-ghost" href="/network-plus">Explore Network-Plus <ArrowRight size={16}/></Link>
   </section>
 
-  {selected?<div className="sc-modal-backdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setSelected(null)}}><section className="sc-modal" role="dialog" aria-modal="true" aria-labelledby="sc-modal-title" aria-describedby="sc-modal-description"><div className={`sc-modal-art sc-card-art-${selected.accent}`}><span className="sc-card-art-icon"><selected.icon size={32}/></span><button type="button" className="sc-modal-close" aria-label="Close concept details" onClick={()=>setSelected(null)}><X size={19}/></button><span className="sc-card-preview">Preview concept · not open for registration</span></div><div className="sc-modal-body"><div className="sc-card-category">{selected.category} · Illustrative concept</div><h2 id="sc-modal-title">{selected.title}</h2><p id="sc-modal-description">{selected.detail}</p><div className="sc-modal-facts"><span><MapPin size={15}/>{selected.place}</span><span><Clock3 size={15}/>{selected.mode}</span><span><CheckCircle2 size={15}/>{selected.focus}</span></div><div className="sc-modal-note"><ShieldCheck size={18}/><p>This is sample content for UX preview only. It is not an approved initiative, a live vacancy or an invitation to register.</p></div><button type="button" className="btn btn-primary" onClick={()=>setSelected(null)}>Close preview</button></div></section></div>:null}
+  {selected?<div className="sc-modal-backdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setSelected(null)}}><section className="sc-modal" role="dialog" aria-modal="true" aria-labelledby="sc-modal-title" aria-describedby="sc-modal-description"><div className={`sc-modal-art sc-card-art-${selected.accent}`}><span className="sc-card-art-icon"><selected.icon size={32}/></span><button ref={closeButtonRef} type="button" className="sc-modal-close" aria-label="Close concept details" onClick={()=>setSelected(null)}><X size={19}/></button><span className="sc-card-preview">Preview concept · not open for registration</span></div><div className="sc-modal-body"><div className="sc-card-category">{selected.category} · Illustrative concept</div><h2 id="sc-modal-title">{selected.title}</h2><p id="sc-modal-description">{selected.detail}</p><div className="sc-modal-facts"><span><MapPin size={15}/>{selected.place}</span><span><Clock3 size={15}/>{selected.mode}</span><span><CheckCircle2 size={15}/>{selected.focus}</span></div><div className="sc-modal-note"><ShieldCheck size={18}/><p>This is sample content for UX preview only. It is not an approved initiative, a live vacancy or an invitation to register.</p></div><button type="button" className="btn btn-primary" onClick={()=>setSelected(null)}>Close preview</button></div></section></div>:null}
  </main>;
 }
 

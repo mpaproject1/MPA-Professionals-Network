@@ -493,6 +493,8 @@ try {
   if (businessPermissions.rowCount!==2 || businessPermissions.rows.some(row=>row.system_only!==true)) {
     throw new Error("Business verification/moderation permissions must be registered as system-only capabilities without user grants.");
   }
+  const businessRoles = await client.query("select role_code from app_role where role_code=any($1::text[])",[["business_verification_reviewer","business_moderator"]]);
+  if (businessRoles.rowCount!==2) throw new Error("Dedicated Network-Plus verification and moderation roles must be registered without automatic user assignments.");
   const badBackfill = await client.query(`
     select count(*)::int as count
       from mentorship_match mm

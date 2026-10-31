@@ -1,7 +1,8 @@
 "use client";
 import {ArrowLeft,ArrowRight,ClipboardList,HeartHandshake,Plus,RefreshCw,Send,Users} from "lucide-react";
 import Link from "next/link";
-import {FormEvent,useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useState} from "react";
+import type {FormEvent} from "react";
 import {api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
 type Initiative={id:string;title:string;category:string;summary:string;description:string;delivery_mode:string;location_label:string|null;capacity:number|null;eligibility:string|null;expected_commitment:string|null;status:string;review_reason:string|null;created_at:string};

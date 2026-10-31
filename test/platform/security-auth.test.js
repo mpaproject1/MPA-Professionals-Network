@@ -119,11 +119,14 @@ test("expired human challenges cannot mint tokens",async()=>{
 });
 
 test("production registration rejects a missing human-check token before creating an account",async()=>{
-  const keys=["NODE_ENV","JWT_SECRET","HUMAN_CHALLENGE_REQUIRED"];
+  const keys=["NODE_ENV","JWT_SECRET","HUMAN_CHALLENGE_REQUIRED","PUBLIC_APP_URL","EMAIL_DELIVERY_WEBHOOK_URL","EMAIL_DELIVERY_WEBHOOK_SECRET"];
   const previous=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
   process.env.NODE_ENV="production";
   process.env.JWT_SECRET="security-test-production-secret-with-more-than-32-characters";
   process.env.HUMAN_CHALLENGE_REQUIRED="false";
+  process.env.PUBLIC_APP_URL="https://mpa.example.test";
+  process.env.EMAIL_DELIVERY_WEBHOOK_URL="https://delivery.example.test/webhook";
+  process.env.EMAIL_DELIVERY_WEBHOOK_SECRET="test-webhook-secret-with-more-than-thirty-two-characters";
   const email=`security-bypass-${suffix}@example.test`;
   try {
     await assert.rejects(membership.register({email,password:"Security-bypass-password-12345",firstName:"Security",lastName:`Bypass${suffix}`,phone:`09${randomUUID().replace(/\D/g,"").slice(0,8)}`},"security-no-human-token"),error=>error.code==="CHALLENGE_REQUIRED");

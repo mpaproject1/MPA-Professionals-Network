@@ -339,7 +339,7 @@ const server=http.createServer(async (req,res)=>{
     }
     if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/network-plus/businesses/")) return ok(res,await networkPlusBusiness.updateBusiness(parts[4],identity.sub,await body(req),requestId),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="owners") return ok(res,await networkPlusBusiness.addBusinessOwner(parts[4],identity.sub,await body(req),requestId),requestId,201);
-    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/business-ownership/") && parts[4]==="respond"){
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/business-ownership/") && parts[5]==="respond"){
       const b=await body(req);return ok(res,await networkPlusBusiness.respondBusinessOwnership(parts[4],identity.sub,b.decision,requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="access") return ok(res,await networkPlusBusiness.grantBusinessAccess(parts[4],identity.sub,await body(req),requestId),requestId,201);

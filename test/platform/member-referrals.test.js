@@ -15,6 +15,7 @@ test("referral schema enforces separate types and duplicate prevention",()=>{
  assert.match(migration,/uq_member_referral_membership_referred/);
  assert.match(migration,/uq_member_referral_employment_application/);
  assert.match(migration,/prevent_member_referral_history_mutation/);
+ assert.ok(migration.includes("unique(attribution_id,event_code)"));
  assert.match(applicationMigration,/alter table job_application add column if not exists referral_code/);
  assert.match(migration,/status_visibility_consent/);
 });

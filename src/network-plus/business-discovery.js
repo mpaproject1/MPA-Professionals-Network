@@ -531,3 +531,39 @@ export async function revokeBusinessAccess(businessId,accessId,userId,requestId)
     return updated;
   });
 }
+
+async function assertReviewer(userId,roleSet,permissionCode,message) {
+  const db=getPool(),roles=await rolesFor(db,userId),permissions=await permissionsFor(db,userId);
+  if(!roles.some(role=>roleSet.includes(role))&&!permissions.includes(permissionCode))fail(403,message,"REVIEW_QUEUE_FORBIDDEN");
+  return db;
+}
+function queueBounds(filters={}) {
+  return {limit:Math.min(Math.max(Number(filters.limit)||20,1),50),offset:Math.min(Math.max(Number(filters.offset)||0,0),100000)};
+}
+export async function listBusinessVerificationQueue(userId,filters={}) {
+  const db=await assertReviewer(userId,BUSINESS_REVIEW_ROLES,"business.verify","Independent business verification reviewer authority is required.");
+  const {limit,offset}=queueBounds(filters);
+  const result=await db.query(`select c.id case_id,c.business_id,c.status case_status,c.submitted_at,c.expires_at,
+    b.display_name,b.business_kind,b.description,b.website,b.location_label,b.verification_status,b.created_at
+    from network_plus_business_verification_case c join network_plus_business b on b.id=c.business_id
+    where c.status=any($1::text[]) order by c.submitted_at asc limit $2 offset $3`,[["submitted","under_review","appealed"],limit,offset]);
+  return {items:result.rows,limit,offset};
+}
+export async function listBusinessModerationQueue(userId,filters={}) {
+  const db=await assertReviewer(userId,LISTING_REVIEW_ROLES,"business.moderate","Independent business moderation authority is required.");
+  const {limit,offset}=queueBounds(filters);
+  const result=await db.query(`select b.id,b.business_kind,b.display_name,b.trading_name,b.description,b.website,b.location_label,
+    b.verification_status,b.moderation_status,b.publication_status,b.created_at,b.moderation_submitted_by
+    from network_plus_business b where b.moderation_status='pending_review'
+    order by b.updated_at asc limit $1 offset $2`,[limit,offset]);
+  return {items:result.rows,limit,offset};
+}
+export async function listProfessionalServiceModerationQueue(userId,filters={}) {
+  const db=await assertReviewer(userId,LISTING_REVIEW_ROLES,"business.moderate","Independent business-listing moderation authority is required.");
+  const {limit,offset}=queueBounds(filters);
+  const result=await db.query(`select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.description,s.service_category,
+    s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.status,s.submitted_by,s.created_at
+    from network_plus_service_listing s join network_plus_business b on b.id=s.business_id
+    where s.status='pending_review' order by s.updated_at asc limit $1 offset $2`,[limit,offset]);
+  return {items:result.rows,limit,offset};
+}

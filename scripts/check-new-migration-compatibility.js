@@ -477,6 +477,10 @@ try {
     }
   }
 
+  const businessPermissions = await client.query("select permission_code,system_only from app_permission where permission_code=any($1::text[])",[["business.verify","business.moderate"]]);
+  if (businessPermissions.rowCount!==2 || businessPermissions.rows.some(row=>row.system_only!==true)) {
+    throw new Error("Business verification/moderation permissions must be registered as system-only capabilities without user grants.");
+  }
   const badBackfill = await client.query(`
     select count(*)::int as count
       from mentorship_match mm

@@ -1310,3 +1310,9 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 .sc-completed-outcomes li{display:flex;flex-wrap:wrap;gap:5px 10px;justify-content:space-between;font-size:12px}
 .sc-completed-outcomes strong{color:var(--text)}.sc-completed-outcomes span{color:var(--muted)}
 @media(max-width:650px){.sc-offline-form-grid{grid-template-columns:minmax(0,1fr);gap:13px}.sc-offline-wide{grid-column:auto}}
+
+.sc-offline-evidence{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.sc-offline-evidence summary{cursor:pointer;color:var(--primary);font-size:12px;font-weight:750}
+.sc-offline-evidence p{margin:6px 0;color:var(--muted);font-size:12px;line-height:1.55;overflow-wrap:anywhere}
+.sc-offline-evidence strong{color:var(--text)}
+.sc-offline-review-image{display:inline-block;width:104px;height:76px;margin:6px 8px 0 0;object-fit:cover;border-radius:8px}

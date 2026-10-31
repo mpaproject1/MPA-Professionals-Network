@@ -194,3 +194,10 @@ comment on table community_impact_claim is 'Private authenticated-account contri
 comment on table community_impact_claim_evidence is 'Private file references with immutable retention-policy snapshots. Evidence bytes remain in the private file store.';
 comment on table community_impact_claim_decision is 'Append-only reviewer decisions; claim status is a current projection.';
 comment on table community_impact_claim_event is 'Append-only claim and evidence lifecycle audit history.';
+
+-- Bind claim-evidence uploads to a specific draft/clarification claim before bytes are accepted.
+alter table private_upload_session add column if not exists purpose text not null default 'general';
+alter table private_upload_session add column if not exists purpose_reference_id uuid references community_impact_claim(id) on delete restrict;
+alter table private_upload_session add constraint private_upload_session_purpose_scope_check
+ check((purpose='general' and purpose_reference_id is null) or (purpose='community_impact_claim_evidence' and purpose_reference_id is not null));
+create index if not exists ix_private_upload_session_claim_purpose on private_upload_session(purpose_reference_id,status) where purpose='community_impact_claim_evidence';

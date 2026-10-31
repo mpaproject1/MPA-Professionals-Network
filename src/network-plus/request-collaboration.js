@@ -272,7 +272,9 @@ export async function updateNetworkPlusWorkspaceMilestone(requestId,milestoneId,
       const valid=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status='accepted'",[requestId,owner])).rowCount>0;
       if(!valid)fail(400,"Milestone owner must be an accepted participant.","INVALID_MILESTONE_OWNER");
     }
-    const updated=(await db.query("update network_plus_collaboration_milestone set status=$1,owner_user_id=$2,due_at=$3,description=$4,updated_at=now() where id=$5 returning *",[status,owner,input?.dueAt===undefined?current.due_at:input.dueAt,input?.description===undefined?current.description:String(input.description).slice(0,2000),milestoneId])).rows[0];
+    const dueAt=input?.dueAt===undefined?current.due_at:input.dueAt, description=input?.description===undefined?current.description:String(input.description).slice(0,2000);
+    if(current.status===status&&current.owner_user_id===owner&&String(current.due_at||"")===String(dueAt||"")&&current.description===description)return current;
+    const updated=(await db.query("update network_plus_collaboration_milestone set status=$1,owner_user_id=$2,due_at=$3,description=$4,updated_at=now() where id=$5 returning *",[status,owner,dueAt,description,milestoneId])).rows[0];
     await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body,metadata) values($1,$2,'milestone',$3,$4,$5)",[ws.id,userId,"Milestone updated",updated.title+" is now "+status.replaceAll("_"," ")+".",{milestoneId,status}]);
     await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'collaboration.milestone_updated','network_plus_collaboration_workspace',$2,$3,'success',$4)",[userId,ws.id,requestIdHeader,{milestoneId,status}]);
     return updated;

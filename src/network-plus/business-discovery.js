@@ -496,7 +496,8 @@ export async function addBusinessVerificationEvidence(businessId,userId,input,re
 }
 export async function listBusinessVerificationEvidence(businessId,userId) {
   const db=getPool(),roles=await rolesFor(db,userId),permissions=await permissionsFor(db,userId);
-  if(!roles.some(r=>BUSINESS_REVIEW_ROLES.includes(r))&&!permissions.includes("business.verify"))fail(403,"Business verification reviewer authority is required.","BUSINESS_REVIEW_FORBIDDEN");
+  const reviewer=roles.some(r=>BUSINESS_REVIEW_ROLES.includes(r))||permissions.includes("business.verify");
+  if(!reviewer)await assertBusinessOwner(db,businessId,userId);
   return (await db.query("select e.id,e.case_id,e.file_object_id,e.evidence_type,e.note,e.created_at from network_plus_business_verification_evidence e join network_plus_business_verification_case c on c.id=e.case_id where c.business_id=$1 order by e.created_at desc",[businessId])).rows;
 }
 

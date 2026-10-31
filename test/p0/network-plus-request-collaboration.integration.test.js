@@ -75,4 +75,18 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
  assert.ok(notices.rows.some(row=>row.user_id===recipient.user.id&&row.event_code==="network_plus.request.submitted"));
  assert.ok(notices.rows.some(row=>row.user_id===requester.user.id&&row.event_code==="network_plus.request.accepted"));
  await db.query("delete from app_user_role where user_id=$1 and role_id=$2",[reviewer.user.id,reviewerRole.id]);
+  const support=await register("support-"+suffix),admin=await register("support-admin-"+suffix);
+  const supportRole=(await db.query("select id from app_role where role_code=$1",["network_plus_support"])).rows[0];
+  const adminRole=(await db.query("select id from app_role where role_code=$1",["system_admin"])).rows[0];
+  assert.ok(supportRole&&adminRole);
+  await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing",[support.user.id,supportRole.id]);
+  await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing",[admin.user.id,adminRole.id]);
+  const supportTicket="SUP-CASE-"+suffix.slice(0,12);
+  const supportReason="Investigate a participant-reported access issue.";
+  const supportGrant=await requests.grantNetworkPlusSupportAccess(draft.id,admin.user.id,{supportUserId:support.user.id,supportCaseReference:supportTicket,reason:supportReason,expiresAt:new Date(Date.now()+3600000).toISOString()},requestRef);
+  const supportDetail=await requests.getNetworkPlusRequest(draft.id,support.user.id,{supportReason,supportTicket});
+  assert.equal(supportDetail.id,draft.id);
+  await requests.revokeNetworkPlusSupportAccess(draft.id,supportGrant.id,admin.user.id,requestRef);
+  await assert.rejects(()=>requests.getNetworkPlusRequest(draft.id,support.user.id,{supportReason,supportTicket}),e=>e.code==="SUPPORT_GRANT_REQUIRED");
+
 });

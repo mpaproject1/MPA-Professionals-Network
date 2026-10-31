@@ -190,6 +190,15 @@ create table if not exists network_plus_service_listing_event (
 create index if not exists ix_network_plus_service_event_history
   on network_plus_service_listing_event(listing_id,created_at desc);
 
+-- Register capabilities without granting them to any account. Direct assignments
+-- remain governed by permissions.manage and independent reviewer appointment.
+insert into app_permission(permission_code,area,label,description,sensitive,system_only) values
+  ('business.verify','Network-Plus','Verify businesses','Review business verification evidence and decisions; conflicts and subject self-review are prohibited.',true,true),
+  ('business.moderate','Network-Plus','Moderate business listings','Review business profiles and commercial service listings; creators cannot moderate their own submissions.',true,true)
+on conflict(permission_code) do update set
+  area=excluded.area,label=excluded.label,description=excluded.description,
+  sensitive=excluded.sensitive,system_only=excluded.system_only;
+
 comment on table network_plus_business is
   'Network-Plus commercial business identity; references canonical app_user/organization ownership and does not duplicate person or organization records.';
 comment on table network_plus_business_ownership is

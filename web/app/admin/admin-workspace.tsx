@@ -26,6 +26,7 @@ const destinations: Destination[] = [
   { href: "/admin/serve-community/offline-projects", label: "Completed projects", description: "Record and review completed offline community projects", icon: ClipboardList },
   { href: "/admin/community-impact/retention-policy", label: "Impact retention policy", description: "Propose and approve evidence-retention rules", icon: Scale },
   { href: "/admin/community-impact/claims", label: "Impact claim review", description: "Assign and independently review private contribution claims and appeals", icon: ClipboardCheck },
+  { href: "/admin/community-impact/governance", label: "Impact governance", description: "Identity assurance, individual attribution, detection policies, reviewer conflicts and assessments", icon: Scale },
   { href: "/admin/referrals", label: "Member referrals", description: "Review employment referrals and govern referral recognition", icon: Users },
   { href: "/organizations", label: "Organizations", description: "Verification, evidence and partner workspace", icon: Building2 },
   { href: "/admin/reports", label: "Reports", description: "Reporting and exports", icon: FileBarChart },
@@ -91,6 +92,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
       if (item.href === "/admin/serve-community/offline-projects") return offlineProjectAccess;
       if (item.href === "/admin/community-impact/retention-policy") return roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.retention.manage", "community_impact.retention.approve"].includes(permission));
       if (item.href === "/admin/community-impact/claims") return roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.claim.review", "community_impact.claim.assign", "community_impact.claim.appeal_review"].includes(permission));
+      if (item.href === "/admin/community-impact/governance") return roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.identity.review","community_impact.offline_attribution.review","community_impact.detection.manage","community_impact.detection_policy.manage","community_impact.detection_policy.approve","community_impact.claim.assess","community_impact.claim.second_review","community_impact.retention.evaluate"].includes(permission));
       if (item.href === "/admin/referrals") return roles?.some((role) => ["system_admin","admin","supporting_staff"].includes(role)) === true || permissions.includes("referral.manage");
       if (item.href === "/admin/support") return supportStaff || roles?.includes("reviewer") === true;
       if (item.href === "/admin/security" || item.href === "/admin/email") return false;

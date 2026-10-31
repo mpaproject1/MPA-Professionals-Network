@@ -94,7 +94,6 @@ const FRIENDLY_ERRORS: Record<string,string> = {
   INVALID_INVITATION: "This member invitation link is incomplete. Open the full link from the invitation email.",
   INVITATION_EXPIRED: "This invitation has expired or was already used. Contact MPA membership support for a new invitation.",
   PUBLIC_CONTACT_DETAILS: "Remove phone numbers and email addresses from the public report summary before publishing it.",
-  CONSENT_REQUIRED: "Confirm the participation terms and contact-sharing permission before applying.",
   CONSENT_VERSION_MISMATCH: "The participation terms changed. Refresh the page and review the latest consent wording.",
   INITIATIVE_CAPACITY_REACHED: "This initiative has reached its approved participation capacity.",
   PARTICIPATION_ALREADY_EXISTS: "You already have an active application for this initiative.",

@@ -58,13 +58,21 @@ export async function detectOfflineProjectApproval(db,projectId){
  if(!row)return null;
  return addCandidate(db,{sourceType:"offline_completed_project",sourceRecordId:row.source_record_id,sourceEventId:row.source_event_id,sourceEventCode:row.event_code,sourceEventVersion:row.source_event_version,contributorUserId:null,sourceCategory:row.source_category,policy,attributionStatus:"unattributed"});
 }
+async function reconcileCandidateReversals(db){
+ let reversed=0;
+ const participation=(await db.query("select c.id,c.contributor_user_id,p.participant_user_id,p.status source_status,i.status parent_status,e.event_code,pv.rules from community_impact_detection_candidate c join community_impact_detection_policy_version pv on pv.id=c.policy_version_id join serve_community_participation p on p.id=c.source_record_id join serve_community_initiative i on i.id=p.initiative_id join serve_community_participation_event e on e.id=c.source_event_id where c.source_type='initiative_participation' and c.detection_status='detected'")).rows;
+ for(const row of participation){const rules=row.rules||{},eligible=Array.isArray(rules.sourceStatuses)&&rules.sourceStatuses.includes(row.source_status)&&Array.isArray(rules.parentStatuses)&&rules.parentStatuses.includes(row.parent_status)&&Array.isArray(rules.sourceEventCodes)&&rules.sourceEventCodes.includes(row.event_code)&&row.participant_user_id===row.contributor_user_id;if(!eligible){const changed=await db.query("update community_impact_detection_candidate set detection_status='source_reversed',updated_at=now() where id=$1 and detection_status='detected' returning id",[row.id]);if(changed.rowCount){reversed++;await db.query("insert into community_impact_detection_candidate_event(candidate_id,event_code,reason,metadata) values($1,'source_reversed','The authoritative participation or initiative source no longer satisfies its detection policy.',$2)",[row.id,{sourceType:"initiative_participation"}]);}}}
+ const offline=(await db.query("select c.id,p.status source_status,e.event_code,pv.rules from community_impact_detection_candidate c join community_impact_detection_policy_version pv on pv.id=c.policy_version_id join serve_community_offline_project p on p.id=c.source_record_id join serve_community_offline_project_event e on e.id=c.source_event_id where c.source_type='offline_completed_project' and c.detection_status='detected'")).rows;
+ for(const row of offline){const rules=row.rules||{},eligible=Array.isArray(rules.sourceStatuses)&&rules.sourceStatuses.includes(row.source_status)&&Array.isArray(rules.sourceEventCodes)&&rules.sourceEventCodes.includes(row.event_code);if(!eligible){const changed=await db.query("update community_impact_detection_candidate set detection_status='source_reversed',updated_at=now() where id=$1 and detection_status='detected' returning id",[row.id]);if(changed.rowCount){reversed++;await db.query("insert into community_impact_detection_candidate_event(candidate_id,event_code,reason,metadata) values($1,'source_reversed','The authoritative offline-project source no longer satisfies its detection policy.',$2)",[row.id,{sourceType:"offline_completed_project"}]);}}}
+ return reversed;
+}
 export async function scanDetectionSources(actorUserId,requestId,options={}){
  const db=getPool();await assertDetectionManager(db,actorUserId);
  const limit=bounded(options.limit,1,500,200);
  return withTransaction(async tx=>{
   const participationPolicy=await activePolicy(tx,"initiative_participation");
   const offlinePolicy=await activePolicy(tx,"offline_completed_project");
-  let participationDetected=0,offlineDetected=0,examined=0;
+  const sourceReversed=await reconcileCandidateReversals(tx);\n  let participationDetected=0,offlineDetected=0,examined=0;
   if(participationPolicy?.rules?.enabled===true){
    const rules=participationPolicy.rules,codes=Array.isArray(rules.sourceEventCodes)?rules.sourceEventCodes:[],sourceStatuses=Array.isArray(rules.sourceStatuses)?rules.sourceStatuses:[],parentStatuses=Array.isArray(rules.parentStatuses)?rules.parentStatuses:[];
    if(codes.length&&sourceStatuses.length&&parentStatuses.length){
@@ -80,7 +88,7 @@ export async function scanDetectionSources(actorUserId,requestId,options={}){
    }
   }
   await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'community_impact.detection_scan','community_impact_detection_candidate',null,$2,'success',$3)",[actorUserId,requestId||null,{examined,participationDetected,offlineDetected,limit}]);
-  return {examined,created:{initiativeParticipations:participationDetected,offlineProjects:offlineDetected},limit,note:"Candidates remain private and unverified. Detection does not award points or publish profile data."};
+  return {examined,sourceReversed,created:{initiativeParticipations:participationDetected,offlineProjects:offlineDetected},limit,note:"Candidates remain private and unverified. Detection does not award points or publish profile data."};
  });
 }
 export async function listMyDetectedContributions(userId,options={}){

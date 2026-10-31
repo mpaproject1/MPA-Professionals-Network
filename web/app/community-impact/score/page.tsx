@@ -1,0 +1,21 @@
+"use client";
+import {useCallback,useEffect,useState} from "react";
+import {api} from "../../../lib/api";
+import {useUiStore} from "../../../lib/store";
+type Entry=Record<string,any>;
+type Score={score:number;awards:number;reversals:number;policyVersion:number;evaluationOnly:boolean;publicScoreEnabled:boolean;publicationStatus:string;items:Entry[]};
+const label=(v:string)=>String(v||"").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
+export default function CommunityImpactScorePage(){
+ const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated),hydrateToken=useUiStore(s=>s.hydrateToken);
+ const [data,setData]=useState<Score|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(true);
+ const load=useCallback(async()=>{if(!token)return;setLoading(true);setError("");try{setData(await api<Score>("/api/v1/me/community-impact/score",{},token))}catch(e){setError(e instanceof Error?e.message:"Your Community Impact score could not be loaded.")}finally{setLoading(false)}},[token]);
+ useEffect(()=>{if(!hydrated)hydrateToken()},[hydrated,hydrateToken]);useEffect(()=>{if(hydrated&&token)void load();else if(hydrated)setLoading(false)},[hydrated,token,load]);
+ if(!hydrated||loading)return <main className="grid"><p>Loading your verified contribution record…</p></main>;
+ if(!token)return <main className="grid"><section className="card"><h1 className="h2">Community Impact Score</h1><p>Sign in to view your private contribution record.</p></section></main>;
+ return <main className="grid" style={{gap:16,maxWidth:900,margin:"0 auto",padding:"24px 16px"}}>
+  <header><p className="muted">MY WORKSPACE · COMMUNITY IMPACT</p><h1 className="h2">My Community Impact Score</h1><p className="muted">A transparent record of verified contributions, evidence and outcomes across community and professional collaboration.</p></header>
+  {error?<div role="alert" className="operation-status operation-status--error">{error}</div>:null}
+  {data?<><section className="card grid"><p className="muted">PRIVATE EVALUATION SCORE · POLICY VERSION {data.policyVersion}</p><div className="row" style={{alignItems:"baseline",gap:8}}><strong style={{fontSize:38,fontWeight:650}}>{Number(data.score).toFixed(2)}</strong><span className="muted">points</span></div><div className="row" style={{gap:12,flexWrap:"wrap"}}><span>{data.awards} award entries</span><span>{data.reversals} reversal entries</span><span className="badge">{data.publicScoreEnabled?"Public score enabled":"Private · not publicly published"}</span></div><p className="muted">This score is calculated from reviewer-verified contributions using a versioned policy. It is not a membership, hiring, award or opportunity eligibility decision. Your private visibility choice does not reduce the score.</p></section>
+  <section className="card grid"><h2 className="h2">Contribution history and explanations</h2>{data.items.length?data.items.map(item=><article key={item.id} className="grid" style={{borderTop:"1px solid var(--border)",paddingTop:12,gap:8}}><div className="row" style={{justifyContent:"space-between",flexWrap:"wrap"}}><strong>{label(item.source_type)} · {label(item.entry_type)}</strong><strong>{Number(item.points)>0?"+":""}{Number(item.points).toFixed(4)} points</strong></div><p className="muted">{new Date(item.created_at).toLocaleString()} · Ledger reference {item.id}</p><p>{item.explanation?.rationale||item.explanation?.reasonCode||"Verified contribution score ledger event."}</p>{item.explanation?.dimensions?.length?<details><summary>Why these points were awarded</summary><ul>{item.explanation.dimensions.map((d:Entry)=><li key={d.key}>{d.label}: rating {d.rating}/{d.maximum}, weighted {d.weight}% (contribution {Number(d.weightedContribution).toFixed(4)}).</li>)}</ul><p className="muted">Attribution share: {item.explanation.attributionShare}% · Role factor: {item.explanation.roleFactor} · Base points: {item.explanation.basePoints} · Policy version: {item.explanation.policyVersion}</p></details>:null}</article>):<p className="muted">No verified contribution score entries are available yet. Verified source records and approved assessments will appear here after authorized scoring evaluation.</p>}</section></>:null}
+ </main>
+}

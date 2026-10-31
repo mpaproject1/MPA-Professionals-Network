@@ -12,7 +12,7 @@ const [migration,service,server,initiatives,offline,compatibility]=await Promise
 ]);
 test("Increment 2 adds only private detection projections and immutable policy/event history",()=>{
  for(const table of ["community_impact_detection_policy_version","community_impact_detection_active_policy","community_impact_detection_candidate","community_impact_detection_candidate_event"])assert.match(migration,new RegExp("create table if not exists "+table,"i"));
- assert.match(migration,/trg_community_impact_policy_version_immutable/);assert.match(migration,/trg_community_impact_candidate_event_immutable/);assert.match(migration,/trg_community_impact_candidate_guard/);assert.match(migration,/Community Impact source and detection provenance is immutable/);
+ assert.match(migration,/trg_community_impact_policy_version_immutable/);assert.match(migration,/trg_community_impact_candidate_event_immutable/);assert.match(migration,/trg_community_impact_candidate_guard/);assert.match(migration,/sourceEventCodes\\":\\\[\\\"approve\\\"\\\]/);assert.match(migration,/Community Impact source and detection provenance is immutable/);
  assert.match(migration,/unique\(source_system,source_type,source_event_id\)/);
  assert.doesNotMatch(migration,/alter table serve_community_participation|alter table serve_community_initiative|alter table serve_community_offline_project/i);
 });

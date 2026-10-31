@@ -56,7 +56,8 @@ const migrationNames = [
   "20261101190000_community_impact_score_effective_date_guard.sql",
   "20261101200000_community_impact_score_outcome_maturity_rule.sql",
   "20261101210000_community_impact_score_recipient_confirmation_rules.sql",
-  "20261101220000_community_impact_score_recipient_confirmation_scope.sql"
+  "20261101220000_community_impact_score_recipient_confirmation_scope.sql",
+  "20261101230000_community_impact_score_historical_dedup.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -698,6 +699,10 @@ try {
   if(weights!=="30,25,20,15,10")throw new Error("Initial score policy weights must match docs/62: 30/25/20/15/10.");
   const reversalConstraint=await client.query("select count(*)::int count from pg_indexes where schemaname='public' and indexname='uq_community_impact_score_ledger_single_reversal'");
   if(reversalConstraint.rows[0].count!==1)throw new Error("A score award must have at most one compensating reversal.");
+  const historicalFingerprint=await client.query("select count(*)::int count from information_schema.columns where table_schema='public' and table_name='community_impact_score_source_link' and column_name='source_fingerprint' and udt_name='text'");
+  if(historicalFingerprint.rows[0].count!==1)throw new Error("Historical contribution source fingerprints are required for duplicate prevention.");
+  const historicalFingerprintIndex=await client.query("select count(*)::int count from pg_indexes where schemaname='public' and indexname='uq_community_impact_score_historical_fingerprint'");
+  if(historicalFingerprintIndex.rows[0].count!==1)throw new Error("Historical source fingerprint uniqueness index is missing.");
   const assessmentPolicyColumn=await client.query("select count(*)::int count from information_schema.columns where table_schema='public' and table_name='community_impact_contribution_assessment' and column_name='score_policy_version_id' and udt_name='uuid'");
   if(assessmentPolicyColumn.rows[0].count!==1)throw new Error("Reviewer assessments must persist the exact score policy version used for their ratings.");
   const scorePermissions=await client.query("select count(*)::int count from app_permission where permission_code=any($1::text[])",[["community_impact.score.policy.manage","community_impact.score.policy.approve","community_impact.score.recalculate","community_impact.score.reverse","community_impact.score.view_all"]]);
@@ -717,6 +722,10 @@ try {
   if(rollbackTriggers.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact governance triggers behind.");
   const scoreRollbackTables=await client.query("select count(*)::int count from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_score_policy_version","community_impact_score_active_policy","community_impact_score_policy_event","community_impact_score_ledger","community_impact_score_recalculation","community_impact_score_adjustment_event","community_impact_score_source_link","community_impact_score_source_link_event"]]);
   if(scoreRollbackTables.rows[0].count!==0)throw new Error("Rollback rehearsal left unified score tables behind.");
+  const historicalFingerprintRollback=await client.query("select count(*)::int count from information_schema.columns where table_schema='public' and table_name='community_impact_score_source_link' and column_name='source_fingerprint'");
+  if(historicalFingerprintRollback.rows[0].count!==0)throw new Error("Rollback rehearsal left the historical source fingerprint column behind.");
+  const historicalFingerprintIndexRollback=await client.query("select count(*)::int count from pg_indexes where schemaname='public' and indexname='uq_community_impact_score_historical_fingerprint'");
+  if(historicalFingerprintIndexRollback.rows[0].count!==0)throw new Error("Rollback rehearsal left the historical source fingerprint index behind.");
   const assessmentPolicyColumnRollback=await client.query("select count(*)::int count from information_schema.columns where table_schema='public' and table_name='community_impact_contribution_assessment' and column_name='score_policy_version_id'");
   if(assessmentPolicyColumnRollback.rows[0].count!==0)throw new Error("Rollback rehearsal left the assessment score policy binding column behind.");
   const reversalIndexRollback=await client.query("select count(*)::int count from pg_indexes where schemaname='public' and indexname='uq_community_impact_score_ledger_single_reversal'");

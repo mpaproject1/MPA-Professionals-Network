@@ -46,7 +46,7 @@ function CompletedProjects() {
       <div className={styles.sectionHeading}>
         <p className={styles.eyebrow}>Evidence from the platform</p>
         <h2 id="completed-projects-title">Completed Projects</h2>
-        <p>Explore community initiatives recorded as completed in MPA. Project descriptions and participation figures are retrieved from system records, not estimated for display.</p>
+        <p>Explore community initiatives recorded as completed in MPA. Project descriptions and participation figures are retrieved from system records, not estimated for display. Participation counts are not independently verified beneficiary totals or measured outcomes.</p>
       </div>
       {loading ? <p className={styles.portfolioState} role="status">Loading completed project records…</p> :
         error ? <div className={styles.portfolioState} role="alert"><p>{error}</p><button type="button" className={styles.secondaryAction} onClick={() => void load()}>Retry</button></div> :

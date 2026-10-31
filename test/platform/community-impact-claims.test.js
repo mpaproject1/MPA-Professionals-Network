@@ -32,11 +32,13 @@ test("claim collection requires an active MPA retention schedule and never assum
  assert.match(migration,/Non-member identity assurance is outside this increment/);
 });
 test("claimants can create, edit, submit, attach private evidence, clarify, withdraw and appeal only their own records",()=>{
- for(const method of ["createClaim","updateMyClaim","attachClaimEvidence","submitMyClaim","respondToClarification","withdrawMyClaim","submitClaimAppeal","getMyClaim"])assert.match(service,new RegExp("export async function "+method));
+ for(const method of ["createClaim","updateMyClaim","attachClaimEvidence","removeClaimEvidence","submitMyClaim","respondToClarification","withdrawMyClaim","submitClaimAppeal","getMyClaim"])assert.match(service,new RegExp("export async function "+method));
  assert.match(service,/where c\.claimant_user_id=\$1/);
  assert.match(service,/ownedClaim\(tx,claimId,userId/);
  assert.match(service,/evidence<1/);
  assert.match(service,/Only your own confirmed claim-scoped private upload/);
+ assert.match(service,/bytesDeleted:false/);
+ assert.match(migration,/evidence_removed/);
  assert.match(service,/public_requested/);
  assert.match(service,/COMMUNITY_IMPACT_CLAIM_PUBLIC_CONSENT_REQUIRED/);
 });
@@ -62,7 +64,7 @@ test("private claim evidence downloads are scoped to claimant or assigned review
  assert.match(migration,/purpose_reference_id uuid references community_impact_claim/);
 });
 test("claim and appeal APIs authenticate every operation",()=>{
- for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","/decision","/assign"])assert.ok(server.includes(route),route);
+ for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","/evidence/","evidence_removed","/decision","/assign"])assert.ok(server.includes(route),route);
 });
 test("member and reviewer screens preserve private-by-default evidence boundaries",()=>{
  assert.match(claimPage,/private draft/i);
@@ -70,6 +72,7 @@ test("member and reviewer screens preserve private-by-default evidence boundarie
  assert.match(claimPage,/uploadPrivateFile/);
  assert.match(claimPage,/downloadPrivateFile/);
  assert.match(claimPage,/Request independent appeal review/);
+ assert.match(claimPage,/Remove from claim/);
  assert.match(reviewPage,/assigned reviewer only/);
  assert.match(reviewPage,/Request clarification/);
  assert.match(reviewPage,/Overturn original decision/);

@@ -107,7 +107,7 @@ export async function listReferralAdminQueue(identity,{status=null,limit=100}={}
  if(!identity.roles?.some(x=>["system_admin","admin","supporting_staff"].includes(x))&&!identity.permissions?.includes("referral.manage"))fail(403,"Referral administration permission is required.","FORBIDDEN");
  const db=getPool();const values=[];const where=[];
  if(status){values.push(status);where.push("a.status=$1");}
- const rows=(await db.query(`select a.id,a.referral_type,a.status,a.created_at,a.job_id,j.title job_title,a.referrer_user_id,a.referred_user_id,a.candidate_consent_at,a.verification_reference
+ const rows=(await db.query(`select a.id,a.referral_type,a.status,a.created_at,a.job_id,j.title job_title,a.referrer_user_id,a.referred_user_id,a.candidate_consent_at,a.candidate_outcome_summary,a.verification_reference
  from member_referral_attribution a left join job j on j.id=a.job_id ${where.length?"where "+where.join(" and "):""}
  order by a.created_at desc limit ${Math.min(Math.max(Number(limit)||100,1),250)}`,values)).rows;
  return {items:rows};

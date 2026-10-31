@@ -456,7 +456,7 @@ export async function saveApplicationDraft(jobId,userId,input={},requestId){
     : existing?.status==="withdrawn"
       ? (await db.query("update job_application set tracking_reference=$1,status='draft',cover_letter=$2,profile_snapshot=$3,eligibility_snapshot='{}'::jsonb,submitted_at=null,withdrawn_at=null,decided_at=null,updated_at=now() where id=$4 returning *",[trackingReference,input.coverLetter||null,snapshot,existing.id])).rows[0]
       : (await db.query("insert into job_application(job_id,applicant_user_id,tracking_reference,status,cover_letter,profile_snapshot) values($1,$2,$3,'draft',$4,$5) returning *",[jobId,userId,trackingReference,input.coverLetter||null,snapshot])).rows[0];
-  if(input.referralCode) await db.query("update job_application set referral_code=$1 where id=$2",[String(input.referralCode).trim().toUpperCase(),app.id]);
+  if(Object.hasOwn(input,"referralCode")) await db.query("update job_application set referral_code=$1 where id=$2",[String(input.referralCode||"").trim().toUpperCase()||null,app.id]);
   if(Array.isArray(input.answers)) await saveScreeningAnswers(db,app.id,jobId,input.answers,false);
   await db.query("insert into job_application_event(application_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,'draft',$4)",[app.id,userId,existing?.status||null,input.note||null]);
   await audit(db,userId,"job.application_draft_saved","job_application",app.id,requestId,{jobId});
@@ -470,7 +470,7 @@ export async function updateApplicationDraft(applicationId,userId,input={},reque
   if(a.applicant_user_id!==userId) throw error(403,"Only the applicant can edit an application draft.","FORBIDDEN");
   if(a.status!=="draft") throw error(409,"Only draft applications can be edited.","INVALID_STATE");
   if(Array.isArray(input.answers)) await saveScreeningAnswers(db,applicationId,a.job_id,input.answers,false);
-  const updated=(await db.query("update job_application set cover_letter=coalesce($1,cover_letter),referral_code=coalesce($2,referral_code),updated_at=now() where id=$3 returning *",[input.coverLetter??null,input.referralCode?String(input.referralCode).trim().toUpperCase():null,applicationId])).rows[0];
+  const updated=(await db.query("update job_application set cover_letter=coalesce($1,cover_letter),referral_code=case when $2 then $3 else referral_code end,updated_at=now() where id=$4 returning *",[input.coverLetter??null,Object.hasOwn(input,"referralCode"),String(input.referralCode||"").trim().toUpperCase()||null,applicationId])).rows[0];
   await audit(db,userId,"job.application_draft_updated","job_application",applicationId,requestId,{});
   return updated;
  });

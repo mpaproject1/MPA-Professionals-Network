@@ -48,7 +48,8 @@ const migrationNames = [
   "20261101110000_community_impact_unified_score.sql",
   "20261101120000_community_impact_score_source_adapters.sql",
   "20261101130000_community_impact_score_history_guards.sql",
-  "20261101140000_community_impact_score_policy_transition_guard.sql"
+  "20261101140000_community_impact_score_policy_transition_guard.sql",
+  "20261101150000_community_impact_score_single_reversal.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -680,6 +681,8 @@ try {
   if(initialScorePolicy.rowCount!==1||initialScorePolicy.rows[0].version!==1||initialScorePolicy.rows[0].status!=="active"||initialScorePolicy.rows[0].evaluation_only!==true||initialScorePolicy.rows[0].public_score_enabled!==false)throw new Error("The initial docs/62 score policy must be active for evaluation only and remain unpublished.");
   const weights=initialScorePolicy.rows[0].dimensions.map(x=>Number(x.weight)).sort((a,b)=>b-a).join(",");
   if(weights!=="30,25,20,15,10")throw new Error("Initial score policy weights must match docs/62: 30/25/20/15/10.");
+  const reversalConstraint=await client.query("select count(*)::int count from pg_indexes where schemaname='public' and indexname='uq_community_impact_score_ledger_single_reversal'");
+  if(reversalConstraint.rows[0].count!==1)throw new Error("A score award must have at most one compensating reversal.");
   const scorePermissions=await client.query("select count(*)::int count from app_permission where permission_code=any($1::text[])",[["community_impact.score.policy.manage","community_impact.score.policy.approve","community_impact.score.recalculate","community_impact.score.reverse","community_impact.score.view_all"]]);
   if(scorePermissions.rows[0].count!==5)throw new Error("Unified score governance permissions are incomplete.");
 
@@ -697,6 +700,8 @@ try {
   if(rollbackTriggers.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact governance triggers behind.");
   const scoreRollbackTables=await client.query("select count(*)::int count from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_score_policy_version","community_impact_score_active_policy","community_impact_score_policy_event","community_impact_score_ledger","community_impact_score_recalculation","community_impact_score_adjustment_event","community_impact_score_source_link","community_impact_score_source_link_event"]]);
   if(scoreRollbackTables.rows[0].count!==0)throw new Error("Rollback rehearsal left unified score tables behind.");
+  const reversalIndexRollback=await client.query("select count(*)::int count from pg_indexes where schemaname='public' and indexname='uq_community_impact_score_ledger_single_reversal'");
+  if(reversalIndexRollback.rows[0].count!==0)throw new Error("Rollback rehearsal left the score reversal uniqueness index behind.");
   const scoreRollbackTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_score_ledger_immutable","trg_community_impact_score_policy_immutable","trg_community_impact_score_source_link_immutable","trg_community_impact_score_policy_event_immutable","trg_community_impact_score_recalculation_immutable","trg_community_impact_score_adjustment_event_immutable","trg_community_impact_score_source_link_event_immutable"]]);
   if(scoreRollbackTriggers.rows[0].count!==0)throw new Error("Rollback rehearsal left unified score immutability triggers behind.");
   console.log("PASS: all listed migrations and post-migration assertions succeeded; rollback removed governance and unified score tables and their immutability triggers from the disposable transaction.");

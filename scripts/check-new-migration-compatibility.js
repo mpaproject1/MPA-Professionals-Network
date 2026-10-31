@@ -33,7 +33,8 @@ const migrationNames = [
   "20261025140000_serve_community_g4_announcement_commitment_experience.sql",
   "20261025150000_serve_community_g6_outcome_proof.sql",
   "20261029160000_account_references_and_governance.sql",
-  "20261031110000_network_plus_business_discovery.sql"
+  "20261031110000_network_plus_business_discovery.sql",
+  "20261031120000_network_plus_request_collaboration.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -432,7 +433,8 @@ try {
     "ux_service_listing_announcement_idempotency_hash",
     "ux_service_request_update_idempotency_hash",
     "ux_talent_inquiry_idempotency_hash",
-    "ux_mentorship_match_one_open_request"
+    "ux_mentorship_match_one_open_request",
+    "ux_network_plus_request_idempotency"
   ];
   for (const name of requiredUniqueIndexes) {
     const row = (await client.query(

@@ -77,6 +77,7 @@ async function permissionsFor(db,userId) {
   return (await db.query("select permission_code from app_user_permission where user_id=$1",[userId])).rows.map(r=>r.permission_code);
 }
 async function assertBusinessOwner(db,businessId,userId,capability="business.manage_listing") {
+  await assertEntry(db,userId);
   const business=(await db.query("select * from network_plus_business where id=$1",[businessId])).rows[0];
   if(!business)fail(404,"Business not found.","NOT_FOUND");
   const owned=(await db.query(`select bo.id,bo.owner_type,bo.owner_role,bo.consent_status,bo.owner_organization_id
@@ -122,6 +123,7 @@ export async function createBusiness(userId,input,requestId,idempotencyKey) {
   const organizationId=input.organizationId||null;
   if(!["member","organization"].includes(ownerType))fail(400,"Choose a canonical member or organization owner.","VALIDATION_ERROR");
   if((ownerType==="organization")!==Boolean(organizationId))fail(400,"Organization ownership requires exactly one organization ID.","VALIDATION_ERROR");
+  await assertEntry(getPool(),userId);
   const roles=await rolesFor(getPool(),userId);
   if(ownerType==="member"){
     if(!roles.some(role=>MEMBER_OWNER_ROLES.includes(role))||!(await hasCurrentActiveMembership(getPool(),userId)))fail(403,"An active professional member account is required to own a personal business.","BUSINESS_OWNER_NOT_ELIGIBLE");

@@ -1,0 +1,249 @@
+import { createHash } from "node:crypto";
+import { getPool, withTransaction } from "../platform/db.js";
+import { createInAppNotification } from "../platform/notifications.js";
+import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
+import { policyError } from "../platform/identity-policy.js";
+
+const INTENTS = new Set(["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request"]);
+const SUPPORT_ROLES = new Set(["network_plus_support","system_admin"]);
+const hash = value => createHash("sha256").update(String(value)).digest("hex");
+function fail(status,message,code="REQUEST_RULE"){ throw policyError(status,message,code); }
+function clean(value,max,label,min=1) { const s=String(value??"").trim(); if(s.length<min||s.length>max)fail(400,`${label} must be between ${min} and ${max} characters.`,"VALIDATION_ERROR"); return s; }
+function object(value,label) { if(value===undefined||value===null)return {}; if(typeof value!=="object"||Array.isArray(value))fail(400,`${label} must be an object.`,"VALIDATION_ERROR"); return value; }
+function safeTerms(intent,raw) {
+  const t=object(raw,"Terms");
+  if(intent==="partnership_proposal"||intent==="collaboration_request") {
+    for(const key of ["purpose","scope","contributions","responsibilities","outputs","timeline","authorizedRepresentatives"]) if(t[key]===undefined)fail(400,`Partnership/collaboration terms require ${key}.`,"TERMS_INCOMPLETE");
+    for(const key of ["purpose","scope"]) t[key]=clean(t[key],5000,key);
+    for(const key of ["contributions","responsibilities","outputs","authorizedRepresentatives"]) {
+      if(!Array.isArray(t[key])||t[key].length<1||t[key].length>30)fail(400,`${key} must be a list of 1–30 items.`,"TERMS_INCOMPLETE");
+      t[key]=t[key].map(v=>clean(v,500,key));
+    }
+    t.timeline=object(t.timeline,"Timeline");
+  }
+  if(intent==="service_request") {
+    if(t.scope!==undefined)t.scope=clean(t.scope,5000,"Scope");
+    if(t.deliverables!==undefined&&(!Array.isArray(t.deliverables)||t.deliverables.length>50))fail(400,"Deliverables must be a list of at most 50 items.","VALIDATION_ERROR");
+    if(t.pricing!==undefined)t.pricing=object(t.pricing,"Pricing/quotation");
+    if(t.schedule!==undefined)t.schedule=object(t.schedule,"Schedule");
+    if(t.completionEvidence!==undefined&&(!Array.isArray(t.completionEvidence)||t.completionEvidence.length>30))fail(400,"Completion evidence must be a list.","VALIDATION_ERROR");
+  }
+  return t;
+}
+async function assertEntry(db,userId) {
+  const access=await resolveNetworkPlusAccess(db,userId);
+  if(!access.eligible)fail(403,"Network-Plus access is required.","NETWORK_PLUS_FORBIDDEN");
+}
+async function participant(db,requestId,userId) {
+  const row=(await db.query("select p.*,r.status request_status,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id from network_plus_request_participant p join network_plus_request r on r.id=p.request_id where p.request_id=$1 and p.user_id=$2",[requestId,userId])).rows[0];
+  if(!row)fail(404,"Request not found.","NOT_FOUND");
+  return row;
+}
+async function assertSupport(db,userId,reason,ticket) {
+  if(!reason||!ticket)fail(400,"Support access requires a recorded reason and support case reference.","SUPPORT_REASON_REQUIRED");
+  const roles=(await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId])).rows.map(x=>x.role_code);
+  if(!roles.some(x=>SUPPORT_ROLES.has(x)))fail(403,"Authorized Network-Plus support staff only.","SUPPORT_FORBIDDEN");
+}
+async function notify(db,userId,event,requestId,message) {
+  await createInAppNotification(db,userId,event,"network_plus_request",requestId,{message,nextAction:"Open Network-Plus requests to review the update."});
+}
+async function audit(db,requestId,actor,event,from,to,requestIdHeader,metadata={}) {
+  await db.query("insert into network_plus_request_event(request_id,actor_user_id,event_code,from_status,to_status,request_id_header,metadata) values($1,$2,$3,$4,$5,$6,$7)",[requestId,actor,event,from||null,to||null,requestIdHeader||null,metadata]);
+  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'network_plus_request',$3,$4,'success',$5)",[actor,event,requestId,requestIdHeader||null,metadata]);
+}
+function canTransition(intent,from,to,actorRole) {
+  const map={
+    draft:["submitted","withdrawn"],
+    submitted:["under_review","clarification_requested","accepted","declined","withdrawn"],
+    under_review:["clarification_requested","accepted","declined","withdrawn"],
+    clarification_requested:["submitted","withdrawn","declined"],
+    accepted:["in_progress","disputed","closed","completed"],
+    in_progress:["completed","disputed","closed"],
+    disputed:["in_progress","completed","closed"],
+    declined:[],withdrawn:[],completed:["disputed","closed"],closed:[]
+  };
+  if(!map[from]?.includes(to))return false;
+  if(to==="withdrawn")return actorRole==="requester";
+  if(["under_review","clarification_requested","accepted","declined"].includes(to))return actorRole==="recipient"||actorRole==="support";
+  if(["in_progress","completed","disputed","closed"].includes(to))return actorRole==="requester"||actorRole==="recipient"||actorRole==="support";
+  return actorRole==="requester";
+}
+export async function createNetworkPlusRequest(userId,input,requestIdHeader,idempotencyKey) {
+  input=input||{};
+  if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure X-Idempotency-Key is required.","IDEMPOTENCY_KEY_REQUIRED");
+  const intent=input.intent;
+  if(!INTENTS.has(intent))fail(400,"Choose a supported request intent.","INVALID_INTENT");
+  const subject=clean(input.subject,180,"Subject",3), summary=clean(input.summary,500,"Summary",10);
+  const details=object(input.details,"Request details"), terms=safeTerms(intent,input.terms);
+  if(input.recipientUserId===userId)fail(400,"You cannot send a request to yourself.","INVALID_RECIPIENT");
+  if(Boolean(input.recipientUserId)===Boolean(input.recipientOrganizationId))fail(400,"Choose exactly one recipient user or organization.","INVALID_RECIPIENT");
+  const fingerprint=hash(JSON.stringify({intent,subject,summary,details,terms,recipientUserId:input.recipientUserId||null,recipientOrganizationId:input.recipientOrganizationId||null,businessId:input.businessId||null,serviceListingId:input.serviceListingId||null}));
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[`network-plus-request:${userId}:${hash(idempotencyKey)}`]);
+    const prior=(await db.query("select id,request_fingerprint from network_plus_request where requester_user_id=$1 and idempotency_hash=$2",[userId,hash(idempotencyKey)])).rows[0];
+    if(prior){if(prior.request_fingerprint!==fingerprint)fail(409,"This idempotency key was already used for different request content.","IDEMPOTENCY_CONFLICT");return getNetworkPlusRequest(prior.id,userId);}
+    let recipientUserId=input.recipientUserId||null;
+    if(input.recipientOrganizationId) {
+      const org=(await db.query("select id,verification_status from organization where id=$1",[input.recipientOrganizationId])).rows[0];
+      if(!org||org.verification_status!=="verified")fail(404,"Recipient organization not found.","RECIPIENT_NOT_FOUND");
+      const reps=(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code in ('owner','administrator')",[org.id])).rows;
+      if(!reps.length)fail(409,"Recipient organization has no active authorized representative.","RECIPIENT_UNAVAILABLE");
+    } else {
+      const eligible=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[recipientUserId])).rowCount>0;
+      if(!eligible)fail(404,"Recipient not found or not eligible for Network-Plus requests.","RECIPIENT_NOT_FOUND");
+    }
+    if(input.serviceListingId) {
+      const listing=(await db.query("select id,business_id from network_plus_service_listing where id=$1 and status='published'",[input.serviceListingId])).rows[0];
+      if(!listing)fail(404,"Published service listing not found.","SERVICE_NOT_FOUND");
+      if(input.businessId&&input.businessId!==listing.business_id)fail(400,"Service listing does not belong to the selected business.","BUSINESS_LISTING_MISMATCH");
+      input.businessId=listing.business_id;
+    }
+    const created=(await db.query(`insert into network_plus_request(intent,status,requester_user_id,recipient_user_id,recipient_organization_id,business_id,service_listing_id,subject,summary,request_details,terms,idempotency_hash,request_fingerprint)
+      values($1,'draft',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,[intent,userId,recipientUserId,input.recipientOrganizationId||null,input.businessId||null,input.serviceListingId||null,subject,summary,details,terms,hash(idempotencyKey),fingerprint])).rows[0];
+    await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,consented_at,added_by) values($1,$2,'requester','accepted',now(),$2)",[created.id,userId]);
+    if(recipientUserId) await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) values($1,$2,'recipient_representative','pending',$3)",[created.id,recipientUserId,userId]);
+    else await db.query(`insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by)
+      select $1,om.user_id,'recipient_representative','pending',$2 from organization_membership om
+      where om.organization_id=$3 and om.status='active' and om.role_code in ('owner','administrator')`,[created.id,userId,input.recipientOrganizationId]);
+    await audit(db,created.id,userId,"request.created",null,"draft",requestIdHeader,{intent});
+    return created;
+  });
+}
+export async function submitNetworkPlusRequest(requestId,userId,requestIdHeader) {
+  return transitionRequest(requestId,userId,"submitted",{},requestIdHeader);
+}
+export async function transitionNetworkPlusRequest(requestId,userId,input,requestIdHeader) {
+  return transitionRequest(requestId,userId,input.status,input,requestIdHeader);
+}
+async function transitionRequest(requestId,userId,to,input,requestIdHeader) {
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    const row=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
+    if(!row)fail(404,"Request not found.","NOT_FOUND");
+    const p=await participant(db,requestId,userId);
+    let role=p.participant_role==="requester"?"requester":p.participant_role==="recipient_representative"?"recipient":"participant";
+    if(input.supportReason||input.supportTicket){await assertSupport(db,userId,input.supportReason,input.supportTicket);role="support";}
+    if(!canTransition(row.intent,row.status,to,role))fail(403,"This role cannot make the requested transition from the current status.","TRANSITION_FORBIDDEN");
+    if(to==="accepted"&&role!=="recipient")fail(403,"Only an authorized recipient representative may explicitly accept this request.","RECIPIENT_ACCEPTANCE_REQUIRED");
+    if(to==="clarification_requested"&&!input.reason)fail(400,"A clarification reason is required.","REASON_REQUIRED");
+    if(to==="declined"&&!input.reason)fail(400,"A decline reason is required.","REASON_REQUIRED");
+    if(to==="disputed"&&!input.reason)fail(400,"A dispute reason is required.","REASON_REQUIRED");
+    if(to==="completed"&&!input.completionEvidence)fail(400,"Completion evidence or a documented not-applicable reason is required.","COMPLETION_EVIDENCE_REQUIRED");
+    if(to==="in_progress"&&row.status!=="accepted")fail(409,"Only an accepted engagement can start.","ACCEPTANCE_REQUIRED");
+    const updated=(await db.query(`update network_plus_request set status=$1,submitted_at=case when $1='submitted' then coalesce(submitted_at,now()) else submitted_at end,
+      accepted_at=case when $1='accepted' then now() else accepted_at end,declined_at=case when $1='declined' then now() else declined_at end,
+      withdrawn_at=case when $1='withdrawn' then now() else withdrawn_at end,completed_at=case when $1='completed' then now() else completed_at end,
+      disputed_at=case when $1='disputed' then now() else disputed_at end,closed_at=case when $1='closed' then now() else closed_at end,
+      version=version+1,updated_at=now() where id=$2 returning *`,[to,requestId])).rows[0];
+    await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version});
+    if(to==="accepted") {
+      if(!["service_request","supplier_inquiry","partnership_proposal","collaboration_request"].includes(row.intent)) {
+        // Accepted referral/expertise requests are recorded as accepted without a project workspace.
+      } else {
+        const t=row.terms||{};
+        const purpose=t.purpose||row.summary, scope=t.scope||row.summary;
+        const ws=(await db.query(`insert into network_plus_collaboration_workspace(request_id,purpose,scope,timeline,created_by,accepted_at)
+          values($1,$2,$3,$4,$5,now()) on conflict(request_id) do nothing returning id`,[requestId,purpose,scope,t.timeline||{},userId])).rows[0];
+        if(ws) await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body) values($1,$2,'update','Engagement accepted','The recipient explicitly accepted this request. The collaboration workspace is now active.')",[ws.id,userId]);
+      }
+    }
+    const other=(await db.query("select user_id from network_plus_request_participant where request_id=$1 and user_id<>$2 and consent_status<>'revoked'",[requestId,userId])).rows;
+    for(const x of other) await notify(db,x.user_id,`network_plus.request.${to}`,requestId,`Your Network-Plus request is now ${to.replaceAll("_"," ")}.`);
+    return updated;
+  });
+}
+export async function listNetworkPlusRequests(userId,{status,intent,limit=30,offset=0,supportReason,supportTicket}={}) {
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    let support=false;
+    if(supportReason||supportTicket){await assertSupport(db,userId,supportReason,supportTicket);support=true;}
+    const rows=(await db.query(`select r.id,r.intent,r.status,r.subject,r.summary,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id,r.business_id,r.service_listing_id,r.version,r.created_at,r.updated_at
+      from network_plus_request r where (${support} or exists(select 1 from network_plus_request_participant p where p.request_id=r.id and p.user_id=$1 and p.consent_status<>'revoked'))
+      and ($2::text is null or r.status=$2) and ($3::text is null or r.intent=$3)
+      order by r.updated_at desc limit $4 offset $5`,[userId,status||null,intent||null,Math.min(100,Math.max(1,Number(limit)||30)),Math.max(0,Number(offset)||0)])).rows;
+    return rows;
+  });
+}
+export async function getNetworkPlusRequest(requestId,userId,{supportReason,supportTicket}={}) {
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    const row=(await db.query("select * from network_plus_request where id=$1",[requestId])).rows[0];
+    if(!row)fail(404,"Request not found.","NOT_FOUND");
+    const isParticipant=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status<>'revoked'",[requestId,userId])).rowCount>0;
+    if(!isParticipant)await assertSupport(db,userId,supportReason,supportTicket);
+    const participants=(await db.query("select user_id,participant_role,consent_status,consented_at from network_plus_request_participant where request_id=$1 and consent_status<>'revoked'",[requestId])).rows;
+    const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 order by created_at",[requestId])).rows;
+    const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;
+    return { ...row, participants, events, workspace };
+  });
+}
+export async function addNetworkPlusRequestParticipant(requestId,userId,input,requestIdHeader) {
+  const target=input?.userId;
+  if(!target||target===userId)fail(400,"Choose another participant.","INVALID_PARTICIPANT");
+  return withTransaction(async db=>{
+    await participant(db,requestId,userId);
+    const request=(await db.query("select status,requester_user_id from network_plus_request where id=$1 for update",[requestId])).rows[0];
+    if(!["accepted","in_progress"].includes(request.status))fail(409,"Additional participants can join only an accepted engagement.","ACCEPTANCE_REQUIRED");
+    await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) values($1,$2,'additional_participant','pending',$3) on conflict(request_id,user_id) do nothing",[requestId,target,userId]);
+    await audit(db,requestId,userId,"request.participant_invited",request.status,request.status,requestIdHeader,{});
+    await notify(db,target,"network_plus.request.participant_invited",requestId,"You have been invited to an accepted Network-Plus engagement. Accept participation to view its workspace.");
+    return {requestId,userId:target,consentStatus:"pending"};
+  });
+}
+export async function respondNetworkPlusParticipant(requestId,userId,decision,requestIdHeader) {
+  if(!["accept","decline"].includes(decision))fail(400,"Choose accept or decline.","INVALID_DECISION");
+  return withTransaction(async db=>{
+    const p=(await db.query("select * from network_plus_request_participant where request_id=$1 and user_id=$2 for update",[requestId,userId])).rows[0];
+    if(!p||p.participant_role!=="additional_participant"||p.consent_status!=="pending")fail(404,"Invitation not found.","NOT_FOUND");
+    await db.query("update network_plus_request_participant set consent_status=$1,consented_at=case when $1='accepted' then now() else consented_at end where request_id=$2 and user_id=$3",[decision==="accept"?"accepted":"declined",requestId,userId]);
+    await audit(db,requestId,userId,`request.participant_${decision}ed`,null,null,requestIdHeader,{});
+    return {requestId,consentStatus:decision==="accept"?"accepted":"declined"};
+  });
+}
+async function workspaceAccess(db,workspaceId,userId) {
+  const ws=(await db.query(`select w.*,r.id request_id from network_plus_collaboration_workspace w join network_plus_request r on r.id=w.request_id
+    join network_plus_request_participant p on p.request_id=r.id and p.user_id=$2 and p.consent_status='accepted'
+    where w.id=$1`,[workspaceId,userId])).rows[0];
+  if(!ws)fail(404,"Collaboration workspace not found.","NOT_FOUND");
+  return ws;
+}
+export async function getNetworkPlusWorkspace(requestId,userId) {
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    const ws=(await db.query("select id from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0];
+    if(!ws)fail(404,"Accepted collaboration workspace not found.","NOT_FOUND");
+    await workspaceAccess(db,ws.id,userId);
+    const milestones=(await db.query("select * from network_plus_collaboration_milestone where workspace_id=$1 order by due_at nulls last,created_at",[ws.id])).rows;
+    const events=(await db.query("select * from network_plus_collaboration_event where workspace_id=$1 order by created_at desc",[ws.id])).rows;
+    return {workspace:ws,milestones,events};
+  });
+}
+export async function addNetworkPlusWorkspaceMilestone(requestId,userId,input) {
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    const ws=(await db.query("select id from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0];
+    if(!ws)fail(404,"Accepted collaboration workspace not found.","NOT_FOUND");
+    await workspaceAccess(db,ws.id,userId);
+    const title=clean(input?.title,180,"Milestone title",2);
+    const owner=input?.ownerUserId||userId;
+    const active=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status='accepted'",[requestId,owner])).rowCount>0;
+    if(!active)fail(400,"Milestone owner must be an accepted participant.","INVALID_MILESTONE_OWNER");
+    return (await db.query("insert into network_plus_collaboration_milestone(workspace_id,title,description,owner_user_id,due_at,created_by) values($1,$2,$3,$4,$5,$6) returning *",[ws.id,title,String(input.description||"").slice(0,2000)||null,owner,input.dueAt||null,userId])).rows[0];
+  });
+}
+export async function addNetworkPlusWorkspaceEvent(requestId,userId,input,requestIdHeader) {
+  const eventType=input?.eventType;
+  if(!["update","blocker","decision","outcome"].includes(eventType))fail(400,"Unsupported collaboration update type.","VALIDATION_ERROR");
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    const ws=(await db.query("select id from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0];
+    if(!ws)fail(404,"Accepted collaboration workspace not found.","NOT_FOUND");
+    await workspaceAccess(db,ws.id,userId);
+    const title=clean(input.title,180,"Title",2), body=clean(input.body,4000,"Update",2);
+    const row=(await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body,metadata) values($1,$2,$3,$4,$5,$6) returning *",[ws.id,userId,eventType,title,body,object(input.metadata,"Metadata")])).rows[0];
+    await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'network_plus_collaboration_workspace',$3,$4,'success',$5)",[userId,`collaboration.${eventType}`,ws.id,requestIdHeader,{requestId}]);
+    return row;
+  });
+}
+export const requestLifecycle = Object.freeze({intents:[...INTENTS],statuses:["draft","submitted","under_review","clarification_requested","accepted","declined","withdrawn","in_progress","completed","disputed","closed"]});

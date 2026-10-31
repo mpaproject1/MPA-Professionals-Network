@@ -330,7 +330,7 @@ export async function submitProfessionalServiceListing(listingId,userId,requestI
     const row=(await db.query("select * from network_plus_service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row)fail(404,"Professional service listing not found.","NOT_FOUND");
     await assertBusinessOwner(db,row.business_id,userId);
-    await assertBusinessPublishable(db,row.business_id);
+    await assertBusinessPublishable(db,row.business_id,{requirePublished:true});
     if(!["draft","changes_requested","rejected","paused","suspended"].includes(row.status))fail(409,"This listing is not ready for moderation submission.","INVALID_STATE");
     const updated=(await db.query("update network_plus_service_listing set status='pending_review',moderation_reason=null,submitted_by=$2,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
     await audit(db,userId,"network_plus.service_listing_submitted","network_plus_service_listing",listingId,requestId,{businessId:row.business_id,from:row.status,to:"pending_review"});

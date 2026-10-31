@@ -7,7 +7,7 @@ function err(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.s
 async function allowed(db,userId){const r=await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId]);return r.rows.map(x=>x.role_code)}
 function admin(roles,permissions=[],requiredPermission="users.manage"){if(!roles.some(x=>["system_admin","admin"].includes(x))&&!permissions.includes(requiredPermission))throw err(403,"Administrator role or explicit user-administration permission required.","FORBIDDEN")}
 const SYSTEM_ROLE="system_admin";
-const PRIVILEGED_ROLES=new Set([SYSTEM_ROLE,"super_admin","admin","platform_admin","reviewer","membership_reviewer","verification_reviewer","ethics_reviewer","appeal_reviewer","finance_officer"]);
+const PRIVILEGED_ROLES=new Set([SYSTEM_ROLE,"super_admin","admin","platform_admin","reviewer","membership_reviewer","verification_reviewer","business_verification_reviewer","business_moderator","ethics_reviewer","appeal_reviewer","finance_officer"]);
 const NON_PLATFORM_ROLES={
  organization_admin:{scope:"organization",reason:"Use an organization membership role instead."},
  recruiter:{scope:"organization_or_job",reason:"Use organization membership or job-team scope instead."},

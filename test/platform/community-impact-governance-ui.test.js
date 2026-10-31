@@ -20,7 +20,7 @@ test("Member identity assurance uses private upload, explicit submission and con
 });
 test("Administrator governance UI exposes identity, attribution, policy, COI, assessment and retention operations",()=>{
  for(const route of ["/api/v1/admin/community-impact/identity-assurance","/api/v1/admin/community-impact/offline-attributions","/api/v1/admin/community-impact/detection/policies","/api/v1/admin/community-impact/claims/","/api/v1/admin/community-impact/assessments/","/api/v1/admin/community-impact/retention/evaluate"])assert.ok(admin.includes(route),route);
- for(const phrase of ["Verify identity","Submit attribution with evidence","Approve version","Activate approved version","Declare reviewer conflict","Submit assessment for review","Record independent second review","Evaluate retention schedule"])assert.ok(admin.includes(phrase),phrase);
+ for(const phrase of ["Verify identity","Submit attribution with evidence","Approve version","Activate approved version","Declare reviewer conflict","Submit assessment for review","Record independent second review","Pending independent assessment queue","Evaluate retention schedule"])assert.ok(admin.includes(phrase),phrase);
  assert.match(admin,/created_by!==actorId/);
  assert.match(admin,/assignedReviewerUserId===actorId/);
  assert.match(nav,/community-impact\/governance/);

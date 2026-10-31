@@ -13,7 +13,7 @@ export async function listMyRecognition(user){const db=getPool();const [n,a]=awa
 ]);return {nominations:n.rows.map(viewNomination),awards:a.rows}}
 export async function submitRecognitionNomination(user,input){
  const programId=String(input?.programId||"");if(!UUID.test(programId))fail(400,"Choose a valid recognition opportunity.","VALIDATION_ERROR");
- const summary=clean(input?.contributionSummary,30,3000,"Contribution summary"),name=clean(input?.nomineeName,2,180,"Nominee name");
+ const summary=clean(input?.contributionSummary,30,3000,"Contribution summary");let name=clean(input?.nomineeName,2,180,"Nominee name");
  const nomineeType=input?.nomineeType==="non_member"?"non_member":"member",nomineeUserId=nomineeType==="member"?String(input?.nomineeUserId||user):null;
  if(nomineeType==="member"&&!UUID.test(nomineeUserId))fail(400,"Choose a valid member nominee.","VALIDATION_ERROR");
  if(nomineeType==="non_member"&&(!input?.nomineeEmail||!/^\S+@\S+\.\S+$/.test(String(input.nomineeEmail))))fail(400,"A valid contact email is required for a non-member nominee.","VALIDATION_ERROR");
@@ -24,7 +24,7 @@ export async function submitRecognitionNomination(user,input){
   if(nomineeType==="non_member"&&!p.accepts_non_member_nominations)fail(403,"This opportunity does not accept non-member nominations.","NOMINATION_NOT_ALLOWED");
   if(nomineeType==="member"&&nomineeUserId===user&&!p.accepts_self_nominations)fail(403,"This opportunity does not accept self-nominations.","NOMINATION_NOT_ALLOWED");
   if(nomineeType==="member"&&nomineeUserId!==user&&!p.accepts_member_nominations)fail(403,"This opportunity does not accept member nominations.","NOMINATION_NOT_ALLOWED");
-  if(nomineeType==="member"){const exists=(await db.query("select 1 from app_user where id=$1",[nomineeUserId])).rowCount;if(!exists)fail(404,"Member nominee was not found.","NOT_FOUND")}
+  if(nomineeType==="member"){const member=(await db.query("select coalesce(nullif(p.display_name,''),u.email) display_name from app_user u left join person p on p.user_id=u.id where u.id=$1 and u.status='active'",[nomineeUserId])).rows[0];if(!member)fail(404,"Active member nominee was not found.","NOT_FOUND");name=member.display_name}
   const claimId=input?.relatedClaimId?String(input.relatedClaimId):null;if(claimId){if(!UUID.test(claimId))fail(400,"Related contribution claim is invalid.","VALIDATION_ERROR");const claim=(await db.query("select id,claimant_user_id,status from community_impact_claim where id=$1",[claimId])).rows[0];if(!claim||claim.status!=="verified"||(nomineeType==="member"&&claim.claimant_user_id!==nomineeUserId))fail(409,"Related claim must be verified and belong to the nominee.","RECOGNITION_CLAIM_MISMATCH")}
   let row;try{row=(await db.query("insert into community_impact_recognition_nomination(program_id,nominator_user_id,nominee_user_id,nominee_type,nominee_name,nominee_email,contribution_summary,evidence_references,related_claim_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *",[programId,user,nomineeUserId,nomineeType,name,nomineeType==="non_member"?String(input.nomineeEmail).trim().toLowerCase():null,summary,evidence,claimId])).rows[0]}catch(error){if(error?.code==="23505")fail(409,"An open nomination already exists for this nominee and recognition opportunity.","DUPLICATE_NOMINATION");throw error}
   await db.query("insert into community_impact_recognition_event(nomination_id,actor_user_id,event_code,rationale,metadata) values($1,$2,'submitted',$3,$4)",[row.id,user,summary,{nomineeType}]);

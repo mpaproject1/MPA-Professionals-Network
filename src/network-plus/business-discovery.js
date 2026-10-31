@@ -425,7 +425,7 @@ export async function reviewBusinessModeration(businessId,userId,input,requestId
     const row=(await db.query("select * from network_plus_business where id=$1 for update",[businessId])).rows[0];
     if(!row)fail(404,"Business not found.","NOT_FOUND");
     if(row.created_by===userId||row.moderation_submitted_by===userId)fail(403,"A business creator or submitter cannot moderate their own business profile.","SELF_REVIEW_FORBIDDEN");
-    if(status!=="suspended"&&row.moderation_status!=="pending_review")fail(409,"Business profile is not awaiting moderation.","INVALID_STATE");
+    if(status!=="suspended"&&row.moderation_status!=="pending_review"&&!(status==="approved"&&row.publication_status==="suspended"))fail(409,"Business profile is not awaiting moderation or eligible for reinstatement.","INVALID_STATE");
     if(status==="approved"&&row.verification_status!=="verified")fail(409,"Only a verified business profile can be approved for publication.","BUSINESS_NOT_VERIFIED");
     const updated=(await db.query("update network_plus_business set moderation_status=$1,publication_status=case when $1='suspended' then 'suspended' when $1='approved' then 'published' else 'draft' end,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];
     if(status==="suspended")await db.query("update network_plus_service_listing set status=$2,suspended_at=now(),suspension_reason=$3,updated_at=now() where business_id=$1 and status=any($4::text[])",[businessId,"suspended",reason,["published","paused","pending_review"]]);

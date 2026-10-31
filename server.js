@@ -358,6 +358,7 @@ const server=http.createServer(async (req,res)=>{
       return ok(res,await networkPlusBusiness.createProfessionalServiceListing(parts[4],identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
     }
     if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/network-plus/services/")) return ok(res,await networkPlusBusiness.updateProfessionalServiceListing(parts[4],identity.sub,await body(req),requestId),requestId);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/services/") && parts[5]==="publication"){ const b=await body(req); return ok(res,await networkPlusBusiness.changeProfessionalServiceStatus(parts[4],identity.sub,b.status,b.reason,requestId),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/services/") && parts[5]==="submit"){
       await enforcePersistentRateLimit(req,"network-plus.service.submit",10,60000,identity.sub);
       return ok(res,await networkPlusBusiness.submitProfessionalServiceListing(parts[4],identity.sub,requestId),requestId);

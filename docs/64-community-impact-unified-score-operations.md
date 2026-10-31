@@ -81,6 +81,7 @@ Each reviewer assessment stores the exact score policy version used for its five
 - `20261101200000_community_impact_score_outcome_maturity_rule.sql`
 - `20261101210000_community_impact_score_recipient_confirmation_rules.sql`
 - `20261101220000_community_impact_score_recipient_confirmation_scope.sql`
+- `20261101230000_community_impact_score_historical_dedup.sql`
 
 The migration runner verifies the active evaluation-only policy v6, the exact five weights, policy thresholds, source-link uniqueness, one-reversal constraint, append-only triggers, assessment policy binding and complete rollback of the score schema changes.
 

@@ -93,6 +93,11 @@ test("API routes are authenticated, rate-limited for discovery and creation, and
   assert.match(server, /api\/v1\/network-plus\/services/);
   assert.match(server, /api\/v1\/admin\/network-plus\/businesses/);
   assert.match(server, /api\/v1\/admin\/network-plus\/services/);
+  assert.match(server, /businesses\/verification-queue/);
+  assert.match(server, /businesses\/moderation-queue/);
+  assert.match(server, /services\/moderation-queue/);
+  assert.match(server, /changeProfessionalServiceStatus/);
+  assert.match(server, /revokeBusinessAccess/);
 });
 
 test("disposable migration compatibility checks include the Increment 5 migration and critical constraints", () => {

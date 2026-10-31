@@ -29,7 +29,7 @@ Source adapters reject stale/reversed/disputed/unconfirmed sources. The source l
 
 ## Policy administration
 
-The initial plan baseline was first seeded as version 1. Operational version 3 is active for private evaluation, preserves the same five weights and adds configurable evidence-quality ranks, outcome-maturity ranks, rating steps, reviewer criteria, modifiers and decay rules. Public publication remains disabled. Administrators may propose a new JSON policy version. The API validates:
+The initial plan baseline was first seeded as version 1. Operational version 4 is active for private evaluation, preserves the same five weights and adds configurable evidence-quality ranks, outcome-maturity ranks, a dimension-specific outcome gate, rating steps, reviewer criteria, modifiers and decay rules. Public publication remains disabled. Administrators may propose a new JSON policy version. The API validates:
 
 - exactly the five approved dimensions;
 - weights total exactly 100%;
@@ -78,8 +78,9 @@ Each reviewer assessment stores the exact score policy version used for its five
 - `20261101170000_community_impact_assessment_score_policy.sql`
 - `20261101180000_community_impact_score_modifiers_and_rubrics.sql`
 - `20261101190000_community_impact_score_effective_date_guard.sql`
+- `20261101200000_community_impact_score_outcome_maturity_rule.sql`
 
-The migration runner verifies the active evaluation-only policy v3, the exact five weights, policy thresholds, source-link uniqueness, one-reversal constraint, append-only triggers, assessment policy binding and complete rollback of the score schema changes.
+The migration runner verifies the active evaluation-only policy v4, the exact five weights, policy thresholds, source-link uniqueness, one-reversal constraint, append-only triggers, assessment policy binding and complete rollback of the score schema changes.
 
 ## Commands
 

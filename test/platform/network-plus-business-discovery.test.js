@@ -94,6 +94,8 @@ test("disposable migration compatibility checks include the Increment 5 migratio
   assert.match(compatibility, /ux_network_plus_business_idempotency_hash/);
   assert.match(compatibility, /ux_network_plus_service_idempotency_hash/);
   assert.match(compatibility, /network_plus_business_verification_case/);
+  assert.match(compatibility, /business_verification_reviewer/);
+  assert.match(compatibility, /business_moderator/);
 });
 
 test("private business verification evidence is readable only by an independent authorized reviewer", () => {

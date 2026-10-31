@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { getPool, withTransaction } from "./db.js";
+import { queueWorkflowEmail } from "./email-operations.js";
 
 const ALPHABET="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const fail=(status,message,code="REFERRAL_ERROR")=>{const e=new Error(message);e.statusCode=status;e.code=code;throw e;};
@@ -22,6 +23,9 @@ async function event(db,attribution,eventCode,fromStatus,toStatus,actor,metadata
  const policy=(await db.query("select id,points from member_referral_score_policy where status='active' limit 1")).rows[0];
  const points=Number(policy?.points?.[eventCode]??0);
  if(policy&&Number.isInteger(points)&&points>0)await db.query("insert into member_referral_score_ledger(attribution_id,event_code,points,policy_id) values($1,$2,$3,$4) on conflict do nothing",[attribution,eventCode,points,policy.id]);
+ const recipient=(await db.query("select referrer_user_id from member_referral_attribution where id=$1",[attribution])).rows[0];
+ if(recipient)await queueWorkflowEmail(db,recipient.referrer_user_id,"professional.workflow_update",{notificationEventCode:"member.referral.progress",category:eventCode==="membership_activated"?"membership":"recruitment",title:"Your referral has a progress update",status:toStatus,message:"Someone you invited has reached a new step. Their private details remain protected.",nextAction:"Open your referral dashboard to review the permitted status.",actionUrl:"/referrals"},"member_referral_attribution",attribution);
+
 }
 export async function ensureMyReferralCode(userId){
  const db=getPool();await activeMember(db,userId);
@@ -55,7 +59,7 @@ export async function recordMembershipActivated(db,referredUserId,actorUserId){
  for(const row of rows){if(row.status==="membership_activated")continue;await db.query("update member_referral_attribution set status='membership_activated',updated_at=now() where id=$1",[row.id]);await event(db,row.id,"membership_activated",row.status,"membership_activated",actorUserId);}
 }
 export async function recordJobApplicationStage(db,applicationId,status,actorUserId){
- const mapping={shortlisted:"shortlisted",interview:"interview",offer:"offer_accepted",accepted:"offer_accepted",hired:"employment_reported"};
+ const mapping={shortlisted:"shortlisted",interview:"interview",accepted:"offer_accepted",hired:"employment_reported"};
  const eventCode=mapping[status];if(!eventCode)return;
  const rows=(await db.query("select id,status from member_referral_attribution where referral_type='employment' and job_application_id=$1 for update",[applicationId])).rows;
  for(const row of rows){await db.query("update member_referral_attribution set status=$1,updated_at=now() where id=$2",[eventCode,row.id]);await event(db,row.id,eventCode,row.status,eventCode,actorUserId);}
@@ -66,6 +70,7 @@ export async function confirmEmploymentOutcome(userId,attributionId,input={}){
   if(!row)fail(404,"Referral record not found.","NOT_FOUND");
   if(row.referred_user_id!==userId)fail(403,"Only the referred candidate can confirm this outcome.","FORBIDDEN");
   if(row.status==="employment_verified")fail(409,"This employment outcome has already been verified.","ALREADY_VERIFIED");
+  if(row.candidate_consent_at)fail(409,"Your employment outcome confirmation has already been submitted for review.","CONFIRMATION_ALREADY_SUBMITTED");
   if(!input.consent)fail(400,"Confirm consent before asking MPA to verify this employment outcome.","CONSENT_REQUIRED");
   const reason=String(input.summary||"").trim();if(reason.length<20||reason.length>1000)fail(400,"Provide a short employment outcome summary (20–1000 characters).","VALIDATION_ERROR");
   await db.query("update member_referral_attribution set status='employment_reported',candidate_consent_at=now(),verification_reference=$1,updated_at=now() where id=$2",[reason,row.id]);

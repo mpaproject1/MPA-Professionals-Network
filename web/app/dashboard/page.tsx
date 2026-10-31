@@ -253,6 +253,12 @@ export default function Dashboard(){
       <div><span>Organization scopes</span><strong>{data?.organizations.length??"—"}</strong><small>Memberships attached to your account</small></div>
     </section>
 
+    {engagementSeries.length>0&&<section className={`${styles.section} ${styles.chartSection}`} aria-labelledby={`${dashboardId}-engagement-chart`}>
+      <div className={styles.sectionHeading}><div><div className={styles.kicker}>Recorded activity</div><h2 id={`${dashboardId}-engagement-chart`}>Engagement by pathway</h2></div><Badge tone="slate">Your account</Badge></div>
+      <p className={styles.muted}>Counts of records returned by your personal outcomes service. These are activity records, not beneficiary or impact totals.</p>
+      <div className={styles.chartList}>{engagementSeries.map(item=><div className={styles.chartRow} key={item.label}><div><span>{item.label}</span><strong>{item.value.toLocaleString()}</strong></div><div className={styles.chartTrack} role="img" aria-label={`${item.label}: ${item.value} records`}><span style={{width:`${item.value/engagementMax*100}%`}}/></div></div>)}</div>
+    </section>}
+
     <div className={styles.columns}>
       <div className={styles.primaryColumn}>
         <section className={styles.section}>

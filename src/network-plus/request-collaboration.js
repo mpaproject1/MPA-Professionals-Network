@@ -271,10 +271,10 @@ export async function addNetworkPlusRequestParticipant(requestId,userId,input,re
     await assertEntry(db,target);
     const request=(await db.query("select status,requester_user_id from network_plus_request where id=$1 for update",[requestId])).rows[0];
     if(!["accepted","in_progress"].includes(request.status))fail(409,"Additional participants can join only an accepted engagement.","ACCEPTANCE_REQUIRED");
-    await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) values($1,$2,'additional_participant','pending',$3) on conflict(request_id,user_id) do nothing",[requestId,target,userId]);
-    await audit(db,requestId,userId,"request.participant_invited",request.status,request.status,requestIdHeader,{});
-    await notify(db,target,"network_plus.request.participant_invited",requestId,"You have been invited to an accepted Network-Plus engagement. Accept participation to view its workspace.");
-    return {requestId,userId:target,consentStatus:"pending"};
+    const inserted=await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) values($1,$2,'additional_participant','pending',$3) on conflict(request_id,user_id) do nothing returning user_id",[requestId,target,userId]);
+    const existing=(await db.query("select consent_status from network_plus_request_participant where request_id=$1 and user_id=$2",[requestId,target])).rows[0];
+    if(inserted.rowCount){await audit(db,requestId,userId,"request.participant_invited",request.status,request.status,requestIdHeader,{});await notify(db,target,"network_plus.request.participant_invited",requestId,"You have been invited to an accepted Network-Plus engagement. Accept participation to view its workspace.");}
+    return {requestId,userId:target,consentStatus:existing.consent_status,replayed:!inserted.rowCount};
   });
 }
 export async function respondNetworkPlusParticipant(requestId,userId,decision,requestIdHeader) {
@@ -282,10 +282,15 @@ export async function respondNetworkPlusParticipant(requestId,userId,decision,re
   return withTransaction(async db=>{
     await assertEntry(db,userId);
     const p=(await db.query("select * from network_plus_request_participant where request_id=$1 and user_id=$2 for update",[requestId,userId])).rows[0];
-    if(!p||p.participant_role!=="additional_participant"||p.consent_status!=="pending")fail(404,"Invitation not found.","NOT_FOUND");
-    await db.query("update network_plus_request_participant set consent_status=$1,consented_at=case when $1='accepted' then now() else consented_at end where request_id=$2 and user_id=$3",[decision==="accept"?"accepted":"declined",requestId,userId]);
+    if(!p||p.participant_role!=="additional_participant")fail(404,"Invitation not found.","NOT_FOUND");
+    const nextConsent=decision==="accept"?"accepted":"declined";
+    if(p.consent_status===nextConsent)return {requestId,consentStatus:nextConsent,replayed:true};
+    if(p.consent_status!=="pending")fail(409,"This invitation has already been decided.","INVITATION_ALREADY_DECIDED");
+    await db.query("update network_plus_request_participant set consent_status=$1,consented_at=case when $1='accepted' then now() else consented_at end where request_id=$2 and user_id=$3",[nextConsent,requestId,userId]);
     await audit(db,requestId,userId,`request.participant_${decision}ed`,null,null,requestIdHeader,{});
-    return {requestId,consentStatus:decision==="accept"?"accepted":"declined"};
+    const others=(await db.query("select user_id from network_plus_request_participant where request_id=$1 and user_id<>$2 and consent_status='accepted'",[requestId,userId])).rows;
+    for(const other of others)await notify(db,other.user_id,"network_plus.request.participant_consent",requestId,"An invited participant has responded to the collaboration invitation.");
+    return {requestId,consentStatus:nextConsent};
   });
 }
 async function workspaceAccess(db,workspaceId,userId) {

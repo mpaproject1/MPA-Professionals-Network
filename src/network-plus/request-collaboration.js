@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { getPool, withTransaction } from "../platform/db.js";
+import { withTransaction } from "../platform/db.js";
 import { createInAppNotification } from "../platform/notifications.js";
 import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
 import { policyError } from "../platform/identity-policy.js";
@@ -180,7 +180,7 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const participants=(await db.query("select user_id,participant_role,consent_status,consented_at from network_plus_request_participant where request_id=$1 and consent_status<>'revoked'",[requestId])).rows;
     const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 order by created_at",[requestId])).rows;
     const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;
-    return { ...row, participants, events, workspace };
+    return { ...row, participants, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative:participants.some(p=>p.user_id===userId&&p.participant_role==="recipient_representative"&&p.consent_status!=="revoked") };
   });
 }
 export async function addNetworkPlusRequestParticipant(requestId,userId,input,requestIdHeader) {

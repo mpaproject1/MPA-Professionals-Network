@@ -65,7 +65,7 @@ export default function CommunityImpactRetentionPage(){
    <div><h2 className="h2">Propose a new policy version</h2><p className="muted">Enter the period and expiry treatment approved by MPA. Every class must be completed; there is no pre-filled retention duration.</p></div>
    {classes.map(({key,label:classLabel,description})=><fieldset key={key} className="grid" style={{gap:10,border:"1px solid var(--border)",borderRadius:10,padding:14}}>
     <legend><strong>{classLabel}</strong></legend><p className="muted">{description}</p>
-    <label>Retention period (days)<input type="number" min="1" max="36500" step="1" value={rules[key].retentionDays} onChange={e=>changeRule(key,"retentionDays",e.target.value)} required/></label>
+    <label>Retention period (days)<input type="number" min="1" step="1" value={rules[key].retentionDays} onChange={e=>changeRule(key,"retentionDays",e.target.value)} required/></label>
     <label>Grace period after expiry (days)<input type="number" min="0" max="36500" step="1" value={rules[key].graceDays} onChange={e=>changeRule(key,"graceDays",e.target.value)} required/></label>
     <label>Start counting from<select value={rules[key].retentionStart} onChange={e=>changeRule(key,"retentionStart",e.target.value)} required><option value="">Choose a start event</option>{starts.map(([value,text])=><option key={value} value={value}>{text}</option>)}</select></label>
     <label>Action at expiry<select value={rules[key].expiryAction} onChange={e=>changeRule(key,"expiryAction",e.target.value)} required><option value="">Choose an action</option>{actions.filter(([value])=>!((key==="audit_events"||key==="score_ledger")&&value==="hard_delete")).map(([value,text])=><option key={value} value={value}>{text}</option>)}</select></label>

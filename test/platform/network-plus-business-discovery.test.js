@@ -56,6 +56,9 @@ test("commercial listings have separate moderation and publication states with c
   assert.match(migration, /system_only/);
   assert.match(service, /submitProfessionalServiceListing/);
   assert.match(service, /moderateProfessionalServiceListing/);
+  assert.match(service, /listBusinessVerificationQueue/);
+  assert.match(service, /listBusinessModerationQueue/);
+  assert.match(service, /listProfessionalServiceModerationQueue/);
   assert.match(service, /changeProfessionalServiceStatus/);
   assert.match(service, /status=any\(\$4::text\[\]\)/);
   assert.match(service, /assertBusinessPublishable/);

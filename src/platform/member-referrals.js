@@ -5,6 +5,11 @@ import { queueWorkflowEmail } from "./email-operations.js";
 const ALPHABET="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const fail=(status,message,code="REFERRAL_ERROR")=>{const e=new Error(message);e.statusCode=status;e.code=code;throw e;};
 function makeCode(){const bytes=randomBytes(8);return "MPA-"+Array.from(bytes,b=>ALPHABET[b%ALPHABET.length]).join("");}
+async function retentionSnapshot(db,dataClass){
+ const row=(await db.query("select p.id,p.version,p.policy->'dataClasses'->($1::text) rule from community_impact_retention_active_policy a join community_impact_retention_policy_version p on p.id=a.policy_version_id where a.singleton=true",[dataClass])).rows[0];
+ if(!row||!row.rule)return {versionId:null,snapshot:null};
+ return {versionId:row.id,snapshot:{version:row.version,dataClass,rule:row.rule}};
+}
 async function activeMember(db,userId){
  const r=await db.query("select id from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date) order by end_date desc nulls last limit 1",[userId]);
  if(!r.rows[0])fail(403,"An active MPA membership is required to create or use a member referral code.","ACTIVE_MEMBERSHIP_REQUIRED");
@@ -19,7 +24,8 @@ async function codeRow(db,code){
  return r.rows[0];
 }
 async function event(db,attribution,eventCode,fromStatus,toStatus,actor,metadata={}){
- await db.query("insert into member_referral_event(attribution_id,actor_user_id,event_code,from_status,to_status,metadata) values($1,$2,$3,$4,$5,$6)",[attribution,eventCode,fromStatus,toStatus,actor||null,JSON.stringify(metadata)]);
+ const retention=await retentionSnapshot(db,"referral_attribution_records");
+ await db.query("insert into member_referral_event(attribution_id,actor_user_id,event_code,from_status,to_status,metadata,retention_policy_version_id,retention_policy_snapshot) values($1,$2,$3,$4,$5,$6,$7,$8)",[attribution,eventCode,fromStatus,toStatus,actor||null,JSON.stringify(metadata),retention.versionId,retention.snapshot?JSON.stringify(retention.snapshot):null]);
  const policy=(await db.query("select id,points from member_referral_score_policy where status='active' limit 1")).rows[0];
  const points=Number(policy?.points?.[eventCode]??0);
  if(policy&&Number.isInteger(points)&&points>=0)await db.query("insert into member_referral_score_ledger(attribution_id,event_code,points,policy_id) values($1,$2,$3,$4) on conflict(attribution_id,event_code) do nothing",[attribution,eventCode,points,policy.id]);

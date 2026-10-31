@@ -245,7 +245,7 @@ export async function updateBusiness(businessId,userId,input,requestId) {
 export async function submitBusinessVerification(businessId,userId,requestId) {
   return withTransaction(async db=>{
     const {business}=await assertBusinessOwner(db,businessId,userId);
-    if(["suspended","archived"].includes(business.publication_status))fail(409,"This business cannot be submitted while suspended or archived.","BUSINESS_LOCKED");
+    if(business.publication_status==="archived")fail(409,"An archived business cannot be resubmitted for verification.","BUSINESS_LOCKED");
     const existing=(await db.query("select id,status,submitted_by from network_plus_business_verification_case where business_id=$1 and status in ('submitted','under_review','appealed') order by created_at desc limit 1 for update",[businessId])).rows[0];
     if(existing)return {...existing,idempotent:true};
     const draft=(await db.query("select id from network_plus_business_verification_case where business_id=$1 and status='draft' order by created_at desc limit 1 for update",[businessId])).rows[0];

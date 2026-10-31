@@ -225,6 +225,7 @@ export default function Dashboard(){
     {href:"/profile",label:"Profile",detail:"Keep your professional identity current.",icon:UserRound},
     {href:"/track",label:"Applications",detail:"Follow membership, organization, and job applications.",icon:ClipboardList},
     ...(roles.includes("member")?[{href:"/membership",label:"Membership",detail:"Manage membership, payments, and renewals.",icon:WalletCards}]:[]),
+    ...(roles.includes("member")?[{href:"/referrals",label:"My referrals",detail:"Invite professionals and follow permitted membership and job referral progress.",icon:UsersRound}]:[]),
     ...(data?.organizations?.length?[{href:"/organizations",label:"Organizations",detail:"Manage organization profiles and verification.",icon:Building2}]:[]),
     ...(data?.organizations?.some(org=>["owner","administrator","recruiter","read_only"].includes(org.role_code))?[{href:"/recruitment",label:"Recruitment",detail:"Review jobs and organization hiring activity.",icon:BriefcaseBusiness}]:[]),
     ...(roles.some(role=>["reviewer","finance_officer","system_admin"].includes(role))?[{href:"/membership",label:"Membership review",detail:"Review applications and payment evidence.",icon:WalletCards}]:[]),

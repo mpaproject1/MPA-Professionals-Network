@@ -123,7 +123,7 @@ test("production registration rejects a missing human-check token before creatin
   const previous=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
   process.env.NODE_ENV="production";
   process.env.JWT_SECRET="security-test-production-secret-with-more-than-32-characters";
-  process.env.HUMAN_CHALLENGE_REQUIRED="false";
+  process.env.HUMAN_CHALLENGE_REQUIRED="true";
   process.env.PUBLIC_APP_URL="https://mpa.example.test";
   process.env.EMAIL_DELIVERY_WEBHOOK_URL="https://delivery.example.test/webhook";
   process.env.EMAIL_DELIVERY_WEBHOOK_SECRET="test-webhook-secret-with-more-than-thirty-two-characters";

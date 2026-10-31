@@ -4,6 +4,7 @@ import { toChapaMinorUnits } from "../platform/chapa-money.js";
 import { isValidChapaWebhookSignature } from "../platform/chapa-signature.js";
 import { loadConfig } from "../platform/config.js";
 import { getPool, withTransaction } from "../platform/db.js";
+import * as memberReferrals from "../platform/member-referrals.js";
 import { displayReference } from "../platform/display-reference.js";
 import { assertEmailDeliveryConfigured, createEmailVerification, deliverEmailVerification } from "../platform/email-verification.js";
 import { assertProfessionalProfileCapability } from "../platform/identity-policy.js";
@@ -102,6 +103,7 @@ export async function register(input,requestId){
     if(identity.rows.length) throw httpError(409,"An existing account or identity matches these details. Sign in or contact membership support instead of creating a duplicate.","IDENTITY_CONFLICT");
     const registrationReference=await nextTrackingReference(db,"membership");
     const user=(await db.query("insert into app_user(username,email,password_hash,status,registration_reference,account_type) values($1,$2,$3,'active',$4,$5) returning id,email,username,registration_reference,account_type",[email,email,hashPassword(input.password),registrationReference,accountType])).rows[0];
+    await memberReferrals.captureMembershipRegistration(db,user.id,input.referralCode,input.referralStatusConsent===true);
     const p=(await db.query(`insert into person(user_id,first_name,middle_name,last_name,display_name,phone,date_of_birth,sex,nationality)
       values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id,user_id,first_name,middle_name,last_name,display_name,phone,date_of_birth,sex,nationality`,
       [user.id,person.firstName,person.middleName,person.lastName,person.displayName,person.phone,person.dateOfBirth,person.sex,person.nationality])).rows[0];
@@ -612,6 +614,7 @@ export async function activateApplication(applicationId,actorId,requestId){
     const membership=(await db.query(`insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source,application_id)
       values($1,$2,$3,'active',$4,$5,'online',$6) returning *`,[app.user_id,app.membership_product_id,number,start.toISOString().slice(0,10),end?.toISOString().slice(0,10)||null,applicationId])).rows[0];
     await db.query("update membership_application set status='activated',activated_at=now(),updated_at=now() where id=$1",[applicationId]);
+    await memberReferrals.recordMembershipActivated(db,app.user_id,actorId);
     await db.query("update payment_reconciliation set membership_id=$1,reconciled_at=coalesce(reconciled_at,now()) where payment_transaction_id=$2 and reconciliation_status='matched'",[membership.id,pay.id]);
     await db.query("insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'activated',now(),$2,'membership_application',$3)",[membership.id,actorId,JSON.stringify({applicationId,paymentId:pay.id,productCode:app.product_code,durationDays:fee.durationDays,durationPolicy:fee.durationPolicy||"fixed_days_inclusive",feeRuleId:fee.feeRuleId||null,feeRuleVersion:fee.feeRuleVersion??null})]);
     await audit(db,actorId,"membership.activated","membership_record",membership.id,requestId,{applicationId,paymentId:pay.id});

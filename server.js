@@ -379,7 +379,7 @@ const server=http.createServer(async (req,res)=>{
       await enforcePersistentRateLimit(req,"network-plus.request.create",10,60000,identity.sub);
       return ok(res,await networkPlusRequests.createNetworkPlusRequest(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
     }
-    if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/network-plus/requests/")) return ok(res,await networkPlusRequests.getNetworkPlusRequest(parts[4],identity.sub),requestId);
+    if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/network-plus/requests/")) { const q=query(req.url); return ok(res,await networkPlusRequests.getNetworkPlusRequest(parts[4],identity.sub,{supportReason:q.get("supportReason"),supportTicket:q.get("supportTicket")}),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/requests/") && parts[5]==="submit") return ok(res,await networkPlusRequests.submitNetworkPlusRequest(parts[4],identity.sub,requestId,req.headers["x-idempotency-key"]),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/requests/") && parts[5]==="transitions") return ok(res,await networkPlusRequests.transitionNetworkPlusRequest(parts[4],identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/requests/") && parts[5]==="participants") return ok(res,await networkPlusRequests.addNetworkPlusRequestParticipant(parts[4],identity.sub,await body(req),requestId),requestId,201);

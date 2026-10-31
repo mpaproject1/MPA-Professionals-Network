@@ -1191,3 +1191,64 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 @media(max-width:600px) {
   .top-actions .icon-btn { min-width:44px; min-height:44px; }
 }
+
+
+/* Reduce stacked panel borders in membership and destination workspaces. */
+.mpa-experience .membership-progress {
+  padding:22px;
+  border:0;
+  border-radius:16px;
+  background:var(--surface-muted);
+}
+.mpa-experience .membership-steps { gap:12px; }
+.mpa-experience .membership-steps>div {
+  padding:16px;
+  border:0;
+  border-radius:13px;
+  background:var(--surface-muted);
+}
+.mpa-experience .membership-steps>div[aria-current="step"] {
+  background:color-mix(in srgb,var(--brand-lemon) 15%,var(--surface));
+  box-shadow:inset 3px 0 0 var(--brand-lemon);
+}
+.mpa-experience .membership-steps>div>span {
+  width:32px;
+  height:32px;
+  margin-bottom:12px;
+  border-radius:10px;
+  background:var(--surface);
+  color:var(--brand-navy);
+  font-weight:600;
+}
+.dark .mpa-experience .membership-steps>div>span { color:var(--brand-navy-deep); }
+.mpa-experience .membership-mode-switch {
+  padding:4px;
+  border:0;
+  border-radius:12px;
+  background:var(--surface-muted);
+}
+.mpa-experience .membership-mode-switch .btn { min-height:44px; }
+.mpa-experience .membership-plan {
+  padding:22px;
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:var(--surface);
+  box-shadow:none;
+}
+.mpa-experience .membership-plan__fee { padding:17px 0; margin:16px 0; }
+.mpa-organizations>div:first-child,.mpa-membership>div:first-child,
+.mpa-services>header,.mpa-recruitment>header,.mpa-mentorship-page>header,.mpa-jobs-page>header {
+  border:0;
+  border-radius:18px;
+  background:var(--surface);
+  box-shadow:none;
+}
+.mpa-services .card,.mpa-recruitment .card,.mpa-mentorship-page .card,.mpa-jobs-page .card {
+  border:1px solid var(--border);
+  border-radius:16px;
+  box-shadow:var(--shadow);
+}
+@media(max-width:640px) {
+  .mpa-experience .membership-progress { padding:17px; }
+  .mpa-experience .membership-plan { padding:17px; }
+}

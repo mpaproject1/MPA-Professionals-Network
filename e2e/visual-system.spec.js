@@ -96,6 +96,22 @@ test.describe("MPA shared visual system", () => {
     }
   });
 
+  test("About page explains and loads the system-backed Completed Projects showcase", async ({ page }) => {
+    let portfolioRequested = false;
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/v1/public/serve-community/completed-projects") portfolioRequested = true;
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/about", { waitUntil: "domcontentloaded" });
+    const section = page.locator('section[aria-labelledby="completed-projects-title"]');
+    await expect(section).toBeVisible();
+    await expect(section.getByRole("heading", { name: "Completed Projects" })).toBeVisible();
+    await expect(section).toContainText("not independently verified beneficiary totals or measured outcomes");
+    await expect.poll(() => portfolioRequested).toBe(true);
+    const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth }));
+    expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
+  });
+
   test("mobile navigation and primary controls preserve practical touch targets", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/", { waitUntil: "domcontentloaded" });

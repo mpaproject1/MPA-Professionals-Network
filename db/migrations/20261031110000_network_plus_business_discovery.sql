@@ -22,10 +22,15 @@ create table if not exists network_plus_business (
   verification_expires_at timestamptz,
   verified_by uuid references app_user(id) on delete restrict,
   created_by uuid not null references app_user(id) on delete restrict,
+  request_idempotency_hash text,
+  request_fingerprint text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (website is null or website ~* '^https://[^[:space:]]+$')
 );
+create unique index if not exists ux_network_plus_business_idempotency_hash
+  on network_plus_business(request_idempotency_hash)
+  where request_idempotency_hash is not null;
 create index if not exists ix_network_plus_business_discovery
   on network_plus_business (display_name, created_at desc)
   where publication_status='published' and verification_status='verified' and moderation_status='approved';

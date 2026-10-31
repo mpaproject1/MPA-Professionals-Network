@@ -10,7 +10,7 @@ export const useUiStore=create<State>((set)=>({
   hydrated:false,
   language:"en",
   queue:0,
-  setMode:(mode)=>{if(typeof document!=="undefined")document.documentElement.classList.toggle("dark",mode==="dark");set({mode})},
+  setMode:(mode)=>{if(typeof document!=="undefined"){document.documentElement.classList.toggle("dark",mode==="dark");try{window.localStorage.setItem("mpa-color-mode",mode)}catch{}}set({mode})},
   setToken:(token)=>{
     if(typeof window!=="undefined"){
       if(token) window.sessionStorage.setItem(TOKEN_KEY,token);
@@ -28,7 +28,15 @@ export const useUiStore=create<State>((set)=>({
   },
   hydrateToken:()=>{
     if(typeof window==="undefined")return;
-    set({token:window.sessionStorage.getItem(TOKEN_KEY)||"",hydrated:true});
+    let mode:Mode="light";
+    try {
+      const savedMode=window.localStorage.getItem("mpa-color-mode");
+      mode=savedMode==="dark"||savedMode==="light"?savedMode:(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+    } catch {
+      mode=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+    }
+    document.documentElement.classList.toggle("dark",mode==="dark");
+    set({token:window.sessionStorage.getItem(TOKEN_KEY)||"",mode,hydrated:true});
   },
   setLanguage:(language)=>set({language}),
   addQueue:()=>set(s=>({queue:s.queue+1})),

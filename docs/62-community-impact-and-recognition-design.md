@@ -1161,7 +1161,7 @@ The scoring source adapter validates authoritative source lifecycle and contribu
 | Network-Plus partnership | Completed partnership proposal and accepted participant consent |
 | Approved historical contribution | Reviewer-verified historical claim, not an unverified self-report |
 
-The verified claim and approved reviewer assessment remain required for every source family. Source links are unique per claim and source/contributor pair, preventing the same underlying source from being claimed twice by the same contributor. An unconfigured or unverified source fails closed.
+The verified claim and approved reviewer assessment remain required for every source family. Source links are unique per claim and source/contributor pair, preventing the same underlying source from being claimed twice by the same contributor. Historical claims use a normalized, contributor-scoped content fingerprint to block exact duplicate historical submissions. An unconfigured or unverified source fails closed.
 
 ### Calculation and reviewer assessment
 
@@ -1213,6 +1213,7 @@ Permissions are separate for policy management, policy approval, scoring/recalcu
 - `20261101200000_community_impact_score_outcome_maturity_rule.sql`
 - `20261101210000_community_impact_score_recipient_confirmation_rules.sql`
 - `20261101220000_community_impact_score_recipient_confirmation_scope.sql`
+- `20261101230000_community_impact_score_historical_dedup.sql`
 
 The disposable migration compatibility runner includes these migrations and checks the initial active evaluation-only policy, exact five weights, permissions, ledger/source-link tables, append-only triggers and rollback removal. This is a transactional rollback rehearsal only; it does not run against or authorize production.
 

@@ -889,3 +889,9 @@ main.shell-main .grid-cols-3, main.shell-main .grid-cols-4 { min-width: 0; }
   background: var(--warning-bg);
   border-color: color-mix(in srgb, var(--warning) 36%, var(--border));
 }
+
+
+/* Consistent emphasis: reserve heavy weights for rare, deliberate emphasis. */
+main.shell-main label { font-weight: 500 !important; }
+main.shell-main :is(strong, b) { font-weight: 600 !important; }
+main.shell-main :is(th, legend, summary) { font-weight: 600; }

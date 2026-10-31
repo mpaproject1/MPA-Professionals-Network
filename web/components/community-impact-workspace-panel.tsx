@@ -1,7 +1,7 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
 import Link from "next/link";
-import {BellRing,CheckCircle2,Volume2,VolumeX,ShieldCheck,Sparkles,ArrowRight,Clock3} from "lucide-react";
+import {BellRing,CheckCircle2,Volume2,VolumeX,ShieldCheck,Sparkles,ArrowRight} from "lucide-react";
 import {api} from "../lib/api";
 type Row=Record<string,any>;
 type Impact=Row&{score:number;policyVersion:number;dimensions:Row[];categoryBreakdown:Row[];items:Row[];claims:Row[];pendingClaims:Row[];detectedContributions:Row[];reminders:Row[]};

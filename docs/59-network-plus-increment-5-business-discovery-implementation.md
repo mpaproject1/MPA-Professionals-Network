@@ -70,6 +70,7 @@ All routes are authenticated and return no-store JSON through the existing API s
 | `POST /api/v1/network-plus/businesses/:id/owners` | Invite a co-owner to a joint business |
 | `POST /api/v1/network-plus/business-ownership/:id/respond` | Accept/decline a pending owner invitation |
 | `POST /api/v1/network-plus/businesses/:id/access` | Grant explicit scoped manager capability |
+| `DELETE /api/v1/network-plus/businesses/:id/access/:accessId` | Revoke an explicit business-scoped manager capability |
 | `POST /api/v1/network-plus/businesses/:id/evidence` | Attach a private file owned by the current authorized business actor to a draft verification case |
 | `POST /api/v1/network-plus/businesses/:id/verification` | Submit an evidence-backed business verification case |
 | `POST /api/v1/network-plus/businesses/:id/moderation` | Submit a verified business profile for moderation |
@@ -110,7 +111,7 @@ Rollback notes:
 
 ## 7. Tests and exit gate
 
-Added `test/platform/network-plus-business-discovery.test.js` for schema/source/API contracts and extended `scripts/check-new-migration-compatibility.js`.
+Added `test/platform/network-plus-business-discovery.test.js` and payload templates in `test/fixtures/network-plus-business-discovery.json` for ownership/negative-case coverage; extended `scripts/check-new-migration-compatibility.js`.
 
 **Not yet evidenced as passed:**
 - [ ] Execute migration compatibility on disposable PostgreSQL and confirm rollback.

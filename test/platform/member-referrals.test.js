@@ -11,7 +11,7 @@ const routes=await readFile(new URL("../../server.js",import.meta.url),"utf8");
 
 test("referral schema enforces separate types and duplicate prevention",()=>{
  assert.match(migration,/member_referral_code/);
- assert.match(migration,/check\(referrer_user_id<>referred_user_id\)/);
+ assert.ok(migration.includes("check(referrer_user_id<>referred_user_id)"));
  assert.match(migration,/uq_member_referral_membership_referred/);
  assert.match(migration,/uq_member_referral_employment_application/);
  assert.match(migration,/prevent_member_referral_history_mutation/);

@@ -47,7 +47,7 @@ begin
   raise exception 'Community Impact retention policy content is immutable; create a new version';
  end if;
  if NEW.status is distinct from OLD.status and not (
-  (OLD.status='in_review' and NEW.status in('approved','revoked')) or
+  (OLD.status='in_review' and NEW.status='approved') or
   (OLD.status='approved' and NEW.status in('active','revoked')) or
   (OLD.status='active' and NEW.status in('superseded','revoked'))
  ) then raise exception 'Invalid Community Impact retention policy transition'; end if;

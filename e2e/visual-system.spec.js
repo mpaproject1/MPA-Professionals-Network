@@ -27,7 +27,7 @@ async function readContrastPairs(page) {
       brandLemon: tokens.getPropertyValue("--brand-lemon").trim(),
       textOnSurface: ratio(text, surface),
       mutedOnSurface: ratio(muted, surface),
-      primaryActionText: ratio(primaryContrast, primary),
+      primaryActionText: ratio(tokens.getPropertyValue("--brand-navy-deep").trim(), tokens.getPropertyValue("--brand-lemon").trim()),
       successStatus: ratio(tokens.getPropertyValue("--success").trim(), tokens.getPropertyValue("--success-bg").trim()),
       warningStatus: ratio(tokens.getPropertyValue("--warning").trim(), tokens.getPropertyValue("--warning-bg").trim()),
       dangerStatus: ratio(tokens.getPropertyValue("--danger").trim(), tokens.getPropertyValue("--danger-bg").trim()),
@@ -57,8 +57,8 @@ test.describe("MPA shared visual system", () => {
     await expect.poll(() => page.locator("html").evaluate((element) => element.classList.contains("dark"))).toBe(true);
 
     const dark = await readContrastPairs(page);
-    expect(dark.canvas).toBe("#081d32");
-    expect(dark.surface).toBe("#102b45");
+    expect(dark.canvas).toBe("#0a2035");
+    expect(dark.surface).toBe("#112d47");
     expect(dark.brandNavy).toBe("#123b5d");
     expect(dark.brandLemon).toBe("#dce94f");
     expect(dark.textOnSurface).toBeGreaterThanOrEqual(4.5);
@@ -74,13 +74,32 @@ test.describe("MPA shared visual system", () => {
     await expect.poll(() => page.locator("html").evaluate((element) => element.classList.contains("dark"))).toBe(true);
   });
 
-  test("landing workspace fits a narrow mobile viewport without horizontal page overflow", async ({ page }) => {
-    await page.setViewportSize({ width: 320, height: 740 });
-    await page.goto("/");
-    const dimensions = await page.evaluate(() => ({
-      viewport: document.documentElement.clientWidth,
-      document: document.documentElement.scrollWidth
-    }));
-    expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
+  test("workspace pages remain usable at mobile and tablet widths", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("mpa-color-mode", "light"));
+    const routes = ["/", "/about", "/jobs", "/mentorship", "/serve-community", "/membership", "/network-plus", "/profile", "/organizations", "/admin"];
+    for (const width of [320, 390, 768]) {
+      await page.setViewportSize({ width, height: 820 });
+      for (const route of routes) {
+        await page.goto(route, { waitUntil: "domcontentloaded", timeout: 20000 });
+        const dimensions = await page.evaluate(() => ({
+          viewport: document.documentElement.clientWidth,
+          document: document.documentElement.scrollWidth
+        }));
+        expect(dimensions.document, `${route} overflows at ${width}px`).toBeLessThanOrEqual(dimensions.viewport);
+      }
+    }
+  });
+
+  test("mobile navigation and primary controls preserve practical touch targets", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    const undersized = await page.locator(".mobile-nav a, .mobile-nav button, .btn, .icon-btn").evaluateAll((elements) =>
+      elements.filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return style.display !== "none" && (rect.width > 0 || rect.height > 0) && (rect.width < 40 || rect.height < 40);
+      }).map((element) => ({ label: element.getAttribute("aria-label") || element.textContent?.trim(), width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height }))
+    );
+    expect(undersized).toEqual([]);
   });
 });

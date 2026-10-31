@@ -128,7 +128,7 @@ export async function verifyEmploymentReferral(identity,attributionId,input,requ
 }
 export async function proposeReferralScorePolicy(identity,points,reason){
  if(!identity.roles?.includes("system_admin"))fail(403,"Only a system administrator can propose a referral scoring policy.","FORBIDDEN");
- const allowed=["registered","membership_application_submitted","membership_approved","membership_activated","shortlisted","interview","offer_accepted","employment_verified"];
+ const allowed=["membership_application_submitted","membership_approved","membership_activated","shortlisted","interview","offer_accepted","employment_verified"];
  if(!points||typeof points!=="object"||Array.isArray(points)||Object.keys(points).some(k=>!allowed.includes(k))||Object.values(points).some(v=>!Number.isInteger(v)||v<0||v>10000))fail(400,"Provide non-negative integer points for supported referral milestones.","INVALID_SCORING_POLICY");
  if(String(reason||"").trim().length<12)fail(400,"Explain the policy reason (at least 12 characters).","POLICY_REASON_REQUIRED");
  return withTransaction(async db=>{

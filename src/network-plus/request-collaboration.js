@@ -47,8 +47,8 @@ async function assertSupport(db,userId,reason,ticket) {
 async function notify(db,userId,event,requestId,message) {
   await createInAppNotification(db,userId,event,"network_plus_request",requestId,{message,nextAction:"Open Network-Plus requests to review the update."});
 }
-async function audit(db,requestId,actor,event,from,to,requestIdHeader,metadata={}) {
-  await db.query("insert into network_plus_request_event(request_id,actor_user_id,event_code,from_status,to_status,request_id_header,metadata) values($1,$2,$3,$4,$5,$6,$7)",[requestId,actor,event,from||null,to||null,requestIdHeader||null,metadata]);
+async function audit(db,requestId,actor,event,from,to,requestIdHeader,metadata={},idempotencyHash=null,requestFingerprint=null) {
+  await db.query("insert into network_plus_request_event(request_id,actor_user_id,event_code,from_status,to_status,request_id_header,idempotency_hash,request_fingerprint,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9)",[requestId,actor,event,from||null,to||null,requestIdHeader||null,idempotencyHash,requestFingerprint,metadata]);
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'network_plus_request',$3,$4,'success',$5)",[actor,event,requestId,requestIdHeader||null,metadata]);
 }
 function canTransition(intent,from,to,actorRole) {
@@ -110,15 +110,20 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
     return created;
   });
 }
-export async function submitNetworkPlusRequest(requestId,userId,requestIdHeader) {
-  return transitionRequest(requestId,userId,"submitted",{},requestIdHeader);
+export async function submitNetworkPlusRequest(requestId,userId,requestIdHeader,idempotencyKey) {
+  return transitionRequest(requestId,userId,"submitted",{},requestIdHeader,idempotencyKey);
 }
-export async function transitionNetworkPlusRequest(requestId,userId,input,requestIdHeader) {
-  return transitionRequest(requestId,userId,input.status,input,requestIdHeader);
+export async function transitionNetworkPlusRequest(requestId,userId,input,requestIdHeader,idempotencyKey) {
+  return transitionRequest(requestId,userId,input.status,input,requestIdHeader,idempotencyKey);
 }
-async function transitionRequest(requestId,userId,to,input,requestIdHeader) {
+async function transitionRequest(requestId,userId,to,input,requestIdHeader,idempotencyKey) {
+  if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure idempotency key is required for this decision.","IDEMPOTENCY_KEY_REQUIRED");
+  const idempotencyHash=hash(idempotencyKey), requestFingerprint=hash(JSON.stringify({to,reason:input.reason||null,completionEvidence:input.completionEvidence||null}));
   return withTransaction(async db=>{
     await assertEntry(db,userId);
+    await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",["network-plus-transition:"+requestId+":"+userId+":"+idempotencyHash]);
+    const replay=(await db.query("select request_fingerprint from network_plus_request_event where request_id=$1 and actor_user_id=$2 and idempotency_hash=$3",[requestId,userId,idempotencyHash])).rows[0];
+    if(replay){if(replay.request_fingerprint!==requestFingerprint)fail(409,"This decision key was already used for a different transition.","IDEMPOTENCY_CONFLICT");return (await db.query("select * from network_plus_request where id=$1",[requestId])).rows[0];}
     const row=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
     if(!row)fail(404,"Request not found.","NOT_FOUND");
     const p=await participant(db,requestId,userId);
@@ -136,7 +141,7 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader) {
       withdrawn_at=case when $1='withdrawn' then now() else withdrawn_at end,completed_at=case when $1='completed' then now() else completed_at end,
       disputed_at=case when $1='disputed' then now() else disputed_at end,closed_at=case when $1='closed' then now() else closed_at end,
       version=version+1,updated_at=now() where id=$2 returning *`,[to,requestId])).rows[0];
-    await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version});
+    await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version},idempotencyHash,requestFingerprint);
     if(to==="accepted") {
       if(row.recipient_organization_id) {
         const currentRep=(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code in ('owner','administrator')",[row.recipient_organization_id,userId])).rowCount>0;

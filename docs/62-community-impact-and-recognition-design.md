@@ -828,13 +828,85 @@ No schema migration should modify the existing initiative/participation, offline
 
 A generic `admin`, `reviewer`, `supporting_staff`, `verification_reviewer` or `ethics_reviewer` role must not silently inherit impact permissions. Role grants are explicit, least-privilege, audited and subject to assignment/conflict checks.
 
+## Increment 2 — Policy-driven detection and attribution implementation
+
+**Status:** Source adapters and private detection-candidate foundation committed; runtime/database/CI validation remains required before the increment can be marked fully accepted.
+
+### 2.1 Implemented source adapters
+
+| Source | Detection trigger | Identity and attribution | Candidate result |
+|---|---|---|---|
+| Serve-Community participation | Append-only participation event completed; participation remains completed; parent initiative is completed | Exact participant_user_id from the authoritative participation record; suggested role from active policy; contributor must confirm attribution | Private detected candidate with pending_confirmation attribution |
+| Staff-entered offline completed project | Append-only offline-project event approve; project remains approved | No individual identity exists in the source record; the adapter deliberately does not assign the project editor or organization owner as contributor | Private detected candidate with unattributed state |
+
+Participation completion alone is insufficient while its parent initiative is not yet completed. The reconciliation scan can detect it later if the parent initiative subsequently reaches the configured eligible state. The source workflows remain authoritative and are not rewritten.
+
+Offline approval records project-level delivery facts, not individual contributor participation. Its candidate is a discovery prompt for later evidence-backed attribution; no project-wide metric is copied to an individual.
+
+### 2.2 Configurable detection policy storage
+
+The Increment 2 migration adds:
+
+- community_impact_detection_policy_version: immutable, versioned source-specific rule documents;
+- community_impact_detection_active_policy: pointer to the active policy version per source adapter;
+- community_impact_detection_candidate: idempotent private projection keyed by source system, source type and source event ID;
+- community_impact_detection_candidate_event: append-only detection and attribution history.
+
+The initial policy versions are seeded as version 1 using the approved initial baseline. Source event codes, eligible source/parent states, enablement, attribution mode, confidence, role defaults, confirmation requirement and source-category-to-canonical-category mapping are read from policy JSON. The adapter code contains no score weights or category mapping constants. A policy change requires a new immutable version and active-pointer change; it does not mutate prior candidate history.
+
+### 2.3 Event-driven ingestion and reconciliation
+
+- The participation completion transition invokes the participation adapter inside the existing source transaction.
+- Independent offline-project approval invokes the offline adapter inside its existing approval transaction.
+- Both adapters use ON CONFLICT (source_system, source_type, source_event_id) DO NOTHING; webhook/retry/reconciliation replay cannot create a second candidate for the same source event.
+- The protected admin reconciliation endpoint scans already-existing eligible source events to backfill candidates missed before the adapter was deployed or while a policy was disabled.
+- Candidate metadata retains policy version and adapter identifier. Source record IDs and event IDs are references; the source tables remain authoritative.
+- Detection is private and unverified. There is no score ledger write, public profile projection or automatic recognition.
+
+### 2.4 Contributor confirmation and dispute
+
+A participant whose exact user ID is proposed by the source can list their own detected candidates and confirm or dispute the attribution. Confirmation rechecks the source participation, initiative state and exact source event before changing the attribution state. Disputes require a reason. Both actions append immutable candidate events and platform audit records.
+
+Confirmation only means “this is my participation record.” It does not certify outcome quality, prove a measurable impact, authorize public publication or award points. Disputed candidates remain excluded from later verification/scoring.
+
+Offline project candidates remain unattributed until a later increment provides a permissioned, evidence-backed person-to-project attribution workflow. This is intentional and safer than guessing from project ownership or staff data-entry identity.
+
+### 2.5 API surface and permissions
+
+- GET /api/v1/me/community-impact/detected — own detected contribution candidates only;
+- POST /api/v1/me/community-impact/detected/:id/confirm — confirm own source-linked attribution;
+- POST /api/v1/me/community-impact/detected/:id/dispute — dispute own proposed attribution with a reason;
+- GET /api/v1/admin/community-impact/detection/candidates — private operational candidate queue;
+- POST /api/v1/admin/community-impact/detection/scan — bounded reconciliation scan.
+
+Admin scan and queue access require system_admin or the explicit system-only community_impact.detection.manage permission. This permission does not grant impact verification, appeal, scoring, policy editing, membership review or ethics review authority. Member endpoints scope every candidate lookup to the authenticated contributor.
+
+### 2.6 Increment 2 acceptance and remaining validation
+
+- [x] Additive detection/policy schema; existing source tables and lifecycle constraints are not altered.
+- [x] Versioned source-specific policy configuration and immutable policy/event history.
+- [x] Participation completion event detection with authoritative identity and contributor confirmation.
+- [x] Approved offline-project event detection without guessed individual attribution.
+- [x] Event-driven candidate creation plus bounded backfill/reconciliation endpoint.
+- [x] Idempotent source-event key and replay-safe insert semantics.
+- [x] Private own-candidate API, confirmation and dispute actions with audit history.
+- [x] Scoped admin scan/queue permission; no broad reviewer role inheritance.
+- [ ] Execute migration compatibility check against a disposable PostgreSQL database.
+- [ ] Run targeted platform tests and the full relevant CI matrix; fix all failures.
+- [ ] Validate concurrency/replay and source-state reversal behavior against a disposable database.
+- [ ] Security review of admin permission assignment, candidate queue, and contributor object scoping.
+- [ ] Configure and verify the operational reconciliation schedule if missed-event backfill must run periodically.
+- [ ] Confirm the offline-project contributor attribution evidence workflow in Increment 3/4.
+
+**Increment 2 status:** Implementation committed; acceptance remains pending runtime/database/CI and security validation. Do not deploy or apply the migration to production as part of this increment.
+
 ## Updated increment tracker
 
 | Increment | Status | Evidence / next gate |
 |---|---|---|
 | 0 — Re-audit and architecture freeze | Source audit complete; formal freeze pending | This delivery record; project-owner approval and policy decisions still required |
 | 1 — Taxonomy and source-link contract | Contract drafted; approval pending | This delivery record; schema/API/privacy review still required |
-| 2 — Automatic detection and attribution | Policy contract specified; implementation not started | Configurable adapter/rule registry, confidence-based attribution, reviewer adjustments and replay-safe tests; source event/cardinality validation remains required |
+| 2 — Automatic detection and attribution | Implementation committed; validation pending | Two Serve-Community adapters, immutable source policy versions, event-driven candidates, replay-safe reconciliation, contributor confirm/dispute; disposable DB, CI, security and scheduler validation remain |
 | 3 — Manual claims and evidence | Not started | Depends on non-member identity assurance, evidence model and retention policy |
 | 4 — Reviewer operations | Not started | Depends on scoped permission/assignment/conflict/appeal policy |
 | 5 — Score ledger and explanations | Not started | Depends on score governance and approved rubric; no score calculation before approval |

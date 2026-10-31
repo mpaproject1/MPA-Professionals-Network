@@ -413,6 +413,7 @@ export async function addBusinessOwner(businessId,userId,input,requestId) {
     if(business.publication_status==="published"){
       await db.query("update network_plus_business set publication_status=$2,updated_at=now() where id=$1",[businessId,"paused"]);
       await db.query("update network_plus_service_listing set status=$2,updated_at=now() where business_id=$1 and status=$3",[businessId,"paused","published"]);
+      await audit(db,userId,"network_plus.business_paused_for_ownership_consent","network_plus_business",businessId,requestId,{from:"published",to:"paused"});
     }
     await audit(db,userId,"network_plus.business_co_owner_invited","network_plus_business_ownership",row.id,requestId,{businessId,ownerType});
     if(ownerType==="member")await createInAppNotification(db,ownerUserId,"network_plus.business_ownership_consent_required","network_plus_business_ownership",row.id,{message:"You have been invited as a co-owner of a Network-Plus business.",nextAction:"Review and explicitly accept or decline this ownership association.",actionUrl:"/network-plus/businesses",actionRequired:true,priority:"high"});

@@ -292,3 +292,14 @@ The action-center event/recipient mapping and acceptance boundary are defined in
 - `GET /api/v1/mentors/:id` — resolves optional identity and requires an active, approved mentor plus public/member visibility.
 - `GET /api/v1/talent/:id` remains the authoritative professional profile detail API.
 - Opportunity search applies posting-scope authorization predicates in SQL before counting or paging. The public/member/partner/internal visibility distinctions remain unchanged. Database migration and exact-head acceptance checks remain open.
+
+
+## Public completed-project portfolio
+
+- `GET /api/v1/public/serve-community/completed-projects` returns a rate-limited, privacy-safe list for the About page.
+- The endpoint includes only initiatives whose authoritative lifecycle status is `completed`, whose owning organization (when present) remains verified and publicly visible, and which have at least five distinct participation records with status `completed`.
+- Response fields are limited to the initiative ID, title, category, public summary, completion timestamp and count of distinct completed member participation records. No participant names, contact details, notes, private evidence, reviewer reasons or internal owner identifiers are returned.
+- Groups below five are withheld. The response explicitly states that completed participation is not an independently verified beneficiary count or measured outcome.
+- Do not relabel completed member participation as beneficiaries, impact achieved, jobs created, or other outcome measures. A future outcome/beneficiary claim requires a dedicated source record, definition, validation/approval workflow and privacy review.
+- The route is public-read only and rate-limited; it does not mutate initiative, participation, membership or audit records.
+- Acceptance: test published/in-progress/completed initiative states, completed/non-completed participation, duplicate participant counting, fewer-than-five suppression, verified/public organization filtering, absence of personal data, and rate limiting. Browser rendering and API integration tests remain required before release.

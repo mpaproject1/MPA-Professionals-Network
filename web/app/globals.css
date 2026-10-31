@@ -1290,3 +1290,23 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 .sc-completed-state p{max-width:760px;font-size:13px;line-height:1.65}
 @media(max-width:900px){.sc-completed-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.serve-community-page .sc-completed{gap:15px;padding:17px;border-radius:18px}.sc-completed-heading{align-items:stretch;flex-direction:column;gap:13px}.sc-completed-heading>.btn{width:100%;white-space:normal}.sc-completed-grid{grid-template-columns:minmax(0,1fr)}.sc-completed-card{padding:16px}.sc-completed-count span{font-size:12px}}
+
+/* Staff entry form for offline completed-project portfolio records */
+.sc-offline-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}
+.sc-offline-form-grid>label{display:grid;align-content:start;gap:7px;min-width:0;color:var(--text);font-size:13px;font-weight:650}
+.sc-offline-form-grid input:not([type=checkbox]),.sc-offline-form-grid select,.sc-offline-form-grid textarea{width:100%;min-width:0;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font:inherit;font-weight:400}
+.sc-offline-form-grid textarea{resize:vertical;line-height:1.55}
+.sc-offline-form-grid input:focus-visible,.sc-offline-form-grid select:focus-visible,.sc-offline-form-grid textarea:focus-visible{outline:3px solid var(--focus-ring,var(--gold));outline-offset:2px}
+.sc-offline-wide{grid-column:1/-1}
+.sc-offline-check{display:flex;align-items:flex-start;gap:10px;font-weight:500;line-height:1.6}
+.sc-offline-check input{flex:0 0 auto;width:20px;height:20px;margin-top:2px;accent-color:var(--primary)}
+.sc-offline-form-grid small{color:var(--muted);font-weight:400;line-height:1.5}
+.sc-completed-media{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:6px 0}
+.sc-completed-media a{display:block;overflow:hidden;aspect-ratio:16/10;border-radius:12px;background:var(--surface-muted,var(--surface))}
+.sc-completed-media img{width:100%;height:100%;object-fit:cover}
+.sc-completed-videos{display:flex;flex-wrap:wrap;gap:8px}
+.sc-completed-videos a{display:inline-flex;align-items:center;gap:6px;color:var(--primary);font-size:12px;font-weight:700}
+.sc-completed-outcomes{display:grid;gap:7px;margin:0;padding:10px 0 0;border-top:1px solid var(--border);list-style:none}
+.sc-completed-outcomes li{display:flex;flex-wrap:wrap;gap:5px 10px;justify-content:space-between;font-size:12px}
+.sc-completed-outcomes strong{color:var(--text)}.sc-completed-outcomes span{color:var(--muted)}
+@media(max-width:650px){.sc-offline-form-grid{grid-template-columns:minmax(0,1fr);gap:13px}.sc-offline-wide{grid-column:auto}}

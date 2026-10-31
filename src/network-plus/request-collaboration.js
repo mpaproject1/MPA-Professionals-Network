@@ -52,7 +52,7 @@ async function notify(db,userId,event,requestId,message) {
   await createInAppNotification(db,userId,event,"network_plus_request",requestId,{message,nextAction:"Open Network-Plus requests to review the update."});
 }
 async function audit(db,requestId,actor,event,from,to,requestIdHeader,metadata={},idempotencyHash=null,requestFingerprint=null) {
-  await db.query("insert into network_plus_request_event(request_id,actor_user_id,event_code,from_status,to_status,request_id_header,idempotency_hash,request_fingerprint,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9)",[requestId,actor,event,from||null,to||null,requestIdHeader||null,idempotencyHash,requestFingerprint,metadata]);
+  await db.query("insert into network_plus_request_event(request_id,actor_user_id,event_code,from_status,to_status,reason,request_id_header,idempotency_hash,request_fingerprint,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",[requestId,actor,event,from||null,to||null,metadata.reason||null,requestIdHeader||null,idempotencyHash,requestFingerprint,metadata]);
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'network_plus_request',$3,$4,'success',$5)",[actor,event,requestId,requestIdHeader||null,metadata]);
 }
 function canTransition(intent,from,to,actorRole) {

@@ -49,7 +49,7 @@ test("organization full detail and roster are scoped to the correct organization
     displayName: `Boundary Org ${suffix.slice(0, 8)}`,
   }, `org-boundary-${suffix}`);
 
-  await organizationJobs.addOrganizationUser(org.id, owner, { userId: recruiter, roleCode: "recruiter" }, `org-recruiter-${suffix}`);
+  await organizationJobs.addOrganizationUser(org.id, owner, { userId: recruiter, roleCode: "recruiter", reason: "Assign recruiter to organization" }, `org-recruiter-${suffix}`);
   const recruiterView = await organizationJobs.getOrganization(org.id, recruiter);
   assert.deepEqual(recruiterView.users, [], "recruiters must not receive the organization roster in the detail response");
   await assert.rejects(organizationJobs.listOrganizationUsers(org.id, recruiter), hasStatus(403));

@@ -322,7 +322,7 @@ const server=http.createServer(async (req,res)=>{
       const q=query(req.url);
       return ok(res,await networkPlusBusiness.listBusinesses(identity.sub,{q:q.get("q"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
     }
-    if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/network-plus/businesses/") && parts[4]==="services") {
+    if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="services") {
       return ok(res,await networkPlusBusiness.getBusiness(parts[3],identity.sub),requestId);
     }
     if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/network-plus/businesses/")) return ok(res,await networkPlusBusiness.getBusiness(parts[3],identity.sub),requestId);
@@ -338,30 +338,30 @@ const server=http.createServer(async (req,res)=>{
       return ok(res,await networkPlusBusiness.createBusiness(identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
     }
     if(req.method==="PATCH" && parts.length===4 && p.startsWith("api/v1/network-plus/businesses/")) return ok(res,await networkPlusBusiness.updateBusiness(parts[3],identity.sub,await body(req),requestId),requestId);
-    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/network-plus/businesses/") && parts[4]==="owners") return ok(res,await networkPlusBusiness.addBusinessOwner(parts[3],identity.sub,await body(req),requestId),requestId,201);
-    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/business-ownership/") && parts[5]==="respond"){
-      const b=await body(req);return ok(res,await networkPlusBusiness.respondBusinessOwnership(parts[4],identity.sub,b.decision,requestId),requestId);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="owners") return ok(res,await networkPlusBusiness.addBusinessOwner(parts[3],identity.sub,await body(req),requestId),requestId,201);
+    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/network-plus/business-ownership/") && parts[4]==="respond"){
+      const b=await body(req);return ok(res,await networkPlusBusiness.respondBusinessOwnership(parts[3],identity.sub,b.decision,requestId),requestId);
     }
-    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/network-plus/businesses/") && parts[4]==="access") return ok(res,await networkPlusBusiness.grantBusinessAccess(parts[3],identity.sub,await body(req),requestId),requestId,201);
-    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/network-plus/businesses/") && parts[4]==="verification"){
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="access") return ok(res,await networkPlusBusiness.grantBusinessAccess(parts[3],identity.sub,await body(req),requestId),requestId,201);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="verification"){
       await enforcePersistentRateLimit(req,"network-plus.business.verification.submit",5,60000,identity.sub);
       return ok(res,await networkPlusBusiness.submitBusinessVerification(parts[3],identity.sub,requestId),requestId,201);
     }
-    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/network-plus/businesses/") && parts[4]==="moderation") return ok(res,await networkPlusBusiness.submitBusinessModeration(parts[3],identity.sub,requestId),requestId,201);
-    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/network-plus/businesses/") && parts[4]==="publication"){
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="moderation") return ok(res,await networkPlusBusiness.submitBusinessModeration(parts[3],identity.sub,requestId),requestId,201);
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="publication"){
       const b=await body(req);return ok(res,await networkPlusBusiness.changeBusinessPublicationStatus(parts[3],identity.sub,b.status,b.reason,requestId),requestId);
     }
-    if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/network-plus/businesses/") && parts[4]==="services"){
+    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="services"){
       await enforcePersistentRateLimit(req,"network-plus.service.create",10,60000,identity.sub);
-      return ok(res,await networkPlusBusiness.createProfessionalServiceListing(parts[3],identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
+      return ok(res,await networkPlusBusiness.createProfessionalServiceListing(parts[4],identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
     }
     if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/network-plus/services/")) return ok(res,await networkPlusBusiness.updateProfessionalServiceListing(parts[4],identity.sub,await body(req),requestId),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/services/") && parts[5]==="submit"){
       await enforcePersistentRateLimit(req,"network-plus.service.submit",10,60000,identity.sub);
       return ok(res,await networkPlusBusiness.submitProfessionalServiceListing(parts[4],identity.sub,requestId),requestId);
     }
-    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/admin/network-plus/businesses/") && parts[5]==="verification") return ok(res,await networkPlusBusiness.reviewBusinessVerification(parts[4],identity.sub,await body(req),requestId),requestId);
-    if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/admin/network-plus/businesses/") && parts[5]==="moderation") return ok(res,await networkPlusBusiness.reviewBusinessModeration(parts[4],identity.sub,await body(req),requestId),requestId);
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/network-plus/businesses/") && parts[6]==="verification") return ok(res,await networkPlusBusiness.reviewBusinessVerification(parts[5],identity.sub,await body(req),requestId),requestId);
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/network-plus/businesses/") && parts[6]==="moderation") return ok(res,await networkPlusBusiness.reviewBusinessModeration(parts[5],identity.sub,await body(req),requestId),requestId);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/admin/network-plus/services/") && parts[5]==="moderation") return ok(res,await networkPlusBusiness.moderateProfessionalServiceListing(parts[4],identity.sub,await body(req),requestId),requestId);
     if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/organizations/") && parts[4]==="network-plus-visibility"){
       return ok(res,await organizationJobs.updateNetworkPlusVisibility(parts[3],identity.sub,await body(req),requestId),requestId);

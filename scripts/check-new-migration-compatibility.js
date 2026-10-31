@@ -681,6 +681,8 @@ try {
   const initialScorePolicy=await client.query("select p.version,p.status,p.evaluation_only,p.public_score_enabled,p.policy->'dimensions' dimensions from community_impact_score_active_policy a join community_impact_score_policy_version p on p.id=a.policy_version_id where a.singleton=true");
   if(initialScorePolicy.rowCount!==1||initialScorePolicy.rows[0].version!==2||initialScorePolicy.rows[0].status!=="active"||initialScorePolicy.rows[0].evaluation_only!==true||initialScorePolicy.rows[0].public_score_enabled!==false)throw new Error("The initial docs/62 score policy must be active for evaluation only and remain unpublished.");
   const weights=initialScorePolicy.rows[0].dimensions.map(x=>Number(x.weight)).sort((a,b)=>b-a).join(",");
+  const scorePolicyConfig=await client.query("select policy->'calculation'->'evidenceQualityRank' evidence_ranks,policy->'calculation'->'outcomeMaturityRank' outcome_ranks,policy->'calculation'->>'rounding' rounding from community_impact_score_policy_version where version=2");
+  if(!scorePolicyConfig.rows[0]?.evidence_ranks||!scorePolicyConfig.rows[0]?.outcome_ranks||scorePolicyConfig.rows[0]?.rounding!=="4dp")throw new Error("Initial active score policy must configure evidence quality, outcome maturity and rounding scales.");
   if(weights!=="30,25,20,15,10")throw new Error("Initial score policy weights must match docs/62: 30/25/20/15/10.");
   const reversalConstraint=await client.query("select count(*)::int count from pg_indexes where schemaname='public' and indexname='uq_community_impact_score_ledger_single_reversal'");
   if(reversalConstraint.rows[0].count!==1)throw new Error("A score award must have at most one compensating reversal.");

@@ -62,7 +62,7 @@ test("recruiters and project managers cannot read another organization's recruit
   }, "report-scope-job-b-" + suffix);
 
   await organizationJobs.addJobTeamMember(jobA.id, ownerA, {
-    userId: jobTeamRecruiterA, roleCode: "recruiter",
+    userId: jobTeamRecruiterA, roleCode: "recruiter", reason: "Assign job team recruiter",
   }, "report-scope-job-team-recruiter-" + suffix);
 
   const unrelatedIdentity = { sub: unrelatedUser, roles: [], permissions: ["reports.view"] };

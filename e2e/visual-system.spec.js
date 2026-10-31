@@ -23,7 +23,12 @@ async function readContrastPairs(page) {
     return {
       textOnSurface: ratio(text, surface),
       mutedOnSurface: ratio(muted, surface),
-      primaryActionText: ratio(primaryContrast, primary)
+      primaryActionText: ratio(primaryContrast, primary),
+      successStatus: ratio(tokens.getPropertyValue("--success").trim(), tokens.getPropertyValue("--success-bg").trim()),
+      warningStatus: ratio(tokens.getPropertyValue("--warning").trim(), tokens.getPropertyValue("--warning-bg").trim()),
+      dangerStatus: ratio(tokens.getPropertyValue("--danger").trim(), tokens.getPropertyValue("--danger-bg").trim()),
+      infoStatus: ratio(tokens.getPropertyValue("--info").trim(), tokens.getPropertyValue("--info-bg").trim()),
+      focusIndicator: ratio(tokens.getPropertyValue("--focus-ring").trim(), surface)
     };
   });
 }
@@ -38,6 +43,11 @@ test.describe("MPA shared visual system", () => {
     expect(light.textOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(light.mutedOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(light.primaryActionText).toBeGreaterThanOrEqual(4.5);
+    expect(light.successStatus).toBeGreaterThanOrEqual(4.5);
+    expect(light.warningStatus).toBeGreaterThanOrEqual(4.5);
+    expect(light.dangerStatus).toBeGreaterThanOrEqual(4.5);
+    expect(light.infoStatus).toBeGreaterThanOrEqual(4.5);
+    expect(light.focusIndicator).toBeGreaterThanOrEqual(4.5);
 
     await page.getByRole("button", { name: "Toggle theme" }).click();
     await expect.poll(() => page.locator("html").evaluate((element) => element.classList.contains("dark"))).toBe(true);
@@ -46,6 +56,11 @@ test.describe("MPA shared visual system", () => {
     expect(dark.textOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(dark.mutedOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(dark.primaryActionText).toBeGreaterThanOrEqual(4.5);
+    expect(dark.successStatus).toBeGreaterThanOrEqual(4.5);
+    expect(dark.warningStatus).toBeGreaterThanOrEqual(4.5);
+    expect(dark.dangerStatus).toBeGreaterThanOrEqual(4.5);
+    expect(dark.infoStatus).toBeGreaterThanOrEqual(4.5);
+    expect(dark.focusIndicator).toBeGreaterThanOrEqual(4.5);
 
     await page.reload();
     await expect.poll(() => page.locator("html").evaluate((element) => element.classList.contains("dark"))).toBe(true);

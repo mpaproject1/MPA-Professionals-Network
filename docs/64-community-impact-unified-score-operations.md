@@ -29,7 +29,7 @@ Source adapters reject stale/reversed/disputed/unconfirmed sources. The source l
 
 ## Policy administration
 
-The initial plan baseline was first seeded as version 1. Operational version 2 is active for private evaluation, preserves the same five weights and adds configurable evidence-quality ranks, outcome-maturity ranks and rating steps. Public publication remains disabled. Administrators may propose a new JSON policy version. The API validates:
+The initial plan baseline was first seeded as version 1. Operational version 3 is active for private evaluation, preserves the same five weights and adds configurable evidence-quality ranks, outcome-maturity ranks, rating steps, reviewer criteria, modifiers and decay rules. Public publication remains disabled. Administrators may propose a new JSON policy version. The API validates:
 
 - exactly the five approved dimensions;
 - weights total exactly 100%;
@@ -41,7 +41,7 @@ A proposer cannot approve or activate their own version. Approval requires a ref
 
 ## Calculation contract
 
-For each dimension, the reviewer rating is normalized to the policy's configured rating range and multiplied by the policy weight. The weighted result is multiplied by policy-configured base points, role factor and attribution share. Policy-configured category/source/period caps and diminishing returns are applied. The service rejects missing ratings, unknown roles, unverified source states, insufficient evidence, unsupported outcomes, or missing policy configuration.
+For each dimension, the reviewer rating is normalized to the policy's configured rating range and multiplied by the policy weight. The weighted result is multiplied by policy-configured base points, role factor and attribution share. Policy-configured category/source/period caps, diminishing returns, conditional modifiers and source-age decay rules are applied. The service rejects missing ratings, unknown roles, unverified source states, insufficient evidence, unsupported outcomes, or missing policy configuration.
 
 The initial baseline does not embed its weights in application code. The member UI shows the active dimension weights and the ledger explanations show each dimension's rating, weight, weighted contribution, role, share, policy version and final points.
 
@@ -76,8 +76,10 @@ Each reviewer assessment stores the exact score policy version used for its five
 - `20261101150000_community_impact_score_single_reversal.sql`
 - `20261101160000_community_impact_score_policy_rubric_config.sql`
 - `20261101170000_community_impact_assessment_score_policy.sql`
+- `20261101180000_community_impact_score_modifiers_and_rubrics.sql`
+- `20261101190000_community_impact_score_effective_date_guard.sql`
 
-The migration runner verifies the active evaluation-only policy v2, the exact five weights, policy thresholds, source-link uniqueness, one-reversal constraint, append-only triggers, assessment policy binding and complete rollback of the score schema changes.
+The migration runner verifies the active evaluation-only policy v3, the exact five weights, policy thresholds, source-link uniqueness, one-reversal constraint, append-only triggers, assessment policy binding and complete rollback of the score schema changes.
 
 ## Commands
 

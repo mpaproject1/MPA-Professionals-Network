@@ -42,7 +42,7 @@ test("Source adapters require authoritative verified source lifecycle and claima
  assert.match(service,/SCORE_ATTRIBUTION_MISMATCH/);
 });
 test("Scoring uses reviewer-assessed dimensions, policy weights, configured caps and role factors",()=>{
- assert.match(service,/assessment\.rubric/);assert.match(service,/SCORE_ASSESSMENT_POLICY_MISMATCH/);assert.match(assessmentPolicyMigration,/score_policy_version_id/);assert.match(service,/weighted\+=normalized\*Number\(d\.weight\)\/100/);
+ assert.match(service,/assessment\.rubric/);assert.match(service,/assessmentPolicyVersionId/);assert.match(assessmentPolicyMigration,/score_policy_version_id/);assert.match(service,/weighted\+=normalized\*Number\(d\.weight\)\/100/);
  assert.match(service,/calc\.roleFactors/);assert.match(service,/calc\.categoryCaps/);assert.match(service,/calc\.sourceCaps/);assert.match(service,/calc\.periodCaps/);assert.match(service,/calc\.diminishingReturns/);assert.match(service,/calc\.evidenceQualityRank/);assert.match(service,/calc\.outcomeMaturityRank/);assert.match(service,/calc\.rounding/);assert.match(service,/for update/);
  assert.match(governance,/measurable_community_outcomes/);
  assert.match(governance,/collaboration_knowledge_sharing/);

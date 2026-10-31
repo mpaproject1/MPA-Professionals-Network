@@ -1,6 +1,6 @@
 "use client";
 import {useCallback,useEffect,useMemo,useState} from "react";
-import {Copy,RefreshCw,Share2,Users,BriefcaseBusiness,CheckCircle2,LockKeyhole} from "lucide-react";
+import {Copy,RefreshCw,Users,BriefcaseBusiness,LockKeyhole} from "lucide-react";
 import {api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
 

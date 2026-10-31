@@ -262,6 +262,7 @@ const server=http.createServer(async (req,res)=>{
     
     if(req.method==="POST" && p==="api/v1/auth/register") { const b=await body(req); await enforcePersistentRateLimit(req,"register",5,60000,String(b.email||"").trim().toLowerCase()); return ok(res,await membership.register(b,requestId),requestId,201); }
     if(req.method==="GET" && p==="api/v1/me/referrals") { const identity=await auth(req); return ok(res,await memberReferrals.listMyReferrals(identity.sub),requestId); }
+    if(req.method==="GET" && p==="api/v1/me/referrals/candidate-outcomes") { const identity=await auth(req); return ok(res,await memberReferrals.listMyCandidateReferrals(identity.sub),requestId); }
     if(req.method==="POST" && p==="api/v1/me/referrals/code") { const identity=await auth(req); return ok(res,await memberReferrals.ensureMyReferralCode(identity.sub),requestId,201); }
     if(req.method==="POST" && parts.length===6 && parts[2]==="me" && parts[3]==="referrals" && parts[5]==="employment-confirmation") { const identity=await auth(req); return ok(res,await memberReferrals.confirmEmploymentOutcome(identity.sub,parts[4],await body(req)),requestId); }
     if(req.method==="GET" && p==="api/v1/admin/referrals") { const identity=await auth(req); return ok(res,await memberReferrals.listReferralAdminQueue(identity,{status:query(req.url).get("status"),limit:query(req.url).get("limit")}),requestId); }

@@ -28,7 +28,7 @@ function validatePolicy(input){
   if(!RETENTION_STARTS.has(start))fail(400,"Choose a supported retention start event for "+key+".","COMMUNITY_IMPACT_RETENTION_INVALID");
   dataClasses[key]={retentionDays:integer(item.retentionDays,1,Number.MAX_SAFE_INTEGER,key+" retentionDays"),graceDays:integer(item.graceDays,0,Number.MAX_SAFE_INTEGER,key+" graceDays"),retentionStart:start,expiryAction:action,legalHoldBehavior:"pause_and_preserve"};
  }
- return {schemaVersion:1,dataClasses};
+ return {schemaVersion:2,dataClasses};
 }
 async function assertPermission(db,userId,permission){
  const result=await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId]);

@@ -177,6 +177,7 @@ export async function recalculateVerifiedClaim(actor,claimId,input){
   return {recalculationId:log.id,...(result||{})};
  });
 }
+export async function listScoreRecalculations(actor){await permission(getPool(),actor,"community_impact.score.view_all");const rows=await getPool().query("select r.*,u.email initiated_by_email from community_impact_score_recalculation r join app_user u on u.id=r.initiated_by order by r.created_at desc limit 200");return {items:rows.rows}}
 export async function listScoreLedger(actor,filters={}){
  await permission(getPool(),actor,"community_impact.score.view_all");
  const values=[],where=[];if(filters.userId){values.push(filters.userId);where.push("l.subject_user_id=$"+values.length)}if(filters.sourceType){values.push(filters.sourceType);where.push("l.source_type=$"+values.length)}

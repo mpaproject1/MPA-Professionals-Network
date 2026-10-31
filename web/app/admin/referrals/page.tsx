@@ -8,7 +8,7 @@ export default function AdminReferralsPage(){
  const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated),hydrateToken=useUiStore(s=>s.hydrateToken);
  const [items,setItems]=useState<Referral[]>([]),[error,setError]=useState(""),[notice,setNotice]=useState(""),[busy,setBusy]=useState("");
  const [method,setMethod]=useState("employer_confirmation"),[reference,setReference]=useState(""),[selected,setSelected]=useState("");
- const [points,setPoints]=useState({membership_activated:0,shortlisted:0,interview:0,offer_accepted:0,employment_verified:0}),[reason,setReason]=useState(""),[policyId,setPolicyId]=useState("");
+ const [points,setPoints]=useState({membership_application_submitted:0,membership_approved:0,membership_activated:0,shortlisted:0,interview:0,offer_accepted:0,employment_verified:0}),[reason,setReason]=useState(""),[policyId,setPolicyId]=useState("");
  const load=useCallback(async()=>{if(!token)return;setError("");try{const r=await api<{items:Referral[]}>("/api/v1/admin/referrals",{},token);setItems(r.items||[]);}catch(e){setError(e instanceof Error?e.message:"Referral queue could not be loaded.");}},[token]);
  useEffect(()=>{if(!hydrated)hydrateToken();},[hydrated,hydrateToken]);
  useEffect(()=>{if(hydrated&&token)void load();},[hydrated,token,load]);

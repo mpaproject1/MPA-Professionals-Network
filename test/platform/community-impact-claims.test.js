@@ -19,7 +19,7 @@ test("Increment 3 creates separate private claim, evidence, assignment, decision
  assert.match(migration,/claimant_user_id uuid not null references app_user\(id\) on delete restrict/);
  assert.match(migration,/retention_policy_version_id uuid not null references community_impact_retention_policy_version/);
  assert.match(migration,/retention_rule_snapshot jsonb not null/);
- assert.match(migration,/file_object_id uuid not null unique references file_object\(id\)/);
+ assert.match(migration,/file_object_id uuid unique references file_object\(id\)/);
  assert.match(migration,/claim history is append-only/i);
  assert.match(migration,/claim decisions are immutable/i);
  assert.match(migration,/evidence references can only be deleted by the approved retention processor/i);

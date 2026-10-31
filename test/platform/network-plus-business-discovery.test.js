@@ -63,6 +63,8 @@ test("commercial listings have separate moderation and publication states with c
   assert.match(service, /status=any\(\$4::text\[\]\)/);
   assert.match(service, /assertBusinessPublishable/);
   assert.match(service, /SELF_REVIEW_FORBIDDEN/);
+  assert.match(service, /assertIndependentBusinessReviewer/);
+  assert.match(service, /BUSINESS_REVIEW_CONFLICT/);
   assert.match(service, /moderation_submitted_by===userId/);
   assert.match(service, /row\.submitted_by===userId/);
 });

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
+
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
 const [migration,service,server,compatibility,page,userAdmin,manage,admin]=await Promise.all([read("../../db/migrations/20261031130000_serve_community_initiatives.sql"),read("../../src/platform/serve-community-initiatives.js"),read("../../server.js"),read("../../scripts/check-new-migration-compatibility.js"),read("../../web/app/serve-community/page.tsx"),read("../../src/platform/user-admin.js"),read("../../web/app/serve-community/manage/page.tsx"),read("../../web/app/admin/serve-community/page.tsx")]);
 test("Increment 7 creates an additive initiative and consent domain without legacy conversion",()=>{for(const table of ["serve_community_initiative","serve_community_initiative_event","serve_community_participation","serve_community_participation_consent_event","serve_community_participation_event","serve_community_legacy_classification","serve_community_legacy_classification_event"])assert.match(migration,new RegExp("create table if not exists "+table,"i"));assert.doesNotMatch(migration,/insert into serve_community_initiative|insert into serve_community_legacy_classification|update service_listing|delete from service_listing|alter table service_listing/i);assert.match(migration,/references app_user\(id\)/i);assert.match(migration,/references organization\(id\)/i);assert.match(migration,/references service_listing\(id\)/i)});

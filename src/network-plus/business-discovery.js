@@ -410,6 +410,10 @@ export async function addBusinessOwner(businessId,userId,input,requestId) {
     if(exists)fail(409,"This owner party is already associated with the business.","DUPLICATE_OWNER");
     const row=(await db.query("insert into network_plus_business_ownership(business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,created_by) values($1,$2,$3,$4,'co_owner','pending','pending',$5) on conflict do nothing returning id,business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,created_at",[businessId,ownerType,ownerUserId,organizationId,userId])).rows[0];
     if(!row)fail(409,"This owner party is already associated with the business.","DUPLICATE_OWNER");
+    if(business.publication_status==="published"){
+      await db.query("update network_plus_business set publication_status=$2,updated_at=now() where id=$1",[businessId,"paused"]);
+      await db.query("update network_plus_service_listing set status=$2,updated_at=now() where business_id=$1 and status=$3",[businessId,"paused","published"]);
+    }
     await audit(db,userId,"network_plus.business_co_owner_invited","network_plus_business_ownership",row.id,requestId,{businessId,ownerType});
     if(ownerType==="member")await createInAppNotification(db,ownerUserId,"network_plus.business_ownership_consent_required","network_plus_business_ownership",row.id,{message:"You have been invited as a co-owner of a Network-Plus business.",nextAction:"Review and explicitly accept or decline this ownership association.",actionUrl:"/network-plus/businesses",actionRequired:true,priority:"high"});
     else {

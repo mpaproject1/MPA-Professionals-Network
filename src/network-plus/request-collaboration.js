@@ -200,7 +200,8 @@ export async function addNetworkPlusRequestParticipant(requestId,userId,input,re
   if(!target||target===userId)fail(400,"Choose another participant.","INVALID_PARTICIPANT");
   return withTransaction(async db=>{
     await assertEntry(db,userId);
-    await participant(db,requestId,userId);
+    const actorParticipant=await participant(db,requestId,userId);
+    if(actorParticipant.consent_status!=="accepted")fail(403,"Only an accepted participant can invite collaborators.","PARTICIPANT_CONSENT_REQUIRED");
     await assertEntry(db,target);
     const request=(await db.query("select status,requester_user_id from network_plus_request where id=$1 for update",[requestId])).rows[0];
     if(!["accepted","in_progress"].includes(request.status))fail(409,"Additional participants can join only an accepted engagement.","ACCEPTANCE_REQUIRED");

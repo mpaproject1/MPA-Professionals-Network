@@ -1,13 +1,72 @@
-import { ArrowRight, BriefcaseBusiness, GraduationCap, HandHeart, ShieldCheck, UserRoundCheck } from "lucide-react";
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { Accessibility, ArrowRight, BarChart3, BriefcaseBusiness, ChartNoAxesCombined, GraduationCap, HandHeart, ShieldCheck, UserRoundCheck, Users } from "lucide-react";
 import Link from "next/link";
+import { api } from "../../lib/api";
 import styles from "./about.module.css";
 
 const pathways = [
   { title: "Job Portal", description: "Browse public job opportunities and follow the application steps shown for each listing.", href: "/jobs", action: "Browse jobs", Icon: BriefcaseBusiness },
-  { title: "Serve-Community", description: "Explore published professional services and reviewed community-service pathways.", href: "/serve-community", action: "Explore services", Icon: HandHeart },
+  { title: "Serve-Community", description: "Explore published community initiatives, volunteer opportunities and completed participation journeys.", href: "/serve-community", action: "Explore initiatives", Icon: HandHeart },
   { title: "Mentorship", description: "Explore mentorship information and the available mentor-request journey.", href: "/mentorship", action: "Explore mentorship", Icon: GraduationCap },
   { title: "Membership", description: "Learn about membership and follow the application and review steps provided by the platform.", href: "/membership", action: "Understand membership", Icon: UserRoundCheck },
 ] as const;
+
+type CompletedProject = { id: string; title: string; category: string; summary: string; completedAt?: string; completedMemberParticipations: number };
+type CompletedPortfolio = { items: CompletedProject[]; minimumReportableGroupSize: number; measurementNote: string };
+
+const categoryLabels: Record<string, string> = {
+  education: "Education", community_care: "Community care", digital_inclusion: "Digital inclusion",
+  environment: "Environment", livelihoods: "Livelihoods", accessibility: "Accessibility", other: "Community initiative",
+};
+
+function CompletedProjects() {
+  const [portfolio, setPortfolio] = useState<CompletedPortfolio | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await api<CompletedPortfolio>("/api/v1/public/serve-community/completed-projects");
+      setPortfolio(result);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Completed project records could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  return (
+    <section className={styles.portfolio} aria-labelledby="completed-projects-title">
+      <div className={styles.sectionHeading}>
+        <p className={styles.eyebrow}>Evidence from the platform</p>
+        <h2 id="completed-projects-title">Completed Projects</h2>
+        <p>Explore community initiatives recorded as completed in MPA. Project descriptions and participation figures are retrieved from system records, not estimated for display.</p>
+      </div>
+      {loading ? <p className={styles.portfolioState} role="status">Loading completed project records…</p> :
+        error ? <div className={styles.portfolioState} role="alert"><p>{error}</p><button type="button" className={styles.secondaryAction} onClick={() => void load()}>Retry</button></div> :
+        portfolio?.items.length ? <>
+          <div className={styles.portfolioGrid}>
+            {portfolio.items.map(project => (
+              <article className={styles.projectCard} key={project.id}>
+                <div className={styles.projectMeta}><span>{categoryLabels[project.category] || "Community initiative"}</span><span className={styles.completedMark}><ShieldCheck size={14} aria-hidden="true" /> Completed</span></div>
+                <h3>{project.title}</h3>
+                <p>{project.summary}</p>
+                <div className={styles.projectCount}><Users size={18} aria-hidden="true" /><strong>{project.completedMemberParticipations.toLocaleString()}</strong><span>members with completed participation records</span></div>
+                {project.completedAt ? <p className={styles.projectDate}>Recorded {new Date(project.completedAt).toLocaleDateString()}</p> : null}
+              </article>
+            ))}
+          </div>
+          <p className={styles.measurementNote}>{portfolio.measurementNote}</p>
+        </> : <div className={styles.portfolioState} role="status"><ChartNoAxesCombined size={24} aria-hidden="true" /><h3>No reportable completed projects yet</h3><p>Completed initiatives will appear here when completion and member participation records meet the platform’s privacy reporting threshold. Small groups are withheld.</p></div>}
+    </section>
+  );
+}
 
 export default function AboutPage() {
   return (
@@ -16,7 +75,7 @@ export default function AboutPage() {
         <div className={styles.heroCopy}>
           <p className={styles.eyebrow}><span aria-hidden="true" /> About MPA Professionals Network</p>
           <h1 id="about-title">Professional connections, directed toward <span>meaningful contribution.</span></h1>
-          <p className={styles.lead}>MPA Professionals Network brings professional opportunities, community service, mentorship and membership pathways into one place for people and organizations to explore.</p>
+          <p className={styles.lead}>MPA Professionals Network connects professionals, members and organizations through clear, accountable journeys for opportunity, service, mentorship, collaboration and membership.</p>
           <div className={styles.actions}>
             <Link href="#pathways-title" className={styles.primaryAction}>Explore pathways <ArrowRight size={17} aria-hidden="true" /></Link>
             <Link href="/jobs" className={styles.secondaryAction}>Browse the Job Portal</Link>
@@ -24,7 +83,7 @@ export default function AboutPage() {
         </div>
         <figure className={styles.illustration}>
           <img src="/illustrations/mpa-network-placeholder.svg" alt="Abstract illustration of people and professional pathways connected in the MPA network" />
-          <figcaption>Original replaceable illustration · MPA navy and lime</figcaption>
+          <figcaption>MPA navy and lemon visual identity</figcaption>
         </figure>
       </section>
 
@@ -43,6 +102,22 @@ export default function AboutPage() {
               <Link href={href} className={styles.pathwayLink}>{action} <ArrowRight size={15} aria-hidden="true" /></Link>
             </article>
           ))}
+        </div>
+      </section>
+
+      <CompletedProjects />
+
+      <section className={styles.experience} aria-labelledby="experience-title">
+        <div className={styles.sectionHeading}>
+          <p className={styles.eyebrow}>Designed around people and progress</p>
+          <h2 id="experience-title">A connected experience, with clear next steps.</h2>
+          <p>The platform brings related work into one coherent experience while keeping each workflow, permission and decision distinct.</p>
+        </div>
+        <div className={styles.experienceGrid}>
+          <article><span><BarChart3 size={21} aria-hidden="true" /></span><h3>Progress you can understand</h3><p>Profile completion, application status, milestones and dashboard summaries help members see what is recorded, what is pending and what action comes next.</p></article>
+          <article><span><ShieldCheck size={21} aria-hidden="true" /></span><h3>Trust and privacy by design</h3><p>Verification, membership approval, payment confirmation and participation consent remain separate. Private evidence and personal records are not public portfolio content.</p></article>
+          <article><span><Accessibility size={21} aria-hidden="true" /></span><h3>Usable on every screen</h3><p>Responsive layouts, readable status labels, keyboard access, visible focus and clear touch targets support mobile, tablet and desktop use.</p></article>
+          <article><span><ChartNoAxesCombined size={21} aria-hidden="true" /></span><h3>Impact grounded in records</h3><p>Charts and public showcases should reflect system records with clear definitions. Missing or unverified outcomes are never replaced with estimates or invented success stories.</p></article>
         </div>
       </section>
 

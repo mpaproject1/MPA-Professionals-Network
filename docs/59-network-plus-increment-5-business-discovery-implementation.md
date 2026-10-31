@@ -41,14 +41,14 @@ The schema uses foreign keys to existing canonical user, organization, geography
 - An organization business is owned by a canonical organization identity.
 - A joint business starts with one accountable primary owner; each additional owner is represented by a separate pending ownership row and must explicitly accept before becoming active.
 - Member co-owners must be active professional members. Organization owner parties must be represented by an authorized current organization owner/admin.
-- Operational manager assignments are not legal ownership. The capability set is explicitly limited to listing management, request response and commercial-term acceptance. Assignments have expiry/revocation fields.
+- Operational manager assignments are not legal ownership. The capability set is explicitly limited to listing management, request response and commercial-term acceptance. Assignments have expiry/revocation fields; owner revocation is exposed through a DELETE endpoint, and current organization project-manager membership is rechecked on every delegated request.
 
 ## 3. Lifecycle and moderation
 
 Business verification and profile moderation are distinct:
 
 - Verification case: draft evidence collection → submitted → under review → verified / changes requested / rejected / suspended; an expiry date is required for a verified decision.
-- Business profile moderation: not submitted → pending review → approved / rejected / suspended.
+- Business profile moderation: not submitted → pending review → approved / rejected / suspended. A moderation suspension cascades to published/paused/pending service listings with a separate audit event for each affected listing; owners may correct suspended records but cannot clear the suspension themselves.
 - Business publication: draft → published / paused / suspended / archived.
 - Service listing: draft → pending review → published / changes requested / rejected / paused / suspended / archived.
 
@@ -123,7 +123,7 @@ Added `test/platform/network-plus-business-discovery.test.js` and payload templa
 - [ ] Add/run seeded PostgreSQL integration fixtures/tests for individual, organization and joint ownership; duplicate business/owner/idempotency conflicts; cross-organization access; delegated project-manager capability; expired/revoked delegation.
 - [ ] Add/run API tests for signed-out, expired membership, verified/unverified organization, direct endpoint access, field-level audience, private evidence isolation, self-review and unauthorized moderation.
 - [ ] Execute and test reviewer-authorized private evidence download through the existing `GET /api/v1/files/:id` route. The private-file service now allows only an independent `business_verification_reviewer` / `system_admin` or explicit `business.verify` permission to read evidence attached to a submitted/under-review case, and rejects the case submitter. Validate the negative cases with PostgreSQL fixtures.
-- [ ] Confirm the two system-only permission catalogue entries `business.verify` and `business.moderate` are present after migration and verify authorized reviewer assignment through the existing permission governance workflow. The migration registers the roles and permissions but does not grant either role or permission to any user.
+- [ ] Confirm the two system-only permission catalogue entries `business.verify` and `business.moderate` are present after migration and verify authorized reviewer assignment through the existing permission governance workflow. The migration registers the roles and permissions but does not grant either role or permission to any user. Existing role governance marks both roles privileged so only system administrators can assign them.
 - [ ] Run backend tests, Biome, TypeScript, production build and browser acceptance after all implementation fixes are ready.
 - [ ] Complete manual privacy, accessibility and responsive checks before public release.
 

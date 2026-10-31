@@ -1252,3 +1252,16 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
   .mpa-experience .membership-progress { padding:17px; }
   .mpa-experience .membership-plan { padding:17px; }
 }
+
+
+/* Keep lemon reserved for actions, selection and focus; use cool blue for dark-theme links/icons. */
+.dark {
+  --primary: #8fb7d6;
+  --primary-strong: #b7d0e5;
+  --primary-contrast: #0d2e4a;
+  --gold: var(--brand-lemon);
+  --focus-ring: var(--brand-lemon);
+}
+.btn svg,.icon-btn svg { flex:0 0 auto; }
+.btn svg { width:16px; height:16px; }
+.icon-btn svg { width:18px; height:18px; }

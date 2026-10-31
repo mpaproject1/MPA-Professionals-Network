@@ -58,7 +58,7 @@ create trigger trg_community_impact_policy_version_immutable before update or de
 drop trigger if exists trg_community_impact_candidate_event_immutable on community_impact_detection_candidate_event;
 create trigger trg_community_impact_candidate_event_immutable before update or delete on community_impact_detection_candidate_event for each row execute function community_impact_reject_history_mutation();
 
-create or replace function community_impact_candidate_guard() returns trigger language plpgsql as $
+create or replace function community_impact_candidate_guard() returns trigger language plpgsql as $$
 begin
  if TG_OP='DELETE' then raise exception 'Community Impact detection candidates cannot be deleted'; end if;
  if NEW.id is distinct from OLD.id
@@ -87,7 +87,7 @@ begin
   raise exception 'Invalid Community Impact attribution status transition';
  end if;
  return NEW;
-end; $;
+end; $$;
 drop trigger if exists trg_community_impact_candidate_guard on community_impact_detection_candidate;
 create trigger trg_community_impact_candidate_guard before update or delete on community_impact_detection_candidate for each row execute function community_impact_candidate_guard();
 

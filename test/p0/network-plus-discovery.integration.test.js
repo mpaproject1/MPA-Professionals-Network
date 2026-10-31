@@ -72,7 +72,8 @@ async function createVerifiedProfessional(label, visibility, reviewerId, showCon
   }
   await db.query("update verification_case set assigned_reviewer_id=$1 where id=$2", [reviewerId, verificationCase.id]);
   await verification.transitionCase(verificationCase.id, "review", reviewerId, "network-plus-review-" + randomUUID());
-  const claimType = (await db.query("select claim_code from verification_claim_type where active=true order by claim_code limit 1")).rows[0];
+  await db.query("insert into verification_claim_type(claim_code,name,description,active) values('service_capability','Service capability','Professional service capability claim used by the Network-Plus integration fixture.',true) on conflict(claim_code) do update set active=true");
+  const claimType = (await db.query("select claim_code from verification_claim_type where claim_code='service_capability' and active=true")).rows[0];
   assert.ok(claimType, "An active verification claim type must exist");
   const claim = await verification.addClaim(verificationCase.id, claimType.claim_code, { capability: "Verified " + label + " capability" }, account.user.id, "network-plus-claim-" + randomUUID());
   await verification.addEvidence(verificationCase.id, {

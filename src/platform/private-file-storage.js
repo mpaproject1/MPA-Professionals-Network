@@ -88,7 +88,7 @@ export async function confirmPrivateUpload(userId,id){
 }
 export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId=null,permissions=[]){
   const db=getPool();
-  const r=await db.query(`select f.*,s.object_key from file_object f join private_upload_session s on s.file_object_id=f.id where f.id=$1 and f.visibility='private' and s.status='confirmed'`,[fileId]);
+  const r=await db.query(`select f.*,s.object_key,s.purpose from file_object f join private_upload_session s on s.file_object_id=f.id where f.id=$1 and f.visibility='private' and s.status='confirmed'`,[fileId]);
   const f=r.rows[0]; if(!f) throw fail(404,"Private file not found.","NOT_FOUND");
   let allowed=f.created_by===userId;
   if(!allowed){
@@ -154,7 +154,7 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
       allowed=businessEvidence.rowCount>0;
     }
   }
-  if(!allowed){
+  if(f.purpose==="community_impact_claim_evidence"){
     const impactEvidence=await db.query(`select c.claimant_user_id,
       exists(select 1 from community_impact_claim_assignment a where a.claim_id=c.id and a.reviewer_user_id=$2 and a.active=true) as assigned_reviewer,
       exists(select 1 from community_impact_claim_appeal ap where ap.claim_id=c.id and ap.assigned_reviewer_id=$2 and ap.status='under_review') as assigned_appeal_reviewer

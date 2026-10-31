@@ -67,3 +67,12 @@
 .experienceGrid p{margin:0;color:var(--muted);font-size:13px;line-height:1.7}
 @media(max-width:980px){.portfolioGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.experienceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.portfolioGrid,.experienceGrid{grid-template-columns:minmax(0,1fr)}.projectCard{padding:18px}.projectCount{grid-template-columns:auto auto minmax(0,1fr)}.portfolio,.experience{padding-inline:18px}}
+
+.projectMedia{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.projectMedia a{display:block;overflow:hidden;aspect-ratio:16/10;border-radius:12px;background:var(--surface)}
+.projectMedia img{width:100%;height:100%;object-fit:cover}
+.projectVideos{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.projectVideos a{display:inline-flex;align-items:center;gap:6px;color:var(--primary);font-size:12px;font-weight:700}
+.projectOutcomes{display:grid;gap:7px;margin:0;padding:10px 0 0;border-top:1px solid var(--border);list-style:none}
+.projectOutcomes li{display:flex;flex-wrap:wrap;gap:5px 10px;justify-content:space-between;font-size:12px}
+.projectOutcomes strong{color:var(--text)}.projectOutcomes span{color:var(--muted)}

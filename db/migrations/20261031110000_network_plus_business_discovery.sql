@@ -88,8 +88,8 @@ create index if not exists ix_network_plus_business_access_user
 create table if not exists network_plus_business_verification_case (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references network_plus_business(id) on delete restrict,
-  status text not null default 'submitted'
-    check (status in ('submitted','under_review','changes_requested','verified','rejected','suspended','appealed','closed')),
+  status text not null default 'draft'
+    check (status in ('draft','submitted','under_review','changes_requested','verified','rejected','suspended','appealed','closed')),
   submitted_by uuid not null references app_user(id) on delete restrict,
   reviewer_user_id uuid references app_user(id) on delete restrict,
   decision_reason text,

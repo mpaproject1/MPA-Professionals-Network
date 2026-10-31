@@ -26,12 +26,19 @@ function safeWebsite(value) {
   if(url.protocol!=="https:"||url.username||url.password||!url.hostname)fail(400,"Website must be a valid HTTPS URL without embedded credentials.","VALIDATION_ERROR");
   return url.toString();
 }
+function publicText(value,max,field,{min=1}={}) {
+  const v=text(value,max,field,{min});
+  const patterns=[/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/i,/(?:https?:\\/\\/|www\\.)\\S+/i,/(?:telegram|whatsapp|signal|instagram|facebook|tiktok)\\s*(?:handle|username|me|us|at)?\\s*[:@]\\s*[\\w.]{3,}/i,/(?:^|\\s)@[A-Z0-9_.]{3,}\\b/i];
+  const phones=v.match(/(?:\\+?\\d[\\d\\s().-]{7,}\\d)/g)||[];
+  if(patterns.some(pattern=>pattern.test(v))||phones.some(phone=>phone.replace(/\\D/g,"").length>=9))fail(400,"Remove personal contact details and direct-contact links from public profile/listing text. Use the approved website field instead.","PUBLIC_CONTACT_DETAILS_FORBIDDEN");
+  return v;
+}
 function normalizeBusinessInput(input) {
   return {
     businessKind:input.businessKind,
     displayName:text(input.displayName,160,"Business name",{min:2}),
     tradingName:text(input.tradingName,160,"Trading name",{optional:true}),
-    description:text(input.description,5000,"Description",{min:20}),
+    description:publicText(input.description,5000,"Description",{min:20}),
     website:safeWebsite(input.website),
     locationLabel:text(input.locationLabel,160,"Location",{optional:true}),
     geographyReferenceItemId:input.geographyReferenceItemId||null
@@ -40,8 +47,8 @@ function normalizeBusinessInput(input) {
 function normalizeListingInput(input) {
   const row={
     title:text(input.title,160,"Title",{min:3}),
-    summary:text(input.summary,500,"Summary",{min:20}),
-    description:text(input.description,8000,"Description",{min:40}),
+    summary:publicText(input.summary,500,"Summary",{min:20}),
+    description:publicText(input.description,8000,"Description",{min:40}),
     serviceCategory:text(input.serviceCategory,100,"Service category",{min:2}).toLowerCase(),
     audience:input.audience||"members",
     deliveryMode:input.deliveryMode||"remote",

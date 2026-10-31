@@ -147,6 +147,14 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
         allowed=financeEvidence.rowCount>0;
       }
     }
+  if(!allowed&&permissions.includes("community_impact.identity.review")){
+    const identityEvidence=await db.query("select 1 from community_impact_identity_assurance_evidence e join community_impact_identity_assurance_case c on c.id=e.case_id where e.file_object_id=$1 and c.user_id<>$2 and c.status in('submitted','under_review') limit 1",[fileId,userId]);
+    allowed=identityEvidence.rowCount>0;
+  }
+  if(!allowed&&permissions.includes("community_impact.offline_attribution.review")){
+    const attributionEvidence=await db.query("select 1 from community_impact_offline_attribution_evidence e join community_impact_offline_attribution a on a.id=e.attribution_id where e.file_object_id=$1 and a.contributor_user_id<>$2 and a.status in('submitted','under_review') limit 1",[fileId,userId]);
+    allowed=attributionEvidence.rowCount>0;
+  }
   if(!allowed){
     const businessReviewer=roles.some(role=>["business_verification_reviewer","system_admin"].includes(role))||permissions.includes("business.verify");
     if(businessReviewer){

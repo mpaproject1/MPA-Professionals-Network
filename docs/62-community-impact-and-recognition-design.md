@@ -918,14 +918,14 @@ Admin scan and queue access require system_admin or the explicit system-only com
 | 0 — Re-audit and architecture freeze | Source audit complete; formal freeze pending | This delivery record; project-owner approval and policy decisions still required |
 | 1 — Taxonomy and source-link contract | Contract drafted; approval pending | This delivery record; schema/API/privacy review still required |
 | 2 — Automatic detection and attribution | Implementation committed; validation pending | Two Serve-Community adapters, immutable source policy versions, event-driven candidates, replay-safe reconciliation, contributor confirm/dispute; disposable DB, CI, security and scheduler validation remain |
-| 3 — Manual claims and evidence | In progress — retention policy registry/API/admin UI added | Claim/evidence schema, non-member identity assurance, evidence lifecycle integration and expiry enforcement remain gated |
-| 4 — Reviewer operations | Not started | Depends on scoped permission/assignment/conflict/appeal policy |
+| 3 — Manual claims and evidence | Core backend extended; validation pending | Identity assurance, evidence-backed offline attribution, reviewer-controlled claim/source reconciliation, evidence privacy and non-destructive retention evaluation added; claimant/admin UI and runtime/security validation remain pending |
+| 4 — Reviewer operations | Core backend extended; validation pending | Case assessments, conflict declarations, database-enforced assignment/decision conflict blocks and independent second-review controls added; operational UI, role matrix and runtime/security validation remain pending |
 | 5 — Score ledger and explanations | Not started | Depends on score governance and approved rubric; no score calculation before approval |
 | 6 — Member workspace and profile | Not started | Depends on stable APIs, privacy projections and consent controls |
 | 7 — Prompts, recognition and discovery | Not started | Depends on rate-limit, notification, recognition governance and opt-in policies |
 | 8 — Operational readiness | Not started | Security, monitoring, retention, support, migration and rollback readiness |
 
-**Change-control note:** This delivery updates the design and progress record only. It does not claim that Increment 0 has formal governance approval or that Increment 1 has passed its approval gates. Keep subsequent implementation on this branch and preserve the existing source workflows and protections.
+**Change-control note:** The governance completion implementation below adds source code, migration, API and regression-contract coverage. It does not claim that Increment 0 has formal governance approval or that Increment 1 has passed its approval gates. Keep all work on this branch and preserve the existing source workflows and protections.
 
 
 ## Policy decision update — initial approval and configurability (2026-10-31)
@@ -1026,3 +1026,103 @@ No workflow run was returned for that latest revision when checked. Therefore Ty
 **No unapproved deletion:** The migration intentionally seeds no retention duration and no active policy. No evidence deletion job is enabled by this registry. Legal holds pause and preserve records. Actual expiry enforcement must be implemented only after the evidence/claim storage model is integrated, MPA approves the class-by-class schedule and deletion/anonymization rules, and backup-expiry and legal-hold behavior are tested. Policy changes create a new version and apply prospectively unless a separately approved, audited migration/recalculation plan explicitly says otherwise.
 
 **Current implementation boundary:** The registry/API is an administrative foundation, not evidence deletion completion. Runtime database migration rehearsal, authorization tests, complete evidence lifecycle enforcement, retention/deletion execution and CI remain required. No production migration, data deletion or deployment is authorized by this work.
+
+
+## Governance completion implementation — 2026-11-01
+
+**Target:** `mpaproject1/MPA-Professionals-Network`, branch `feat/workstream-3-progress-members-workspace`.
+
+The following additive backend work has been prepared for this branch. It does not change the existing source-of-truth Serve-Community project or participation workflows, does not award points, and does not publish contribution data.
+
+### 3.1 Individual attribution for offline completed projects
+
+- An offline-project detection candidate remains unattributed until a separate attribution proposal identifies a contributor account, contribution role, attribution share and rationale.
+- The proposal requires at least one private evidence file and explicit confirmation by the named contributor before independent reviewer verification. Evidence is recorded with the active raw-evidence retention policy snapshot.
+- A non-member contributor must have a verified identity-assurance case before attribution can be verified.
+- An authorized offline-attribution reviewer makes the independent verification/decline decision. The proposer and contributor cannot verify their own proposal.
+- Multiple contributors may be attributed to the same offline project. Combined submitted, under-review and verified attribution shares for a project cannot exceed 100 percent; candidate-row locking serializes concurrent proposals.
+- Staff data-entry identity is never used as an inferred contributor.
+- Attribution remains separate from project approval, impact verification and scoring.
+
+### 3.2 Non-member identity assurance
+
+- A person without active membership may submit an authenticated-account identity-assurance case with legal name, country, assurance level and private evidence.
+- Identity evidence requires an active MPA-approved `identity_assurance_artifacts` retention rule before it is collected.
+- A separate system-only `community_impact.identity.review` permission controls the reviewer queue and decision operation.
+- A claimant cannot verify their own identity. The reviewer decision is retained with a policy snapshot and audit event.
+- Manual claim submission now requires verified identity assurance when the claimant has no active membership. This does not create, approve or grant membership.
+- Identity evidence downloads are limited to the owner and authorized identity reviewers while the case is submitted or under review.
+
+### 3.3 Claim-to-detected-contribution reconciliation
+
+- Reconciliation is an explicit reviewer operation, not a fuzzy-match job.
+- The assigned impact reviewer must link an open manual claim to one detected candidate.
+- The claimant account must match the authoritative contributor account. Offline candidates require exactly one verified individual attribution matching the claimant.
+- One-to-one database uniqueness prevents a claim or candidate being linked more than once.
+- The link stores reviewer identity, rationale and timestamp. It does not change source records, merge source rows, or award score.
+
+### 3.4 Detection policy administration
+
+- Detection policy proposals create a new immutable source-specific policy version and a separate governance record.
+- Proposal, approval and activation are separate operations with separate system-only permissions.
+- The proposer cannot approve or activate their own version. Approval reference and rationale are stored in the governance record and append-only policy events.
+- Activation changes only the active policy pointer. Existing candidate provenance remains attached to the original policy version.
+- The existing version-one source policy remains in place until a separately authorized version is approved and activated.
+
+### 3.5 Reviewer-adjustable assessments
+
+- An assigned reviewer may propose a case-level assessment with category, contribution type, role, evidence quality, outcome maturity, attribution share, rubric ratings, evidence references, rationale and risk level.
+- Every evidence reference is checked against active evidence attached to that claim.
+- Standard-risk assessments can be approved by the assigned reviewer; elevated/high-risk assessments remain pending until an independent second reviewer approves or rejects them.
+- The original reviewer and claimant cannot perform the second review. An active declared/confirmed conflict blocks assessment.
+- Assessments do not mutate the global scoring policy, source business records or claim provenance. They are not yet consumed by a score ledger.
+
+### 3.6 Conflict-of-interest and second-review safeguards
+
+- Reviewers can declare personal, financial, employment, project-involvement, prior-decision or other conflicts on claims to which they are assigned.
+- Database triggers reject new claim assignments and reviewer decisions when an active conflict exists for that reviewer and claim.
+- Assessment and second-review services repeat conflict checks server-side.
+- A conflict declaration does not silently rewrite an existing assignment or decision. The assigned reviewer must be recused/reassigned through a governed operation; the database prevents further decisions while the conflict is active.
+
+### 3.7 Retention lifecycle integration — non-destructive
+
+- A retention evaluator reads the currently active MPA-approved version and evaluates supported claim, identity-assurance, evidence, consent, reviewer-note and claim-event record classes.
+- It records the policy version, due date, configured action and evaluation disposition in a separate ledger.
+- Due records are marked `deletion_not_authorized`. The evaluator performs no DELETE, anonymization, access restriction, file-object purge or backup purge.
+- No retention period is seeded, no policy is activated by this implementation, and legal holds are not bypassed.
+- Actual deletion/anonymization remains disabled until MPA approves the data-class schedule and a separately reviewed processor covers database rows, private storage objects, backups, audit/legal holds and restoration behavior.
+
+### API operations added
+
+- `POST /api/v1/me/community-impact/identity-assurance`
+- `POST /api/v1/me/community-impact/identity-assurance/:id/evidence`
+- `POST /api/v1/me/community-impact/identity-assurance/:id/submit`
+- `GET /api/v1/admin/community-impact/identity-assurance`
+- `POST /api/v1/admin/community-impact/identity-assurance/:id/decision`
+- `GET /api/v1/admin/community-impact/offline-attributions`
+- `POST /api/v1/admin/community-impact/detection/candidates/:id/offline-attributions`
+- `POST /api/v1/me/community-impact/offline-attributions/:id/confirm`
+- `POST /api/v1/admin/community-impact/offline-attributions/:id/assign`
+- `POST /api/v1/admin/community-impact/offline-attributions/:id/decision`
+- `GET /api/v1/admin/community-impact/detection/policies`
+- `POST /api/v1/admin/community-impact/detection/policies`
+- `POST /api/v1/admin/community-impact/detection/policies/:id/approve`
+- `POST /api/v1/admin/community-impact/detection/policies/:id/activate`
+- `POST /api/v1/admin/community-impact/claims/:id/reconcile`
+- `POST /api/v1/admin/community-impact/claims/:id/conflicts`
+- `POST /api/v1/admin/community-impact/claims/:id/assessment`
+- `POST /api/v1/admin/community-impact/assessments/:id/second-review`
+- `POST /api/v1/admin/community-impact/retention/evaluate`
+
+### Validation and remaining gates
+
+- [ ] Execute the new additive migration against a disposable PostgreSQL database and run all migration compatibility/rollback checks.
+- [ ] Run targeted Community Impact tests and the full final-increment CI matrix.
+- [ ] Add and verify the member identity-assurance UI and administrator operations UI for identity, offline attribution, detection policy, conflicts and assessments.
+- [ ] Exercise private evidence reads for owners, assigned reviewers, unrelated users and revoked/closed cases.
+- [ ] Exercise concurrent attribution proposals and share-cap races against PostgreSQL to confirm the candidate-row lock serializes concurrent writes.
+- [ ] Validate policy proposal/approval/activation concurrency and ensure no unapproved policy pointer can become active.
+- [ ] Validate retention start events, due-date calculations, legal holds, evidence storage objects, backups and restore behavior.
+- [ ] Verify reviewer conflict declarations cause safe reassignment/recusal and that second review is independent in every role/action/object combination.
+
+**Status boundary:** Backend schema/service/API foundations are added; they are not marked runtime-validated or release-ready. UI coverage and all database, security, migration and CI validation remain pending. No CI was run for this intermediate delivery, consistent with the instruction to run CI at the final increment. No production migration, deployment, data deletion, permission assignment, merge or branch change is authorized.

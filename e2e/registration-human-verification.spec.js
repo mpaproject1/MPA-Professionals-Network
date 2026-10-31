@@ -9,6 +9,9 @@ const challenge = (id = "challenge-1") => ({
 const json = (data) => ({ status: 200, contentType: "application/json", body: JSON.stringify({ data }) });
 
 async function stubChallenge(page, options = {}) {
+  await page.addInitScript(() => {
+    localStorage.setItem("mpa-privacy-preferences-v1", JSON.stringify({ version: "2026-10-16-v1", necessary: true, analytics: false, personalization: false, updatedAt: new Date().toISOString() }));
+  });
   let issued = 0;
   await page.route("**/api/v1/auth/human-challenge", async route => {
     issued += 1;

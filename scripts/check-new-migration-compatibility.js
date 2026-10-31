@@ -42,7 +42,8 @@ const migrationNames = [
   "20261031180000_community_impact_manual_claims.sql",
   "20261031200000_member_referrals.sql",
   "20261031210000_job_application_referral_code.sql",
-  "20261031220000_referral_candidate_outcome_summary.sql"
+  "20261031220000_referral_candidate_outcome_summary.sql",
+  "20261031230000_referral_retention_snapshots.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -658,6 +659,9 @@ try {
   const referralHistoryTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_member_referral_event_immutable","trg_member_referral_score_immutable"]]);
   if(referralHistoryTriggers.rows[0].count!==2)throw new Error("Referral event and score ledger append-only triggers are missing.");
   const referralPolicy=await client.query("select count(*)::int count from member_referral_score_policy where status='active'");
+  const referralRetentionColumns=await client.query("select count(*)::int count from information_schema.columns where table_schema='public' and table_name=any($1::text[]) and column_name='retention_policy_snapshot'",[["member_referral_code","member_referral_attribution","member_referral_event","member_referral_score_ledger"]]);
+  if(referralRetentionColumns.rows[0].count!==4)throw new Error("Referral records are missing their approved retention policy snapshots.");
+
   if(referralPolicy.rows[0].count!==0)throw new Error("Fresh referral migrations must not silently activate an unapproved scoring policy.");
 
   await client.query("rollback");

@@ -276,7 +276,19 @@ try {
     ["support_conversation_workflow","waiting_on","text"],
     ["support_conversation_workflow","escalated_at","timestamptz"],
     ["support_conversation_workflow","escalated_by","uuid"],
-    ["support_conversation_workflow","updated_by","uuid"]
+    ["support_conversation_workflow","updated_by","uuid"],
+    ["serve_community_offline_project","id","uuid"],
+    ["serve_community_offline_project","completion_date","date"],
+    ["serve_community_offline_project","beneficiary_count","int4"],
+    ["serve_community_offline_project","outcome_metrics","jsonb"],
+    ["serve_community_offline_project","image_urls","jsonb"],
+    ["serve_community_offline_project","video_urls","jsonb"],
+    ["serve_community_offline_project","created_by","uuid"],
+    ["serve_community_offline_project","updated_by","uuid"],
+    ["serve_community_offline_project","status","text"],
+    ["serve_community_offline_project_event","id","uuid"],
+    ["serve_community_offline_project_event","project_id","uuid"],
+    ["serve_community_offline_project_event","actor_user_id","uuid"]
   ];
   const columnErrors = [];
   for (const [table,column,type] of postMigrationColumns) {
@@ -297,7 +309,12 @@ try {
     ["support_conversation_workflow","priority"],
     ["support_conversation_workflow","waiting_on"],
     ["support_conversation_workflow","created_at"],
-    ["support_conversation_workflow","updated_at"]
+    ["support_conversation_workflow","updated_at"],
+    ["serve_community_offline_project","created_by"],
+    ["serve_community_offline_project","updated_by"],
+    ["serve_community_offline_project","status"],
+    ["serve_community_offline_project_event","project_id"],
+    ["serve_community_offline_project_event","actor_user_id"]
   ];
   for (const [table,column] of requiredNotNull) {
     const result = await client.query(
@@ -346,6 +363,11 @@ try {
   if (!expiryDefinition || expiryDefinition.attnotnull || expiryDefinition.expression) throw new Error("service_listing.expires_at must remain nullable with no expiry default.");
 
   const requiredForeignKeys = [
+    ["serve_community_offline_project","created_by","app_user","id"],
+    ["serve_community_offline_project","updated_by","app_user","id"],
+    ["serve_community_offline_project","reviewed_by","app_user","id"],
+    ["serve_community_offline_project_event","project_id","serve_community_offline_project","id"],
+    ["serve_community_offline_project_event","actor_user_id","app_user","id"],
     ["network_plus_business","created_by","app_user","id"],
     ["network_plus_business","verified_by","app_user","id"],
     ["network_plus_business","moderation_submitted_by","app_user","id"],

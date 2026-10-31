@@ -15,7 +15,7 @@ const admin={sub:"admin",roles:["system_admin"],permissions:[]};
 const readersAvailable=spawnSync("python3",["-c","import openpyxl,pypdf"],{encoding:"utf8"}).status===0;
 async function createReportAdmin(){
  const suffix=randomUUID(),digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
- const created=await register({email:`report-admin-${suffix}@example.test`,password:"ReportAdminP1Password!2026",firstName:"Report",lastName:"Test",phone:`07${digits}`},"report-export-test-admin");
+ const created=await register({email:`report-admin-${suffix}@example.test`,password:"ReportAdminP1Password!2026",firstName:"Report",lastName:"Test",phone:`07${digits}`},"report-export-test-admin-" + suffix);
  const db=getPool(),role=(await db.query("select id from app_role where role_code='system_admin'")).rows[0];
  assert.ok(role,"system_admin role must exist in the migrated test database");
  await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing",[created.user.id,role.id]);
@@ -32,10 +32,10 @@ test("report catalogue respects role scope and hides restricted personal/financi
  assert.equal(support.some(r=>r.id==="member-directory"),false);
  assert.equal(support.some(r=>r.id==="payment-reconciliation"),false);
 });
-test("the full catalogue contains all 25 required reports and preserves role boundaries",async()=>{
+test("the full catalogue contains all 26 required reports and preserves role boundaries",async()=>{
  const reports=await listReportCatalogue(admin),ids=new Set(reports.map(report=>report.id));
- assert.equal(reports.length,25,"all 25 report definitions must remain available to an administrator");
- for(const id of ["membership-status","membership-applications","member-directory","payment-reconciliation","approved-payments","failed-reversed-payments","membership-collections","outstanding-membership-payments","finance-summary","job-seeker-demand","service-demand","job-application-funnel","service-listings","service-request-outcomes","mentorship-offers-requests-matches","mentorship-lifecycle","job-seeker-sharing-activity","professional-verification","organization-verification","support-demand-response","reference-import-quality","platform-usage","audit-activity","member-volunteer-capacity","manual-finance-receipts"])assert.ok(ids.has(id),`missing agreed report: ${id}`);
+ assert.equal(reports.length,26,"all 26 report definitions must remain available to an administrator");
+ for(const id of ["membership-status","membership-applications","member-directory","payment-reconciliation","approved-payments","failed-reversed-payments","membership-collections","outstanding-membership-payments","finance-summary","job-seeker-demand","service-demand","job-application-funnel","service-listings","service-request-outcomes","mentorship-offers-requests-matches","mentorship-lifecycle","job-seeker-sharing-activity","professional-verification","organization-verification","support-demand-response","reference-import-quality","platform-usage","audit-activity","member-volunteer-capacity","ethics-case-summary","manual-finance-receipts"])assert.ok(ids.has(id),`missing agreed report: ${id}`);
  const support=await listReportCatalogue({sub:"support",roles:["supporting_staff"],permissions:[]});
  assert.ok(support.some(report=>report.id==="support-demand-response"));
  assert.ok(support.some(report=>report.id==="job-seeker-demand"),"Support Desk may access only suppressed job-seeker demand aggregates");

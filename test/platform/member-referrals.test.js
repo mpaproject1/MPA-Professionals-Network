@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const migration=await readFile(new URL("../../db/migrations/20261031200000_member_referrals.sql",import.meta.url),"utf8");
 const applicationMigration=await readFile(new URL("../../db/migrations/20261031210000_job_application_referral_code.sql",import.meta.url),"utf8");
+const retentionMigration=await readFile(new URL("../../db/migrations/20261031230000_referral_retention_snapshots.sql",import.meta.url),"utf8");
 const service=await readFile(new URL("../../src/platform/member-referrals.js",import.meta.url),"utf8");
 const membership=await readFile(new URL("../../src/membership/service.js",import.meta.url),"utf8");
 const jobs=await readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8");
@@ -18,6 +19,7 @@ test("referral schema enforces separate types and duplicate prevention",()=>{
  assert.ok(migration.includes("unique(attribution_id,event_code)"));
  assert.match(applicationMigration,/alter table job_application add column if not exists referral_code/);
  assert.match(migration,/status_visibility_consent/);
+ assert.match(retentionMigration,/retention_policy_snapshot/);
 });
 test("membership attribution follows registration, application, review and activation events",()=>{
  for(const name of ["captureMembershipRegistration","recordMembershipMilestone","recordMembershipActivated"])assert.ok(service.includes(name));

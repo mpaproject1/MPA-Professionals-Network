@@ -51,6 +51,9 @@ test("review and appeal actions require assignment, separate permissions and ind
 });
 test("private claim evidence downloads are scoped to claimant or assigned reviewers",()=>{
  assert.match(privateFiles,/community_impact_claim_evidence/);
+ assert.match(privateFiles,/if\(f\.purpose==="community_impact_claim_evidence"\)/);
+ assert.match(migration,/decision_retention_policy_version_id uuid references community_impact_retention_policy_version/);
+ assert.match(migration,/retention_rule_snapshot jsonb not null/);
  assert.match(privateFiles,/assigned_reviewer/);
  assert.match(privateFiles,/assigned_appeal_reviewer/);
  assert.match(privateFiles,/claimant_user_id===userId/);

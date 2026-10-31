@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 const initiative={id:"a15a2d90-32ef-4c30-9a7d-0fdd7a0e7a61",title:"Community digital learning labs",category:"digital_inclusion",summary:"Help local community groups build confidence with safe and accessible digital tools.",description:"Approved volunteer-led sessions will help community groups build practical digital skills, improve everyday workflows and understand safe online practices. Participation is coordinated by the approved initiative owner.",deliveryMode:"hybrid",locationLabel:"Addis Ababa community hubs",capacity:12,eligibility:"Active MPA members with relevant digital skills.",expectedCommitment:"Two sessions per month",publishedAt:"2026-10-31T08:00:00.000Z"};
 const listBody={data:{items:[initiative],page:{limit:30,offset:0,total:1,hasMore:false}}};
 test.describe("Serve-Community approved initiative journey",()=>{

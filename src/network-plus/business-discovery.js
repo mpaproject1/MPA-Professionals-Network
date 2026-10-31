@@ -98,6 +98,7 @@ async function assertBusinessOwner(db,businessId,userId,capability="business.man
 }
 async function audit(db,actor,action,type,id,requestId,metadata={}) {
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,metadata]);
+  if(type==="network_plus_business")await db.query("insert into network_plus_business_event(business_id,actor_user_id,event_code,from_status,to_status,reason,request_id,metadata) values($1,$2,$3,$4,$5,$6,$7,$8)",[id,actor,action,metadata.from||null,metadata.to||metadata.status||null,metadata.reason||null,requestId,metadata]);
 }
 async function notifyOwners(db,businessId,eventCode,payload) {
   const owners=(await db.query(`select distinct bo.owner_user_id user_id from network_plus_business_ownership bo
@@ -402,6 +403,8 @@ export async function submitBusinessModeration(businessId,userId,requestId) {
     const updated=(await db.query("update network_plus_business set moderation_status='pending_review',updated_at=now() where id=$1 and moderation_status in ('not_submitted','rejected') returning *",[businessId])).rows[0];
     if(!updated)fail(409,"Business profile is already under review or cannot be resubmitted.","INVALID_STATE");
     await audit(db,userId,"network_plus.business_profile_submitted","network_plus_business",businessId,requestId,{});
+    const reviewers=(await db.query("select distinct u.id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($1::text[])) or exists(select 1 from app_user_permission p where p.user_id=u.id and p.permission_code='business.moderate'))",[LISTING_REVIEW_ROLES])).rows;
+    for(const reviewer of reviewers)await createInAppNotification(db,reviewer.id,"network_plus.business_profile_review_required","network_plus_business",businessId,{message:"A verified business profile is awaiting moderation.",nextAction:"Review the public business profile and approve, reject or suspend it with a reason.",actionUrl:"/admin/network-plus/businesses",actionRequired:true,priority:"high",eventVersion:updated.updated_at});
     return updated;
   });
 }

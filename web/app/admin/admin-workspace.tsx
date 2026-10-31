@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BookOpenCheck, Building2, ClipboardList, CreditCard, FileBarChart, Fingerprint, Mail, MessageSquareText, ShieldCheck, Users } from "lucide-react";
+import { Activity, BookOpenCheck, Building2, ClipboardList, CreditCard, FileBarChart, Fingerprint, Mail, MessageSquareText, ShieldCheck, Users, Scale } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -24,6 +24,7 @@ const destinations: Destination[] = [
   { href: "/admin/reference-portfolio", label: "Reference data", description: "Governed profile options", icon: BookOpenCheck },
   { href: "/admin/marketplace", label: "Serve-Community review", description: "Demand and listing review", icon: ClipboardList },
   { href: "/admin/serve-community/offline-projects", label: "Completed projects", description: "Record and review completed offline community projects", icon: ClipboardList },
+  { href: "/admin/community-impact/retention-policy", label: "Impact retention policy", description: "Propose and approve evidence-retention rules", icon: Scale },
   { href: "/organizations", label: "Organizations", description: "Verification, evidence and partner workspace", icon: Building2 },
   { href: "/admin/reports", label: "Reports", description: "Reporting and exports", icon: FileBarChart },
   { href: "/admin/email", label: "Email operations", description: "Queues, templates and delivery", icon: Mail },
@@ -76,7 +77,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     const financeConfig = Boolean(financeOfficer || permissions.includes("finance.manage"));
     const supportStaff = Boolean(roles?.includes("supporting_staff"));
     const offlineProjectAccess = Boolean(supportStaff || permissions.includes("serve_community.projects.manage"));
-    if (platformAdmin) return destinations;
+    if (platformAdmin) return destinations.filter((item) => item.href !== "/admin/community-impact/retention-policy" || roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.retention.manage", "community_impact.retention.approve"].includes(permission)));
     return destinations.filter((item) => {
       if (["/admin/accounts", "/admin/account-governance", "/admin/experience", "/admin/members", "/admin/members/catalog", "/admin/membership-card", "/admin/reference-portfolio"].includes(item.href)) return false;
       if (item.href === "/admin/membership") return membershipReviewer;
@@ -86,6 +87,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
       if (item.href === "/admin/organizations") return roles?.some((role) => ["reviewer", "organization_admin"].includes(role)) === true;
       if (item.href === "/admin/marketplace") return membershipReviewer || supportStaff;
       if (item.href === "/admin/serve-community/offline-projects") return offlineProjectAccess;
+      if (item.href === "/admin/community-impact/retention-policy") return roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.retention.manage", "community_impact.retention.approve"].includes(permission));
       if (item.href === "/admin/support") return supportStaff || roles?.includes("reviewer") === true;
       if (item.href === "/admin/security" || item.href === "/admin/email") return false;
       return false;

@@ -113,3 +113,24 @@ comment on table network_plus_request_participant is 'Explicit participant membe
 comment on table network_plus_collaboration_workspace is 'Created only in the same transaction as explicit recipient acceptance.';
 comment on table network_plus_collaboration_milestone is 'Participant-visible milestone tracking for accepted engagements.';
 comment on table network_plus_collaboration_event is 'Participant-visible updates, blockers, decisions and outcomes; immutable history.';
+
+-- Enforce the accepted-engagement boundary at the database layer as well as in the service.
+create or replace function enforce_network_plus_accepted_workspace() returns trigger language plpgsql as $$
+declare request_status text; request_accepted_at timestamptz;
+begin
+  select status,accepted_at into request_status,request_accepted_at
+    from network_plus_request where id=new.request_id;
+  if request_status not in ('accepted','in_progress','disputed','completed') or request_accepted_at is null then
+    raise exception 'A collaboration workspace requires an explicitly accepted request'
+      using errcode='23514', constraint='network_plus_workspace_requires_acceptance';
+  end if;
+  return new;
+end $$;
+drop trigger if exists trg_network_plus_workspace_requires_acceptance on network_plus_collaboration_workspace;
+create trigger trg_network_plus_workspace_requires_acceptance
+  before insert or update of request_id on network_plus_collaboration_workspace
+  for each row execute function enforce_network_plus_accepted_workspace();
+
+insert into app_role(role_code,name,description) values
+  ('network_plus_support','Network-Plus Support','Read-only, case-scoped support access to private Network-Plus requests; requires a support case reference and audit reason.')
+on conflict(role_code) do update set name=excluded.name,description=excluded.description;

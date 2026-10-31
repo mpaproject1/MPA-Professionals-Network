@@ -35,3 +35,7 @@
 @media(prefers-reduced-motion:reduce){.item,.skeleton span{transition:none;animation:none}}
 
 .reassurance{margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+
+/* MPA hierarchy and whitespace refinement */
+
+.network{padding:clamp(24px,3.5vw,44px) clamp(14px,3vw,38px) 30px}.intro{margin-bottom:34px}.kicker{font-weight:600}.intro h2{font-weight:600;line-height:1.18}.feedGrid{gap:20px}.feed{padding:clamp(18px,2vw,24px);border-radius:17px;box-shadow:none}.feedHead{gap:14px;margin-bottom:20px}.feedIcon{border-radius:11px}.feedHeading>p{font-weight:600}.feedHeading h3{font-weight:600;line-height:1.35}.items{gap:12px}.item{min-height:150px;padding:17px;border-radius:12px;box-shadow:none;transition:border-color .16s ease,background-color .16s ease}.item:hover{transform:none;box-shadow:none;background:var(--surface-raised)}.itemTop{font-weight:600}.item h4{font-weight:600;line-height:1.4}.viewAll{font-weight:600}@media(max-width:720px){.network{padding:20px 13px 26px}.feedGrid{grid-template-columns:1fr;gap:14px}.feed{padding:17px}.items{grid-template-columns:1fr}.item{min-height:0}}

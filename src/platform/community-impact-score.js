@@ -100,11 +100,12 @@ async function scoreClaim(tx,actorUserId,claimId,rationale,policy,recalcId){
  const entry=(await tx.query("insert into community_impact_score_ledger(subject_user_id,source_system,source_type,source_record_id,claim_id,assessment_id,policy_version_id,entry_type,points,idempotency_key,explanation,created_by) values($1,$2,$3,$4,$5,$6,$7,'award',$8,$9,$10,$11) returning id,points",[claim.claimant_user_id,sourceSystem,source,sourceRecord,claimId,assessment.id,policy.id,points,idempotency,explanation,actorUserId])).rows[0];
  return {ledgerEntryId:entry.id,points:Number(entry.points),status:"awarded",evaluationOnly:policy.evaluation_only};
 }
+export async function getActiveScorePolicy(){const row=await activePolicy(getPool());return {version:row.version,evaluationOnly:row.evaluation_only,publicScoreEnabled:row.public_score_enabled,dimensions:row.policy.dimensions,publication:row.policy.publication};}
 export async function getMyScore(userId){
  const db=getPool(),policy=await activePolicy(db);
  const totals=(await db.query("select coalesce(sum(points),0)::numeric(14,4) total,count(*) filter(where points>0)::int awards,count(*) filter(where points<0)::int reversals from community_impact_score_ledger where subject_user_id=$1",[userId])).rows[0];
  const rows=(await db.query("select id,source_type,source_record_id,entry_type,points,explanation,created_at from community_impact_score_ledger where subject_user_id=$1 order by created_at desc limit 100",[userId])).rows;
- return {score:Number(totals.total),awards:totals.awards,reversals:totals.reversals,policyVersion:policy.version,evaluationOnly:policy.evaluation_only,publicScoreEnabled:policy.public_score_enabled,publicationStatus:"private_evaluation",items:rows};
+ return {score:Number(totals.total),awards:totals.awards,reversals:totals.reversals,policyVersion:policy.version,dimensions:policy.policy.dimensions,evaluationOnly:policy.evaluation_only,publicScoreEnabled:policy.public_score_enabled,publicationStatus:"private_evaluation",items:rows};
 }
 export async function listScorePolicies(actor){const db=getPool();await permission(db,actor,"community_impact.score.policy.manage").catch(async error=>{if(error.code!=="FORBIDDEN")throw error;await permission(db,actor,"community_impact.score.policy.approve")});const rows=await db.query("select id,version,status,evaluation_only,public_score_enabled,rationale,change_summary,created_by,approved_by,approval_reference,effective_at,created_at,policy from community_impact_score_policy_version order by version desc");return {items:rows.rows}}
 export async function proposeScorePolicy(actor,input){

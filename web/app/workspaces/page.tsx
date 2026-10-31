@@ -1,5 +1,5 @@
 "use client";
-import { ArrowRight, BriefcaseBusiness, Building2, ClipboardCheck, FileCheck2, HandHeart, Handshake, LifeBuoy, ShieldCheck, Users, WalletCards } from "lucide-react";
+import { ArrowRight, Award, BriefcaseBusiness, Building2, ClipboardCheck, FileCheck2, HandHeart, Handshake, LifeBuoy, ShieldCheck, Users, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
@@ -28,6 +28,7 @@ const tasks: Task[] = [
  { title: "Finance operations", detail: "Verify payments, record manual receipts, issue vouchers and use finance reports.", href: "/admin/finance", roles: ["finance_officer","system_admin"], permissions: ["finance.view","finance.payment.record"], icon: WalletCards, group: "Platform operations" },
  { title: "Support desk", detail: "Handle support requests and authorized staff-assisted follow-up.", href: "/admin/support", roles: ["supporting_staff","system_admin"], permissions: ["support.manage"], icon: LifeBuoy, group: "Platform operations" },
  { title: "Platform review and moderation", detail: "Open the operational review tools allowed by your current permissions.", href: "/admin", roles: ["reviewer","supporting_staff","admin","system_admin"], permissions: ["reviews.view"], icon: ClipboardCheck, group: "Platform operations" },
+ { title: "Community Impact recognition review", detail: "Review achievement nominations, apply published criteria and approve consent-gated recognition awards.", href: "/admin/community-impact/recognition", roles: ["system_admin"], permissions: ["community_impact.recognition.review"], icon: Award, group: "Platform operations" },
  { title: "Platform administration", detail: "Manage operational platform administration without system bootstrap ownership.", href: "/admin", roles: ["admin","platform_admin","system_admin"], permissions: ["users.manage"], icon: ShieldCheck, group: "Administration" },
  { title: "System administration", detail: "Manage privileged role grants, direct permissions, security controls and platform foundation.", href: "/admin/accounts", roles: ["system_admin"], icon: ShieldCheck, group: "Administration" },
 ];

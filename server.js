@@ -18,6 +18,7 @@ import * as communityImpactDetection from "./src/platform/community-impact-detec
 import * as communityImpactGovernance from "./src/platform/community-impact-governance.js";
 import * as communityImpactRetention from "./src/platform/community-impact-retention.js";
 import * as communityImpactScore from "./src/platform/community-impact-score.js";
+import * as communityImpactRecognition from "./src/platform/community-impact-recognition.js";
 import * as memberReferrals from "./src/platform/member-referrals.js";
 import {loadConfig, resolveAllowedOrigin} from "./src/platform/config.js";
 import {getPool} from "./src/platform/db.js";
@@ -198,6 +199,15 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/admin/community-impact/detection/candidates") { const identity=await auth(req); return ok(res,await communityImpactDetection.listDetectionCandidates(identity.sub,{limit:query(req.url).get("limit"),offset:query(req.url).get("offset")}),requestId); }
     if(req.method==="GET" && p==="api/v1/me/community-impact/score/policy") { const identity=await auth(req); return ok(res,await communityImpactScore.getActiveScorePolicy(),requestId); }
     if(req.method==="GET" && p==="api/v1/me/community-impact/score") { const identity=await auth(req); return ok(res,await communityImpactScore.getMyScore(identity.sub),requestId); }
+    if(req.method==="GET" && p==="api/v1/me/community-impact/workspace") { const identity=await auth(req); return ok(res,await communityImpactScore.getMyImpactWorkspace(identity.sub),requestId); }
+    if(req.method==="GET" && p==="api/v1/me/community-impact/recognition") { const identity=await auth(req); return ok(res,await communityImpactRecognition.listMyRecognition(identity.sub),requestId); }
+    if(req.method==="GET" && p==="api/v1/community-impact/recognition/programs") { return ok(res,await communityImpactRecognition.listRecognitionPrograms(),requestId); }
+    if(req.method==="POST" && p==="api/v1/me/community-impact/recognition/nominations") { const identity=await auth(req); return ok(res,await communityImpactRecognition.submitRecognitionNomination(identity.sub,await body(req)),requestId,201); }
+    if(req.method==="POST" && parts.length===8 && parts.slice(0,6).join("/") === "api/v1/me/community-impact/recognition/awards" && parts[7]==="public-consent") { const identity=await auth(req); const input=await body(req); return ok(res,await communityImpactRecognition.setAwardPublicConsent(identity.sub,parts[6],input.enabled===true),requestId); }
+    if(req.method==="GET" && p==="api/v1/admin/community-impact/recognition/queue") { const identity=await auth(req); return ok(res,await communityImpactRecognition.listRecognitionQueue(identity.sub),requestId); }
+    if(req.method==="GET" && p==="api/v1/admin/community-impact/recognition/summary") { const identity=await auth(req); return ok(res,await communityImpactRecognition.getRecognitionAdminSummary(identity.sub),requestId); }
+    if(req.method==="POST" && parts.length===8 && parts.slice(0,6).join("/") === "api/v1/admin/community-impact/recognition/nominations" && parts[7]==="assign") { const identity=await auth(req); const input=await body(req); return ok(res,await communityImpactRecognition.assignRecognitionNomination(identity.sub,parts[6],input.reviewerUserId,input.rationale),requestId); }
+    if(req.method==="POST" && parts.length===8 && parts.slice(0,6).join("/") === "api/v1/admin/community-impact/recognition/nominations" && parts[7]==="decision") { const identity=await auth(req); return ok(res,await communityImpactRecognition.decideRecognitionNomination(identity.sub,parts[6],await body(req)),requestId); }
     if(req.method==="GET" && p==="api/v1/admin/community-impact/score/policies") { const identity=await auth(req); return ok(res,await communityImpactScore.listScorePolicies(identity.sub),requestId); }
     if(req.method==="POST" && p==="api/v1/admin/community-impact/score/policies") { const identity=await auth(req); return ok(res,await communityImpactScore.proposeScorePolicy(identity.sub,await body(req)),requestId,201); }
     if(req.method==="POST" && parts.length===8 && parts.slice(0,6).join("/") === "api/v1/admin/community-impact/score/policies" && parts[7]==="approve") { const identity=await auth(req); return ok(res,await communityImpactScore.approveScorePolicy(identity.sub,parts[6],await body(req)),requestId); }

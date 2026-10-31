@@ -58,7 +58,7 @@ export default function CommunityImpactRetentionPage(){
   <section className="card grid" style={{gap:12}}>
    <div><h2 className="h2">Current enforcement state</h2><p className="muted">No retention duration is assumed. Automated expiry is not enabled by this policy registry.</p></div>
    <p><strong>Active policy:</strong> {data?.active?"Version "+data.active.version:"No approved policy activated"}</p>
-   <p><strong>Evidence deletion:</strong> Not enabled — evidence lifecycle integration and release validation are still required.</p>
+   <p><strong>Evidence deletion:</strong> Not enabled — policy snapshots are now captured for claims and evidence, but expiry execution, legal-hold enforcement, backup expiry and validated deletion/anonymization remain a separate release gate.</p>
    {data?.active?.policy?.dataClasses?<div className="grid" style={{gap:6}}><h3>Active policy schedule</h3>{classes.map(({key,label:classLabel})=>{const item=data.active!.policy.dataClasses[key];return <p key={key}><strong>{classLabel}:</strong> {item.retentionDays} days + {item.graceDays} grace days · {label(item.retentionStart)} · {label(item.expiryAction)}</p>})}</div>:null}
    <button type="button" className="btn btn-ghost" onClick={()=>void load()} disabled={loading||busy}>{loading?"Refreshing…":"Refresh policy status"}</button>
   </section>

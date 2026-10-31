@@ -307,6 +307,23 @@ try {
   if (!expiryDefinition || expiryDefinition.attnotnull || expiryDefinition.expression) throw new Error("service_listing.expires_at must remain nullable with no expiry default.");
 
   const requiredForeignKeys = [
+    ["network_plus_business","created_by","app_user","id"],
+    ["network_plus_business","verified_by","app_user","id"],
+    ["network_plus_business_ownership","business_id","network_plus_business","id"],
+    ["network_plus_business_ownership","owner_user_id","app_user","id"],
+    ["network_plus_business_ownership","owner_organization_id","organization","id"],
+    ["network_plus_business_ownership","created_by","app_user","id"],
+    ["network_plus_business_access","business_id","network_plus_business","id"],
+    ["network_plus_business_access","user_id","app_user","id"],
+    ["network_plus_business_verification_case","business_id","network_plus_business","id"],
+    ["network_plus_business_verification_case","submitted_by","app_user","id"],
+    ["network_plus_business_verification_case","reviewer_user_id","app_user","id"],
+    ["network_plus_business_verification_evidence","case_id","network_plus_business_verification_case","id"],
+    ["network_plus_business_verification_evidence","file_object_id","file_object","id"],
+    ["network_plus_service_listing","business_id","network_plus_business","id"],
+    ["network_plus_service_listing","created_by","app_user","id"],
+    ["network_plus_service_listing_event","listing_id","network_plus_service_listing","id"],
+    ["network_plus_service_listing_event","actor_user_id","app_user","id"],
     ["service_listing_lifecycle_event","listing_id","service_listing","id"],
     ["service_listing_lifecycle_event","actor_user_id","app_user","id"],
     ["service_listing_interest","listing_id","service_listing","id"],

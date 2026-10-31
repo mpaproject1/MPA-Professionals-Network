@@ -46,11 +46,11 @@ export async function captureMembershipRegistration(db,referredUserId,code,statu
  if(row)await event(db,row.id,"registered","attributed","registered",referredUserId);
  return row;
 }
-export async function captureEmploymentApplication(db,jobId,referredUserId,applicationId,code){
+export async function captureEmploymentApplication(db,jobId,referredUserId,applicationId,code,statusVisibilityConsent=false){
  if(!code)return null;
  const ref=await codeRow(db,code);
  if(ref.member_user_id===referredUserId)fail(400,"You cannot refer yourself to a job.","SELF_REFERRAL");
- const row=(await db.query("insert into member_referral_attribution(referral_type,referrer_user_id,referred_user_id,job_id,job_application_id,referral_code_id,status) values('employment',$1,$2,$3,$4,$5,'application_submitted') on conflict(job_application_id) where referral_type='employment' and job_application_id is not null do nothing returning id,status",[ref.member_user_id,referredUserId,jobId,applicationId,ref.id])).rows[0];
+ const row=(await db.query("insert into member_referral_attribution(referral_type,referrer_user_id,referred_user_id,job_id,job_application_id,referral_code_id,status,status_visibility_consent) values('employment',$1,$2,$3,$4,$5,'application_submitted',$6) on conflict(job_application_id) where referral_type='employment' and job_application_id is not null do nothing returning id,status",[ref.member_user_id,referredUserId,jobId,applicationId,ref.id,statusVisibilityConsent===true])).rows[0];
  if(row)await event(db,row.id,"application_submitted","attributed","application_submitted",referredUserId,{jobId});
  return row;
 }

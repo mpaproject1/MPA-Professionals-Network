@@ -1,7 +1,7 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
-import {api} from "../../../../lib/api";
-import {useUiStore} from "../../../../lib/store";
+import {api} from "../../../lib/api";
+import {useUiStore} from "../../../lib/store";
 
 type Referral={id:string;referral_type:string;status:string;created_at:string;job_id:string|null;job_title:string|null;referrer_user_id:string;referred_user_id:string;candidate_consent_at:string|null;verification_reference:string|null};
 export default function AdminReferralsPage(){

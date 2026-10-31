@@ -22,7 +22,7 @@ A shared referral service supports two distinct processes: membership acquisitio
 ## Scoring governance
 - There is no default scoring policy and no points are issued until MPA approves and activates a version.
 - A system administrator proposes event-to-point values. A different system administrator must approve; activation retires the previous active policy.
-- Score ledger entries are append-only and unique by attribution, event and policy version. Later policy changes do not rewrite historic points.
+- Score ledger entries are append-only and unique by attribution and milestone across all policy versions. A zero-point ledger entry is retained when an active policy intentionally gives a milestone zero points, preventing later policies from re-awarding the same event. Later policy changes do not rewrite historic points.
 - Supported event keys: membership application submitted, membership approved, membership activated, shortlisted, interview, offer accepted and employment verified.
 - MPA should ordinarily reserve substantive employment-impact recognition for independently verified outcomes. Registration by itself cannot earn points. Values remain an MPA governance decision.
 

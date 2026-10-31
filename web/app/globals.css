@@ -871,3 +871,21 @@ main.shell-main .grid-cols-3, main.shell-main .grid-cols-4 { min-width: 0; }
   main.shell-main table { min-width: 640px; }
   main.shell-main [role="table"], main.shell-main .table-scroll { max-width: 100%; overflow-x: auto; }
 }
+
+
+/* Workflow state surfaces use semantic tokens in both themes. */
+.sc-manage-alert, .sc-live-error, .form-error {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
+}
+.sc-manage-success, .sc-application-success, .form-success {
+  color: var(--success);
+  background: var(--success-bg);
+  border-color: color-mix(in srgb, var(--success) 38%, var(--border));
+}
+.sc-modal-note {
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-color: color-mix(in srgb, var(--warning) 36%, var(--border));
+}

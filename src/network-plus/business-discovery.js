@@ -143,8 +143,9 @@ async function assertBusinessPublishable(db,businessId) {
   if(row.publication_status==="suspended"||row.publication_status==="archived")fail(409,"This business is not eligible to publish listings.","BUSINESS_NOT_PUBLISHABLE");
 }
 export async function createBusiness(userId,input,requestId,idempotencyKey) {
+  input=input||{};
   if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure idempotency key is required.","IDEMPOTENCY_KEY_REQUIRED");
-  const normalized=normalizeBusinessInput(input||{});
+  const normalized=normalizeBusinessInput(input);
   const ownerType=input.ownerType;
   const organizationId=input.organizationId||null;
   if(!["member","organization"].includes(ownerType))fail(400,"Choose a canonical member or organization owner.","VALIDATION_ERROR");

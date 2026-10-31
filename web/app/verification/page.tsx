@@ -4,7 +4,7 @@ import {type FormEvent,useCallback,useEffect,useState} from "react";
 import {EmptyState} from "../../components/empty-state";
 import {OperationStatus} from "../../components/operation-status";
 import {Badge, Card} from "../../components/ui";
-import {api, ApiError} from "../../lib/api";
+import {ApiError, api} from "../../lib/api";
 import {humanStatus} from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 

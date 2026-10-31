@@ -377,6 +377,7 @@ export async function respondBusinessOwnership(ownershipId,userId,decision,reque
     if(!row)fail(404,"Ownership invitation not found.","NOT_FOUND");
     const permitted=(row.owner_type==="member"&&row.owner_user_id===userId)||(row.owner_type==="organization"&&Boolean((await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code=any($3::text[])",[row.owner_organization_id,userId,ORG_OWNER_ROLES])).rowCount);
     if(!permitted)fail(403,"Only the invited owner party may respond to this ownership request.","OWNERSHIP_FORBIDDEN");
+    if(decision==="accepted"&&row.owner_type==="member"&&(!(await hasCurrentActiveMembership(db,userId))||!(await hasProfessionalIdentity(db,userId))))fail(403,"An active professional membership is required to accept business ownership.","OWNER_NOT_ELIGIBLE");
     if(row.status!=="pending"||row.consent_status!=="pending")fail(409,"This ownership invitation is no longer awaiting consent.","INVALID_STATE");
     const updated=(await db.query("update network_plus_business_ownership set consent_status=$1,status=$2,consented_at=case when $1='accepted' then now() else null end,updated_at=now() where id=$3 returning *",[decision,decision==="accepted"?"active":"removed",ownershipId])).rows[0];
     await audit(db,userId,"network_plus.business_ownership_responded","network_plus_business_ownership",ownershipId,requestId,{decision,businessId:row.business_id});

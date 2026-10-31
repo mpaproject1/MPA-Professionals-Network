@@ -40,3 +40,7 @@
 .content :global(p.muted){line-height:1.7}
 .breadcrumbs{margin-bottom:22px}
 @media(max-width:760px){.sidebar{gap:10px}.nav{padding-bottom:7px}.link,.active{min-height:44px;min-width:145px}}
+
+/* Workspace density and hierarchy refinement */
+
+.sidebar{gap:14px;padding:14px;border-radius:16px;box-shadow:none}.nav{gap:3px}.link,.active{min-height:44px;padding:10px 11px;border-radius:10px}.active{background:color-mix(in srgb,var(--brand-lemon) 30%,var(--surface));border-color:color-mix(in srgb,var(--brand-lemon) 55%,var(--border));color:var(--brand-navy-deep)}:global(.dark) .active{background:color-mix(in srgb,var(--brand-lemon) 18%,var(--surface));border-color:color-mix(in srgb,var(--brand-lemon) 36%,var(--border));color:var(--brand-lemon)}.linkText strong{font-weight:600}.content :global(h1),.content :global(.h1){font-weight:600;margin-bottom:12px}.content :global(p.muted){line-height:1.7}.breadcrumbs{margin-bottom:22px}@media(max-width:760px){.sidebar{gap:10px}.nav{padding-bottom:7px}.link,.active{min-height:44px;min-width:145px}}

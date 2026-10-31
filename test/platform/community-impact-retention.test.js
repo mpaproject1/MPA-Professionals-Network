@@ -18,7 +18,7 @@ test("retention policy is versioned and has no unapproved default schedule",()=>
  assert.match(migration,/no row means retention enforcement is not authorized/i);
 });
 test("retention configuration covers separate data classes and explicit expiry semantics",()=>{
- for(const key of ["claim_metadata","identity_assurance_artifacts","raw_evidence","consent_and_rights_records","reviewer_notes","audit_events","score_ledger"])assert.ok(service.includes('"'+key+'"'),key);
+ for(const key of ["claim_metadata","identity_assurance_artifacts","raw_evidence","consent_and_rights_records","reviewer_notes","referral_attribution_records","audit_events","score_ledger"])assert.ok(service.includes('"'+key+'"'),key);
  for(const action of ["hard_delete","anonymize","restrict_access","retain_minimal"])assert.ok(service.includes('"'+action+'"'),action);
  assert.match(service,/retentionDays:integer\(item\.retentionDays/);
  assert.match(service,/graceDays:integer\(item\.graceDays/);

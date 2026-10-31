@@ -77,6 +77,7 @@ All routes are authenticated and return no-store JSON through the existing API s
 | `POST /api/v1/network-plus/businesses/:id/services` | Create a commercial/professional service listing with idempotency |
 | `PATCH /api/v1/network-plus/services/:id` | Update an owned/delegated listing |
 | `POST /api/v1/network-plus/services/:id/submit` | Submit an eligible listing for moderation |
+| `POST /api/v1/network-plus/services/:id/publication` | Owner pause/archive; publication requires independent moderation |
 | `POST /api/v1/admin/network-plus/businesses/:id/verification` | Independent verification decision |
 | `POST /api/v1/admin/network-plus/businesses/:id/moderation` | Independent business profile moderation decision |
 | `GET /api/v1/admin/network-plus/businesses/:id/evidence` | Reviewer-only evidence metadata list |
@@ -113,7 +114,7 @@ Added `test/platform/network-plus-business-discovery.test.js` for schema/source/
 
 **Not yet evidenced as passed:**
 - [ ] Execute migration compatibility on disposable PostgreSQL and confirm rollback.
-- [ ] Add/run seeded PostgreSQL integration tests for individual, organization and joint ownership; duplicate owner/idempotency conflicts; cross-organization access; delegated project-manager capability; expired/revoked delegation.
+- [ ] Add/run seeded PostgreSQL integration fixtures/tests for individual, organization and joint ownership; duplicate business/owner/idempotency conflicts; cross-organization access; delegated project-manager capability; expired/revoked delegation.
 - [ ] Add/run API tests for signed-out, expired membership, verified/unverified organization, direct endpoint access, field-level audience, private evidence isolation, self-review and unauthorized moderation.
 - [ ] Execute and test reviewer-authorized private evidence download through the existing `GET /api/v1/files/:id` route. The private-file service now allows only an independent `verification_reviewer` / `system_admin` or explicit `business.verify` permission to read evidence attached to a submitted/under-review case, and rejects the case submitter. Validate the negative cases with PostgreSQL fixtures.
 - [ ] Confirm the two system-only permission catalogue entries `business.verify` and `business.moderate` are present after migration and verify authorized reviewer assignment through the existing permission governance workflow. The migration does not grant either permission to any user.

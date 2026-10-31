@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync,spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { mkdtempSync,rmSync,writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,8 +14,8 @@ import { listReportCatalogue, makePdf, makeXlsx, runReport } from "../../src/pla
 const admin={sub:"admin",roles:["system_admin"],permissions:[]};
 const readersAvailable=spawnSync("python3",["-c","import openpyxl,pypdf"],{encoding:"utf8"}).status===0;
 async function createReportAdmin(){
- const suffix=randomUUID(),digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
- const created=await register({email:`report-admin-${suffix}@example.test`,password:"ReportAdminP1Password!2026",firstName:"Report",lastName:"Test",phone:`07${digits}`},"report-export-test-admin-" + suffix);
+ const suffix=randomUUID(),digits=randomInt(10_000_000,99_999_999);
+ const created=await register({email:`report-admin-${suffix}@example.test`,password:"ReportAdminP1Password!2026",firstName:"Report",lastName:`Test${suffix.slice(0,8)}`,phone:`07${digits}`},"report-export-test-admin-" + suffix);
  const db=getPool(),role=(await db.query("select id from app_role where role_code='system_admin'")).rows[0];
  assert.ok(role,"system_admin role must exist in the migrated test database");
  await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing",[created.user.id,role.id]);
@@ -190,7 +190,7 @@ function unzipEntries(buffer){
 function resultFor(report,rows=[]){return {report:{...report,scope:report.scope||"Test scope",definition:report.definition||"Test report definition.",columns:report.columns||["Status","Count"]},filters:{from:"2026-01-01",to:"2026-01-31",status:"",q:"",groupBy:"default"},generatedAt:"2026-10-28T12:00:00.000Z",rows,totals:{rows:rows.length,Count:rows.length}};}
 
 test("every report produces empty-state PDF and XLSX files with defined headings",async()=>{
- const reports=await listReportCatalogue(admin);assert.equal(reports.length,25);
+ const reports=await listReportCatalogue(admin);assert.equal(reports.length,26);
  for(const report of reports){
   const result=resultFor(report),pdf=makePdf(result),xlsx=makeXlsx(result),entries=unzipEntries(xlsx),sheet=entries.get("xl/worksheets/sheet1.xml");
   assert.ok(pdf.toString("ascii").startsWith("%PDF-1.4"),report.id+" PDF signature");

@@ -157,6 +157,40 @@ Automatic tracking should create a **detected contribution** or link an existing
 
 For group projects, record individual roles and attribution. Do not copy the whole project outcome to every participant without a defensible contribution method. Project owners may propose role attribution; contributors should be able to confirm or dispute it.
 
+#### Automatic detection and attribution are policy-configured
+
+Automatic detection is a configurable rules-and-adapters service, not a list of status strings hard-coded into route handlers. Each source adapter must publish a versioned capability contract and emit candidate events only when its source-specific eligibility rule is satisfied. The following settings are policy data, editable by authorized policy administrators and approved through change control:
+
+- enabled/disabled source systems, source record types and event codes;
+- qualifying source states and required predecessor states;
+- required source evidence, consent state, completion confirmation and source-owner authority;
+- event freshness window, backfill window, replay handling and retry policy;
+- person-resolution strategy and minimum identity-match confidence;
+- contributor-role vocabulary, role confirmation requirements and allowed attribution cardinality;
+- whether a source event creates a candidate, updates an existing candidate, or is ineligible;
+- duplicate matching keys, source-specific uniqueness/cardinality constraints and human-review thresholds;
+- automatic attribution confidence thresholds and the conditions that require claimant/source-owner confirmation;
+- permitted outcome maturity, evidence classes and score eligibility gates;
+- notification behavior, rate limits, and exception queue routing.
+
+**Detection flow (required):**
+1. Receive a source event or scheduled reconciliation signal through an authenticated, source-scoped adapter.
+2. Validate source ownership, event authenticity, source state, source version and required completion/consent facts against the active detection policy.
+3. Resolve the canonical person identifier using the source's authoritative identity link. Do not infer identity from display names or unverified email similarity.
+4. Resolve the event's contributor list and role evidence. If the source only identifies a project or organization and not an individual, create an unattributed candidate or route for confirmation; never assign the full project outcome to its owner by default.
+5. Apply the source-specific idempotency key and duplicate rules. Replays update/reconcile the same candidate and append ingestion history; they do not create a second contribution or score event.
+6. Calculate a detection confidence and record the rule/policy version, source event version, evidence references, matching rationale and unresolved fields.
+7. Auto-link only when all configured high-confidence conditions pass. Otherwise place the candidate in attribution-pending or human-review state.
+8. Notify the contributor/source owner where configured and provide confirm, dispute, correct or decline actions.
+9. Keep detected, attributed, submitted, verified and score-eligible states distinct. Detection or attribution alone never means verification or points.
+10. Reconcile source changes, cancellations, reversals and consent withdrawals. Reopen or flag the impact record according to policy; preserve the full event history.
+
+**Attribution rules:** Attribution is per person and per contribution, not a blanket copy of project metrics. The policy may define role-specific contribution shares, equal-share defaults only where explicitly justified, or evidence-based reviewer allocation. The sum of allocated shares for a shared metric must not exceed 100% unless the metric is explicitly non-additive and the policy says how it is represented. A reviewer may correct role, person, dates, share or outcome attribution after examining evidence, but must record before/after values, evidence references, reason code, rationale, reviewer identity, timestamp and policy version. Material attribution changes require independent second review when configured by risk tier.
+
+**Reviewer-adjustable case details:** Reviewers may select a more accurate canonical category, contribution type, role, evidence quality, outcome maturity, confidence band, attribution share, rubric ratings, and scoring modifiers where the active policy allows them. Each adjustment must cite evidence and explain why the default or automated suggestion was inaccurate. Reviewers cannot edit the underlying source record, erase source history, change another person's identity without an identity-resolution process, or bypass required evidence/consent. A disputed or low-confidence attribution remains pending and cannot contribute to a public score.
+
+**Policy changes vs. case decisions:** A reviewer decision changes only the individual contribution assessment. Changes to global detection rules, thresholds, scoring weights, taxonomy, identity matching or retention are policy changes and require a separate authorized policy-administration workflow, approval and a new immutable policy version. Policy changes apply prospectively by default. Retroactive recalculation requires an explicit migration/recalculation decision, impact analysis, audit record and notification plan.
+
 ### Manual claims
 
 Members and non-members can submit claims for off-platform, historical, or otherwise untracked contributions. The flow should support:
@@ -220,17 +254,19 @@ The impact review workflow must remain separate from membership review, identity
 
 The score is a summary of verified contribution quality and outcomes, not a direct sum of raw activity. Publish the methodology, caps, and limitations before enabling public scores.
 
-A possible initial policy for evaluation (not approved for production) uses these weights:
+The project owner has approved the following **initial policy baseline for design and controlled evaluation**. It is a starting configuration, not a hard-coded formula or an authorization to publish live scores. The values must be stored as versioned policy data and be adjustable through governed configuration.
 
-| Dimension | Illustrative weight |
-|---|---:|
-| Measurable community outcomes | 30% |
-| Quality and significance | 25% |
-| Verified contribution/responsibility | 20% |
-| Sustainability | 15% |
-| Collaboration and knowledge sharing | 10% |
+| Dimension | Initial baseline weight | Configurable behavior |
+|---|---:|---|
+| Measurable community outcomes | 30% | Weight, evidence threshold, outcome maturity and measurement rules |
+| Quality and significance | 25% | Rubric criteria, rating scale, evidence requirements and caps |
+| Verified contribution/responsibility | 20% | Role factors, attribution confidence and contribution-share rules |
+| Sustainability | 15% | Follow-up period, durability evidence and decay/review rules |
+| Collaboration and knowledge sharing | 10% | Collaboration evidence, recipient confirmation and category rules |
 
-These weights are a discussion baseline only. Validate them with community governance, diverse member cohorts, and fairness analysis before adoption.
+The initial weights total 100%. They are the default policy version for evaluation. A policy administrator/governance approver may revise them prospectively through a new policy version after documenting rationale, impact analysis, approval and effective date. Reviewers may adjust an individual case's evidence-supported rubric ratings, role attribution, contribution share, outcome maturity and applicable modifiers within the active policy's permitted ranges. Reviewers must not silently edit global weights or invent an ad hoc scoring formula for one person.
+
+The score engine must read all weights, rubrics, thresholds, caps, modifiers, rounding rules, eligibility gates and effective dates from the active immutable policy version. No scoring constant or category-to-points mapping may be embedded as application logic. If a required policy setting is missing, invalid, or outside approved bounds, scoring must fail closed and leave the contribution unscored pending policy correction.
 
 Scoring safeguards:
 
@@ -248,6 +284,53 @@ Scoring safeguards:
 - do not make the score the sole criterion for awards, access, hiring, membership, or opportunity eligibility.
 
 Consider showing a score band or qualitative summary instead of a precise number if the data volume or calibration does not support false precision. A minimum evidence threshold and confidence indicator may be more honest than a number for early-stage users.
+
+## 8A. Configurable policy registry, reviewer adjustments, and automatic attribution governance
+
+All operational policy must be stored as versioned configuration records, not embedded constants. The registry should support independently versioned policy families:
+
+- taxonomy and source-to-canonical category mappings;
+- source detection adapters, event eligibility and reconciliation rules;
+- identity resolution and attribution confidence thresholds;
+- role definitions, attribution-share methods and confirmation requirements;
+- evidence classes, quality levels and risk-tier evidence thresholds;
+- verification decision rules, reviewer adjustment ranges and second-review triggers;
+- score dimensions, weights, rubrics, caps, diminishing returns, modifiers, rounding and eligibility;
+- visibility, consent, publication and redaction rules;
+- retention, deletion, legal hold and audit requirements;
+- notifications, escalation, queue routing and rate limits.
+
+Each policy version must include a stable identifier, semantic version, status (draft, in_review, approved, scheduled, active, superseded, revoked), owner, approver(s), rationale, change summary, created/approved/effective timestamps, applicable source/category/risk scope, configuration schema version, and integrity hash. Approved versions are immutable. Editing an approved policy creates a new version; it must never mutate historical decisions or score calculations.
+
+### Reviewer case-level adjustment contract
+
+The review interface must show, side by side:
+- source-provided values and their provenance;
+- automatic detection/attribution suggestions and confidence;
+- claimant-provided values;
+- current reviewer-assessed values;
+- the evidence supporting each value;
+- the active policy version and permitted adjustment ranges.
+
+For every reviewer adjustment, require:
+- field changed and before/after values;
+- one or more evidence references (or a documented reason why no evidence exists);
+- standardized reason code plus meaningful rationale;
+- reviewer identity, role, assignment and conflict check;
+- timestamp and active policy version;
+- whether a second approval is required and its outcome.
+
+Reviewers may correct the individual record within policy bounds; they may not change global policy, suppress required evidence, bypass consent, override a source's authoritative lifecycle, self-approve their own entry, or grant themselves permissions. Out-of-range changes must be blocked or routed to a senior/policy approver rather than silently accepted. Appeals must be handled by an independent reviewer.
+
+### Initial policy activation and safe defaults
+
+The initial score baseline in Section 8 is the starting configuration. It remains in evaluation mode until a separately recorded governance activation decision. Detection rules may be enabled source by source after source-contract tests pass. For an unconfigured source, missing identity link, ambiguous role, unsupported event version, conflicting evidence, or failed confidence threshold, the safe default is **do not auto-attribute and do not score**; route to a confirmation/review queue where appropriate.
+
+A reviewer can make an evidence-backed case adjustment without changing the initial global policy. If the evidence shows the rubric itself is inadequate, the reviewer should flag a policy-change proposal rather than invent a one-off rule. Policy administrators must analyze consistency and fairness before approval.
+
+### Required audit and reproducibility
+
+Persist the exact policy versions used for detection, identity resolution, attribution, verification and score calculation. Preserve raw source event identifiers and versions, normalized event payload fingerprints, adapter version, rule outcomes, confidence components, reviewer changes and score ledger inputs. A historical decision must be reproducible from its preserved inputs and policy version, subject to lawful retention and privacy constraints. A policy update must not silently change an already published score; use explicit recalculation and ledger reversal/supersession records.
 
 ## 9. Privacy, consent, retention, and safety
 
@@ -751,7 +834,7 @@ A generic `admin`, `reviewer`, `supporting_staff`, `verification_reviewer` or `e
 |---|---|---|
 | 0 — Re-audit and architecture freeze | Source audit complete; formal freeze pending | This delivery record; project-owner approval and policy decisions still required |
 | 1 — Taxonomy and source-link contract | Contract drafted; approval pending | This delivery record; schema/API/privacy review still required |
-| 2 — Automatic detection and attribution | Not started | Begin only after Increment 1 approval and source event/cardinality validation |
+| 2 — Automatic detection and attribution | Policy contract specified; implementation not started | Configurable adapter/rule registry, confidence-based attribution, reviewer adjustments and replay-safe tests; source event/cardinality validation remains required |
 | 3 — Manual claims and evidence | Not started | Depends on non-member identity assurance, evidence model and retention policy |
 | 4 — Reviewer operations | Not started | Depends on scoped permission/assignment/conflict/appeal policy |
 | 5 — Score ledger and explanations | Not started | Depends on score governance and approved rubric; no score calculation before approval |
@@ -760,3 +843,16 @@ A generic `admin`, `reviewer`, `supporting_staff`, `verification_reviewer` or `e
 | 8 — Operational readiness | Not started | Security, monitoring, retention, support, migration and rollback readiness |
 
 **Change-control note:** This delivery updates the design and progress record only. It does not claim that Increment 0 has formal governance approval or that Increment 1 has passed its approval gates. Keep subsequent implementation on this branch and preserve the existing source workflows and protections.
+
+
+## Policy decision update — initial approval and configurability (2026-10-31)
+
+**Project-owner direction recorded:** Use the five-dimension score weights in Section 8 (30/25/20/15/10) as the initial policy baseline for evaluation. Do not hard-code those values. All scoring, detection, attribution, evidence, taxonomy and reviewer-adjustment rules must be configurable through immutable, versioned policy records.
+
+**Reviewer adjustment authority:** An authorized impact reviewer may adjust an individual contribution's category, type, role, evidence assessment, outcome maturity, attribution share, rubric ratings and permitted modifiers after reviewing evidence. The reviewer must record evidence references, before/after values, rationale, reason code and identity. Higher-risk or out-of-range changes require independent second review. Reviewers do not acquire authority to change global policy or source records.
+
+**Automatic detection direction:** Source detection must use configurable, versioned adapters and rules. Each source event is validated, identity-resolved, attributed only when evidence/confidence thresholds pass, deduplicated idempotently and recorded as detected/attribution-pending until the appropriate confirmation and verification gates are satisfied. No detection-only event awards points or becomes public.
+
+**Approval boundary:** This is approval of the initial policy approach and baseline for design/evaluation. It is not approval to enable public scoring, deploy detection adapters, create migrations, assign reviewer permissions or change production data. Those require the relevant increment's schema, security, privacy, fairness and operational gates.
+
+**Progress:** Policy configurability, reviewer case-level adjustments and automatic detection/attribution governance are now specified. Increment 2's implementation remains not started.

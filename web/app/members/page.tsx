@@ -9,9 +9,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
 import { SupportAction } from "../../components/support-action";
 import { Badge, Card } from "../../components/ui";
+import { VolunteerPledgePanel } from "../../components/volunteer-pledge-panel";
 import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
-import { VolunteerPledgePanel } from "../../components/volunteer-pledge-panel";
 
 type Me = {
   user_id: string;

@@ -51,7 +51,9 @@ const migrationNames = [
   "20261101140000_community_impact_score_policy_transition_guard.sql",
   "20261101150000_community_impact_score_single_reversal.sql",
   "20261101160000_community_impact_score_policy_rubric_config.sql",
-  "20261101170000_community_impact_assessment_score_policy.sql"
+  "20261101170000_community_impact_assessment_score_policy.sql",
+  "20261101180000_community_impact_score_modifiers_and_rubrics.sql",
+  "20261101190000_community_impact_score_effective_date_guard.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -680,10 +682,12 @@ try {
   const scoreTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_score_ledger_immutable","trg_community_impact_score_policy_immutable","trg_community_impact_score_source_link_immutable","trg_community_impact_score_policy_event_immutable","trg_community_impact_score_recalculation_immutable","trg_community_impact_score_adjustment_event_immutable","trg_community_impact_score_source_link_event_immutable"]]);
   if(scoreTriggers.rows[0].count!==7)throw new Error("Unified score append-only and policy immutability triggers are incomplete.");
   const initialScorePolicy=await client.query("select p.version,p.status,p.evaluation_only,p.public_score_enabled,p.policy->'dimensions' dimensions from community_impact_score_active_policy a join community_impact_score_policy_version p on p.id=a.policy_version_id where a.singleton=true");
-  if(initialScorePolicy.rowCount!==1||initialScorePolicy.rows[0].version!==2||initialScorePolicy.rows[0].status!=="active"||initialScorePolicy.rows[0].evaluation_only!==true||initialScorePolicy.rows[0].public_score_enabled!==false)throw new Error("The initial docs/62 score policy must be active for evaluation only and remain unpublished.");
+  if(initialScorePolicy.rowCount!==1||initialScorePolicy.rows[0].version!==3||initialScorePolicy.rows[0].status!=="active"||initialScorePolicy.rows[0].evaluation_only!==true||initialScorePolicy.rows[0].public_score_enabled!==false)throw new Error("The initial docs/62 score policy must be active for evaluation only and remain unpublished.");
   const weights=initialScorePolicy.rows[0].dimensions.map(x=>Number(x.weight)).sort((a,b)=>b-a).join(",");
-  const scorePolicyConfig=await client.query("select policy->'calculation'->'evidenceQualityRank' evidence_ranks,policy->'calculation'->'outcomeMaturityRank' outcome_ranks,policy->'calculation'->>'rounding' rounding from community_impact_score_policy_version where version=2");
+  const scorePolicyConfig=await client.query("select policy->'calculation'->'evidenceQualityRank' evidence_ranks,policy->'calculation'->'outcomeMaturityRank' outcome_ranks,policy->'calculation'->>'rounding' rounding from community_impact_score_policy_version where version=3");
   if(!scorePolicyConfig.rows[0]?.evidence_ranks||!scorePolicyConfig.rows[0]?.outcome_ranks||scorePolicyConfig.rows[0]?.rounding!=="4dp")throw new Error("Initial active score policy must configure evidence quality, outcome maturity and rounding scales.");
+  const scoreRubrics=await client.query("select policy->'dimensions'->0->'criteria' criteria,policy->'calculation'->'modifiers' modifiers,policy->'calculation'->'decayRules' decay_rules from community_impact_score_policy_version where version=3");
+  if(!Array.isArray(scoreRubrics.rows[0]?.criteria)||!Array.isArray(scoreRubrics.rows[0]?.modifiers)||!Array.isArray(scoreRubrics.rows[0]?.decay_rules))throw new Error("Initial score policy must store rubric criteria, modifiers and decay rules as policy data.");
   if(weights!=="30,25,20,15,10")throw new Error("Initial score policy weights must match docs/62: 30/25/20/15/10.");
   const reversalConstraint=await client.query("select count(*)::int count from pg_indexes where schemaname='public' and indexname='uq_community_impact_score_ledger_single_reversal'");
   if(reversalConstraint.rows[0].count!==1)throw new Error("A score award must have at most one compensating reversal.");

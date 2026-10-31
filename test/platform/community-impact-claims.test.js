@@ -22,6 +22,13 @@ test("Increment 3 creates separate private claim, evidence, assignment, decision
  assert.match(migration,/file_object_id uuid not null unique references file_object\(id\)/);
  assert.match(migration,/claim history is append-only/i);
  assert.match(migration,/claim decisions are immutable/i);
+ assert.match(migration,/mentorship_knowledge_sharing/);
+ assert.match(migration,/professional_pro_bono_services/);
+ assert.match(migration,/employment_referrals/);
+ assert.match(migration,/partnerships_organizational_capacity/);
+ assert.match(migration,/beneficiary_count_method/);
+ assert.match(migration,/sustained_impact_summary/);
+ assert.match(migration,/location_summary/);
 });
 test("claim collection requires an active MPA retention schedule and never assumes membership",()=>{
  assert.match(service,/activeRetention\(db,"claim_metadata"\)/);
@@ -72,6 +79,9 @@ test("claim and appeal APIs authenticate every operation",()=>{
 });
 test("member and reviewer screens preserve private-by-default evidence boundaries",()=>{
  assert.match(claimPage,/private draft/i);
+ assert.match(claimPage,/mentorship_knowledge_sharing/);
+ assert.match(claimPage,/sustainedImpactSummary/);
+ assert.match(claimPage,/beneficiaryCountMethod/);
  assert.match(claimPage,/not required/);
  assert.match(claimPage,/uploadPrivateFile/);
  assert.match(claimPage,/downloadPrivateFile/);

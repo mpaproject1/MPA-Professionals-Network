@@ -23,8 +23,8 @@ A shared referral service supports two distinct processes: membership acquisitio
 - There is no default scoring policy and no points are issued until MPA approves and activates a version.
 - A system administrator proposes event-to-point values. A different system administrator must approve; activation retires the previous active policy.
 - Score ledger entries are append-only and unique by attribution, event and policy version. Later policy changes do not rewrite historic points.
-- Supported event keys: registration, membership application submitted, membership approved, membership activated, shortlisted, interview, offer accepted and employment verified.
-- MPA should ordinarily reserve substantive employment-impact recognition for independently verified outcomes. Values remain an MPA governance decision.
+- Supported event keys: membership application submitted, membership approved, membership activated, shortlisted, interview, offer accepted and employment verified.
+- MPA should ordinarily reserve substantive employment-impact recognition for independently verified outcomes. Registration by itself cannot earn points. Values remain an MPA governance decision.
 
 ## Privacy, authorization and audit
 - Referral codes are tied to active memberships. Schema supports suspension/revocation states.

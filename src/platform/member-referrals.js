@@ -87,7 +87,7 @@ export async function confirmEmploymentOutcome(userId,attributionId,input={}){
   if(row.candidate_consent_at)fail(409,"Your employment outcome confirmation has already been submitted for review.","CONFIRMATION_ALREADY_SUBMITTED");
   if(!input.consent)fail(400,"Confirm consent before asking MPA to verify this employment outcome.","CONSENT_REQUIRED");
   const reason=String(input.summary||"").trim();if(reason.length<20||reason.length>1000)fail(400,"Provide a short employment outcome summary (20–1000 characters).","VALIDATION_ERROR");
-  await db.query("update member_referral_attribution set status='employment_reported',candidate_consent_at=now(),verification_reference=$1,updated_at=now() where id=$2",[reason,row.id]);
+  await db.query("update member_referral_attribution set status='employment_reported',candidate_consent_at=now(),candidate_outcome_summary=$1,updated_at=now() where id=$2",[reason,row.id]);
   await event(db,row.id,"employment_reported",row.status,"employment_reported",userId,{candidateConfirmed:true});
   return {id:row.id,status:"employment_reported",message:"Your confirmation has been sent for MPA review. It is not yet a verified employment outcome."};
  });

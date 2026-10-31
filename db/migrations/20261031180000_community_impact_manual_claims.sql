@@ -8,16 +8,20 @@ create table if not exists community_impact_claim (
  idempotency_hash text not null,
  request_fingerprint text not null,
  status text not null default 'draft' check(status in('draft','submitted','under_review','clarification_requested','verified','declined','withdrawn','revoked')),
- category text not null check(category in('education_skills','community_care','digital_inclusion','environment_sustainability','livelihoods_economic_opportunity','accessibility_inclusion','other_review_required')),
+ category text not null check(category in('education_skills','community_care','digital_inclusion','environment_sustainability','livelihoods_economic_opportunity','accessibility_inclusion','mentorship_knowledge_sharing','professional_pro_bono_services','employment_referrals','partnerships_organizational_capacity','other_review_required')),
  contribution_type text not null check(contribution_type in('initiative_participation','project_delivery','mentoring','professional_service','referral','partnership','knowledge_resource','other')),
  contribution_role text not null check(contribution_role in('lead','co_lead','contributor','mentor','reviewer_organizer','partner_organization','other')),
  start_date date not null,
  end_date date,
  organization_name text,
  project_title text,
+ location_summary text check(location_summary is null or length(trim(location_summary)) between 2 and 120),
  activity_summary text not null check(length(trim(activity_summary)) between 20 and 2000),
  output_summary text not null check(length(trim(output_summary)) between 10 and 2000),
  outcome_summary text,
+ sustained_impact_summary text,
+ beneficiary_count integer check(beneficiary_count is null or beneficiary_count between 0 and 1000000000),
+ beneficiary_count_method text,
  desired_visibility text not null default 'private' check(desired_visibility in('private','member_visible','public_requested')),
  public_consent boolean not null default false,
  public_consent_version text,
@@ -38,6 +42,7 @@ create table if not exists community_impact_claim (
  updated_at timestamptz not null default now(),
  unique(claimant_user_id,idempotency_hash),
  check(end_date is null or end_date>=start_date),
+ check((beneficiary_count is null and beneficiary_count_method is null) or (beneficiary_count is not null and length(trim(coalesce(beneficiary_count_method,''))) between 8 and 500)),
  check((desired_visibility<>'public_requested') or (public_consent=true and public_consent_version is not null and public_consent_at is not null and media_rights_confirmed=true)),
  check((current_decision_code is null and current_reviewer_id is null) or (current_decision_code is not null and current_reviewer_id is not null))
 );
@@ -140,8 +145,8 @@ begin
   NEW.category is distinct from OLD.category or NEW.contribution_type is distinct from OLD.contribution_type
   or NEW.contribution_role is distinct from OLD.contribution_role or NEW.start_date is distinct from OLD.start_date
   or NEW.end_date is distinct from OLD.end_date or NEW.organization_name is distinct from OLD.organization_name
-  or NEW.project_title is distinct from OLD.project_title or NEW.activity_summary is distinct from OLD.activity_summary
-  or NEW.output_summary is distinct from OLD.output_summary or NEW.outcome_summary is distinct from OLD.outcome_summary
+  or NEW.project_title is distinct from OLD.project_title or NEW.location_summary is distinct from OLD.location_summary or NEW.activity_summary is distinct from OLD.activity_summary
+  or NEW.output_summary is distinct from OLD.output_summary or NEW.outcome_summary is distinct from OLD.outcome_summary or NEW.sustained_impact_summary is distinct from OLD.sustained_impact_summary or NEW.beneficiary_count is distinct from OLD.beneficiary_count or NEW.beneficiary_count_method is distinct from OLD.beneficiary_count_method
   or NEW.desired_visibility is distinct from OLD.desired_visibility or NEW.public_consent is distinct from OLD.public_consent
   or NEW.public_consent_version is distinct from OLD.public_consent_version or NEW.media_rights_confirmed is distinct from OLD.media_rights_confirmed
  ) then raise exception 'Submitted Community Impact claim details cannot be edited; use clarification or appeal workflows'; end if;

@@ -4,6 +4,7 @@ import test from "node:test";
 import * as membership from "../../src/membership/service.js";
 import {closePool} from "../../src/platform/db.js";
 import * as governance from "../../src/platform/community-impact-governance.js";
+import * as score from "../../src/platform/community-impact-score.js";
 
 async function account(){
  const suffix=randomUUID(),digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");
@@ -30,7 +31,17 @@ test("governance actions deny an authenticated account without the specific perm
   ()=>governance.proposeContributionAssessment(userId,id,{evidenceReferences:[randomUUID()],category:"community_care",contributionType:"project_delivery",contributionRole:"contributor",evidenceQuality:"adequate",outcomeMaturity:"output",attributionShare:100,riskLevel:"standard",rationale:"This is a valid test assessment rationale."}),
   ()=>governance.secondReviewAssessment(userId,id,{decision:"approved",rationale:"This is a valid test second-review rationale."}),
   ()=>governance.listPendingContributionAssessments(userId),
-  ()=>governance.evaluateRetention(userId,{limit:1})
+  ()=>governance.evaluateRetention(userId,{limit:1}),
+  ()=>score.listScorePolicies(userId),
+  ()=>score.proposeScorePolicy(userId,{policy:{},rationale:"This is a valid test policy proposal rationale.",changeSummary:"Test policy version"}),
+  ()=>score.approveScorePolicy(userId,id,{approvalReference:"TEST-SCORE-APPROVAL",rationale:"This is a valid test approval rationale."}),
+  ()=>score.activateScorePolicy(userId,id,"This is a valid test activation rationale."),
+  ()=>score.linkVerifiedSource(userId,id,{sourceType:"historical_contribution",sourceRecordId:id,rationale:"This is a valid source-link rationale."}),
+  ()=>score.scoreVerifiedClaim(userId,id,"This is a valid test score rationale."),
+  ()=>score.recalculateVerifiedClaim(userId,id,{rationale:"This is a valid recalculation rationale."}),
+  ()=>score.reverseScoreEntry(userId,id,{reasonCode:"test",rationale:"This is a valid reversal rationale."}),
+  ()=>score.listScoreLedger(userId),
+  ()=>score.listScoreRecalculations(userId)
  ];
  for(const action of actions)await assert.rejects(action,forbidden);
 });

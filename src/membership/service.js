@@ -411,6 +411,7 @@ export async function createApplication(userId,input,requestId){
     const termsSnapshotHash=createHash("sha256").update(JSON.stringify({acknowledgement:"I have reviewed the plan fee, validity and eligibility terms.",feeSnapshot:fee})).digest("hex");
     const row=(await db.query(`insert into membership_application(user_id,tracking_reference,submission_idempotency_key,submission_payload_sha256,terms_acknowledged_at,terms_snapshot_sha256,application_type,previous_membership_id,membership_product_id,status,submitted_at,data_snapshot,fee_snapshot)
       values($1,$2,$3,$4,now(),$5,$6,$7,$8,'submitted',now(),$9,$10) returning *`,[userId,trackingReference,submissionKey,submissionPayloadHash,termsSnapshotHash,type,active.rows[0]?.id||null,prod.id,snapshot,fee])).rows[0];
+    await memberReferrals.recordMembershipMilestone(db,userId,"membership_application_submitted",userId);
     await audit(db,userId,"membership.application_submitted","membership_application",row.id,requestId,{applicationType:type,productCode:prod.product_code});
     await notify(db,userId,"membership_application_submitted","membership_application",row.id,{productCode:prod.product_code,eventVersion:row.submitted_at||row.updated_at||row.id});
     const reviewers=(await db.query("select distinct u.id user_id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='members.manage'))")).rows;
@@ -440,6 +441,7 @@ export async function reviewApplication(applicationId,reviewerId,input,requestId
     const next=applicationStatusAfterReview(decision,verifiedPayment);
     await db.query("update membership_application set status=$1,approved_at=case when $2 then coalesce(approved_at,now()) else approved_at end,updated_at=now() where id=$3",[next,decision==="approved",applicationId]);
     if(decision==="correction_required") await db.query("insert into membership_correction(application_id,requested_by,requested_fields,reviewer_note) values($1,$2,$3,$4)",[applicationId,reviewerId,JSON.stringify(input.requestedFields||[]),input.note||"Correction required."]);
+    await memberReferrals.recordMembershipMilestone(db,row.user_id,decision==="approved"?"membership_approved":decision==="rejected"?"membership_declined":null,reviewerId);
     await audit(db,reviewerId,"membership.application_reviewed","membership_application",applicationId,requestId,{decision});
     await notify(db,row.user_id,`membership_application_${decision}`,"membership_application",applicationId,{note:input.note||null,eventVersion:review.id});
     if(decision==="rejected"){

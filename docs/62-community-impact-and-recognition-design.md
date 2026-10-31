@@ -427,13 +427,22 @@ Do not introduce a new migration until the current schema and source-record keys
 - **Exit:** replay-safe integration tests; no duplicate contribution or points.
 
 ### Increment 3 — Manual claims and evidence
-- Support member and non-member claims with identity assurance appropriate to risk.
-- Add evidence handling, consent, private defaults, clarification, and withdrawal.
-- **Exit:** complete claimant journey and privacy tests.
+- [x] Add authenticated-account claim drafts and lifecycle without requiring active membership.
+- [x] Capture category, contribution type/role, date range, organization/project context, and separate activity, output and outcome summaries.
+- [x] Add private evidence uploads using the existing bounded private-file store; upload authorization is claim-scoped and captures the active raw-evidence retention version before bytes are accepted.
+- [x] Require approved active retention rules for claim metadata, consent/rights, raw evidence and audit events; snapshot each applicable policy version/rule with the record.
+- [x] Add private-by-default visibility requests, explicit public-consent/media-rights checks, clarification response, withdrawal and appeal submission.
+- [ ] Non-member claimants remain gated until MPA approves a separate identity-assurance and anti-impersonation standard; no membership is created or granted by this flow.
+- [ ] Reconcile a manual claim with an existing detected contribution through a reviewer-controlled, idempotent link/merge flow; fuzzy matching must not auto-merge or reject.
+- [ ] Complete upload, storage, access, retention and cross-user privacy tests; CI and migration rehearsal must pass before exit.
+- **Exit:** complete claimant journey and privacy tests, including the approved non-member boundary.
 
 ### Increment 4 — Reviewer operations
-- Add scoped queues, assignment, conflict checks, independent decisions, appeals, revocation, and audit.
-- Preserve separation from membership, verification, and ethics decisions.
+- [x] Add permission-gated claim queues, reviewer assignment, organization-affiliation conflict checks, independent decisions, appeal assignment and independent appeal decisions.
+- [x] Preserve separate review/assignment/appeal permissions and assigned-reviewer-only evidence downloads.
+- [x] Record immutable decisions and append-only claim events with retention snapshots.
+- [ ] Add verified-claim revocation and correction/recalculation workflow.
+- [ ] Complete role/action/object permission matrix, IDOR, conflict and cross-organization tests; CI and migration rehearsal remain pending.
 - **Exit:** permission matrix tests for every role/action/object; no self-review path.
 
 ### Increment 5 — Score ledger and explanations
@@ -443,8 +452,9 @@ Do not introduce a new migration until the current schema and source-record keys
 - **Exit:** reproducible calculations and auditable recalculation; governance approval.
 
 ### Increment 6 — Member workspace and profile
-- Add responsive impact dashboard, progress states, timeline, category breakdown, and claim management.
-- Add optional public profile section and field-level visibility preview.
+- [x] Add a responsive authenticated-account contribution-claim workspace with draft creation, private evidence attachment, submission, status, clarification response, withdrawal and appeal.
+- [ ] Add the full impact dashboard, progress states, verified timeline and category breakdown.
+- [ ] Add optional public profile projection and field-level visibility preview; no claim is published by the claim workspace.
 - **Exit:** accessibility and privacy acceptance across desktop/mobile.
 
 ### Increment 7 — Prompts, recognition, and opportunity discovery
@@ -593,7 +603,7 @@ The exact identity proof standard, provider, lawful basis, access controls and r
 
 **Evidence retention — gap and proposed hold point**
 
-No impact-specific evidence retention schedule or deletion policy was identified in the inspected impact source services and migrations. Existing append-only audit/event history does not define how long uploaded evidence, identity documents, media consent artifacts or rejected claims should be retained.
+An MPA-governed, versioned retention-policy registry now exists. Claim and evidence collection is gated on an active schedule and stores the applicable policy version/rule snapshot. Automated expiry, deletion/anonymization, legal-hold execution and backup-expiry workflows are not yet implemented. Existing append-only audit/event history does not by itself define how long uploaded evidence, identity documents, media consent artifacts or rejected claims should be retained.
 
 Before the first evidence migration/API is implemented, approve a retention schedule by data class (claim metadata, identity assurance artifacts, raw evidence, public media/consent, reviewer notes, audit events and score ledger), with legal hold, appeal window, withdrawal, deletion/anonymization and backup-expiry behavior. Until then, do not invent a retention duration or silently retain all uploads indefinitely.
 
@@ -1015,4 +1025,4 @@ No workflow run was returned for that latest revision when checked. Therefore Ty
 
 **No unapproved deletion:** The migration intentionally seeds no retention duration and no active policy. No evidence deletion job is enabled by this registry. Legal holds pause and preserve records. Actual expiry enforcement must be implemented only after the evidence/claim storage model is integrated, MPA approves the class-by-class schedule and deletion/anonymization rules, and backup-expiry and legal-hold behavior are tested. Policy changes create a new version and apply prospectively unless a separately approved, audited migration/recalculation plan explicitly says otherwise.
 
-**Current implementation boundary:** The registry/API is an administrative foundation, not evidence deletion completion. Runtime database migration rehearsal, authorization tests, evidence lifecycle integration and CI remain required. No production migration, data deletion or deployment is authorized by this work.
+**Current implementation boundary:** The registry/API is an administrative foundation, not evidence deletion completion. Runtime database migration rehearsal, authorization tests, complete evidence lifecycle enforcement, retention/deletion execution and CI remain required. No production migration, data deletion or deployment is authorized by this work.

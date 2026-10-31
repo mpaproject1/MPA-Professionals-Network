@@ -65,6 +65,20 @@ The initial baseline does not embed its weights in application code. The member 
 - Administrator: `/admin/community-impact/scoring` — policy versioning, source reconciliation, calculation, reversal and restricted ledger/recalculation history.
 - Reviewer dimension ratings are entered in the existing Community Impact governance assessment flow and derive rating ranges from the active policy endpoint.
 
+Each reviewer assessment stores the exact score policy version used for its five ratings. A contribution cannot be scored under a different active policy until it receives a fresh assessment under that policy. Legacy assessments without a policy binding are intentionally ineligible until reassessed.
+
+## Database migrations
+
+- `20261101110000_community_impact_unified_score.sql`
+- `20261101120000_community_impact_score_source_adapters.sql`
+- `20261101130000_community_impact_score_history_guards.sql`
+- `20261101140000_community_impact_score_policy_transition_guard.sql`
+- `20261101150000_community_impact_score_single_reversal.sql`
+- `20261101160000_community_impact_score_policy_rubric_config.sql`
+- `20261101170000_community_impact_assessment_score_policy.sql`
+
+The migration runner verifies the active evaluation-only policy v2, the exact five weights, policy thresholds, source-link uniqueness, one-reversal constraint, append-only triggers, assessment policy binding and complete rollback of the score schema changes.
+
 ## Commands
 
 ```sh

@@ -60,6 +60,11 @@ async function audit(db,requestId,actor,event,from,to,requestIdHeader,metadata={
   await db.query("insert into network_plus_request_event(request_id,actor_user_id,event_code,from_status,to_status,reason,request_id_header,idempotency_hash,request_fingerprint,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",[requestId,actor,event,from||null,to||null,metadata.reason||null,requestIdHeader||null,idempotencyHash,requestFingerprint,metadata]);
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'network_plus_request',$3,$4,'success',$5)",[actor,event,requestId,requestIdHeader||null,metadata]);
 }
+async function hasBusinessAuthority(db,businessId,userId,capability) {
+  const owner=(await db.query("select 1 from network_plus_business_ownership bo join network_plus_business b on b.id=bo.business_id where bo.business_id=$1 and bo.status='active' and bo.consent_status='accepted' and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published' and ((bo.owner_type='member' and bo.owner_user_id=$2 and exists(select 1 from membership_record mr where mr.user_id=$2 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))) or (bo.owner_type='organization' and exists(select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=bo.owner_organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true)))",[businessId,userId])).rowCount>0;
+  if(owner)return true;
+  return (await db.query("select 1 from network_plus_business_access a join network_plus_business b on b.id=a.business_id where a.business_id=$1 and a.user_id=$2 and a.capability_code=$3 and a.revoked_at is null and (a.expires_at is null or a.expires_at>now()) and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published'",[businessId,userId,capability])).rowCount>0;
+}
 function canTransition(intent,from,to,actorRole) {
   if(["in_progress","completed"].includes(to)&&!["service_request","supplier_inquiry","expertise_request","partnership_proposal","collaboration_request"].includes(intent))return false;
   const map={
@@ -139,7 +144,7 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
       where om.organization_id=$3 and om.status='active' and om.role_code in ('owner','administrator')`,[created.id,userId,recipientOrganizationId]);
     if(input.businessId) {
       await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) select $1,bo.owner_user_id,'recipient_representative','pending',$2 from network_plus_business_ownership bo join membership_record mr on mr.user_id=bo.owner_user_id and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date) where bo.business_id=$3 and bo.owner_type='member' and bo.status='active' and bo.consent_status='accepted' on conflict(request_id,user_id) do nothing",[created.id,userId,input.businessId]);
-      await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) select $1,a.user_id,'recipient_representative','pending',$2 from network_plus_business_access a where a.business_id=$3 and a.capability_code='business.respond_requests' and a.revoked_at is null and (a.expires_at is null or a.expires_at>now()) and (exists(select 1 from membership_record mr where mr.user_id=a.user_id and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date)) or exists(select 1 from organization_membership om where om.user_id=a.user_id and om.status='active')) on conflict(request_id,user_id) do nothing",[created.id,userId,input.businessId]);
+      await db.query("insert into network_plus_request_participant(request_id,user_id,participant_role,consent_status,added_by) select $1,a.user_id,'recipient_representative','pending',$2 from network_plus_business_access a where a.business_id=$3 and a.capability_code in ('business.respond_requests','business.accept_terms') and a.revoked_at is null and (a.expires_at is null or a.expires_at>now()) and (exists(select 1 from membership_record mr where mr.user_id=a.user_id and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date)) or exists(select 1 from organization_membership om where om.user_id=a.user_id and om.status='active')) on conflict(request_id,user_id) do nothing",[created.id,userId,input.businessId]);
     }
     await audit(db,created.id,userId,"request.created",null,"draft",requestIdHeader,{intent});
     return created;
@@ -164,6 +169,18 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
     const p=await participant(db,requestId,userId);
     let role=p.participant_role==="requester"?"requester":p.participant_role==="recipient_representative"?"recipient":"participant";
     if(input.supportReason||input.supportTicket){await assertSupport(db,userId,input.supportReason,input.supportTicket);role="support";}
+    if(role==="recipient") {
+      if(row.business_id) {
+        const capability=to==="accepted"?"business.accept_terms":"business.respond_requests";
+        if(!await hasBusinessAuthority(db,row.business_id,userId,capability))fail(403,"The current business owner or required delegated capability is needed for this decision.","RECIPIENT_AUTHORITY_REQUIRED");
+      } else if(row.recipient_user_id) {
+        const active=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[userId])).rowCount>0;
+        if(userId!==row.recipient_user_id||!active)fail(403,"Only the intended active member recipient may decide this request.","RECIPIENT_AUTHORITY_REQUIRED");
+      } else if(row.recipient_organization_id) {
+        const active=(await db.query("select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true",[row.recipient_organization_id,userId])).rowCount>0;
+        if(!active)fail(403,"Only a current authorized representative of the recipient organization may decide this request.","RECIPIENT_AUTHORITY_REQUIRED");
+      }
+    }
     if(!canTransition(row.intent,row.status,to,role))fail(403,"This role cannot make the requested transition from the current status.","TRANSITION_FORBIDDEN");
     if(to==="accepted"&&role!=="recipient")fail(403,"Only an authorized recipient representative may explicitly accept this request.","RECIPIENT_ACCEPTANCE_REQUIRED");
     if(to==="clarification_requested"&&!input.reason)fail(400,"A clarification reason is required.","REASON_REQUIRED");
@@ -179,17 +196,6 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
     await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version},idempotencyHash,requestFingerprint);
     if(["disputed","completed","closed"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to; await db.query("update network_plus_collaboration_workspace set status=$1,completed_at=case when $1=$3 then coalesce(completed_at,now()) else completed_at end,closed_at=case when $1=$4 then coalesce(closed_at,now()) else closed_at end,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId,"completed","closed"]); }
     if(to==="accepted") {
-      if(row.business_id) {
-        const authorized=(await db.query("select 1 from network_plus_business_ownership bo join network_plus_business b on b.id=bo.business_id where bo.business_id=$1 and bo.status='active' and bo.consent_status='accepted' and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published' and ((bo.owner_type='member' and bo.owner_user_id=$2 and exists(select 1 from membership_record mr where mr.user_id=$2 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))) or (bo.owner_type='organization' and exists(select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=bo.owner_organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true))) union all select 1 from network_plus_business_access a join network_plus_business b on b.id=a.business_id where a.business_id=$1 and a.user_id=$2 and a.capability_code='business.respond_requests' and a.revoked_at is null and (a.expires_at is null or a.expires_at>now()) and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published' limit 1",[row.business_id,userId])).rowCount>0;
-        if(!authorized)fail(403,"Only a current business owner or explicitly delegated request manager may accept this request.","RECIPIENT_AUTHORITY_REQUIRED");
-      } else {
-        if(row.recipient_user_id && row.recipient_user_id!==userId)fail(403,"Only the intended recipient may accept this request.","RECIPIENT_AUTHORITY_REQUIRED");
-        if(row.recipient_user_id) { const currentMember=(await db.query("select 1 from membership_record where user_id=$1 and status=$2 and start_date<=current_date and (end_date is null or end_date>=current_date)",[userId,"active"])).rowCount>0; if(!currentMember)fail(403,"The intended recipient must retain active membership to accept.","RECIPIENT_AUTHORITY_REQUIRED"); }
-        if(row.recipient_organization_id) {
-          const currentRep=(await db.query("select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true",[row.recipient_organization_id,userId])).rowCount>0;
-          if(!currentRep)fail(403,"Only a current active owner or administrator of the recipient organization may accept.","RECIPIENT_AUTHORITY_REQUIRED");
-        }
-      }
       await db.query("update network_plus_request_participant set consent_status='accepted',consented_at=now() where request_id=$1 and user_id=$2 and participant_role='recipient_representative'",[requestId,userId]);
       if(!["service_request","supplier_inquiry","expertise_request","partnership_proposal","collaboration_request"].includes(row.intent)) {
         // Accepted referral/expertise requests are recorded as accepted without a project workspace.

@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
-import { createInAppNotification } from "../platform/notifications.js";
-import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
 import { assertOrganizationCapability, hasCurrentActiveMembership, hasProfessionalIdentity, policyError } from "../platform/identity-policy.js";
+import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
+import { createInAppNotification } from "../platform/notifications.js";
 
 const MEMBER_OWNER_ROLES = ["member", "professional"];
 const ORG_OWNER_ROLES = ["owner", "administrator"];

@@ -33,6 +33,9 @@ test("ownership requires one canonical owner party, explicit consent and scoped 
   assert.match(service, /organization_membership om/);
   assert.match(service, /respondBusinessOwnership/);
   assert.match(service, /grantBusinessAccess/);
+  assert.match(service, /DUPLICATE_BUSINESS/);
+  assert.match(service, /pg_advisory_xact_lock/);
+  assert.match(service, /PUBLIC_CONTACT_DETAILS_FORBIDDEN/);
 });
 
 test("commercial listings have separate moderation and publication states with constrained pricing and idempotency", () => {

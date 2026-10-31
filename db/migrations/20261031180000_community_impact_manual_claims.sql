@@ -25,6 +25,8 @@ create table if not exists community_impact_claim (
  media_rights_confirmed boolean not null default false,
  retention_policy_version_id uuid not null references community_impact_retention_policy_version(id) on delete restrict,
  retention_rule_snapshot jsonb not null check(jsonb_typeof(retention_rule_snapshot)='object'),
+ consent_retention_policy_version_id uuid not null references community_impact_retention_policy_version(id) on delete restrict,
+ consent_retention_rule_snapshot jsonb not null check(jsonb_typeof(consent_retention_rule_snapshot)='object'),
  current_reviewer_id uuid references app_user(id) on delete restrict,
  current_decision_code text check(current_decision_code in('verified','declined','clarification_requested','revoked')),
  current_decision_reason_code text,
@@ -75,6 +77,8 @@ create table if not exists community_impact_claim_decision (
  reason_code text not null check(length(trim(reason_code)) between 3 and 80),
  rationale text not null check(length(trim(rationale)) between 12 and 2000),
  evidence_summary text,
+ retention_policy_version_id uuid not null references community_impact_retention_policy_version(id) on delete restrict,
+ retention_rule_snapshot jsonb not null check(jsonb_typeof(retention_rule_snapshot)='object'),
  created_at timestamptz not null default now()
 );
 create index if not exists ix_community_impact_claim_decision_history on community_impact_claim_decision(claim_id,created_at desc);
@@ -87,6 +91,8 @@ create table if not exists community_impact_claim_appeal (
  status text not null default 'submitted' check(status in('submitted','under_review','upheld','overturned','withdrawn')),
  assigned_reviewer_id uuid references app_user(id) on delete restrict,
  decision_rationale text,
+ retention_policy_version_id uuid not null references community_impact_retention_policy_version(id) on delete restrict,
+ retention_rule_snapshot jsonb not null check(jsonb_typeof(retention_rule_snapshot)='object'),
  decided_at timestamptz,
  created_at timestamptz not null default now(),
  updated_at timestamptz not null default now(),
@@ -103,6 +109,8 @@ create table if not exists community_impact_claim_event (
  reason text not null check(length(trim(reason)) between 4 and 2000),
  request_id text,
  metadata jsonb not null default '{}'::jsonb check(jsonb_typeof(metadata)='object'),
+ retention_policy_version_id uuid not null references community_impact_retention_policy_version(id) on delete restrict,
+ retention_rule_snapshot jsonb not null check(jsonb_typeof(retention_rule_snapshot)='object'),
  created_at timestamptz not null default now()
 );
 create index if not exists ix_community_impact_claim_event_history on community_impact_claim_event(claim_id,created_at desc);

@@ -44,7 +44,9 @@ const migrationNames = [
   "20261031210000_job_application_referral_code.sql",
   "20261031220000_referral_candidate_outcome_summary.sql",
   "20261031230000_referral_retention_snapshots.sql",
-  "20261101090000_community_impact_governance_completion.sql"
+  "20261101090000_community_impact_governance_completion.sql",
+  "20261101110000_community_impact_unified_score.sql",
+  "20261101120000_community_impact_score_source_adapters.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -668,6 +670,17 @@ try {
   const impactPermissions=await client.query("select count(*)::int count from app_permission where permission_code=any($1::text[])",[["community_impact.identity.review","community_impact.offline_attribution.review","community_impact.detection_policy.manage","community_impact.detection_policy.approve","community_impact.claim.second_review","community_impact.retention.evaluate"]]);
   if(impactPermissions.rows[0].count!==6)throw new Error("Community Impact governance permission registration is incomplete.");
 
+  const scoreTables=await client.query("select count(*)::int count from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_score_policy_version","community_impact_score_active_policy","community_impact_score_policy_event","community_impact_score_ledger","community_impact_score_recalculation","community_impact_score_adjustment_event","community_impact_score_source_link","community_impact_score_source_link_event"]]);
+  if(scoreTables.rows[0].count!==8)throw new Error("Unified score migration did not create all eight policy, ledger, recalculation and source-link tables.");
+  const scoreTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_score_ledger_immutable","trg_community_impact_score_policy_immutable","trg_community_impact_score_source_link_immutable"]]);
+  if(scoreTriggers.rows[0].count!==3)throw new Error("Unified score append-only and policy immutability triggers are incomplete.");
+  const initialScorePolicy=await client.query("select p.version,p.status,p.evaluation_only,p.public_score_enabled,p.policy->'dimensions' dimensions from community_impact_score_active_policy a join community_impact_score_policy_version p on p.id=a.policy_version_id where a.singleton=true");
+  if(initialScorePolicy.rowCount!==1||initialScorePolicy.rows[0].version!==1||initialScorePolicy.rows[0].status!=="active"||initialScorePolicy.rows[0].evaluation_only!==true||initialScorePolicy.rows[0].public_score_enabled!==false)throw new Error("The initial docs/62 score policy must be active for evaluation only and remain unpublished.");
+  const weights=initialScorePolicy.rows[0].dimensions.map(x=>Number(x.weight)).sort((a,b)=>b-a).join(",");
+  if(weights!=="30,25,20,15,10")throw new Error("Initial score policy weights must match docs/62: 30/25/20/15/10.");
+  const scorePermissions=await client.query("select count(*)::int count from app_permission where permission_code=any($1::text[])",[["community_impact.score.policy.manage","community_impact.score.policy.approve","community_impact.score.recalculate","community_impact.score.reverse","community_impact.score.view_all"]]);
+  if(scorePermissions.rows[0].count!==5)throw new Error("Unified score governance permissions are incomplete.");
+
   const referralPolicy=await client.query("select count(*)::int count from member_referral_score_policy where status='active'");
   const referralRetentionColumns=await client.query("select count(*)::int count from information_schema.columns where table_schema='public' and table_name=any($1::text[]) and column_name='retention_policy_snapshot'",[["member_referral_code","member_referral_attribution","member_referral_event","member_referral_score_ledger"]]);
   if(referralRetentionColumns.rows[0].count!==4)throw new Error("Referral records are missing their approved retention policy snapshots.");
@@ -680,7 +693,11 @@ try {
   if(rollbackTables.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact governance tables behind in the disposable transaction.");
   const rollbackTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_block_conflicted_assignment","trg_community_impact_block_conflicted_decision","trg_community_impact_policy_event_immutable","trg_community_impact_assessment_event_immutable","trg_community_impact_governance_event_immutable","trg_community_impact_detection_policy_activation_guard","trg_community_impact_offline_attribution_guard","trg_community_impact_identity_decision_immutable","trg_community_impact_identity_evidence_immutable","trg_community_impact_retention_evaluation_immutable","trg_community_impact_assessment_guard"]]);
   if(rollbackTriggers.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact governance triggers behind.");
-  console.log("PASS: all listed migrations and post-migration assertions succeeded; rollback removed all 13 Community Impact governance tables and 11 associated triggers from the disposable transaction.");
+  const scoreRollbackTables=await client.query("select count(*)::int count from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_score_policy_version","community_impact_score_active_policy","community_impact_score_policy_event","community_impact_score_ledger","community_impact_score_recalculation","community_impact_score_adjustment_event","community_impact_score_source_link","community_impact_score_source_link_event"]]);
+  if(scoreRollbackTables.rows[0].count!==0)throw new Error("Rollback rehearsal left unified score tables behind.");
+  const scoreRollbackTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_score_ledger_immutable","trg_community_impact_score_policy_immutable","trg_community_impact_score_source_link_immutable"]]);
+  if(scoreRollbackTriggers.rows[0].count!==0)throw new Error("Rollback rehearsal left unified score immutability triggers behind.");
+  console.log("PASS: all listed migrations and post-migration assertions succeeded; rollback removed governance and unified score tables and their immutability triggers from the disposable transaction.");
   console.log("NOTE: this validates migration execution and existing column types/FK targets; it does not replace application-level integration tests.");
 } catch (error) {
   if (transactionOpen) {

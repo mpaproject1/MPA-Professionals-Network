@@ -72,7 +72,9 @@ async function createVerifiedProfessional(label, visibility, reviewerId, showCon
   }
   await db.query("update verification_case set assigned_reviewer_id=$1 where id=$2", [reviewerId, verificationCase.id]);
   await verification.transitionCase(verificationCase.id, "review", reviewerId, "network-plus-review-" + randomUUID());
-  const claim = await verification.addClaim(verificationCase.id, "SERVICE_CAPABILITY", { capability: "Verified " + label + " capability" }, account.user.id, "network-plus-claim-" + randomUUID());
+  const claimType = (await db.query("select claim_code from verification_claim_type where active=true order by claim_code limit 1")).rows[0];
+  assert.ok(claimType, "An active verification claim type must exist");
+  const claim = await verification.addClaim(verificationCase.id, claimType.claim_code, { capability: "Verified " + label + " capability" }, account.user.id, "network-plus-claim-" + randomUUID());
   await verification.addEvidence(verificationCase.id, {
     claimId: claim.id,
     evidenceType: "supporting_document",

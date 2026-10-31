@@ -4,6 +4,7 @@ import { policyError } from "../platform/identity-policy.js";
 import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
 import { createInAppNotification } from "../platform/notifications.js";
 
+
 const INTENTS = new Set(["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request"]);
 const SUPPORT_ROLES = new Set(["network_plus_support","system_admin"]);
 const hash = value => createHash("sha256").update(String(value)).digest("hex");

@@ -1174,3 +1174,8 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
   .sc-manage-panel { padding:17px; }
   .sc-modal-body { padding:18px; }
 }
+
+
+/* Semantic lifecycle badge tones */
+.badge-blue { background:var(--info-bg); color:var(--info); border-color:color-mix(in srgb,var(--info) 32%,var(--border)); }
+.badge-red { background:var(--danger-bg); color:var(--danger); border-color:color-mix(in srgb,var(--danger) 32%,var(--border)); }

@@ -85,3 +85,12 @@ This document is an acceptance contract, not evidence that visual regression, ma
 - The About page includes a live Completed Projects showcase backed by `GET /api/v1/public/serve-community/completed-projects`. It displays only completed initiatives with at least five distinct completed member participation records and hides participant identities.
 - Current Serve-Community data records completed participation, but does not provide an independently verified beneficiary count or outcome measure. The About page and API response state this limitation explicitly; no impact totals or testimonials are fabricated.
 - Required validation: run unit/integration tests for query filters, deduplication, privacy suppression and authorization/rate limits; run the web production build; verify mobile widths and keyboard/screen-reader semantics for the progress and chart components. These checks have not yet been executed for this addition.
+
+
+## Serve-Community completed-project showcase
+
+- The Serve-Community discovery page repeats the same public, privacy-safe Completed Projects feed used by About. It is positioned immediately after the reviewed initiative directory and before the member's private participation area: members see real completed work after exploring current opportunities, then receive a clear route back to the discovery list.
+- The section uses the same authoritative completed-project endpoint, privacy threshold, verified/public organization rule and measurement disclaimer. It does not create a second project dataset or count participation in the browser.
+- The primary action returns members to `#discover` to explore current approved initiatives. The showcase remains informational; it does not bypass eligibility, membership, consent, review or application workflows.
+- Responsive layout: three cards on wide screens, two on tablet and one on mobile; full-width call to action on narrow screens. Loading, retry/error and no-reportable-project states are included.
+- Added browser acceptance coverage for section placement, endpoint request, discovery link and mobile horizontal overflow. Execution remains part of the full PR Quality/browser validation gate.

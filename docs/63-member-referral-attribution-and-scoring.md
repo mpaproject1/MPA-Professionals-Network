@@ -15,9 +15,9 @@ A shared referral service supports two distinct processes: membership acquisitio
 - A member shares the same code alongside a specific job vacancy.
 - The authenticated candidate enters the code on the vacancy application. The code is persisted with the existing job application draft and captured when the formal application is submitted.
 - One attribution is allowed per job application; the first recorded code is retained. The candidate cannot refer themselves.
-- Existing hiring workflow events update referral progress: shortlisted, interview, candidate offer acceptance and employer-recorded hired status.
+- Existing hiring workflow events update referral progress: shortlisted, interview, candidate offer acceptance, employer-recorded hired status, rejection and withdrawal.
 - An employer-recorded hired status is only an outcome reported for review. It does not automatically become verified.
-- The candidate must confirm the outcome and consent to MPA verification. An authorized MPA reviewer then records an independent verification method and evidence/confirmation reference. Only this decision sets employment_verified and makes the event eligible for score policy rules.
+- The candidate must confirm the outcome and consent to MPA verification using the candidate outcome workspace. The candidate separately chooses whether the referrer may see their name and limited referral progress. An authorized MPA reviewer then records an independent verification method and evidence/confirmation reference. Only this decision sets employment_verified and makes the event eligible for score policy rules.
 
 ## Scoring governance
 - There is no default scoring policy and no points are issued until MPA approves and activates a version.

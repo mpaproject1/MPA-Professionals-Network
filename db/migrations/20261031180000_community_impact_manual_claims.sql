@@ -201,3 +201,9 @@ alter table private_upload_session add column if not exists purpose_reference_id
 alter table private_upload_session add constraint private_upload_session_purpose_scope_check
  check((purpose='general' and purpose_reference_id is null) or (purpose='community_impact_claim_evidence' and purpose_reference_id is not null));
 create index if not exists ix_private_upload_session_claim_purpose on private_upload_session(purpose_reference_id,status) where purpose='community_impact_claim_evidence';
+
+alter table private_upload_session add column if not exists retention_policy_version_id uuid references community_impact_retention_policy_version(id) on delete restrict;
+alter table private_upload_session add column if not exists retention_rule_snapshot jsonb;
+alter table private_upload_session add constraint private_upload_session_claim_retention_check
+ check((purpose='general' and retention_policy_version_id is null and retention_rule_snapshot is null) or
+       (purpose='community_impact_claim_evidence' and retention_policy_version_id is not null and jsonb_typeof(retention_rule_snapshot)='object'));

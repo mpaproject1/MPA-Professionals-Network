@@ -1,7 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { recordManualFinancePayment, decideManualFinancePayment, issueFinancePaymentVoucher, issueVerifiedMembershipPaymentVoucher, verifyFinancePaymentVoucher } from "../../src/platform/finance-receipts.js";
+import test from "node:test";
+import { decideManualFinancePayment, issueFinancePaymentVoucher, issueVerifiedMembershipPaymentVoucher, recordManualFinancePayment, verifyFinancePaymentVoucher } from "../../src/platform/finance-receipts.js";
 
 test("manual finance receipts keep verification and voucher issuance as separate decisions",async()=>{
   const source=await readFile(new URL("../../src/platform/finance-receipts.js",import.meta.url),"utf8");

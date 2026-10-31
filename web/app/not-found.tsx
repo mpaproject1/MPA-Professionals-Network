@@ -1,6 +1,6 @@
+import {Home} from "lucide-react";
 import Link from "next/link";
-import { Home } from "lucide-react";
-import { SupportAction } from "../components/support-action";
+import {SupportAction} from "../components/support-action";
 
 export default function NotFound() {
   return (

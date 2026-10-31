@@ -1,8 +1,8 @@
 import { getPool, withTransaction } from "../platform/db.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
 import { assertOrganizationCapability } from "../platform/identity-policy.js";
-import { nextTrackingReference } from "../platform/tracking-reference.js";
 import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
+import { nextTrackingReference } from "../platform/tracking-reference.js";
 
 function error(status,message,code="BUSINESS_RULE"){ const e=new Error(message); e.statusCode=status; e.code=code; return e; }
 const ORG_WRITE_ROLES=["owner","administrator","recruiter","project_manager"];

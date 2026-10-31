@@ -1,15 +1,15 @@
 "use client";
 
-import { ArrowLeft, Building2, ExternalLink, MapPin, Search } from "lucide-react";
+import {ArrowLeft, Building2, ExternalLink, MapPin, Search} from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { DiscoveryPagination } from "../../../components/discovery-pagination";
-import { OperationStatus } from "../../../components/operation-status";
-import { FormFeedback } from "../../../components/form-feedback";
-import { Badge, Card } from "../../../components/ui";
-import { NetworkPlusAccessGuard } from "../../../components/network-plus-access-guard";
-import { ApiError, api } from "../../../lib/api";
-import { useUiStore } from "../../../lib/store";
+import {type FormEvent, useCallback, useEffect, useState} from "react";
+import {DiscoveryPagination} from "../../../components/discovery-pagination";
+import {FormFeedback} from "../../../components/form-feedback";
+import {NetworkPlusAccessGuard} from "../../../components/network-plus-access-guard";
+import {OperationStatus} from "../../../components/operation-status";
+import {Badge, Card} from "../../../components/ui";
+import {api, ApiError} from "../../../lib/api";
+import {useUiStore} from "../../../lib/store";
 
 type OrganizationResult = {
   id: string;

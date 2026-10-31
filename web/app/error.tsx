@@ -1,9 +1,9 @@
 "use client";
-import {AlertTriangle,Home, RefreshCw} from "lucide-react";
+import {AlertTriangle, Home, RefreshCw} from "lucide-react";
 import Link from "next/link";
 import {useEffect} from "react";
-import {Card} from "../components/ui";
 import { SupportAction } from "../components/support-action";
+import {Card} from "../components/ui";
 
 export default function ErrorPage({error,reset}:{error:Error & {digest?:string};reset:()=>void}){
   useEffect(()=>{console.error("Portal route failed",error.digest||error.name||"client exception")},[error]);

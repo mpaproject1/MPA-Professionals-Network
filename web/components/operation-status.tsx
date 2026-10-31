@@ -1,8 +1,8 @@
 "use client";
 
-import { CheckCircle2, CircleAlert, type LucideIcon } from "lucide-react";
-import { BrandedLoader } from "./branded-loader";
-import type { ReactNode } from "react";
+import {CheckCircle2, CircleAlert, type LucideIcon} from "lucide-react";
+import type {ReactNode} from "react";
+import {BrandedLoader} from "./branded-loader";
 
 type OperationStatusProps = {
   state: "loading" | "success" | "error" | "info";

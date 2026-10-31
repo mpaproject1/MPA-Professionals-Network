@@ -1,6 +1,7 @@
 import "./src/platform/load-env.js";
 import {randomUUID} from "node:crypto";
 import http from "node:http";
+import * as ethics from "./src/ethics/service.js";
 import * as membershipAdminBulk from "./src/membership/admin-bulk.js";
 import * as membershipCard from "./src/membership/card.js";
 import { assertMembershipPaymentMethodAdmin } from "./src/membership/payment-method-policy.js";
@@ -30,6 +31,7 @@ import * as serveCommunityImpactReports from "./src/platform/serve-community-imp
 import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
 import * as supportBot from "./src/platform/support-bot.js";
 import * as userAdmin from "./src/platform/user-admin.js";
+import * as volunteerPledges from "./src/platform/volunteer-pledges.js";
 import {beginAdminPasskeyAuthentication, beginAdminPasskeyRegistration, finishAdminPasskeyAuthentication, finishAdminPasskeyRegistration, listAdminPasskeys, recoverAdminPasskey, revokeAdminPasskey} from "./src/platform/webauthn.js";
 import {assertFinancePaymentQueueAccess,assertMembershipActivationAccess,assertMembershipReviewAccess,assertMembershipReviewQueueAccess,assertPaymentReversalAccess,assertPaymentVerificationAccess} from "./src/platform/workspace-authorization.js";
 import * as marketplaceDemand from "./src/services-mentorship/demand.js";
@@ -39,8 +41,6 @@ import * as servicesMentorship from "./src/services-mentorship/service.js";
 import * as serviceMentorshipSupportCases from "./src/services-mentorship/support-cases.js";
 import * as talent from "./src/talent/service.js";
 import * as verification from "./src/verification/service.js";
-import * as ethics from "./src/ethics/service.js";
-import * as volunteerPledges from "./src/platform/volunteer-pledges.js";
 
 const config=loadConfig();
 const logger=createLogger({level:config.logLevel});

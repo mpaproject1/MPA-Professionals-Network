@@ -1205,6 +1205,9 @@ Permissions are separate for policy management, policy approval, scoring/recalcu
 - `20261101120000_community_impact_score_source_adapters.sql`
 - `20261101130000_community_impact_score_history_guards.sql`
 - `20261101140000_community_impact_score_policy_transition_guard.sql`
+- `20261101150000_community_impact_score_single_reversal.sql`
+- `20261101160000_community_impact_score_policy_rubric_config.sql`
+- `20261101170000_community_impact_assessment_score_policy.sql`
 
 The disposable migration compatibility runner includes these migrations and checks the initial active evaluation-only policy, exact five weights, permissions, ledger/source-link tables, append-only triggers and rollback removal. This is a transactional rollback rehearsal only; it does not run against or authorize production.
 

@@ -191,7 +191,7 @@ jobs:
             sleep 2
           done
           if [ "$READY" != "1" ]; then cat /tmp/mpa-web.log; exit 1; fi
-          npx playwright test e2e/support-bot-movement.spec.js e2e/ui-guide-tour.spec.js e2e/homepage-institutional-ux.spec.js e2e/membership-card-print.spec.js e2e/registration-human-verification.spec.js e2e/network-plus-discovery.spec.js
+          npx playwright test e2e/support-bot-movement.spec.js e2e/ui-guide-tour.spec.js e2e/homepage-institutional-ux.spec.js e2e/membership-card-print.spec.js e2e/registration-human-verification.spec.js e2e/network-plus-discovery.spec.js e2e/serve-community-separation.spec.js
 
 
 # Browser role journeys are temporarily excluded from required PR CI because the

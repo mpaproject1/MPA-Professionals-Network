@@ -519,3 +519,5 @@
 .chartTrack span{display:block;height:100%;min-width:0;border-radius:inherit;background:var(--brand-lemon)}
 .orgChart{width:100%;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
 @media(max-width:620px){.chartSection{padding:17px 15px}.chartRow>div:first-child{font-size:12px}.chartTrack{height:14px}}
+
+@media(max-width:620px){.profileProgress{align-items:stretch;flex-direction:column;gap:9px}.profileProgress>div:first-child{display:flex;align-items:baseline;justify-content:space-between;width:100%}.progressTrack{min-height:12px}}

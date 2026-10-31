@@ -50,6 +50,8 @@ test("commercial listings have separate moderation and publication states with c
   assert.match(migration, /ux_network_plus_service_idempotency_hash/);
   assert.match(migration, /business\.verify/);
   assert.match(migration, /business\.moderate/);
+  assert.match(migration, /business_verification_reviewer/);
+  assert.match(migration, /business_moderator/);
   assert.match(migration, /system_only/);
   assert.match(service, /submitProfessionalServiceListing/);
   assert.match(service, /moderateProfessionalServiceListing/);
@@ -98,6 +100,7 @@ test("private business verification evidence is readable only by an independent 
   assert.match(service, /file\.visibility!==\"private\"\|\|file\.created_by!==userId/);
   assert.match(service, /listBusinessVerificationEvidence/);
   assert.match(privateFiles, /network_plus_business_verification_evidence e join network_plus_business_verification_case c/);
+  assert.match(privateFiles, /business_verification_reviewer/);
   assert.match(privateFiles, /c\.submitted_by<>\$2/);
   assert.match(privateFiles, /permissions\.includes\(\"business\.verify\"\)/);
 });

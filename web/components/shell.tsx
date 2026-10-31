@@ -23,7 +23,7 @@ useEffect(()=>{let cancelled=false;if(!token){setAccountRoles(null);setHasOrgani
 useEffect(()=>{let cancelled=false;if(!token){setNotificationUnread(0);return()=>{cancelled=true}}const refresh=()=>api<{counts?:{unread?:number}}>("/api/v1/notifications?limit=1",{},token).then(result=>{if(!cancelled)setNotificationUnread(Math.max(0,Number(result.counts?.unread)||0))}).catch(()=>{if(!cancelled)setNotificationUnread(0)});void refresh();const timer=window.setInterval(()=>void refresh(),60000);return()=>{cancelled=true;window.clearInterval(timer)}},[token]);
 async function logout(){try{if(token)await api("/api/v1/auth/logout",{method:"POST"},token)}catch{}finally{clearSession();router.replace("/login");router.refresh()}}
 const visibleNav=nav.filter(([href])=>{
-const authenticatedOnly=["/members","/learning","/mentorship","/membership","/community-impact/identity-assurance","/saved","/profile"];
+const authenticatedOnly=["/members","/learning","/mentorship","/membership","/community-impact/identity-assurance","/community-impact/score","/saved","/profile"];
 if(!token)return ["/about","/jobs","/serve-community"].includes(href);
 if(authenticatedOnly.includes(href)&&!token)return false;
 if(href==="/profile"&&(accountRoles===null||!hasProfessionalIdentity(accountRoles)))return false;

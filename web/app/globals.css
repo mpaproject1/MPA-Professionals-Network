@@ -846,3 +846,29 @@ a { text-underline-offset: 3px; }
   .btn, .badge, .card, input, select, textarea { forced-color-adjust: auto; }
   :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid Highlight; }
 }
+
+
+/* Keep page-module heading declarations aligned with the shared, calmer type scale. */
+main.shell-main :is(h1, h2, h3, h4) {
+  font-family: var(--font-heading) !important;
+  font-weight: 600 !important;
+  line-height: var(--heading-line-height);
+}
+main.shell-main h1 span {
+  color: var(--primary);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+.dark main.shell-main h1 span { color: var(--brand-lemon); }
+.badge-green { background: var(--success-bg); color: var(--success); border-color: color-mix(in srgb, var(--success) 35%, var(--border)); }
+.badge-slate { background: var(--surface-muted); color: var(--muted); border-color: var(--border); }
+main.shell-main .grid-cols-3, main.shell-main .grid-cols-4 { min-width: 0; }
+@media (max-width: 900px) {
+  main.shell-main .grid-cols-3, main.shell-main .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  main.shell-main .grid-cols-2, main.shell-main .grid-cols-3 { grid-template-columns: minmax(0, 1fr); }
+  main.shell-main .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  main.shell-main table { min-width: 640px; }
+  main.shell-main [role="table"], main.shell-main .table-scroll { max-width: 100%; overflow-x: auto; }
+}

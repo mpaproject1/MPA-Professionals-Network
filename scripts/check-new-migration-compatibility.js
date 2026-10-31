@@ -497,6 +497,20 @@ try {
     }
   }
 
+  const requestChecks = [
+    ["network_plus_request","network_plus_request_intent_check",["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request"]],
+    ["network_plus_request","network_plus_request_status_check",["draft","submitted","under_review","clarification_requested","accepted","declined","withdrawn","in_progress","completed","disputed","closed"]],
+    ["network_plus_collaboration_workspace","network_plus_collaboration_workspace_status_check",["active","blocked","disputed","completed","closed"]],
+    ["network_plus_collaboration_milestone","network_plus_collaboration_milestone_status_check",["not_started","in_progress","blocked","completed","cancelled"]]
+  ];
+  for (const [table,name,values] of requestChecks) {
+    const row=(await client.query("select pg_get_constraintdef(oid) as definition from pg_constraint where conrelid=$1::regclass and conname=$2 and contype='c'",[`public.${table}`,name])).rows[0];
+    if(!row||values.some(value=>!row.definition.includes(`'${value}'`))) throw new Error(`Increment 6 check constraint ${table}.${name} is missing expected states.`);
+  }
+  const workspaceTrigger=await client.query("select 1 from pg_trigger where tgname='trg_network_plus_workspace_requires_acceptance' and not tgisinternal");
+  if(!workspaceTrigger.rowCount) throw new Error("Collaboration workspace database acceptance trigger is missing.");
+  const supportRole=await client.query("select 1 from app_role where role_code='network_plus_support'");
+  if(!supportRole.rowCount) throw new Error("The scoped Network-Plus support role is missing.");
   const businessPermissions = await client.query("select permission_code,system_only from app_permission where permission_code=any($1::text[])",[["business.verify","business.moderate"]]);
   if (businessPermissions.rowCount!==2 || businessPermissions.rows.some(row=>row.system_only!==true)) {
     throw new Error("Business verification/moderation permissions must be registered as system-only capabilities without user grants.");

@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import * as membership from "../../src/membership/service.js";
+import * as requests from "../../src/network-plus/request-collaboration.js";
+import { closePool, getPool } from "../../src/platform/db.js";
 import * as talent from "../../src/talent/service.js";
 import * as verification from "../../src/verification/service.js";
-import { closePool, getPool } from "../../src/platform/db.js";
-import * as requests from "../../src/network-plus/request-collaboration.js";
 
 function accountInput(label) {
   const suffix=randomUUID(),digits=suffix.replace(/\D/g,"").slice(0,8).padEnd(8,"7");

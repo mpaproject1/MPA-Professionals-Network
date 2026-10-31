@@ -10,7 +10,9 @@ This document defines the shared visual contract for all member, organization, s
 - Use lemon as a restrained accent for emphasis, selected states and high-visibility calls to action. Do not use lemon as small body text on white.
 - Light theme: cool, bright neutral page canvas, white surfaces, navy text and controls, clear muted text and borders.
 - Dark theme: deep blue-navy canvas, lifted blue-navy surfaces, cool-white text, readable muted text and borders, lemon accent. Avoid flat black backgrounds and avoid using lemon for every foreground element.
-- Maintain clear surface separation in both themes through border, tonal elevation and restrained shadows.
+- Maintain clear surface separation in both themes through tonal elevation and restrained borders; flatten nested cards and use one primary container where possible.
+- Use lemon for primary actions and selected navigation, not as a general-purpose text or icon color. Secondary actions remain neutral.
+- Use 44px minimum action controls (48px mobile navigation targets), predictable form spacing and horizontally scrollable data tables inside their own containers.
 - Keep the page content and existing information architecture; do not change workflow order or hide existing actions as a styling shortcut.
 
 ## Typography
@@ -30,7 +32,9 @@ The canonical CSS custom properties live in `web/app/globals.css`; Tailwind alia
 - Spacing: 4px base rhythm with named 4/8/12/16/20/24/32/40/48px steps.
 - Radii: 7/10/14/18/24px.
 - Shadows: low-contrast navy-tinted elevation; dark theme uses a deeper navy shadow, not black card fills.
-- Shared `.card`, `.btn`, `.badge`, `.icon-btn`, inputs, `.operation-status` and navigation styles must consume tokens rather than introduce a new palette per workspace.
+- Shared `.card`, `.btn`, `.badge`, `.icon-btn`, inputs, `.operation-status` and navigation styles consume the token system; semantic badge tones distinguish success, waiting/review, in-progress, neutral and declined/error states.
+- The mentorship progress journey uses distinct complete/current/waiting/upcoming labels and a visually emphasized current step. Membership application status badges distinguish approved/active, pending/review, in-progress and declined/failed outcomes.
+- Next-action feedback separates the server-returned status from the next permitted action; it must not imply an action completed before confirmation.
 
 ## Source-level route coverage
 
@@ -40,7 +44,7 @@ The shared root layout and global design tokens were checked against the current
 - Opportunity and relationship journeys: `/jobs`, `/mentorship`, `/serve-community`.
 - Governance and money workflows: `/membership`, `/admin`, `/admin/finance`.
 
-These routes inherit the shared root typography, token palette, form controls, navigation and responsive shell. Page-specific modules that define their own hero treatments are aligned with the same tokens where identified. This is a source-level consistency pass; it does not replace the rendered page-by-page review in the validation gate.
+These routes inherit the shared root typography, token palette, form controls, navigation and responsive shell. Page-specific refinements cover the landing and About experiences, dashboard, profile, Network-Plus, Jobs, Mentorship, Serve-Community directory/owner/reviewer, organization directory, membership application and verification/card experiences, Finance, Administration overview, Support Desk, reports, account tables, organization review and membership-card administration. Admin workspace navigation and shared data tables are also aligned. Routes without a dedicated CSS module inherit the shared shell and component styles. This is a source-level consistency pass; it does not replace the rendered page-by-page review in the validation gate.
 
 ## Workspace consistency requirements
 
@@ -68,6 +72,6 @@ These routes inherit the shared root typography, token palette, form controls, n
 
 ## Validation gate
 
-Automated smoke coverage is added in `e2e/visual-system.spec.js`: it checks WCAG AA contrast for text, muted text, primary actions, semantic status colors and focus indicators in both themes; it also checks theme persistence and horizontal overflow at a 320px viewport. This test is committed but has not yet been executed. Before declaring the visual system complete, run the branch's full PR Quality workflow and browser acceptance suite. Add or update screenshot baselines only after reviewing intentional changes. Manually inspect every route in the workspace matrix above in both themes and at mobile/tablet/desktop widths; keyboard-test navigation, forms, dialogs, error/retry and empty states. Confirm WCAG AA contrast for text, controls, status indicators and focus in both themes.
+Automated smoke coverage is added in `e2e/visual-system.spec.js`: it checks WCAG AA contrast for text, muted text, lemon-on-navy primary actions, semantic status colors and focus indicators in both themes; it checks theme persistence, horizontal overflow across 10 workspace routes at 320px, 390px, 768px and 1280px, and minimum mobile touch-target dimensions. This test is committed but has not yet been executed. Before declaring the visual system complete, run the branch's full PR Quality workflow and browser acceptance suite. Add or update screenshot baselines only after reviewing intentional changes. Manually inspect every route in the workspace matrix above in both themes and at mobile/tablet/desktop widths; keyboard-test navigation, forms, dialogs, error/retry and empty states. Confirm WCAG AA contrast for text, controls, status indicators and focus in both themes.
 
 This document is an acceptance contract, not evidence that visual regression, manual assistive-technology review or full browser validation has already passed. Do not mark the workstream release-ready until those checks are evidenced.

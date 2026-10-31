@@ -35,7 +35,8 @@ const migrationNames = [
   "20261029160000_account_references_and_governance.sql",
   "20261031110000_network_plus_business_discovery.sql",
   "20261031120000_network_plus_request_collaboration.sql",
-  "20261031130000_serve_community_initiatives.sql"
+  "20261031130000_serve_community_initiatives.sql",
+  "20261031140000_serve_community_offline_completed_projects.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [

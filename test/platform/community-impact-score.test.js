@@ -77,4 +77,6 @@ test("Member score view is private and administrator score operations are separa
  assert.match(checker,/20261101180000_community_impact_score_modifiers_and_rubrics\.sql/);
  assert.match(checker,/20261101190000_community_impact_score_effective_date_guard\.sql/);
  assert.match(checker,/20261101200000_community_impact_score_outcome_maturity_rule\.sql/);
+ assert.match(checker,/20261101210000_community_impact_score_recipient_confirmation_rules\.sql/);
+ assert.match(checker,/20261101220000_community_impact_score_recipient_confirmation_scope\.sql/);
 });

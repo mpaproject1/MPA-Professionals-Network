@@ -29,7 +29,7 @@ The service stores these values in a constrained `intent` column. It does not in
 - Partnership/collaboration proposals capture purpose, scope, contributions, responsibilities, outputs, timeline and authorized-representative descriptions.
 - Service requests capture scope, one or more deliverables, a pricing/quotation proposal and schedule (including “to be agreed”).
 - Optional completion-evidence references are kept private in the request/workspace lifecycle. No private contact information should be placed in request details; contact fields are rejected by the service validator.
-- Recipient acceptance is a state decision over the submitted request terms. It is not represented as a legally reviewed contract or legal advice.
+- Recipient acceptance is a state decision over the submitted request terms. For business requests, the server resolves the primary owner and active co-owners/delegates from canonical Increment 5 ownership/access records; the requester does not submit a private owner ID. Business managers need `business.respond_requests` to review/clarify/decline and the distinct `business.accept_terms` capability to accept. It is not represented as a legally reviewed contract or legal advice.
 
 ## 3. Status transition contract
 
@@ -49,7 +49,7 @@ The service stores these values in a constrained `intent` column. It does not in
 | accepted / in_progress / disputed / completed | closed | Requester or recipient | Closes the engagement |
 | declined / withdrawn / closed | — | — | Terminal |
 
-Invalid transitions are rejected server-side. The browser never decides whether a transition is allowed. A recipient organization decision is rechecked against its current active owner/administrator membership at decision time. Direct member recipients must retain active membership.
+Invalid transitions are rejected server-side. The browser never decides whether a transition is allowed. A recipient organization decision is rechecked against its current active owner/administrator membership at decision time. Direct member recipients must be verified, directory-visible and retain active membership. Direct organization recipients must be verified and opted into Network-Plus. Business listing recipients must still be published, verified and moderated at decision time.
 
 **Workspace rule:** the service inserts a workspace only while processing the explicit `accepted` transition. A database trigger independently rejects workspace inserts unless the referenced request has an accepted timestamp and is in an accepted/active/disputed/completed state. Referral acceptance does not create a project workspace by default.
 
@@ -59,7 +59,7 @@ Invalid transitions are rejected server-side. The browser never decides whether 
 |---|---:|---:|---:|---:|
 | Create and edit a draft | Yes | No | No | No |
 | Submit / withdraw own request | Yes | No | No | No |
-| Review / request clarification / accept / decline | No | Yes | No | No |
+| Review / request clarification / accept / decline | No | Yes (with the appropriate current business capability) | No | No |
 | Resubmit clarification | Yes | No | No | No |
 | Invite an additional participant | Accepted participant only | Accepted participant only | No | No |
 | View request and history | Yes | Yes | Only after invitation consent | Case-scoped read-only |
@@ -72,7 +72,7 @@ Participant visibility is enforced by participant rows and consent status. An un
 
 ### Support policy
 
-The `network_plus_support` role is registered as privileged and must be assigned through the existing system-administrator role-governance workflow. A system administrator must separately grant access for one request, one support user and one support-case reference, with an expiry no later than 72 hours. Every support read must repeat the case reference and a meaningful access reason; the grant is checked against the request and current user. Support access is read-only. Each list/detail read writes an audit entry tied to the request. Support cannot accept, decline, withdraw, edit terms, invite participants or update a collaboration workspace. Moderators and business verification reviewers do not receive request access by virtue of their moderation role.
+The `network_plus_support` role is registered as privileged and must be assigned through the existing system-administrator role-governance workflow. A system administrator must separately grant access for one request, one support user and one support-case reference, with an expiry no later than 72 hours. Business delegates are separated: `business.respond_requests` does not grant acceptance authority; only a current owner/organization representative or a delegate with `business.accept_terms` may accept. Every support read must repeat the case reference and a meaningful access reason; the grant is checked against the request and current user. Support access is read-only. Each list/detail read writes an audit entry tied to the request. Support cannot accept, decline, withdraw, edit terms, invite participants or update a collaboration workspace. Moderators and business verification reviewers do not receive request access by virtue of their moderation role.
 
 ## 5. Schema and integrity
 

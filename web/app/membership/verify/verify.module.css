@@ -16,3 +16,7 @@
 .sheet dd{font-weight:600}
 .disclaimer{background:var(--surface-muted);color:var(--muted)}
 .sheet footer{color:var(--muted)}
+
+/* Workspace density and hierarchy refinement */
+
+.page{padding:clamp(14px,3vw,28px);background:var(--bg);color:var(--text)}.sheet{background:var(--surface);border-color:var(--border);border-radius:18px;box-shadow:var(--shadow);padding:clamp(22px,5vw,42px)}.brand{padding-bottom:20px;border-color:var(--border)}.brand>span{background:var(--brand-lemon);color:var(--brand-navy-deep);font-weight:700}.brand small{color:var(--muted);font-weight:600}.status{background:var(--success-bg);border-color:color-mix(in srgb,var(--success) 32%,var(--border))}.status[data-valid=false]{background:var(--danger-bg);border-color:color-mix(in srgb,var(--danger) 32%,var(--border))}.status>span{background:var(--success);color:#fff}.status[data-valid=false]>span{background:var(--danger)}.status p{color:var(--muted)}.sheet dl>div{border-color:var(--border);padding:15px 0}.sheet dt{color:var(--muted);font-weight:600}.sheet dd{font-weight:600}.disclaimer{background:var(--surface-muted);color:var(--muted)}.sheet footer{color:var(--muted)}

@@ -82,7 +82,7 @@ test("discovery requires Network-Plus entry and exposes a limited published/veri
   assert.match(service, /s\.audience=any/);
   const publicList = service.slice(service.indexOf("export async function listBusinesses"),service.indexOf("export async function getBusiness"));
   const projectionStart = publicList.indexOf("select b.id,b.business_kind,b.display_name");
-  const projectionEnd = publicList.indexOf("\${base}", projectionStart);
+  const projectionEnd = publicList.indexOf("${base}", projectionStart);
   const projection = projectionStart >= 0 && projectionEnd > projectionStart
     ? publicList.slice(projectionStart, projectionEnd)
     : "";

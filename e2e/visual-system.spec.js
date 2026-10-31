@@ -77,7 +77,7 @@ test.describe("MPA shared visual system", () => {
   test("workspace pages remain usable at mobile and tablet widths", async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem("mpa-color-mode", "light"));
     const routes = ["/", "/about", "/jobs", "/mentorship", "/serve-community", "/membership", "/network-plus", "/profile", "/organizations", "/admin"];
-    for (const width of [320, 390, 768]) {
+    for (const width of [320, 390, 768, 1280]) {
       await page.setViewportSize({ width, height: 820 });
       for (const route of routes) {
         await page.goto(route, { waitUntil: "domcontentloaded", timeout: 20000 });

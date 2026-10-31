@@ -41,3 +41,29 @@
 /* MPA hierarchy and whitespace refinement */
 
 .hero{gap:clamp(28px,4vw,58px);padding:clamp(26px,4vw,50px) clamp(18px,4vw,40px) clamp(42px,5vw,62px)}.eyebrow{font-weight:600}.hero h1{font-weight:600;line-height:1.1;letter-spacing:-.04em}.lead{line-height:1.8}.actions{gap:12px;margin-top:30px}.primaryAction,.secondaryAction{min-height:46px;border-radius:10px;font-weight:600;box-shadow:none;transition:background-color .16s ease,border-color .16s ease}.primaryAction{background:var(--brand-lemon);border-color:var(--brand-lemon);color:var(--brand-navy-deep)}.primaryAction:hover,.secondaryAction:hover{transform:none}.illustration{padding:clamp(16px,2vw,22px);border-radius:20px;box-shadow:none}.sectionHeading{margin-bottom:28px}.sectionHeading h2,.process h2,.finalCta h2{font-weight:600;line-height:1.2}@media(max-width:760px){.hero{grid-template-columns:1fr;gap:24px}.hero h1{font-size:clamp(34px,9vw,46px)}.illustration{max-width:560px;width:100%;margin-inline:auto}}
+
+
+/* Completed Projects and product-experience sections */
+.portfolio,.experience{max-width:1240px;margin:0 auto;padding:0 clamp(18px,4vw,40px) clamp(42px,5vw,62px);width:100%}
+.portfolioGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.projectCard{display:flex;min-width:0;flex-direction:column;gap:12px;padding:22px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+.projectMeta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+.completedMark{display:inline-flex;align-items:center;gap:6px;color:var(--success,var(--primary));font-weight:600}
+.projectCard h3{margin:0;color:var(--text);font-size:18px;font-weight:600;line-height:1.3}
+.projectCard>p{margin:0;color:var(--muted);font-size:14px;line-height:1.7}
+.projectCount{display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:center;gap:8px;margin-top:auto;padding-top:14px;border-top:1px solid var(--border);color:var(--muted)}
+.projectCount strong{color:var(--text);font-size:20px;font-variant-numeric:tabular-nums}
+.projectCount span{font-size:12px;line-height:1.45}
+.projectCard .projectDate{font-size:12px}
+.measurementNote{max-width:920px;margin:16px 0 0;color:var(--muted);font-size:12px;line-height:1.65}
+.portfolioState{display:grid;justify-items:start;gap:10px;padding:24px;border-radius:16px;background:var(--surface-muted);color:var(--muted)}
+.portfolioState h3{margin:0;color:var(--text);font-size:17px;font-weight:600}
+.portfolioState p{max-width:760px;margin:0;line-height:1.65}
+.portfolioState button{width:auto}
+.experienceGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.experienceGrid article{min-width:0;padding:20px;border-radius:15px;background:var(--surface-muted)}
+.experienceGrid article>span{display:grid;width:40px;height:40px;place-items:center;border-radius:11px;background:var(--surface);color:var(--primary)}
+.experienceGrid h3{margin:15px 0 8px;color:var(--text);font-size:16px;font-weight:600;line-height:1.35}
+.experienceGrid p{margin:0;color:var(--muted);font-size:13px;line-height:1.7}
+@media(max-width:980px){.portfolioGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.experienceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.portfolioGrid,.experienceGrid{grid-template-columns:minmax(0,1fr)}.projectCard{padding:18px}.projectCount{grid-template-columns:auto auto minmax(0,1fr)}.portfolio,.experience{padding-inline:18px}}

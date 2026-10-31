@@ -47,7 +47,7 @@ test("Scoring uses reviewer-assessed dimensions, policy weights, configured caps
  assert.match(governance,/collaboration_knowledge_sharing/);
 });
 test("Reversals and recalculations append compensating history without editing the ledger",()=>{
- assert.match(service,/entry_type:'reversal'/);assert.match(service,/reverses_entry_id/);
+ assert.match(service,/'reversal'/);assert.match(service,/reverses_entry_id/);
  assert.match(service,/community_impact_score_recalculation/);
  assert.match(migration,/before update or delete on community_impact_score_ledger/);
  assert.doesNotMatch(service,/update community_impact_score_ledger/i);

@@ -39,7 +39,7 @@ async function assertEntry(db,userId) {
   if(!access.eligible)fail(403,"Network-Plus access is required.","NETWORK_PLUS_FORBIDDEN");
 }
 async function participant(db,requestId,userId) {
-  const row=(await db.query("select p.*,r.status request_status,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id from network_plus_request_participant p join network_plus_request r on r.id=p.request_id where p.request_id=$1 and p.user_id=$2",[requestId,userId])).rows[0];
+  const row=(await db.query("select p.*,r.status request_status,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id from network_plus_request_participant p join network_plus_request r on r.id=p.request_id where p.request_id=$1 and p.user_id=$2 and p.consent_status<>'revoked' and (p.participant_role<>'additional_participant' or p.consent_status='accepted')",[requestId,userId])).rows[0];
   if(!row)fail(404,"Request not found.","NOT_FOUND");
   return row;
 }
@@ -176,7 +176,7 @@ export async function listNetworkPlusRequests(userId,{status,intent,limit=30,off
     let support=false;
     if(supportReason||supportTicket){await assertSupport(db,userId,supportReason,supportTicket);support=true;} else await assertEntry(db,userId);
     const rows=(await db.query(`select r.id,r.intent,r.status,r.subject,r.summary,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id,r.business_id,r.service_listing_id,r.version,r.created_at,r.updated_at
-      from network_plus_request r where (${support} or exists(select 1 from network_plus_request_participant p where p.request_id=r.id and p.user_id=$1 and p.consent_status<>'revoked'))
+      from network_plus_request r where (${support} or exists(select 1 from network_plus_request_participant p where p.request_id=r.id and p.user_id=$1 and p.consent_status<>'revoked' and (p.participant_role<>'additional_participant' or p.consent_status='accepted')))
       and ($2::text is null or r.status=$2) and ($3::text is null or r.intent=$3)
       order by r.updated_at desc limit $4 offset $5`,[userId,status||null,intent||null,Math.min(100,Math.max(1,Number(limit)||30)),Math.max(0,Number(offset)||0)])).rows;
     if(support) for(const row of rows) await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_list","network_plus_request",row.id,"success",{reason:supportReason,ticket:supportTicket}]);
@@ -187,7 +187,7 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
   return withTransaction(async db=>{
     const row=(await db.query("select * from network_plus_request where id=$1",[requestId])).rows[0];
     if(!row)fail(404,"Request not found.","NOT_FOUND");
-    const isParticipant=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status<>'revoked'",[requestId,userId])).rowCount>0;
+    const isParticipant=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status<>'revoked' and (participant_role<>'additional_participant' or consent_status='accepted')",[requestId,userId])).rowCount>0;
     if(isParticipant) await assertEntry(db,userId); else { await assertSupport(db,userId,supportReason,supportTicket); await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_read","network_plus_request",requestId,"success",{reason:supportReason,ticket:supportTicket}]); }
     const participants=(await db.query("select user_id,participant_role,consent_status,consented_at from network_plus_request_participant where request_id=$1 and consent_status<>'revoked'",[requestId])).rows;
     const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 order by created_at",[requestId])).rows;

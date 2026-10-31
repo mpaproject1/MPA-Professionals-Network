@@ -1,10 +1,12 @@
 -- Recognition duplicate prevention and lifecycle guard.
-create unique index if not exists uq_community_impact_member_open_nomination
- on community_impact_recognition_nomination(program_id,nominator_user_id,nominee_user_id)
- where nominee_type='member' and status in('submitted','under_review','clarification_requested');
-create unique index if not exists uq_community_impact_nonmember_open_nomination
- on community_impact_recognition_nomination(program_id,nominator_user_id,lower(nominee_email))
- where nominee_type='non_member' and status in('submitted','under_review','clarification_requested');
+drop index if exists uq_community_impact_member_open_nomination;
+drop index if exists uq_community_impact_nonmember_open_nomination;
+create unique index uq_community_impact_member_open_nomination
+ on community_impact_recognition_nomination(program_id,nominee_user_id)
+ where nominee_type='member' and status in('submitted','under_review','clarification_requested','approved');
+create unique index uq_community_impact_nonmember_open_nomination
+ on community_impact_recognition_nomination(program_id,lower(nominee_email))
+ where nominee_type='non_member' and status in('submitted','under_review','clarification_requested','approved');
 create or replace function community_impact_recognition_nomination_guard() returns trigger language plpgsql as $$
 begin
  if TG_OP='DELETE' then raise exception 'Recognition nominations are retained; withdraw rather than delete'; end if;

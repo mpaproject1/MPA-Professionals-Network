@@ -1,4 +1,4 @@
-import { Badge, Card } from "./ui";
+import { Card } from "./ui";
 
 export type MentorshipProgressStep = {
   title: string;
@@ -30,7 +30,7 @@ export function MentorshipProgressJourney({ steps }: { steps: MentorshipProgress
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                     <strong>{step.title}</strong>
-                    <Badge>{STATUS_LABEL[step.status]}</Badge>
+                    <span className={`badge journey-status journey-status--${step.status}`}>{STATUS_LABEL[step.status]}</span>
                   </div>
                   <p className="muted">{step.description}</p>
                 </div>

@@ -103,7 +103,7 @@ test.describe("Network-Plus discovery acceptance", () => {
       body: JSON.stringify({ error: { code: "SERVICE_UNAVAILABLE", message: "private database stack detail" } }),
     }));
     await page.getByRole("button", { name: "Search organizations" }).click();
-    const alert = page.getByRole("alert");
+    const alert = page.getByRole("alert").filter({ hasText: /server problem/i });
     await expect(alert).toContainText("server problem");
     await expect(alert).not.toContainText("private database stack detail");
     await expect(page.getByRole("heading", { name: "No organizations match these filters" })).toHaveCount(0);

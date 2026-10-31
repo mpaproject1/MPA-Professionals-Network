@@ -105,7 +105,7 @@ create table if not exists community_impact_claim_event (
  id uuid primary key default gen_random_uuid(),
  claim_id uuid not null references community_impact_claim(id) on delete restrict,
  actor_user_id uuid references app_user(id) on delete restrict,
- event_code text not null check(event_code in('created','updated','evidence_attached','submitted','assigned','clarification_requested','clarification_responded','verified','declined','withdrawn','appeal_submitted','appeal_assigned','appeal_upheld','appeal_overturned','revoked')),
+ event_code text not null check(event_code in('created','updated','evidence_attached','evidence_removed','submitted','assigned','clarification_requested','clarification_responded','verified','declined','withdrawn','appeal_submitted','appeal_assigned','appeal_upheld','appeal_overturned','revoked')),
  from_status text,
  to_status text,
  reason text not null check(length(trim(reason)) between 4 and 2000),
@@ -207,3 +207,11 @@ alter table private_upload_session add column if not exists retention_rule_snaps
 alter table private_upload_session add constraint private_upload_session_claim_retention_check
  check((purpose='general' and retention_policy_version_id is null and retention_rule_snapshot is null) or
        (purpose='community_impact_claim_evidence' and retention_policy_version_id is not null and jsonb_typeof(retention_rule_snapshot)='object'));
+
+alter table community_impact_claim_evidence add column if not exists removed_at timestamptz;
+alter table community_impact_claim_evidence add column if not exists removed_by uuid references app_user(id) on delete restrict;
+alter table community_impact_claim_evidence add column if not exists removal_reason text;
+alter table community_impact_claim_evidence add constraint community_impact_claim_evidence_removal_check
+ check((removed_at is null and removed_by is null and removal_reason is null) or
+       (removed_at is not null and removed_by is not null and length(trim(coalesce(removal_reason,''))) between 8 and 1000));
+create index if not exists ix_community_impact_claim_evidence_active on community_impact_claim_evidence(claim_id,created_at) where removed_at is null;

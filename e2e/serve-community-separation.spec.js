@@ -40,6 +40,12 @@ test.describe("Serve-Community public UX separation", () => {
     const dialog = page.getByRole("dialog", { name: "Neighbourhood learning circles" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(/not an approved initiative, a live vacancy or an invitation to register/i)).toBeVisible();
+    const close = dialog.getByRole("button", { name: "Close concept details" });
+    await expect(close).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(dialog.getByRole("button", { name: "Close preview" })).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(close).toBeFocused();
 
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);

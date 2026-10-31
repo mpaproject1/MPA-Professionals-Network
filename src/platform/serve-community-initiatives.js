@@ -1,8 +1,8 @@
 import {createHash} from "node:crypto";
-import {getPool,withTransaction} from "./db.js";
-import {createInAppNotification} from "./notifications.js";
-import {assertCurrentActiveMembership,assertOrganizationCapability,hasProfessionalIdentity,policyError} from "./identity-policy.js";
 import {detectParticipationCompletion} from "./community-impact-detection.js";
+import {getPool,withTransaction} from "./db.js";
+import {assertCurrentActiveMembership,assertOrganizationCapability,hasProfessionalIdentity,policyError} from "./identity-policy.js";
+import {createInAppNotification} from "./notifications.js";
 export const PARTICIPATION_CONSENT_VERSION="serve-community-participation-2026-10-31-v1";
 export const PARTICIPATION_PRIVACY_VERSION="serve-community-privacy-2026-10-31-v1";
 const CONSENT_TEXT="I have read the participation and privacy terms and agree to participate voluntarily. I explicitly consent to MPA sharing my account name and email with this initiative's owner or its authorized organization owner/administrator only to coordinate my participation. These details will not be public. I can withdraw my consent.";

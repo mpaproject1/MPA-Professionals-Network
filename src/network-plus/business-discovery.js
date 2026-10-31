@@ -505,3 +505,16 @@ export async function changeProfessionalServiceStatus(listingId,userId,status,re
     return updated;
   });
 }
+
+export async function revokeBusinessAccess(businessId,accessId,userId,requestId) {
+  return withTransaction(async db=>{
+    const {owner}=await assertBusinessOwner(db,businessId,userId);
+    if(!owner||owner.owner_role!=="primary_owner")fail(403,"Only the accountable primary owner can revoke business delegation.","DELEGATION_FORBIDDEN");
+    const row=(await db.query("select * from network_plus_business_access where id=$1 and business_id=$2 and revoked_at is null for update",[accessId,businessId])).rows[0];
+    if(!row)fail(404,"Active business delegation not found.","NOT_FOUND");
+    const updated=(await db.query("update network_plus_business_access set revoked_at=now() where id=$1 returning *",[accessId])).rows[0];
+    await audit(db,userId,"network_plus.business_access_revoked","network_plus_business_access",accessId,requestId,{businessId,targetUserId:row.user_id,capability:row.capability_code});
+    await createInAppNotification(db,row.user_id,"network_plus.business_access_revoked","network_plus_business",businessId,{message:"A business owner revoked a previously delegated capability.",nextAction:"Your access to the affected business capability has ended.",actionUrl:"/network-plus/businesses"});
+    return updated;
+  });
+}

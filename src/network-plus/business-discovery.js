@@ -145,7 +145,7 @@ async function notifyOwners(db,businessId,eventCode,payload) {
         and bo.consent_status='accepted' and om.status='active' and om.role_code=any($2::text[])`,[businessId,ORG_OWNER_ROLES])).rows;
   for(const owner of owners)await createInAppNotification(db,owner.user_id,eventCode,"network_plus_business",businessId,payload);
 }
-async function assertBusinessPublishable(db,businessId) {
+async function assertBusinessPublishable(db,businessId,{requireModeration=true,allowSuspended=false}={}) {
   const row=(await db.query("select b.business_kind,b.verification_status,b.moderation_status,b.publication_status,b.verification_expires_at, exists(select 1 from network_plus_business_ownership bo join organization o on o.id=bo.owner_organization_id where bo.business_id=b.id and bo.owner_type='organization' and bo.status='active' and bo.consent_status='accepted' and o.verification_status<>'verified') organization_unverified, (select count(*)::int from network_plus_business_ownership bo where bo.business_id=b.id and bo.status='pending') pending_owner_count, (select count(*)::int from network_plus_business_ownership bo where bo.business_id=b.id and bo.status='active' and bo.consent_status='accepted') active_owner_count from network_plus_business b where b.id=$1",[businessId])).rows[0];
   if(!row)fail(404,"Business not found.","NOT_FOUND");
   if(row.verification_status!=="verified")fail(409,"Business verification must be approved before a service listing can be published.","BUSINESS_NOT_VERIFIED");
@@ -153,8 +153,8 @@ async function assertBusinessPublishable(db,businessId) {
   if(row.organization_unverified)fail(409,"The linked organization must remain verified before this business can publish.","ORGANIZATION_NOT_VERIFIED");
   if(row.pending_owner_count>0)fail(409,"All invited co-owners must accept or decline before publication.","OWNERSHIP_CONSENT_PENDING");
   if(row.business_kind==="joint"&&row.active_owner_count<2)fail(409,"A joint business requires at least two accepted owner parties before publication.","JOINT_OWNERSHIP_INCOMPLETE");
-  if(row.moderation_status!=="approved")fail(409,"Business profile moderation must be approved before publishing a service listing.","BUSINESS_NOT_MODERATED");
-  if(row.publication_status==="suspended"||row.publication_status==="archived")fail(409,"This business is not eligible to publish listings.","BUSINESS_NOT_PUBLISHABLE");
+  if(requireModeration&&row.moderation_status!=="approved")fail(409,"Business profile moderation must be approved before publishing a service listing.","BUSINESS_NOT_MODERATED");
+  if((row.publication_status==="suspended"&&!allowSuspended)||row.publication_status==="archived")fail(409,"This business is not eligible to publish listings.","BUSINESS_NOT_PUBLISHABLE");
 }
 export async function createBusiness(userId,input,requestId,idempotencyKey) {
   input=input||{};
@@ -478,7 +478,7 @@ export async function reviewBusinessModeration(businessId,userId,input,requestId
     if(row.created_by===userId||row.moderation_submitted_by===userId)fail(403,"A business creator or submitter cannot moderate their own business profile.","SELF_REVIEW_FORBIDDEN");
     await assertIndependentBusinessReviewer(db,businessId,userId);
     if(status!=="suspended"&&row.moderation_status!=="pending_review"&&!(status==="approved"&&row.publication_status==="suspended"))fail(409,"Business profile is not awaiting moderation or eligible for reinstatement.","INVALID_STATE");
-    if(status==="approved"&&row.verification_status!=="verified")fail(409,"Only a verified business profile can be approved for publication.","BUSINESS_NOT_VERIFIED");
+    if(status==="approved")await assertBusinessPublishable(db,businessId,{requireModeration:false,allowSuspended:true});
     const updated=(await db.query("update network_plus_business set moderation_status=$1,publication_status=case when $1='suspended' then 'suspended' when $1='approved' then 'published' else 'draft' end,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];
     if(status==="suspended")await db.query("update network_plus_service_listing set status=$2,suspended_at=now(),suspension_reason=$3,updated_at=now() where business_id=$1 and status=any($4::text[])",[businessId,"suspended",reason,["published","paused","pending_review"]]);
     await audit(db,userId,"network_plus.business_profile_moderated","network_plus_business",businessId,requestId,{status,reason});

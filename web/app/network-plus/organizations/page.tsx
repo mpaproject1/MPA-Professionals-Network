@@ -8,7 +8,7 @@ import {FormFeedback} from "../../../components/form-feedback";
 import {NetworkPlusAccessGuard} from "../../../components/network-plus-access-guard";
 import {OperationStatus} from "../../../components/operation-status";
 import {Badge, Card} from "../../../components/ui";
-import {api, ApiError} from "../../../lib/api";
+import {ApiError, api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
 
 type OrganizationResult = {

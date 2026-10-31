@@ -70,7 +70,7 @@ test("About page uses the local replaceable illustration and only supported core
   assert.match(about, /src="\/illustrations\/mpa-network-placeholder\.svg"/);
   assert.match(about, /alt="Abstract illustration of people and professional pathways/);
   for (const path of ["/jobs", "/serve-community", "/mentorship", "/membership"]) assert.ok(about.includes(path), `Missing pathway ${path}`);
-  assert.doesNotMatch(about, /testimonial|\b[0-9,]+ members\b|https?:\/\//i);
+  assert.doesNotMatch(about, /testimonial|\b[0-9][0-9,]* members\b|https?:\/\//i);
   const asset = read("web/public/illustrations/mpa-network-placeholder.svg");
   assert.match(asset, /<title/);
   assert.match(asset, /<desc/);

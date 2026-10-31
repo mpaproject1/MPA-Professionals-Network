@@ -325,7 +325,12 @@ export async function addNetworkPlusWorkspaceMilestone(requestId,userId,input,id
     const description=String(input.description||"").slice(0,2000)||null, dueAt=input.dueAt||null, keyHash=hash(idempotencyKey), fingerprint=hash(JSON.stringify({title,description,owner,dueAt}));
     const prior=(await db.query("select * from network_plus_collaboration_milestone where workspace_id=$1 and created_by=$2 and idempotency_hash=$3",[ws.id,userId,keyHash])).rows[0];
     if(prior){if(prior.request_fingerprint!==fingerprint)fail(409,"This milestone key was used for different content.","IDEMPOTENCY_CONFLICT");return prior;}
-    return (await db.query("insert into network_plus_collaboration_milestone(workspace_id,title,description,owner_user_id,due_at,created_by,idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[ws.id,title,description,owner,dueAt,userId,keyHash,fingerprint])).rows[0];
+    const created=(await db.query("insert into network_plus_collaboration_milestone(workspace_id,title,description,owner_user_id,due_at,created_by,idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[ws.id,title,description,owner,dueAt,userId,keyHash,fingerprint])).rows[0];
+    await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body,metadata,idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8)",[ws.id,userId,"milestone","Milestone created",title,{milestoneId:created.id},keyHash,fingerprint]);
+    await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,$6,$7)",[userId,"collaboration.milestone_created","network_plus_collaboration_workspace",ws.id,requestId,"success",{milestoneId:created.id,title}]);
+    const others=(await db.query("select user_id from network_plus_request_participant where request_id=$1 and user_id<>$2 and consent_status='accepted'",[requestId,userId])).rows;
+    for(const other of others)await notify(db,other.user_id,"network_plus.collaboration.milestone",requestId,"A collaboration milestone was added.");
+    return created;
   });
 }
 export async function updateNetworkPlusWorkspaceMilestone(requestId,milestoneId,userId,input,requestIdHeader) {

@@ -43,7 +43,8 @@ const migrationNames = [
   "20261031200000_member_referrals.sql",
   "20261031210000_job_application_referral_code.sql",
   "20261031220000_referral_candidate_outcome_summary.sql",
-  "20261031230000_referral_retention_snapshots.sql"
+  "20261031230000_referral_retention_snapshots.sql",
+  "20261101090000_community_impact_governance_completion.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -658,6 +659,15 @@ try {
   if(referralColumns.rowCount!==2)throw new Error("Job application referral code and candidate outcome summary columns are missing.");
   const referralHistoryTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_member_referral_event_immutable","trg_member_referral_score_immutable"]]);
   if(referralHistoryTriggers.rows[0].count!==2)throw new Error("Referral event and score ledger append-only triggers are missing.");
+  const impactTables=await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_identity_assurance_case","community_impact_identity_assurance_evidence","community_impact_identity_assurance_decision","community_impact_detection_policy_governance","community_impact_detection_policy_event","community_impact_offline_attribution","community_impact_offline_attribution_evidence","community_impact_claim_candidate_link","community_impact_reviewer_conflict","community_impact_contribution_assessment","community_impact_contribution_assessment_event","community_impact_retention_evaluation","community_impact_governance_event"]]);
+  if(impactTables.rowCount!==13)throw new Error("Community Impact governance migration did not create all 13 required tables.");
+  const impactTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_block_conflicted_assignment","trg_community_impact_block_conflicted_decision","trg_community_impact_policy_event_immutable","trg_community_impact_assessment_event_immutable","trg_community_impact_governance_event_immutable","trg_community_impact_detection_policy_activation_guard","trg_community_impact_offline_attribution_guard","trg_community_impact_identity_decision_immutable","trg_community_impact_identity_evidence_immutable","trg_community_impact_retention_evaluation_immutable","trg_community_impact_assessment_guard"]]);
+  if(impactTriggers.rows[0].count!==11)throw new Error("Community Impact governance safety/immutability triggers are incomplete.");
+  const attributionConstraint=await client.query("select count(*)::int count from pg_constraint where conrelid='public.community_impact_claim_candidate_link'::regclass and contype='u'");
+  if(attributionConstraint.rows[0].count!==1)throw new Error("Claim reconciliation must enforce one link per claim while permitting distinct contributors to one project candidate.");
+  const impactPermissions=await client.query("select count(*)::int count from app_permission where permission_code=any($1::text[])",[["community_impact.identity.review","community_impact.offline_attribution.review","community_impact.detection_policy.manage","community_impact.detection_policy.approve","community_impact.claim.second_review","community_impact.retention.evaluate"]]);
+  if(impactPermissions.rows[0].count!==6)throw new Error("Community Impact governance permission registration is incomplete.");
+
   const referralPolicy=await client.query("select count(*)::int count from member_referral_score_policy where status='active'");
   const referralRetentionColumns=await client.query("select count(*)::int count from information_schema.columns where table_schema='public' and table_name=any($1::text[]) and column_name='retention_policy_snapshot'",[["member_referral_code","member_referral_attribution","member_referral_event","member_referral_score_ledger"]]);
   if(referralRetentionColumns.rows[0].count!==4)throw new Error("Referral records are missing their approved retention policy snapshots.");
@@ -666,7 +676,11 @@ try {
 
   await client.query("rollback");
   transactionOpen = false;
-  console.log("PASS: all listed migrations and post-migration schema assertions succeeded; all DDL was rolled back.");
+  const rollbackTables=await client.query("select count(*)::int count from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_identity_assurance_case","community_impact_identity_assurance_evidence","community_impact_identity_assurance_decision","community_impact_detection_policy_governance","community_impact_detection_policy_event","community_impact_offline_attribution","community_impact_offline_attribution_evidence","community_impact_claim_candidate_link","community_impact_reviewer_conflict","community_impact_contribution_assessment","community_impact_contribution_assessment_event","community_impact_retention_evaluation","community_impact_governance_event"]]);
+  if(rollbackTables.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact governance tables behind in the disposable transaction.");
+  const rollbackTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_block_conflicted_assignment","trg_community_impact_block_conflicted_decision","trg_community_impact_policy_event_immutable","trg_community_impact_assessment_event_immutable","trg_community_impact_governance_event_immutable","trg_community_impact_detection_policy_activation_guard","trg_community_impact_offline_attribution_guard","trg_community_impact_identity_decision_immutable","trg_community_impact_identity_evidence_immutable","trg_community_impact_retention_evaluation_immutable","trg_community_impact_assessment_guard"]]);
+  if(rollbackTriggers.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact governance triggers behind.");
+  console.log("PASS: all listed migrations and post-migration assertions succeeded; rollback removed all 13 Community Impact governance tables and 11 associated triggers from the disposable transaction.");
   console.log("NOTE: this validates migration execution and existing column types/FK targets; it does not replace application-level integration tests.");
 } catch (error) {
   if (transactionOpen) {

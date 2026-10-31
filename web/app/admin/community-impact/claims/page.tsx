@@ -5,7 +5,7 @@ import {downloadPrivateFile} from "../../../../lib/private-upload";
 import {useUiStore} from "../../../../lib/store";
 
 type Reviewer={id:string;email:string;can_review:boolean;can_review_appeals:boolean};
-type Evidence={id:string;fileObjectId:string;label:string;evidenceType:string;description:string;sourceDate?:string|null};
+type Evidence={id:string;fileObjectId:string|null;evidenceUrl:string|null;label:string;evidenceType:string;description:string;sourceDate?:string|null};
 type Claim={id:string;trackingReference:string;claimantUserId:string;status:string;category:string;contributionType:string;contributionRole:string;startDate:string;endDate:string|null;organizationName:string|null;projectTitle:string|null;locationSummary:string|null;activitySummary:string;outputSummary:string;outcomeSummary:string|null;sustainedImpactSummary:string|null;beneficiaryCount:number|null;beneficiaryCountMethod:string|null;assignedReviewerUserId:string|null;evidence:Evidence[];currentDecisionRationale:string|null};
 type Appeal={appeal_id:string;appeal_status:string;appeal_rationale:string;appeal_created_at:string;assigned_reviewer_id:string|null;claim_id:string;tracking_reference:string;claimant_user_id:string;category:string;contribution_type:string;activity_summary:string;original_reviewer:string;evidence:Evidence[]};
 const label=(v:string)=>String(v||"").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());

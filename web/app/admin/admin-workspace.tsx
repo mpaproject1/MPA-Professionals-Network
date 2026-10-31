@@ -26,6 +26,7 @@ const destinations: Destination[] = [
   { href: "/admin/serve-community/offline-projects", label: "Completed projects", description: "Record and review completed offline community projects", icon: ClipboardList },
   { href: "/admin/community-impact/retention-policy", label: "Impact retention policy", description: "Propose and approve evidence-retention rules", icon: Scale },
   { href: "/admin/community-impact/claims", label: "Impact claim review", description: "Assign and independently review private contribution claims and appeals", icon: ClipboardCheck },
+  { href: "/admin/referrals", label: "Member referrals", description: "Review employment referrals and govern referral recognition", icon: Users },
   { href: "/organizations", label: "Organizations", description: "Verification, evidence and partner workspace", icon: Building2 },
   { href: "/admin/reports", label: "Reports", description: "Reporting and exports", icon: FileBarChart },
   { href: "/admin/email", label: "Email operations", description: "Queues, templates and delivery", icon: Mail },
@@ -78,7 +79,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     const financeConfig = Boolean(financeOfficer || permissions.includes("finance.manage"));
     const supportStaff = Boolean(roles?.includes("supporting_staff"));
     const offlineProjectAccess = Boolean(supportStaff || permissions.includes("serve_community.projects.manage"));
-    if (platformAdmin) return destinations.filter((item) => (item.href !== "/admin/community-impact/retention-policy" || roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.retention.manage", "community_impact.retention.approve"].includes(permission))) && (item.href !== "/admin/community-impact/claims" || roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.claim.review", "community_impact.claim.assign", "community_impact.claim.appeal_review"].includes(permission))));
+    if (platformAdmin) return destinations.filter((item) => (item.href !== "/admin/community-impact/retention-policy" || roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.retention.manage", "community_impact.retention.approve"].includes(permission))) && (item.href !== "/admin/community-impact/claims" || roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.claim.review", "community_impact.claim.assign", "community_impact.claim.appeal_review"].includes(permission))) && (item.href !== "/admin/referrals" || roles?.some((role) => ["system_admin","admin","supporting_staff"].includes(role)) === true || permissions.includes("referral.manage")));
     return destinations.filter((item) => {
       if (["/admin/accounts", "/admin/account-governance", "/admin/experience", "/admin/members", "/admin/members/catalog", "/admin/membership-card", "/admin/reference-portfolio"].includes(item.href)) return false;
       if (item.href === "/admin/membership") return membershipReviewer;
@@ -90,6 +91,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
       if (item.href === "/admin/serve-community/offline-projects") return offlineProjectAccess;
       if (item.href === "/admin/community-impact/retention-policy") return roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.retention.manage", "community_impact.retention.approve"].includes(permission));
       if (item.href === "/admin/community-impact/claims") return roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.claim.review", "community_impact.claim.assign", "community_impact.claim.appeal_review"].includes(permission));
+      if (item.href === "/admin/referrals") return roles?.some((role) => ["system_admin","admin","supporting_staff"].includes(role)) === true || permissions.includes("referral.manage");
       if (item.href === "/admin/support") return supportStaff || roles?.includes("reviewer") === true;
       if (item.href === "/admin/security" || item.href === "/admin/email") return false;
       return false;

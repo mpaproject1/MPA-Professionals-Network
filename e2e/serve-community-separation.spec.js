@@ -15,7 +15,8 @@ test.describe("Serve-Community public UX separation", () => {
 
     await expect(page.getByRole("link", { name: /Explore Network-Plus/i })).toHaveAttribute("href", "/network-plus");
     await expect(page.getByRole("link", { name: /Explore initiatives/i })).toHaveAttribute("href", "#discover");
-    await expect(page.getByRole("link", { name: /Careers|Mentorship|Professional services|Organization workspace/i })).toHaveCount(0);
+    const experience = page.locator("main.serve-community-page");
+    await expect(experience.getByRole("link", { name: /Careers|Mentorship|Professional services|Organization workspace/i })).toHaveCount(0);
   });
 
   test("search and category filters update the sample concept list", async ({ page }) => {

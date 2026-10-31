@@ -58,6 +58,39 @@ create trigger trg_community_impact_policy_version_immutable before update or de
 drop trigger if exists trg_community_impact_candidate_event_immutable on community_impact_detection_candidate_event;
 create trigger trg_community_impact_candidate_event_immutable before update or delete on community_impact_detection_candidate_event for each row execute function community_impact_reject_history_mutation();
 
+create or replace function community_impact_candidate_guard() returns trigger language plpgsql as $
+begin
+ if TG_OP='DELETE' then raise exception 'Community Impact detection candidates cannot be deleted'; end if;
+ if NEW.id is distinct from OLD.id
+  or NEW.source_system is distinct from OLD.source_system
+  or NEW.source_type is distinct from OLD.source_type
+  or NEW.source_record_id is distinct from OLD.source_record_id
+  or NEW.source_event_id is distinct from OLD.source_event_id
+  or NEW.source_event_code is distinct from OLD.source_event_code
+  or NEW.source_event_version is distinct from OLD.source_event_version
+  or NEW.contributor_user_id is distinct from OLD.contributor_user_id
+  or NEW.source_category is distinct from OLD.source_category
+  or NEW.canonical_category is distinct from OLD.canonical_category
+  or NEW.contribution_role is distinct from OLD.contribution_role
+  or NEW.confidence is distinct from OLD.confidence
+  or NEW.policy_version_id is distinct from OLD.policy_version_id
+  or NEW.detection_metadata is distinct from OLD.detection_metadata
+  or NEW.created_at is distinct from OLD.created_at then
+  raise exception 'Community Impact source and detection provenance is immutable';
+ end if;
+ if NEW.detection_status is distinct from OLD.detection_status
+  and not (OLD.detection_status='detected' and NEW.detection_status='source_reversed') then
+  raise exception 'Invalid Community Impact detection status transition';
+ end if;
+ if NEW.attribution_status is distinct from OLD.attribution_status
+  and not (OLD.attribution_status='pending_confirmation' and NEW.attribution_status in('confirmed','disputed')) then
+  raise exception 'Invalid Community Impact attribution status transition';
+ end if;
+ return NEW;
+end; $;
+drop trigger if exists trg_community_impact_candidate_guard on community_impact_detection_candidate;
+create trigger trg_community_impact_candidate_guard before update or delete on community_impact_detection_candidate for each row execute function community_impact_candidate_guard();
+
 insert into community_impact_detection_policy_version(source_system,source_type,version,rules,approval_reference) values
 ('serve_community','initiative_participation',1,'{"enabled":true,"sourceEventCodes":["completed"],"sourceStatuses":["completed"],"parentStatuses":["completed"],"attributionMode":"authoritative_source_user","confidence":1,"requireContributorConfirmation":true,"defaultRole":"delivery_contributor","categoryMap":{"education":"education_skills","community_care":"community_care","digital_inclusion":"digital_inclusion","environment":"environment_sustainability","livelihoods":"livelihoods_economic_opportunity","accessibility":"accessibility_inclusion","other":"other_review_required"}}'::jsonb,'project-owner-approved-initial-policy-baseline'),
 ('serve_community','offline_completed_project',1,'{"enabled":true,"sourceEventCodes":["approve"],"sourceStatuses":["approved"],"parentStatuses":[],"attributionMode":"unattributed_until_evidenced","confidence":0,"requireContributorConfirmation":true,"defaultRole":null,"categoryMap":{"education":"education_skills","community_care":"community_care","digital_inclusion":"digital_inclusion","environment":"environment_sustainability","livelihoods":"livelihoods_economic_opportunity","accessibility":"accessibility_inclusion","other":"other_review_required"}}'::jsonb,'project-owner-approved-initial-policy-baseline')

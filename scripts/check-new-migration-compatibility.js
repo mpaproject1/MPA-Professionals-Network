@@ -32,7 +32,8 @@ const migrationNames = [
   "20261025130000_serve_community_g3_impact_metrics.sql",
   "20261025140000_serve_community_g4_announcement_commitment_experience.sql",
   "20261025150000_serve_community_g6_outcome_proof.sql",
-  "20261029160000_account_references_and_governance.sql"
+  "20261029160000_account_references_and_governance.sql",
+  "20261031110000_network_plus_business_discovery.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -55,6 +56,19 @@ const requiredColumns = [
   ["mentorship", "mentee_user_id", "uuid"],
   ["mentorship", "status", "text"],
   ["service_listing", "id", "uuid"],
+  ["network_plus_business", "id", "uuid"],
+  ["network_plus_business", "business_kind", "text"],
+  ["network_plus_business", "verification_status", "text"],
+  ["network_plus_business", "request_idempotency_hash", "text"],
+  ["network_plus_business_ownership", "business_id", "uuid"],
+  ["network_plus_business_ownership", "owner_user_id", "uuid"],
+  ["network_plus_business_ownership", "owner_organization_id", "uuid"],
+  ["network_plus_business_access", "capability_code", "text"],
+  ["network_plus_business_verification_case", "business_id", "uuid"],
+  ["network_plus_business_verification_evidence", "file_object_id", "uuid"],
+  ["network_plus_service_listing", "business_id", "uuid"],
+  ["network_plus_service_listing", "request_idempotency_hash", "text"],
+  ["network_plus_service_listing_event", "listing_id", "uuid"],
   ["service_request", "id", "uuid"],
   ["service_request_feedback", "request_id", "uuid"],
   ["service_request_feedback", "reviewer_user_id", "uuid"],
@@ -368,6 +382,11 @@ try {
     throw new Error("Mentorship mentee-consent check constraint is missing or has unexpected values.");
   }
   const requiredUniqueIndexes = [
+    "ux_network_plus_business_idempotency_hash",
+    "ux_network_plus_business_member_owner",
+    "ux_network_plus_business_org_owner",
+    "ux_network_plus_business_primary_owner",
+    "ux_network_plus_service_idempotency_hash",
     "ux_marketplace_demand_idempotency_hash",
     "ux_mentorship_request_idempotency_hash",
     "ux_service_request_idempotency_hash",

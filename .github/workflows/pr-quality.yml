@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - ux/p0-navigation-and-org-privacy
+      - feat/workstream-3-progress-members-workspace
       - feat/serve-community-impact-workflows
       - feat/serve-community-g5-reconciled
       - feat/serve-community-g6-reconciled
@@ -17,7 +18,6 @@ on:
       - feat/serve-community-g5-reconciled
       - feat/serve-community-g6-reconciled
       - feat/serve-community-g7-acceptance
-      - feat/workstream-3-progress-members-workspace
   workflow_dispatch:
 
 permissions:

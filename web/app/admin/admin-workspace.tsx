@@ -23,6 +23,7 @@ const destinations: Destination[] = [
   { href: "/admin/membership-card", label: "Membership card", description: "Credential appearance", icon: ShieldCheck },
   { href: "/admin/reference-portfolio", label: "Reference data", description: "Governed profile options", icon: BookOpenCheck },
   { href: "/admin/marketplace", label: "Serve-Community review", description: "Demand and listing review", icon: ClipboardList },
+  { href: "/admin/serve-community/offline-projects", label: "Completed projects", description: "Record and review completed offline community projects", icon: ClipboardList },
   { href: "/organizations", label: "Organizations", description: "Verification, evidence and partner workspace", icon: Building2 },
   { href: "/admin/reports", label: "Reports", description: "Reporting and exports", icon: FileBarChart },
   { href: "/admin/email", label: "Email operations", description: "Queues, templates and delivery", icon: Mail },
@@ -74,6 +75,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     const financeAccess = Boolean(financeOfficer || permissions.some((permission) => ["finance.view", "finance.payment.verify", "finance.payment.reverse", "finance.manage"].includes(permission)));
     const financeConfig = Boolean(financeOfficer || permissions.includes("finance.manage"));
     const supportStaff = Boolean(roles?.includes("supporting_staff"));
+    const offlineProjectAccess = Boolean(supportStaff || permissions.includes("serve_community.projects.manage"));
     if (platformAdmin) return destinations;
     return destinations.filter((item) => {
       if (["/admin/accounts", "/admin/account-governance", "/admin/experience", "/admin/members", "/admin/members/catalog", "/admin/membership-card", "/admin/reference-portfolio"].includes(item.href)) return false;
@@ -83,6 +85,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
       if (item.href === "/admin/reports") return reportIds.length > 0;
       if (item.href === "/admin/organizations") return roles?.some((role) => ["reviewer", "organization_admin"].includes(role)) === true;
       if (item.href === "/admin/marketplace") return membershipReviewer || supportStaff;
+      if (item.href === "/admin/serve-community/offline-projects") return offlineProjectAccess;
       if (item.href === "/admin/support") return supportStaff || roles?.includes("reviewer") === true;
       if (item.href === "/admin/security" || item.href === "/admin/email") return false;
       return false;

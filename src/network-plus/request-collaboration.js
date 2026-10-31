@@ -139,7 +139,7 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
     if(to==="clarification_requested"&&!input.reason)fail(400,"A clarification reason is required.","REASON_REQUIRED");
     if(to==="declined"&&!input.reason)fail(400,"A decline reason is required.","REASON_REQUIRED");
     if(to==="disputed"&&!input.reason)fail(400,"A dispute reason is required.","REASON_REQUIRED");
-    if(to==="completed"&&!input.completionEvidence)fail(400,"Completion evidence or a documented not-applicable reason is required.","COMPLETION_EVIDENCE_REQUIRED");
+    if(to==="completed"&&(!Array.isArray(input.completionEvidence)||!input.completionEvidence.length||input.completionEvidence.some(value=>typeof value!=="string"||value.trim().length<5)))fail(400,"Provide completion evidence or a documented not-applicable reason.","COMPLETION_EVIDENCE_REQUIRED");
     if(to==="in_progress"&&row.status!=="accepted")fail(409,"Only an accepted engagement can start.","ACCEPTANCE_REQUIRED");
     const updated=(await db.query(`update network_plus_request set status=$1,submitted_at=case when $1='submitted' then coalesce(submitted_at,now()) else submitted_at end,
       accepted_at=case when $1='accepted' then now() else accepted_at end,declined_at=case when $1='declined' then now() else declined_at end,
@@ -147,7 +147,7 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
       disputed_at=case when $1='disputed' then now() else disputed_at end,closed_at=case when $1='closed' then now() else closed_at end,
       version=version+1,updated_at=now() where id=$2 returning *`,[to,requestId])).rows[0];
     await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version},idempotencyHash,requestFingerprint);
-    if(["disputed","completed","closed"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to; await db.query("update network_plus_collaboration_workspace set status=$1,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId]); }
+    if(["disputed","completed","closed"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to; await db.query("update network_plus_collaboration_workspace 0",[nextWorkspaceStatus,requestId,"completed","closed"]); }
     if(to==="accepted") {
       if(row.recipient_user_id && row.recipient_user_id!==userId)fail(403,"Only the intended recipient may accept this request.","RECIPIENT_AUTHORITY_REQUIRED");
       if(row.recipient_user_id) { const currentMember=(await db.query("select 1 from membership_record where user_id=$1 and status=$2 and start_date<=current_date and (end_date is null or end_date>=current_date)",[userId,"active"])).rowCount>0; if(!currentMember)fail(403,"The intended recipient must retain active membership to accept.","RECIPIENT_AUTHORITY_REQUIRED"); }

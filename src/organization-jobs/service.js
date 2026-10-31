@@ -1,4 +1,5 @@
 import { getPool, withTransaction } from "../platform/db.js";
+import * as memberReferrals from "../platform/member-referrals.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
 import { assertOrganizationCapability } from "../platform/identity-policy.js";
 import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
@@ -486,6 +487,7 @@ export async function submitApplication(applicationId,userId,input={},requestId)
   const snapshot=await safeProfileSnapshot(db,userId);
   const updated=(await db.query("update job_application set status='submitted',cover_letter=coalesce($1,cover_letter),profile_snapshot=$2,eligibility_snapshot=$3,submitted_at=now(),updated_at=now() where id=$4 returning *",[input.coverLetter??null,snapshot,eligibility,applicationId])).rows[0];
   await db.query("insert into job_application_event(application_id,actor_user_id,from_status,to_status,note) values($1,$2,'draft','submitted',$3)",[applicationId,userId,input.note||null]);
+  await memberReferrals.captureEmploymentApplication(db,a.job_id,userId,applicationId,input.referralCode||a.referral_code);
   await audit(db,userId,"job.application_submitted","job_application",applicationId,requestId,{jobId:a.job_id});
   await queueWorkflowEmail(db,userId,"professional.workflow_update",{notificationEventCode:"job.application_submitted",category:"recruitment",title:"Application submitted",message:`Your application for ${a.job_title||"the role"} was submitted.`,status:"submitted",jobTitle:a.job_title||"job application",nextAction:"Monitor the application timeline for employer updates.",actionUrl:"/track",registrationReference:updated.tracking_reference||""},"job_application",applicationId);
   const employers=(await db.query("select om.user_id from organization_membership om join app_user u on u.id=om.user_id where om.organization_id=$1 and om.status='active' and u.status='active' and om.role_code=any($2::text[])",[a.organization_id,["owner","administrator","recruiter"]])).rows;
@@ -507,6 +509,7 @@ export async function applyToJob(jobId,userId,input,requestId){
   const app=(await db.query("insert into job_application(job_id,applicant_user_id,tracking_reference,status,cover_letter,profile_snapshot,eligibility_snapshot,submitted_at) values($1,$2,$3,'submitted',$4,$5,$6,now()) returning *",[jobId,userId,trackingReference,input.coverLetter||null,snapshot,eligibility])).rows[0];
   await saveScreeningAnswers(db,app.id,jobId,input.answers||[]);
   await db.query("insert into job_application_event(application_id,actor_user_id,from_status,to_status,note) values($1,$2,null,'submitted',$3)",[app.id,userId,input.note||null]);
+  await memberReferrals.captureEmploymentApplication(db,jobId,userId,app.id,input.referralCode);
   await audit(db,userId,"job.application_submitted","job_application",app.id,requestId,{jobId});
   await queueWorkflowEmail(db,userId,"professional.workflow_update",{notificationEventCode:"job.application_submitted",category:"recruitment",title:"Application submitted",message:"Your application was submitted successfully.",status:"submitted",nextAction:"Monitor the application timeline for employer updates.",actionUrl:"/track",registrationReference:app.tracking_reference||""},"job_application",app.id);
   const jobDetails=(await db.query("select title,organization_id from job where id=$1",[jobId])).rows[0];
@@ -562,6 +565,7 @@ export async function updateCandidate(jobId,applicationId,userId,input,requestId
       [input.status,offerAmount,offerCurrency,input.offerTerms||null,offerApproval,applicationId]
     )).rows[0];
     await db.query("insert into job_application_event(application_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,$4,$5)",[applicationId,userId,a.status,input.status,input.note||null]);
+    await memberReferrals.recordJobApplicationStage(db,applicationId,input.status,userId);
     await audit(db,userId,"job.candidate_status_changed","job_application",applicationId,requestId,{from:a.status,to:input.status});
     if(input.status==="offer"&&offerApproval==="pending"){
       const approvers=(await db.query("select jtm.user_id from job_team_member jtm join app_user u on u.id=jtm.user_id where jtm.job_id=$1 and jtm.role_code='approver' and jtm.active=true and u.status='active'",[jobId])).rows;

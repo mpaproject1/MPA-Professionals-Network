@@ -108,7 +108,14 @@ async function assertBusinessOwner(db,businessId,userId,capability="business.man
   if(owned)return {business,owner:owned};
   const delegated=(await db.query(`select 1 from network_plus_business_access
     where business_id=$1 and user_id=$2 and capability_code=$3 and revoked_at is null
-      and (expires_at is null or expires_at>now()) limit 1`,[businessId,userId,capability])).rowCount>0;
+      and (expires_at is null or expires_at>now())
+      and (
+        exists(select 1 from network_plus_business_ownership bo join organization_membership om on om.organization_id=bo.owner_organization_id
+          where bo.business_id=$1 and bo.owner_type='organization' and bo.owner_role='primary_owner' and bo.status='active'
+            and om.user_id=$2 and om.status='active' and om.role_code='project_manager')
+        or (not exists(select 1 from network_plus_business_ownership bo where bo.business_id=$1 and bo.owner_type='organization' and bo.owner_role='primary_owner' and bo.status='active')
+          and exists(select 1 from membership_record mr where mr.user_id=$2 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date)))
+      ) limit 1`,[businessId,userId,capability])).rowCount>0;
   if(!delegated)fail(403,"An active owner or explicit business-scoped assignment is required.","BUSINESS_FORBIDDEN");
   return {business,owner:null};
 }
@@ -419,7 +426,7 @@ export async function grantBusinessAccess(businessId,userId,input,requestId) {
     if(!owner||owner.owner_role!=="primary_owner")fail(403,"Only an accountable primary owner can delegate business capabilities.","DELEGATION_FORBIDDEN");
     const target=(await db.query("select status from app_user where id=$1",[targetUserId])).rows[0];
     if(!target||target.status!=="active")fail(404,"The proposed manager account is unavailable.","TARGET_NOT_FOUND");
-    const orgId=business.business_kind==="organization"?(await db.query("select owner_organization_id from network_plus_business_ownership where business_id=$1 and owner_type='organization' and owner_role='primary_owner' and status='active'",[businessId])).rows[0]?.owner_organization_id:null;
+    const orgId=(await db.query("select owner_organization_id from network_plus_business_ownership where business_id=$1 and owner_type='organization' and owner_role='primary_owner' and status='active'",[businessId])).rows[0]?.owner_organization_id||null;
     if(orgId){
       const member=(await db.query("select role_code from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[orgId,targetUserId])).rows[0];
       if(!member||member.role_code!=="project_manager")fail(403,"Organization business delegation is limited to an active project manager of the owning organization.","TARGET_SCOPE_FORBIDDEN");

@@ -98,7 +98,7 @@ async function scoreClaim(tx,actorUserId,claimId,rationale,policy){
  if(candidateLink&&candidateLink.detection_status!=="detected")fail(409,"The linked detected source has been reversed and cannot be scored.","SCORE_SOURCE_REVERSED");
  if(candidateLink&&candidateLink.source_type==="initiative_participation"&&candidateLink.attribution_status!=="confirmed")fail(409,"Serve-Community participation attribution is not confirmed.","SCORE_ATTRIBUTION_UNCONFIRMED");
  if(candidateLink&&candidateLink.contributor_user_id&&candidateLink.contributor_user_id!==claim.claimant_user_id)fail(409,"The claim claimant does not match the verified source contributor.","SCORE_ATTRIBUTION_MISMATCH");
- if(candidateLink&&sourceLink&&["serve_community_participation","offline_completed_project"].includes(sourceLink.source_type)&&candidateLink.id!==sourceLink.source_record_id)fail(409,"The score source link does not match the claim's reconciled detected candidate.","SCORE_SOURCE_MISMATCH");
+ if(sourceLink&&["serve_community_participation","offline_completed_project"].includes(sourceLink.source_type)&&(!candidateLink||candidateLink.id!==sourceLink.source_record_id))fail(409,"The score source link no longer matches an exact claim-to-detection reconciliation.","SCORE_SOURCE_MISMATCH");
  const rubric=assessment.rubric||{},ratings=rubric.dimensions||rubric;
  const explanations=[];let weighted=0;
  for(const d of policy.policy.dimensions){

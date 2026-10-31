@@ -22,7 +22,7 @@ async function event(db,attribution,eventCode,fromStatus,toStatus,actor,metadata
  await db.query("insert into member_referral_event(attribution_id,actor_user_id,event_code,from_status,to_status,metadata) values($1,$2,$3,$4,$5,$6)",[attribution,eventCode,fromStatus,toStatus,actor||null,JSON.stringify(metadata)]);
  const policy=(await db.query("select id,points from member_referral_score_policy where status='active' limit 1")).rows[0];
  const points=Number(policy?.points?.[eventCode]??0);
- if(policy&&Number.isInteger(points)&&points>0)await db.query("insert into member_referral_score_ledger(attribution_id,event_code,points,policy_id) values($1,$2,$3,$4) on conflict do nothing",[attribution,eventCode,points,policy.id]);
+ if(policy&&Number.isInteger(points)&&points>=0)await db.query("insert into member_referral_score_ledger(attribution_id,event_code,points,policy_id) values($1,$2,$3,$4) on conflict(attribution_id,event_code) do nothing",[attribution,eventCode,points,policy.id]);
  const recipient=(await db.query("select referrer_user_id from member_referral_attribution where id=$1",[attribution])).rows[0];
  if(recipient)await queueWorkflowEmail(db,recipient.referrer_user_id,"professional.workflow_update",{notificationEventCode:"member.referral.progress",category:eventCode.startsWith("membership")||eventCode==="registered"?"membership":"recruitment",title:"Your referral has a progress update",status:toStatus,message:"Someone you invited has reached a new step. Their private details remain protected.",nextAction:"Open your referral dashboard to review the permitted status.",actionUrl:"/referrals"},"member_referral_attribution",attribution);
 

@@ -70,12 +70,20 @@ export async function recordJobApplicationStage(db,applicationId,status,actorUse
  const rows=(await db.query("select id,status from member_referral_attribution where referral_type='employment' and job_application_id=$1 for update",[applicationId])).rows;
  for(const row of rows){await db.query("update member_referral_attribution set status=$1,updated_at=now() where id=$2",[eventCode,row.id]);await event(db,row.id,eventCode,row.status,eventCode,actorUserId);}
 }
+export async function listMyCandidateReferrals(userId){
+ const db=getPool();
+ const rows=(await db.query(`select a.id,a.status,a.created_at,a.candidate_consent_at,j.title job_title,j.id job_id
+ from member_referral_attribution a join job j on j.id=a.job_id
+ where a.referral_type='employment' and a.referred_user_id=$1 order by a.created_at desc limit 100`,[userId])).rows;
+ return {items:rows};
+}
 export async function confirmEmploymentOutcome(userId,attributionId,input={}){
  return withTransaction(async db=>{
   const row=(await db.query("select * from member_referral_attribution where id=$1 and referral_type='employment' for update",[attributionId])).rows[0];
   if(!row)fail(404,"Referral record not found.","NOT_FOUND");
   if(row.referred_user_id!==userId)fail(403,"Only the referred candidate can confirm this outcome.","FORBIDDEN");
   if(row.status==="employment_verified")fail(409,"This employment outcome has already been verified.","ALREADY_VERIFIED");
+  if(row.status!=="employment_reported")fail(409,"The employer must first record a hired outcome before you can confirm it.","EMPLOYER_OUTCOME_REQUIRED");
   if(row.candidate_consent_at)fail(409,"Your employment outcome confirmation has already been submitted for review.","CONFIRMATION_ALREADY_SUBMITTED");
   if(!input.consent)fail(400,"Confirm consent before asking MPA to verify this employment outcome.","CONSENT_REQUIRED");
   const reason=String(input.summary||"").trim();if(reason.length<20||reason.length>1000)fail(400,"Provide a short employment outcome summary (20–1000 characters).","VALIDATION_ERROR");

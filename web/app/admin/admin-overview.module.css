@@ -9,3 +9,18 @@
 @media(max-width:700px){.welcome{padding:18px;border-radius:17px}.moduleGrid{grid-template-columns:minmax(0,1fr)}.moduleCard{padding:14px}.roleChips{justify-content:flex-start}.sectionHeader{align-items:flex-start}}
 @media(max-width:420px){.metrics{grid-template-columns:minmax(0,1fr)}.metric{grid-template-columns:minmax(0,1fr) auto;align-items:center}.metric small{grid-column:1/-1}.moduleCard{grid-template-columns:38px minmax(0,1fr) 14px;gap:10px}.moduleIcon{width:38px;height:38px}}
 @media(prefers-reduced-motion:reduce){.moduleCard{transition:none}.moduleCard:hover{transform:none}}
+
+
+/* Calm overview: open layout, restrained surfaces and consistent touch targets */
+.welcome{gap:28px;padding:clamp(22px,3vw,34px);border-radius:18px;background:var(--surface);box-shadow:none}
+.welcomeCopy h2{font-weight:600;line-height:1.2;margin-bottom:13px}
+.welcomeCopy p{line-height:1.75}
+.searchWrap{gap:9px}
+.searchBox{min-height:46px;border-radius:11px;background:var(--surface)}
+.moduleGrid{gap:14px}
+.moduleCard{padding:18px;border-radius:14px;border-color:var(--border);box-shadow:none;transition:border-color .16s ease,background-color .16s ease}
+.moduleCard:hover{transform:none;box-shadow:none;background:var(--surface-raised);border-color:var(--border-strong)}
+.moduleCopy strong{font-weight:600;line-height:1.4}
+.moduleCopy>span{line-height:1.65}
+.moduleCopy small,.kicker{font-weight:600;letter-spacing:.08em}
+@media(max-width:700px){.welcome{padding:20px;gap:20px}.moduleGrid{gap:12px}.moduleCard{padding:16px}}

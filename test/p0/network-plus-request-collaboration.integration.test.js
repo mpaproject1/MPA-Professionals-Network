@@ -1,0 +1,78 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import test from "node:test";
+import * as membership from "../../src/membership/service.js";
+import * as talent from "../../src/talent/service.js";
+import * as verification from "../../src/verification/service.js";
+import { closePool, getPool } from "../../src/platform/db.js";
+import * as requests from "../../src/network-plus/request-collaboration.js";
+
+function accountInput(label) {
+  const suffix=randomUUID(),digits=suffix.replace(/\D/g,"").slice(0,8).padEnd(8,"7");
+  return {email:`np-request-${label}-${suffix}@example.test`,password:"NetworkPlusRequestPassword!2026",firstName:"Network",lastName:`Request${label}`,phone:`09${digits}`,accountType:"professional"};
+}
+async function register(label){return membership.register(accountInput(label),`np-request-register-${label}-${randomUUID()}`);}
+async function setMembership(userId,endDate="current_date+365"){
+ const db=getPool(),product=(await db.query("select id from membership_product where product_code='BASIC'")).rows[0];
+ assert.ok(product);
+ await db.query(`insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source) values($1,$2,$3,'active',current_date,${endDate},'online')`,[userId,""+product.id,"MPA-NPR-"+randomUUID().slice(0,12).toUpperCase()]);
+}
+async function verifiedRecipient(label,reviewerId){
+ const db=getPool(),account=await register(label);await setMembership(account.user.id);
+ await talent.updateProfessionalProfile(account.user.id,{professionalTitle:"Verified Network-Plus professional",visibility:"members",directorySummary:"Synthetic verified professional for request lifecycle tests."},`np-profile-${randomUUID()}`);
+ await talent.updateVisibility(account.user.id,{directoryVisible:true,showIdentityBadge:true,showProfessionalBadge:true,showExperienceBadge:false,showLocation:false,showExperience:false,showContact:false},`np-visibility-${randomUUID()}`);
+ const program=(await db.query("select program_code from verification_program where active=true order by program_code limit 1")).rows[0];
+ const verificationCase=await verification.createCase(account.user.id,program.program_code,account.user.id,`np-case-${randomUUID()}`);
+ if(verificationCase.status==="consent_pending")await verification.giveConsent(verificationCase.id,account.user.id,"network-plus-request-test-v1",`np-consent-${randomUUID()}`);
+ await db.query("update verification_case set assigned_reviewer_id=$1 where id=$2",[reviewerId,verificationCase.id]);
+ await verification.transitionCase(verificationCase.id,"review",reviewerId,`np-review-${randomUUID()}`);
+ await db.query("insert into verification_claim_type(claim_code,name,description,active) values('SERVICE_CAPABILITY','Service capability','Request lifecycle test capability.',true) on conflict(claim_code) do update set active=true");
+ const claim=await verification.addClaim(verificationCase.id,"SERVICE_CAPABILITY",{capability:"Verified service capability"},account.user.id,`np-claim-${randomUUID()}`);
+ await verification.addEvidence(verificationCase.id,{claimId:claim.id,evidenceType:"supporting_document",sourceType:"member",sourceName:"Synthetic evidence",sourceReference:`np-ref-${randomUUID()}`,notes:"Synthetic test evidence."},account.user.id,`np-evidence-${randomUUID()}`);
+ await verification.setClaimStatus(claim.id,"verified",reviewerId,`np-verify-${randomUUID()}`,verificationCase.id);
+ return account;
+}
+test("Network-Plus requests require recipient acceptance, create participant-only workspaces, notify participants and replay safely",async t=>{
+ if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
+ const db=getPool(),suffix=randomUUID().replace(/-/g,"");
+ const reviewer=await register("reviewer-"+suffix);
+ const reviewerRole=(await db.query("select id from app_role where role_code='verification_reviewer'")).rows[0];
+ assert.ok(reviewerRole);
+ await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing",[reviewer.user.id,reviewerRole.id]);
+ const requester=await register("requester-"+suffix);await setMembership(requester.user.id);
+ const recipient=await verifiedRecipient("recipient-"+suffix,reviewer.user.id);
+ const outsider=await register("outsider-"+suffix);await setMembership(outsider.user.id);
+ const idempotencyKey=randomUUID()+randomUUID(),requestRef=`np-request-${randomUUID()}`;
+ const draft=await requests.createNetworkPlusRequest(requester.user.id,{
+   intent:"service_request",recipientUserId:recipient.user.id,subject:"Accessibility review",summary:"Please review our public website accessibility.",
+   details:{context:"Public website"},terms:{scope:"Review public pages against WCAG AA.",deliverables:["Prioritized audit report"],pricing:{proposal:"Quotation requested"},schedule:{requested:"To be agreed"}}
+ },requestRef,idempotencyKey);
+ assert.equal(draft.status,"draft");
+ await assert.rejects(()=>requests.getNetworkPlusWorkspace(draft.id,requester.user.id),e=>e.code==="NOT_FOUND");
+ const submitted=await requests.submitNetworkPlusRequest(draft.id,requester.user.id,requestRef,randomUUID()+randomUUID());
+ assert.equal(submitted.status,"submitted");
+ const recipientInbox=await requests.listNetworkPlusRequests(recipient.user.id);
+ assert.ok(recipientInbox.some(row=>row.id===draft.id));
+ const decisionKey=randomUUID()+randomUUID();
+ const accepted=await requests.transitionNetworkPlusRequest(draft.id,recipient.user.id,{status:"accepted"},requestRef,decisionKey);
+ assert.equal(accepted.status,"accepted");
+ const replay=await requests.transitionNetworkPlusRequest(draft.id,recipient.user.id,{status:"accepted"},requestRef,decisionKey);
+ assert.equal(replay.status,"accepted");
+ await assert.rejects(()=>requests.transitionNetworkPlusRequest(draft.id,recipient.user.id,{status:"declined"},requestRef,decisionKey),e=>e.code==="IDEMPOTENCY_CONFLICT");
+ const requesterWorkspace=await requests.getNetworkPlusWorkspace(draft.id,requester.user.id);
+ const recipientWorkspace=await requests.getNetworkPlusWorkspace(draft.id,recipient.user.id);
+ assert.equal(requesterWorkspace.workspace.id,recipientWorkspace.workspace.id);
+ const milestone=await requests.addNetworkPlusWorkspaceMilestone(draft.id,requester.user.id,{title:"Complete accessibility audit"});
+ assert.equal(milestone.status,"not_started");
+ await requests.updateNetworkPlusWorkspaceMilestone(draft.id,milestone.id,recipient.user.id,{status:"in_progress"},requestRef);
+ await requests.addNetworkPlusWorkspaceEvent(draft.id,recipient.user.id,{eventType:"blocker",title:"Content dependency",body:"Waiting for approved content samples."},requestRef);
+ const refreshed=await requests.getNetworkPlusWorkspace(draft.id,requester.user.id);
+ assert.equal(refreshed.milestones[0].status,"in_progress");
+ assert.ok(refreshed.events.some(event=>event.event_type==="blocker"));
+ assert.deepEqual(await requests.listNetworkPlusRequests(outsider.user.id),[]);
+ await assert.rejects(()=>requests.getNetworkPlusRequest(draft.id,outsider.user.id),e=>e.code==="NOT_FOUND");
+ const notices=await db.query("select user_id,event_code from notification_event where resource_type='network_plus_request' and resource_id=$1",[draft.id]);
+ assert.ok(notices.rows.some(row=>row.user_id===recipient.user.id&&row.event_code==="network_plus.request.submitted"));
+ assert.ok(notices.rows.some(row=>row.user_id===requester.user.id&&row.event_code==="network_plus.request.accepted"));
+ await db.query("delete from app_user_role where user_id=$1 and role_id=$2",[reviewer.user.id,reviewerRole.id]);
+});

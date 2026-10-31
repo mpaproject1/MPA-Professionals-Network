@@ -258,7 +258,10 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const participants=(await db.query("select user_id,participant_role,consent_status,consented_at from network_plus_request_participant where request_id=$1 and consent_status<>'revoked'",[requestId])).rows;
     const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 order by created_at",[requestId])).rows;
     const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;
-    return { ...row, participants, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative:participants.some(p=>p.user_id===userId&&p.participant_role==="recipient_representative"&&p.consent_status!=="revoked") };
+    const isRecipientRepresentative=participants.some(p=>p.user_id===userId&&p.participant_role==="recipient_representative"&&p.consent_status!=="revoked");
+    const canReview=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.respond_requests")||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));
+    const canAccept=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));
+    return { ...row, participants, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative, canReview, canAccept };
   });
 }
 export async function addNetworkPlusRequestParticipant(requestId,userId,input,requestIdHeader) {

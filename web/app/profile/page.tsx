@@ -495,6 +495,11 @@ export default function Profile() {
             <a href="#notification-preferences">Notifications</a>
             <a href="#account-preferences">Account preferences</a>
           </nav>
+          <section className={styles.completionCard} aria-labelledby={`${profileId}-completion-title`}>
+            <div className={styles.completionHeading}><div><div className="eyebrow">Your progress</div><h2 id={`${profileId}-completion-title`}>Profile completion</h2></div><strong>{profile ? `${Math.max(0,Math.min(100,Number(profile.completion_percent)||0))}%` : loading ? "Loading…" : "Not available"}</strong></div>
+            {profile ? <progress className={styles.completionTrack} max={100} value={Math.max(0,Math.min(100,Number(profile.completion_percent)||0))} aria-label={`Profile ${Math.max(0,Math.min(100,Number(profile.completion_percent)||0))}% complete`} /> : <div className={styles.completionUnavailable} role="status">Profile completion is shown when your account record has loaded.</div>}
+            <p>Complete the relevant profile details at your own pace. Saving your profile does not change verification or directory eligibility.</p>
+          </section>
           <Card>
             <div className="eyebrow">Membership application references</div><p className="muted">Use these display references when contacting MPA Support Desk. Internal record IDs are never shown as a fallback.</p>{membershipReferencesError&&<p className="muted" role="status">{membershipReferencesError}</p>}{membershipApplications.length===0&&!membershipReferencesError?<p className="muted">No membership applications are currently available for this account.</p>:membershipApplications.map(app=><div className="row" key={app.id} style={{justifyContent:"space-between",flexWrap:"wrap",padding:"8px 0",borderBottom:"1px solid var(--border)"}}><div><b>{app.tracking_reference||"Reference not assigned yet"}</b><div className="muted">{(app.application_type||"membership").replaceAll("_"," ")} · {app.status.replaceAll("_"," ")}</div></div>{app.tracking_reference&&<button type="button" className="btn btn-ghost" onClick={()=>void copyDisplayReference(app.tracking_reference||"")}><ClipboardCopy size={15}/> Copy reference</button>}</div>)}{copyNotice&&<p className="muted" role="status" aria-live="polite">{copyNotice}</p>}
           </Card>

@@ -92,7 +92,7 @@ Migration rehearsal:
 npm run check:migrations:rollback
 ```
 
-The new UI contract test covers member identity assurance, private upload integration, contributor confirmation, administrator operations, independent approval, reviewer eligibility checks and rollback inventory assertions.
+The new UI contract test covers member identity assurance, private upload integration, contributor confirmation, administrator operations, independent approval, reviewer eligibility checks and rollback inventory assertions. A database-backed authorization test now exercises the service permission gates for identity review, attribution, detection policy, reconciliation, conflict, assessment, second review and retention operations. The existing private-file integration suite continues to exercise owner/reviewer-scoped file access; the new source-contract test additionally checks the identity/offline-attribution reviewer scopes.
 
 ## 5. Validation status and acceptance gate
 
@@ -104,9 +104,9 @@ Before marking the increment fully accepted, record evidence for all of the foll
 - [ ] `npm test` passes.
 - [ ] `npm run web:build` passes with strict TypeScript checking.
 - [ ] Disposable PostgreSQL rehearsal passes against a named disposable database; capture migration and rollback output.
-- [ ] Runtime authorization tests prove unprivileged users cannot read queues, decide cases, assign reviewers, approve policies, reconcile claims or access another person's private evidence.
-- [ ] Concurrency test proves two simultaneous attribution proposals cannot allocate more than 100% of one candidate's share.
-- [ ] Private-file integration tests prove owners and authorized reviewers can read evidence while unrelated users cannot.
+- [ ] Run the database-backed authorization test and capture a passing result for unprivileged access denial.
+- [ ] Add/run a database-backed concurrent attribution test proving two simultaneous proposals cannot allocate more than 100% of one candidate's share. The service currently serializes proposals by locking the candidate row before summing committed/pending shares; a static contract assertion covers this ordering.
+- [ ] Run private-file integration tests and add a dedicated runtime case for identity-assurance and offline-attribution reviewer access (the generic private-file isolation test and new source-contract checks are not a substitute for this targeted case).
 - [ ] Manual UI walkthrough confirms responsive layout, empty/error/loading states, evidence upload, contributor confirmation, independent review and audit trail.
 - [ ] CI results are checked on the target branch after the final commit.
 

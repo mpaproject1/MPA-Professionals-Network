@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,sourceMigration,service,server,member,admin,governance,checker,rubricMigration]=await Promise.all([
+const [migration,sourceMigration,service,server,member,admin,governance,checker,rubricMigration,assessmentPolicyMigration]=await Promise.all([
  read("../../db/migrations/20261101110000_community_impact_unified_score.sql"),
  read("../../db/migrations/20261101120000_community_impact_score_source_adapters.sql"),
  read("../../src/platform/community-impact-score.js"),
@@ -11,7 +11,8 @@ const [migration,sourceMigration,service,server,member,admin,governance,checker,
  read("../../web/app/admin/community-impact/scoring/page.tsx"),
  read("../../web/app/admin/community-impact/governance/page.tsx"),
  read("../../scripts/check-new-migration-compatibility.js"),
- read("../../db/migrations/20261101160000_community_impact_score_policy_rubric_config.sql")
+ read("../../db/migrations/20261101160000_community_impact_score_policy_rubric_config.sql"),
+ read("../../db/migrations/20261101170000_community_impact_assessment_score_policy.sql")
 ]);
 test("Initial active evaluation policy matches the approved five-dimension baseline and is not public",()=>{
  assert.match(migration,/"weight":30/);assert.match(migration,/"weight":25/);assert.match(migration,/"weight":20/);assert.match(migration,/"weight":15/);assert.match(migration,/"weight":10/);
@@ -41,7 +42,7 @@ test("Source adapters require authoritative verified source lifecycle and claima
  assert.match(service,/SCORE_ATTRIBUTION_MISMATCH/);
 });
 test("Scoring uses reviewer-assessed dimensions, policy weights, configured caps and role factors",()=>{
- assert.match(service,/assessment\.rubric/);assert.match(service,/weighted\+=normalized\*Number\(d\.weight\)\/100/);
+ assert.match(service,/assessment\.rubric/);assert.match(service,/SCORE_ASSESSMENT_POLICY_MISMATCH/);assert.match(assessmentPolicyMigration,/score_policy_version_id/);assert.match(service,/weighted\+=normalized\*Number\(d\.weight\)\/100/);
  assert.match(service,/calc\.roleFactors/);assert.match(service,/calc\.categoryCaps/);assert.match(service,/calc\.sourceCaps/);assert.match(service,/calc\.periodCaps/);assert.match(service,/calc\.diminishingReturns/);assert.match(service,/calc\.evidenceQualityRank/);assert.match(service,/calc\.outcomeMaturityRank/);assert.match(service,/calc\.rounding/);assert.match(service,/for update/);
  assert.match(governance,/measurable_community_outcomes/);
  assert.match(governance,/collaboration_knowledge_sharing/);
@@ -66,4 +67,5 @@ test("Member score view is private and administrator score operations are separa
  assert.match(checker,/20261101110000_community_impact_unified_score\.sql/);
  assert.match(checker,/20261101120000_community_impact_score_source_adapters\.sql/);
  assert.match(checker,/20261101160000_community_impact_score_policy_rubric_config\.sql/);
+ assert.match(checker,/20261101170000_community_impact_assessment_score_policy\.sql/);
 });

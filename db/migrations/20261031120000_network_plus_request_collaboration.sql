@@ -143,3 +143,18 @@ create trigger trg_network_plus_workspace_requires_acceptance
 insert into app_role(role_code,name,description) values
   ('network_plus_support','Network-Plus Support','Read-only, case-scoped support access to private Network-Plus requests; requires a support case reference and audit reason.')
 on conflict(role_code) do update set name=excluded.name,description=excluded.description;
+
+-- Request and collaboration event streams are append-only. Corrections are new events.
+create or replace function prevent_network_plus_history_mutation() returns trigger language plpgsql as $$
+begin
+  raise exception 'Network-Plus lifecycle history is append-only'
+    using errcode='55000';
+end $$;
+drop trigger if exists trg_network_plus_request_event_immutable on network_plus_request_event;
+create trigger trg_network_plus_request_event_immutable
+  before update or delete on network_plus_request_event
+  for each row execute function prevent_network_plus_history_mutation();
+drop trigger if exists trg_network_plus_collaboration_event_immutable on network_plus_collaboration_event;
+create trigger trg_network_plus_collaboration_event_immutable
+  before update or delete on network_plus_collaboration_event
+  for each row execute function prevent_network_plus_history_mutation();

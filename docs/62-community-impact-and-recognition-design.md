@@ -889,6 +889,7 @@ Admin scan and queue access require system_admin or the explicit system-only com
 - [x] Approved offline-project event detection without guessed individual attribution.
 - [x] Event-driven candidate creation plus bounded backfill/reconciliation endpoint.
 - [x] Idempotent source-event key and replay-safe insert semantics.
+- [x] Reconciliation marks candidates source_reversed when the authoritative source no longer meets the original policy; source provenance is immutable.
 - [x] Private own-candidate API, confirmation and dispute actions with audit history.
 - [x] Scoped admin scan/queue permission; no broad reviewer role inheritance.
 - [ ] Execute migration compatibility check against a disposable PostgreSQL database.

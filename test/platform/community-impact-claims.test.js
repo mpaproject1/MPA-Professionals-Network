@@ -31,6 +31,9 @@ test("Increment 3 creates separate private claim, evidence, assignment, decision
  assert.match(migration,/beneficiary_count_method/);
  assert.match(migration,/sustained_impact_summary/);
  assert.match(migration,/location_summary/);
+ assert.match(migration,/community_impact_claim_consent/);
+ assert.match(migration,/consent_text_hash text not null/);
+ assert.match(migration,/consent history is immutable/i);
  assert.match(migration,/evidence_url text/);
  assert.match(migration,/video/);
  assert.match(migration,/url/);
@@ -58,6 +61,9 @@ test("claimants can create, edit, submit, attach private evidence, clarify, with
  assert.match(service,/safeEvidenceUrl/);
  assert.match(service,/host.endsWith/);
  assert.match(service,/COMMUNITY_IMPACT_CLAIM_PUBLIC_CONSENT_REQUIRED/);
+ assert.match(service,/PUBLIC_CONSENT_VERSION/);
+ assert.match(service,/MEDIA_RIGHTS_VERSION/);
+ assert.match(service,/consentChanges/);
 });
 test("review and appeal actions require assignment, separate permissions and independent decision-makers",()=>{
  assert.match(service,/community_impact\.claim\.review/);

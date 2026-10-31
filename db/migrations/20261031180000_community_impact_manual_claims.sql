@@ -93,6 +93,8 @@ create table if not exists community_impact_claim_appeal (
  decision_rationale text,
  retention_policy_version_id uuid not null references community_impact_retention_policy_version(id) on delete restrict,
  retention_rule_snapshot jsonb not null check(jsonb_typeof(retention_rule_snapshot)='object'),
+ decision_retention_policy_version_id uuid references community_impact_retention_policy_version(id) on delete restrict,
+ decision_retention_rule_snapshot jsonb check(decision_retention_rule_snapshot is null or jsonb_typeof(decision_retention_rule_snapshot)='object'),
  decided_at timestamptz,
  created_at timestamptz not null default now(),
  updated_at timestamptz not null default now(),

@@ -56,7 +56,7 @@ async function audit(db,requestId,actor,event,from,to,requestIdHeader,metadata={
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'network_plus_request',$3,$4,'success',$5)",[actor,event,requestId,requestIdHeader||null,metadata]);
 }
 function canTransition(intent,from,to,actorRole) {
-  if(["in_progress","completed"].includes(to)&&!["service_request","supplier_inquiry","partnership_proposal","collaboration_request"].includes(intent))return false;
+  if(["in_progress","completed"].includes(to)&&!["service_request","supplier_inquiry","expertise_request","partnership_proposal","collaboration_request"].includes(intent))return false;
   const map={
     draft:["submitted","withdrawn"],
     submitted:["under_review","clarification_requested","accepted","declined","withdrawn"],
@@ -156,7 +156,7 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
         if(!currentRep)fail(403,"Only a current active owner or administrator of the recipient organization may accept.","RECIPIENT_AUTHORITY_REQUIRED");
       }
       await db.query("update network_plus_request_participant set consent_status='accepted',consented_at=now() where request_id=$1 and user_id=$2 and participant_role='recipient_representative'",[requestId,userId]);
-      if(!["service_request","supplier_inquiry","partnership_proposal","collaboration_request"].includes(row.intent)) {
+      if(!["service_request","supplier_inquiry","expertise_request","partnership_proposal","collaboration_request"].includes(row.intent)) {
         // Accepted referral/expertise requests are recorded as accepted without a project workspace.
       } else {
         const t=row.terms||{};

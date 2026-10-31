@@ -155,13 +155,13 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
     }
   }
   if(f.purpose==="community_impact_claim_evidence"){
-    const impactEvidence=await db.query(`select c.claimant_user_id,
+    const impactEvidence=await db.query(`select c.claimant_user_id,e.removed_at,
       exists(select 1 from community_impact_claim_assignment a where a.claim_id=c.id and a.reviewer_user_id=$2 and a.active=true) as assigned_reviewer,
       exists(select 1 from community_impact_claim_appeal ap where ap.claim_id=c.id and ap.assigned_reviewer_id=$2 and ap.status='under_review') as assigned_appeal_reviewer
       from community_impact_claim_evidence e join community_impact_claim c on c.id=e.claim_id
-      where e.file_object_id=$1 and e.removed_at is null limit 1`,[fileId,userId]);
+      where e.file_object_id=$1 limit 1`,[fileId,userId]);
     const claimAccess=impactEvidence.rows[0];
-    allowed=Boolean(claimAccess&&(claimAccess.claimant_user_id===userId||claimAccess.assigned_reviewer||claimAccess.assigned_appeal_reviewer));
+    allowed=Boolean(claimAccess&&(claimAccess.claimant_user_id===userId||(!claimAccess.removed_at&&(claimAccess.assigned_reviewer||claimAccess.assigned_appeal_reviewer))));
   }
   if(!allowed) throw fail(403,"You do not have permission to read this private file.","FORBIDDEN");
   const {readFile}=await import("node:fs/promises");

@@ -33,7 +33,7 @@ test("offline projects create unattributed candidates instead of assigning the w
 });
 test("candidate ingestion is replay-safe and contributor confirmation/dispute is auditable",()=>{
  assert.match(service,/on conflict\(source_system,source_type,source_event_id\) do nothing/);
- assert.match(service,/attribution_confirmed/);assert.match(service,/attribution_disputed/);assert.match(service,/reconcileCandidateReversals/);assert.match(service,/source_reversed/);
+ assert.match(service,/attribution_confirmed/);assert.match(service,/attribution_disputed/);assert.match(service,/reconcileCandidateReversals/);assert.match(service,/reconcileCandidateReversals\(tx,limit\)/);assert.match(service,/not exists\(select 1 from community_impact_detection_candidate/);assert.match(service,/order by c\.created_at limit \$1/);assert.match(service,/source_reversed/);
  assert.match(migration,/community_impact_detection_candidate_event/);
 });
 test("private candidate and scan APIs are authenticated and scoped",()=>{

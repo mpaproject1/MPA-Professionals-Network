@@ -8,7 +8,7 @@ import { useUiStore } from "../../../lib/store";
 type Intent = "service_request"|"supplier_inquiry"|"referral"|"expertise_request"|"partnership_proposal"|"collaboration_request";
 type Participant = {user_id:string;participant_role:string;consent_status:string};
 type Workspace = {id:string;purpose:string;scope:string;status:string};
-type RequestRow = {id:string;intent:Intent;status:string;subject:string;summary:string;requester_user_id:string;recipient_user_id?:string|null;recipient_organization_id?:string|null;participants?:Participant[];terms?:Record<string,any>;workspace?:Workspace|null;events?:any[]};
+type RequestRow = {isRequester?:boolean;isRecipientRepresentative?:boolean;id:string;intent:Intent;status:string;subject:string;summary:string;requester_user_id:string;recipient_user_id?:string|null;recipient_organization_id?:string|null;participants?:Participant[];terms?:Record<string,any>;workspace?:Workspace|null;events?:any[]};
 const intents: {value:Intent;label:string;description:string}[] = [
  {value:"service_request",label:"Service request",description:"Ask a business to deliver a defined professional service."},
  {value:"supplier_inquiry",label:"Supplier inquiry",description:"Ask about supplying goods, materials or professional capacity."},
@@ -25,7 +25,7 @@ export default function NetworkPlusRequestsPage(){
  const token=useUiStore(s=>s.token);
  const [items,setItems]=useState<RequestRow[]>([]);
  const [selectedId,setSelectedId]=useState("");
- const [selected,setSelected]=useState<RequestRow|null>(null);
+ const [selected,setSelected]=useState<RequestRow|null>(null);\n const [workspaceData,setWorkspaceData]=useState<any>(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false);
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const [intent,setIntent]=useState<Intent>("service_request");
@@ -51,7 +51,7 @@ export default function NetworkPlusRequestsPage(){
   catch(e){setError(e instanceof ApiError?e.message:"This request could not be opened.");}
  },[token]);
  useEffect(()=>{void load();},[load]);
- useEffect(()=>{if(selectedId)void loadDetail(selectedId);else setSelected(null);},[selectedId,loadDetail]);
+ useEffect(()=>{if(selectedId)void loadDetail(selectedId);else {setSelected(null);setWorkspaceData(null);}},[selectedId,loadDetail]);\n useEffect(()=>{if(selected?.workspace&&token)void api<any>("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/workspace",{},token).then(setWorkspaceData).catch(()=>setWorkspaceData(null));else setWorkspaceData(null);},[selected?.id,selected?.workspace?.id,token]);
  const currentIntent=useMemo(()=>intents.find(v=>v.value===intent),[intent]);
 
  async function createDraft(e:React.FormEvent){
@@ -89,7 +89,7 @@ export default function NetworkPlusRequestsPage(){
   finally{setSaving(false);}
  }
  const myParticipant=selected?.participants?.find(p=>p.consent_status!=="revoked"&&p.participant_role!=="additional_participant");
- const canAccept=selected?.status==="submitted"||selected?.status==="under_review"||selected?.status==="clarification_requested";
+ const canAccept=selected?.isRecipientRepresentative&&(selected?.status==="submitted"||selected?.status==="under_review"||selected?.status==="clarification_requested");
  const recipientPending=selected?.participants?.some(p=>p.participant_role==="recipient_representative"&&p.consent_status==="pending");
 
  return <NetworkPlusAccessGuard><main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6">
@@ -131,14 +131,14 @@ export default function NetworkPlusRequestsPage(){
     </div>
     {selected&&<section className="card grid gap-4" aria-live="polite">
      <div><div className="eyebrow">{label(selected.intent)}</div><h2 className="h2">{selected.subject}</h2><p className="muted">{selected.summary}</p><p className="mt-2 text-sm font-semibold">Status: {label(selected.status)}</p></div>
-     {selected.status==="draft"&&selected.requester_user_id===useUiStore.getState?.()?.user?.id&&<button className="btn btn-primary w-fit" disabled={saving} onClick={()=>void action("/submit")}>Submit request</button>}
+     {selected.status==="draft"&&selected.isRequester&&<button className="btn btn-primary w-fit" disabled={saving} onClick={()=>void action("/submit")}>Submit request</button>}
      {canAccept&&recipientPending&&<div className="flex flex-wrap gap-2"><button className="btn btn-primary" disabled={saving} onClick={()=>void action("/transitions",{status:"accepted"})}>Explicitly accept request</button><button className="btn btn-secondary" disabled={saving} onClick={()=>void action("/transitions",{status:"declined",reason:"The recipient declined this request."})}>Decline</button></div>}
      {selected.status==="draft"&&<p className="muted text-sm">This is a private draft. It has not been sent to the recipient.</p>}
      {selected.status==="submitted"&&<p className="muted text-sm">Awaiting the recipient’s explicit decision. No agreement or workspace exists yet.</p>}
      {selected.workspace&&<div className="grid gap-3 border-t pt-4"><div><h3 className="h2">Collaboration workspace</h3><p className="muted text-sm">Created after recipient acceptance. {selected.workspace.purpose}</p></div>
       <form className="grid gap-2" onSubmit={e=>{e.preventDefault();void addMilestone();}}><h4 className="font-semibold">Add milestone</h4><input className="input" required value={milestoneTitle} onChange={e=>setMilestoneTitle(e.target.value)} placeholder="Milestone title"/><input className="input" type="date" value={milestoneDue} onChange={e=>setMilestoneDue(e.target.value)}/><button className="btn btn-secondary w-fit" disabled={saving}>Add milestone</button></form>
       <form className="grid gap-2" onSubmit={e=>{e.preventDefault();void workspaceEvent();}}><h4 className="font-semibold">Record collaboration update</h4><select className="input" value={updateType} onChange={e=>setUpdateType(e.target.value)}><option value="update">Progress update</option><option value="blocker">Blocker</option><option value="decision">Decision</option><option value="outcome">Outcome</option></select><input className="input" required value={updateTitle} onChange={e=>setUpdateTitle(e.target.value)} placeholder="Update title"/><textarea className="input min-h-20" required value={updateBody} onChange={e=>setUpdateBody(e.target.value)} placeholder="Describe the update"/><button className="btn btn-secondary w-fit" disabled={saving}>Save update</button></form>
-      <ul className="grid gap-2">{(selected.events||[]).map((event:any,i)=><li key={i} className="rounded-lg border p-3"><strong>{label(event.event_code||event.event_type||"Update")}</strong><p className="text-sm">{event.body||event.reason||""}</p></li>)}</ul>
+      <ul className="grid gap-2">{(workspaceData?.milestones||[]).map((milestone:any)=><li key={milestone.id} className="rounded-lg border p-3"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{milestone.title}</strong><span className="text-xs">{label(milestone.status)}</span></div><p className="muted text-xs">{milestone.due_at?new Date(milestone.due_at).toLocaleDateString():"No due date"}</p><select className="input mt-2" aria-label={"Update "+milestone.title+" status"} value={milestone.status} onChange={async e=>{try{await api("/api/v1/network-plus/requests/"+selected.id+"/workspace/milestones/"+milestone.id,{method:"PATCH",body:JSON.stringify({status:e.target.value})},token);await loadDetail(selected.id);}catch(err){setError(err instanceof ApiError?err.message:"Milestone update failed.");}}}><option value="not_started">Not started</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></li>)}{(workspaceData?.events||[]).map((event:any,i)=><li key={i} className="rounded-lg border p-3"><strong>{label(event.event_type||"Update")}: {event.title}</strong><p className="text-sm">{event.body}</p></li>)}</ul>
      </div>}
      <div className="border-t pt-3"><h3 className="font-semibold">Request history</h3><ol className="mt-2 grid gap-2">{(selected.events||[]).map((event:any,i)=><li key={i} className="text-sm"><span className="font-medium">{label(event.event_code)}</span> <span className="muted">{event.to_status? "→ "+label(event.to_status):""}</span></li>)}</ol></div>
     </section>}

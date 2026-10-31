@@ -3,13 +3,14 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
-const [migration, service, server, compatibility, privateFiles, fixtureText] = await Promise.all([
+const [migration, service, server, compatibility, privateFiles, fixtureText, userAdmin] = await Promise.all([
   read("../../db/migrations/20261031110000_network_plus_business_discovery.sql"),
   read("../../src/network-plus/business-discovery.js"),
   read("../../server.js"),
   read("../../scripts/check-new-migration-compatibility.js"),
   read("../../src/platform/private-file-storage.js"),
   read("../fixtures/network-plus-business-discovery.json"),
+  read("../../src/platform/user-admin.js"),
 ]);
 
 test("Increment 5 adds a separate business domain without duplicating canonical identities or rewriting legacy services", () => {
@@ -115,4 +116,11 @@ test("disposable fixture templates cover all canonical ownership types and negat
   assert.ok(fixtures.negativeCases.includes("cross-organization-manager"));
   assert.ok(fixtures.negativeCases.includes("unconfirmed-private-evidence-file"));
   assert.equal(fixtures.serviceListing.audience,"both");
+});
+
+test("business reviewer roles remain privileged in the existing role governance catalogue", () => {
+  assert.match(userAdmin, /business_verification_reviewer/);
+  assert.match(userAdmin, /business_moderator/);
+  assert.match(userAdmin, /PRIVILEGED_ROLES/);
+  assert.match(userAdmin, /actorRoles\.includes\(SYSTEM_ROLE\)/);
 });

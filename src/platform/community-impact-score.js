@@ -23,6 +23,7 @@ function validatePolicy(policy){
  const actual=policy.dimensions.map(x=>x.key);if(keys.some(k=>!actual.includes(k))||new Set(actual).size!==5)fail(400,"All five approved score dimensions must be present exactly once.","SCORE_POLICY_INVALID");
  const sum=policy.dimensions.reduce((n,x)=>n+Number(x.weight),0);if(!Number.isFinite(sum)||Math.abs(sum-100)>0.0001)fail(400,"Score dimension weights must total exactly 100%.","SCORE_POLICY_INVALID");
  const calc=policy.calculation;if(!calc||!Number.isFinite(Number(calc.basePoints))||Number(calc.basePoints)<=0||!calc.roleFactors||!Array.isArray(calc.eligibleSourceTypes))fail(400,"Score policy calculation settings are incomplete.","SCORE_POLICY_INVALID");
+ if(!policy.publication||typeof policy.publication.enabled!=="boolean"||policy.publication.consentRequired!==true||Number(policy.publication.minimumGroupSize)<5)fail(400,"Publication policy must explicitly require consent and a minimum group size of at least five.","SCORE_POLICY_INVALID");
  for(const d of policy.dimensions){if(!Number.isFinite(Number(d.weight))||Number(d.weight)<0||!d.ratings||!Number.isFinite(Number(d.ratings.min))||!Number.isFinite(Number(d.ratings.max))||Number(d.ratings.max)<=Number(d.ratings.min))fail(400,"Each dimension needs a valid weight and rating range.","SCORE_POLICY_INVALID")}
  return policy;
 }
@@ -98,7 +99,7 @@ export async function activateScorePolicy(actor,id,rationale){
   const row=(await tx.query("select * from community_impact_score_policy_version where id=$1 for update",[id])).rows[0];if(!row||row.status!=="approved")fail(409,"Only an independently approved score policy can be activated.","INVALID_STATE");if(row.created_by===actor)fail(403,"The policy proposer cannot activate their own policy.","SELF_ACTIVATION");
   const active=(await tx.query("select policy_version_id from community_impact_score_active_policy where singleton=true for update")).rows[0];
   if(active)await tx.query("update community_impact_score_policy_version set status='superseded' where id=$1",[active.policy_version_id]);
-  await tx.query("update community_impact_score_policy_version set status='active' where id=$1",[id]);
+  await tx.query("update community_impact_score_policy_version set status='active',evaluation_only=case when policy->'publication'->>'enabled' = 'true' then false else true end,public_score_enabled=case when policy->'publication'->>'enabled' = 'true' then true else false end where id=$1",[id]);
   await tx.query("update community_impact_score_active_policy set policy_version_id=$1,activated_by=$2,activated_at=now() where singleton=true",[id,actor]);
   await tx.query("insert into community_impact_score_policy_event(policy_version_id,actor_user_id,event_code,rationale,metadata) values($1,$2,'activated',$3,$4)",[id,actor,why,{version:row.version}]);
   return {id,status:"active",version:row.version};

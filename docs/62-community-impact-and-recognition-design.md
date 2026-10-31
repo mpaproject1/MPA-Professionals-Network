@@ -1232,3 +1232,8 @@ Implementation and tests are committed, but Increment 5 is not accepted until al
 - [ ] CI is green on the target branch.
 
 No production migration, deployment, public score publication, permission assignment, merge, force-push or data deletion is authorized by this implementation record.
+
+
+## Increment 6 and 7 implementation record
+
+The implementation and operational contract for the member Community Impact workspace and recognition/engagement capabilities are recorded in [docs/65-community-impact-workspace-and-recognition.md](65-community-impact-workspace-and-recognition.md). The document records the member UI, consent-controlled profile awards, notification/reminder behavior, recognition program governance, API surface, permissions, migrations and validation gates. CI/runtime acceptance remains pending by design until the final workstream validation.

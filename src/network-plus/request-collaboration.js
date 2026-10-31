@@ -274,16 +274,20 @@ export async function updateNetworkPlusWorkspaceMilestone(requestId,milestoneId,
     return updated;
   });
 }
-export async function addNetworkPlusWorkspaceEvent(requestId,userId,input,requestIdHeader) {
+export async function addNetworkPlusWorkspaceEvent(requestId,userId,input,requestIdHeader,idempotencyKey) {
   const eventType=input?.eventType;
   if(!["update","blocker","decision","outcome"].includes(eventType))fail(400,"Unsupported collaboration update type.","VALIDATION_ERROR");
+  if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure idempotency key is required.","IDEMPOTENCY_KEY_REQUIRED");
   return withTransaction(async db=>{
     await assertEntry(db,userId);
     const ws=(await db.query("select id from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0];
     if(!ws)fail(404,"Accepted collaboration workspace not found.","NOT_FOUND");
     await workspaceAccess(db,ws.id,userId);
-    const title=clean(input.title,180,"Title",2), body=clean(input.body,4000,"Update",2);
-    const row=(await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body,metadata) values($1,$2,$3,$4,$5,$6) returning *",[ws.id,userId,eventType,title,body,object(input.metadata,"Metadata")])).rows[0];
+    const title=clean(input.title,180,"Title",2), body=clean(input.body,4000,"Update",2), metadata=object(input.metadata,"Metadata"); assertNoContactFields(metadata);
+    const keyHash=hash(idempotencyKey), fingerprint=hash(JSON.stringify({eventType,title,body,metadata}));
+    const prior=(await db.query("select * from network_plus_collaboration_event where workspace_id=$1 and actor_user_id=$2 and idempotency_hash=$3",[ws.id,userId,keyHash])).rows[0];
+    if(prior){if(prior.request_fingerprint!==fingerprint)fail(409,"This update key was used for different content.","IDEMPOTENCY_CONFLICT");return prior;}
+    const row=(await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body,metadata,idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[ws.id,userId,eventType,title,body,metadata,keyHash,fingerprint])).rows[0];
     await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'network_plus_collaboration_workspace',$3,$4,'success',$5)",[userId,`collaboration.${eventType}`,ws.id,requestIdHeader,{requestId}]);
     return row;
   });

@@ -24,7 +24,7 @@ async function event(db,attribution,eventCode,fromStatus,toStatus,actor,metadata
  const points=Number(policy?.points?.[eventCode]??0);
  if(policy&&Number.isInteger(points)&&points>0)await db.query("insert into member_referral_score_ledger(attribution_id,event_code,points,policy_id) values($1,$2,$3,$4) on conflict do nothing",[attribution,eventCode,points,policy.id]);
  const recipient=(await db.query("select referrer_user_id from member_referral_attribution where id=$1",[attribution])).rows[0];
- if(recipient)await queueWorkflowEmail(db,recipient.referrer_user_id,"professional.workflow_update",{notificationEventCode:"member.referral.progress",category:eventCode==="membership_activated"?"membership":"recruitment",title:"Your referral has a progress update",status:toStatus,message:"Someone you invited has reached a new step. Their private details remain protected.",nextAction:"Open your referral dashboard to review the permitted status.",actionUrl:"/referrals"},"member_referral_attribution",attribution);
+ if(recipient)await queueWorkflowEmail(db,recipient.referrer_user_id,"professional.workflow_update",{notificationEventCode:"member.referral.progress",category:eventCode.startsWith("membership")||eventCode==="registered"?"membership":"recruitment",title:"Your referral has a progress update",status:toStatus,message:"Someone you invited has reached a new step. Their private details remain protected.",nextAction:"Open your referral dashboard to review the permitted status.",actionUrl:"/referrals"},"member_referral_attribution",attribution);
 
 }
 export async function ensureMyReferralCode(userId){

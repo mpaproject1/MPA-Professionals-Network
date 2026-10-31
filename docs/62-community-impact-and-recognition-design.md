@@ -859,13 +859,13 @@ The initial policy versions are seeded as version 1 using the approved initial b
 - The participation completion transition invokes the participation adapter inside the existing source transaction.
 - Independent offline-project approval invokes the offline adapter inside its existing approval transaction.
 - Both adapters use ON CONFLICT (source_system, source_type, source_event_id) DO NOTHING; webhook/retry/reconciliation replay cannot create a second candidate for the same source event.
-- The protected admin reconciliation endpoint scans already-existing eligible source events to backfill candidates missed before the adapter was deployed or while a policy was disabled.
+- The protected admin reconciliation endpoint scans already-existing eligible source events to backfill candidates missed before the adapter was deployed or while a policy was disabled. It also compares each existing candidate against its original immutable policy version and marks it source_reversed, with append-only history, if the authoritative source event or lifecycle state is no longer eligible.
 - Candidate metadata retains policy version and adapter identifier. Source record IDs and event IDs are references; the source tables remain authoritative.
 - Detection is private and unverified. There is no score ledger write, public profile projection or automatic recognition.
 
 ### 2.4 Contributor confirmation and dispute
 
-A participant whose exact user ID is proposed by the source can list their own detected candidates and confirm or dispute the attribution. Confirmation rechecks the source participation, initiative state and exact source event before changing the attribution state. Disputes require a reason. Both actions append immutable candidate events and platform audit records.
+A participant whose exact user ID is proposed by the source can list their own detected candidates and confirm or dispute the attribution. Confirmation rechecks the source participation, initiative state and exact source event before changing the attribution state. Disputes require a reason. Both actions append immutable candidate events and platform audit records. Candidate source identity, event provenance, original category, proposed role, confidence and policy version are protected by a database guard; source reversals and attribution decisions are the only allowed candidate state changes.
 
 Confirmation only means “this is my participation record.” It does not certify outcome quality, prove a measurable impact, authorize public publication or award points. Disputed candidates remain excluded from later verification/scoring.
 

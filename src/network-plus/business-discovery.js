@@ -317,7 +317,7 @@ export async function moderateProfessionalServiceListing(listingId,userId,input,
 }
 export async function listBusinesses(viewerId,filters={}) {
   const db=getPool();await assertEntry(db,viewerId);
-  const args=[],where=["b.publication_status='published'","b.verification_status='verified'","b.moderation_status='approved'","(b.verification_expires_at is null or b.verification_expires_at>now())"];
+  const args=[],where=["b.publication_status='published'","b.verification_status='verified'","b.moderation_status='approved'","(b.verification_expires_at is null or b.verification_expires_at>now())", "not exists(select 1 from network_plus_business_ownership bo join organization o on o.id=bo.owner_organization_id where bo.business_id=b.id and bo.owner_type='organization' and bo.status='active' and bo.consent_status='accepted' and o.verification_status<>'verified')"];
   const q=String(filters.q||"").trim().slice(0,120);
   if(q){args.push(`%${q}%`);where.push(`(b.display_name ilike $${args.length} or coalesce(b.trading_name,'') ilike $${args.length} or b.description ilike $${args.length})`);}
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
@@ -331,7 +331,7 @@ export async function getBusiness(businessId,viewerId) {
   const db=getPool();const access=await assertEntry(db,viewerId);
   const row=(await db.query(`select b.id,b.business_kind,b.display_name,b.trading_name,b.description,b.website,b.location_label,b.verified_at,b.verification_expires_at,b.created_at
     from network_plus_business b where b.id=$1 and b.publication_status='published' and b.verification_status='verified'
-      and b.moderation_status='approved' and (b.verification_expires_at is null or b.verification_expires_at>now())`,[businessId])).rows[0];
+      and b.moderation_status='approved' and (b.verification_expires_at is null or b.verification_expires_at>now()) and not exists(select 1 from network_plus_business_ownership bo join organization o on o.id=bo.owner_organization_id where bo.business_id=b.id and bo.owner_type='organization' and bo.status='active' and bo.consent_status='accepted' and o.verification_status<>'verified')`,[businessId])).rows[0];
   if(!row)fail(404,"Published business profile not found.","NOT_FOUND");
   const services=(await db.query(`select id,title,summary,description,service_category,audience,delivery_mode,location_label,capacity,pricing_model,price_amount,currency,availability,credentials,published_at
     from network_plus_service_listing where business_id=$1 and status='published' and audience=any($2::text[]) order by published_at desc`,[businessId,visibleAudiences(access)])).rows;

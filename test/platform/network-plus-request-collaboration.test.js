@@ -33,6 +33,10 @@ test("request lifecycle requires explicit recipient authority and never creates 
  assert.match(service,/RECIPIENT_ACCEPTANCE_REQUIRED/);
  assert.match(service,/recipient_representative/);
  assert.match(service,/RECIPIENT_AUTHORITY_REQUIRED/);
+ assert.match(service,/hasBusinessAuthority/);
+ assert.match(service,/business.respond_requests/);
+ assert.match(service,/business.accept_terms/);
+ assert.match(service,/network_plus_business_ownership/);
  assert.match(service,/network_plus_request_participant set consent_status='accepted'/);
  assert.match(service,/if\(to==="accepted"\)/);
  assert.match(service,/insert into network_plus_collaboration_workspace/);
@@ -75,10 +79,13 @@ test("browser journey distinguishes draft, submission, recipient acceptance and 
  assert.match(ui,/Explicitly accept request/);
  assert.match(ui,/Submission is not a contract/);
  assert.match(ui,/Collaboration workspace/);
+ assert.match(ui,/Published business/);
+ assert.match(ui,/Find a verified member recipient/);
  assert.match(ui,/Request clarification/);
  assert.match(ui,/Withdraw request/);
  assert.match(e2e,/creates a draft without submitting/);
  assert.match(e2e,/only explicit recipient acceptance/);
+ assert.match(e2e,/canonical business ownership/);
  assert.match(e2e,/document\.documentElement\.scrollWidth<=window\.innerWidth/);
 });
 

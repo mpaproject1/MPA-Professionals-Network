@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,service,server,staffPage,publicPage,about,compatibility]=await Promise.all([
+const [migration,service,server,staffPage,publicPage,about,compatibility,adminWorkspace]=await Promise.all([
  read("../../db/migrations/20261031140000_serve_community_offline_completed_projects.sql"),
  read("../../src/platform/serve-community-offline-projects.js"),
  read("../../server.js"),
  read("../../web/app/admin/serve-community/offline-projects/page.tsx"),
  read("../../web/app/serve-community/page.tsx"),
  read("../../web/app/about/page.tsx"),
- read("../../scripts/check-new-migration-compatibility.js")
+ read("../../scripts/check-new-migration-compatibility.js"),\n read("../../web/app/admin/admin-workspace.tsx")
 ]);
 test("offline project storage is additive and distinct from platform participation",()=>{
  assert.match(migration,/create table if not exists serve_community_offline_project/i);
@@ -52,7 +52,7 @@ test("API exposes staff draft, update, submit, independent review and unified pu
 });
 test("staff UI defines required project, outcome, evidence and public-media fields",()=>{
  for(const field of ["title","category","summary","publicStory","completionDate","locationLabel","deliveryMode","activitySummary","outputSummary","beneficiaryCount","beneficiaryCountMethod","beneficiaryCountEvidence","outcomeMetrics","imageUrls","videoUrls","consentNote"])assert.ok(staffPage.includes(field),field);
- assert.match(staffPage,/Save as private draft/);assert.match(staffPage,/Submit for review/);assert.match(staffPage,/Approve & publish/);
+ assert.match(staffPage,/Save as private draft/);assert.match(staffPage,/Submit for review/);assert.match(staffPage,/Approve & publish/);assert.match(adminWorkspace,/Completed projects/);assert.match(adminWorkspace,/offlineProjectAccess/);assert.match(adminWorkspace,/supporting_staff/);
 });
 test("About and Serve-Community display approved offline stories and media without treating them as member participation",()=>{
  assert.match(publicPage,/imageUrls\?\.length/);assert.match(publicPage,/videoUrls\?\.length/);assert.match(publicPage,/beneficiaryCount/);

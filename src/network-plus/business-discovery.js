@@ -287,8 +287,7 @@ export async function submitProfessionalServiceListing(listingId,userId,requestI
     await assertBusinessPublishable(db,row.business_id);
     if(!["draft","changes_requested","rejected","paused"].includes(row.status))fail(409,"This listing is not ready for moderation submission.","INVALID_STATE");
     const updated=(await db.query("update network_plus_service_listing set status='pending_review',moderation_reason=null,submitted_by=$2,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
-    await db.query("insert into network_plus_service_listing_event(listing_id,actor_user_id,event_code,from_status,to_status,request_id) values($1,$2,'submitted_for_moderation',$3,'pending_review',$4)",[listingId,userId,row.status,requestId]);
-    await audit(db,userId,"network_plus.service_listing_submitted","network_plus_service_listing",listingId,requestId,{businessId:row.business_id});
+    await audit(db,userId,"network_plus.service_listing_submitted","network_plus_service_listing",listingId,requestId,{businessId:row.business_id,from:row.status,to:"pending_review"});
     const reviewers=(await db.query(`select distinct u.id from app_user u where u.status='active' and
       (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($1::text[]))
        or exists(select 1 from app_user_permission p where p.user_id=u.id and p.permission_code='business.moderate'))`,[LISTING_REVIEW_ROLES])).rows;
@@ -311,8 +310,7 @@ export async function moderateProfessionalServiceListing(listingId,userId,input,
       published_at=case when $1='published' then now() else published_at end,
       suspended_at=case when $1='suspended' then now() else null end,
       suspension_reason=case when $1='suspended' then $2 else null end,updated_at=now() where id=$4 returning *`,[status,reason,userId,listingId])).rows[0];
-    await db.query("insert into network_plus_service_listing_event(listing_id,actor_user_id,event_code,from_status,to_status,reason,request_id) values($1,$2,'moderation_decision',$3,$4,$5,$6)",[listingId,userId,row.status,status,reason,requestId]);
-    await audit(db,userId,"network_plus.service_listing_moderated","network_plus_service_listing",listingId,requestId,{status,reason,businessId:row.business_id});
+    await audit(db,userId,"network_plus.service_listing_moderated","network_plus_service_listing",listingId,requestId,{status,reason,businessId:row.business_id,from:row.status,to:status});
     await notifyOwners(db,row.business_id,"network_plus.service_listing_moderation_decided",{message:"A moderation decision was recorded for a professional service listing.",nextAction:status==="published"?"Your listing is now visible to eligible Network-Plus members.":"Review the moderation reason and update the listing if changes are requested.",actionUrl:"/network-plus/businesses/"+row.business_id,status,eventVersion:updated.updated_at});
     return updated;
   });

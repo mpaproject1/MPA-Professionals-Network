@@ -311,6 +311,7 @@ try {
   const requiredForeignKeys = [
     ["network_plus_business","created_by","app_user","id"],
     ["network_plus_business","verified_by","app_user","id"],
+    ["network_plus_business","moderation_submitted_by","app_user","id"],
     ["network_plus_business_ownership","business_id","network_plus_business","id"],
     ["network_plus_business_ownership","owner_user_id","app_user","id"],
     ["network_plus_business_ownership","owner_organization_id","organization","id"],
@@ -324,6 +325,7 @@ try {
     ["network_plus_business_verification_evidence","file_object_id","file_object","id"],
     ["network_plus_service_listing","business_id","network_plus_business","id"],
     ["network_plus_service_listing","created_by","app_user","id"],
+    ["network_plus_service_listing","submitted_by","app_user","id"],
     ["network_plus_service_listing_event","listing_id","network_plus_service_listing","id"],
     ["network_plus_service_listing_event","actor_user_id","app_user","id"],
     ["service_listing_lifecycle_event","listing_id","service_listing","id"],

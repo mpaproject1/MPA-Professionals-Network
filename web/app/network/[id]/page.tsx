@@ -7,7 +7,7 @@ import {Badge, Card} from "../../../components/ui";
 import {ApiError, api} from "../../../lib/api";
 import {useSavedDiscoveryItems} from "../../../lib/use-saved-discovery-items";
 
-type Profile={user_id:string;display_name:string;professional_title?:string|null;headline?:string|null;bio?:string|null;directory_summary?:string|null;years_experience?:number|null;location_label?:string|null;availability_status?:string|null;verifiedClaims?:{claim_code:string}[];experience?:{id:string;role_title:string;employer_name?:string|null;description?:string|null;start_date?:string|null;end_date?:string|null;is_current:boolean}[]};
+type Profile={user_id:string;publicAchievements?:{id:string;title:string;citation:string;awarded_at:string}[];display_name:string;professional_title?:string|null;headline?:string|null;bio?:string|null;directory_summary?:string|null;years_experience?:number|null;location_label?:string|null;availability_status?:string|null;verifiedClaims?:{claim_code:string}[];experience?:{id:string;role_title:string;employer_name?:string|null;description?:string|null;start_date?:string|null;end_date?:string|null;is_current:boolean}[]};
 export default function PublicProfessionalProfile(){
  const params=useParams<{id:string}>();const id=String(params.id||"");const saved=useSavedDiscoveryItems();
  const [item,setItem]=useState<Profile|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
@@ -22,6 +22,7 @@ export default function PublicProfessionalProfile(){
  {item.years_experience!==null&&item.years_experience!==undefined&&<p className="tagline">{item.years_experience} years of experience</p>}
  {item.availability_status&&<p className="tagline">Availability: {item.availability_status.replaceAll("_"," ")}</p>}
  {Array.isArray(item.verifiedClaims)&&item.verifiedClaims.length>0&&<div><h2 className="h2">Verified claims</h2><div className="row" style={{flexWrap:"wrap"}}>{item.verifiedClaims.map(claim=><Badge key={claim.claim_code}><ShieldCheck size={13}/>{claim.claim_code.replaceAll("_"," ")}</Badge>)}</div></div>}
+ {Array.isArray(item.publicAchievements)&&item.publicAchievements.length>0&&<div><h2 className="h2">Community achievements</h2><p className="muted">Achievements shown here were approved through MPA recognition review and explicitly shared by the recipient.</p>{item.publicAchievements.map(award=><div key={award.id} style={{padding:"12px 0",borderBottom:"1px solid var(--border, #d1d5db)"}}><strong>{award.title}</strong><p className="muted">{award.citation}</p><p className="muted text-xs">Recognized {new Date(award.awarded_at).toLocaleDateString()}</p></div>)}</div>}
  {Array.isArray(item.experience)&&item.experience.length>0&&<div><h2 className="h2">Experience</h2>{item.experience.map(role=><div key={role.id} style={{padding:"12px 0",borderBottom:"1px solid var(--border, #d1d5db)"}}><strong>{role.role_title}</strong>{role.employer_name&&<p className="muted">{role.employer_name}</p>}{role.description&&<p className="muted">{role.description}</p>}</div>)}</div>}
  <p className="muted">Contact details stay protected by the inquiry and explicit contact-release workflow.</p><Link className="btn btn-primary" href="/network">Open professional directory</Link>{saved.savedError&&<p aria-live="polite" aria-atomic="true" className="form-error">{saved.savedError}</p>}</Card>}
  </main>;

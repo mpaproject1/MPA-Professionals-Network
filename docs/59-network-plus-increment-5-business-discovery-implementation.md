@@ -95,7 +95,7 @@ Creation and search/submission routes use persistent rate limits. Creation route
 - Service audience is checked against the resolved Network-Plus member/organization access context.
 - Owner actions check current active ownership consent or a live, unrevoked, unexpired business capability assignment.
 - Organization owner/admin actions check an active `organization_membership` row for the exact owner organization.
-- Verification and moderation require independent reviewer roles or explicit `business.verify` / `business.moderate` permissions; self-review is rejected.
+- Verification requires the dedicated `business_verification_reviewer` role or explicit system-only `business.verify` permission; profile/listing moderation requires `business_moderator` or explicit system-only `business.moderate` permission. The additive migration registers these roles/capabilities but grants none to any user. Self-review is rejected.
 - Audit log entries, business/listing lifecycle events and in-app reviewer/owner notifications are written within the mutation transaction where implemented.
 
 ## 6. Migration, compatibility and rollback

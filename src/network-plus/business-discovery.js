@@ -66,6 +66,7 @@ function normalizeListingInput(input) {
   if(JSON.stringify(row.availability).length>8000)fail(400,"Availability details are too large.","VALIDATION_ERROR");
   return row;
 }
+function visibleAudiences(access) { return [...(access.access.member?["members"]:[]),...(access.access.organization?["organizations"]:[]),"both"]; }
 async function assertEntry(db,userId) {
   const access=await resolveNetworkPlusAccess(db,userId);
   if(!access.eligible)fail(403,"Network-Plus access is required.","NETWORK_PLUS_FORBIDDEN");
@@ -328,7 +329,7 @@ export async function getBusiness(businessId,viewerId) {
       and b.moderation_status='approved' and (b.verification_expires_at is null or b.verification_expires_at>now())`,[businessId])).rows[0];
   if(!row)fail(404,"Published business profile not found.","NOT_FOUND");
   const services=(await db.query(`select id,title,summary,description,service_category,audience,delivery_mode,location_label,capacity,pricing_model,price_amount,currency,availability,credentials,published_at
-    from network_plus_service_listing where business_id=$1 and status='published' and audience=any($2::text[]) order by published_at desc`,[businessId,access.access.member?["members","both"]:["organizations","both"]])).rows;
+    from network_plus_service_listing where business_id=$1 and status='published' and audience=any($2::text[]) order by published_at desc`,[businessId,visibleAudiences(access)])).rows;
   return {...row,services};
 }
 export async function listProfessionalServices(viewerId,filters={}) {

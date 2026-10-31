@@ -434,7 +434,9 @@ try {
     "ux_service_request_update_idempotency_hash",
     "ux_talent_inquiry_idempotency_hash",
     "ux_mentorship_match_one_open_request",
-    "ux_network_plus_request_idempotency"
+    "ux_network_plus_request_idempotency",
+    "ux_network_plus_request_event_idempotency",
+    "ux_network_plus_collaboration_event_idempotency"
   ];
   for (const name of requiredUniqueIndexes) {
     const row = (await client.query(

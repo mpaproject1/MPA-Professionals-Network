@@ -968,3 +968,40 @@ The remediation commits are source changes only. The latest branch revision must
 6. The build no longer depends on a successful external font download, or the font-download issue is independently shown not to block compilation.
 
 **Safety boundary:** No production migration, deployment, data mutation, permission assignment, merge or main-branch change was performed. Keep PR #18 in draft until all validation gates pass. Do not treat this remediation as proof of runtime or database acceptance.
+
+
+## CI root-cause audit and remediation — run 41211068657
+
+The run checked out `ebf506db9ddf5beb322b54ac7d17486dac5c58a2` on `feat/workstream-3-progress-members-workspace`.
+
+### Results and independent/dependent causes
+
+| Area | Observed result | Root cause and treatment |
+|---|---|---|
+| Disposable PostgreSQL legacy upgrade | Passed | The prior SQL delimiter repair is effective. |
+| Full migration application | Passed | No migration-application failure was reported. |
+| Rollback-only migration compatibility | Passed | No rollback-compatibility failure was reported. |
+| TypeScript | Failed | Three source defects: an untyped event-map index parameter in the Network-Plus request workspace, a missing optional `hasMore` field in the Serve-Community pagination response type, and a duplicate `CONSENT_REQUIRED` key in the client error map. Fixed the type declarations and removed the duplicate key without changing server authorization or consent enforcement. |
+| Biome lint | Failed | Five blocking diagnostics: import organization in `server.js` and `src/network-plus/business-discovery.js`, import/declaration spacing in two Serve-Community E2E specs, and the duplicate client error-map key. Targeted source formatting and duplicate-key repair applied; non-blocking warnings were not suppressed. |
+| Backend tests | 446 passed, 5 failed, 3 skipped (454 total) | All five failures were assertion drift or overly broad source-text matching, not PostgreSQL failures. The checks were updated to verify the current route boundary, the actual public projection, and the exact permission-seed statement while retaining privacy and authorization assertions. |
+| Next.js build | Failed during type validation after successful compilation | Dependent on the Network-Plus event-map index type error; no independent bundler or font-download failure was shown in this run. |
+
+### Backend test failures reconciled
+
+- The homepage pathway test expected the retired `/service-demand` route in the Serve-Community landing page. It now verifies the live completed-project API and the explicit Network-Plus boundary.
+- The role-workspace test expected the former Serve-Community page to link directly to commercial services, mentorship and demand routes. It now verifies the current separation: Serve-Community initiatives/completed projects remain distinct, Network-Plus is the commercial discovery boundary, and the existing services and private-demand workspaces remain independently available through their own routes.
+- The About-page test's member-claim detector treated the phrase `, members` as a numeric member claim because its character class allowed a comma as the first character. The detector now requires a digit before the optional thousands separators.
+- The Network-Plus public-projection test rejected `owner_organization_id` anywhere in the SQL text, including a private ownership join used only to suppress listings associated with unverified organizations. It now inspects the explicit selected projection for private fields and separately asserts that the eligibility filter remains present.
+- The Serve-Community migration test's `[^;]+` expression stopped at a semicolon inside the quoted permission description. It now checks the permission row on its own SQL line and retains the required `true,true` seed values.
+
+### Additional form behavior correction
+
+The two collaboration-workspace forms had submit handlers but their action buttons were marked `type="button"`, so clicking them did not submit the forms. They are now `type="submit"`. The event-list index parameter is explicitly typed. This restores the intended Add milestone and Save update actions rather than merely silencing the compiler.
+
+### Latest remediation revision and acceptance boundary
+
+The fixes were committed to the same branch, including the request-page type/form correction, pagination typing, duplicate-key removal, import organization, and the five focused backend-test reconciliations. Latest recorded commit at the time of this note: `cd2777099f9d675e8694d177ddc58a98804e4bb7`.
+
+No workflow run was returned for that latest revision when checked. Therefore TypeScript, Biome, backend tests, Next.js build, browser acceptance and PDF validation remain **unverified** until PR Quality runs against the latest branch head. The successful PostgreSQL checks above apply only to the earlier run's checked-out commit, not to the new commits.
+
+**Safety boundary:** No production database, production deployment, permission assignment, merge, or main-branch change was made. Keep the workstream unmerged and the PR in draft until the complete workflow passes against the latest commit.

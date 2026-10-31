@@ -1,5 +1,6 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
+import type {FormEvent} from "react";
 import Link from "next/link";
 import {api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
@@ -14,8 +15,8 @@ export default function OfflineCompletedProjectsPage(){
  useEffect(()=>{if(!hydrated)hydrateToken()},[hydrated,hydrateToken]);
  const load=useCallback(async()=>{if(!token)return;setLoading(true);setError("");try{const r=await api<{items:Project[]}>("/api/v1/admin/serve-community/offline-projects?limit=60",{},token);setItems(r.items||[])}catch(e){setError(e instanceof Error?e.message:"Could not load offline project records.")}finally{setLoading(false)}},[token]);
  useEffect(()=>{if(hydrated&&token)void load()},[hydrated,token,load]);
- const change=(key:keyof typeof initial,value:string|boolean)=>setForm(old=>({...old,[key]:value}));
- const save=async(e:React.FormEvent)=>{e.preventDefault();setSaving(true);setError("");setNotice("");let metrics;try{metrics=JSON.parse(form.outcomeMetrics||"[]");if(!Array.isArray(metrics))throw new Error("Outcome measures must be a JSON array.")}catch(e){setError(e instanceof Error?e.message:"Outcome measures are invalid.");setSaving(false);return}
+ const change=(key:keyof typeof initial,value:string|boolean)=>setForm(old=>({...old,[key]:value} as typeof initial));
+ const save=async(e:FormEvent)=>{e.preventDefault();setSaving(true);setError("");setNotice("");let metrics;try{metrics=JSON.parse(form.outcomeMetrics||"[]");if(!Array.isArray(metrics))throw new Error("Outcome measures must be a JSON array.")}catch(e){setError(e instanceof Error?e.message:"Outcome measures are invalid.");setSaving(false);return}
  const imageUrls=lines(form.imageUrls),imageAltText=lines(form.imageAltText);if(imageUrls.length!==imageAltText.length){setError("Add one image description (alt text) per image URL, in the same order.");setSaving(false);return}
  const payload={...form,beneficiaryCount:form.beneficiaryCount===""?null:Number(form.beneficiaryCount),imageUrls,imageAltText,videoUrls:lines(form.videoUrls),outcomeMetrics:metrics};
  try{await api(editingId?"/api/v1/admin/serve-community/offline-projects/"+editingId:"/api/v1/admin/serve-community/offline-projects",{method:editingId?"PATCH":"POST",body:JSON.stringify(payload)},token);setForm(initial);setEditingId(null);setNotice("Offline project saved as a private draft. It is not public until independently approved.");await load()}catch(e){setError(e instanceof Error?e.message:"The project could not be saved.")}finally{setSaving(false)}};

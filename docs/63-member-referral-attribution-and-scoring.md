@@ -26,6 +26,11 @@ A shared referral service supports two distinct processes: membership acquisitio
 - Supported event keys: membership application submitted, membership approved, membership activated, shortlisted, interview, offer accepted and employment verified.
 - MPA should ordinarily reserve substantive employment-impact recognition for independently verified outcomes. Registration by itself cannot earn points. Values remain an MPA governance decision.
 
+## Retention governance
+- Referral codes, attribution rows and milestone events capture a snapshot of the currently active MPA-approved referral-attribution retention rule when one exists. Referral score ledger entries capture the active score-ledger retention rule.
+- The adjustable retention-policy editor now includes referral attribution records; referral attribution and score-ledger records cannot be configured for hard deletion.
+- If no applicable retention policy is active, the snapshot remains null; no retention duration is hard-coded. Automated expiry/deletion/anonymization remains disabled until the separate retention processor, legal-hold, backup-expiry and deletion-verification release gate is implemented.
+
 ## Privacy, authorization and audit
 - Referral codes are tied to active memberships. Schema supports suspension/revocation states.
 - Referrers never receive private evidence, payment details, application documents, employer contacts or candidate contact information.

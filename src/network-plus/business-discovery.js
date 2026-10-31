@@ -403,7 +403,7 @@ export async function addBusinessOwner(businessId,userId,input,requestId) {
       const target=(await db.query("select status from app_user where id=$1",[ownerUserId])).rows[0];
       if(!target||target.status!=="active"||!(await hasCurrentActiveMembership(db,ownerUserId))||!(await hasProfessionalIdentity(db,ownerUserId)))fail(409,"The proposed member co-owner must be an active account with current professional membership.","OWNER_NOT_ELIGIBLE");
       if(ownerUserId===userId)fail(409,"The primary owner is already recorded.","DUPLICATE_OWNER");
-    }else await assertOrganizationCapability(db,organizationId,userId,ORG_OWNER_ROLES);
+    }else if(!(await db.query("select 1 from organization where id=$1",[organizationId])).rowCount)fail(404,"The proposed co-owner organization was not found.","OWNER_ORGANIZATION_NOT_FOUND");
     const exists=(await db.query("select 1 from network_plus_business_ownership where business_id=$1 and status in ('pending','active') and ((owner_type='member' and owner_user_id=$2) or (owner_type='organization' and owner_organization_id=$3))",[businessId,ownerUserId,organizationId])).rowCount;
     if(exists)fail(409,"This owner party is already associated with the business.","DUPLICATE_OWNER");
     const row=(await db.query("insert into network_plus_business_ownership(business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,created_by) values($1,$2,$3,$4,'co_owner','pending','pending',$5) on conflict do nothing returning id,business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,created_at",[businessId,ownerType,ownerUserId,organizationId,userId])).rows[0];

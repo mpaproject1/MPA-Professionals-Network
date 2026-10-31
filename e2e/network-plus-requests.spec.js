@@ -75,4 +75,31 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     await expect(page.getByRole("heading",{name:"Collaboration workspace"})).toBeVisible();
     await expect(page.getByText(/Created after recipient acceptance/i)).toBeVisible();
   });
+  test("routes a business proposal through canonical business ownership without exposing owner identifiers",async({page})=>{
+    await mockSession(page);
+    await page.route("**/api/v1/network-plus/businesses?*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[{id:"business-1",display_name:"Verified Design Cooperative",business_kind:"cooperative"}]}})}));
+    let payload=null;
+    await page.route("**/api/v1/network-plus/requests",async route=>{
+      if(route.request().method()==="POST"){payload=route.request().postDataJSON();await route.fulfill({status:201,contentType:"application/json",body:JSON.stringify({data:{...draft,intent:"partnership_proposal"}})});}
+      else await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[]})});
+    });
+    await page.goto("/network-plus/requests");
+    await page.getByLabel("Request type").selectOption("partnership_proposal");
+    await page.getByLabel("Published business").selectOption("business-1");
+    await page.getByLabel("Subject").fill("Community technology partnership");
+    await page.getByLabel("Request summary").fill("Propose a structured technology partnership for community services.");
+    await page.getByLabel("Purpose").fill("Expand access to reliable digital services.");
+    await page.getByLabel("Scope").fill("Plan and deliver a defined pilot programme.");
+    await page.getByLabel("Contributions (one per line)").fill("Provide technical expertise");
+    await page.getByLabel("Responsibilities (one per line)").fill("Coordinate delivery");
+    await page.getByLabel("Outputs (one per line)").fill("Pilot programme and outcome report");
+    await page.getByLabel("Timeline").fill("Three-month pilot");
+    await page.getByLabel("Authorized representatives (one per line)").fill("Authorized project representative");
+    await page.getByRole("button",{name:"Save draft"}).click();
+    await expect.poll(()=>payload?.businessId).toBe("business-1");
+    expect(payload.recipientUserId).toBeUndefined();
+    expect(payload.recipientOrganizationId).toBeUndefined();
+    expect(payload.terms.authorizedRepresentatives).toContain("Authorized project representative");
+  });
+
 });

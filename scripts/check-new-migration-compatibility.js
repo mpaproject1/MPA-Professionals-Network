@@ -47,7 +47,8 @@ const migrationNames = [
   "20261101090000_community_impact_governance_completion.sql",
   "20261101110000_community_impact_unified_score.sql",
   "20261101120000_community_impact_score_source_adapters.sql",
-  "20261101130000_community_impact_score_history_guards.sql"
+  "20261101130000_community_impact_score_history_guards.sql",
+  "20261101140000_community_impact_score_policy_transition_guard.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [

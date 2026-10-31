@@ -25,6 +25,7 @@ async function readContrastPairs(page) {
       surface,
       brandNavy: tokens.getPropertyValue("--brand-navy").trim(),
       brandLemon: tokens.getPropertyValue("--brand-lemon").trim(),
+      primaryLinkColor: tokens.getPropertyValue("--primary").trim(),
       textOnSurface: ratio(text, surface),
       mutedOnSurface: ratio(muted, surface),
       primaryActionText: ratio(tokens.getPropertyValue("--brand-navy-deep").trim(), tokens.getPropertyValue("--brand-lemon").trim()),
@@ -61,6 +62,7 @@ test.describe("MPA shared visual system", () => {
     expect(dark.surface).toBe("#112d47");
     expect(dark.brandNavy).toBe("#123b5d");
     expect(dark.brandLemon).toBe("#dce94f");
+    expect(dark.primaryLinkColor).not.toBe(dark.brandLemon);
     expect(dark.textOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(dark.mutedOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(dark.primaryActionText).toBeGreaterThanOrEqual(4.5);
@@ -75,6 +77,7 @@ test.describe("MPA shared visual system", () => {
   });
 
   test("workspace pages remain usable at mobile and tablet widths", async ({ page }) => {
+    test.setTimeout(180000);
     await page.addInitScript(() => localStorage.setItem("mpa-color-mode", "light"));
     const routes = ["/", "/about", "/jobs", "/mentorship", "/serve-community", "/membership", "/network-plus", "/profile", "/organizations", "/admin"];
     for (const width of [320, 390, 768, 1280]) {

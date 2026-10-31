@@ -6,7 +6,7 @@ import {useUiStore} from "../../lib/store";
 
 type ReferralItem={id:string;referral_type:"membership"|"employment";status:string;created_at:string;job_id?:string|null;job_title?:string|null;referred_person:string};
 type Dashboard={code:{code:string;status:string;shareUrl:string};counts:{referral_type:string;status:string;count:number}[];items:ReferralItem[];score:number;scoringActive:boolean};
-const labels:Record<string,string>={registered:"Registered",membership_activated:"Active member",application_submitted:"Application submitted",shortlisted:"Shortlisted",interview:"Interview",offer_accepted:"Offer accepted",employment_reported:"Outcome awaiting review",employment_verified:"Employment verified",declined:"Declined",withdrawn:"Withdrawn",disputed:"Under review"};
+const labels:Record<string,string>={registered:"Registered",membership_application_submitted:"Membership application submitted",membership_approved:"Membership approved",membership_declined:"Membership declined",membership_activated:"Active member",application_submitted:"Application submitted",shortlisted:"Shortlisted",interview:"Interview",offer_accepted:"Offer accepted",employment_reported:"Outcome awaiting review",employment_verified:"Employment verified",declined:"Declined",withdrawn:"Withdrawn",disputed:"Under review"};
 export default function ReferralsPage(){
  const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated),hydrateToken=useUiStore(s=>s.hydrateToken);
  const [data,setData]=useState<Dashboard|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[notice,setNotice]=useState("");

@@ -69,6 +69,7 @@ function normalizeListingInput(input) {
 async function assertEntry(db,userId) {
   const access=await resolveNetworkPlusAccess(db,userId);
   if(!access.eligible)fail(403,"Network-Plus access is required.","NETWORK_PLUS_FORBIDDEN");
+  return access;
 }
 async function rolesFor(db,userId) {
   return (await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId])).rows.map(r=>r.role_code);
@@ -305,23 +306,24 @@ export async function listBusinesses(viewerId,filters={}) {
   return {items:items.slice(0,limit),limit,offset,total,hasMore:offset+limit<total};
 }
 export async function getBusiness(businessId,viewerId) {
-  const db=getPool();await assertEntry(db,viewerId);
+  const db=getPool();const access=await assertEntry(db,viewerId);
   const row=(await db.query(`select b.id,b.business_kind,b.display_name,b.trading_name,b.description,b.website,b.location_label,b.verified_at,b.verification_expires_at,b.created_at
     from network_plus_business b where b.id=$1 and b.publication_status='published' and b.verification_status='verified'
       and b.moderation_status='approved' and (b.verification_expires_at is null or b.verification_expires_at>now())`,[businessId])).rows[0];
   if(!row)fail(404,"Published business profile not found.","NOT_FOUND");
   const services=(await db.query(`select id,title,summary,description,service_category,audience,delivery_mode,location_label,capacity,pricing_model,price_amount,currency,availability,credentials,published_at
-    from network_plus_service_listing where business_id=$1 and status='published' order by published_at desc`,[businessId])).rows;
+    from network_plus_service_listing where business_id=$1 and status='published' and audience=any($2::text[]) order by published_at desc`,[businessId,access.access.member?["members","both"]:["organizations","both"]])).rows;
   return {...row,services};
 }
 export async function listProfessionalServices(viewerId,filters={}) {
-  const db=getPool();await assertEntry(db,viewerId);
+  const db=getPool();const access=await assertEntry(db,viewerId);
   const args=[],where=["s.status='published'","b.publication_status='published'","b.verification_status='verified'","b.moderation_status='approved'","(b.verification_expires_at is null or b.verification_expires_at>now())"];
   const q=String(filters.q||"").trim().slice(0,120);
   if(q){args.push(`%${q}%`);where.push(`(s.title ilike $${args.length} or s.summary ilike $${args.length} or s.description ilike $${args.length} or b.display_name ilike $${args.length})`);}
   const category=String(filters.category||"").trim().toLowerCase();
   if(category){args.push(category);where.push(`s.service_category=$${args.length}`);}
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
+  args.push(access.access.member?["members","both"]:["organizations","both"]);where.push("s.audience=any($"+args.length+"::text[])");
   const base=` from network_plus_service_listing s join network_plus_business b on b.id=s.business_id where ${where.join(" and ")}`;
   const total=Number((await db.query(`select count(*)::int count${base}`,args)).rows[0]?.count||0);
   const items=(await db.query(`select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.service_category,s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.published_at
@@ -329,11 +331,11 @@ export async function listProfessionalServices(viewerId,filters={}) {
   return {items:items.slice(0,limit),limit,offset,total,hasMore:offset+limit<total};
 }
 export async function getProfessionalService(listingId,viewerId) {
-  const db=getPool();await assertEntry(db,viewerId);
+  const db=getPool();const access=await assertEntry(db,viewerId);
   const row=(await db.query(`select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.description,s.service_category,s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.availability,s.credentials,s.published_at
     from network_plus_service_listing s join network_plus_business b on b.id=s.business_id
-    where s.id=$1 and s.status='published' and b.publication_status='published' and b.verification_status='verified' and b.moderation_status='approved'
-      and (b.verification_expires_at is null or b.verification_expires_at>now())`,[listingId])).rows[0];
+    where s.id=$1 and s.audience=any($2::text[]) and s.status='published' and b.publication_status='published' and b.verification_status='verified' and b.moderation_status='approved'
+      and (b.verification_expires_at is null or b.verification_expires_at>now())`,[listingId,access.access.member?["members","both"]:["organizations","both"]])).rows[0];
   if(!row)fail(404,"Published professional service not found.","NOT_FOUND");
   return row;
 }

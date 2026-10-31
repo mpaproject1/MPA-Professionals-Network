@@ -24,7 +24,7 @@ function validatePolicy(input){
   const action=String(item.expiryAction||"");
   const start=String(item.retentionStart||"");
   if(!EXPIRY_ACTIONS.has(action))fail(400,"Choose a supported expiry action for "+key+".","COMMUNITY_IMPACT_RETENTION_INVALID");
-  if(["audit_events","score_ledger","claim_metadata","reviewer_notes","consent_and_rights_records","referral_attribution_records"].includes(key)&&action==="hard_delete")fail(400,"Claim history, reviewer decisions, consent records, audit history and score-ledger provenance cannot be hard-deleted; choose anonymization or minimal retention.","COMMUNITY_IMPACT_RETENTION_AUDIT_PRESERVATION");
+  if(["audit_events","score_ledger","claim_metadata","reviewer_notes","consent_and_rights_records","referral_attribution_records"].includes(key)&&action==="hard_delete")fail(400,"Claim history, referral attribution, reviewer decisions, consent records, audit history and score-ledger provenance cannot be hard-deleted; choose anonymization or minimal retention.","COMMUNITY_IMPACT_RETENTION_AUDIT_PRESERVATION");
   if(!RETENTION_STARTS.has(start))fail(400,"Choose a supported retention start event for "+key+".","COMMUNITY_IMPACT_RETENTION_INVALID");
   dataClasses[key]={retentionDays:integer(item.retentionDays,1,Number.MAX_SAFE_INTEGER,key+" retentionDays"),graceDays:integer(item.graceDays,0,Number.MAX_SAFE_INTEGER,key+" graceDays"),retentionStart:start,expiryAction:action,legalHoldBehavior:"pause_and_preserve"};
  }

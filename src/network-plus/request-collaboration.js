@@ -82,7 +82,7 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
     await assertEntry(db,userId);
     await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[`network-plus-request:${userId}:${hash(idempotencyKey)}`]);
     const prior=(await db.query("select id,request_fingerprint from network_plus_request where requester_user_id=$1 and idempotency_hash=$2",[userId,hash(idempotencyKey)])).rows[0];
-    if(prior){if(prior.request_fingerprint!==fingerprint)fail(409,"This idempotency key was already used for different request content.","IDEMPOTENCY_CONFLICT");return getNetworkPlusRequest(prior.id,userId);}
+    if(prior){if(prior.request_fingerprint!==fingerprint)fail(409,"This idempotency key was already used for different request content.","IDEMPOTENCY_CONFLICT");return (await db.query("select * from network_plus_request where id=$1",[prior.id])).rows[0];}
     let recipientUserId=input.recipientUserId||null;
     if(input.recipientOrganizationId) {
       const org=(await db.query("select id,verification_status from organization where id=$1",[input.recipientOrganizationId])).rows[0];
@@ -138,6 +138,11 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader) {
       version=version+1,updated_at=now() where id=$2 returning *`,[to,requestId])).rows[0];
     await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version});
     if(to==="accepted") {
+      if(row.recipient_organization_id) {
+        const currentRep=(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code in ('owner','administrator')",[row.recipient_organization_id,userId])).rowCount>0;
+        if(!currentRep)fail(403,"Only a current active owner or administrator of the recipient organization may accept.","RECIPIENT_AUTHORITY_REQUIRED");
+      }
+      await db.query("update network_plus_request_participant set consent_status='accepted',consented_at=now() where request_id=$1 and user_id=$2 and participant_role='recipient_representative'",[requestId,userId]);
       if(!["service_request","supplier_inquiry","partnership_proposal","collaboration_request"].includes(row.intent)) {
         // Accepted referral/expertise requests are recorded as accepted without a project workspace.
       } else {
@@ -230,6 +235,27 @@ export async function addNetworkPlusWorkspaceMilestone(requestId,userId,input) {
     const active=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status='accepted'",[requestId,owner])).rowCount>0;
     if(!active)fail(400,"Milestone owner must be an accepted participant.","INVALID_MILESTONE_OWNER");
     return (await db.query("insert into network_plus_collaboration_milestone(workspace_id,title,description,owner_user_id,due_at,created_by) values($1,$2,$3,$4,$5,$6) returning *",[ws.id,title,String(input.description||"").slice(0,2000)||null,owner,input.dueAt||null,userId])).rows[0];
+  });
+}
+export async function updateNetworkPlusWorkspaceMilestone(requestId,milestoneId,userId,input,requestIdHeader) {
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    const ws=(await db.query("select id from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0];
+    if(!ws)fail(404,"Accepted collaboration workspace not found.","NOT_FOUND");
+    await workspaceAccess(db,ws.id,userId);
+    const current=(await db.query("select * from network_plus_collaboration_milestone where id=$1 and workspace_id=$2 for update",[milestoneId,ws.id])).rows[0];
+    if(!current)fail(404,"Milestone not found.","NOT_FOUND");
+    const status=input?.status||current.status;
+    if(!["not_started","in_progress","blocked","completed","cancelled"].includes(status))fail(400,"Unsupported milestone status.","VALIDATION_ERROR");
+    const owner=input?.ownerUserId||current.owner_user_id;
+    if(owner) {
+      const valid=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status='accepted'",[requestId,owner])).rowCount>0;
+      if(!valid)fail(400,"Milestone owner must be an accepted participant.","INVALID_MILESTONE_OWNER");
+    }
+    const updated=(await db.query("update network_plus_collaboration_milestone set status=$1,owner_user_id=$2,due_at=$3,description=$4,updated_at=now() where id=$5 returning *",[status,owner,input?.dueAt===undefined?current.due_at:input.dueAt,input?.description===undefined?current.description:String(input.description).slice(0,2000),milestoneId])).rows[0];
+    await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body,metadata) values($1,$2,'milestone',$3,$4,$5)",[ws.id,userId,"Milestone updated",updated.title+" is now "+status.replaceAll("_"," ")+".",{milestoneId,status}]);
+    await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'collaboration.milestone_updated','network_plus_collaboration_workspace',$2,$3,'success',$4)",[userId,ws.id,requestIdHeader,{milestoneId,status}]);
+    return updated;
   });
 }
 export async function addNetworkPlusWorkspaceEvent(requestId,userId,input,requestIdHeader) {

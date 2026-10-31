@@ -895,3 +895,11 @@ main.shell-main .grid-cols-3, main.shell-main .grid-cols-4 { min-width: 0; }
 main.shell-main label { font-weight: 500 !important; }
 main.shell-main :is(strong, b) { font-weight: 600 !important; }
 main.shell-main :is(th, legend, summary) { font-weight: 600; }
+
+
+/* Use one canonical lemon accent across both themes. */
+.dark {
+  --primary: var(--brand-lemon);
+  --gold: var(--brand-lemon);
+  --focus-ring: var(--brand-lemon);
+}

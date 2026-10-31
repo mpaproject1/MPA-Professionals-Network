@@ -226,7 +226,7 @@ export async function updateBusiness(businessId,userId,input,requestId) {
   if(!entries.length)fail(400,"Provide at least one supported business profile field.","VALIDATION_ERROR");
   return withTransaction(async db=>{
     const {business}=await assertBusinessOwner(db,businessId,userId);
-    if(["suspended","archived"].includes(business.publication_status))fail(409,"A suspended or archived business cannot be edited through the ordinary management route.","BUSINESS_LOCKED");
+    if(business.publication_status==="archived")fail(409,"An archived business cannot be edited through the ordinary management route.","BUSINESS_LOCKED");
     const next={displayName:business.display_name,tradingName:business.trading_name,description:business.description,website:business.website,locationLabel:business.location_label};
     for(const [key,value] of entries){
       if(key==="website")next.website=safeWebsite(value);
@@ -305,14 +305,14 @@ export async function updateProfessionalServiceListing(listingId,userId,input,re
     const row=(await db.query("select * from network_plus_service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row)fail(404,"Professional service listing not found.","NOT_FOUND");
     await assertBusinessOwner(db,row.business_id,userId);
-    if(["suspended","archived","rejected"].includes(row.status))fail(409,"This listing cannot be edited in its current status.","LISTING_LOCKED");
+    if(["archived","rejected"].includes(row.status))fail(409,"This listing cannot be edited in its current status.","LISTING_LOCKED");
     const merged={title:row.title,summary:row.summary,description:row.description,serviceCategory:row.service_category,audience:row.audience,deliveryMode:row.delivery_mode,locationLabel:row.location_label,capacity:row.capacity,pricingModel:row.pricing_model,priceAmount:row.price_amount,currency:row.currency,availability:row.availability,credentials:row.credentials};
     const inputEntries=Object.entries(input||{}).filter(([key])=>LISTING_MODIFIABLE.has(key));
     if(!inputEntries.length)fail(400,"Provide at least one supported listing field.","VALIDATION_ERROR");
     for(const [key,value] of inputEntries)merged[key]=value;
     const normalized=normalizeListingInput(merged);
     const updated=(await db.query(`update network_plus_service_listing set title=$1,summary=$2,description=$3,service_category=$4,audience=$5,delivery_mode=$6,location_label=$7,capacity=$8,pricing_model=$9,price_amount=$10,currency=$11,availability=$12,credentials=$13,
-      status=case when status='published' then 'paused' else 'draft' end,updated_at=now() where id=$14 returning *`,[normalized.title,normalized.summary,normalized.description,normalized.serviceCategory,normalized.audience,normalized.deliveryMode,normalized.locationLabel,normalized.capacity,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.availability,normalized.credentials,listingId])).rows[0];
+      status=case when status='published' then 'paused' when status='suspended' then 'suspended' else 'draft' end,updated_at=now() where id=$14 returning *`,[normalized.title,normalized.summary,normalized.description,normalized.serviceCategory,normalized.audience,normalized.deliveryMode,normalized.locationLabel,normalized.capacity,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.availability,normalized.credentials,listingId])).rows[0];
     await audit(db,userId,"network_plus.service_listing_updated","network_plus_service_listing",listingId,requestId,{fields:inputEntries.map(([key])=>key)});
     return updated;
   });
@@ -323,7 +323,7 @@ export async function submitProfessionalServiceListing(listingId,userId,requestI
     if(!row)fail(404,"Professional service listing not found.","NOT_FOUND");
     await assertBusinessOwner(db,row.business_id,userId);
     await assertBusinessPublishable(db,row.business_id);
-    if(!["draft","changes_requested","rejected","paused"].includes(row.status))fail(409,"This listing is not ready for moderation submission.","INVALID_STATE");
+    if(!["draft","changes_requested","rejected","paused","suspended"].includes(row.status))fail(409,"This listing is not ready for moderation submission.","INVALID_STATE");
     const updated=(await db.query("update network_plus_service_listing set status='pending_review',moderation_reason=null,submitted_by=$2,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
     await audit(db,userId,"network_plus.service_listing_submitted","network_plus_service_listing",listingId,requestId,{businessId:row.business_id,from:row.status,to:"pending_review"});
     const reviewers=(await db.query(`select distinct u.id from app_user u where u.status='active' and
@@ -472,7 +472,7 @@ export async function submitBusinessModeration(businessId,userId,requestId) {
   return withTransaction(async db=>{
     const {business}=await assertBusinessOwner(db,businessId,userId);
     if(business.verification_status!=="verified")fail(409,"Business verification must be complete before profile moderation.","BUSINESS_NOT_VERIFIED");
-    const updated=(await db.query("update network_plus_business set moderation_status='pending_review',moderation_submitted_by=$2,updated_at=now() where id=$1 and moderation_status in ('not_submitted','rejected') returning *",[businessId,userId])).rows[0];
+    const updated=(await db.query("update network_plus_business set moderation_status='pending_review',moderation_submitted_by=$2,updated_at=now() where id=$1 and moderation_status in ('not_submitted','rejected','suspended') returning *",[businessId,userId])).rows[0];
     if(!updated)fail(409,"Business profile is already under review or cannot be resubmitted.","INVALID_STATE");
     await audit(db,userId,"network_plus.business_profile_submitted","network_plus_business",businessId,requestId,{});
     const reviewers=(await db.query("select distinct u.id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($1::text[])) or exists(select 1 from app_user_permission p where p.user_id=u.id and p.permission_code='business.moderate'))",[LISTING_REVIEW_ROLES])).rows;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,sourceMigration,service,server,member,admin,governance,checker,rubricMigration,assessmentPolicyMigration,modifiersMigration]=await Promise.all([
+const [migration,sourceMigration,service,server,member,admin,governance,checker,rubricMigration,assessmentPolicyMigration,modifiersMigration,outcomeMigration]=await Promise.all([
  read("../../db/migrations/20261101110000_community_impact_unified_score.sql"),
  read("../../db/migrations/20261101120000_community_impact_score_source_adapters.sql"),
  read("../../src/platform/community-impact-score.js"),
@@ -13,7 +13,8 @@ const [migration,sourceMigration,service,server,member,admin,governance,checker,
  read("../../scripts/check-new-migration-compatibility.js"),
  read("../../db/migrations/20261101160000_community_impact_score_policy_rubric_config.sql"),
  read("../../db/migrations/20261101170000_community_impact_assessment_score_policy.sql"),
- read("../../db/migrations/20261101180000_community_impact_score_modifiers_and_rubrics.sql")
+ read("../../db/migrations/20261101180000_community_impact_score_modifiers_and_rubrics.sql"),
+ read("../../db/migrations/20261101200000_community_impact_score_outcome_maturity_rule.sql")
 ]);
 test("Initial active evaluation policy matches the approved five-dimension baseline and is not public",()=>{
  assert.match(migration,/"weight":30/);assert.match(migration,/"weight":25/);assert.match(migration,/"weight":20/);assert.match(migration,/"weight":15/);assert.match(migration,/"weight":10/);
@@ -24,6 +25,7 @@ test("Initial active evaluation policy matches the approved five-dimension basel
  assert.match(modifiersMigration,/modifiers/);
  assert.match(modifiersMigration,/decayRules/);
  assert.match(modifiersMigration,/criteria/);
+ assert.match(outcomeMigration,/minimumOutcomeMaturity/);
  assert.match(rubricMigration,/status='superseded'/);
  assert.match(service,/exactly the five approved dimensions/);
  assert.match(service,/weights must total exactly 100%/);
@@ -74,4 +76,5 @@ test("Member score view is private and administrator score operations are separa
  assert.match(checker,/20261101170000_community_impact_assessment_score_policy\.sql/);
  assert.match(checker,/20261101180000_community_impact_score_modifiers_and_rubrics\.sql/);
  assert.match(checker,/20261101190000_community_impact_score_effective_date_guard\.sql/);
+ assert.match(checker,/20261101200000_community_impact_score_outcome_maturity_rule\.sql/);
 });

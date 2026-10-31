@@ -391,7 +391,8 @@ export async function addBusinessOwner(businessId,userId,input,requestId) {
     }else await assertOrganizationCapability(db,organizationId,userId,ORG_OWNER_ROLES);
     const exists=(await db.query("select 1 from network_plus_business_ownership where business_id=$1 and status in ('pending','active') and ((owner_type='member' and owner_user_id=$2) or (owner_type='organization' and owner_organization_id=$3))",[businessId,ownerUserId,organizationId])).rowCount;
     if(exists)fail(409,"This owner party is already associated with the business.","DUPLICATE_OWNER");
-    const row=(await db.query("insert into network_plus_business_ownership(business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,created_by) values($1,$2,$3,$4,'co_owner','pending','pending',$5) returning id,business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,created_at",[businessId,ownerType,ownerUserId,organizationId,userId])).rows[0];
+    const row=(await db.query("insert into network_plus_business_ownership(business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,created_by) values($1,$2,$3,$4,'co_owner','pending','pending',$5) on conflict do nothing returning id,business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,created_at",[businessId,ownerType,ownerUserId,organizationId,userId])).rows[0];
+    if(!row)fail(409,"This owner party is already associated with the business.","DUPLICATE_OWNER");
     await audit(db,userId,"network_plus.business_co_owner_invited","network_plus_business_ownership",row.id,requestId,{businessId,ownerType});
     if(ownerType==="member")await createInAppNotification(db,ownerUserId,"network_plus.business_ownership_consent_required","network_plus_business_ownership",row.id,{message:"You have been invited as a co-owner of a Network-Plus business.",nextAction:"Review and explicitly accept or decline this ownership association.",actionUrl:"/network-plus/businesses",actionRequired:true,priority:"high"});
     else {
@@ -484,6 +485,7 @@ export async function addBusinessVerificationEvidence(businessId,userId,input,re
   if(!fileId)fail(400,"Choose a private uploaded evidence file.","VALIDATION_ERROR");
   return withTransaction(async db=>{
     await assertBusinessOwner(db,businessId,userId);
+    await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",["business-verification-evidence:"+businessId]);
     const file=(await db.query("select f.id,f.visibility,f.created_by from file_object f join private_upload_session s on s.file_object_id=f.id and s.status='confirmed' where f.id=$1",[fileId])).rows[0];
     if(!file||file.visibility!=="private"||file.created_by!==userId)fail(403,"Only a private file uploaded by the current authorized owner can be attached as business evidence.","EVIDENCE_FILE_FORBIDDEN");
     let verificationCase=(await db.query("select id from network_plus_business_verification_case where business_id=$1 and status='draft' order by created_at desc limit 1 for update",[businessId])).rows[0];

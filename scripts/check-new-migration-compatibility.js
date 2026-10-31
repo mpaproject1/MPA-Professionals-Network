@@ -437,7 +437,8 @@ try {
     "ux_network_plus_request_idempotency",
     "ux_network_plus_request_event_idempotency",
     "ux_network_plus_collaboration_event_idempotency",
-    "ux_network_plus_collaboration_milestone_idempotency"
+    "ux_network_plus_collaboration_milestone_idempotency",
+    "ix_network_plus_request_support_grant_active"
   ];
   for (const name of requiredUniqueIndexes) {
     const row = (await client.query(
@@ -514,6 +515,10 @@ try {
   if(!workspaceTrigger.rowCount) throw new Error("Collaboration workspace database acceptance trigger is missing.");
   const supportRole=await client.query("select 1 from app_role where role_code='network_plus_support'");
   if(!supportRole.rowCount) throw new Error("The scoped Network-Plus support role is missing.");
+  const supportGrantTable=await client.query("select 1 from information_schema.tables where table_schema=$1 and table_name=$2",["public","network_plus_request_support_grant"]);
+  if(!supportGrantTable.rowCount) throw new Error("The expiring request-scoped support grant table is missing.");
+  const immutableTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_network_plus_request_event_immutable","trg_network_plus_collaboration_event_immutable"]]);
+  if(immutableTriggers.rows[0].count!==2) throw new Error("Request and collaboration event history must be append-only.");
   const businessPermissions = await client.query("select permission_code,system_only from app_permission where permission_code=any($1::text[])",[["business.verify","business.moderate"]]);
   if (businessPermissions.rowCount!==2 || businessPermissions.rows.some(row=>row.system_only!==true)) {
     throw new Error("Business verification/moderation permissions must be registered as system-only capabilities without user grants.");

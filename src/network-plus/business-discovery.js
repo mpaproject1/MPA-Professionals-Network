@@ -305,7 +305,7 @@ export async function updateProfessionalServiceListing(listingId,userId,input,re
     const row=(await db.query("select * from network_plus_service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row)fail(404,"Professional service listing not found.","NOT_FOUND");
     await assertBusinessOwner(db,row.business_id,userId);
-    if(["archived","rejected"].includes(row.status))fail(409,"This listing cannot be edited in its current status.","LISTING_LOCKED");
+    if(row.status==="archived")fail(409,"An archived listing cannot be edited.","LISTING_LOCKED");
     const merged={title:row.title,summary:row.summary,description:row.description,serviceCategory:row.service_category,audience:row.audience,deliveryMode:row.delivery_mode,locationLabel:row.location_label,capacity:row.capacity,pricingModel:row.pricing_model,priceAmount:row.price_amount,currency:row.currency,availability:row.availability,credentials:row.credentials};
     const inputEntries=Object.entries(input||{}).filter(([key])=>LISTING_MODIFIABLE.has(key));
     if(!inputEntries.length)fail(400,"Provide at least one supported listing field.","VALIDATION_ERROR");

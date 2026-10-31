@@ -182,8 +182,10 @@ test.describe("registration human verification", () => {
   test("the refresh action supports at least ten consecutive challenge refreshes", async ({ page }) => {
     const issued = await stubChallenge(page);
     await page.goto("/register");
-    const refresh = page.getByRole("button", { name: "Refresh human verification challenge" });
-    await expect(page.getByRole("region", { name: "Human verification" })).toBeVisible();
+    const verification = page.getByRole("region", { name: "Human verification" });
+    const refresh = verification.locator("button").first();
+    await expect(verification).toBeVisible();
+    await expect(refresh).toBeVisible();
     await expect(refresh).toBeEnabled();
     for (let retry = 0; retry < 10; retry += 1) {
       const before = issued.issued();

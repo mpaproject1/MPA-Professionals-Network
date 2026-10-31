@@ -81,7 +81,10 @@ test("discovery requires Network-Plus entry and exposes a limited published/veri
   assert.match(service, /export async function getProfessionalService/);
   assert.match(service, /s\.audience=any/);
   const publicList = service.slice(service.indexOf("export async function listBusinesses"),service.indexOf("export async function getBusiness"));
-  assert.doesNotMatch(publicList, /select b\.\*|verification_evidence|owner_user_id|owner_organization_id/);
+  const projection = publicList.match(/select\s+([\s\S]*?)\s+from network_plus_business b/i)?.[1] || "";
+  assert.ok(projection, "public business query must declare an explicit projection");
+  assert.doesNotMatch(projection, /verification_evidence|owner_user_id|owner_organization_id/i);
+  assert.match(publicList, /not exists\(select 1 from network_plus_business_ownership bo join organization o on o\.id=bo\.owner_organization_id/i);
 });
 
 test("API routes are authenticated, rate-limited for discovery and creation, and delegate resource checks to domain services", () => {

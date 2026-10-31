@@ -3,12 +3,13 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
-const [migration, service, server, compatibility, privateFiles] = await Promise.all([
+const [migration, service, server, compatibility, privateFiles, fixtureText] = await Promise.all([
   read("../../db/migrations/20261031110000_network_plus_business_discovery.sql"),
   read("../../src/network-plus/business-discovery.js"),
   read("../../server.js"),
   read("../../scripts/check-new-migration-compatibility.js"),
   read("../../src/platform/private-file-storage.js"),
+  read("../fixtures/network-plus-business-discovery.json"),
 ]);
 
 test("Increment 5 adds a separate business domain without duplicating canonical identities or rewriting legacy services", () => {
@@ -95,4 +96,14 @@ test("private business verification evidence is readable only by an independent 
   assert.match(privateFiles, /network_plus_business_verification_evidence e join network_plus_business_verification_case c/);
   assert.match(privateFiles, /c\.submitted_by<>\$2/);
   assert.match(privateFiles, /permissions\.includes\(\"business\.verify\"\)/);
+});
+
+test("disposable fixture templates cover all canonical ownership types and negative access cases", () => {
+  const fixtures=JSON.parse(fixtureText);
+  assert.deepEqual(fixtures.businesses.map(item=>item.case),["individual-member-owned","organization-owned","joint-member-organization"]);
+  assert.equal(fixtures.businesses[2].coOwner.expectedConsentStatus,"pending");
+  assert.ok(fixtures.negativeCases.includes("duplicate-business-name-same-owner"));
+  assert.ok(fixtures.negativeCases.includes("cross-organization-manager"));
+  assert.ok(fixtures.negativeCases.includes("unconfirmed-private-evidence-file"));
+  assert.equal(fixtures.serviceListing.audience,"both");
 });

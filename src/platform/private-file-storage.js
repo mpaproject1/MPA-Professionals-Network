@@ -36,19 +36,19 @@ export async function authorizePrivateUpload(userId,input){
   if(!Number.isSafeInteger(byteSize)||byteSize<1||byteSize>MAX_PRIVATE_UPLOAD_BYTES) throw fail(413,"Private files must be between 1 byte and 10 MiB.","PAYLOAD_TOO_LARGE");
   const expected= input?.checksumSha256==null ? null : String(input.checksumSha256).toLowerCase();
   if(expected!==null&&!/^[a-f0-9]{64}$/.test(expected)) throw fail(400,"checksumSha256 must be a SHA-256 hex digest.","INVALID_CHECKSUM");
-  const purpose=String(input?.purpose||"general"),purposeReferenceId=input?.purposeReferenceId==null?null:String(input.purposeReferenceId);
+  const purpose=String(input?.purpose||"general"),purposeReferenceId=input?.purposeReferenceId==null?null:String(input.purposeReferenceId);let retentionPolicyVersionId=null,retentionRuleSnapshot=null;
   if(!["general","community_impact_claim_evidence"].includes(purpose))throw fail(400,"Unsupported private upload purpose.","INVALID_UPLOAD_PURPOSE");
   if(purpose==="general"&&purposeReferenceId!==null)throw fail(400,"A general private upload cannot reference a Community Impact claim.","INVALID_UPLOAD_PURPOSE");
   if(purpose==="community_impact_claim_evidence"){
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(purposeReferenceId||""))throw fail(400,"A valid Community Impact claim reference is required.","INVALID_UPLOAD_PURPOSE");
     const claim=(await getPool().query("select id from community_impact_claim where id=$1 and claimant_user_id=$2 and status in('draft','clarification_requested')",[purposeReferenceId,userId])).rows[0];
     if(!claim)throw fail(403,"You may only upload evidence for your own draft or clarification claim.","FORBIDDEN");
-    const policy=await getPool().query("select 1 from community_impact_retention_active_policy a join community_impact_retention_policy_version p on p.id=a.policy_version_id where a.singleton=true and p.status='active' and p.policy->'dataClasses' ? 'raw_evidence'");
-    if(!policy.rowCount)throw fail(409,"MPA must approve and activate the raw-evidence retention rule before uploading claim evidence.","COMMUNITY_IMPACT_RETENTION_POLICY_REQUIRED");
+    const policy=(await getPool().query("select p.id,p.policy->'dataClasses'->'raw_evidence' rule from community_impact_retention_active_policy a join community_impact_retention_policy_version p on p.id=a.policy_version_id where a.singleton=true and p.status='active'")).rows[0];
+    if(!policy?.id||!policy.rule)throw fail(409,"MPA must approve and activate the raw-evidence retention rule before uploading claim evidence.","COMMUNITY_IMPACT_RETENTION_POLICY_REQUIRED");retentionPolicyVersionId=policy.id;retentionRuleSnapshot=policy.rule;
   }
   const id=randomUUID(),token=randomBytes(32).toString("base64url"),objectKey=path.posix.join(userId,randomUUID());
   const expiresAt=new Date(Date.now()+10*60*1000);
-  await getPool().query("insert into private_upload_session(id,user_id,object_key,original_name,content_type,expected_byte_size,expected_checksum_sha256,upload_token_sha256,expires_at,purpose,purpose_reference_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",[id,userId,objectKey,originalName,contentType,byteSize,expected,sha256(token),expiresAt,purpose,purposeReferenceId]);
+  await getPool().query("insert into private_upload_session(id,user_id,object_key,original_name,content_type,expected_byte_size,expected_checksum_sha256,upload_token_sha256,expires_at,purpose,purpose_reference_id,retention_policy_version_id,retention_rule_snapshot) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",[id,userId,objectKey,originalName,contentType,byteSize,expected,sha256(token),expiresAt,purpose,purposeReferenceId,retentionPolicyVersionId,retentionRuleSnapshot?JSON.stringify(retentionRuleSnapshot):null]);
   return {uploadId:id,uploadToken:token,uploadUrl:`/api/v1/files/uploads/${id}/content`,expiresAt:expiresAt.toISOString(),maxBytes:MAX_PRIVATE_UPLOAD_BYTES};
 }
 export async function receivePrivateUpload(userId,id,token,bytes){

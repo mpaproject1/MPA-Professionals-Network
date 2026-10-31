@@ -9,7 +9,8 @@ const [migration,service,server,staffPage,publicPage,about,compatibility,adminWo
  read("../../web/app/admin/serve-community/offline-projects/page.tsx"),
  read("../../web/app/serve-community/page.tsx"),
  read("../../web/app/about/page.tsx"),
- read("../../scripts/check-new-migration-compatibility.js"),\n read("../../web/app/admin/admin-workspace.tsx")
+ read("../../scripts/check-new-migration-compatibility.js"),
+ read("../../web/app/admin/admin-workspace.tsx")
 ]);
 test("offline project storage is additive and distinct from platform participation",()=>{
  assert.match(migration,/create table if not exists serve_community_offline_project/i);

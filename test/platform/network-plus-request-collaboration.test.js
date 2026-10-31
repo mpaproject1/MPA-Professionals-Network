@@ -22,6 +22,9 @@ test("Increment 6 schema adds typed requests, explicit participants, immutable e
  assert.match(migration,/ux_network_plus_request_idempotency/);
  assert.match(migration,/ux_network_plus_request_event_idempotency/);
  assert.match(migration,/trg_network_plus_workspace_requires_acceptance/);
+ assert.match(migration,/network_plus_request_support_grant/);
+ assert.match(migration,/trg_network_plus_request_event_immutable/);
+ assert.match(migration,/trg_network_plus_collaboration_event_immutable/);
  assert.match(migration,/explicitly accepted request/);
  assert.doesNotMatch(migration,/delete from|drop table|truncate table|alter table service_request\b/i);
 });
@@ -45,6 +48,9 @@ test("participant privacy, support policy, audit and notifications are explicit"
  assert.match(service,/workspaceAccess/);
  assert.match(service,/PARTICIPANT_CONSENT_REQUIRED/);
  assert.match(service,/SUPPORT_REASON_REQUIRED/);
+ assert.match(service,/SUPPORT_GRANT_REQUIRED/);
+ assert.match(service,/grantNetworkPlusSupportAccess/);
+ assert.match(service,/revokeNetworkPlusSupportAccess/);
  assert.match(service,/SUPPORT_FORBIDDEN/);
  assert.match(service,/network_plus\.request\.support_read/);
  assert.match(service,/network_plus\.request\.support_list/);
@@ -80,6 +86,8 @@ test("migration compatibility and support-role governance include Increment 6",(
  assert.match(compatibility,/20261031120000_network_plus_request_collaboration\.sql/);
  assert.match(compatibility,/network_plus_request_event_idempotency/);
  assert.match(compatibility,/trg_network_plus_workspace_requires_acceptance/);
+ assert.match(compatibility,/network_plus_request_support_grant/);
+ assert.match(compatibility,/trg_network_plus_request_event_immutable/);
  assert.match(userAdmin,/network_plus_support/);
  assert.match(userAdmin,/PRIVILEGED_ROLES/);
 });

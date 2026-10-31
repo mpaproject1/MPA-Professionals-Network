@@ -437,8 +437,7 @@ try {
     "ux_network_plus_request_idempotency",
     "ux_network_plus_request_event_idempotency",
     "ux_network_plus_collaboration_event_idempotency",
-    "ux_network_plus_collaboration_milestone_idempotency",
-    "ix_network_plus_request_support_grant_active"
+    "ux_network_plus_collaboration_milestone_idempotency"
   ];
   for (const name of requiredUniqueIndexes) {
     const row = (await client.query(
@@ -461,6 +460,9 @@ try {
       throw new Error("The mentorship rematching index must be partial and cover only proposed/accepted matches that have not been declined by the mentee.");
     }
   }
+  const supportGrantIndex=await client.query("select 1 from pg_indexes where schemaname=$1 and indexname=$2",["public","ix_network_plus_request_support_grant_active"]);
+  if(!supportGrantIndex.rowCount) throw new Error("The active request-scoped support grant index is missing.");
+
   const publicInquiryTokenIndex = await client.query(
     "select indexdef from pg_indexes where schemaname='public' and tablename='public_opportunity_inquiry' and indexdef ilike 'CREATE UNIQUE INDEX%' and indexdef ilike '%continuation_token_hash%'"
   );

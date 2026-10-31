@@ -153,7 +153,7 @@ async function notifyOwners(db,businessId,eventCode,payload) {
         and bo.consent_status='accepted' and om.status='active' and om.role_code=any($2::text[])`,[businessId,ORG_OWNER_ROLES])).rows;
   for(const owner of owners)await createInAppNotification(db,owner.user_id,eventCode,"network_plus_business",businessId,payload);
 }
-async function assertBusinessPublishable(db,businessId,{requireModeration=true,allowSuspended=false}={}) {
+async function assertBusinessPublishable(db,businessId,{requireModeration=true,allowSuspended=false,requirePublished=false}={}) {
   const row=(await db.query("select b.business_kind,b.verification_status,b.moderation_status,b.publication_status,b.verification_expires_at, exists(select 1 from network_plus_business_ownership bo join organization o on o.id=bo.owner_organization_id where bo.business_id=b.id and bo.owner_type='organization' and bo.status='active' and bo.consent_status='accepted' and o.verification_status<>'verified') organization_unverified, (select count(*)::int from network_plus_business_ownership bo where bo.business_id=b.id and bo.status='pending') pending_owner_count, (select count(*)::int from network_plus_business_ownership bo where bo.business_id=b.id and bo.status='active' and bo.consent_status='accepted') active_owner_count from network_plus_business b where b.id=$1",[businessId])).rows[0];
   if(!row)fail(404,"Business not found.","NOT_FOUND");
   if(row.verification_status!=="verified")fail(409,"Business verification must be approved before a service listing can be published.","BUSINESS_NOT_VERIFIED");
@@ -162,6 +162,7 @@ async function assertBusinessPublishable(db,businessId,{requireModeration=true,a
   if(row.pending_owner_count>0)fail(409,"All invited co-owners must accept or decline before publication.","OWNERSHIP_CONSENT_PENDING");
   if(row.business_kind==="joint"&&row.active_owner_count<2)fail(409,"A joint business requires at least two accepted owner parties before publication.","JOINT_OWNERSHIP_INCOMPLETE");
   if(requireModeration&&row.moderation_status!=="approved")fail(409,"Business profile moderation must be approved before publishing a service listing.","BUSINESS_NOT_MODERATED");
+  if(requirePublished&&row.publication_status!=="published")fail(409,"The business profile must be published before its service listings can be published.","BUSINESS_NOT_PUBLISHED");
   if((row.publication_status==="suspended"&&!allowSuspended)||row.publication_status==="archived")fail(409,"This business is not eligible to publish listings.","BUSINESS_NOT_PUBLISHABLE");
 }
 export async function createBusiness(userId,input,requestId,idempotencyKey) {
@@ -351,7 +352,7 @@ export async function moderateProfessionalServiceListing(listingId,userId,input,
     if(row.created_by===userId||row.submitted_by===userId)fail(403,"A listing creator or submitter cannot moderate their own listing.","SELF_REVIEW_FORBIDDEN");
     await assertIndependentBusinessReviewer(db,row.business_id,userId);
     if(status==="suspended" ? !["published","paused","pending_review"].includes(row.status) : !["pending_review","suspended"].includes(row.status))fail(409,"This listing is not in a state eligible for the requested moderation decision.","INVALID_STATE");
-    if(status==="published")await assertBusinessPublishable(db,row.business_id);
+    if(status==="published")await assertBusinessPublishable(db,row.business_id,{requirePublished:true});
     const updated=(await db.query(`update network_plus_service_listing set status=$1,moderation_reason=$2,reviewed_by=$3,reviewed_at=now(),
       published_at=case when $1='published' then now() else published_at end,
       suspended_at=case when $1='suspended' then now() else null end,

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Serve-Community | MPA Professionals Network",
-  description: "Discover professional services, mentorship, career opportunities and community initiatives through the MPA Professionals Network.",
+  description: "Discover reviewed community-benefit initiatives and consent-based volunteering opportunities through the MPA Professionals Network.",
   alternates: { canonical: "/serve-community" },
 };
 

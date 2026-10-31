@@ -34,7 +34,8 @@ const migrationNames = [
   "20261025150000_serve_community_g6_outcome_proof.sql",
   "20261029160000_account_references_and_governance.sql",
   "20261031110000_network_plus_business_discovery.sql",
-  "20261031120000_network_plus_request_collaboration.sql"
+  "20261031120000_network_plus_request_collaboration.sql",
+  "20261031130000_serve_community_initiatives.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -105,7 +106,12 @@ const requiredColumns = [
   ["network_plus_request_support_grant", "request_id", "uuid"],
   ["network_plus_request_support_grant", "support_user_id", "uuid"],
   ["network_plus_request_support_grant", "support_case_reference", "text"],
-  ["network_plus_request_support_grant", "expires_at", "timestamptz"]
+  ["network_plus_request_support_grant", "expires_at", "timestamptz"],
+  ["serve_community_initiative","id","uuid"],["serve_community_initiative","owner_user_id","uuid"],["serve_community_initiative","owner_organization_id","uuid"],["serve_community_initiative","status","text"],
+  ["serve_community_initiative_event","initiative_id","uuid"],["serve_community_initiative_event","actor_user_id","uuid"],
+  ["serve_community_participation","initiative_id","uuid"],["serve_community_participation","participant_user_id","uuid"],["serve_community_participation","consent_text_hash","text"],["serve_community_participation","contact_consent","bool"],
+  ["serve_community_participation_consent_event","participation_id","uuid"],["serve_community_participation_consent_event","actor_user_id","uuid"],
+  ["serve_community_participation_event","participation_id","uuid"],["serve_community_legacy_classification","service_listing_id","uuid"],["serve_community_legacy_classification","initiative_id","uuid"]
 ];
 
 const client = new Client({ connectionString, application_name: "mpa-migration-compatibility-check" });
@@ -457,7 +463,8 @@ try {
     "ux_network_plus_request_idempotency",
     "ux_network_plus_request_event_idempotency",
     "ux_network_plus_collaboration_event_idempotency",
-    "ux_network_plus_collaboration_milestone_idempotency"
+    "ux_network_plus_collaboration_milestone_idempotency",
+    "ux_serve_community_initiative_idempotency_hash","ux_serve_community_participation_idempotency_hash","ux_serve_community_participation_active"
   ];
   for (const name of requiredUniqueIndexes) {
     const row = (await client.query(
@@ -523,6 +530,13 @@ try {
     }
   }
 
+  const serveRoles=await client.query("select role_code from app_role where role_code='serve_community_reviewer'");
+  const servePermissions=await client.query("select permission_code,system_only from app_permission where permission_code=any($1::text[])",[["serve_community.initiatives.moderate","serve_community.legacy.classify"]]);
+  if(!serveRoles.rowCount||servePermissions.rowCount!==2||servePermissions.rows.some(x=>x.system_only!==true))throw new Error("Serve-Community reviewer role and system-only permissions are missing.");
+  const serveTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_serve_community_initiative_event_immutable","trg_serve_community_participation_event_immutable","trg_serve_community_consent_event_immutable","trg_serve_community_legacy_classification_event_immutable"]]);
+  if(serveTriggers.rows[0].count!==4)throw new Error("Serve-Community append-only history triggers are missing.");
+  const noLegacyBackfill=await client.query("select count(*)::int count from serve_community_legacy_classification");
+  if(noLegacyBackfill.rows[0].count!==0)throw new Error("Fresh migration unexpectedly created legacy classification rows.");
   const requestChecks = [
     ["network_plus_request","network_plus_request_intent_check",["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request"]],
     ["network_plus_request","network_plus_request_status_check",["draft","submitted","under_review","clarification_requested","accepted","declined","withdrawn","in_progress","completed","disputed","closed"]],

@@ -1,63 +1,13 @@
 import { expect, test } from "@playwright/test";
+const initiative={id:"a15a2d90-32ef-4c30-9a7d-0fdd7a0e7a61",title:"Community digital learning labs",category:"digital_inclusion",summary:"Help local community groups build confidence with safe and accessible digital tools.",description:"Approved volunteer-led sessions will help community groups build practical digital skills, improve everyday workflows and understand safe online practices. Participation is coordinated by the approved initiative owner.",deliveryMode:"hybrid",locationLabel:"Addis Ababa community hubs",capacity:12,eligibility:"Active MPA members with relevant digital skills.",expectedCommitment:"Two sessions per month",publishedAt:"2026-10-31T08:00:00.000Z"};
+const listBody={data:{items:[initiative],page:{limit:30,offset:0,total:1,hasMore:false}}};
+test.describe("Serve-Community approved initiative journey",()=>{
+ test("loads API-backed approved initiatives and keeps the commercial boundary",async({page})=>{await page.route("**/api/v1/serve-community/initiatives**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(listBody)}));await page.goto("/serve-community");await expect(page.getByRole("heading",{name:/Good work grows/i})).toBeVisible();await expect(page.getByRole("heading",{name:"Community digital learning labs"})).toBeVisible();await expect(page.getByText("MPA approved",{exact:true})).toBeVisible();await expect(page.getByText(/Preview content|sample concept|not live opportunities/i)).toHaveCount(0);await expect(page.getByRole("link",{name:/Explore Network-Plus/i})).toHaveAttribute("href","/network-plus")});
+ test("search and category filters request the approved directory",async({page})=>{const requested=[];await page.route("**/api/v1/serve-community/initiatives**",route=>{requested.push(route.request().url());return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(listBody)})});await page.goto("/serve-community");await page.getByRole("group",{name:"Filter initiatives by category"}).getByRole("button",{name:"Digital inclusion"}).click();await expect.poll(()=>requested.some(url=>url.includes("category=digital_inclusion"))).toBe(true);await page.getByRole("textbox",{name:"Search approved initiatives"}).fill("digital");await expect.poll(()=>requested.some(url=>url.includes("q=digital"))).toBe(true)});
+ test("participation requires two consent choices and submits an idempotent authenticated request",async({page})=>{await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","test-session-token"));await page.route("**/api/v1/serve-community/initiatives**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(listBody)}));await page.route("**/api/v1/me/serve-community/participations",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[]}})}));let submitted=null;await page.route("**/api/v1/serve-community/initiatives/*/participations",async route=>{submitted={headers:route.request().headers(),body:route.request().postDataJSON()};await route.fulfill({status:201,contentType:"application/json",body:JSON.stringify({data:{id:"f15a2d90-32ef-4c30-9a7d-0fdd7a0e7a61",status:"submitted"}})})});await page.goto("/serve-community");await page.getByRole("button",{name:"View initiative"}).click();await expect(page.getByRole("dialog",{name:"Community digital learning labs"})).toBeVisible();const apply=page.getByRole("button",{name:"Apply to participate"});await expect(apply).toBeDisabled();await page.getByLabel(/read the participation and privacy terms/i).check();await expect(apply).toBeDisabled();await page.getByLabel(/explicitly consent to MPA sharing/i).check();await expect(apply).toBeEnabled();await apply.click();await expect(page.getByRole("status").filter({hasText:"Your application has been submitted"})).toBeVisible();expect(submitted?.headers["x-idempotency-key"]).toBeTruthy();expect(submitted?.headers.authorization).toBe("Bearer test-session-token");expect(submitted?.body).toMatchObject({consent:true,contactConsent:true,consentVersion:"serve-community-participation-2026-10-31-v1"})});
+ test("empty directory never invents initiatives",async({page})=>{await page.route("**/api/v1/serve-community/initiatives**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[],page:{limit:30,offset:0,total:0,hasMore:false}}})}));await page.goto("/serve-community");await expect(page.getByRole("heading",{name:"New community initiatives are being reviewed"})).toBeVisible();await expect(page.locator(".sc-initiative-card")).toHaveCount(0)});
+ test("mobile and tablet layouts remain usable",async({page})=>{await page.route("**/api/v1/serve-community/initiatives**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(listBody)}));for(const viewport of [{width:820,height:1180},{width:390,height:844}]){await page.setViewportSize(viewport);await page.goto("/serve-community");await expect(page.getByRole("heading",{name:"Community digital learning labs"})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)}});
 
-test.describe("Serve-Community public UX separation", () => {
-  test("presents a distinct community-impact destination and clearly labels sample concepts", async ({ page }) => {
-    await page.goto("/serve-community");
+ test("participants can withdraw and the private action uses the authenticated account",async({page})=>{await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","test-session-token"));await page.route("**/api/v1/serve-community/initiatives**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[],page:{limit:30,offset:0,total:0,hasMore:false}}})}));await page.route("**/api/v1/me/serve-community/participations",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[{id:"c15a2d90-32ef-4c30-9a7d-0fdd7a0e7a61",initiative_id:initiative.id,status:"submitted",title:initiative.title,category:initiative.category,created_at:initiative.publishedAt}]}})}));let withdrawal=null;await page.route("**/api/v1/me/serve-community/participations/*/withdraw",async route=>{withdrawal={headers:route.request().headers(),body:route.request().postDataJSON()};await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:"c15a2d90-32ef-4c30-9a7d-0fdd7a0e7a61",status:"withdrawn"}})})});page.on("dialog",dialog=>dialog.accept());await page.goto("/serve-community");await expect(page.getByRole("heading",{name:"My community participation"})).toBeVisible();await page.getByRole("button",{name:"Withdraw participation"}).click();await expect.poll(()=>withdrawal!==null).toBe(true);expect(withdrawal?.headers.authorization).toBe("Bearer test-session-token");expect(withdrawal?.body.reason).toContain("withdraw")});
 
-    await expect(page.getByRole("heading", { name: /Good work grows when we do it together/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Explore community initiatives" })).toBeVisible();
-    await expect(page.getByText(/Preview content — not live opportunities/i)).toBeVisible();
-    await expect(page.getByText(/not currently being advertised or accepting registrations/i)).toBeVisible();
-
-    await expect(page.getByRole("heading", { name: "Neighbourhood learning circles" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Community care and wellbeing" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Digital skills for community groups" })).toBeVisible();
-
-    await expect(page.getByRole("link", { name: /Explore Network-Plus/i })).toHaveAttribute("href", "/network-plus");
-    await expect(page.getByRole("link", { name: /Explore initiatives/i })).toHaveAttribute("href", "#discover");
-    const experience = page.locator("main.serve-community-page");
-    await expect(experience.getByRole("link", { name: /Careers|Mentorship|Professional services|Organization workspace/i })).toHaveCount(0);
-  });
-
-  test("search and category filters update the sample concept list", async ({ page }) => {
-    await page.goto("/serve-community");
-    await page.getByRole("group", { name: "Filter initiatives by category" }).getByRole("button", { name: "Education" }).click();
-
-    await expect(page.getByRole("heading", { name: "Neighbourhood learning circles" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Community care and wellbeing" })).toHaveCount(0);
-    await expect(page.getByText("1 sample concept")).toBeVisible();
-
-    await page.getByRole("button", { name: "All", exact: true }).click();
-    await page.getByRole("textbox", { name: "Search sample initiatives" }).fill("digital");
-    await expect(page.getByRole("heading", { name: "Digital skills for community groups" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Neighbourhood learning circles" })).toHaveCount(0);
-    await expect(page.getByText("1 sample concept")).toBeVisible();
-  });
-
-  test("concept details dialog is keyboard dismissible and repeats preview-only status", async ({ page }) => {
-    await page.goto("/serve-community");
-    await page.getByRole("button", { name: "View concept" }).first().click();
-    const dialog = page.getByRole("dialog", { name: "Neighbourhood learning circles" });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/not an approved initiative, a live vacancy or an invitation to register/i)).toBeVisible();
-    const close = dialog.getByRole("button", { name: "Close concept details" });
-    await expect(close).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(dialog.getByRole("button", { name: "Close preview" })).toBeFocused();
-    await page.keyboard.press("Shift+Tab");
-    await expect(close).toBeFocused();
-
-    await page.keyboard.press("Escape");
-    await expect(dialog).toHaveCount(0);
-  });
-
-  test("mobile and tablet layouts remain usable without horizontal overflow", async ({ page }) => {
-    for (const viewport of [{ width: 820, height: 1180 }, { width: 390, height: 844 }]) {
-      await page.setViewportSize(viewport);
-      await page.goto("/serve-community");
-      await expect(page.getByRole("heading", { name: "Explore community initiatives" })).toBeVisible();
-      await expect(page.getByRole("textbox", { name: "Search sample initiatives" })).toBeVisible();
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    }
-  });
 });

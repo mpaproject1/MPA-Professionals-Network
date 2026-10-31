@@ -1,68 +1,45 @@
-# Network-Plus Increment 7 — Serve-Community separation and public UX
+# Network-Plus Increment 7 — Serve-Community backend and participation
 
 **Branch:** `feat/workstream-3-progress-members-workspace`  
-**PR:** #18 — keep draft; do not merge or deploy.  
-**Plan:** [docs/53-network-plus-discovery-and-collaboration-integration-plan.md](53-network-plus-discovery-and-collaboration-integration-plan.md)  
-**Status:** Public UX separation prototype implemented; full increment and exit gate are **NOT COMPLETE**.
+**PR:** #18 — draft; no merge or deployment.  
+**Status:** implementation added; CI and disposable-database validation must pass before acceptance.
 
-## 1. Approved product boundary
+## Approved boundary
+Only independently reviewed and published community-benefit initiatives appear in Serve-Community. Commercial services remain in Network-Plus. Existing service listings are not copied, relabelled, hidden, deleted or changed. A legacy listing can be mapped only through a specific owner-proposed classification, independent moderator approval and a recorded reversal path.
 
-The project owner approved this policy on 2026-10-31:
+## Domain and lifecycle
+The additive migration creates a distinct initiative domain, append-only initiative events, private participation applications, versioned consent events, append-only participation events, and explicit legacy classification mappings/events. It does not modify existing service listings, requests, volunteer pledges or mentorship tables.
 
-- Serve-Community publicly presents only community-benefit initiatives that have been explicitly reviewed and approved.
-- Standard commercial professional services remain in Network-Plus Business Discovery.
-- Existing service records are not automatically converted, deleted, hidden or relabelled.
-- Any future classification of a legacy service record requires an auditable, reversible decision and a reviewed mapping.
-- Mentorship, Jobs, membership and organization workspaces remain separate journeys.
-- Private participation and member data remain behind their existing authorization boundaries. Public impact reporting must remain aggregate and privacy-safe.
+Initiative lifecycle: `draft → submitted → under_review → approved → published`; review may request clarification or reject; published initiatives may be suspended, completed or archived. Only `published` and non-expired rows are exposed publicly. Reviewer permissions are system-only and the reviewer role is privileged; no account is assigned by migration. Submitter/owner self-review is prohibited.
 
-## 2. Source reconciliation
+## Consent and participation
+- Participation submission requires a current active MPA membership.
+- Both affirmative choices are required: voluntary participation/privacy terms and explicit sharing of account name/email with the initiative owner for coordination only.
+- Consent and privacy notice versions plus a SHA-256 hash are persisted with immutable grant events. Contact-sharing consent is not public.
+- Applications are idempotent; a partial unique index prevents duplicate active applications.
+- Participants can withdraw while submitted or accepted. Withdrawal appends consent-withdrawal and lifecycle events; history is not erased.
+- Initiative owners can review private applications and accept/decline/complete them. Capacity is enforced transactionally. Owners cannot apply to their own initiatives.
+- Notifications use the existing in-app service. No public participant names, contact details, application notes or counts are exposed.
 
-The current source did not contain a public, approved initiative-directory contract:
+## API
+- Public read: `GET /api/v1/serve-community/initiatives`, `GET /api/v1/serve-community/initiatives/:id`.
+- Owner: `POST/PATCH /api/v1/serve-community/initiatives`, `POST /:id/submit`, `GET /api/v1/me/serve-community/initiatives`, `GET /api/v1/serve-community/initiatives/:id/participations`, `PATCH /api/v1/serve-community/participations/:id/decision`.
+- Participant: `POST /api/v1/serve-community/initiatives/:id/participations`, `GET /api/v1/me/serve-community/participations`, `POST /api/v1/me/serve-community/participations/:id/withdraw`.
+- Moderation: `GET /api/v1/admin/serve-community/initiatives`, `PATCH /api/v1/admin/serve-community/initiatives/:id/review`.
+- Legacy mapping: owner proposal at `POST /api/v1/serve-community/legacy-classifications`; independent review/reversal at `PATCH /api/v1/admin/serve-community/legacy-classifications/:id/review`.
 
-- `web/app/serve-community/page.tsx` previously combined commercial professional services, mentorship, Jobs, community demand and organization workspace links in one page.
-- `src/platform/volunteer-pledges.js` and `GET/POST/PATCH/DELETE /api/v1/me/volunteer-pledges` manage a member's own private volunteer pledges. They are not a public initiative directory or public volunteer registration workflow.
-- `/api/v1/marketplace-demand/topics` publishes reviewed demand topics, but its contract explicitly includes service and mentorship demand. It is not an approved initiative inventory and must not be repurposed as one.
-- `/api/v1/services/listings/:id/impact-report` is an owner/governance report for existing service listings. It is not a public discovery API.
-- Existing service listings, requests, pledges, agreements, delivery history and impact reports are retained without migration or visibility changes.
+## UX integration
+The public page fetches the directory from the approved-only API; illustrative cards are removed. Search and category filters query persisted data. Detail dialogs provide initiative information and consent form. Logged-out visitors are directed to sign in; applications require active membership server-side. Signed-in participants see their private participation statuses. Empty and error states do not invent opportunities.
 
-## 3. Implemented UX prototype
+## Validation gates
+- [x] Additive initiative schema and append-only event/consent history.
+- [x] Reviewer role and system-only moderation/classification permissions; no automatic role assignments.
+- [x] Published-only public projection and private owner/member projections.
+- [x] Idempotent participation, versioned consent, explicit contact-sharing consent and withdrawal.
+- [x] Auditable reversible legacy classification proposal/approval/reversal; no migration backfill.
+- [x] API-backed directory, consent-gated participation UI and browser acceptance coverage.
+- [ ] Apply migration on disposable PostgreSQL and pass rollback compatibility assertions.
+- [ ] Run all backend tests, TypeScript, Biome, Next.js production build and Playwright on this exact commit.
+- [ ] Review CI results and resolve every blocker/regression.
 
-The public page now has:
-
-- A distinct Serve-Community hero and community-impact value proposition.
-- Clear trust principles for review, voluntary participation and privacy-safe reporting.
-- An interactive search field and category filters.
-- Responsive initiative cards with a detail dialog, keyboard Escape close, accessible labels and visible focus states.
-- A clear boundary link to Network-Plus for professional/commercial discovery.
-- No commercial services search, mentorship, Jobs or organization workspace presented as Serve-Community pathways.
-- Sample initiative cards are conspicuously labelled as illustrative preview content, not approved opportunities; no registration, interest, volunteer pledge or impact metrics are fabricated.
-
-The sample concepts are presentation fixtures only. They are not stored in the database, sent to an API or represented as actual MPA programmes.
-
-## 4. Remaining implementation required before Increment 7 can pass
-
-A live experience still requires a distinct initiative and participation contract. Do not mark this increment complete based on the UX prototype alone.
-
-1. Define the initiative lifecycle and ownership model, including draft, submitted, under review, clarification, approved/published, suspended, completed and archived states; enforce valid transitions server-side.
-2. Define the approved public projection and classification controls. Existing commercial service records must not be auto-imported. If selected legacy impact services are to appear, record each approved mapping and reversal path.
-3. Add an additive migration for initiative records and explicit moderation/classification audit history only after the domain contract is reviewed. Preserve all existing tables and records.
-4. Implement public read-only discovery of approved/published initiatives with search, category, location, delivery mode, pagination and bounded safe fields. Never return contact details, private notes, participant lists or internal evidence.
-5. Implement authenticated, consent-based participation/volunteer interest with idempotency, explicit withdrawal, capacity and eligibility rules where applicable, and notifications to authorized owners.
-6. Reuse member volunteer pledges only as a separate member-owned offer. Do not publish those private pledge rows without a distinct opt-in and moderation contract.
-7. Preserve impact reporting semantics and aggregate suppression; do not publish page views or infer impact from listing exposure.
-8. Add disposable-PostgreSQL migration/API tests, authorization and negative-case tests, Playwright public discovery/participation journeys, mobile/responsive checks and WCAG AA keyboard/screen-reader/contrast review.
-
-## 5. Validation
-
-- [x] Source audit completed for the current page, volunteer-pledge service/API, demand-topic API and impact-report API.
-- [x] Interactive UX prototype separates the public community destination from commercial/professional, Jobs and Mentorship journeys.
-- [x] Preview/sample content is clearly disclosed and cannot be mistaken for live approved listings.
-- [ ] Live initiative schema, moderation lifecycle and auditable classification controls.
-- [ ] Approved-only public initiative API and authorization/privacy tests.
-- [ ] Consent-based volunteer participation and withdrawal lifecycle.
-- [ ] Disposable PostgreSQL migration and rollback compatibility.
-- [ ] Playwright, responsive and accessibility acceptance on the new implementation head.
-- [ ] Regression verification for services, mentorship, Jobs and impact reporting.
-
-**Exit status: IN PROGRESS — NOT PASSED.** No legacy service records were changed. No production migration, deployment, merge or main-branch update was performed.
+No production database was changed. No production deployment or merge was performed.

@@ -466,3 +466,17 @@ export async function listBusinessVerificationEvidence(businessId,userId) {
   if(!roles.some(r=>BUSINESS_REVIEW_ROLES.includes(r))&&!permissions.includes("business.verify"))fail(403,"Business verification reviewer authority is required.","BUSINESS_REVIEW_FORBIDDEN");
   return (await db.query("select e.id,e.case_id,e.file_object_id,e.evidence_type,e.note,e.created_at from network_plus_business_verification_evidence e join network_plus_business_verification_case c on c.id=e.case_id where c.business_id=$1 order by e.created_at desc",[businessId])).rows;
 }
+
+export async function changeProfessionalServiceStatus(listingId,userId,status,reason,requestId) {
+  if(!["paused","archived"].includes(status))fail(400,"Owners may pause or archive a listing; publication requires independent moderation.","INVALID_STATUS");
+  return withTransaction(async db=>{
+    const row=(await db.query("select * from network_plus_service_listing where id=$1 for update",[listingId])).rows[0];
+    if(!row)fail(404,"Professional service listing not found.","NOT_FOUND");
+    await assertBusinessOwner(db,row.business_id,userId);
+    if(row.status==="suspended")fail(409,"Only an independent moderator can clear a listing suspension.","MODERATION_CLEARANCE_REQUIRED");
+    if(row.status==="archived")fail(409,"An archived listing cannot be reopened.","INVALID_STATE");
+    const updated=(await db.query("update network_plus_service_listing set status=$1,updated_at=now() where id=$2 returning *",[status,listingId])).rows[0];
+    await audit(db,userId,"network_plus.service_listing_owner_status_changed","network_plus_service_listing",listingId,requestId,{from:row.status,to:status,reason:String(reason||"").trim().slice(0,500)||null});
+    return updated;
+  });
+}

@@ -32,10 +32,10 @@ The page provides:
 1. **Identity assurance queue** — evidence review and verified / clarification / declined decisions. The claimant is excluded from the decision action.
 2. **Offline attribution** — evidence-backed individual contributor proposals; contributor account, contribution role, attribution share and rationale; contributor confirmation gate; reviewer assignment; reviewer verification or decline.
 3. **Detection policies** — versioned JSON rule proposals, independent approval with an approval reference, and separate activation. The policy proposer cannot approve or activate their own version.
-4. **Reviewer conflicts and assessments** — conflict declarations for assigned reviewers, source reconciliation against an exact candidate, evidence-referenced assessment with category/type/role, evidence quality, outcome maturity, attribution share and risk level, plus a separate second-review action for elevated/high-risk cases.
+4. **Reviewer conflicts and assessments** — conflict declarations for assigned reviewers, source reconciliation against an exact candidate, evidence-referenced assessment with category/type/role, evidence quality, outcome maturity, attribution share and risk level, plus a dedicated pending second-review queue with approve/reject actions for elevated/high-risk cases.
 5. **Retention evaluation** — due-date evaluation only. The UI explicitly states that it does not delete, anonymize, restrict or purge records.
 
-The existing claim-review and retention-policy screens remain in place. This new governance screen complements rather than replaces them.
+The existing claim-review and retention-policy screens remain in place. This new governance screen complements rather than replaces them. The pending-assessment queue is read through a permission-checked endpoint and exposes only assessments awaiting independent second review.
 
 ## 2. Authorization and privacy boundaries
 

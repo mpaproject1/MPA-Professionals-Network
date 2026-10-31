@@ -62,6 +62,7 @@ test("private claim evidence downloads are scoped to claimant or assigned review
  assert.match(privateFiles,/assigned_reviewer/);
  assert.match(privateFiles,/assigned_appeal_reviewer/);
  assert.match(privateFiles,/claimant_user_id===userId/);
+ assert.match(privateFiles,/!claimAccess\.removed_at/);
  assert.match(privateFiles,/community_impact_claim_evidence/);
  assert.match(uploadHelper,/purposeReferenceId/);
  assert.match(migration,/purpose_reference_id uuid references community_impact_claim/);

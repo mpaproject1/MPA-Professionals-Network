@@ -470,3 +470,64 @@
 @keyframes heroMeshDrift{from{transform:translate3d(-.3%,0,0) scale(1)}to{transform:translate3d(.3%,.5%,0) scale(1.015)}}
 @keyframes heroLightFloat{from{transform:translate3d(-2%,0,0);opacity:.65}to{transform:translate3d(2%,3%,0);opacity:1}}
 @media(prefers-reduced-motion:reduce){.heroMesh,.heroGlowOne,.heroGlowTwo{animation:none!important;transform:none!important}}
+
+
+/* Shared MPA theme and typography overrides for the public landing experience. */
+.heroTitle, .heroSubtitle, .networkTag, .trustSignals, .scrollHint {
+  color: var(--text);
+}
+.heroTitle { font-family: var(--font-heading); font-weight: 600; letter-spacing: -.04em; }
+.heroTitle span {
+  color: var(--primary);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+.primaryCta, .secondaryCta, .loginCta, .finalPrimary, .finalSecondary {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.primaryCta {
+  background: var(--brand-navy);
+  color: #fff;
+  border-color: var(--brand-navy);
+  box-shadow: 0 8px 22px rgba(18, 59, 93, .16);
+}
+.primaryCta:hover { background: var(--brand-navy-deep); }
+.secondaryCta {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+.loginCta { color: var(--primary); }
+.finalPrimary {
+  background: var(--brand-lemon);
+  color: var(--brand-navy-deep);
+  border-color: var(--brand-lemon);
+}
+.finalSecondary {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+:global(.dark) .heroTitle,
+:global(.dark) .heroSubtitle,
+:global(.dark) .networkTag,
+:global(.dark) .trustSignals,
+:global(.dark) .scrollHint { color: var(--text); }
+:global(.dark) .heroTitle span { color: var(--brand-lemon); -webkit-text-fill-color: currentColor; }
+:global(.dark) .primaryCta {
+  background: var(--brand-lemon);
+  border-color: var(--brand-lemon);
+  color: var(--brand-navy-deep);
+  box-shadow: 0 8px 22px rgba(228, 239, 89, .12);
+}
+:global(.dark) .primaryCta:hover { background: #f0f58c; }
+:global(.dark) .secondaryCta,
+:global(.dark) .finalSecondary {
+  color: var(--text);
+  background: var(--surface-raised);
+  border-color: var(--border-strong);
+}
+:global(.dark) .loginCta { color: var(--brand-lemon); }
+:global(.dark) .finalPrimary { background: var(--brand-lemon); color: var(--brand-navy-deep); }

@@ -62,10 +62,10 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
  const requesterWorkspace=await requests.getNetworkPlusWorkspace(draft.id,requester.user.id);
  const recipientWorkspace=await requests.getNetworkPlusWorkspace(draft.id,recipient.user.id);
  assert.equal(requesterWorkspace.workspace.id,recipientWorkspace.workspace.id);
- const milestone=await requests.addNetworkPlusWorkspaceMilestone(draft.id,requester.user.id,{title:"Complete accessibility audit"});
+ const milestone=await requests.addNetworkPlusWorkspaceMilestone(draft.id,requester.user.id,{title:"Complete accessibility audit"},randomUUID()+randomUUID());
  assert.equal(milestone.status,"not_started");
  await requests.updateNetworkPlusWorkspaceMilestone(draft.id,milestone.id,recipient.user.id,{status:"in_progress"},requestRef);
- await requests.addNetworkPlusWorkspaceEvent(draft.id,recipient.user.id,{eventType:"blocker",title:"Content dependency",body:"Waiting for approved content samples."},requestRef);
+ await requests.addNetworkPlusWorkspaceEvent(draft.id,recipient.user.id,{eventType:"blocker",title:"Content dependency",body:"Waiting for approved content samples."},requestRef,randomUUID()+randomUUID());
  const refreshed=await requests.getNetworkPlusWorkspace(draft.id,requester.user.id);
  assert.equal(refreshed.milestones[0].status,"in_progress");
  assert.ok(refreshed.events.some(event=>event.event_type==="blocker"));

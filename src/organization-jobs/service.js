@@ -456,6 +456,7 @@ export async function saveApplicationDraft(jobId,userId,input={},requestId){
     : existing?.status==="withdrawn"
       ? (await db.query("update job_application set tracking_reference=$1,status='draft',cover_letter=$2,profile_snapshot=$3,eligibility_snapshot='{}'::jsonb,submitted_at=null,withdrawn_at=null,decided_at=null,updated_at=now() where id=$4 returning *",[trackingReference,input.coverLetter||null,snapshot,existing.id])).rows[0]
       : (await db.query("insert into job_application(job_id,applicant_user_id,tracking_reference,status,cover_letter,profile_snapshot) values($1,$2,$3,'draft',$4,$5) returning *",[jobId,userId,trackingReference,input.coverLetter||null,snapshot])).rows[0];
+  if(input.referralCode) await db.query("update job_application set referral_code=$1 where id=$2",[String(input.referralCode).trim().toUpperCase(),app.id]);
   if(Array.isArray(input.answers)) await saveScreeningAnswers(db,app.id,jobId,input.answers,false);
   await db.query("insert into job_application_event(application_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,'draft',$4)",[app.id,userId,existing?.status||null,input.note||null]);
   await audit(db,userId,"job.application_draft_saved","job_application",app.id,requestId,{jobId});

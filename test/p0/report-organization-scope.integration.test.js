@@ -43,13 +43,13 @@ test("recruiters and project managers cannot read another organization's recruit
   }, "report-scope-org-b-" + suffix);
 
   await organizationJobs.addOrganizationUser(orgA.id, ownerA, {
-    userId: recruiterA, roleCode: "recruiter",
+    userId: recruiterA, roleCode: "recruiter", reason: "Assign recruiter to organization",
   }, "report-scope-recruiter-" + suffix);
   await organizationJobs.addOrganizationUser(orgA.id, ownerA, {
-    userId: jobTeamRecruiterA, roleCode: "read_only",
+    userId: jobTeamRecruiterA, roleCode: "read_only", reason: "Add job team member",
   }, "report-scope-job-team-member-" + suffix);
   await organizationJobs.addOrganizationUser(orgB.id, ownerB, {
-    userId: projectManagerB, roleCode: "project_manager",
+    userId: projectManagerB, roleCode: "project_manager", reason: "Assign project manager",
   }, "report-scope-project-manager-" + suffix);
 
   const jobA = await organizationJobs.createJob(orgA.id, ownerA, {

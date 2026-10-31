@@ -1,0 +1,82 @@
+{
+  "description": "Payload templates for disposable PostgreSQL/API integration tests. Resolve symbolic canonical IDs from seeded app_user and organization fixtures; never insert placeholder strings as UUIDs.",
+  "businesses": [
+    {
+      "case": "individual-member-owned",
+      "payload": {
+        "businessKind": "individual",
+        "ownerType": "member",
+        "displayName": "Example Member Consultancy",
+        "description": "Provides professional advisory and delivery services to eligible member and organization clients.",
+        "website": "https://example-member.test",
+        "locationLabel": "Addis Ababa"
+      },
+      "ownerRef": "$ACTIVE_PROFESSIONAL_MEMBER_USER_ID"
+    },
+    {
+      "case": "organization-owned",
+      "payload": {
+        "businessKind": "organization",
+        "ownerType": "organization",
+        "organizationId": "$VERIFIED_ORGANIZATION_ID",
+        "displayName": "Example Organization Services",
+        "description": "Provides professional services through the verified organization and its authorized team.",
+        "website": "https://example-organization.test",
+        "locationLabel": "Addis Ababa"
+      },
+      "actorRef": "$ACTIVE_ORGANIZATION_OWNER_USER_ID"
+    },
+    {
+      "case": "joint-member-organization",
+      "payload": {
+        "businessKind": "joint",
+        "ownerType": "member",
+        "displayName": "Example Joint Venture",
+        "description": "A jointly governed professional business with explicit member and organization owner consent.",
+        "locationLabel": "Addis Ababa"
+      },
+      "ownerRef": "$ACTIVE_PROFESSIONAL_MEMBER_USER_ID",
+      "coOwner": {
+        "ownerType": "organization",
+        "organizationId": "$VERIFIED_ORGANIZATION_ID",
+        "expectedConsentStatus": "pending"
+      }
+    }
+  ],
+  "serviceListing": {
+    "title": "Professional advisory service",
+    "summary": "Structured advisory support for member and organization projects.",
+    "description": "A professional service description that explains scope, delivery and expected outputs without publishing personal contact details.",
+    "serviceCategory": "consulting",
+    "audience": "both",
+    "deliveryMode": "remote",
+    "pricingModel": "quote",
+    "priceAmount": null,
+    "currency": null,
+    "capacity": 5,
+    "availability": {
+      "timezone": "Africa/Addis_Ababa",
+      "notes": "By appointment"
+    },
+    "credentials": [
+      "Verified professional capability"
+    ]
+  },
+  "negativeCases": [
+    "expired-member-owner",
+    "unverified-organization-owner",
+    "cross-organization-manager",
+    "recruiter-role-only",
+    "read-only-role-only",
+    "duplicate-owner-party",
+    "duplicate-business-name-same-owner",
+    "idempotency-key-reused-with-different-payload",
+    "unconfirmed-private-evidence-file",
+    "self-verification-review",
+    "self-moderation-review",
+    "organization-verification-expired",
+    "listing-audience-not-authorized",
+    "public-description-contains-contact-details",
+    "suspended-business-listing-publication"
+  ]
+}

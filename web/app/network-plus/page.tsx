@@ -59,6 +59,12 @@ export default function NetworkPlusPage() {
           </section>
         </section>
 
+        <section className="card grid gap-2">
+          <h2 className="h2">Requests & collaboration</h2>
+          <p className="muted">Manage private service, supplier, referral, expertise, partnership and collaboration requests. A workspace opens only after the recipient explicitly accepts an engagement.</p>
+          <Link className="btn btn-primary w-fit" href="/network-plus/requests">Open my requests <ArrowRight size={16} aria-hidden="true" /></Link>
+        </section>
+
         <p className="muted text-sm">
           Serve-Community remains separate for public initiatives, volunteering and community
           impact. Volunteer initiatives are not business listings, and submitting a connection

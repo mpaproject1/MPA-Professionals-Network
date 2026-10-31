@@ -29,7 +29,7 @@ Source adapters reject stale/reversed/disputed/unconfirmed sources. The source l
 
 ## Policy administration
 
-The initial policy is version 1, active for private evaluation, with public publication disabled. Administrators may propose a new JSON policy version. The API validates:
+The initial plan baseline was first seeded as version 1. Operational version 2 is active for private evaluation, preserves the same five weights and adds configurable evidence-quality ranks, outcome-maturity ranks and rating steps. Public publication remains disabled. Administrators may propose a new JSON policy version. The API validates:
 
 - exactly the five approved dimensions;
 - weights total exactly 100%;

@@ -470,8 +470,8 @@ Do not introduce a new migration until the current schema and source-record keys
 ## 15. Acceptance criteria and test strategy
 
 ### Functional
-- System-linked events and manual claims resolve to one contribution record.
-- Claims can be created by eligible non-members without granting membership or member privileges.
+- System-linked events and manual claims must resolve through an explicit, idempotent, reviewer-approved link/merge to one contribution record; automatic matching must not merge or reject claims.
+- Authenticated accounts can create claims without active membership or membership privileges; broader non-member identity assurance must be approved by MPA before it is enabled.
 - Activity, output, outcome, and sustained impact remain distinct in data and UI.
 - Only verified eligible contributions affect the score.
 - Users can see status, reviewer clarification, decision reasons, and appeal state.

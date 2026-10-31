@@ -836,10 +836,10 @@ A generic `admin`, `reviewer`, `supporting_staff`, `verification_reviewer` or `e
 
 | Source | Detection trigger | Identity and attribution | Candidate result |
 |---|---|---|---|
-| Serve-Community participation | Append-only participation event completed; participation remains completed; parent initiative is completed | Exact participant_user_id from the authoritative participation record; suggested role from active policy; contributor must confirm attribution | Private detected candidate with pending_confirmation attribution |
+| Serve-Community participation | Append-only participation event completed; participation remains completed; parent initiative is published or completed | Exact participant_user_id from the authoritative participation record; suggested role from active policy; contributor must confirm attribution | Private detected candidate with pending_confirmation attribution |
 | Staff-entered offline completed project | Append-only offline-project event approve; project remains approved | No individual identity exists in the source record; the adapter deliberately does not assign the project editor or organization owner as contributor | Private detected candidate with unattributed state |
 
-Participation completion alone is insufficient while its parent initiative is not yet completed. The reconciliation scan can detect it later if the parent initiative subsequently reaches the configured eligible state. The source workflows remain authoritative and are not rewritten.
+Participation completion is eligible while the parent initiative is in a policy-approved published or completed state. If the parent is still a draft, under review, suspended or otherwise outside the active policy, the reconciliation scan can detect it later only if the parent subsequently reaches an eligible state. The source workflows remain authoritative and are not rewritten.
 
 Offline approval records project-level delivery facts, not individual contributor participation. Its candidate is a discovery prompt for later evidence-backed attribution; no project-wide metric is copied to an individual.
 

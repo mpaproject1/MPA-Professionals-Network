@@ -61,7 +61,7 @@ test("organization full detail and roster are scoped to the correct organization
     hasStatus(400),
   );
   await assert.rejects(
-    organizationJobs.updateOrganizationUser(org.id, owner, owner, { roleCode: "administrator" }, `org-owner-change-${suffix}`),
+    organizationJobs.updateOrganizationUser(org.id, owner, owner, { roleCode: "administrator", reason: "Attempt owner role change" }, `org-owner-change-${suffix}`),
     hasStatus(403),
   );
 });

@@ -8,7 +8,7 @@ import * as services from "../../src/services-mentorship/service.js";
 import * as initiatives from "../../src/platform/serve-community-initiatives.js";
 
 test.after(async()=>{await closePool()});
-function identity(suffix){const digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");return {email:`serve-i7-${suffix}@example.test`,password:"ServeCommunityI7Password!2026",firstName:"Serve",lastName:`Initiative${suffix.slice(0,8)}`,phone:`06${digits}`}}
+function identity(suffix){const digits=suffix.replace(/[^0-9a-f]/gi,"").slice(0,8).split("").map(character=>String(parseInt(character,16)%10)).join("");return {email:`serve-i7-${suffix}@example.test`,password:"ServeCommunityI7Password!2026",firstName:"Serve",lastName:`Initiative${suffix.slice(0,8)}`,phone:`06${digits}`}}
 async function account(){const suffix=randomUUID().replaceAll("-","").slice(0,16);return (await membership.register(identity(suffix),`serve-community-i7-${suffix}`)).user.id}
 async function activeAccount(){const userId=await account();await getPool().query("insert into membership_record(user_id,status,start_date,source) values($1,'active',current_date,'admin')",[userId]);return userId}
 async function reviewer(){const userId=await account();await getPool().query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='serve_community_reviewer' on conflict do nothing",[userId]);return userId}
@@ -58,9 +58,9 @@ test("database lifecycle: explicit consent, owner-only contact projection, capac
  assert.equal(withdrawn.status,"withdrawn");
  const row=(await getPool().query("select status,contact_consent from serve_community_participation where id=$1",[application.id])).rows[0];
  assert.equal(row.contact_consent,false);
- const consentEvents=await getPool().query("select consent_type,decision from serve_community_participation_consent_event where participation_id=$1 order by created_at",[application.id]);
- assert.equal(consentEvents.rowCount,5);
- assert.equal(consentEvents.rows.at(-1).decision,"withdrawn");
+ const consentEvents=await getPool().query("select count(*)::int total,count(*) filter(where decision='withdrawn')::int withdrawn from serve_community_participation_consent_event where participation_id=$1",[application.id]);
+ assert.equal(consentEvents.rows[0].total,5);
+ assert.equal(consentEvents.rows[0].withdrawn,2);
  const ownerAfter=await initiatives.listInitiativeParticipations(draft.id,owner);
  assert.equal(ownerAfter.items[0].applicant_email,null);
  assert.equal((await initiatives.listMyParticipations(participant)).items[0].status,"withdrawn");

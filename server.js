@@ -325,7 +325,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="services") {
       return ok(res,await networkPlusBusiness.getBusiness(parts[4],identity.sub),requestId);
     }
-    if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/network-plus/businesses/")) return ok(res,await networkPlusBusiness.getBusiness(parts[3],identity.sub),requestId);
+    if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/network-plus/businesses/")) return ok(res,await networkPlusBusiness.getBusiness(parts[4],identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/network-plus/services"){
       await enforcePersistentRateLimit(req,"network-plus.service.search",60,60000,identity.sub);
       const q=query(req.url);
@@ -362,7 +362,7 @@ const server=http.createServer(async (req,res)=>{
     }
     if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/network-plus/businesses/") && parts[6]==="verification") return ok(res,await networkPlusBusiness.reviewBusinessVerification(parts[5],identity.sub,await body(req),requestId),requestId);
     if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/network-plus/businesses/") && parts[6]==="moderation") return ok(res,await networkPlusBusiness.reviewBusinessModeration(parts[5],identity.sub,await body(req),requestId),requestId);
-    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/network-plus/services/") && parts[5]==="moderation") return ok(res,await networkPlusBusiness.moderateProfessionalServiceListing(parts[5],identity.sub,await body(req),requestId),requestId);
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/network-plus/services/") && parts[6]==="moderation") return ok(res,await networkPlusBusiness.moderateProfessionalServiceListing(parts[5],identity.sub,await body(req),requestId),requestId);
     if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/organizations/") && parts[4]==="network-plus-visibility"){
       return ok(res,await organizationJobs.updateNetworkPlusVisibility(parts[3],identity.sub,await body(req),requestId),requestId);
     }

@@ -208,7 +208,7 @@ Business routes above are planned destinations, not permission to create busines
 
 **Exit gate:** project-owner approval recorded 2026-10-31. The approved design is the input contract for Increment 5; legal/compliance policy for regulated categories, retention and jurisdiction-specific disclosures remains a publication gate, not a reason to invent defaults in the schema.
 
-### Increment 5 — business and professional-service models (next; schema and additive migration)
+### Increment 5 — business and professional-service models (implementation in progress; additive migration committed)
 1. Add business profile and ownership relations only if no canonical equivalent exists.
 2. Add professional service listings linked to an authorized business/organization owner.
 3. Link provider identity to canonical member/organization records.
@@ -219,6 +219,18 @@ Business routes above are planned destinations, not permission to create busines
 8. Add non-destructive migrations, compatibility checks, rollback notes and fixtures.
 
 **Exit gate:** schema review, migration compatibility, API authorization/privacy tests and duplicate/ownership tests. No production migration.
+
+**Implementation record (2026-10-31; validation pending):**
+- Added additive migration `20261031110000_network_plus_business_discovery.sql` for `network_plus_business`, explicit canonical owner relations, business-scoped capability delegation, verification cases/private evidence references, separate commercial service listings, and lifecycle event tables.
+- No person, member, professional-profile or organization identity table is duplicated. Business owner parties reference existing `app_user` or `organization` rows. Joint ownership requires a separate pending consent record for each co-owner.
+- Added `src/network-plus/business-discovery.js` with business creation/management, ownership consent, explicit manager delegation, business verification submission/review, profile moderation/publication, commercial service listing management/moderation, and bounded discovery projections.
+- Added authenticated API routes in `server.js` under `/api/v1/network-plus/businesses`, `/api/v1/network-plus/services` and `/api/v1/admin/network-plus/*`. Discovery and management functions re-resolve Network-Plus access; organization-owned business actions require current owner/administrator membership for the exact organization, while project-manager actions require an explicit business-scoped capability.
+- Public discovery projections return published, verified and approved business/listing fields only; they do not serialize ownership parties, contact details, verification evidence or reviewer notes. Listing audience is stored distinctly from public/member/organization identity visibility.
+- Added idempotency hashes/fingerprints, persistent rate limits for discovery and creation/submission endpoints, audit-log events, lifecycle event records and in-app reviewer/owner notifications.
+- Added `test/platform/network-plus-business-discovery.test.js` and extended `scripts/check-new-migration-compatibility.js` to execute the migration in the disposable-database rollback check and assert core tables, columns, indexes and foreign keys.
+- Existing `service_listing`, `service_request`, Serve-Community impact records and historical data are not altered, backfilled or converted. No production migration was run.
+
+**Known validation/release gates still open:** full PostgreSQL migration execution and rollback, runtime API integration tests against seeded member/organization identities, private evidence file review/download authorization, reviewer role/permission catalogue provisioning, and CI/type/lint/browser checks. The current implementation adds evidence metadata attachment and reviewer listing; it does not yet wire a reviewer evidence-download route or UI. Do not mark Increment 5 complete until these are addressed and the full disposable-DB/CI gate passes.
 
 ### Increment 6 — request and collaboration lifecycle
 1. Support service requests, supplier inquiries, referrals, expertise requests, partnership proposals and collaboration requests as distinct typed intents.

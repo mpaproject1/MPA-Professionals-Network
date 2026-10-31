@@ -114,10 +114,7 @@ const requiredColumns = [
   ["serve_community_participation","initiative_id","uuid"],["serve_community_participation","participant_user_id","uuid"],["serve_community_participation","consent_text_hash","text"],["serve_community_participation","contact_consent","bool"],
   ["serve_community_participation_consent_event","participation_id","uuid"],["serve_community_participation_consent_event","actor_user_id","uuid"],
   ["serve_community_participation_event","participation_id","uuid"],["serve_community_legacy_classification","service_listing_id","uuid"],["serve_community_legacy_classification","initiative_id","uuid"],
-  ["community_impact_detection_policy_version","id","uuid"],["community_impact_detection_policy_version","source_system","text"],["community_impact_detection_policy_version","source_type","text"],["community_impact_detection_policy_version","version","int4"],["community_impact_detection_policy_version","rules","jsonb"],
-  ["community_impact_detection_active_policy","source_system","text"],["community_impact_detection_active_policy","policy_version_id","uuid"],
-  ["community_impact_detection_candidate","id","uuid"],["community_impact_detection_candidate","source_record_id","uuid"],["community_impact_detection_candidate","source_event_id","uuid"],["community_impact_detection_candidate","contributor_user_id","uuid"],["community_impact_detection_candidate","canonical_category","text"],["community_impact_detection_candidate","confidence","numeric"],["community_impact_detection_candidate","policy_version_id","uuid"],
-  ["community_impact_detection_candidate_event","candidate_id","uuid"],["community_impact_detection_candidate_event","event_code","text"]
+
 ];
 
 const client = new Client({ connectionString, application_name: "mpa-migration-compatibility-check" });

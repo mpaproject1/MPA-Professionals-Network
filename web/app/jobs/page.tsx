@@ -121,10 +121,10 @@ export default function Jobs(){
    try{
      let draftId=draftIds[job.id];
      if(!draftId){
-       const draft=await api<{id:string}>("/api/v1/jobs/"+encodeURIComponent(job.id)+"/application-drafts",{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode||undefined,referralStatusConsent})},token);
+       const draft=await api<{id:string}>("/api/v1/jobs/"+encodeURIComponent(job.id)+"/application-drafts",{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode,referralStatusConsent})},token);
        draftId=draft.id;setDraftIds(current=>({...current,[job.id]:draftId!}));
      }else{
-       await api("/api/v1/job-applications/"+encodeURIComponent(draftId),{method:"PATCH",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode||undefined,referralStatusConsent})},token);
+       await api("/api/v1/job-applications/"+encodeURIComponent(draftId),{method:"PATCH",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode,referralStatusConsent})},token);
      }
      setNotice("Your application draft is saved to your account. You can return to it before submitting.");
    }catch(e){setError(e instanceof ApiError?e.message:"We couldn't save this draft. Your text is still on this page; retry before leaving.");}
@@ -139,10 +139,10 @@ export default function Jobs(){
     try{
       let draftId=draftIds[job.id];
       if(!draftId){
-        const draft=await api<{id:string}>(`/api/v1/jobs/${encodeURIComponent(job.id)}/application-drafts`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode||undefined,referralStatusConsent})},token);
+        const draft=await api<{id:string}>(`/api/v1/jobs/${encodeURIComponent(job.id)}/application-drafts`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode,referralStatusConsent})},token);
         draftId=draft.id;setDraftIds(current=>({...current,[job.id]:draftId!}));
       }
-      const submitted=await api<{status?:string;tracking_reference?:string|null}>(`/api/v1/job-applications/${encodeURIComponent(draftId)}/submit`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode||undefined,referralStatusConsent})},token);
+      const submitted=await api<{status?:string;tracking_reference?:string|null}>(`/api/v1/job-applications/${encodeURIComponent(draftId)}/submit`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode,referralStatusConsent})},token);
       setNotice(`Formal application status: ${humanStatus(submitted.status||"submitted")}.${submitted.tracking_reference?` Reference ${submitted.tracking_reference}.`:""} Open application tracking for the next steps.`);
       setDraftIds(current=>{const next={...current};delete next[job.id];return next;});
     }catch(e){

@@ -6,3 +6,13 @@
 .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:100%}
 .actions :global(.btn){min-height:40px;white-space:normal;text-align:center}
 @media(max-width:600px){.copy{flex-basis:100%}.actions{width:100%}.actions :global(.btn){flex:1 1 auto}}
+
+
+.header{gap:22px}
+.copy{flex-basis:460px}
+.eyebrow{font-weight:600;letter-spacing:.09em}
+.copy h1{font-weight:600;line-height:1.16;letter-spacing:-.03em;margin-bottom:12px}
+.description{font-size:15px;line-height:1.7}
+.actions{gap:10px}
+.actions :global(.btn){min-height:44px}
+@media(max-width:600px){.header{gap:16px}.actions :global(.btn){min-height:44px}}

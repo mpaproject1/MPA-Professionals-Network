@@ -112,6 +112,24 @@ test.describe("MPA shared visual system", () => {
     expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
   });
 
+  test("Serve-Community places completed projects after discovery and links members back to opportunities", async ({ page }) => {
+    let portfolioRequested = false;
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/v1/public/serve-community/completed-projects") portfolioRequested = true;
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/serve-community", { waitUntil: "domcontentloaded" });
+    const showcase = page.locator('section[aria-labelledby="sc-completed-title"]');
+    await expect(showcase).toBeVisible();
+    await expect(showcase.getByRole("heading", { name: "Completed Projects" })).toBeVisible();
+    await expect(showcase.getByRole("link", { name: /Find an initiative to join/ })).toHaveAttribute("href", "#discover");
+    await expect.poll(() => portfolioRequested).toBe(true);
+    const discoverIndex = await page.locator("#discover").evaluate(element => element.compareDocumentPosition(document.querySelector("#sc-completed-title")) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : 0);
+    expect(discoverIndex).toBe(1);
+    const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth }));
+    expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
+  });
+
   test("mobile navigation and primary controls preserve practical touch targets", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/", { waitUntil: "domcontentloaded" });

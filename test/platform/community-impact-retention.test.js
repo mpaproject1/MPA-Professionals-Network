@@ -32,8 +32,13 @@ test("policy proposals require separate authorization, independent approval and 
  assert.match(service,/community_impact\.retention\.approve/);
  assert.match(service,/row\.created_by===actorUserId/);
  assert.match(service,/Only an independently approved policy can be activated/);
- assert.match(service,/pg_advisory_xact_lock/);\n assert.match(service,/policyHash:row\.policy_hash/);
- assert.match(migration,/approved_by<>created_by/);\n assert.match(migration,/schema_version integer not null/);\n assert.match(migration,/policy_hash text not null/);\n assert.match(service,/createHash\("sha256"\)/);\n assert.match(service,/stableJson\(policy\)/);
+ assert.match(service,/pg_advisory_xact_lock/);
+ assert.match(service,/policyHash:row\.policy_hash/);
+ assert.match(migration,/approved_by<>created_by/);
+ assert.match(migration,/schema_version integer not null/);
+ assert.match(migration,/policy_hash text not null/);
+ assert.match(service,/createHash\("sha256"\)/);
+ assert.match(service,/stableJson\(policy\)/);
  assert.match(migration,/policy content is immutable/);
  assert.match(migration,/events are append-only/i);
 });

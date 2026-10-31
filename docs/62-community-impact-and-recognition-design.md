@@ -429,9 +429,9 @@ Do not introduce a new migration until the current schema and source-record keys
 ### Increment 3 — Manual claims and evidence
 - [x] Add authenticated-account claim drafts and lifecycle without requiring active membership.
 - [x] Capture category, contribution type/role, date range, organization/project context, and separate activity, output and outcome summaries.
-- [x] Add private evidence uploads using the existing bounded private-file store; upload authorization is claim-scoped and captures the active raw-evidence retention version before bytes are accepted.
+- [x] Add private evidence uploads using the existing bounded private-file store; upload authorization is claim-scoped and captures the active raw-evidence retention version before bytes are accepted. Claim-specific evidence downloads are limited to the claimant and currently assigned reviewer/appeal reviewer.
 - [x] Require approved active retention rules for claim metadata, consent/rights, raw evidence and audit events; snapshot each applicable policy version/rule with the record.
-- [x] Add private-by-default visibility requests, explicit public-consent/media-rights checks, clarification response, withdrawal and appeal submission.
+- [x] Add private-by-default visibility requests, explicit public-consent/media-rights checks, clarification response, withdrawal, appeal submission and draft evidence detachment (without bypassing retention or immediately deleting file bytes).
 - [ ] Non-member claimants remain gated until MPA approves a separate identity-assurance and anti-impersonation standard; no membership is created or granted by this flow.
 - [ ] Reconcile a manual claim with an existing detected contribution through a reviewer-controlled, idempotent link/merge flow; fuzzy matching must not auto-merge or reject.
 - [ ] Complete upload, storage, access, retention and cross-user privacy tests; CI and migration rehearsal must pass before exit.

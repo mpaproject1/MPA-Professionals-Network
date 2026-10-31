@@ -28,9 +28,9 @@ function safeWebsite(value) {
 }
 function publicText(value,max,field,{min=1}={}) {
   const v=text(value,max,field,{min});
-  const patterns=[/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/i,/(?:https?:\\/\\/|www\\.)\\S+/i,/(?:telegram|whatsapp|signal|instagram|facebook|tiktok)\\s*(?:handle|username|me|us|at)?\\s*[:@]\\s*[\\w.]{3,}/i,/(?:^|\\s)@[A-Z0-9_.]{3,}\\b/i];
-  const phones=v.match(/(?:\\+?\\d[\\d\\s().-]{7,}\\d)/g)||[];
-  if(patterns.some(pattern=>pattern.test(v))||phones.some(phone=>phone.replace(/\\D/g,"").length>=9))fail(400,"Remove personal contact details and direct-contact links from public profile/listing text. Use the approved website field instead.","PUBLIC_CONTACT_DETAILS_FORBIDDEN");
+  const patterns=[/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,/(?:https?:\/\/|www\.)\S+/i,/(?:telegram|whatsapp|signal|instagram|facebook|tiktok)\s*(?:handle|username|me|us|at)?\s*[:@]\s*[\w.]{3,}/i,/(?:^|\s)@[A-Z0-9_.]{3,}\b/i];
+  const phones=v.match(/(?:\+?\d[\d\s().-]{7,}\d)/g)||[];
+  if(patterns.some(pattern=>pattern.test(v))||phones.some(phone=>phone.replace(/\D/g,"").length>=9))fail(400,"Remove personal contact details and direct-contact links from public profile/listing text. Use the approved website field instead.","PUBLIC_CONTACT_DETAILS_FORBIDDEN");
   return v;
 }
 async function validateGeographyReference(db,id) {
@@ -445,7 +445,7 @@ export async function respondBusinessOwnership(ownershipId,userId,decision,reque
   return withTransaction(async db=>{
     const row=(await db.query("select * from network_plus_business_ownership where id=$1 for update",[ownershipId])).rows[0];
     if(!row)fail(404,"Ownership invitation not found.","NOT_FOUND");
-    const permitted=(row.owner_type==="member"&&row.owner_user_id===userId)||(row.owner_type==="organization"&&Boolean((await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code=any($3::text[])",[row.owner_organization_id,userId,ORG_OWNER_ROLES])).rowCount);
+    const permitted=(row.owner_type==="member"&&row.owner_user_id===userId)||(row.owner_type==="organization"&&Boolean((await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code=any($3::text[])",[row.owner_organization_id,userId,ORG_OWNER_ROLES])).rowCount));
     if(!permitted)fail(403,"Only the invited owner party may respond to this ownership request.","OWNERSHIP_FORBIDDEN");
     if(decision==="accepted"&&row.owner_type==="member"&&(!(await hasCurrentActiveMembership(db,userId))||!(await hasProfessionalIdentity(db,userId))))fail(403,"An active professional membership is required to accept business ownership.","OWNER_NOT_ELIGIBLE");
     if(row.status!=="pending"||row.consent_status!=="pending")fail(409,"This ownership invitation is no longer awaiting consent.","INVALID_STATE");

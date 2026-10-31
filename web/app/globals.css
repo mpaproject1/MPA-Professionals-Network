@@ -473,7 +473,7 @@ body{background:radial-gradient(ellipse at 12% 8%,rgba(218,239,147,.22),transpar
  .topbar .top-actions select{display:none}
  .topbar .top-actions .btn{padding:8px}
 }
-.mpa-experience .refresh-control,.mpa-experience button:has(svg.lucide-refresh-cw),button:has(svg.lucide-refresh-cw){display:none!important}
+/* Refresh controls must remain available to users; hide only controls explicitly marked by their owning component. */
 .operation-status__icon--moving{color:var(--primary);animation:mpa-brand-spin .9s linear infinite}
 .operation-status--loading .operation-status__icon{width:36px;height:36px;display:grid;place-items:center;border-radius:12px;background:color-mix(in srgb,var(--gold) 28%,var(--surface));color:var(--primary)}
 .operation-status--loading .operation-status__icon svg{stroke-width:2.5}

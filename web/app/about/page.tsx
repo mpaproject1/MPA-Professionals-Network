@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import { Accessibility, ArrowRight, BarChart3, BriefcaseBusiness, ChartNoAxesCombined, GraduationCap, HandHeart, ShieldCheck, UserRoundCheck, Users } from "lucide-react";
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import styles from "./about.module.css";
 

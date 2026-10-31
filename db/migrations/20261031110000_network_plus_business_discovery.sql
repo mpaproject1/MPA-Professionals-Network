@@ -192,6 +192,12 @@ create table if not exists network_plus_service_listing_event (
 create index if not exists ix_network_plus_service_event_history
   on network_plus_service_listing_event(listing_id,created_at desc);
 
+-- Add distinct reviewer roles but do not assign them to any account.
+insert into app_role(role_code,name,description) values
+  ('business_verification_reviewer','Business Verification Reviewer','Reviews Network-Plus business verification evidence and decisions; must be independent of the business submitter.'),
+  ('business_moderator','Business Moderator','Moderates Network-Plus business profiles and commercial service listings; creators and submitters cannot review their own records.')
+on conflict(role_code) do update set name=excluded.name,description=excluded.description;
+
 -- Register capabilities without granting them to any account. Direct assignments
 -- remain governed by permissions.manage and independent reviewer appointment.
 insert into app_permission(permission_code,area,label,description,sensitive,system_only) values

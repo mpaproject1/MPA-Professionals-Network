@@ -21,6 +21,8 @@ async function mockSession(page) {
   await page.route("**/api/v1/organizations", route => route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[]})}));
   await page.route("**/api/v1/notifications?*", route => route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{counts:{unread:0}}})}));
   await page.route("**/api/v1/network-plus/access", route => route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{eligible:true,access:{member:true,organization:false},nextAction:"Choose discovery."}})}));
+  await page.route("**/api/v1/network-plus/businesses?*", route => route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[]}})}));
+  await page.route("**/api/v1/network-plus/services?*", route => route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[]}})}));
 }
 
 test.describe("Network-Plus request and collaboration journey",()=>{

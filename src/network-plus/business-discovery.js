@@ -120,6 +120,17 @@ async function assertBusinessOwner(db,businessId,userId,capability="business.man
   if(!delegated)fail(403,"An active owner or explicit business-scoped assignment is required.","BUSINESS_FORBIDDEN");
   return {business,owner:null};
 }
+async function assertIndependentBusinessReviewer(db,businessId,userId) {
+  const conflict=(await db.query(`select 1 from network_plus_business_ownership bo
+    where bo.business_id=$1 and bo.status='active' and bo.consent_status='accepted'
+      and ((bo.owner_type='member' and bo.owner_user_id=$2) or
+        (bo.owner_type='organization' and exists(select 1 from organization_membership om
+          where om.organization_id=bo.owner_organization_id and om.user_id=$2 and om.status='active' and om.role_code=any($3::text[]))))
+    union all
+    select 1 from network_plus_business_access a where a.business_id=$1 and a.user_id=$2 and a.revoked_at is null and (a.expires_at is null or a.expires_at>now())
+    limit 1`,[businessId,userId,ORG_OWNER_ROLES])).rowCount>0;
+  if(conflict)fail(403,"A business owner, co-owner or delegated manager cannot review or moderate that business.","BUSINESS_REVIEW_CONFLICT");
+}
 async function audit(db,actor,action,type,id,requestId,metadata={}) {
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,metadata]);
   if(type==="network_plus_business")await db.query("insert into network_plus_business_event(business_id,actor_user_id,event_code,from_status,to_status,reason,request_id,metadata) values($1,$2,$3,$4,$5,$6,$7,$8)",[id,actor,action,metadata.from||null,metadata.to||metadata.status||null,metadata.reason||null,requestId,metadata]);
@@ -251,6 +262,7 @@ export async function reviewBusinessVerification(businessId,userId,input,request
     const open=(await db.query("select * from network_plus_business_verification_case where business_id=$1 and status in ('submitted','under_review','appealed') order by created_at desc limit 1 for update",[businessId])).rows[0];
     if(!open)fail(409,"There is no open business verification case.","NO_OPEN_VERIFICATION_CASE");
     if(open.submitted_by===userId)fail(403,"A person cannot review their own business verification submission.","SELF_REVIEW_FORBIDDEN");
+    await assertIndependentBusinessReviewer(db,businessId,userId);
     const expiry=input.expiresAt?new Date(input.expiresAt):null;
     if(status==="verified"&&(!expiry||!Number.isFinite(expiry.getTime())||expiry<=new Date()))fail(400,"A verified decision requires a valid future revalidation date.","VERIFICATION_EXPIRY_REQUIRED");
     const updated=(await db.query(`update network_plus_business_verification_case set status=$1,reviewer_user_id=$2,decision_reason=$3,reviewed_at=now(),expires_at=$4,updated_at=now() where id=$5 returning *`,[status,userId,reason,expiry,open.id])).rows[0];
@@ -320,6 +332,7 @@ export async function moderateProfessionalServiceListing(listingId,userId,input,
     const row=(await db.query("select * from network_plus_service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row)fail(404,"Professional service listing not found.","NOT_FOUND");
     if(row.created_by===userId||row.submitted_by===userId)fail(403,"A listing creator or submitter cannot moderate their own listing.","SELF_REVIEW_FORBIDDEN");
+    await assertIndependentBusinessReviewer(db,row.business_id,userId);
     if(status==="suspended" ? !["published","paused","pending_review"].includes(row.status) : !["pending_review","suspended"].includes(row.status))fail(409,"This listing is not in a state eligible for the requested moderation decision.","INVALID_STATE");
     if(status==="published")await assertBusinessPublishable(db,row.business_id);
     const updated=(await db.query(`update network_plus_service_listing set status=$1,moderation_reason=$2,reviewed_by=$3,reviewed_at=now(),
@@ -461,6 +474,7 @@ export async function reviewBusinessModeration(businessId,userId,input,requestId
     const row=(await db.query("select * from network_plus_business where id=$1 for update",[businessId])).rows[0];
     if(!row)fail(404,"Business not found.","NOT_FOUND");
     if(row.created_by===userId||row.moderation_submitted_by===userId)fail(403,"A business creator or submitter cannot moderate their own business profile.","SELF_REVIEW_FORBIDDEN");
+    await assertIndependentBusinessReviewer(db,businessId,userId);
     if(status!=="suspended"&&row.moderation_status!=="pending_review"&&!(status==="approved"&&row.publication_status==="suspended"))fail(409,"Business profile is not awaiting moderation or eligible for reinstatement.","INVALID_STATE");
     if(status==="approved"&&row.verification_status!=="verified")fail(409,"Only a verified business profile can be approved for publication.","BUSINESS_NOT_VERIFIED");
     const updated=(await db.query("update network_plus_business set moderation_status=$1,publication_status=case when $1='suspended' then 'suspended' when $1='approved' then 'published' else 'draft' end,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];

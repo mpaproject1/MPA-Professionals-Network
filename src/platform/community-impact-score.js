@@ -94,8 +94,10 @@ async function scoreClaim(tx,actorUserId,claimId,rationale,policy,recalcId){
  const maturityRank=Number(calc.outcomeMaturityRank[assessment.outcome_maturity]),minimumMaturity=Number(calc.outcomeMaturityRank[calc.minimumOutcomeMaturity]);
  if(!Number.isFinite(maturityRank)||maturityRank<minimumMaturity)fail(409,"Contribution outcome maturity does not meet the active score policy threshold.","SCORE_OUTCOME_THRESHOLD");
  const candidateLink=(await tx.query("select c.* from community_impact_claim_candidate_link l join community_impact_detection_candidate c on c.id=l.candidate_id where l.claim_id=$1 order by l.created_at desc limit 1",[claimId])).rows[0];
- if(candidateLink&&(candidateLink.detection_status!=="detected"||candidateLink.attribution_status!=="confirmed"))fail(409,"The linked detected source is reversed or its contributor attribution is not confirmed.","SCORE_ATTRIBUTION_UNCONFIRMED");
+ if(candidateLink&&candidateLink.detection_status!=="detected")fail(409,"The linked detected source has been reversed and cannot be scored.","SCORE_SOURCE_REVERSED");
+ if(candidateLink&&candidateLink.source_type==="initiative_participation"&&candidateLink.attribution_status!=="confirmed")fail(409,"Serve-Community participation attribution is not confirmed.","SCORE_ATTRIBUTION_UNCONFIRMED");
  if(candidateLink&&candidateLink.contributor_user_id&&candidateLink.contributor_user_id!==claim.claimant_user_id)fail(409,"The claim claimant does not match the verified source contributor.","SCORE_ATTRIBUTION_MISMATCH");
+ if(candidateLink&&sourceLink&&["serve_community_participation","offline_completed_project"].includes(sourceLink.source_type)&&candidateLink.id!==sourceLink.source_record_id)fail(409,"The score source link does not match the claim's reconciled detected candidate.","SCORE_SOURCE_MISMATCH");
  const rubric=assessment.rubric||{},ratings=rubric.dimensions||rubric;
  const explanations=[];let weighted=0;
  for(const d of policy.policy.dimensions){

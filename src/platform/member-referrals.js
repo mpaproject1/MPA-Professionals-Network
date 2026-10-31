@@ -35,11 +35,12 @@ async function event(db,attribution,eventCode,fromStatus,toStatus,actor,metadata
 }
 export async function ensureMyReferralCode(userId){
  const db=getPool();await activeMember(db,userId);
+ const retention=await retentionSnapshot(db,"referral_attribution_records");
  const existing=(await db.query("select code,status,created_at from member_referral_code where member_user_id=$1",[userId])).rows[0];
  if(existing)return {...existing,shareUrl:"/register?ref="+encodeURIComponent(existing.code)};
  for(let attempt=0;attempt<5;attempt++){
   const code=makeCode();
-  try{const row=(await db.query("insert into member_referral_code(member_user_id,code) values($1,$2) on conflict(member_user_id) do nothing returning code,status,created_at",[userId,code])).rows[0];if(row)return {...row,shareUrl:"/register?ref="+encodeURIComponent(row.code)};}catch(e){if(e.code!=="23505")throw e;}
+  try{const row=(await db.query("insert into member_referral_code(member_user_id,code,retention_policy_version_id,retention_policy_snapshot) values($1,$2,$3,$4) on conflict(member_user_id) do nothing returning code,status,created_at",[userId,code,retention.versionId,retention.snapshot?JSON.stringify(retention.snapshot):null])).rows[0];if(row)return {...row,shareUrl:"/register?ref="+encodeURIComponent(row.code)};}catch(e){if(e.code!=="23505")throw e;}
   const raced=(await db.query("select code,status,created_at from member_referral_code where member_user_id=$1",[userId])).rows[0];if(raced)return {...raced,shareUrl:"/register?ref="+encodeURIComponent(raced.code)};
  }
  fail(503,"A referral code could not be generated. Please retry.","REFERRAL_CODE_GENERATION_FAILED");

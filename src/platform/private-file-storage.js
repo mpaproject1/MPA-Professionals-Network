@@ -86,9 +86,11 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
       join network_plus_business_verification_case vc on vc.id=e.case_id
       join network_plus_business_ownership bo on bo.business_id=vc.business_id
       where e.file_object_id=$1 and bo.status='active' and bo.consent_status='accepted'
-        and ((bo.owner_type='member' and bo.owner_user_id=$2)
-          or (bo.owner_type='organization' and exists(select 1 from organization_membership om
-            where om.organization_id=bo.owner_organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator'))))
+        and ((bo.owner_type='member' and bo.owner_user_id=$2
+            and exists(select 1 from membership_record mr where mr.user_id=$2 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))
+            and exists(select 1 from app_user_role ur join app_role ar on ar.id=ur.role_id where ur.user_id=$2 and ar.role_code in ('member','professional')))
+          or (bo.owner_type='organization' and exists(select 1 from organization_membership om join organization o on o.id=om.organization_id
+            where om.organization_id=bo.owner_organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified')))
       limit 1`,[fileId,userId]);
     allowed=businessOwnerEvidence.rowCount>0;
   }

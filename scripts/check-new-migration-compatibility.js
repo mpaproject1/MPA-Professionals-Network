@@ -282,13 +282,21 @@ try {
     ["serve_community_offline_project","beneficiary_count","int4"],
     ["serve_community_offline_project","outcome_metrics","jsonb"],
     ["serve_community_offline_project","image_urls","jsonb"],
+    ["serve_community_offline_project","image_alt_text","jsonb"],
+    ["serve_community_offline_project","offline_source","text"],
+    ["serve_community_offline_project","consent_confirmed","bool"],
+    ["serve_community_offline_project","public_visible","bool"],
+    ["serve_community_offline_project","source_reference","text"],
     ["serve_community_offline_project","video_urls","jsonb"],
     ["serve_community_offline_project","created_by","uuid"],
     ["serve_community_offline_project","updated_by","uuid"],
     ["serve_community_offline_project","status","text"],
     ["serve_community_offline_project_event","id","uuid"],
     ["serve_community_offline_project_event","project_id","uuid"],
-    ["serve_community_offline_project_event","actor_user_id","uuid"]
+    ["serve_community_offline_project_event","actor_user_id","uuid"],
+    ["serve_community_offline_project_event","event_code","text"],
+    ["serve_community_offline_project_event","reason","text"],
+    ["serve_community_offline_project_event","created_at","timestamptz"]
   ];
   const columnErrors = [];
   for (const [table,column,type] of postMigrationColumns) {
@@ -314,7 +322,10 @@ try {
     ["serve_community_offline_project","updated_by"],
     ["serve_community_offline_project","status"],
     ["serve_community_offline_project_event","project_id"],
-    ["serve_community_offline_project_event","actor_user_id"]
+    ["serve_community_offline_project_event","actor_user_id"],
+    ["serve_community_offline_project_event","event_code"],
+    ["serve_community_offline_project_event","reason"],
+    ["serve_community_offline_project_event","created_at"]
   ];
   for (const [table,column] of requiredNotNull) {
     const result = await client.query(

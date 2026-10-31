@@ -27,7 +27,7 @@ export default function CommunityImpactRetentionPage(){
  const [approvalReference,setApprovalReference]=useState(""),[approvalReason,setApprovalReason]=useState(""),[activationReason,setActivationReason]=useState("");
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  useEffect(()=>{if(!hydrated)hydrateToken()},[hydrated,hydrateToken]);
- const load=useCallback(async()=>{if(!token)return;setLoading(true);setError("");try{setData(await api<Governance>("/api/v1/admin/community-impact/retention-policy",{},token));}catch(e){setError(e instanceof Error?e.message:"Retention policy governance could not be loaded.");}finally{setLoading(false)}},[token]);
+ const load=useCallback(async()=>{if(!token)return;setLoading(true);setError("");try{const result=await api<Governance>("/api/v1/admin/community-impact/retention-policy",{},token);setData(result);if(result.active?.policy?.dataClasses){setRules(Object.fromEntries(classes.map(({key})=>{const item=result.active!.policy.dataClasses[key];return [key,{retentionDays:String(item.retentionDays),graceDays:String(item.graceDays),retentionStart:item.retentionStart,expiryAction:item.expiryAction}]})) as Record<DataClass,Rule>);}}catch(e){setError(e instanceof Error?e.message:"Retention policy governance could not be loaded.");}finally{setLoading(false)}},[token]);
  useEffect(()=>{if(hydrated&&token)void load()},[hydrated,token,load]);
  const pending=useMemo(()=>data?.items.filter(item=>item.status==="in_review")||[],[data]);
  const approved=useMemo(()=>data?.items.filter(item=>item.status==="approved")||[],[data]);
@@ -59,6 +59,7 @@ export default function CommunityImpactRetentionPage(){
    <div><h2 className="h2">Current enforcement state</h2><p className="muted">No retention duration is assumed. Automated expiry is not enabled by this policy registry.</p></div>
    <p><strong>Active policy:</strong> {data?.active?"Version "+data.active.version:"No approved policy activated"}</p>
    <p><strong>Evidence deletion:</strong> Not enabled — evidence lifecycle integration and release validation are still required.</p>
+   {data?.active?.policy?.dataClasses?<div className="grid" style={{gap:6}}><h3>Active policy schedule</h3>{classes.map(({key,label:classLabel})=>{const item=data.active!.policy.dataClasses[key];return <p key={key}><strong>{classLabel}:</strong> {item.retentionDays} days + {item.graceDays} grace days · {label(item.retentionStart)} · {label(item.expiryAction)}</p>})}</div>:null}
    <button type="button" className="btn btn-ghost" onClick={()=>void load()} disabled={loading||busy}>{loading?"Refreshing…":"Refresh policy status"}</button>
   </section>
   <section className="card grid" style={{gap:14}}>

@@ -267,7 +267,7 @@ export async function submitProfessionalServiceListing(listingId,userId,requestI
     await assertBusinessOwner(db,row.business_id,userId);
     await assertBusinessPublishable(db,row.business_id);
     if(!["draft","changes_requested","rejected","paused"].includes(row.status))fail(409,"This listing is not ready for moderation submission.","INVALID_STATE");
-    const updated=(await db.query("update network_plus_service_listing set status='pending_review',moderation_reason=null,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
+    const updated=(await db.query("update network_plus_service_listing set status='pending_review',moderation_reason=null,submitted_by=$2,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
     await db.query("insert into network_plus_service_listing_event(listing_id,actor_user_id,event_code,from_status,to_status,request_id) values($1,$2,'submitted_for_moderation',$3,'pending_review',$4)",[listingId,userId,row.status,requestId]);
     await audit(db,userId,"network_plus.service_listing_submitted","network_plus_service_listing",listingId,requestId,{businessId:row.business_id});
     const reviewers=(await db.query(`select distinct u.id from app_user u where u.status='active' and
@@ -285,7 +285,7 @@ export async function moderateProfessionalServiceListing(listingId,userId,input,
     if(!roles.some(r=>LISTING_REVIEW_ROLES.includes(r))&&!permissions.includes("business.moderate"))fail(403,"Independent business-listing moderation authority is required.","LISTING_REVIEW_FORBIDDEN");
     const row=(await db.query("select * from network_plus_service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row)fail(404,"Professional service listing not found.","NOT_FOUND");
-    if(row.created_by===userId)fail(403,"A listing creator cannot moderate their own listing.","SELF_REVIEW_FORBIDDEN");
+    if(row.created_by===userId||row.submitted_by===userId)fail(403,"A listing creator or submitter cannot moderate their own listing.","SELF_REVIEW_FORBIDDEN");
     if(row.status!=="pending_review")fail(409,"Only a listing awaiting moderation can receive this decision.","INVALID_STATE");
     if(status==="published")await assertBusinessPublishable(db,row.business_id);
     const updated=(await db.query(`update network_plus_service_listing set status=$1,moderation_reason=$2,reviewed_by=$3,reviewed_at=now(),
@@ -401,7 +401,7 @@ export async function submitBusinessModeration(businessId,userId,requestId) {
   return withTransaction(async db=>{
     const {business}=await assertBusinessOwner(db,businessId,userId);
     if(business.verification_status!=="verified")fail(409,"Business verification must be complete before profile moderation.","BUSINESS_NOT_VERIFIED");
-    const updated=(await db.query("update network_plus_business set moderation_status='pending_review',updated_at=now() where id=$1 and moderation_status in ('not_submitted','rejected') returning *",[businessId])).rows[0];
+    const updated=(await db.query("update network_plus_business set moderation_status='pending_review',moderation_submitted_by=$2,updated_at=now() where id=$1 and moderation_status in ('not_submitted','rejected') returning *",[businessId,userId])).rows[0];
     if(!updated)fail(409,"Business profile is already under review or cannot be resubmitted.","INVALID_STATE");
     await audit(db,userId,"network_plus.business_profile_submitted","network_plus_business",businessId,requestId,{});
     const reviewers=(await db.query("select distinct u.id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($1::text[])) or exists(select 1 from app_user_permission p where p.user_id=u.id and p.permission_code='business.moderate'))",[LISTING_REVIEW_ROLES])).rows;
@@ -417,7 +417,7 @@ export async function reviewBusinessModeration(businessId,userId,input,requestId
     if(!roles.some(r=>LISTING_REVIEW_ROLES.includes(r))&&!permissions.includes("business.moderate"))fail(403,"Independent business moderation authority is required.","BUSINESS_MODERATION_FORBIDDEN");
     const row=(await db.query("select * from network_plus_business where id=$1 for update",[businessId])).rows[0];
     if(!row)fail(404,"Business not found.","NOT_FOUND");
-    if(row.created_by===userId)fail(403,"A business creator cannot moderate their own business profile.","SELF_REVIEW_FORBIDDEN");
+    if(row.created_by===userId||row.moderation_submitted_by===userId)fail(403,"A business creator or submitter cannot moderate their own business profile.","SELF_REVIEW_FORBIDDEN");
     if(row.moderation_status!=="pending_review")fail(409,"Business profile is not awaiting moderation.","INVALID_STATE");
     if(status==="approved"&&row.verification_status!=="verified")fail(409,"Only a verified business profile can be approved for publication.","BUSINESS_NOT_VERIFIED");
     const updated=(await db.query("update network_plus_business set moderation_status=$1,publication_status=case when $1='suspended' then 'suspended' when $1='approved' then 'published' else 'draft' end,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];

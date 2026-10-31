@@ -52,6 +52,7 @@ async function audit(db,requestId,actor,event,from,to,requestIdHeader,metadata={
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'network_plus_request',$3,$4,'success',$5)",[actor,event,requestId,requestIdHeader||null,metadata]);
 }
 function canTransition(intent,from,to,actorRole) {
+  if(["in_progress","completed"].includes(to)&&!["service_request","supplier_inquiry","partnership_proposal","collaboration_request"].includes(intent))return false;
   const map={
     draft:["submitted","withdrawn"],
     submitted:["under_review","clarification_requested","accepted","declined","withdrawn"],
@@ -142,7 +143,10 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
       disputed_at=case when $1='disputed' then now() else disputed_at end,closed_at=case when $1='closed' then now() else closed_at end,
       version=version+1,updated_at=now() where id=$2 returning *`,[to,requestId])).rows[0];
     await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version},idempotencyHash,requestFingerprint);
+    if(["disputed","completed","closed"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to; await db.query("update network_plus_collaboration_workspace set status=$1,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId]); }
     if(to==="accepted") {
+      if(row.recipient_user_id && row.recipient_user_id!==userId)fail(403,"Only the intended recipient may accept this request.","RECIPIENT_AUTHORITY_REQUIRED");
+      if(row.recipient_user_id) { const currentMember=(await db.query("select 1 from membership_record where user_id=$1 and status=$2 and start_date<=current_date and (end_date is null or end_date>=current_date)",[userId,"active"])).rowCount>0; if(!currentMember)fail(403,"The intended recipient must retain active membership to accept.","RECIPIENT_AUTHORITY_REQUIRED"); }
       if(row.recipient_organization_id) {
         const currentRep=(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code in ('owner','administrator')",[row.recipient_organization_id,userId])).rowCount>0;
         if(!currentRep)fail(403,"Only a current active owner or administrator of the recipient organization may accept.","RECIPIENT_AUTHORITY_REQUIRED");
@@ -171,6 +175,7 @@ export async function listNetworkPlusRequests(userId,{status,intent,limit=30,off
       from network_plus_request r where (${support} or exists(select 1 from network_plus_request_participant p where p.request_id=r.id and p.user_id=$1 and p.consent_status<>'revoked'))
       and ($2::text is null or r.status=$2) and ($3::text is null or r.intent=$3)
       order by r.updated_at desc limit $4 offset $5`,[userId,status||null,intent||null,Math.min(100,Math.max(1,Number(limit)||30)),Math.max(0,Number(offset)||0)])).rows;
+    if(support) for(const row of rows) await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_list","network_plus_request",row.id,"success",{reason:supportReason,ticket:supportTicket}]);
     return rows;
   });
 }

@@ -1134,7 +1134,7 @@ The following additive backend work has been prepared for this branch. It does n
 
 ### Initial scoring policy
 
-The initial policy is version 1, seeded as the active policy for private/evaluation calculations. It uses the approved Section 8 dimensions and weights:
+The initial plan baseline was seeded as version 1; the fully specified operational version 2 is the active policy for private/evaluation calculations. Version 2 preserves the exact five approved weights and adds policy-driven evidence-quality ranks, outcome-maturity ranks and rating steps. It uses the approved Section 8 dimensions and weights:
 
 - Measurable community outcomes — 30%.
 - Quality and significance — 25%.

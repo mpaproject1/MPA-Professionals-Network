@@ -18,9 +18,18 @@ export default function CommunityImpactClaimReviewPage(){
  const [canAssign,setCanAssign]=useState(false),[canReview,setCanReview]=useState(false),[canAppeal,setCanAppeal]=useState(false);
  useEffect(()=>{if(!hydrated)hydrateToken()},[hydrated,hydrateToken]);
  const load=useCallback(async()=>{if(!token)return;setLoading(true);setError("");try{
-  const [self,queue,reviewerResult]=await Promise.all([api<{user_id:string;permissions?:string[];roles?:string[]}>("/api/v1/me",{},token),api<{items:Claim[]}>("/api/v1/admin/community-impact/claims?status="+encodeURIComponent(status),{},token),api<{items:Reviewer[]}>("/api/v1/admin/community-impact/claim-reviewers",{},token).catch(()=>({items:[]}))]);
-  setMe(self.user_id);const perms=self.permissions||[],roles=self.roles||[];setCanAssign(roles.includes("system_admin")||perms.includes("community_impact.claim.assign"));setCanReview(roles.includes("system_admin")||perms.includes("community_impact.claim.review"));setCanAppeal(roles.includes("system_admin")||perms.includes("community_impact.claim.appeal_review"));setClaims(queue.items||[]);setReviewers(reviewerResult.items||[]);
-  if(roles.includes("system_admin")||perms.includes("community_impact.claim.assign")||roles.includes("system_admin")||perms.includes("community_impact.claim.appeal_review")){const result=await api<{items:Appeal[]}>("/api/v1/admin/community-impact/claim-appeals",{},token).catch(()=>({items:[]}));setAppeals(result.items||[])}
+  const self=await api<{user_id:string;permissions?:string[];roles?:string[]}>("/api/v1/me",{},token);
+  setMe(self.user_id);const perms=self.permissions||[],roles=self.roles||[];
+  const assign=roles.includes("system_admin")||perms.includes("community_impact.claim.assign");
+  const review=roles.includes("system_admin")||perms.includes("community_impact.claim.review");
+  const appeal=roles.includes("system_admin")||perms.includes("community_impact.claim.appeal_review");
+  setCanAssign(assign);setCanReview(review);setCanAppeal(appeal);
+  const [queue,reviewerResult,appealResult]=await Promise.all([
+   assign||review?api<{items:Claim[]}>("/api/v1/admin/community-impact/claims?status="+encodeURIComponent(status),{},token):Promise.resolve({items:[]}),
+   assign?api<{items:Reviewer[]}>("/api/v1/admin/community-impact/claim-reviewers",{},token):Promise.resolve({items:[]}),
+   assign||appeal?api<{items:Appeal[]}>("/api/v1/admin/community-impact/claim-appeals",{},token):Promise.resolve({items:[]})
+  ]);
+  setClaims(queue.items||[]);setReviewers(reviewerResult.items||[]);setAppeals(appealResult.items||[]);
  }catch(e){setError(e instanceof Error?e.message:"The impact review queue could not be loaded.")}finally{setLoading(false)}},[token,status]);
  useEffect(()=>{if(hydrated&&token)void load()},[hydrated,token,load]);
  const assign=async(item:Claim)=>{const reviewerUserId=assignments[item.id]||"";setBusy(item.id);setError("");try{await api("/api/v1/admin/community-impact/claims/"+encodeURIComponent(item.id)+"/assign",{method:"POST",body:JSON.stringify({reviewerUserId,reason:"Assigned for independent Community Impact claim review."})},token);setNotice("Claim assigned. Evidence access is now limited to its claimant and assigned reviewer.");await load()}catch(e){setError(e instanceof Error?e.message:"Claim could not be assigned.")}finally{setBusy("")}};

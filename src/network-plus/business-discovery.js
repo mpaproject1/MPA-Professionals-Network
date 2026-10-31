@@ -358,7 +358,7 @@ export async function getProfessionalService(listingId,viewerId) {
   const row=(await db.query(`select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.description,s.service_category,s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.availability,s.credentials,s.published_at
     from network_plus_service_listing s join network_plus_business b on b.id=s.business_id
     where s.id=$1 and s.audience=any($2::text[]) and s.status='published' and b.publication_status='published' and b.verification_status='verified' and b.moderation_status='approved'
-      and (b.verification_expires_at is null or b.verification_expires_at>now()) and not exists(select 1 from network_plus_business_ownership bo join organization o on o.id=bo.owner_organization_id where bo.business_id=b.id and bo.owner_type='organization' and bo.status='active' and bo.consent_status='accepted' and o.verification_status<>'verified')`,[listingId,access.access.member?["members","both"]:["organizations","both"]])).rows[0];
+      and (b.verification_expires_at is null or b.verification_expires_at>now()) and not exists(select 1 from network_plus_business_ownership bo join organization o on o.id=bo.owner_organization_id where bo.business_id=b.id and bo.owner_type='organization' and bo.status='active' and bo.consent_status='accepted' and o.verification_status<>'verified')`,[listingId,visibleAudiences(access)])).rows[0];
   if(!row)fail(404,"Published professional service not found.","NOT_FOUND");
   return row;
 }

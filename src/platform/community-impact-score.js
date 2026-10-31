@@ -2,7 +2,8 @@ import {createHash} from "node:crypto";
 import {getPool,withTransaction} from "./db.js";
 import {policyError} from "./identity-policy.js";
 
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst fail=(status,message,code="COMMUNITY_IMPACT_SCORE_ERROR")=>{throw policyError(status,message,code)};
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const fail=(status,message,code="COMMUNITY_IMPACT_SCORE_ERROR")=>{throw policyError(status,message,code)};
 const clean=(value,min,max,label)=>{const v=String(value??"").trim();if(v.length<min||v.length>max)fail(400,label+" must be between "+min+" and "+max+" characters.","VALIDATION_ERROR");return v};
 async function permission(db,userId,code){const q=await db.query("select exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code='system_admin') or exists(select 1 from app_user_permission where user_id=$1 and permission_code=$2) allowed",[userId,code]);if(!q.rows[0]?.allowed)fail(403,"The required Community Impact score permission is required.","FORBIDDEN")}
 const hash=value=>createHash("sha256").update(value).digest("hex");
@@ -112,8 +113,9 @@ export async function proposeScorePolicy(actor,input){
  await permission(getPool(),actor,"community_impact.score.policy.manage");
  const policy=validatePolicy(input?.policy),rationale=clean(input?.rationale,12,2000,"Policy rationale"),summary=clean(input?.changeSummary,8,1000,"Change summary");
  return withTransaction(async tx=>{
-  const current=await tx.query("select coalesce(max(version),0)::int version from community_impact_score_policy_version");
-  await tx.query("lock table community_impact_score_policy_version in exclusive mode");\n  const latest=await tx.query("select coalesce(max(version),0)::int version from community_impact_score_policy_version");\n  const version=latest.rows[0].version+1,serialized=JSON.stringify(policy),digest=hash(serialized);
+  await tx.query("lock table community_impact_score_policy_version in exclusive mode");
+  const latest=await tx.query("select coalesce(max(version),0)::int version from community_impact_score_policy_version");
+  const version=latest.rows[0].version+1,serialized=JSON.stringify(policy),digest=hash(serialized);
   const row=(await tx.query("insert into community_impact_score_policy_version(version,schema_version,policy_hash,policy,status,evaluation_only,public_score_enabled,rationale,change_summary,created_by) values($1,1,$2,$3,'in_review',true,false,$4,$5,$6) returning id,version,status",[version,digest,policy,rationale,summary,actor])).rows[0];
   await tx.query("insert into community_impact_score_policy_event(policy_version_id,actor_user_id,event_code,rationale,metadata) values($1,$2,'proposed',$3,$4)",[row.id,actor,rationale,{version,policyHash:digest}]);
   return row;
@@ -167,6 +169,7 @@ export async function recalculateVerifiedClaim(actor,claimId,input){
  await permission(getPool(),actor,"community_impact.score.recalculate");
  const rationale=clean(input?.rationale,12,2000,"Recalculation rationale");
  return withTransaction(async tx=>{
+  const locked=(await tx.query("select id from community_impact_claim where id=$1 for update",[claimId])).rows[0];if(!locked)fail(404,"Contribution claim not found.","NOT_FOUND");
   const policy=await activePolicy(tx);
   const prior=(await tx.query("select * from community_impact_score_ledger where claim_id=$1 and entry_type='award' and not exists(select 1 from community_impact_score_ledger r where r.reverses_entry_id=community_impact_score_ledger.id) order by created_at desc for update",[claimId])).rows;
   const currentAssessment=(await tx.query("select id from community_impact_contribution_assessment where claim_id=$1 and status='approved' order by approved_at desc nulls last,created_at desc limit 1",[claimId])).rows[0];

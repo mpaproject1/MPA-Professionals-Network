@@ -106,10 +106,13 @@ create table if not exists network_plus_collaboration_event (
   title text not null check (length(trim(title)) between 2 and 180),
   body text not null check (length(trim(body)) between 2 and 4000),
   metadata jsonb not null default '{}'::jsonb,
+  idempotency_hash text,
+  request_fingerprint text,
   created_at timestamptz not null default now(),
   check (jsonb_typeof(metadata)='object')
 );
 create index if not exists ix_network_plus_collaboration_event on network_plus_collaboration_event(workspace_id,created_at desc);
+create unique index if not exists ux_network_plus_collaboration_event_idempotency on network_plus_collaboration_event(workspace_id,actor_user_id,idempotency_hash) where idempotency_hash is not null;
 
 comment on table network_plus_request is 'Private typed Network-Plus request lifecycle. Submission is not acceptance or an agreement.';
 comment on table network_plus_request_participant is 'Explicit participant membership and consent for a private request.';

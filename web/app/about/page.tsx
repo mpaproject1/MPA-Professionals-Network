@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import styles from "./about.module.css";
 
+
 const pathways = [
   { title: "Job Portal", description: "Browse public job opportunities and follow the application steps shown for each listing.", href: "/jobs", action: "Browse jobs", Icon: BriefcaseBusiness },
   { title: "Serve-Community", description: "Explore published community initiatives, volunteer opportunities and completed participation journeys.", href: "/serve-community", action: "Explore initiatives", Icon: HandHeart },

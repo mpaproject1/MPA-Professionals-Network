@@ -71,7 +71,8 @@ All routes are authenticated and return no-store JSON through the existing API s
 | `POST /api/v1/network-plus/business-ownership/:id/respond` | Accept/decline a pending owner invitation |
 | `POST /api/v1/network-plus/businesses/:id/access` | Grant explicit scoped manager capability |
 | `DELETE /api/v1/network-plus/businesses/:id/access/:accessId` | Revoke an explicit business-scoped manager capability |
-| `POST /api/v1/network-plus/businesses/:id/evidence` | Attach a private file owned by the current authorized business actor to a draft verification case |
+| `GET /api/v1/network-plus/businesses/:id/evidence` | Owner-scoped evidence metadata list |
+| `POST /api/v1/network-plus/businesses/:id/evidence` | Attach a confirmed private file owned by the current authorized business actor to a draft verification case |
 | `POST /api/v1/network-plus/businesses/:id/verification` | Submit an evidence-backed business verification case |
 | `POST /api/v1/network-plus/businesses/:id/moderation` | Submit a verified business profile for moderation |
 | `POST /api/v1/network-plus/businesses/:id/publication` | Owner pause/publish/archive action subject to policy |
@@ -82,6 +83,7 @@ All routes are authenticated and return no-store JSON through the existing API s
 | `POST /api/v1/admin/network-plus/businesses/:id/verification` | Independent verification decision |
 | `POST /api/v1/admin/network-plus/businesses/:id/moderation` | Independent business profile moderation decision |
 | `GET /api/v1/admin/network-plus/businesses/:id/evidence` | Reviewer-only evidence metadata list |
+| `GET /api/v1/files/:id` | Existing private-file route; business evidence is readable by its uploader or an independent reviewer on a submitted case, never the case submitter |
 | `POST /api/v1/admin/network-plus/services/:id/moderation` | Independent listing moderation decision |
 
 Creation and search/submission routes use persistent rate limits. Creation routes require an `X-Idempotency-Key`; hashes and payload fingerprints prevent accidental duplicate creation and reject key reuse with different payloads.

@@ -72,7 +72,8 @@ export async function scanDetectionSources(actorUserId,requestId,options={}){
  return withTransaction(async tx=>{
   const participationPolicy=await activePolicy(tx,"initiative_participation");
   const offlinePolicy=await activePolicy(tx,"offline_completed_project");
-  const sourceReversed=await reconcileCandidateReversals(tx);\n  let participationDetected=0,offlineDetected=0,examined=0;
+  const sourceReversed=await reconcileCandidateReversals(tx,limit);
+  let participationDetected=0,offlineDetected=0,examined=0;
   if(participationPolicy?.rules?.enabled===true){
    const rules=participationPolicy.rules,codes=Array.isArray(rules.sourceEventCodes)?rules.sourceEventCodes:[],sourceStatuses=Array.isArray(rules.sourceStatuses)?rules.sourceStatuses:[],parentStatuses=Array.isArray(rules.parentStatuses)?rules.parentStatuses:[];
    if(codes.length&&sourceStatuses.length&&parentStatuses.length){

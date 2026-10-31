@@ -920,7 +920,7 @@ Admin scan and queue access require system_admin or the explicit system-only com
 | 2 — Automatic detection and attribution | Implementation committed; validation pending | Two Serve-Community adapters, immutable source policy versions, event-driven candidates, replay-safe reconciliation, contributor confirm/dispute; disposable DB, CI, security and scheduler validation remain |
 | 3 — Manual claims and evidence | Core backend extended; validation pending | Identity assurance, evidence-backed offline attribution, reviewer-controlled claim/source reconciliation, evidence privacy and non-destructive retention evaluation added; claimant/admin UI and runtime/security validation remain pending |
 | 4 — Reviewer operations | Core backend extended; validation pending | Case assessments, conflict declarations, database-enforced assignment/decision conflict blocks and independent second-review controls added; operational UI, role matrix and runtime/security validation remain pending |
-| 5 — Score ledger and explanations | Not started | Depends on score governance and approved rubric; no score calculation before approval |
+| 5 — Score ledger and explanations | Core implementation committed; acceptance pending runtime, migration, security and CI validation | Versioned five-dimension policy v1 active for private evaluation (30/25/20/15/10); verified source adapters, reviewer ratings, append-only ledger, duplicate protection, reversals and recalculation history; public publication remains disabled |
 | 6 — Member workspace and profile | Not started | Depends on stable APIs, privacy projections and consent controls |
 | 7 — Prompts, recognition and discovery | Not started | Depends on rate-limit, notification, recognition governance and opt-in policies |
 | 8 — Operational readiness | Not started | Security, monitoring, retention, support, migration and rollback readiness |
@@ -1126,3 +1126,100 @@ The following additive backend work has been prepared for this branch. It does n
 - [ ] Verify reviewer conflict declarations cause safe reassignment/recusal and that second review is independent in every role/action/object combination.
 
 **Status boundary:** Backend schema/service/API foundations are added; they are not marked runtime-validated or release-ready. UI coverage and all database, security, migration and CI validation remain pending. No CI was run for this intermediate delivery, consistent with the instruction to run CI at the final increment. No production migration, deployment, data deletion, permission assignment, merge or branch change is authorized.
+
+
+## Increment 5 implementation record — Unified Community Impact Score (2026-11-01)
+
+**Target:** `mpaproject1/MPA-Professionals-Network`, branch `feat/workstream-3-progress-members-workspace`.
+
+### Initial scoring policy
+
+The initial policy is version 1, seeded as the active policy for private/evaluation calculations. It uses the approved Section 8 dimensions and weights:
+
+- Measurable community outcomes — 30%.
+- Quality and significance — 25%.
+- Verified contribution and responsibility — 20%.
+- Sustainability — 15%.
+- Collaboration and knowledge sharing — 10%.
+
+Weights, rating ranges, base points, role factors, source/category/period caps, diminishing-return rules, eligible source types and publication settings are JSON policy data. They are not hard-coded scoring constants. Policy versions are immutable, with independent proposal, approval and activation operations. A new public-scoring configuration requires a separately approved and activated policy; activation must explicitly require consent and a minimum publication group size of five.
+
+**Initial policy mode:** active for private evaluation; public score publication is disabled. This is not authorization to publish scores or use them as a sole basis for membership, hiring, awards or opportunity decisions.
+
+### Source adapters and eligibility
+
+The scoring source adapter validates authoritative source lifecycle and contributor identity before linking a verified claim:
+
+| Source family | Required authoritative state |
+|---|---|
+| Serve-Community participation | Detected participation candidate, confirmed contributor, not source-reversed |
+| Offline completed project | Detected offline project candidate, individual attribution verified, contributor confirmation recorded |
+| Mentorship | Completed session, accepted session coordination, claimant is the mentor |
+| Professional / pro-bono service | Completed service request, provider completion recorded, requester accepted; paid engagements require successful payment |
+| Employment referral | Employment referral attribution in `employment_verified`, claimant is the referrer |
+| Network-Plus collaboration | Completed collaboration request and accepted participant consent |
+| Network-Plus partnership | Completed partnership proposal and accepted participant consent |
+| Approved historical contribution | Reviewer-verified historical claim, not an unverified self-report |
+
+The verified claim and approved reviewer assessment remain required for every source family. Source links are unique per claim and source/contributor pair, preventing the same underlying source from being claimed twice by the same contributor. An unconfigured or unverified source fails closed.
+
+### Calculation and reviewer assessment
+
+The engine reads the active policy and the approved assessment. It requires all five policy-defined dimension ratings, evidence quality meeting the policy threshold, verified output/outcome maturity, a valid role factor and attribution share. It applies configured category/source/period caps and diminishing-return rules. Missing or invalid configuration blocks calculation rather than substituting a fallback formula.
+
+The reviewer interface reads the active policy's rating ranges and weights. Reviewer adjustments remain attached to the claim, require evidence references and rationale, and continue to respect the existing independent second-review gates for elevated/high-risk cases.
+
+### Immutable ledger and corrections
+
+- Awards are append-only entries with policy, assessment, claim, source and calculation explanation snapshots.
+- A unique idempotency key and unique source-link constraints prevent duplicate awards.
+- The ledger has a database trigger preventing update or deletion.
+- Reversals append negative compensating entries referencing the original award; the original row remains intact.
+- Recalculation reverses the previous active award(s), evaluates the current approved assessment against the active policy and records a separate recalculation summary.
+- Repeated calculation with the same active policy and approved assessment returns the existing result; policy or assessment changes require explicit recalculation.
+- Member score views are private and show dimension weights, individual award explanations, reversals and policy version.
+- Restricted administrator screens expose policy versions, authoritative source reconciliation, calculation, reversal, ledger and recalculation history.
+
+### Routes
+
+Member:
+- `GET /api/v1/me/community-impact/score`
+- `GET /api/v1/me/community-impact/score/policy`
+
+Administrator:
+- `GET/POST /api/v1/admin/community-impact/score/policies`
+- `POST /api/v1/admin/community-impact/score/policies/:id/approve`
+- `POST /api/v1/admin/community-impact/score/policies/:id/activate`
+- `POST /api/v1/admin/community-impact/score/claims/:id/source-link`
+- `POST /api/v1/admin/community-impact/score/claims/:id/calculate`
+- `POST /api/v1/admin/community-impact/score/claims/:id/recalculate`
+- `GET /api/v1/admin/community-impact/score/ledger`
+- `GET /api/v1/admin/community-impact/score/recalculations`
+- `POST /api/v1/admin/community-impact/score/ledger/:id/reverse`
+
+Permissions are separate for policy management, policy approval, scoring/recalculation, reversal and viewing the restricted ledger. The UI does not grant permissions; no role grants are added by this increment.
+
+### Database migrations
+
+- `20261101110000_community_impact_unified_score.sql`
+- `20261101120000_community_impact_score_source_adapters.sql`
+- `20261101130000_community_impact_score_history_guards.sql`
+- `20261101140000_community_impact_score_policy_transition_guard.sql`
+
+The disposable migration compatibility runner includes these migrations and checks the initial active evaluation-only policy, exact five weights, permissions, ledger/source-link tables, append-only triggers and rollback removal. This is a transactional rollback rehearsal only; it does not run against or authorize production.
+
+### Acceptance gate
+
+Implementation and tests are committed, but Increment 5 is not accepted until all execution evidence is recorded:
+
+- [ ] Focused Community Impact tests pass, including source adapter, policy, ledger and authorization tests.
+- [ ] Full backend test suite passes.
+- [ ] TypeScript, lint and Next.js production build pass.
+- [ ] Disposable PostgreSQL applies all migrations, verifies seeded policy and constraints, then rolls back cleanly.
+- [ ] Runtime source-adapter tests cover each source family and reject unverified, disputed, reversed, wrong-contributor and unconsented records.
+- [ ] Concurrent duplicate source-link and score-calculation attempts result in one source link and one award.
+- [ ] Reversal and recalculation tests prove original ledger entries remain immutable and totals reconcile.
+- [ ] Member privacy and administrator least-privilege checks pass.
+- [ ] CI is green on the target branch.
+
+No production migration, deployment, public score publication, permission assignment, merge, force-push or data deletion is authorized by this implementation record.

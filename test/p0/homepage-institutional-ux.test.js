@@ -26,7 +26,8 @@ test("pathway slider uses supported destinations and accessible manual controls"
   assert.match(pathways, /\/mentorship/);
   assert.match(pathways, /aria-label/);
   assert.match(pathways, /aria-pressed/);
-  assert.match(serveCommunity, /\/service-demand/);
+  assert.match(serveCommunity, /api\/v1\/public\/serve-community\/completed-projects/);
+  assert.match(serveCommunity, /href="\/network-plus"/);
 });
 
 test("signed-out hero uses the real login workflow rather than a fake subscription", () => {

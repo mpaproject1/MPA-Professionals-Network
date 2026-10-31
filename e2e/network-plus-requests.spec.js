@@ -8,7 +8,7 @@ const draft = {
   events: [], workspace: null,
 };
 const submitted = {
-  ...draft, status: "submitted", isRequester: false, isRecipientRepresentative: true,
+  ...draft, status: "submitted", isRequester: false, isRecipientRepresentative: true, canReview: true, canAccept: true,
   participants: [
     { user_id: "requester-1", participant_role: "requester", consent_status: "accepted" },
     { user_id: "recipient-1", participant_role: "recipient_representative", consent_status: "pending" },

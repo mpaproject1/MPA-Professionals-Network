@@ -25,7 +25,9 @@ test("Increment 3 creates separate private claim, evidence, assignment, decision
 });
 test("claim collection requires an active MPA retention schedule and never assumes membership",()=>{
  assert.match(service,/activeRetention\(db,"claim_metadata"\)/);
- assert.match(service,/activeRetention\(tx,"raw_evidence"\)/);
+ assert.match(privateFiles,/raw_evidence/);
+ assert.match(privateFiles,/retentionPolicyVersionId=policy.id/);
+ assert.match(service,/file.retention_policy_version_id/);
  assert.match(service,/MPA must approve and activate a retention schedule/);
  assert.doesNotMatch(service,/membership_record|has_active_membership|MEMBERSHIP_REQUIRED/);
  assert.match(migration,/Membership is not required/);
@@ -65,7 +67,7 @@ test("private claim evidence downloads are scoped to claimant or assigned review
  assert.match(migration,/purpose_reference_id uuid references community_impact_claim/);
 });
 test("claim and appeal APIs authenticate every operation",()=>{
- for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","/evidence/","/decision","/assign"])assert.ok(server.includes(route),route);
+ for(const route of ["api/v1/me/community-impact/claims","api/v1/admin/community-impact/claims","api/v1/admin/community-impact/claim-reviewers","api/v1/admin/community-impact/claim-appeals","clarification-response","parts[6]===\"evidence\"","/decision","/assign"])assert.ok(server.includes(route),route);
 });
 test("member and reviewer screens preserve private-by-default evidence boundaries",()=>{
  assert.match(claimPage,/private draft/i);

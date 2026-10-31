@@ -240,7 +240,8 @@ export async function getNetworkPlusWorkspace(requestId,userId) {
     return {workspace:ws,milestones,events};
   });
 }
-export async function addNetworkPlusWorkspaceMilestone(requestId,userId,input) {
+export async function addNetworkPlusWorkspaceMilestone(requestId,userId,input,idempotencyKey) {
+  if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure idempotency key is required.","IDEMPOTENCY_KEY_REQUIRED");
   return withTransaction(async db=>{
     await assertEntry(db,userId);
     const ws=(await db.query("select id from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0];
@@ -250,7 +251,10 @@ export async function addNetworkPlusWorkspaceMilestone(requestId,userId,input) {
     const owner=input?.ownerUserId||userId;
     const active=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status='accepted'",[requestId,owner])).rowCount>0;
     if(!active)fail(400,"Milestone owner must be an accepted participant.","INVALID_MILESTONE_OWNER");
-    return (await db.query("insert into network_plus_collaboration_milestone(workspace_id,title,description,owner_user_id,due_at,created_by) values($1,$2,$3,$4,$5,$6) returning *",[ws.id,title,String(input.description||"").slice(0,2000)||null,owner,input.dueAt||null,userId])).rows[0];
+    const description=String(input.description||"").slice(0,2000)||null, dueAt=input.dueAt||null, keyHash=hash(idempotencyKey), fingerprint=hash(JSON.stringify({title,description,owner,dueAt}));
+    const prior=(await db.query("select * from network_plus_collaboration_milestone where workspace_id=$1 and created_by=$2 and idempotency_hash=$3",[ws.id,userId,keyHash])).rows[0];
+    if(prior){if(prior.request_fingerprint!==fingerprint)fail(409,"This milestone key was used for different content.","IDEMPOTENCY_CONFLICT");return prior;}
+    return (await db.query("insert into network_plus_collaboration_milestone(workspace_id,title,description,owner_user_id,due_at,created_by,idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[ws.id,title,description,owner,dueAt,userId,keyHash,fingerprint])).rows[0];
   });
 }
 export async function updateNetworkPlusWorkspaceMilestone(requestId,milestoneId,userId,input,requestIdHeader) {

@@ -43,10 +43,13 @@ async function participant(db,requestId,userId) {
   if(!row)fail(404,"Request not found.","NOT_FOUND");
   return row;
 }
-async function assertSupport(db,userId,reason,ticket) {
-  if(!reason||!ticket)fail(400,"Support access requires a recorded reason and support case reference.","SUPPORT_REASON_REQUIRED");
+async function hasSupportRole(db,userId) {
   const roles=(await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId])).rows.map(x=>x.role_code);
-  if(!roles.some(x=>SUPPORT_ROLES.has(x)))fail(403,"Authorized Network-Plus support staff only.","SUPPORT_FORBIDDEN");
+  return roles.some(x=>SUPPORT_ROLES.has(x));
+}
+async function assertSupport(db,userId,reason,ticket) {
+  if(!await hasSupportRole(db,userId))fail(403,"Authorized Network-Plus support staff only.","SUPPORT_FORBIDDEN");
+  if(!reason||!ticket)fail(400,"Support access requires a recorded reason and support case reference.","SUPPORT_REASON_REQUIRED");
 }
 async function notify(db,userId,event,requestId,message) {
   await createInAppNotification(db,userId,event,"network_plus_request",requestId,{message,nextAction:"Open Network-Plus requests to review the update."});
@@ -188,7 +191,7 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const row=(await db.query("select * from network_plus_request where id=$1",[requestId])).rows[0];
     if(!row)fail(404,"Request not found.","NOT_FOUND");
     const isParticipant=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status<>'revoked' and (participant_role<>'additional_participant' or consent_status='accepted')",[requestId,userId])).rowCount>0;
-    if(isParticipant) await assertEntry(db,userId); else { await assertSupport(db,userId,supportReason,supportTicket); await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_read","network_plus_request",requestId,"success",{reason:supportReason,ticket:supportTicket}]); }
+    if(isParticipant) await assertEntry(db,userId); else { if(!await hasSupportRole(db,userId))fail(404,"Request not found.","NOT_FOUND"); await assertSupport(db,userId,supportReason,supportTicket); await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_read","network_plus_request",requestId,"success",{reason:supportReason,ticket:supportTicket}]); }
     const participants=(await db.query("select user_id,participant_role,consent_status,consented_at from network_plus_request_participant where request_id=$1 and consent_status<>'revoked'",[requestId])).rows;
     const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 order by created_at",[requestId])).rows;
     const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;

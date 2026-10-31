@@ -41,7 +41,8 @@ const migrationNames = [
   "20261031170000_community_impact_retention_policy.sql",
   "20261031180000_community_impact_manual_claims.sql",
   "20261031200000_member_referrals.sql",
-  "20261031210000_job_application_referral_code.sql"
+  "20261031210000_job_application_referral_code.sql",
+  "20261031220000_referral_candidate_outcome_summary.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
@@ -648,6 +649,16 @@ try {
   if (missingActiveConsent.rows[0].count > 0) {
     throw new Error(`Mentorship consent migration left ${missingActiveConsent.rows[0].count} active relationship(s) without a matching accepted proposal and recorded mentee consent; review these records before applying.`);
   }
+
+
+  const referralTables=await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["member_referral_code","member_referral_attribution","member_referral_event","member_referral_score_policy","member_referral_score_ledger"]]);
+  if(referralTables.rowCount!==5)throw new Error("Member referral attribution, event, policy and score-ledger tables are incomplete.");
+  const referralColumns=await client.query("select table_name,column_name from information_schema.columns where table_schema='public' and ((table_name='job_application' and column_name='referral_code') or (table_name='member_referral_attribution' and column_name='candidate_outcome_summary'))");
+  if(referralColumns.rowCount!==2)throw new Error("Job application referral code and candidate outcome summary columns are missing.");
+  const referralHistoryTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_member_referral_event_immutable","trg_member_referral_score_immutable"]]);
+  if(referralHistoryTriggers.rows[0].count!==2)throw new Error("Referral event and score ledger append-only triggers are missing.");
+  const referralPolicy=await client.query("select count(*)::int count from member_referral_score_policy where status='active'");
+  if(referralPolicy.rows[0].count!==0)throw new Error("Fresh referral migrations must not silently activate an unapproved scoring policy.");
 
   await client.query("rollback");
   transactionOpen = false;

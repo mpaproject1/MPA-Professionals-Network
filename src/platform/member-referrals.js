@@ -65,7 +65,7 @@ export async function recordMembershipActivated(db,referredUserId,actorUserId){
  for(const row of rows){if(row.status==="membership_activated")continue;await db.query("update member_referral_attribution set status='membership_activated',updated_at=now() where id=$1",[row.id]);await event(db,row.id,"membership_activated",row.status,"membership_activated",actorUserId);}
 }
 export async function recordJobApplicationStage(db,applicationId,status,actorUserId){
- const mapping={shortlisted:"shortlisted",interview:"interview",accepted:"offer_accepted",hired:"employment_reported"};
+ const mapping={shortlisted:"shortlisted",interview:"interview",accepted:"offer_accepted",hired:"employment_reported",rejected:"declined",withdrawn:"withdrawn"};
  const eventCode=mapping[status];if(!eventCode)return;
  const rows=(await db.query("select id,status from member_referral_attribution where referral_type='employment' and job_application_id=$1 for update",[applicationId])).rows;
  for(const row of rows){await db.query("update member_referral_attribution set status=$1,updated_at=now() where id=$2",[eventCode,row.id]);await event(db,row.id,eventCode,row.status,eventCode,actorUserId);}

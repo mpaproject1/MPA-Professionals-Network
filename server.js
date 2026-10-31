@@ -16,6 +16,7 @@ import {requireRole, verifyToken, withCurrentRoles} from "./src/platform/auth.js
 import * as communityImpactClaims from "./src/platform/community-impact-claims.js";
 import * as communityImpactDetection from "./src/platform/community-impact-detection.js";
 import * as communityImpactRetention from "./src/platform/community-impact-retention.js";
+import * as memberReferrals from "./src/platform/member-referrals.js";
 import {loadConfig, resolveAllowedOrigin} from "./src/platform/config.js";
 import {getPool} from "./src/platform/db.js";
 import * as directoryExports from "./src/platform/directory-exports.js";
@@ -258,7 +259,15 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/files/uploads/") && parts[5]==="confirm") { const identity=await auth(req); return ok(res,await confirmPrivateUpload(identity.sub,parts[4]),requestId,201); }
     if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/files/")) { const identity=await auth(req); const result=await readAuthorizedPrivateFile(identity.sub,parts[3],identity.roles||[],requestId,identity.permissions||[]); res.writeHead(200,{"content-type":result.file.content_type,"content-length":String(result.bytes.length),"content-disposition":`attachment; filename*=UTF-8''${encodeURIComponent(result.file.original_name)}`,"cache-control":"private, no-store","x-content-type-options":"nosniff","x-request-id":requestId}); return res.end(result.bytes); }
     if(req.method==="POST" && p==="api/v1/auth/member-invitation/claim") return ok(res,await membershipAdminBulk.claimMemberInvitation(await body(req)),requestId);
+    
     if(req.method==="POST" && p==="api/v1/auth/register") { const b=await body(req); await enforcePersistentRateLimit(req,"register",5,60000,String(b.email||"").trim().toLowerCase()); return ok(res,await membership.register(b,requestId),requestId,201); }
+    if(req.method==="GET" && p==="api/v1/me/referrals") { const identity=await auth(req); return ok(res,await memberReferrals.listMyReferrals(identity.sub),requestId); }
+    if(req.method==="POST" && p==="api/v1/me/referrals/code") { const identity=await auth(req); return ok(res,await memberReferrals.ensureMyReferralCode(identity.sub),requestId,201); }
+    if(req.method==="POST" && parts.length===7 && parts[2]==="me" && parts[3]==="referrals" && parts[5]==="employment-confirmation") { const identity=await auth(req); return ok(res,await memberReferrals.confirmEmploymentOutcome(identity.sub,parts[4],await body(req)),requestId); }
+    if(req.method==="GET" && p==="api/v1/admin/referrals") { const identity=await auth(req); return ok(res,await memberReferrals.listReferralAdminQueue(identity,{status:query(req.url).get("status"),limit:query(req.url).get("limit")}),requestId); }
+    if(req.method==="POST" && parts.length===6 && parts[2]==="admin" && parts[3]==="referrals" && parts[5]==="verify-employment") { const identity=await auth(req); return ok(res,await memberReferrals.verifyEmploymentReferral(identity,parts[4],await body(req),requestId),requestId); }
+    if(req.method==="POST" && p==="api/v1/admin/referrals/scoring-policies") { const identity=await auth(req); const b=await body(req); return ok(res,await memberReferrals.proposeReferralScorePolicy(identity,b.points,b.reason),requestId,201); }
+    if(req.method==="POST" && parts.length===7 && parts[2]==="admin" && parts[3]==="referrals" && parts[4]==="scoring-policies" && parts[6]==="approve") { const identity=await auth(req); const b=await body(req); return ok(res,await memberReferrals.approveReferralScorePolicy(identity,parts[5],b.activate===true,b.reason),requestId); }
     if(req.method==="GET" && p==="api/v1/membership/products") return ok(res,await membership.listMembershipProducts(),requestId);
     if(req.method==="GET" && p==="api/v1/membership/payment-methods") { await auth(req); return ok(res,await membership.listMembershipPaymentMethods(),requestId); }
      if(req.method==="GET" && p==="api/v1/admin/membership/payment-methods") {

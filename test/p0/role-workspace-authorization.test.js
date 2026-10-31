@@ -313,7 +313,7 @@ test("Serve-Community routes discovery into existing private workflows with comp
   assert.match(marketplace, /api\/v1\/public\/serve-community\/completed-projects/);
   assert.match(marketplace, /href="\/network-plus"/);
   assert.doesNotMatch(marketplace, /href="\/(?:services|service-demand|mentorship)"/);
-  assert.match(services, /api\/v1\/network-plus\/services/);
+  assert.match(services, /api\/v1\/services/);
   assert.match(demand, /api\/v1\/marketplace-demand/);
   assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);
   assert.match(shell, /const primaryHrefs=token\?\["\/about","\/jobs","\/network-plus","\/serve-community","\/members","\/learning"\]:\["\/about","\/jobs","\/serve-community"\]/);

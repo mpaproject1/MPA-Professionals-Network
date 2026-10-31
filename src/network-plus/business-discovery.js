@@ -352,7 +352,8 @@ export async function addBusinessOwner(businessId,userId,input,requestId) {
   const ownerType=input?.ownerType, ownerUserId=input?.ownerUserId||null, organizationId=input?.organizationId||null;
   if(!["member","organization"].includes(ownerType)||(ownerType==="member"?!ownerUserId:!organizationId))fail(400,"Provide one canonical member or organization owner.","VALIDATION_ERROR");
   return withTransaction(async db=>{
-    const {business}=await assertBusinessOwner(db,businessId,userId);
+    const {business,owner}=await assertBusinessOwner(db,businessId,userId);
+    if(!owner||owner.owner_role!=="primary_owner")fail(403,"Only the accountable primary owner can invite co-owners.","OWNERSHIP_FORBIDDEN");
     if(business.business_kind!=="joint")fail(409,"Additional owners are supported only for joint businesses.","JOINT_OWNERSHIP_REQUIRED");
     if(ownerType==="member"){
       if(!(await hasCurrentActiveMembership(db,ownerUserId))||!(await hasProfessionalIdentity(db,ownerUserId)))fail(409,"The proposed member co-owner must have an active professional membership.","OWNER_NOT_ELIGIBLE");
@@ -381,6 +382,7 @@ export async function respondBusinessOwnership(ownershipId,userId,decision,reque
     if(row.status!=="pending"||row.consent_status!=="pending")fail(409,"This ownership invitation is no longer awaiting consent.","INVALID_STATE");
     const updated=(await db.query("update network_plus_business_ownership set consent_status=$1,status=$2,consented_at=case when $1='accepted' then now() else null end,updated_at=now() where id=$3 returning *",[decision,decision==="accepted"?"active":"removed",ownershipId])).rows[0];
     await audit(db,userId,"network_plus.business_ownership_responded","network_plus_business_ownership",ownershipId,requestId,{decision,businessId:row.business_id});
+    await notifyOwners(db,row.business_id,"network_plus.business_ownership_responded",{message:"A co-owner responded to the business ownership invitation.",nextAction:"Review the updated ownership consent state.",status:decision,eventVersion:updated.updated_at});
     return updated;
   });
 }

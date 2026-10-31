@@ -34,7 +34,7 @@ test("offline project claims require definitions, methodology and evidence",()=>
 test("media links require HTTPS, bounded counts, approved video hosts and matching image descriptions",()=>{
  assert.match(service,/u\.protocol!=="https:"/);assert.match(service,/UNSUPPORTED_VIDEO_HOST/);
  assert.match(service,/listUrls\(input\.imageUrls,"image",8\)/);assert.match(service,/listUrls\(input\.videoUrls,"video",3\)/);
- assert.match(service,/imageUrls\.length\!==imageAltText\.length/);assert.match(service,/consent_confirmed/);
+ assert.match(service,/alt\\.length!==imageUrls\\.length/);assert.match(service,/consent_confirmed/);
  assert.match(staffPage,/consentConfirmed/);assert.match(staffPage,/imageAltText/);assert.match(staffPage,/YouTube\/Vimeo/);
 });
 test("public projection excludes internal evidence summaries and staff-only metadata",()=>{

@@ -3,7 +3,7 @@ import { getPool, withTransaction } from "./db.js";
 export class NotificationProvider { async send(){throw new Error("No notification provider configured.");} }
 export class NotificationService { constructor(provider){this.provider=provider;} async send(command){return this.provider.send(command);} }
 
-const CATEGORIES = new Set(["membership","verification","opportunities","recruitment","organizations","mentorship","services","events_learning","security","system"]);
+const CATEGORIES = new Set(["membership","verification","opportunities","recruitment","organizations","mentorship","services","events_learning","community_impact","security","system"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 export function safeInternalUrl(value){const url=String(value||"");return url.startsWith("/")&&!url.startsWith("//")&&!url.includes("\\")&&![...url].some(ch=>ch.charCodeAt(0)<32||ch.charCodeAt(0)===127)?url:null;}
@@ -20,6 +20,7 @@ const NOTIFICATION_CATEGORIES=new Set(["membership","verification","opportunitie
 export function notificationCategoryFor(eventCode,resourceType,payload={}){
  const code=String(eventCode||"").toLowerCase(),type=String(resourceType||"").toLowerCase();
  if(code.startsWith("security.")||code.startsWith("security_")||type==="security_event"||type==="auth_session"||type==="one_time_session_link")return "security";
+ if(code.startsWith("community_impact.")||code.startsWith("community-impact.")||type.startsWith("community_impact"))return "community_impact";
  if(payload.category&&NOTIFICATION_CATEGORIES.has(payload.category))return payload.category;
  if(code.startsWith("membership.")||code.startsWith("membership_")||type.startsWith("membership_")||type==="membership_record"||type==="payment_transaction")return "membership";
  if(code.startsWith("verification.")||code.startsWith("verification_")||type.startsWith("verification_")||type==="verification_case"||type==="verification_claim"||type==="verification_decision"||type==="verification_appeal")return "verification";
@@ -38,7 +39,7 @@ function defaultActionUrl(category,resourceType,payload={}){
   const queues={membership:"/membership",verification:"/verification",organizations:"/organizations",recruitment:"/recruitment",mentorship:"/mentorship",services:"/services",security:"/dashboard"};
   return queues[category]||"/dashboard";
  }
- const routes={membership:"/membership",verification:"/verification",opportunities:"/jobs",recruitment:"/jobs",organizations:"/organizations",mentorship:"/mentorship",services:"/services",security:"/profile",system:"/dashboard"};
+ const routes={membership:"/membership",verification:"/verification",opportunities:"/jobs",community_impact:"/community-impact/recognition",recruitment:"/jobs",organizations:"/organizations",mentorship:"/mentorship",services:"/services",security:"/profile",system:"/dashboard"};
  if(resourceType==="job_application"&&payload.audience==="employer")return "/recruitment";
  if(resourceType==="job_application")return "/track";
  if(resourceType==="organization_verification_case")return "/organizations";

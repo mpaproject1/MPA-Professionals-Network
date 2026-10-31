@@ -46,6 +46,8 @@ test("Detection policies require separate proposer, approver and activator opera
  assert.match(service,/activateDetectionPolicy/);
  assert.match(service,/policy proposer cannot approve their own policy/);
  assert.match(server,/api\/v1\/admin\/community-impact\/detection\/policies/);
+ assert.match(server,/api\/v1\/admin\/community-impact\/assessments/);
+ assert.match(service,/listPendingContributionAssessments/);
 });
 test("Reviewer assessments and conflict controls enforce independent second review",()=>{
  assert.match(service,/proposeContributionAssessment/);

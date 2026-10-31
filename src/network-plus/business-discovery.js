@@ -107,9 +107,11 @@ async function notifyOwners(db,businessId,eventCode,payload) {
   for(const owner of owners)await createInAppNotification(db,owner.user_id,eventCode,"network_plus_business",businessId,payload);
 }
 async function assertBusinessPublishable(db,businessId) {
-  const row=(await db.query("select verification_status,moderation_status,publication_status from network_plus_business where id=$1",[businessId])).rows[0];
+  const row=(await db.query("select b.verification_status,b.moderation_status,b.publication_status,b.verification_expires_at, exists(select 1 from network_plus_business_ownership bo join organization o on o.id=bo.owner_organization_id where bo.business_id=b.id and bo.owner_type='organization' and bo.status='active' and bo.consent_status='accepted' and o.verification_status<>'verified') organization_unverified from network_plus_business b where b.id=$1",[businessId])).rows[0];
   if(!row)fail(404,"Business not found.","NOT_FOUND");
   if(row.verification_status!=="verified")fail(409,"Business verification must be approved before a service listing can be published.","BUSINESS_NOT_VERIFIED");
+  if(row.verification_expires_at&&new Date(row.verification_expires_at)<=new Date())fail(409,"Business verification has expired and must be renewed before publication.","BUSINESS_VERIFICATION_EXPIRED");
+  if(row.organization_unverified)fail(409,"The linked organization must remain verified before this business can publish.","ORGANIZATION_NOT_VERIFIED");
   if(row.moderation_status!=="approved")fail(409,"Business profile moderation must be approved before publishing a service listing.","BUSINESS_NOT_MODERATED");
   if(row.publication_status==="suspended"||row.publication_status==="archived")fail(409,"This business is not eligible to publish listings.","BUSINESS_NOT_PUBLISHABLE");
 }
@@ -332,4 +334,95 @@ export async function getProfessionalService(listingId,viewerId) {
       and (b.verification_expires_at is null or b.verification_expires_at>now())`,[listingId])).rows[0];
   if(!row)fail(404,"Published professional service not found.","NOT_FOUND");
   return row;
+}
+
+export async function addBusinessOwner(businessId,userId,input,requestId) {
+  const ownerType=input?.ownerType, ownerUserId=input?.ownerUserId||null, organizationId=input?.organizationId||null;
+  if(!["member","organization"].includes(ownerType)||(ownerType==="member"?!ownerUserId:!organizationId))fail(400,"Provide one canonical member or organization owner.","VALIDATION_ERROR");
+  return withTransaction(async db=>{
+    const {business}=await assertBusinessOwner(db,businessId,userId);
+    if(business.business_kind!=="joint")fail(409,"Additional owners are supported only for joint businesses.","JOINT_OWNERSHIP_REQUIRED");
+    if(ownerType==="member"){
+      if(!(await hasCurrentActiveMembership(db,ownerUserId))||!(await hasProfessionalIdentity(db,ownerUserId)))fail(409,"The proposed member co-owner must have an active professional membership.","OWNER_NOT_ELIGIBLE");
+      if(ownerUserId===userId)fail(409,"The primary owner is already recorded.","DUPLICATE_OWNER");
+    }else await assertOrganizationCapability(db,organizationId,userId,ORG_OWNER_ROLES);
+    const exists=(await db.query("select 1 from network_plus_business_ownership where business_id=$1 and status in ('pending','active') and ((owner_type='member' and owner_user_id=$2) or (owner_type='organization' and owner_organization_id=$3))",[businessId,ownerUserId,organizationId])).rowCount;
+    if(exists)fail(409,"This owner party is already associated with the business.","DUPLICATE_OWNER");
+    const row=(await db.query("insert into network_plus_business_ownership(business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,created_by) values($1,$2,$3,$4,'co_owner','pending','pending',$5) returning id,business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,created_at",[businessId,ownerType,ownerUserId,organizationId,userId])).rows[0];
+    await audit(db,userId,"network_plus.business_co_owner_invited","network_plus_business_ownership",row.id,requestId,{businessId,ownerType});
+    if(ownerType==="member")await createInAppNotification(db,ownerUserId,"network_plus.business_ownership_consent_required","network_plus_business_ownership",row.id,{message:"You have been invited as a co-owner of a Network-Plus business.",nextAction:"Review and explicitly accept or decline this ownership association.",actionUrl:"/network-plus/businesses",actionRequired:true,priority:"high"});
+    return row;
+  });
+}
+export async function respondBusinessOwnership(ownershipId,userId,decision,requestId) {
+  if(!["accepted","declined"].includes(decision))fail(400,"Choose accept or decline.","VALIDATION_ERROR");
+  return withTransaction(async db=>{
+    const row=(await db.query("select * from network_plus_business_ownership where id=$1 for update",[ownershipId])).rows[0];
+    if(!row)fail(404,"Ownership invitation not found.","NOT_FOUND");
+    const permitted=(row.owner_type==="member"&&row.owner_user_id===userId)||(row.owner_type==="organization"&&Boolean((await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' and role_code=any($3::text[])",[row.owner_organization_id,userId,ORG_OWNER_ROLES])).rowCount);
+    if(!permitted)fail(403,"Only the invited owner party may respond to this ownership request.","OWNERSHIP_FORBIDDEN");
+    if(row.status!=="pending"||row.consent_status!=="pending")fail(409,"This ownership invitation is no longer awaiting consent.","INVALID_STATE");
+    const updated=(await db.query("update network_plus_business_ownership set consent_status=$1,status=$2,consented_at=case when $1='accepted' then now() else null end,updated_at=now() where id=$3 returning *",[decision,decision==="accepted"?"active":"removed",ownershipId])).rows[0];
+    await audit(db,userId,"network_plus.business_ownership_responded","network_plus_business_ownership",ownershipId,requestId,{decision,businessId:row.business_id});
+    return updated;
+  });
+}
+export async function grantBusinessAccess(businessId,userId,input,requestId) {
+  const targetUserId=input?.userId,capability=input?.capability;
+  if(!targetUserId||!["business.manage_listing","business.respond_requests","business.accept_terms"].includes(capability))fail(400,"Choose a user and a supported business capability.","VALIDATION_ERROR");
+  const expiresAt=input.expiresAt?new Date(input.expiresAt):null;
+  if(expiresAt&&(!Number.isFinite(expiresAt.getTime())||expiresAt<=new Date()))fail(400,"Delegation expiry must be a future date.","VALIDATION_ERROR");
+  return withTransaction(async db=>{
+    const {business,owner}=await assertBusinessOwner(db,businessId,userId);
+    if(!owner||owner.owner_role!=="primary_owner")fail(403,"Only an accountable primary owner can delegate business capabilities.","DELEGATION_FORBIDDEN");
+    const target=(await db.query("select status from app_user where id=$1",[targetUserId])).rows[0];
+    if(!target||target.status!=="active")fail(404,"The proposed manager account is unavailable.","TARGET_NOT_FOUND");
+    const orgId=business.business_kind==="organization"?(await db.query("select owner_organization_id from network_plus_business_ownership where business_id=$1 and owner_type='organization' and owner_role='primary_owner' and status='active'",[businessId])).rows[0]?.owner_organization_id:null;
+    if(orgId){
+      const member=(await db.query("select role_code from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[orgId,targetUserId])).rows[0];
+      if(!member||member.role_code!=="project_manager")fail(403,"Organization business delegation is limited to an active project manager of the owning organization.","TARGET_SCOPE_FORBIDDEN");
+    }else if(!(await hasCurrentActiveMembership(db,targetUserId)))fail(403,"A delegated manager must have current active membership.","TARGET_SCOPE_FORBIDDEN");
+    const row=(await db.query("insert into network_plus_business_access(business_id,user_id,capability_code,granted_by,expires_at,revoked_at) values($1,$2,$3,$4,$5,null) on conflict(business_id,user_id,capability_code) do update set granted_by=excluded.granted_by,expires_at=excluded.expires_at,revoked_at=null returning *",[businessId,targetUserId,capability,userId,expiresAt])).rows[0];
+    await audit(db,userId,"network_plus.business_access_granted","network_plus_business_access",row.id,requestId,{businessId,targetUserId,capability});
+    await createInAppNotification(db,targetUserId,"network_plus.business_access_granted","network_plus_business",businessId,{message:"A business owner delegated a scoped capability to you.",nextAction:"Open Business Discovery to review the business resources assigned to you.",actionUrl:"/network-plus/businesses"});
+    return row;
+  });
+}
+export async function submitBusinessModeration(businessId,userId,requestId) {
+  return withTransaction(async db=>{
+    const {business}=await assertBusinessOwner(db,businessId,userId);
+    if(business.verification_status!=="verified")fail(409,"Business verification must be complete before profile moderation.","BUSINESS_NOT_VERIFIED");
+    const updated=(await db.query("update network_plus_business set moderation_status='pending_review',updated_at=now() where id=$1 and moderation_status in ('not_submitted','rejected') returning *",[businessId])).rows[0];
+    if(!updated)fail(409,"Business profile is already under review or cannot be resubmitted.","INVALID_STATE");
+    await audit(db,userId,"network_plus.business_profile_submitted","network_plus_business",businessId,requestId,{});
+    return updated;
+  });
+}
+export async function reviewBusinessModeration(businessId,userId,input,requestId) {
+  const status=input?.status,reason=text(input?.reason,1000,"Moderation reason",{min:8});
+  if(!["approved","rejected","suspended"].includes(status))fail(400,"Unsupported business moderation decision.","VALIDATION_ERROR");
+  return withTransaction(async db=>{
+    const roles=await rolesFor(db,userId),permissions=await permissionsFor(db,userId);
+    if(!roles.some(r=>LISTING_REVIEW_ROLES.includes(r))&&!permissions.includes("business.moderate"))fail(403,"Independent business moderation authority is required.","BUSINESS_MODERATION_FORBIDDEN");
+    const row=(await db.query("select * from network_plus_business where id=$1 for update",[businessId])).rows[0];
+    if(!row)fail(404,"Business not found.","NOT_FOUND");
+    if(row.created_by===userId)fail(403,"A business creator cannot moderate their own business profile.","SELF_REVIEW_FORBIDDEN");
+    if(row.moderation_status!=="pending_review")fail(409,"Business profile is not awaiting moderation.","INVALID_STATE");
+    if(status==="approved"&&row.verification_status!=="verified")fail(409,"Only a verified business profile can be approved for publication.","BUSINESS_NOT_VERIFIED");
+    const updated=(await db.query("update network_plus_business set moderation_status=$1,publication_status=case when $1='suspended' then 'suspended' when $1='approved' then 'published' else 'draft' end,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];
+    await audit(db,userId,"network_plus.business_profile_moderated","network_plus_business",businessId,requestId,{status,reason});
+    await notifyOwners(db,businessId,"network_plus.business_profile_moderation_decided",{message:"A moderation decision was recorded for your business profile.",nextAction:status==="approved"?"Your approved business profile is now discoverable by eligible Network-Plus members.":"Review the decision reason and make any requested corrections.",status,eventVersion:updated.updated_at});
+    return updated;
+  });
+}
+export async function changeBusinessPublicationStatus(businessId,userId,status,reason,requestId) {
+  if(!["paused","published","archived"].includes(status))fail(400,"Unsupported business publication status.","VALIDATION_ERROR");
+  return withTransaction(async db=>{
+    const {business}=await assertBusinessOwner(db,businessId,userId);
+    if(status==="published"&&(business.verification_status!=="verified"||business.moderation_status!=="approved"))fail(409,"Business must be verified and approved before publication.","BUSINESS_NOT_PUBLISHABLE");
+    if(business.publication_status==="suspended")fail(409,"Only an independent moderator can clear a business suspension.","MODERATION_CLEARANCE_REQUIRED");
+    const updated=(await db.query("update network_plus_business set publication_status=$1,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];
+    await audit(db,userId,"network_plus.business_publication_changed","network_plus_business",businessId,requestId,{from:business.publication_status,to:status,reason:String(reason||"").trim().slice(0,500)||null});
+    return updated;
+  });
 }

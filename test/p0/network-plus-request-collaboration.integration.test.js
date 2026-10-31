@@ -69,6 +69,18 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
  const refreshed=await requests.getNetworkPlusWorkspace(draft.id,requester.user.id);
  assert.equal(refreshed.milestones[0].status,"in_progress");
  assert.ok(refreshed.events.some(event=>event.event_type==="blocker"));
+ const invitee=await register("invitee-"+suffix);await setMembership(invitee.user.id);
+ await requests.addNetworkPlusRequestParticipant(draft.id,requester.user.id,{userId:invitee.user.id},requestRef);
+ await assert.rejects(()=>requests.getNetworkPlusWorkspace(draft.id,invitee.user.id),e=>e.code==="NOT_FOUND");
+ await assert.rejects(()=>requests.getNetworkPlusRequest(draft.id,invitee.user.id),e=>e.code==="NOT_FOUND");
+ const invitationNotice=await db.query("select 1 from notification_event where user_id=$1 and event_code=$2 and resource_id=$3",[invitee.user.id,"network_plus.request.participant_invited",draft.id]);
+ assert.equal(invitationNotice.rowCount,1);
+ await requests.respondNetworkPlusParticipant(draft.id,invitee.user.id,"accept",requestRef);
+ assert.equal((await requests.getNetworkPlusWorkspace(draft.id,invitee.user.id)).workspace.id,requesterWorkspace.workspace.id);
+ const collaborationNotices=await db.query("select event_code from notification_event where resource_type=$1 and resource_id=$2",[ "network_plus_request",draft.id]);
+ assert.ok(collaborationNotices.rows.some(row=>row.event_code==="network_plus.collaboration.milestone"));
+ assert.ok(collaborationNotices.rows.some(row=>row.event_code==="network_plus.collaboration.blocker"));
+
  assert.deepEqual(await requests.listNetworkPlusRequests(outsider.user.id),[]);
  await assert.rejects(()=>requests.getNetworkPlusRequest(draft.id,outsider.user.id),e=>e.code==="NOT_FOUND");
  const notices=await db.query("select user_id,event_code from notification_event where resource_type='network_plus_request' and resource_id=$1",[draft.id]);

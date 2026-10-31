@@ -145,6 +145,14 @@ export async function createBusiness(userId,input,requestId,idempotencyKey) {
       if(existing.request_fingerprint!==payloadFingerprint)fail(409,"This submission key was already used for different business details.","IDEMPOTENCY_CONFLICT");
       return {...existing,idempotent:true};
     }
+    const ownerIdentity=ownerType==="member"?userId:organizationId;
+    const duplicateKey=ownerType+":"+ownerIdentity+":"+normalized.displayName.toLowerCase();
+    await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[duplicateKey]);
+    const duplicate=(await db.query(`select b.id from network_plus_business b join network_plus_business_ownership bo on bo.business_id=b.id
+      where lower(b.display_name)=lower($1) and bo.status in ('pending','active')
+        and ((bo.owner_type='member' and bo.owner_user_id=$2) or (bo.owner_type='organization' and bo.owner_organization_id=$3))
+      limit 1`,[normalized.displayName,ownerType==="member"?userId:null,organizationId])).rows[0];
+    if(duplicate)fail(409,"A business with this name is already registered under this owner identity.","DUPLICATE_BUSINESS");
     const row=(await db.query(`insert into network_plus_business(business_kind,display_name,trading_name,description,website,geography_reference_item_id,location_label,created_by,request_idempotency_hash,request_fingerprint)
       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,[normalized.businessKind,normalized.displayName,normalized.tradingName,normalized.description,normalized.website,normalized.geographyReferenceItemId,normalized.locationLabel,userId,keyHash,payloadFingerprint])).rows[0];
     const ownership=(await db.query(`insert into network_plus_business_ownership(business_id,owner_type,owner_user_id,owner_organization_id,owner_role,consent_status,status,consented_at,created_by)

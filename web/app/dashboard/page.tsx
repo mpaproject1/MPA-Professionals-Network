@@ -209,6 +209,13 @@ export default function Dashboard(){
   const serviceRows=data?.outcomes?.services||[];
   const mentorshipRows=data?.outcomes?.mentorships||[];
   const activeEngagements=serviceRows.filter(item=>!terminalStatuses.has(item.status)).length+mentorshipRows.filter(item=>!terminalStatuses.has(item.status)).length;
+  const engagementSeries=[
+    {label:"Service requests",value:serviceRows.length,available:Array.isArray(data?.outcomes?.services)},
+    {label:"Mentorships",value:mentorshipRows.length,available:Array.isArray(data?.outcomes?.mentorships)},
+    {label:"Inquiries",value:data?.outcomes?.inquiries?.length||0,available:Array.isArray(data?.outcomes?.inquiries)},
+    {label:"Job outcomes",value:data?.outcomes?.jobs?.length||0,available:Array.isArray(data?.outcomes?.jobs)}
+  ].filter(item=>item.available);
+  const engagementMax=Math.max(1,...engagementSeries.map(item=>item.value));
   const reviewCount=(data?.reviewQueues||[]).reduce((sum,queue)=>sum+queue.count,0);
   const assignedItems=(data?.reviewQueues||[]).flatMap(queue=>queue.items.map(item=>({...item,queueLabel:queue.label}))).sort((a,b)=>({Urgent:0,High:1,Standard:2}[a.priority]-{Urgent:0,High:1,Standard:2}[b.priority])||(a.deadline?new Date(a.deadline).getTime():Number.MAX_SAFE_INTEGER)-(b.deadline?new Date(b.deadline).getTime():Number.MAX_SAFE_INTEGER));
   const reviewPageSize=12,reviewPageCount=Math.max(1,Math.ceil(assignedItems.length/reviewPageSize)),safeReviewPage=Math.min(reviewPage,reviewPageCount-1),visibleAssignedItems=assignedItems.slice(safeReviewPage*reviewPageSize,(safeReviewPage+1)*reviewPageSize);
@@ -283,7 +290,7 @@ export default function Dashboard(){
           <div className={styles.sectionHeading}><div><div className={styles.kicker}>Organization scope</div><h2>Your workspace</h2></div><a className="btn btn-ghost" href="/organizations">Manage organizations <ArrowRight size={15}/></a></div>
           <label className={styles.organizationPicker}>Active organization<select value={selectedOrganizationId} onChange={event=>setSelectedOrganizationId(event.target.value)}>{data.organizations.map(org=><option key={org.id} value={org.id}>{org.display_name} · {roleName(org.role_code)}</option>)}</select></label>
           {selectedOrganization&&<div className={styles.organization}><div className={styles.organizationHead}><span className={styles.activityIcon}><Building2 size={17}/></span><div className={styles.activityBody}><b>{selectedOrganization.display_name}</b><small>{selectedOrganization.legal_name} · {roleName(selectedOrganization.role_code)}</small></div><Badge tone="slate">{(selectedOrganization.verification_status||"unverified").replaceAll("_"," ")}</Badge></div>
-            {organizationLoading?<OperationStatus state="loading" title="Loading organization performance" detail="We’re retrieving the selected organization’s applications, open jobs and recorded hires. No organization data is being changed." />:organizationError?<p className="form-error" role="alert">{organizationError}</p>:organizationPulse&&["owner","administrator","recruiter","read_only","finance","project_manager","event_manager"].includes(selectedOrganization.role_code)?<div className={styles.orgMetrics}><span><b>{organizationPulse.applications}</b> applications</span><span><b>{organizationPulse.openJobs}</b> open jobs</span><span><b>{organizationPulse.hires}</b> hires</span></div>:null}
+            {organizationLoading?<OperationStatus state="loading" title="Loading organization performance" detail="We’re retrieving the selected organization’s applications, open jobs and recorded hires. No organization data is being changed." />:organizationError?<p className="form-error" role="alert">{organizationError}</p>:organizationPulse&&["owner","administrator","recruiter","read_only","finance","project_manager","event_manager"].includes(selectedOrganization.role_code)?<div className={styles.orgMetrics}><span><b>{organizationPulse.applications}</b> applications</span><span><b>{organizationPulse.openJobs}</b> open jobs</span><span><b>{organizationPulse.hires}</b> hires</span></div><div className={styles.orgChart} aria-label="Organization activity chart">{[{label:"Applications",value:organizationPulse.applications},{label:"Open jobs",value:organizationPulse.openJobs},{label:"Hires",value:organizationPulse.hires}].map(metric=><div className={styles.chartRow} key={metric.label}><div><span>{metric.label}</span><strong>{metric.value.toLocaleString()}</strong></div><div className={styles.chartTrack} role="img" aria-label={`${metric.label}: ${metric.value}`}><span style={{width:`${metric.value/Math.max(1,organizationPulse.applications,organizationPulse.openJobs,organizationPulse.hires)*100}%`}}/></div></div>)}</div>:null}
           </div>}
         </section>:null}
       </div>
@@ -296,7 +303,7 @@ export default function Dashboard(){
         </section>
         <section className={styles.section}>
           <div className={styles.sectionHeading}><div><div className={styles.kicker}>Profile</div><h2>Professional identity</h2></div><UserRound size={20}/></div>
-          <div className={styles.profileProgress}><div><b>{profile?.completion_percent??0}%</b><span>complete</span></div><div className={styles.progressTrack}><span style={{width:`${Math.max(0,Math.min(100,profile?.completion_percent||0))}%`}}/></div></div>
+          <div className={styles.profileProgress}><div><b>{profile?.completion_percent??0}%</b><span>complete</span></div><div className={styles.progressTrack} role="progressbar" aria-label="Profile completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0,Math.min(100,profile?.completion_percent||0))}><span style={{width:`${Math.max(0,Math.min(100,profile?.completion_percent||0))}%`}}/></div></div>
           <p className={styles.muted}>A complete profile helps keep your membership and professional records current.</p><a className={styles.secondaryLink} href="/profile">Review your profile <ArrowRight size={14}/></a>
         </section>
         <section className={styles.section}>

@@ -1005,3 +1005,14 @@ The fixes were committed to the same branch, including the request-page type/for
 No workflow run was returned for that latest revision when checked. Therefore TypeScript, Biome, backend tests, Next.js build, browser acceptance and PDF validation remain **unverified** until PR Quality runs against the latest branch head. The successful PostgreSQL checks above apply only to the earlier run's checked-out commit, not to the new commits.
 
 **Safety boundary:** No production database, production deployment, permission assignment, merge, or main-branch change was made. Keep the workstream unmerged and the PR in draft until the complete workflow passes against the latest commit.
+
+
+## Retention policy configurability decision — 2026-10-31
+
+**Project-owner direction:** Retention periods and expiry/deletion treatment must be adjustable through MPA-governed, versioned policy data. Do not hard-code a retention duration or silently apply a global default. A policy schedule must define separate rules for claim metadata, non-member identity-assurance artifacts, raw evidence, consent/rights records, reviewer notes, audit events and score-ledger records. Each class carries its own retention start event, period, grace period and expiry action.
+
+**Governance boundary:** The branch now provides an additive retention-policy registry and authenticated governance API. A policy proposal is immutable and must cover every required data class. The proposer cannot approve or activate their own proposal; approval requires a separate authorized actor and an approval reference. Activation is a separate explicit operation. Every proposal, approval, activation and supersession is recorded in append-only history and the platform audit log.
+
+**No unapproved deletion:** The migration intentionally seeds no retention duration and no active policy. No evidence deletion job is enabled by this registry. Legal holds pause and preserve records. Actual expiry enforcement must be implemented only after the evidence/claim storage model is integrated, MPA approves the class-by-class schedule and deletion/anonymization rules, and backup-expiry and legal-hold behavior are tested. Policy changes create a new version and apply prospectively unless a separately approved, audited migration/recalculation plan explicitly says otherwise.
+
+**Current implementation boundary:** The registry/API is an administrative foundation, not evidence deletion completion. Runtime database migration rehearsal, authorization tests, admin UI, evidence lifecycle integration and CI remain required. No production migration, data deletion or deployment is authorized by this work.

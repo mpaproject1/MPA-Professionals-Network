@@ -59,10 +59,13 @@ create table if not exists network_plus_request_event (
   to_status text,
   reason text,
   request_id_header text,
+  idempotency_hash text,
+  request_fingerprint text,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 create index if not exists ix_network_plus_request_event_history on network_plus_request_event(request_id,created_at);
+create unique index if not exists ux_network_plus_request_event_idempotency on network_plus_request_event(request_id,actor_user_id,idempotency_hash) where idempotency_hash is not null;
 
 -- A workspace is a consequence of recipient acceptance, never of submission.
 create table if not exists network_plus_collaboration_workspace (

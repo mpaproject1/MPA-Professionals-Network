@@ -12,7 +12,7 @@ const [migration,service,server,initiatives,offline,compatibility]=await Promise
 ]);
 test("Increment 2 adds only private detection projections and immutable policy/event history",()=>{
  for(const table of ["community_impact_detection_policy_version","community_impact_detection_active_policy","community_impact_detection_candidate","community_impact_detection_candidate_event"])assert.match(migration,new RegExp("create table if not exists "+table,"i"));
- assert.match(migration,/trg_community_impact_policy_version_immutable/);assert.match(migration,/trg_community_impact_candidate_event_immutable/);assert.match(migration,/trg_community_impact_candidate_guard/);assert.ok(migration.includes('"sourceEventCodes":["approve"]'));assert.match(migration,/Community Impact source and detection provenance is immutable/);
+ assert.match(migration,/trg_community_impact_policy_version_immutable/);assert.match(migration,/trg_community_impact_candidate_event_immutable/);assert.match(migration,/trg_community_impact_candidate_guard/);assert.ok(migration.includes('"sourceEventCodes":["approve"]'));assert.ok(migration.includes('"parentStatuses":["published","completed"]'));assert.match(migration,/Community Impact source and detection provenance is immutable/);
  assert.match(migration,/unique\(source_system,source_type,source_event_id\)/);
  assert.doesNotMatch(migration,/alter table serve_community_participation|alter table serve_community_initiative|alter table serve_community_offline_project/i);
 });
@@ -22,7 +22,7 @@ test("source detection rules and category mappings are versioned configuration, 
  assert.doesNotMatch(service,/education_skills.*community_care.*digital_inclusion/);
 });
 test("initiative completion candidates use authoritative source identity and remain unverified pending contributor confirmation",()=>{
- assert.match(service,/authoritative_source_user/);assert.match(service,/pending_confirmation/);assert.match(service,/confirmMyDetectedAttribution/);
+ assert.match(service,/authoritative_source_user/);assert.match(service,/pending_confirmation/);assert.match(service,/confirmMyDetectedAttribution/);assert.match(service,/row\.policy_rules/);assert.match(service,/rules\.parentStatuses\.includes\(current\.parent_status\)/);
  assert.match(service,/i\.status=any\(\$4::text\[\]\)/);assert.match(service,/p\.status=any\(\$3::text\[\]\)/);
  assert.match(service,/detection does not award points or publish profile data/i);
  assert.match(initiatives,/detectParticipationCompletion/);

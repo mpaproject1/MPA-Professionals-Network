@@ -427,6 +427,7 @@ export async function reviewBusinessModeration(businessId,userId,input,requestId
     if(status!=="suspended"&&row.moderation_status!=="pending_review")fail(409,"Business profile is not awaiting moderation.","INVALID_STATE");
     if(status==="approved"&&row.verification_status!=="verified")fail(409,"Only a verified business profile can be approved for publication.","BUSINESS_NOT_VERIFIED");
     const updated=(await db.query("update network_plus_business set moderation_status=$1,publication_status=case when $1='suspended' then 'suspended' when $1='approved' then 'published' else 'draft' end,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];
+    if(status==="suspended")await db.query("update network_plus_service_listing set status=$2,suspended_at=now(),suspension_reason=$3,updated_at=now() where business_id=$1 and status=any($4::text[])",[businessId,"suspended",reason,["published","paused","pending_review"]]);
     await audit(db,userId,"network_plus.business_profile_moderated","network_plus_business",businessId,requestId,{status,reason});
     await notifyOwners(db,businessId,"network_plus.business_profile_moderation_decided",{message:"A moderation decision was recorded for your business profile.",nextAction:status==="approved"?"Your approved business profile is now discoverable by eligible Network-Plus members.":"Review the decision reason and make any requested corrections.",status,eventVersion:updated.updated_at});
     return updated;

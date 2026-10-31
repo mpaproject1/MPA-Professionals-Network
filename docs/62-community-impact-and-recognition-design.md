@@ -908,7 +908,7 @@ Admin scan and queue access require system_admin or the explicit system-only com
 | 0 — Re-audit and architecture freeze | Source audit complete; formal freeze pending | This delivery record; project-owner approval and policy decisions still required |
 | 1 — Taxonomy and source-link contract | Contract drafted; approval pending | This delivery record; schema/API/privacy review still required |
 | 2 — Automatic detection and attribution | Implementation committed; validation pending | Two Serve-Community adapters, immutable source policy versions, event-driven candidates, replay-safe reconciliation, contributor confirm/dispute; disposable DB, CI, security and scheduler validation remain |
-| 3 — Manual claims and evidence | Not started | Depends on non-member identity assurance, evidence model and retention policy |
+| 3 — Manual claims and evidence | In progress — retention policy registry/API/admin UI added | Claim/evidence schema, non-member identity assurance, evidence lifecycle integration and expiry enforcement remain gated |
 | 4 — Reviewer operations | Not started | Depends on scoped permission/assignment/conflict/appeal policy |
 | 5 — Score ledger and explanations | Not started | Depends on score governance and approved rubric; no score calculation before approval |
 | 6 — Member workspace and profile | Not started | Depends on stable APIs, privacy projections and consent controls |
@@ -1015,4 +1015,4 @@ No workflow run was returned for that latest revision when checked. Therefore Ty
 
 **No unapproved deletion:** The migration intentionally seeds no retention duration and no active policy. No evidence deletion job is enabled by this registry. Legal holds pause and preserve records. Actual expiry enforcement must be implemented only after the evidence/claim storage model is integrated, MPA approves the class-by-class schedule and deletion/anonymization rules, and backup-expiry and legal-hold behavior are tested. Policy changes create a new version and apply prospectively unless a separately approved, audited migration/recalculation plan explicitly says otherwise.
 
-**Current implementation boundary:** The registry/API is an administrative foundation, not evidence deletion completion. Runtime database migration rehearsal, authorization tests, admin UI, evidence lifecycle integration and CI remain required. No production migration, data deletion or deployment is authorized by this work.
+**Current implementation boundary:** The registry/API is an administrative foundation, not evidence deletion completion. Runtime database migration rehearsal, authorization tests, evidence lifecycle integration and CI remain required. No production migration, data deletion or deployment is authorized by this work.

@@ -22,6 +22,7 @@ test("Increment 5 adds a separate business domain without duplicating canonical 
   assert.doesNotMatch(migration, /create table if not exists (person|app_user|organization|professional_profile)\b/i);
   assert.doesNotMatch(migration, /insert into (network_plus_business|network_plus_business_ownership|network_plus_service_listing)/i);
   assert.doesNotMatch(migration, /delete from|drop table|truncate table|alter table service_listing\b|alter table service_request\b/i);
+  assert.doesNotMatch(migration, /insert into app_user_role|insert into app_user_permission/i);
 });
 
 test("ownership requires one canonical owner party, explicit consent and scoped operational delegation", () => {
@@ -60,7 +61,7 @@ test("commercial listings have separate moderation and publication states with c
   assert.match(service, /listBusinessModerationQueue/);
   assert.match(service, /listProfessionalServiceModerationQueue/);
   assert.match(service, /changeProfessionalServiceStatus/);
-  assert.match(service, /status=any\(\$4::text\[\]\)/);
+  assert.match(service, /status=any\(\$2::text\[\]\)/);
   assert.match(service, /assertBusinessPublishable/);
   assert.match(service, /SELF_REVIEW_FORBIDDEN/);
   assert.match(service, /assertIndependentBusinessReviewer/);

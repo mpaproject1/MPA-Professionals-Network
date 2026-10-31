@@ -89,15 +89,16 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
   if(!input.businessId&&!input.serviceListingId&&Boolean(input.recipientUserId)===Boolean(input.recipientOrganizationId))fail(400,"Choose exactly one recipient user or organization, or select a published business/service listing.","INVALID_RECIPIENT");
   const fingerprint=hash(JSON.stringify({intent,subject,summary,details,terms,recipientUserId:input.recipientUserId||null,recipientOrganizationId:input.recipientOrganizationId||null,businessId:input.businessId||null,serviceListingId:input.serviceListingId||null}));
   return withTransaction(async db=>{
-    await assertEntry(db,userId);
+    const entry=await assertEntry(db,userId);
     await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[`network-plus-request:${userId}:${hash(idempotencyKey)}`]);
     const prior=(await db.query("select id,request_fingerprint from network_plus_request where requester_user_id=$1 and idempotency_hash=$2",[userId,hash(idempotencyKey)])).rows[0];
     if(prior){if(prior.request_fingerprint!==fingerprint)fail(409,"This idempotency key was already used for different request content.","IDEMPOTENCY_CONFLICT");return (await db.query("select * from network_plus_request where id=$1",[prior.id])).rows[0];}
     let recipientUserId=input.recipientUserId||null;
     let recipientOrganizationId=input.recipientOrganizationId||null;
     if(input.serviceListingId) {
-      const listing=(await db.query("select s.id,s.business_id from network_plus_service_listing s join network_plus_business b on b.id=s.business_id where s.id=$1 and s.status='published' and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published'",[input.serviceListingId])).rows[0];
+      const listing=(await db.query("select s.id,s.business_id,s.audience from network_plus_service_listing s join network_plus_business b on b.id=s.business_id where s.id=$1 and s.status='published' and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published'",[input.serviceListingId])).rows[0];
       if(!listing)fail(404,"Published verified service listing not found.","SERVICE_NOT_FOUND");
+      if((listing.audience==="members"&&!entry.access.member)||(listing.audience==="organizations"&&!entry.access.organization))fail(403,"This service listing is not available to your Network-Plus audience.","SERVICE_AUDIENCE_FORBIDDEN");
       if(input.businessId&&input.businessId!==listing.business_id)fail(400,"Service listing does not belong to the selected business.","BUSINESS_LISTING_MISMATCH");
       input.businessId=listing.business_id;
     }
@@ -118,8 +119,8 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
     }
     if(recipientUserId===userId)fail(400,"You cannot send a request to yourself.","INVALID_RECIPIENT");
     if(recipientOrganizationId) {
-      const org=(await db.query("select id,verification_status from organization where id=$1",[recipientOrganizationId])).rows[0];
-      if(!org||org.verification_status!=="verified")fail(404,"Recipient organization not found.","RECIPIENT_NOT_FOUND");
+      const org=(await db.query("select id,verification_status,network_plus_visible from organization where id=$1",[recipientOrganizationId])).rows[0];
+      if(!org||org.verification_status!=="verified"||org.network_plus_visible!==true)fail(404,"Verified opted-in recipient organization not found.","RECIPIENT_NOT_FOUND");
       const reps=(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code in ('owner','administrator')",[org.id])).rows;
       if(!reps.length)fail(409,"Recipient organization has no active authorized representative.","RECIPIENT_UNAVAILABLE");
     } else if(input.businessId) {

@@ -16,6 +16,7 @@ test("referral schema enforces separate types and duplicate prevention",()=>{
  assert.match(migration,/uq_member_referral_employment_application/);
  assert.match(migration,/prevent_member_referral_history_mutation/);
  assert.match(applicationMigration,/alter table job_application add column if not exists referral_code/);
+ assert.match(migration,/status_visibility_consent/);
 });
 test("membership attribution follows registration, application, review and activation events",()=>{
  for(const name of ["captureMembershipRegistration","recordMembershipMilestone","recordMembershipActivated"])assert.ok(service.includes(name));

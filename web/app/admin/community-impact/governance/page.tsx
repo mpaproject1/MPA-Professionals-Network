@@ -3,7 +3,7 @@ import {useCallback,useEffect,useState} from "react";
 import {api} from "../../../../lib/api";
 import {uploadPrivateFile,downloadPrivateFile} from "../../../../lib/private-upload";
 import {useUiStore} from "../../../../lib/store";
-import {AdminPageHeader} from "../../../admin-page-header";
+import {AdminPageHeader} from "../../admin-page-header";
 
 type Row=Record<string,any>;
 type Me={roles?:string[];permissions?:string[]};
@@ -27,12 +27,13 @@ export default function CommunityImpactGovernancePage(){
  const can=(...codes:string[])=>isAdmin||codes.some(code=>permissions.includes(code));
  const load=useCallback(async()=>{if(!token)return;setError("");try{
   const self=await api<Me>("/api/v1/me",{},token);setMe(self);
+  const rolesNow=self.roles||[],permissionsNow=self.permissions||[],adminNow=rolesNow.includes("system_admin");const allowed=(...codes:string[])=>adminNow||codes.some(code=>permissionsNow.includes(code));
   const tasks:[string,Promise<any>][]=[
-   ["identity",can("community_impact.identity.review")?api("/api/v1/admin/community-impact/identity-assurance",{},token):Promise.resolve({items:[]})],
-   ["attributions",can("community_impact.offline_attribution.review")?api("/api/v1/admin/community-impact/offline-attributions",{},token):Promise.resolve({items:[]})],
-   ["candidates",can("community_impact.detection.manage")?api("/api/v1/admin/community-impact/detection/candidates?limit=100",{},token):Promise.resolve({items:[]})],
-   ["policies",can("community_impact.detection_policy.manage","community_impact.detection_policy.approve")?api("/api/v1/admin/community-impact/detection/policies",{},token):Promise.resolve({items:[]})],
-   ["claims",can("community_impact.claim.review","community_impact.claim.assign","community_impact.claim.assess","community_impact.claim.second_review")?api("/api/v1/admin/community-impact/claims?status=under_review",{},token):Promise.resolve({items:[]})]
+   ["identity",allowed("community_impact.identity.review")?api("/api/v1/admin/community-impact/identity-assurance",{},token):Promise.resolve({items:[]})],
+   ["attributions",allowed("community_impact.offline_attribution.review")?api("/api/v1/admin/community-impact/offline-attributions",{},token):Promise.resolve({items:[]})],
+   ["candidates",allowed("community_impact.detection.manage")?api("/api/v1/admin/community-impact/detection/candidates?limit=100",{},token):Promise.resolve({items:[]})],
+   ["policies",allowed("community_impact.detection_policy.manage","community_impact.detection_policy.approve")?api("/api/v1/admin/community-impact/detection/policies",{},token):Promise.resolve({items:[]})],
+   ["claims",allowed("community_impact.claim.review","community_impact.claim.assign","community_impact.claim.assess","community_impact.claim.second_review")?api("/api/v1/admin/community-impact/claims?status=under_review",{},token):Promise.resolve({items:[]})]
   ];
   const results=await Promise.all(tasks.map(x=>x[1]));setIdentity(results[0]?.items||[]);setAttributions(results[1]?.items||[]);setCandidates(results[2]?.items||[]);setPolicies(results[3]?.items||[]);setClaims(results[4]?.items||[]);
  }catch(e){setError(e instanceof Error?e.message:"Community Impact governance data could not be loaded.")}},[token]);

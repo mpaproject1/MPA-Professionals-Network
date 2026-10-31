@@ -116,7 +116,7 @@ create table if not exists community_impact_claim_event (
  created_at timestamptz not null default now()
 );
 create index if not exists ix_community_impact_claim_event_history on community_impact_claim_event(claim_id,created_at desc);
-create or replace function community_impact_claim_guard() returns trigger language plpgsql as $
+create or replace function community_impact_claim_guard() returns trigger language plpgsql as $ci$
 begin
  if TG_OP='DELETE' then raise exception 'Community Impact claims cannot be deleted outside approved retention processing'; end if;
  if NEW.id is distinct from OLD.id or NEW.tracking_reference is distinct from OLD.tracking_reference
@@ -146,10 +146,10 @@ begin
   or NEW.public_consent_version is distinct from OLD.public_consent_version or NEW.media_rights_confirmed is distinct from OLD.media_rights_confirmed
  ) then raise exception 'Submitted Community Impact claim details cannot be edited; use clarification or appeal workflows'; end if;
  return NEW;
-end; $;
+end; $ci$;
 drop trigger if exists trg_community_impact_claim_guard on community_impact_claim;
 create trigger trg_community_impact_claim_guard before update or delete on community_impact_claim for each row execute function community_impact_claim_guard();
-create or replace function community_impact_claim_assignment_guard() returns trigger language plpgsql as $
+create or replace function community_impact_claim_assignment_guard() returns trigger language plpgsql as $ci$
 begin
  if TG_OP='DELETE' then raise exception 'Community Impact claim assignment history cannot be deleted'; end if;
  if NEW.id is distinct from OLD.id or NEW.claim_id is distinct from OLD.claim_id
@@ -157,10 +157,10 @@ begin
   or NEW.assigned_at is distinct from OLD.assigned_at then raise exception 'Community Impact reviewer assignment provenance is immutable'; end if;
  if OLD.active=false or (NEW.active=true and OLD.active=false) then raise exception 'Closed reviewer assignments cannot be reactivated'; end if;
  return NEW;
-end; $;
+end; $ci$;
 drop trigger if exists trg_community_impact_claim_assignment_guard on community_impact_claim_assignment;
 create trigger trg_community_impact_claim_assignment_guard before update or delete on community_impact_claim_assignment for each row execute function community_impact_claim_assignment_guard();
-create or replace function community_impact_claim_appeal_guard() returns trigger language plpgsql as $
+create or replace function community_impact_claim_appeal_guard() returns trigger language plpgsql as $ci$
 begin
  if TG_OP='DELETE' then raise exception 'Community Impact claim appeals cannot be deleted'; end if;
  if NEW.id is distinct from OLD.id or NEW.claim_id is distinct from OLD.claim_id
@@ -176,7 +176,7 @@ begin
  if NEW.assigned_reviewer_id is distinct from OLD.assigned_reviewer_id and not (OLD.status='submitted' and NEW.status='under_review') then raise exception 'Appeal reviewer can only be assigned during assignment'; end if;
  if (NEW.decision_rationale is distinct from OLD.decision_rationale or NEW.decision_retention_policy_version_id is distinct from OLD.decision_retention_policy_version_id or NEW.decision_retention_rule_snapshot is distinct from OLD.decision_retention_rule_snapshot or NEW.decided_at is distinct from OLD.decided_at) and not (OLD.status='under_review' and NEW.status in('upheld','overturned')) then raise exception 'Appeal decision fields can only be set during independent decision'; end if;
  return NEW;
-end; $;
+end; $ci$;
 drop trigger if exists trg_community_impact_claim_appeal_guard on community_impact_claim_appeal;
 create trigger trg_community_impact_claim_appeal_guard before update or delete on community_impact_claim_appeal for each row execute function community_impact_claim_appeal_guard();
 create or replace function community_impact_claim_event_immutable() returns trigger language plpgsql as $$ begin raise exception 'Community Impact claim history is append-only'; end; $$;

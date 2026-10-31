@@ -2,9 +2,9 @@
 import {ArrowRight,BookOpen,CheckCircle2,Clock3,Compass,Filter,Globe2,HeartHandshake,Leaf,MapPin,Search,ShieldCheck,Users,X} from "lucide-react";
 import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
+import {SupportAction} from "../../components/support-action";
 import {api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
-import {SupportAction} from "../../components/support-action";
 type Initiative={id:string;title:string;category:string;summary:string;description:string;deliveryMode:string;locationLabel:string|null;capacity:number|null;eligibility:string|null;expectedCommitment:string|null;publishedAt:string};
 type Participation={id:string;initiative_id:string;status:string;title:string;category:string;created_at:string};
 type CompletedProject={id:string;source?:string;title:string;category:string;summary:string;completedAt?:string;completedMemberParticipations?:number;publicStory?:string;locationLabel?:string;beneficiaryCount?:number|null;beneficiaryDefinition?:string|null;outcomeMetrics?:{label:string;value:string;unit:string}[];imageUrls?:string[];videoUrls?:string[];imageAltText?:string[]};

@@ -82,6 +82,9 @@ All routes are authenticated and return no-store JSON through the existing API s
 | `POST /api/v1/network-plus/services/:id/publication` | Owner pause/archive; publication requires independent moderation |
 | `POST /api/v1/admin/network-plus/businesses/:id/verification` | Independent verification decision |
 | `POST /api/v1/admin/network-plus/businesses/:id/moderation` | Independent business profile moderation decision |
+| `GET /api/v1/admin/network-plus/businesses/verification-queue` | Dedicated business verification review queue |
+| `GET /api/v1/admin/network-plus/businesses/moderation-queue` | Dedicated business profile moderation queue |
+| `GET /api/v1/admin/network-plus/services/moderation-queue` | Dedicated commercial service listing moderation queue |
 | `GET /api/v1/admin/network-plus/businesses/:id/evidence` | Reviewer-only evidence metadata list |
 | `GET /api/v1/files/:id` | Existing private-file route; business evidence is readable by its uploader or an independent reviewer on a submitted case, never the case submitter |
 | `POST /api/v1/admin/network-plus/services/:id/moderation` | Independent listing moderation decision |
@@ -124,4 +127,4 @@ Added `test/platform/network-plus-business-discovery.test.js` and payload templa
 - [ ] Run backend tests, Biome, TypeScript, production build and browser acceptance after all implementation fixes are ready.
 - [ ] Complete manual privacy, accessibility and responsive checks before public release.
 
-**Exit status: IN PROGRESS — NOT PASSED.** The current changes are a source implementation draft. No production migration, deployment, merge or main-branch change has occurred. Keep PR #18 draft until the full exit gate passes.
+**Exit status: IN PROGRESS — NOT PASSED.** The current changes are a source implementation draft, including reviewer queue APIs; no browser management/review screens are included in Increment 5. No production migration, deployment, merge or main-branch change has occurred. Keep PR #18 draft until the full exit gate passes.

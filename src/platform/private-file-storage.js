@@ -125,7 +125,7 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
       }
     }
   if(!allowed){
-    const businessReviewer=roles.some(role=>["verification_reviewer","system_admin"].includes(role))||permissions.includes("business.verify");
+    const businessReviewer=roles.some(role=>["business_verification_reviewer","system_admin"].includes(role))||permissions.includes("business.verify");
     if(businessReviewer){
       const businessEvidence=await db.query("select 1 from network_plus_business_verification_evidence e join network_plus_business_verification_case c on c.id=e.case_id where e.file_object_id=$1 and c.submitted_by<>$2 and c.status in ('submitted','under_review','appealed') limit 1",[fileId,userId]);
       allowed=businessEvidence.rowCount>0;

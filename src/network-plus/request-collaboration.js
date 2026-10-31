@@ -193,6 +193,7 @@ export async function grantNetworkPlusSupportAccess(requestId,actorUserId,input,
     const roles=(await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[actorUserId])).rows.map(row=>row.role_code);
     if(!roles.includes("system_admin"))fail(403,"Only a system administrator may grant request support access.","SUPPORT_GRANT_FORBIDDEN");
     const targetUserId=input?.supportUserId, ticket=clean(input?.supportCaseReference,120,"Support case reference",6), reason=clean(input?.reason,500,"Grant reason",8);
+    if(!targetUserId)fail(400,"Choose a support user for this grant.","SUPPORT_USER_REQUIRED");
     const targetRoles=(await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[targetUserId])).rows.map(row=>row.role_code);
     if(!targetRoles.includes("network_plus_support")&&!targetRoles.includes("system_admin"))fail(403,"The support user must hold the privileged Network-Plus support role.","SUPPORT_FORBIDDEN");
     const expiresAt=new Date(input?.expiresAt);

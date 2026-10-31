@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,service,server,compatibility]=await Promise.all([
+const [migration,service,server,compatibility,adminWorkspace,adminPage]=await Promise.all([
  read("../../db/migrations/20261031170000_community_impact_retention_policy.sql"),
  read("../../src/platform/community-impact-retention.js"),
  read("../../server.js"),
- read("../../scripts/check-new-migration-compatibility.js")
+ read("../../scripts/check-new-migration-compatibility.js"),
+ read("../../web/app/admin/admin-workspace.tsx"),
+ read("../../web/app/admin/community-impact/retention-policy/page.tsx")
 ]);
 test("retention policy is versioned and has no unapproved default schedule",()=>{
  for(const table of ["community_impact_retention_policy_version","community_impact_retention_active_policy","community_impact_retention_policy_event"])assert.match(migration,new RegExp("create table if not exists "+table,"i"));
@@ -43,4 +45,14 @@ test("retention governance endpoints are authenticated and do not trigger deleti
 });
 test("migration compatibility inventory includes the retention-policy migration",()=>{
  assert.match(compatibility,/20261031170000_community_impact_retention_policy\.sql/);
+});
+
+test("restricted MPA admin UI exposes policy proposal, approval and activation without a default period",()=>{
+ assert.match(adminWorkspace,/Impact retention policy/);
+ assert.match(adminWorkspace,/community_impact\.retention\.manage/);
+ assert.match(adminPage,/retentionDays:""/);
+ assert.match(adminPage,/Submit policy for independent approval/);
+ assert.match(adminPage,/Approve policy version/);
+ assert.match(adminPage,/Activate version/);
+ assert.match(adminPage,/No retention duration is assumed/);
 });

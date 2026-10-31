@@ -67,6 +67,25 @@ create table if not exists network_plus_request_event (
 create index if not exists ix_network_plus_request_event_history on network_plus_request_event(request_id,created_at);
 create unique index if not exists ux_network_plus_request_event_idempotency on network_plus_request_event(request_id,actor_user_id,idempotency_hash) where idempotency_hash is not null;
 
+
+-- Support is explicitly granted per request, per support user and per case, with short expiry.
+create table if not exists network_plus_request_support_grant (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid not null references network_plus_request(id) on delete restrict,
+  support_user_id uuid not null references app_user(id) on delete restrict,
+  support_case_reference text not null check (length(trim(support_case_reference)) between 6 and 120),
+  granted_by uuid not null references app_user(id) on delete restrict,
+  grant_reason text not null check (length(trim(grant_reason)) between 8 and 500),
+  expires_at timestamptz not null,
+  revoked_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique(request_id,support_user_id,support_case_reference),
+  check (expires_at>created_at and expires_at<=created_at+interval '72 hours')
+);
+create index if not exists ix_network_plus_request_support_grant_active
+  on network_plus_request_support_grant(request_id,support_user_id,expires_at)
+  where revoked_at is null;
+
 -- A workspace is a consequence of recipient acceptance, never of submission.
 create table if not exists network_plus_collaboration_workspace (
   id uuid primary key default gen_random_uuid(),

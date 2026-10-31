@@ -615,6 +615,7 @@ export async function respondToJobApplication(applicationId,userId,input,request
       if(!["submitted","screening","shortlisted","interview","offer","accepted"].includes(a.status)) throw error(409,"This application cannot be withdrawn at its current stage.","INVALID_STATE");
       const row=(await db.query("update job_application set status='withdrawn',withdrawn_at=now(),updated_at=now() where id=$1 returning *",[applicationId])).rows[0];
       await db.query("insert into job_application_event(application_id,actor_user_id,from_status,to_status,note) values($1,$2,$3,'withdrawn',$4)",[applicationId,userId,a.status,input.note||null]);
+      await memberReferrals.recordJobApplicationStage(db,applicationId,"withdrawn",userId);
       await audit(db,userId,"job.application_withdrawn","job_application",applicationId,requestId);
       const employers=(await db.query("select om.user_id from organization_membership om join app_user u on u.id=om.user_id where om.organization_id=$1 and om.status='active' and u.status='active' and om.role_code=any($2::text[])",[a.organization_id,["owner","administrator","recruiter"]])).rows;
       for(const employer of employers)await queueWorkflowEmail(db,employer.user_id,"employer.candidate_update",{notificationEventCode:"job.application_withdrawn",category:"recruitment",title:"Candidate withdrew application",audience:"employer",status:"withdrawn",message:"A candidate withdrew their job application.",nextAction:"Review the updated candidate pipeline.",actionUrl:"/recruitment"},"job_application",applicationId);

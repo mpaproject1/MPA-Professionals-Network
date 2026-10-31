@@ -99,6 +99,7 @@ async function assertBusinessOwner(db,businessId,userId,capability="business.man
 async function audit(db,actor,action,type,id,requestId,metadata={}) {
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,metadata]);
   if(type==="network_plus_business")await db.query("insert into network_plus_business_event(business_id,actor_user_id,event_code,from_status,to_status,reason,request_id,metadata) values($1,$2,$3,$4,$5,$6,$7,$8)",[id,actor,action,metadata.from||null,metadata.to||metadata.status||null,metadata.reason||null,requestId,metadata]);
+  if(type==="network_plus_service_listing")await db.query("insert into network_plus_service_listing_event(listing_id,actor_user_id,event_code,from_status,to_status,reason,request_id,metadata) values($1,$2,$3,$4,$5,$6,$7,$8)",[id,actor,action,metadata.from||null,metadata.to||metadata.status||null,metadata.reason||null,requestId,metadata]);
 }
 async function notifyOwners(db,businessId,eventCode,payload) {
   const owners=(await db.query(`select distinct bo.owner_user_id user_id from network_plus_business_ownership bo

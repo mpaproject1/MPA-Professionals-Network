@@ -138,10 +138,10 @@ export default function Jobs(){
     try{
       let draftId=draftIds[job.id];
       if(!draftId){
-        const draft=await api<{id:string}>(`/api/v1/jobs/${encodeURIComponent(job.id)}/application-drafts`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id)})},token);
+        const draft=await api<{id:string}>(`/api/v1/jobs/${encodeURIComponent(job.id)}/application-drafts`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode||undefined})},token);
         draftId=draft.id;setDraftIds(current=>({...current,[job.id]:draftId!}));
       }
-      const submitted=await api<{status?:string;tracking_reference?:string|null}>(`/api/v1/job-applications/${encodeURIComponent(draftId)}/submit`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id)})},token);
+      const submitted=await api<{status?:string;tracking_reference?:string|null}>(`/api/v1/job-applications/${encodeURIComponent(draftId)}/submit`,{method:"POST",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode||undefined})},token);
       setNotice(`Formal application status: ${humanStatus(submitted.status||"submitted")}.${submitted.tracking_reference?` Reference ${submitted.tracking_reference}.`:""} Open application tracking for the next steps.`);
       setDraftIds(current=>{const next={...current};delete next[job.id];return next;});
     }catch(e){

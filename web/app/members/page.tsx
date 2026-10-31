@@ -10,6 +10,7 @@ import { OperationStatus } from "../../components/operation-status";
 import { SupportAction } from "../../components/support-action";
 import { Badge, Card } from "../../components/ui";
 import { VolunteerPledgePanel } from "../../components/volunteer-pledge-panel";
+import { CommunityImpactWorkspacePanel } from "../../components/community-impact-workspace-panel";
 import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
 
@@ -316,6 +317,8 @@ export default function MembersWorkspacePage() {
           })}
         </ol>
       </section>
+
+      <CommunityImpactWorkspacePanel token={token || ""} />
 
       <VolunteerPledgePanel token={token || ""} active={active} />
 

@@ -13,7 +13,7 @@ const pathways = [
   { title: "Membership", description: "Learn about membership and follow the application and review steps provided by the platform.", href: "/membership", action: "Understand membership", Icon: UserRoundCheck },
 ] as const;
 
-type CompletedProject = { id: string; title: string; category: string; summary: string; completedAt?: string; completedMemberParticipations: number };
+type CompletedProject = { id: string; source?: string; title: string; category: string; summary: string; completedAt?: string; completedMemberParticipations?: number; publicStory?: string; locationLabel?: string; beneficiaryCount?: number | null; beneficiaryDefinition?: string | null; outcomeMetrics?: { label: string; value: string; unit: string }[]; imageUrls?: string[]; videoUrls?: string[]; imageAltText?: string[] };
 type CompletedPortfolio = { items: CompletedProject[]; minimumReportableGroupSize: number; measurementNote: string };
 
 const categoryLabels: Record<string, string> = {

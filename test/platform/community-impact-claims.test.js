@@ -22,6 +22,8 @@ test("Increment 3 creates separate private claim, evidence, assignment, decision
  assert.match(migration,/file_object_id uuid not null unique references file_object\(id\)/);
  assert.match(migration,/claim history is append-only/i);
  assert.match(migration,/claim decisions are immutable/i);
+ assert.match(migration,/evidence references can only be deleted by the approved retention processor/i);
+ assert.match(migration,/current_setting\('app\.community_impact_retention_processing'/);
  assert.match(migration,/mentorship_knowledge_sharing/);
  assert.match(migration,/professional_pro_bono_services/);
  assert.match(migration,/employment_referrals/);

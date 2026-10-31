@@ -1,3 +1,4 @@
+import {isIP} from "node:net";
 import {getPool,withTransaction} from "./db.js";
 import {policyError} from "./identity-policy.js";
 const CATEGORIES=new Set(["education","community_care","digital_inclusion","environment","livelihoods","accessibility","other"]);

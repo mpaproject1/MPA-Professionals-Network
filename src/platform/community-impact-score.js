@@ -2,7 +2,7 @@ import {createHash} from "node:crypto";
 import {getPool,withTransaction} from "./db.js";
 import {policyError} from "./identity-policy.js";
 
-const fail=(status,message,code="COMMUNITY_IMPACT_SCORE_ERROR")=>{throw policyError(status,message,code)};
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst fail=(status,message,code="COMMUNITY_IMPACT_SCORE_ERROR")=>{throw policyError(status,message,code)};
 const clean=(value,min,max,label)=>{const v=String(value??"").trim();if(v.length<min||v.length>max)fail(400,label+" must be between "+min+" and "+max+" characters.","VALIDATION_ERROR");return v};
 async function permission(db,userId,code){const q=await db.query("select exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code='system_admin') or exists(select 1 from app_user_permission where user_id=$1 and permission_code=$2) allowed",[userId,code]);if(!q.rows[0]?.allowed)fail(403,"The required Community Impact score permission is required.","FORBIDDEN")}
 const hash=value=>createHash("sha256").update(value).digest("hex");
@@ -44,7 +44,7 @@ async function verifySource(db,sourceType,sourceRecordId,subjectUserId,claim){
 export async function linkVerifiedSource(actor,claimId,input){
  await permission(getPool(),actor,"community_impact.score.recalculate");
  const sourceType=String(input?.sourceType||"");if(!SCORE_SOURCE_TYPES.has(sourceType))fail(400,"Choose a supported Community Impact source type.","VALIDATION_ERROR");
- const sourceRecordId=clean(input?.sourceRecordId,36,36,"Source record ID"),rationale=clean(input?.rationale,12,2000,"Source-link rationale");
+ const sourceRecordId=clean(input?.sourceRecordId,36,36,"Source record ID"),rationale=clean(input?.rationale,12,2000,"Source-link rationale");if(!UUID.test(sourceRecordId))fail(400,"Source record ID must be a valid UUID.","VALIDATION_ERROR");
  return withTransaction(async tx=>{
   const claim=(await tx.query("select * from community_impact_claim where id=$1 for update",[claimId])).rows[0];if(!claim)fail(404,"Contribution claim not found.","NOT_FOUND");
   if(claim.status!=="verified"||claim.current_decision_code!=="verified")fail(409,"Only a verified claim can be linked to a scoring source.","SCORE_SOURCE_NOT_VERIFIED");
@@ -106,7 +106,7 @@ export async function getMyScore(userId){
  const rows=(await db.query("select id,source_type,source_record_id,entry_type,points,explanation,created_at from community_impact_score_ledger where subject_user_id=$1 order by created_at desc limit 100",[userId])).rows;
  return {score:Number(totals.total),awards:totals.awards,reversals:totals.reversals,policyVersion:policy.version,evaluationOnly:policy.evaluation_only,publicScoreEnabled:policy.public_score_enabled,publicationStatus:"private_evaluation",items:rows};
 }
-export async function listScorePolicies(actor){await permission(getPool(),actor,"community_impact.score.policy.manage");const rows=await getPool().query("select id,version,status,evaluation_only,public_score_enabled,rationale,change_summary,created_by,approved_by,approval_reference,effective_at,created_at,policy from community_impact_score_policy_version order by version desc");return {items:rows.rows}}
+export async function listScorePolicies(actor){const db=getPool();await permission(db,actor,"community_impact.score.policy.manage").catch(async error=>{if(error.code!=="FORBIDDEN")throw error;await permission(db,actor,"community_impact.score.policy.approve")});const rows=await db.query("select id,version,status,evaluation_only,public_score_enabled,rationale,change_summary,created_by,approved_by,approval_reference,effective_at,created_at,policy from community_impact_score_policy_version order by version desc");return {items:rows.rows}}
 export async function proposeScorePolicy(actor,input){
  await permission(getPool(),actor,"community_impact.score.policy.manage");
  const policy=validatePolicy(input?.policy),rationale=clean(input?.rationale,12,2000,"Policy rationale"),summary=clean(input?.changeSummary,8,1000,"Change summary");
@@ -144,7 +144,7 @@ export async function activateScorePolicy(actor,id,rationale){
 export async function scoreVerifiedClaim(actor,claimId,rationale){
  await permission(getPool(),actor,"community_impact.score.recalculate");
  const why=clean(rationale,12,2000,"Scoring rationale");
- return withTransaction(async tx=>{const policy=await activePolicy(tx);return scoreClaim(tx,actor,claimId,why,policy,null)});
+ return withTransaction(async tx=>{const policy=await activePolicy(tx);const existing=(await tx.query("select l.id,l.policy_version_id,l.assessment_id,l.points from community_impact_score_ledger l where l.claim_id=$1 and l.entry_type='award' and not exists(select 1 from community_impact_score_ledger r where r.reverses_entry_id=l.id) order by l.created_at desc",[claimId])).rows;if(existing.length){const assessment=(await tx.query("select id from community_impact_contribution_assessment where claim_id=$1 and status='approved' order by approved_at desc nulls last,created_at desc limit 1",[claimId])).rows[0];if(existing.length===1&&existing[0].policy_version_id===policy.id&&existing[0].assessment_id===assessment?.id)return {status:"already_recorded",ledgerEntryId:existing[0].id,points:Number(existing[0].points)};fail(409,"This contribution already has an active ledger award. Use the explicit recalculation operation to preserve reversal history before replacing it.","SCORE_RECALCULATION_REQUIRED")}return scoreClaim(tx,actor,claimId,why,policy,null)});
 }
 async function reverseEntry(tx,actor,entry,reason,reasonCode){
  const idempotency=hash(["reversal",entry.id,reasonCode,reason].join(":"));

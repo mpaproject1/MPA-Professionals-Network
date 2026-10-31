@@ -39,20 +39,21 @@ async function validateGeographyReference(db,id) {
   if(!valid)fail(400,"Choose a location from the published geography reference list.","INVALID_GEOGRAPHY_REFERENCE");
   return id;
 }
+function optionalPublicText(value,max,field) { return value===undefined||value===null||String(value).trim()===""?null:publicText(value,max,field,{min:1}); }
 function normalizeBusinessInput(input) {
   return {
     businessKind:input.businessKind,
-    displayName:text(input.displayName,160,"Business name",{min:2}),
-    tradingName:text(input.tradingName,160,"Trading name",{optional:true}),
+    displayName:publicText(input.displayName,160,"Business name",{min:2}),
+    tradingName:optionalPublicText(input.tradingName,160,"Trading name"),
     description:publicText(input.description,5000,"Description",{min:20}),
     website:safeWebsite(input.website),
-    locationLabel:text(input.locationLabel,160,"Location",{optional:true}),
+    locationLabel:optionalPublicText(input.locationLabel,160,"Location"),
     geographyReferenceItemId:input.geographyReferenceItemId||null
   };
 }
 function normalizeListingInput(input) {
   const row={
-    title:text(input.title,160,"Title",{min:3}),
+    title:publicText(input.title,160,"Title",{min:3}),
     summary:publicText(input.summary,500,"Summary",{min:20}),
     description:publicText(input.description,8000,"Description",{min:40}),
     serviceCategory:text(input.serviceCategory,100,"Service category",{min:2}).toLowerCase(),
@@ -64,7 +65,7 @@ function normalizeListingInput(input) {
     priceAmount:input.priceAmount===undefined||input.priceAmount===null||input.priceAmount===""?null:Number(input.priceAmount),
     currency:input.currency?String(input.currency).trim().toUpperCase():null,
     availability:input.availability&&typeof input.availability==="object"&&!Array.isArray(input.availability)?input.availability:{},
-    credentials:Array.isArray(input.credentials)?input.credentials:[]
+    credentials:Array.isArray(input.credentials)?input.credentials.map(value=>publicText(value,160,"Credential",{min:2})):[]
   };
   if(!CATEGORIES.has(row.serviceCategory))fail(400,"Choose a supported service category.","VALIDATION_ERROR");
   if(!["members","organizations","both"].includes(row.audience))fail(400,"Unsupported listing audience.","VALIDATION_ERROR");
@@ -208,7 +209,7 @@ export async function updateBusiness(businessId,userId,input,requestId) {
     const next={displayName:business.display_name,tradingName:business.trading_name,description:business.description,website:business.website,locationLabel:business.location_label};
     for(const [key,value] of entries){
       if(key==="website")next.website=safeWebsite(value);
-      else next[key]=key==="tradingName"||key==="locationLabel"?text(value,160,key,{optional:true}):key==="displayName"?text(value,160,key,{min:2}):publicText(value,5000,key,{min:20});
+      else next[key]=key==="tradingName"||key==="locationLabel"?optionalPublicText(value,160,key):key==="displayName"?publicText(value,160,key,{min:2}):publicText(value,5000,key,{min:20});
     }
     const row=(await db.query(`update network_plus_business set display_name=$1,trading_name=$2,description=$3,website=$4,location_label=$5,
       verification_status=case when verification_status='verified' then 'submitted' else verification_status end,

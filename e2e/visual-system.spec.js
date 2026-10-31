@@ -21,6 +21,10 @@ async function readContrastPairs(page) {
     const primary = tokens.getPropertyValue("--primary").trim();
     const primaryContrast = tokens.getPropertyValue("--primary-contrast").trim();
     return {
+      canvas: tokens.getPropertyValue("--bg").trim(),
+      surface,
+      brandNavy: tokens.getPropertyValue("--brand-navy").trim(),
+      brandLemon: tokens.getPropertyValue("--brand-lemon").trim(),
       textOnSurface: ratio(text, surface),
       mutedOnSurface: ratio(muted, surface),
       primaryActionText: ratio(primaryContrast, primary),
@@ -53,6 +57,10 @@ test.describe("MPA shared visual system", () => {
     await expect.poll(() => page.locator("html").evaluate((element) => element.classList.contains("dark"))).toBe(true);
 
     const dark = await readContrastPairs(page);
+    expect(dark.canvas).toBe("#081d32");
+    expect(dark.surface).toBe("#102b45");
+    expect(dark.brandNavy).toBe("#123b5d");
+    expect(dark.brandLemon).toBe("#dce94f");
     expect(dark.textOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(dark.mutedOnSurface).toBeGreaterThanOrEqual(4.5);
     expect(dark.primaryActionText).toBeGreaterThanOrEqual(4.5);

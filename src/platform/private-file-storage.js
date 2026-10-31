@@ -124,6 +124,13 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
         allowed=financeEvidence.rowCount>0;
       }
     }
+  if(!allowed){
+    const businessReviewer=roles.some(role=>["verification_reviewer","system_admin"].includes(role))||permissions.includes("business.verify");
+    if(businessReviewer){
+      const businessEvidence=await db.query("select 1 from network_plus_business_verification_evidence e join network_plus_business_verification_case c on c.id=e.case_id where e.file_object_id=$1 and c.submitted_by<>$2 and c.status in ('submitted','under_review','appealed') limit 1",[fileId,userId]);
+      allowed=businessEvidence.rowCount>0;
+    }
+  }
   if(!allowed) throw fail(403,"You do not have permission to read this private file.","FORBIDDEN");
   const {readFile}=await import("node:fs/promises");
   let bytes; try{bytes=await readFile(filePath(f.object_key));}catch{throw fail(404,"Private file content is unavailable.","PRIVATE_FILE_MISSING");}

@@ -189,9 +189,12 @@ export async function submitBusinessVerification(businessId,userId,requestId) {
   return withTransaction(async db=>{
     const {business}=await assertBusinessOwner(db,businessId,userId);
     if(["suspended","archived"].includes(business.publication_status))fail(409,"This business cannot be submitted while suspended or archived.","BUSINESS_LOCKED");
-    const existing=(await db.query("select id,status from network_plus_business_verification_case where business_id=$1 and status in ('submitted','under_review','appealed') order by created_at desc limit 1 for update",[businessId])).rows[0];
+    const existing=(await db.query("select id,status,submitted_by from network_plus_business_verification_case where business_id=$1 and status in ('submitted','under_review','appealed') order by created_at desc limit 1 for update",[businessId])).rows[0];
     if(existing)return {...existing,idempotent:true};
-    const row=(await db.query("insert into network_plus_business_verification_case(business_id,status,submitted_by) values($1,'submitted',$2) returning *",[businessId,userId])).rows[0];
+    const draft=(await db.query("select id from network_plus_business_verification_case where business_id=$1 and status='draft' order by created_at desc limit 1 for update",[businessId])).rows[0];
+    const evidenceCount=Number((await db.query("select count(*)::int count from network_plus_business_verification_evidence e join network_plus_business_verification_case c on c.id=e.case_id where c.business_id=$1 and c.id=$2",[businessId,draft?.id||null])).rows[0]?.count||0);
+    if(!draft||evidenceCount<1)fail(409,"Attach at least one private verification evidence file before submitting this business for review.","BUSINESS_EVIDENCE_REQUIRED");
+    const row=(await db.query("update network_plus_business_verification_case set status='submitted',submitted_by=$1,submitted_at=now(),updated_at=now() where id=$2 returning *",[userId,draft.id])).rows[0];
     await db.query("update network_plus_business set verification_status='submitted',updated_at=now() where id=$1",[businessId]);
     await audit(db,userId,"network_plus.business_verification_submitted","network_plus_business",businessId,requestId,{caseId:row.id});
     const reviewers=(await db.query(`select distinct u.id from app_user u
@@ -429,4 +432,25 @@ export async function changeBusinessPublicationStatus(businessId,userId,status,r
     await audit(db,userId,"network_plus.business_publication_changed","network_plus_business",businessId,requestId,{from:business.publication_status,to:status,reason:String(reason||"").trim().slice(0,500)||null});
     return updated;
   });
+}
+
+export async function addBusinessVerificationEvidence(businessId,userId,input,requestId) {
+  const fileId=input?.fileObjectId,evidenceType=text(input?.evidenceType,80,"Evidence type",{min:2}),note=text(input?.note,500,"Evidence note",{optional:true});
+  if(!fileId)fail(400,"Choose a private uploaded evidence file.","VALIDATION_ERROR");
+  return withTransaction(async db=>{
+    await assertBusinessOwner(db,businessId,userId);
+    const file=(await db.query("select id,visibility,created_by from file_object where id=$1",[fileId])).rows[0];
+    if(!file||file.visibility!=="private"||file.created_by!==userId)fail(403,"Only a private file uploaded by the current authorized owner can be attached as business evidence.","EVIDENCE_FILE_FORBIDDEN");
+    let verificationCase=(await db.query("select id from network_plus_business_verification_case where business_id=$1 and status='draft' order by created_at desc limit 1 for update",[businessId])).rows[0];
+    if(!verificationCase)verificationCase=(await db.query("insert into network_plus_business_verification_case(business_id,status,submitted_by) values($1,'draft',$2) returning id",[businessId,userId])).rows[0];
+    const row=(await db.query("insert into network_plus_business_verification_evidence(case_id,file_object_id,evidence_type,note,created_by) values($1,$2,$3,$4,$5) on conflict(case_id,file_object_id) do nothing returning id,case_id,evidence_type,note,created_at",[verificationCase.id,fileId,evidenceType,note,userId])).rows[0];
+    if(!row)fail(409,"This evidence file is already attached to the verification case.","DUPLICATE_EVIDENCE");
+    await audit(db,userId,"network_plus.business_verification_evidence_added","network_plus_business_verification_case",verificationCase.id,requestId,{businessId,evidenceType});
+    return row;
+  });
+}
+export async function listBusinessVerificationEvidence(businessId,userId) {
+  const db=getPool(),roles=await rolesFor(db,userId),permissions=await permissionsFor(db,userId);
+  if(!roles.some(r=>BUSINESS_REVIEW_ROLES.includes(r))&&!permissions.includes("business.verify"))fail(403,"Business verification reviewer authority is required.","BUSINESS_REVIEW_FORBIDDEN");
+  return (await db.query("select e.id,e.case_id,e.file_object_id,e.evidence_type,e.note,e.created_at from network_plus_business_verification_evidence e join network_plus_business_verification_case c on c.id=e.case_id where c.business_id=$1 order by e.created_at desc",[businessId])).rows;
 }

@@ -85,7 +85,23 @@ const requiredColumns = [
   ["service_request_completion_event", "actor_user_id", "uuid"],
   ["service_request_completion_event", "event_type", "text"],
   ["service_request_completion_event", "evidence_delivery_id", "uuid"],
-  ["service_request_completion_event", "created_at", "timestamptz"]
+  ["service_request_completion_event", "created_at", "timestamptz"],
+  ["network_plus_request", "id", "uuid"],
+  ["network_plus_request", "intent", "text"],
+  ["network_plus_request", "status", "text"],
+  ["network_plus_request", "requester_user_id", "uuid"],
+  ["network_plus_request_participant", "request_id", "uuid"],
+  ["network_plus_request_event", "request_id", "uuid"],
+  ["network_plus_request_event", "idempotency_hash", "text"],
+  ["network_plus_collaboration_workspace", "request_id", "uuid"],
+  ["network_plus_collaboration_milestone", "workspace_id", "uuid"],
+  ["network_plus_collaboration_milestone", "idempotency_hash", "text"],
+  ["network_plus_collaboration_event", "workspace_id", "uuid"],
+  ["network_plus_collaboration_event", "idempotency_hash", "text"],
+  ["network_plus_request_support_grant", "request_id", "uuid"],
+  ["network_plus_request_support_grant", "support_user_id", "uuid"],
+  ["network_plus_request_support_grant", "support_case_reference", "text"],
+  ["network_plus_request_support_grant", "expires_at", "timestamptz"]
 ];
 
 const client = new Client({ connectionString, application_name: "mpa-migration-compatibility-check" });

@@ -20,7 +20,7 @@ function validatePolicy(input){
   if(!EXPIRY_ACTIONS.has(action))fail(400,"Choose a supported expiry action for "+key+".","COMMUNITY_IMPACT_RETENTION_INVALID");
   if((key==="audit_events"||key==="score_ledger")&&action==="hard_delete")fail(400,"Audit history and score-ledger provenance cannot be hard-deleted; choose anonymization or minimal retention.","COMMUNITY_IMPACT_RETENTION_AUDIT_PRESERVATION");
   if(!RETENTION_STARTS.has(start))fail(400,"Choose a supported retention start event for "+key+".","COMMUNITY_IMPACT_RETENTION_INVALID");
-  dataClasses[key]={retentionDays:integer(item.retentionDays,1,36500,key+" retentionDays"),graceDays:integer(item.graceDays,0,36500,key+" graceDays"),retentionStart:start,expiryAction:action,legalHoldBehavior:"pause_and_preserve"};
+  dataClasses[key]={retentionDays:integer(item.retentionDays,1,Number.MAX_SAFE_INTEGER,key+" retentionDays"),graceDays:integer(item.graceDays,0,Number.MAX_SAFE_INTEGER,key+" graceDays"),retentionStart:start,expiryAction:action,legalHoldBehavior:"pause_and_preserve"};
  }
  return {schemaVersion:1,dataClasses};
 }

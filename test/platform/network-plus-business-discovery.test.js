@@ -40,10 +40,15 @@ test("commercial listings have separate moderation and publication states with c
   assert.match(migration, /'draft','pending_review','changes_requested','published','paused','suspended','rejected','archived'/);
   assert.match(migration, /pricing_model in \('free','fixed','hourly','quote'\)/);
   assert.match(migration, /ux_network_plus_service_idempotency_hash/);
+  assert.match(migration, /business\\.verify/);
+  assert.match(migration, /business\\.moderate/);
+  assert.match(migration, /system_only/);
   assert.match(service, /submitProfessionalServiceListing/);
   assert.match(service, /moderateProfessionalServiceListing/);
   assert.match(service, /assertBusinessPublishable/);
   assert.match(service, /SELF_REVIEW_FORBIDDEN/);
+  assert.match(service, /moderation_submitted_by===userId/);
+  assert.match(service, /row\\.submitted_by===userId/);
 });
 
 test("discovery requires Network-Plus entry and exposes a limited published/verified projection", () => {
@@ -55,6 +60,7 @@ test("discovery requires Network-Plus entry and exposes a limited published/veri
   assert.match(service, /export async function getBusiness/);
   assert.match(service, /export async function listProfessionalServices/);
   assert.match(service, /export async function getProfessionalService/);
+  assert.match(service, /s\\.audience=any/);
   assert.doesNotMatch(service.slice(service.indexOf("export async function listBusinesses")), /select b\.\*|verification_evidence|owner_user_id|owner_organization_id/);
 });
 

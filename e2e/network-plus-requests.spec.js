@@ -83,6 +83,7 @@ test.describe("Network-Plus request and collaboration journey",()=>{
       if(route.request().method()==="POST"){payload=route.request().postDataJSON();await route.fulfill({status:201,contentType:"application/json",body:JSON.stringify({data:{...draft,intent:"partnership_proposal"}})});}
       else await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[]})});
     });
+    await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:draft})}));
     await page.goto("/network-plus/requests");
     await page.getByLabel("Request type").selectOption("partnership_proposal");
     await page.getByLabel("Published business").selectOption("business-1");

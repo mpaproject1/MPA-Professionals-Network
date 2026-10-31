@@ -8,7 +8,7 @@
 
 ## Status
 
-<badge>Source + CI exit gate passed</badge>
+**Status: Source + CI exit gate passed**
 
 Increment 3's documented automated exit gate is satisfied at the reviewed head. The latest PR Quality run tested the exact commit `c849f0be2c0308880a2d7a117d4a63d8cd104355` and all four required jobs completed successfully:
 

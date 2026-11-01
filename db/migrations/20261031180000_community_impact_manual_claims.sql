@@ -243,12 +243,14 @@ comment on table community_impact_claim_event is 'Append-only claim and evidence
 -- Bind claim-evidence uploads to a specific draft/clarification claim before bytes are accepted.
 alter table private_upload_session add column if not exists purpose text not null default 'general';
 alter table private_upload_session add column if not exists purpose_reference_id uuid references community_impact_claim(id) on delete restrict;
+alter table private_upload_session drop constraint if exists private_upload_session_purpose_scope_check;
 alter table private_upload_session add constraint private_upload_session_purpose_scope_check
  check((purpose='general' and purpose_reference_id is null) or (purpose='community_impact_claim_evidence' and purpose_reference_id is not null));
 create index if not exists ix_private_upload_session_claim_purpose on private_upload_session(purpose_reference_id,status) where purpose='community_impact_claim_evidence';
 
 alter table private_upload_session add column if not exists retention_policy_version_id uuid references community_impact_retention_policy_version(id) on delete restrict;
 alter table private_upload_session add column if not exists retention_rule_snapshot jsonb;
+alter table private_upload_session drop constraint if exists private_upload_session_claim_retention_check;
 alter table private_upload_session add constraint private_upload_session_claim_retention_check
  check((purpose='general' and retention_policy_version_id is null and retention_rule_snapshot is null) or
        (purpose='community_impact_claim_evidence' and retention_policy_version_id is not null and jsonb_typeof(retention_rule_snapshot)='object'));
@@ -256,6 +258,7 @@ alter table private_upload_session add constraint private_upload_session_claim_r
 alter table community_impact_claim_evidence add column if not exists removed_at timestamptz;
 alter table community_impact_claim_evidence add column if not exists removed_by uuid references app_user(id) on delete restrict;
 alter table community_impact_claim_evidence add column if not exists removal_reason text;
+alter table community_impact_claim_evidence drop constraint if exists community_impact_claim_evidence_removal_check;
 alter table community_impact_claim_evidence add constraint community_impact_claim_evidence_removal_check
  check((removed_at is null and removed_by is null and removal_reason is null) or
        (removed_at is not null and removed_by is not null and length(trim(coalesce(removal_reason,''))) between 8 and 1000));

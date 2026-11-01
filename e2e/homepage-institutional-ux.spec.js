@@ -130,6 +130,8 @@ test.describe("MPA installable mobile workspace", () => {
     });
     expect(registration?.active).toBe(true);
     expect(registration?.scope).toBe(new URL("/", page.url()).href);
+    const cachedMobileHome = await page.evaluate(async () => Boolean(await caches.match("/mobile")));
+    expect(cachedMobileHome).toBe(true);
   });
 
   test("desktop retains its primary navigation and hides the mobile dock", async ({ page }) => {

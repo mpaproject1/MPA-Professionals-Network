@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
-import {assertIndependentApprover,campaignContentDigest,campaignDeliveryKey,isApprovedContent,slotOccurrence,validateCampaignActionUrl,zonedLocalToUtc} from "../../src/platform/community-campaigns.js";
+import {assertIndependentApprover,campaignContentDigest,campaignDeliveryKey,isApprovedContent,isValidLocalTime,slotOccurrence,validateCampaignActionUrl,zonedLocalToUtc} from "../../src/platform/community-campaigns.js";
 import {validPushEndpoint} from "../../src/platform/web-push.js";
 
 test("campaign author and approver must be different people",()=>{
@@ -27,7 +27,7 @@ test("campaign destinations are restricted to verified same-origin MPA routes",(
  assert.equal(validateCampaignActionUrl("/jobs\\\\evil"),null);\n assert.equal(validateCampaignActionUrl("/serve-community/%2e%2e/admin"),null);
 });
 
-test("Africa/Addis_Ababa Friday 15:00 resolves to 12:00 UTC",()=>{
+test("local schedule times accept only valid 24-hour HH:mm values",()=>{\n assert.equal(isValidLocalTime("15:00"),true);\n assert.equal(isValidLocalTime("09:00"),true);\n assert.equal(isValidLocalTime("25:00"),false);\n assert.equal(isValidLocalTime("9:00"),false);\n});\n\ntest("Africa/Addis_Ababa Friday 15:00 resolves to 12:00 UTC",()=>{
  const date=zonedLocalToUtc({year:2026,month:11,day:6,hour:15,minute:0},"Africa/Addis_Ababa");
  assert.equal(date.toISOString(),"2026-11-06T12:00:00.000Z");
 });

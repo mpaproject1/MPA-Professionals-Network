@@ -109,7 +109,6 @@ export default function NetworkPlusRequestsPage(){
   catch(e){setError(e instanceof ApiError?e.message:"The milestone could not be saved.");}
   finally{setSaving(false);}
  }
- const myParticipant=selected?.participants?.find(p=>p.consent_status!=="revoked"&&p.participant_role!=="additional_participant");
  const canAccept=selected?.canAccept&&(selected?.status==="submitted"||selected?.status==="under_review"||selected?.status==="clarification_requested");
  const recipientPending=selected?.participants?.some(p=>p.participant_role==="recipient_representative"&&p.consent_status==="pending");
 

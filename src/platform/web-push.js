@@ -131,7 +131,7 @@ async function deliverOne(row,config){
 export async function dispatchPendingPushNotifications(limit=50){
  const config=vapidConfig();if(!config)return {sent:0,failed:0,skipped:true,reason:"VAPID_NOT_CONFIGURED"};
  const db=getPool(),batch=Math.min(Math.max(Number(limit)||50,1),200);
- await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_EXPIRED',updated_at=now() WHERE status='pending' AND created_at<now()-interval '7 days'");
+ await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_EXPIRED',updated_at=now() WHERE status IN ('pending','sending') AND created_at<now()-interval '7 days'");
  const claimed=await db.query(`WITH candidates AS (
    SELECT id FROM notification_push_delivery WHERE (status='pending' AND available_at<=now()) OR (status='sending' AND updated_at<now()-interval '5 minutes')
    ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT $1

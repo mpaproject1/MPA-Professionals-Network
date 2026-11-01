@@ -63,7 +63,7 @@ test("member and organization discovery remain separate experiences with separat
   assert.match(organizationPage, /location/);
   assert.match(organizationPage, /read-only/i);
   assert.match(landing, /href:\s*"\/network"/);
-  assert.match(landing, /href="\/network-plus\/organizations"/);
+  assert.match(landing, /href:\s*"\/network-plus\/organizations"/);
 });
 
 test("conditional Network-Plus navigation is bound to the current authenticated token", () => {

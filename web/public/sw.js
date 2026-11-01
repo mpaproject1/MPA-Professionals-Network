@@ -7,6 +7,7 @@ const PRECACHE_URLS = [
   "/mobile",
   "/manifest.webmanifest",
   "/brand/mpa-pwa-icon.svg",
+  "/brand/apple-touch-icon.png",
   "/brand/mpa-logo-light.svg",
   "/brand/mpa-logo-dark.svg",
   "/brand/mpa-favicon-light.svg",

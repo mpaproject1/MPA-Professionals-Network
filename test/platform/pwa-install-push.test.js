@@ -102,6 +102,8 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.ok(shell.includes("api(\"/api/v1/notifications/push/subscriptions\""));
  assert.ok(shell.includes("await subscription.unsubscribe()"));
  assert.ok(notifications.includes("enqueuePushDelivery(db,notification.id,userId)"));
+ assert.ok(notifications.includes("coalesce(push_enabled,false) push_enabled"));
+ assert.ok(notifications.includes("&& !user.push_enabled")||notifications.includes("&&!user.push_enabled"));
  assert.ok(pushUi.includes("Notification.requestPermission()"));
  assert.ok(pushUi.includes("userVisibleOnly:true"));
 });

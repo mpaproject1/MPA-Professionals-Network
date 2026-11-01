@@ -94,6 +94,15 @@ export async function removePushSubscription(userId,endpoint){
  });
  return getPushSubscriptionStatus(userId);
 }
+export async function disablePushForUser(userId){
+ await withTransaction(async db=>{
+  const active=await db.query("SELECT id FROM notification_push_subscription WHERE user_id=$1 AND revoked_at IS NULL FOR UPDATE",[userId]);
+  if(active.rowCount)await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_OPT_OUT',updated_at=now() WHERE subscription_id=ANY($1::uuid[]) AND status IN ('pending','sending')",[active.rows.map(row=>row.id)]);
+  await db.query("UPDATE notification_push_subscription SET revoked_at=coalesce(revoked_at,now()),updated_at=now() WHERE user_id=$1",[userId]);
+  await db.query("INSERT INTO notification_preference(user_id,push_enabled,updated_at) VALUES($1,false,now()) ON CONFLICT(user_id) DO UPDATE SET push_enabled=false,updated_at=now()",[userId]);
+ });
+ return getPushSubscriptionStatus(userId);
+}
 export async function getPushSubscriptionStatus(userId){
  const db=getPool(),config=vapidConfig();
  const result=await db.query("SELECT count(*)::int active_devices FROM notification_push_subscription s JOIN notification_preference p ON p.user_id=s.user_id AND p.push_enabled=true WHERE s.user_id=$1 AND s.revoked_at IS NULL",[userId]);

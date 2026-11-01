@@ -489,6 +489,34 @@ try {
   if (!expiryDefinition || expiryDefinition.attnotnull || expiryDefinition.expression) throw new Error("service_listing.expires_at must remain nullable with no expiry default.");
 
   const requiredForeignKeys = [
+    ["community_impact_claim","claimant_user_id","app_user","id"],
+    ["community_impact_claim","retention_policy_version_id","community_impact_retention_policy_version","id"],
+    ["community_impact_claim","consent_retention_policy_version_id","community_impact_retention_policy_version","id"],
+    ["community_impact_claim","current_reviewer_id","app_user","id"],
+    ["community_impact_claim_consent","claim_id","community_impact_claim","id"],
+    ["community_impact_claim_consent","actor_user_id","app_user","id"],
+    ["community_impact_claim_consent","retention_policy_version_id","community_impact_retention_policy_version","id"],
+    ["community_impact_claim_evidence","claim_id","community_impact_claim","id"],
+    ["community_impact_claim_evidence","file_object_id","file_object","id"],
+    ["community_impact_claim_evidence","uploaded_by","app_user","id"],
+    ["community_impact_claim_evidence","retention_policy_version_id","community_impact_retention_policy_version","id"],
+    ["community_impact_claim_assignment","claim_id","community_impact_claim","id"],
+    ["community_impact_claim_assignment","reviewer_user_id","app_user","id"],
+    ["community_impact_claim_assignment","assigned_by","app_user","id"],
+    ["community_impact_claim_decision","claim_id","community_impact_claim","id"],
+    ["community_impact_claim_decision","reviewer_user_id","app_user","id"],
+    ["community_impact_claim_decision","retention_policy_version_id","community_impact_retention_policy_version","id"],
+    ["community_impact_claim_appeal","claim_id","community_impact_claim","id"],
+    ["community_impact_claim_appeal","decision_id","community_impact_claim_decision","id"],
+    ["community_impact_claim_appeal","claimant_user_id","app_user","id"],
+    ["community_impact_claim_appeal","assigned_reviewer_id","app_user","id"],
+    ["community_impact_claim_appeal","retention_policy_version_id","community_impact_retention_policy_version","id"],
+    ["community_impact_claim_appeal","decision_retention_policy_version_id","community_impact_retention_policy_version","id"],
+    ["community_impact_claim_event","claim_id","community_impact_claim","id"],
+    ["community_impact_claim_event","actor_user_id","app_user","id"],
+    ["community_impact_claim_event","retention_policy_version_id","community_impact_retention_policy_version","id"],
+    ["private_upload_session","purpose_reference_id","community_impact_claim","id"],
+    ["private_upload_session","retention_policy_version_id","community_impact_retention_policy_version","id"],
     ["serve_community_offline_project","created_by","app_user","id"],
     ["serve_community_offline_project","updated_by","app_user","id"],
     ["serve_community_offline_project","reviewed_by","app_user","id"],
@@ -633,7 +661,7 @@ try {
     "ux_network_plus_request_event_idempotency",
     "ux_network_plus_collaboration_event_idempotency",
     "ux_network_plus_collaboration_milestone_idempotency",
-    "ux_serve_community_initiative_idempotency_hash","ux_serve_community_participation_idempotency_hash","ux_serve_community_participation_active","ux_serve_community_legacy_classification_initiative"
+    "ux_serve_community_initiative_idempotency_hash","ux_serve_community_participation_idempotency_hash","ux_serve_community_participation_active","ux_serve_community_legacy_classification_initiative","uq_community_impact_claim_evidence_url","uq_community_impact_claim_active_assignment"
   ];
   for (const name of requiredUniqueIndexes) {
     const row = (await client.query(
@@ -643,7 +671,7 @@ try {
     if (!row || !row.indexdef.toUpperCase().includes("CREATE UNIQUE INDEX")) {
       throw new Error(`Required unique index ${name} is missing or not unique.`);
     }
-    if (["ux_marketplace_demand_idempotency_hash","ux_mentorship_request_idempotency_hash","ux_service_request_idempotency_hash","ux_service_listing_idempotency_hash","ux_service_listing_pledge_idempotency_hash","ux_service_request_update_idempotency_hash","ux_talent_inquiry_idempotency_hash"].includes(name) &&
+    if (["ux_marketplace_demand_idempotency_hash","ux_mentorship_request_idempotency_hash","ux_service_request_idempotency_hash","ux_service_listing_idempotency_hash","ux_service_listing_pledge_idempotency_hash","ux_service_request_update_idempotency_hash","ux_talent_inquiry_idempotency_hash","uq_community_impact_claim_evidence_url","uq_community_impact_claim_active_assignment"].includes(name) &&
         (!row.indexdef.includes("request_idempotency_hash") || !row.indexdef.toLowerCase().includes("where"))) {
       throw new Error(`Idempotency index ${name} must uniquely index the request hash and exclude null keys.`);
     }

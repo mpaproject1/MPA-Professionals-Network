@@ -1330,3 +1330,5 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
   --font-manrope: Manrope, "Segoe UI", Arial, sans-serif;
   --font-ethiopic: "Noto Sans Ethiopic", Nyala, sans-serif;
 }
+
+@media(max-width:767px){.shell-main{padding-bottom:calc(88px + env(safe-area-inset-bottom))}.mobile-nav{grid-template-columns:repeat(5,minmax(0,1fr));min-height:calc(58px + env(safe-area-inset-bottom))}.mobile-nav a,.mobile-nav>button{min-width:0;min-height:44px}}

@@ -54,24 +54,13 @@ create table if not exists community_impact_claim_consent (
  actor_user_id uuid not null references app_user(id) on delete restrict,
  consent_code text not null check(consent_code in('public_profile_display','media_rights_confirmation')),
  consent_version text not null check(length(trim(consent_version)) between 4 and 100),
- consent_text_hash text not null check(consent_text_hash ~ '^[a-f0-9]{64}
- id uuid primary key default gen_random_uuid(),
- claim_id uuid not null references community_impact_claim(id) on delete restrict,
- file_object_id uuid unique references file_object(id) on delete restrict,
- evidence_type text not null check(evidence_type in('document','image','video','url','attestation','metric_source','other')),
- evidence_url text check(evidence_url is null or length(evidence_url) between 12 and 2048),
- label text not null check(length(trim(label)) between 3 and 120),
- description text not null check(length(trim(description)) between 8 and 800),
- source_date date,
- uploaded_by uuid not null references app_user(id) on delete restrict,
+ consent_text_hash text not null check(consent_text_hash ~ '^[a-f0-9]{64}$'),
+ granted boolean not null,
+ scope text not null check(length(trim(scope)) between 8 and 500),
  retention_policy_version_id uuid not null references community_impact_retention_policy_version(id) on delete restrict,
  retention_rule_snapshot jsonb not null check(jsonb_typeof(retention_rule_snapshot)='object'),
- created_at timestamptz not null default now(),
- check((file_object_id is not null and evidence_url is null) or (file_object_id is null and evidence_url is not null)),
- check((evidence_type in('video','url') and evidence_url is not null) or (evidence_type not in('video','url') and file_object_id is not null))
+ created_at timestamptz not null default now()
 );
-create unique index if not exists uq_community_impact_claim_evidence_url on community_impact_claim_evidence(claim_id,evidence_url) where evidence_url is not null;
-create index if not exists ix_community_impact_claim_evidence_claim on community_impact_claim_evidence(claim_id,created_at);
 create table if not exists community_impact_claim_assignment (
  id uuid primary key default gen_random_uuid(),
  claim_id uuid not null references community_impact_claim(id) on delete restrict,
@@ -253,13 +242,6 @@ alter table community_impact_claim_evidence add constraint community_impact_clai
  check((removed_at is null and removed_by is null and removal_reason is null) or
        (removed_at is not null and removed_by is not null and length(trim(coalesce(removal_reason,''))) between 8 and 1000));
 create index if not exists ix_community_impact_claim_evidence_active on community_impact_claim_evidence(claim_id,created_at) where removed_at is null;
-),
- granted boolean not null,
- scope text not null check(length(trim(scope)) between 8 and 500),
- retention_policy_version_id uuid not null references community_impact_retention_policy_version(id) on delete restrict,
- retention_rule_snapshot jsonb not null check(jsonb_typeof(retention_rule_snapshot)='object'),
- created_at timestamptz not null default now()
-);
 create index if not exists ix_community_impact_claim_consent_history on community_impact_claim_consent(claim_id,created_at desc);
 create or replace function community_impact_claim_consent_immutable() returns trigger language plpgsql as $ci$
 begin raise exception 'Community Impact consent history is immutable'; end; $ci$;

@@ -8,6 +8,7 @@ function fakeDb(preference={in_app_enabled:true,in_app_categories:{}}){
   calls.push({sql,params});
   if(sql.startsWith("select coalesce(in_app_enabled"))return {rows:[preference]};
   if(sql.includes("insert into notification_event"))return {rows:[{id:"notification-1"}]};
+  if(sql.includes("insert into notification_push_delivery"))return {rows:[],rowCount:0};
   throw new Error(`Unexpected query in notification unit test: ${sql}`);
  }};
 }
@@ -28,6 +29,16 @@ test("ordinary category preferences suppress optional in-app notifications",asyn
  const result=await createInAppNotification(db,"user-1","service.request_received","service_request","request-1",{nextAction:"Respond"});
  assert.equal(result,null);
  assert.equal(db.calls.filter(call=>call.sql.includes("insert into notification_event")).length,0);
+});
+
+
+test("explicit push opt-in still queues alerts when the in-app feed is disabled",async()=>{
+ const db=fakeDb({in_app_enabled:false,in_app_categories:{services:false},push_enabled:true});
+ const result=await createInAppNotification(db,"user-1","service.request_received","service_request","request-1",{nextAction:"Respond"});
+ assert.equal(result.id,"notification-1");
+ const delivery=db.calls.find(call=>call.sql.includes("insert into notification_push_delivery"));
+ assert.ok(delivery);
+ assert.deepEqual(delivery.params,["notification-1","user-1"]);
 });
 
 test("critical security notifications bypass ordinary notification preference toggles",async()=>{

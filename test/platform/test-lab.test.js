@@ -33,7 +33,7 @@ test("composite and non-UUID primary keys are captured and deleted only by their
 test("domain fixtures create private synthetic evidence and cover the requested workflows",async()=>{
  const {readFile}=await import("node:fs/promises");
  const source=await readFile(new URL("../../src/platform/test-lab-domain-fixtures.js",import.meta.url),"utf8");
- for(const table of ["verification_case","verification_evidence","organization","organization_verification_case","organization_verification_evidence","job","job_application","service_listing","service_request","mentor_profile","mentorship_request","serve_community_initiative","serve_community_participation","serve_community_offline_project","finance_payment_record"])assert.match(source,new RegExp("insert into "+table+"\\b"));
+ for(const table of ["verification_case","verification_evidence","organization","organization_verification_case","organization_verification_evidence","job","job_application","service_listing","service_request","mentor_profile","mentorship_request","serve_community_initiative","serve_community_participation","serve_community_offline_project","finance_payment_record","community_campaign_delivery"])assert.match(source,new RegExp("insert into "+table+"\\b"));
  assert.match(source,/storage_provider,object_key,original_name,content_type,byte_size,checksum_sha256/);
  assert.match(source,/flag:"wx",mode:0o600/);
  assert.match(source,/insert into private_upload_session/);

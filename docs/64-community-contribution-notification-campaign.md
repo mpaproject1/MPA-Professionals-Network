@@ -293,7 +293,7 @@ Each draft includes a notification title, message, Qur'an reminder, hadith remin
 **Notification:** *Your experience can guide a next step*  
 **Message:** What do you know now that you wish you had known earlier? Turn that lesson into a short guide, discussion or mentoring session. Practical experience becomes more valuable when it is shared responsibly.  
 **Qur'an:** “Are those who know equal to those who do not know?” — Qur'an 39:9  
-**Hadith:** The Prophet ﷺ praised beneficial knowledge that continues after a person's death. — Sahih Muslim 2699. [Source](https://sunnah.com/muslim:2699)  
+**Hadith:** The Prophet ﷺ described ongoing charity and beneficial knowledge among deeds whose benefit continues after death. — Sahih Muslim 1631. [Source](https://sunnah.com/muslim:1631)  
 **Action:** Share your knowledge — `/mentorship`
 
 ### 25 — Choose fairness in your work
@@ -341,7 +341,7 @@ Each draft includes a notification title, message, Qur'an reminder, hadith remin
 **Notification:** *Keep the good moving forward*  
 **Message:** Thank you to everyone who has shared knowledge, mentored, volunteered, offered a professional service or supported an initiative. What is one contribution you can continue, improve or invite someone else to join?  
 **Qur'an:** “Whoever does an atom’s weight of good will see it.” — Qur'an 99:7  
-**Hadith:** The Prophet ﷺ described ongoing charity and beneficial knowledge among the deeds whose benefit continues. — Sahih Muslim 2699. [Source](https://sunnah.com/muslim:2699)  
+**Hadith:** The Prophet ﷺ described ongoing charity and beneficial knowledge among deeds whose benefit continues after death. — Sahih Muslim 1631. [Source](https://sunnah.com/muslim:1631)  
 **Action:** Continue contributing to the community — `/serve-community`
 
 ## 8. Action destination contract
@@ -388,6 +388,7 @@ This PR increment is the **product specification and editorial library only**. A
 The following Sunnah.com records were used for the short hadith excerpts and source labels in this draft:
 
 - [Sahih Muslim 2699](https://sunnah.com/muslim:2699) — helping others, relieving hardship and seeking beneficial knowledge.
+- [Sahih Muslim 1631](https://sunnah.com/muslim:1631) — ongoing charity and beneficial knowledge after death.
 - [Sahih Muslim 2585](https://sunnah.com/muslim:2585) — believers supporting one another.
 - [Sahih al-Bukhari 5027](https://sunnah.com/bukhari:5027) — learning and teaching the Qur'an.
 - [Sahih al-Bukhari 1427](https://sunnah.com/bukhari:1427) — giving and the upper hand.

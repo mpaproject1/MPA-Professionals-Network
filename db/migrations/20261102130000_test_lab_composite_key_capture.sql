@@ -28,7 +28,7 @@ begin
    'reviewed_by','approved_by','rejected_by','requested_by','responded_by','completed_by',
    'claimant_user_id','member_user_id','mentor_user_id','mentee_user_id','candidate_user_id',
    'applicant_user_id','requester_user_id','provider_user_id','donor_user_id','volunteer_user_id',
-   'representative_user_id','organization_owner_user_id','recipient_user_id','invited_by',
+   'representative_user_id','organization_owner_user_id','recipient_user_id','recipient_id','invited_by',
    'participant_user_id','payer_user_id','subject_user_id','uploaded_by','changed_by','reporter_user_id'
   ) and v.value=a.user_id::text)
   or (v.key in ('email','recipient','candidate_email','contact_email') and lower(v.value)=lower(a.email))
@@ -71,7 +71,7 @@ begin
    'member_user_id','mentor_user_id','mentee_user_id','candidate_user_id',
    'applicant_user_id','requester_user_id','provider_user_id','donor_user_id',
    'volunteer_user_id','representative_user_id','organization_owner_user_id',
-   'recipient_user_id','invited_by','participant_user_id','payer_user_id','subject_user_id','uploaded_by','changed_by','reporter_user_id','participant_user_id','reporter_user_id',
+   'recipient_user_id','recipient_id','invited_by','participant_user_id','payer_user_id','subject_user_id','uploaded_by','changed_by','reporter_user_id','participant_user_id','reporter_user_id',
    'payer_user_id','subject_user_id','opened_by','changed_by','submitted_by_user_id'
   ) and v.value=a.user_id::text)
   or (v.key in ('email','recipient','candidate_email','contact_email')

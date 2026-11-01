@@ -115,9 +115,9 @@ export async function enqueuePushDelivery(db,notificationId,userId){
    WHERE s.user_id=$2 AND s.revoked_at IS NULL
    ON CONFLICT(notification_event_id,subscription_id) DO NOTHING`,[notificationId,userId]);
 }
-async function deliverOne(row,config){
+async function deliverOne(row,config,customPayload=null){
  const endpoint=validPushEndpoint(row.endpoint);if(!endpoint)return {ok:false,expired:true,status:410,code:"INVALID_ENDPOINT"};
- const payload={title:row.priority==="urgent"||row.priority==="high"?"MPA · Action needed":"MPA · New update",
+ const payload=customPayload||{title:row.priority==="urgent"||row.priority==="high"?"MPA · Action needed":"MPA · New update",
    body:row.priority==="urgent"||row.priority==="high"?"You have an important MPA update. Open the app to review it.":"You have a new MPA update. Open the app to review it.",
    url:row.action_url&&row.action_url.startsWith("/")&&!row.action_url.startsWith("//")?row.action_url:"/notifications",
    notificationId:row.notification_event_id,priority:row.priority};
@@ -166,4 +166,16 @@ export async function dispatchPendingPushNotifications(limit=50){
   await Promise.all(claimed.rows.slice(offset,offset+10).map(processRow));
  }
  return {sent,failed,skipped:false};
+}
+
+export async function deliverCommunityCampaignPush(subscription,payload){
+ const config=vapidConfig();
+ if(!config)return {ok:false,retryable:false,code:"VAPID_NOT_CONFIGURED"};
+ return deliverOne({endpoint:subscription.endpoint,p256dh:subscription.p256dh,auth_secret:subscription.auth_secret,notification_event_id:subscription.notification_event_id||"community-campaign",priority:"low",action_url:payload.url},config,{
+  title:String(payload.title||"MPA · Community contribution").slice(0,100),
+  body:String(payload.body||"A new community contribution invitation is available.").slice(0,180),
+  url:payload.url&&payload.url.startsWith("/")&&!payload.url.startsWith("//")?payload.url:"/notifications",
+  notificationId:String(payload.notificationId||"community-campaign"),
+  priority:"low"
+ });
 }

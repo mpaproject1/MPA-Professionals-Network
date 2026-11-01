@@ -3,7 +3,7 @@ import {useCallback,useEffect,useState} from "react";
 import Link from "next/link";
 import {api} from "../../../../lib/api";
 import {useUiStore} from "../../../../lib/store";
-import {AdminPageHeader} from "../../../admin-page-header";
+import {AdminPageHeader} from "../../admin-page-header";
 type Row=Record<string,any>;
 export default function RecognitionAdminPage(){
  const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated),hydrate=useUiStore(s=>s.hydrateToken);

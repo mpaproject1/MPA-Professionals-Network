@@ -1,6 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
+import test from "node:test";
+
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
 test("Increment 6 member impact workspace uses server-owned verified score and privacy-safe contribution data",async()=>{
  const [service,component,members,score]=await Promise.all([read("../../src/platform/community-impact-score.js"),read("../../web/components/community-impact-workspace-panel.tsx"),read("../../web/app/members/page.tsx"),read("../../web/app/community-impact/score/page.tsx")]);

@@ -48,20 +48,26 @@ test("push endpoint validation rejects insecure, local and non-provider endpoint
  assert.equal(validPushEndpoint("https://localhost/push"),null);
  assert.equal(validPushEndpoint("https://attacker.example/push"),null);
  assert.equal(validPushEndpoint("https://user:pass@fcm.googleapis.com/send/example"),null);
+ assert.equal(validPushEndpoint("https://fcm.googleapis.com/"+ "a".repeat(5000)),null);
 });
 
 test("PWA install shell registers service worker and exposes a standalone manifest",async()=>{
- const [layout,shell,manifest,worker,checker]=await Promise.all([
+ const [layout,shell,manifest,worker,checker,api,notifications,pushUi]=await Promise.all([
   readFile(new URL("../../web/app/layout.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/components/shell.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/public/manifest.webmanifest",import.meta.url),"utf8"),
   readFile(new URL("../../web/public/sw.js",import.meta.url),"utf8"),
-  readFile(new URL("../../scripts/check-new-migration-compatibility.js",import.meta.url),"utf8")
+  readFile(new URL("../../scripts/check-new-migration-compatibility.js",import.meta.url),"utf8"),
+  readFile(new URL("../../server.js",import.meta.url),"utf8"),
+  readFile(new URL("../../src/platform/notifications.js",import.meta.url),"utf8"),
+  readFile(new URL("../../web/components/push-notification-settings.tsx",import.meta.url),"utf8")
  ]);
  const config=JSON.parse(manifest);
  assert.equal(config.display,"standalone");
  assert.equal(config.scope,"/");
+ assert.ok(config.icons.some(icon=>icon.src==="/brand/mpa-pwa-icon.svg"&&icon.purpose==="any maskable"));
  assert.ok(layout.includes('manifest:"/manifest.webmanifest"'));
+ assert.ok(layout.includes('viewportFit:"cover"'));
  assert.ok(shell.includes('serviceWorker.register("/sw.js"'));
  assert.ok(shell.includes('className="mobile-nav"'));
  assert.ok(shell.includes('const mobilePrimaryHrefs=token?["/about","/jobs","/members","/learning"]'));
@@ -71,6 +77,11 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.ok(worker.includes('"/api/"'));
  assert.ok(checker.includes("pushTableBaseline"));
  assert.ok(checker.includes("Web Push table baseline exactly"));
+ assert.ok(api.includes("api/v1/notifications/push/subscriptions"));
+ assert.ok(api.includes("disablePushForUser(identity.sub)"));
+ assert.ok(notifications.includes("enqueuePushDelivery(db,notification.id,userId)"));
+ assert.ok(pushUi.includes("Notification.requestPermission()"));
+ assert.ok(pushUi.includes("userVisibleOnly:true"));
 });
 
 test("push migration is additive and delivery preferences require explicit opt-in",async()=>{

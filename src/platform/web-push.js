@@ -85,12 +85,13 @@ export async function registerPushSubscription(userId,input){
 }
 export async function removePushSubscription(userId,endpoint){
  const safe=validPushEndpoint(endpoint);if(!safe)fail(400,"The browser push endpoint is invalid.");
- const db=getPool();
- const existing=await db.query("SELECT id FROM notification_push_subscription WHERE user_id=$1 AND endpoint_sha256=$2 AND revoked_at IS NULL",[userId,sha256(safe)]);
- if(existing.rowCount)await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='SUBSCRIPTION_REVOKED',updated_at=now() WHERE subscription_id=ANY($1::uuid[]) AND status IN ('pending','sending')",[existing.rows.map(row=>row.id)]);
- await db.query("UPDATE notification_push_subscription SET revoked_at=coalesce(revoked_at,now()),updated_at=now() WHERE user_id=$1 AND endpoint_sha256=$2",[userId,sha256(safe)]);
- const active=await db.query("SELECT 1 FROM notification_push_subscription WHERE user_id=$1 AND revoked_at IS NULL LIMIT 1",[userId]);
- if(!active.rowCount)await db.query("INSERT INTO notification_preference(user_id,push_enabled,updated_at) VALUES($1,false,now()) ON CONFLICT(user_id) DO UPDATE SET push_enabled=false,updated_at=now()",[userId]);
+ await withTransaction(async db=>{
+  const existing=await db.query("SELECT id FROM notification_push_subscription WHERE user_id=$1 AND endpoint_sha256=$2 AND revoked_at IS NULL FOR UPDATE",[userId,sha256(safe)]);
+  if(existing.rowCount)await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='SUBSCRIPTION_REVOKED',updated_at=now() WHERE subscription_id=ANY($1::uuid[]) AND status IN ('pending','sending')",[existing.rows.map(row=>row.id)]);
+  await db.query("UPDATE notification_push_subscription SET revoked_at=coalesce(revoked_at,now()),updated_at=now() WHERE user_id=$1 AND endpoint_sha256=$2",[userId,sha256(safe)]);
+  const active=await db.query("SELECT 1 FROM notification_push_subscription WHERE user_id=$1 AND revoked_at IS NULL LIMIT 1",[userId]);
+  if(!active.rowCount)await db.query("INSERT INTO notification_preference(user_id,push_enabled,updated_at) VALUES($1,false,now()) ON CONFLICT(user_id) DO UPDATE SET push_enabled=false,updated_at=now()",[userId]);
+ });
  return getPushSubscriptionStatus(userId);
 }
 export async function getPushSubscriptionStatus(userId){

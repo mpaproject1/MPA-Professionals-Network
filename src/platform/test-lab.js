@@ -178,7 +178,9 @@ export async function resetTestPortfolio(identity,portfolioId,input={},requestId
    files.push(...f.rows.map(x=>x.object_key));
   }
   for(const key of files)safeStoragePath(key);
-  const userIds=(await tx.query("select user_id from test_portfolio_account where portfolio_id=$1",[portfolioId])).rows.map(x=>x.user_id);
+  const accountRows=(await tx.query("select user_id,email, (select username from app_user u where u.id=test_portfolio_account.user_id) username from test_portfolio_account where portfolio_id=$1",[portfolioId])).rows;
+  const userIds=accountRows.map(x=>x.user_id),identities=accountRows.flatMap(x=>[String(x.email).toLowerCase(),String(x.username).toLowerCase()]);
+  if(identities.length)await tx.query("delete from auth_login_attempt where lower(identity_key)=any($1::text[])",[identities]);
   if(userIds.length){
    await tx.query("delete from app_user_role where user_id=any($1::uuid[])",[userIds]);
    await tx.query("delete from app_user_permission where user_id=any($1::uuid[])",[userIds]);

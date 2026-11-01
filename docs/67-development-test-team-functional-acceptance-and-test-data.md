@@ -477,3 +477,23 @@ The following are required to make the proposed test-team experience real; this 
 10. Reconcile every scenario in this manual to a real route, API contract, permission and automated test. Update this document whenever functionality or known gaps change.
 
 **Release rule:** Do not expose one-click reset or credential export to a shared test team until the isolation, authorization, audit, file deletion, external side-effect and production-hard-block tests pass.
+
+
+---
+
+## 12. Implementation update — Development Test Lab foundation
+
+The Test Lab foundation is now implemented on the target branch. See [Development Test Lab setup and safety runbook](68-development-test-lab-setup-and-safety.md).
+
+Delivered in the branch:
+- environment/database allowlist and production hard-block;
+- portfolio creation with synthetic role-based accounts;
+- encrypted-at-rest temporary credentials and authenticated XLSX export;
+- initial in-app welcome notifications, captured email outbox entries and simulated payment records;
+- database ownership capture for UUID-keyed rows referencing test accounts;
+- child-first portfolio-scoped reset with foreign-key fail-closed behavior and private-local file cleanup;
+- automatic expiry disabling and session revocation;
+- test-only email/push capture and hosted Chapa blocking;
+- admin Test Lab screen, API endpoints, setup documentation and contract/XLSX tests.
+
+**Fixture scope limitation:** the initial fixture pack is an account, notification, email-capture and simulated-payment foundation. It does not yet pre-create every domain workflow entity listed in Section 6 (such as fully linked membership-review/verification, organization/job, service/mentorship, project/donation and event journeys). Those fixtures must be added through their owning domain services and tested against their existing permissions before the test portfolio can be described as a complete end-to-end business-data pack. The ownership trigger captures future UUID-keyed rows that directly reference test accounts; non-UUID/composite-key tables require explicit cleanup coverage. See Section 11 of the setup runbook for the safety boundary.

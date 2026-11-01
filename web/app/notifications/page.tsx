@@ -3,9 +3,9 @@ import {AlertTriangle, Archive, ArrowRight, Bell, CheckCheck, Clock3, ExternalLi
 import Link from "next/link";
 import {useCallback, useEffect, useState} from "react";
 import {OperationStatus} from "../../components/operation-status";
+import {PushNotificationSettings} from "../../components/push-notification-settings";
 import {ApiError, api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
-import {PushNotificationSettings} from "../../components/push-notification-settings";
 
 type Category="all"|"membership"|"verification"|"opportunities"|"recruitment"|"organizations"|"mentorship"|"services"|"events_learning"|"community_impact"|"security"|"system";
 type Notification={id:string;category:Exclude<Category,"all">;title:string;body:string;priority:"low"|"normal"|"high"|"urgent";actionRequired:boolean;actionUrl:string|null;resourceType:string|null;resourceId:string|null;eventCode:string;createdAt:string;readAt:string|null;archivedAt:string|null};

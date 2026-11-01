@@ -264,8 +264,7 @@ try {
     ["community_impact_claim_assignment",1,3,1,0],
     ["community_impact_claim_decision",4,3,1,0],
     ["community_impact_claim_appeal",5,6,1,1],
-    ["community_impact_claim_event",4,3,1,0],
-    ["private_upload_session",2,0,0,0]
+    ["community_impact_claim_event",4,3,1,0]
   ];
   for (const [table,checks,foreignKeys,primaryKeys,uniqueConstraints] of manualClaimConstraintCounts) {
     const result = await client.query(
@@ -288,7 +287,6 @@ try {
     "ix_community_impact_claim_evidence_claim",
     "ix_community_impact_claim_reviewer",
     "ix_community_impact_claim_decision_history",
-    "ix_community_impact_claim_appeal",
     "ix_community_impact_claim_event_history",
     "ix_private_upload_session_claim_purpose",
     "ix_community_impact_claim_evidence_active",

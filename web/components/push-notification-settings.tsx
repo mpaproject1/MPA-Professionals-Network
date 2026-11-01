@@ -10,7 +10,7 @@ function encodeKey(value:ArrayBuffer){return btoa(String.fromCharCode(...new Uin
 function decodeKey(value:string){const padded=value.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((value.length+3)%4);return Uint8Array.from(atob(padded),char=>char.charCodeAt(0));}
 
 export function PushNotificationSettings({token}:{token:string}){
- const [status,setStatus]=useState<PushStatus|null>(null);
+ const [status,setStatus]=useState<PushStatus|null>(null),[deviceEnabled,setDeviceEnabled]=useState(false);
  const [permission,setPermission]=useState<NotificationPermission|"unsupported">("default");
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const supported=typeof window!=="undefined"&&window.isSecureContext&&"serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window;
@@ -18,6 +18,7 @@ export function PushNotificationSettings({token}:{token:string}){
   let cancelled=false;
   if(typeof window!=="undefined"&&"Notification" in window)setPermission(Notification.permission);else setPermission("unsupported");
   api<PushStatus>("/api/v1/notifications/push/status",{},token).then(value=>{if(!cancelled)setStatus(value)}).catch(e=>{if(!cancelled)setError(e instanceof ApiError?e.message:"Push notification status could not be loaded.")});
+  if("serviceWorker" in navigator)void navigator.serviceWorker.getRegistration("/").then(registration=>registration?.pushManager.getSubscription()).then(subscription=>{if(!cancelled)setDeviceEnabled(Boolean(subscription))}).catch(()=>{});
   return()=>{cancelled=true};
  },[token]);
  async function enable(){
@@ -37,7 +38,7 @@ export function PushNotificationSettings({token}:{token:string}){
    const p256dh=subscription.getKey("p256dh"),auth=subscription.getKey("auth");
    if(!p256dh||!auth)throw new Error("The browser did not provide the encryption keys required for secure push delivery.");
    const saved=await api<PushStatus>("/api/v1/notifications/push/subscriptions",{method:"POST",body:JSON.stringify({endpoint:subscription.endpoint,expirationTime:subscription.expirationTime,keys:{p256dh:encodeKey(p256dh),auth:encodeKey(auth)}})},token);
-   setStatus(saved);setNotice("Push notifications are enabled on this device. You can change this permission in your browser settings.");
+   setStatus(saved);setDeviceEnabled(true);setNotice("Push notifications are enabled on this device. You can change this permission in your browser settings.");
   }catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Push notifications could not be enabled.");}
   finally{setBusy(false);}
  }
@@ -51,7 +52,7 @@ export function PushNotificationSettings({token}:{token:string}){
     await subscription.unsubscribe();
    }
    const current=await api<PushStatus>("/api/v1/notifications/push/status",{},token);
-   setStatus(current);setNotice("Push notifications were turned off for this device.");
+   setStatus(current);setDeviceEnabled(false);setNotice("Push notifications were turned off for this device.");
   }catch(e){setError(e instanceof ApiError?e.message:"Push notifications could not be disabled.");}
   finally{setBusy(false);}
  }
@@ -64,7 +65,7 @@ export function PushNotificationSettings({token}:{token:string}){
      <p className="mt-1 text-xs text-[var(--muted)]">Works on supported HTTPS browsers and installed web apps. Sound and vibration depend on your device settings; this is not an alarm that can override silent mode or Do Not Disturb.</p>
     </div>
    </div>
-   {status?.enabled?<button type="button" className="btn btn-secondary inline-flex items-center justify-center gap-2" disabled={busy} onClick={()=>void disable()}><BellOff size={16}/>{busy?"Updating…":"Turn off this device"}</button>:<button type="button" className="btn btn-primary inline-flex items-center justify-center gap-2" disabled={busy||!supported||status?.configured===false} onClick={()=>void enable()}><BellRing size={16}/>{busy?"Enabling…":"Enable push"}</button>}
+   {deviceEnabled?<button type="button" className="btn btn-secondary inline-flex items-center justify-center gap-2" disabled={busy} onClick={()=>void disable()}><BellOff size={16}/>{busy?"Updating…":"Turn off this device"}</button>:<button type="button" className="btn btn-primary inline-flex items-center justify-center gap-2" disabled={busy||!supported||status?.configured===false} onClick={()=>void enable()}><BellRing size={16}/>{busy?"Enabling…":"Enable push"}</button>}
   </div>
   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
    <span>{status?.enabled?"Enabled on "+status.activeDevices+" device"+(status.activeDevices===1?"":"s"):status?.configured===false?"Server push delivery is not configured yet":supported?"Available on this device":"Not supported in this browser or connection"}</span>

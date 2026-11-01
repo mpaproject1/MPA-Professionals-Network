@@ -93,6 +93,7 @@ test.describe("MPA application workspace UX", () => {
   });
 
   test("mentorship paths are presented as a compact two-path workspace on mobile", async ({ page }) => {
+    await page.route("**/api/v1/**", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) }));
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/mentorship");
     await expect(page.getByRole("heading", { name: "Guidance with purpose. Leadership with integrity." })).toBeVisible();

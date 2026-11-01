@@ -214,6 +214,7 @@ export async function resetTestPortfolio(identity,portfolioId,input={},requestId
    if(f.rows.some(x=>x.storage_provider!=="private-local"))throw fail(409,"A test portfolio references a non-local file provider; reset was blocked to avoid deleting outside private storage.","TEST_FILE_PROVIDER_UNSUPPORTED");
    files.push(...f.rows.map(x=>x.object_key));
   }
+  files.splice(0,files.length,...new Set(files));
   for(const key of files)safeStoragePath(key);
   const accountRows=(await tx.query("select user_id,email, (select username from app_user u where u.id=test_portfolio_account.user_id) username from test_portfolio_account where portfolio_id=$1",[portfolioId])).rows;
   const userIds=accountRows.map(x=>x.user_id),identities=accountRows.flatMap(x=>[String(x.email).toLowerCase(),String(x.username).toLowerCase()]);

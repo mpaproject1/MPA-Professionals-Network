@@ -41,7 +41,7 @@ The database name must exactly match PostgreSQL `current_database()`. A mismatch
 
 - Email dispatch is captured to the Test Lab delivery ledger when `TEST_DELIVERY_MODE=capture`; no Resend or signed-webhook delivery occurs.
 - Push dispatch is captured locally; no Web Push service endpoint is contacted.
-- Hosted Chapa checkout/verification is blocked while Test Lab is enabled. The initial portfolio payment rows are explicitly simulated and do not represent a provider transaction.
+- Hosted Chapa checkout/verification is blocked while Test Lab is enabled. The initial portfolio payment rows are explicitly simulated and do not represent a provider transaction. The Test Lab operations panel lists captured deliveries and simulated payments; a system administrator can move a pending simulator payment to succeeded, failed or cancelled for QA. The simulator accepts only payment rows registered to the active portfolio and never calls Chapa.
 - Test accounts use `example.test` email addresses, synthetic names and generated passwords. Passwords are stored only as AES-256-GCM ciphertext using the dedicated environment key; application authentication stores only the normal password hash.
 - The XLSX export is authenticated, system-admin-only and returned with no-store headers. It is not written to the repository or sent by email.
 
@@ -62,6 +62,8 @@ Rows without a UUID `id` primary key are not automatically tracked by the generi
 5. Confirm reset.
 6. Verify the portfolio status is `reset`, test accounts and sessions are removed, registered rows are deleted, captured deliveries are cleared, and registered private files are removed.
 7. A reset audit event is retained. The portfolio row remains as a non-secret audit marker.
+
+The **Delivery & payments** action opens a portfolio-scoped operations panel. It shows captured email/push/payment events and permits state transitions only on the portfolio's own `test-simulator` payment rows. A succeeded/failed/cancelled payment cannot be reopened or changed to a different terminal result.
 
 The reset runs in a database transaction and deletes registered records child-first using the actual foreign-key graph. If an unregistered or non-test record references a registered row, PostgreSQL rejects the delete and the transaction rolls back. The reset reports an error rather than attempting a broader cascade. File paths are resolved against `PRIVATE_FILE_STORAGE_ROOT`; any path outside that root is rejected. File cleanup occurs after the database commit; failed file removals are reported for operator follow-up.
 

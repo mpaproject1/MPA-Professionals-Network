@@ -236,3 +236,33 @@ export async function expireTestPortfolioAccounts(){
   return {expired:userIds.length,skipped:false};
  });
 }
+
+export async function getTestPortfolioOperations(identity,portfolioId){
+ requireSystemAdmin(identity);const db=getPool();await assertSafeEnvironment(db);
+ const portfolio=(await db.query("select id,name,status from test_portfolio where id=$1",[portfolioId])).rows[0];
+ if(!portfolio)throw fail(404,"Test portfolio not found.","NOT_FOUND");
+ const deliveries=(await db.query("select id,channel,recipient,event_code,payload,captured_at from test_delivery_capture where portfolio_id=$1 order by captured_at desc limit 200",[portfolioId])).rows;
+ const payments=(await db.query(`select r.entity_id id,p.provider_transaction_id,p.purpose,p.amount,p.currency,p.status,p.created_at,p.updated_at
+  from test_portfolio_record r join payment_transaction p on p.id=r.entity_id
+  where r.portfolio_id=$1 and r.table_name='payment_transaction' and p.provider='test-simulator' and p.purpose='test_lab_simulation'
+  order by p.created_at desc`,[portfolioId])).rows;
+ return {portfolio,deliveries,payments};
+}
+export async function simulateTestPayment(identity,portfolioId,paymentId,input={},requestId=null){
+ requireSystemAdmin(identity);const db=getPool();await assertSafeEnvironment(db);
+ const next=String(input.status||"").trim().toLowerCase();
+ if(!["pending","succeeded","failed","cancelled"].includes(next))throw fail(400,"Choose pending, succeeded, failed or cancelled for a simulated payment.","VALIDATION_ERROR");
+ return withTransaction(async tx=>{
+  const payment=(await tx.query(`select p.* from payment_transaction p join test_portfolio_record r on r.entity_id=p.id and r.table_name='payment_transaction' and r.portfolio_id=$1
+   join test_portfolio t on t.id=r.portfolio_id and t.status='active'
+   where p.id=$2 and p.provider='test-simulator' and p.purpose='test_lab_simulation' for update of p`,[portfolioId,paymentId])).rows[0];
+  if(!payment)throw fail(404,"Simulated payment was not found in this active test portfolio.","NOT_FOUND");
+  if(payment.status===next)return {paymentId,status:next,replayed:true,simulated:true};
+  if(!["initiated","pending"].includes(payment.status))throw fail(409,"A completed simulated payment cannot be reopened or changed to a different outcome.","PAYMENT_ALREADY_DECIDED");
+  const updated=(await tx.query("update payment_transaction set status=$1,response_payload=response_payload || $2::jsonb,completed_at=case when $1 in ('succeeded','failed','cancelled') then now() else null end,updated_at=now() where id=$3 returning id,status,amount,currency,provider_transaction_id",
+   [next,{simulated:true,testPortfolioId:portfolioId,simulationReason:clean(input.reason,240)||"QA payment simulation",simulatedAt:new Date().toISOString()},paymentId])).rows[0];
+  await tx.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','simulated_payment_status_changed',$2)",[portfolioId,{paymentId,status:next,amount:payment.amount,currency:payment.currency}]);
+  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'test_lab.payment.simulated','payment_transaction',$2,$3,'success',$4)",[identity.sub,paymentId,requestId,{portfolioId,from:payment.status,to:next,reason:clean(input.reason,240)}]);
+  return {...updated,simulated:true,replayed:false};
+ });
+}

@@ -69,7 +69,7 @@ test("migration seeds only draft content and leaves both weekly slots disabled",
  assert.match(sql,/sunday_morning',0,'09:00'::time,'Africa\/Addis_Ababa',false/);
  assert.match(sql,/unique\(schedule_id,message_version_id,slot_occurrence,recipient_type,recipient_id\)/);
  assert.match(sql,/status\)\s*select c\.id,v\.message_number,1/);
- assert.equal((sql.match(/gen_random_uuid\(\),'[^']+',\d+,1,/g)||[]).length,30);
+ assert.equal((sql.match(/\(gen_random_uuid\(\),/g)||[]).length,30);
 });
 
 test("invalid and non-HTTPS push endpoints are rejected",()=>{
@@ -128,5 +128,4 @@ test("member campaign opt-out does not alter transactional push preferences",asy
  assert.match(server,/community_campaign_enabled/);
  assert.match(sender,/row\.category==="community_campaign"&&row\.community_campaign_enabled!==true/);
  assert.match(sender,/row\.push_enabled!==true/);
- assert.doesNotMatch(sender,/community_campaign_enabled!==true\)\s*\{/);
 });

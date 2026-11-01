@@ -1,5 +1,5 @@
 "use client";
-import {Bookmark,Briefcase,MapPin,MessageSquareText, RefreshCw,Search,ShieldCheck,UserRound} from "lucide-react";
+import {Bookmark,Briefcase,MapPin,MessageSquareText,Search,ShieldCheck,UserRound} from "lucide-react";
 import Link from "next/link";
 import {type FormEvent,useCallback,useEffect,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";

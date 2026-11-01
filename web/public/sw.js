@@ -37,6 +37,47 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+function safeNotificationPath(value) {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\\\") || /[\\u0000-\\u001f\\u007f]/.test(value)) return "/notifications";
+  return value;
+}
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
+  const priority = ["low", "normal", "high", "urgent"].includes(data.priority) ? data.priority : "normal";
+  const title = typeof data.title === "string" && data.title.length <= 100 ? data.title : "MPA · New update";
+  const body = typeof data.body === "string" && data.body.length <= 180 ? data.body : "You have an MPA update. Open the app to review it.";
+  const url = safeNotificationPath(data.url);
+  const options = {
+    body,
+    icon: "/brand/mpa-pwa-icon.svg",
+    badge: "/brand/mpa-favicon-light.svg",
+    tag: typeof data.notificationId === "string" ? "mpa-" + data.notificationId : "mpa-update",
+    renotify: false,
+    requireInteraction: priority === "urgent",
+    data: { url },
+    ...(priority === "urgent" || priority === "high" ? { vibrate: [120, 60, 120] } : {})
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = safeNotificationPath(event.notification.data && event.notification.data.url);
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+      if ("focus" in client) {
+        await client.focus();
+        if ("navigate" in client && new URL(client.url).origin === self.location.origin) await client.navigate(target);
+        return;
+      }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(target);
+  })());
+});
+
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "MPA_SKIP_WAITING") self.skipWaiting();
 });

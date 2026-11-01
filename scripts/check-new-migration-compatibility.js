@@ -216,6 +216,28 @@ try {
     "select conrelid::regclass::text relation,conname,pg_get_constraintdef(oid) definition,convalidated from pg_constraint where conname=any($1::text[]) order by conrelid::regclass::text,conname",
     [taxonomyConstraintNames]
   );
+  // The CI database has already applied the full migration set before this
+  // compatibility rehearsal. These reference datasets may therefore exist
+  // before BEGIN. Snapshot datasets, versions and items so rollback is checked
+  // against the real pre-rehearsal state rather than an incorrect empty state.
+  const taxonomyDataBaseline = await client.query(
+    `select 'dataset'::text entity,to_jsonb(d) row_data
+       from reference_dataset d
+      where d.dataset_key=any($1::text[])
+     union all
+     select 'version'::text entity,to_jsonb(v) row_data
+       from reference_dataset_version v
+       join reference_dataset d on d.id=v.dataset_id
+      where d.dataset_key=any($1::text[])
+     union all
+     select 'item'::text entity,to_jsonb(i) row_data
+       from reference_item i
+       join reference_dataset_version v on v.id=i.dataset_version_id
+       join reference_dataset d on d.id=v.dataset_id
+      where d.dataset_key=any($1::text[])
+     order by entity,row_data::text`,
+    [requiredCommunityImpactTaxonomyDatasets]
+  );
 
   await client.query("begin");
   transactionOpen = true;
@@ -871,8 +893,27 @@ try {
     [taxonomyConstraintNames]
   );
   if(JSON.stringify(taxonomyConstraintRollback.rows)!==JSON.stringify(taxonomyConstraintBaseline.rows))throw new Error("Rollback rehearsal did not restore the pre-existing dynamic taxonomy constraints exactly.");
-  const taxonomyRollback=await client.query("select count(*)::int count from reference_dataset where dataset_key=any($1::text[])",[requiredCommunityImpactTaxonomyDatasets]);
-  if(taxonomyRollback.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact taxonomy datasets behind.");
+  const taxonomyRollback = await client.query(
+    `select 'dataset'::text entity,to_jsonb(d) row_data
+       from reference_dataset d
+      where d.dataset_key=any($1::text[])
+     union all
+     select 'version'::text entity,to_jsonb(v) row_data
+       from reference_dataset_version v
+       join reference_dataset d on d.id=v.dataset_id
+      where d.dataset_key=any($1::text[])
+     union all
+     select 'item'::text entity,to_jsonb(i) row_data
+       from reference_item i
+       join reference_dataset_version v on v.id=i.dataset_version_id
+       join reference_dataset d on d.id=v.dataset_id
+      where d.dataset_key=any($1::text[])
+     order by entity,row_data::text`,
+    [requiredCommunityImpactTaxonomyDatasets]
+  );
+  if (JSON.stringify(taxonomyRollback.rows) !== JSON.stringify(taxonomyDataBaseline.rows)) {
+    throw new Error("Rollback rehearsal did not restore the pre-existing Community Impact taxonomy datasets, versions and items exactly.");
+  }
   const rollbackTables=await client.query("select count(*)::int count from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_identity_assurance_case","community_impact_identity_assurance_evidence","community_impact_identity_assurance_decision","community_impact_detection_policy_governance","community_impact_detection_policy_event","community_impact_offline_attribution","community_impact_offline_attribution_evidence","community_impact_claim_candidate_link","community_impact_reviewer_conflict","community_impact_contribution_assessment","community_impact_contribution_assessment_event","community_impact_retention_evaluation","community_impact_governance_event"]]);
   if(rollbackTables.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact governance tables behind in the disposable transaction.");
   const rollbackTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_block_conflicted_assignment","trg_community_impact_block_conflicted_decision","trg_community_impact_policy_event_immutable","trg_community_impact_assessment_event_immutable","trg_community_impact_governance_event_immutable","trg_community_impact_detection_policy_activation_guard","trg_community_impact_offline_attribution_guard","trg_community_impact_identity_decision_immutable","trg_community_impact_identity_evidence_immutable","trg_community_impact_retention_evaluation_immutable","trg_community_impact_assessment_guard"]]);

@@ -906,6 +906,23 @@ try {
   if(taxonomyConstraints.rows[0].count!==4)throw new Error("Community Impact claim classification columns must accept versioned taxonomy codes rather than fixed hard-coded lists.");
   const taxonomyRows=await client.query("select d.dataset_key,count(i.id)::int active_items from reference_dataset d join reference_dataset_version v on v.dataset_id=d.id and v.status='published' join reference_item i on i.dataset_version_id=v.id and i.active=true where d.dataset_key=any($1::text[]) group by d.dataset_key",[requiredCommunityImpactTaxonomyDatasets]);
    if(taxonomyRows.rowCount!==4||taxonomyRows.rows.some(row=>row.active_items<1))throw new Error("All four Community Impact governed taxonomies must contain active published reference values.");
+  const pushTables=await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[]) order by table_name",[pushTableNames]);
+  if(pushTables.rowCount!==2)throw new Error("Web Push subscription and delivery outbox tables are incomplete.");
+  const pushConstraints=await client.query("select conrelid::regclass::text relation,conname,contype,pg_get_constraintdef(oid) definition from pg_constraint where conrelid in ('public.notification_push_subscription'::regclass,'public.notification_push_delivery'::regclass)");
+  const pushConstraintNames=new Set(pushConstraints.rows.map(row=>row.conname));
+  for(const required of ["notification_push_subscription_endpoint_hash_unique","notification_push_subscription_https","notification_push_subscription_hash","notification_push_delivery_status_valid","notification_push_delivery_attempts_valid","notification_push_delivery_unique"]){
+    if(!pushConstraintNames.has(required))throw new Error("Web Push schema is missing required constraint "+required+".");
+  }
+  const pushForeignKeys=await client.query("select conrelid::regclass::text source,confrelid::regclass::text target from pg_constraint where contype='f' and conrelid in ('public.notification_push_subscription'::regclass,'public.notification_push_delivery'::regclass)");
+  const pushForeignKeyTargets=new Set(pushForeignKeys.rows.map(row=>row.source+"->"+row.target));
+  for(const required of ["notification_push_subscription->app_user","notification_push_delivery->notification_event","notification_push_delivery->notification_push_subscription"]){
+    if(!pushForeignKeyTargets.has(required))throw new Error("Web Push schema is missing required ownership foreign key "+required+".");
+  }
+  const pushIndexes=await client.query("select indexname from pg_indexes where schemaname='public' and indexname=any($1::text[])",[["ix_notification_push_subscription_user_active","ix_notification_push_delivery_pending"]]);
+  if(pushIndexes.rowCount!==2)throw new Error("Web Push subscription and delivery worker indexes are incomplete.");
+  const pushPreferenceDefault=await client.query("select column_default from information_schema.columns where table_schema='public' and table_name='notification_preference' and column_name='push_enabled'");
+  if(pushPreferenceDefault.rows[0]?.column_default!=="false")throw new Error("Web Push must remain opt-in by default.");
+
    await client.query("rollback");
   transactionOpen = false;
   const taxonomyConstraintRollback=await client.query(

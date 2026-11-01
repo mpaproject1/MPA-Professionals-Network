@@ -1,13 +1,14 @@
 "use client";
 import {ArrowRight, BellRing, CheckCircle2, ShieldCheck, Sparkles, Volume2, VolumeX} from "lucide-react";
 import Link from "next/link";
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useId, useState} from "react";
 import {api} from "../lib/api";
 
 type Row=Record<string,any>;
 type Impact=Row&{score:number;policyVersion:number;dimensions:Row[];categoryBreakdown:Row[];items:Row[];claims:Row[];pendingClaims:Row[];detectedContributions:Row[];reminders:Row[]};
 const label=(v:string)=>String(v||"Other").replaceAll("_"," ").replace(/\b\w/g,x=>x.toUpperCase());
 export function CommunityImpactWorkspacePanel({token}:{token:string}){
+ const headingId=useId();
  const [data,setData]=useState<Impact|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(true),[sound,setSound]=useState(false),[soundAvailable,setSoundAvailable]=useState(false),[soundPrompt,setSoundPrompt]=useState(false);
  const load=useCallback(async()=>{if(!token)return;setLoading(true);setError("");try{setData(await api<Impact>("/api/v1/me/community-impact/workspace",{},token))}catch(e){setError(e instanceof Error?e.message:"Community Impact workspace could not be loaded.")}finally{setLoading(false)}},[token]);
  useEffect(()=>{void load()},[load]);
@@ -19,8 +20,8 @@ export function CommunityImpactWorkspacePanel({token}:{token:string}){
  if(!data)return null;
  const max=Math.max(1,...data.categoryBreakdown.map(x=>Math.abs(Number(x.points)||0)));
  const totalWeight=data.dimensions.reduce((n,d)=>n+Number(d.weight||0),0);
- return <section className="mb-7 grid gap-4" aria-labelledby="impact-workspace-title">
-  <header className="flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">Your contribution journey</p><h2 id="impact-workspace-title" className="h2">Community Impact</h2><p className="muted mt-1 max-w-2xl">A transparent record of verified service, professional contribution and measurable outcomes.</p></div><div className="flex flex-wrap gap-2"><Link className="btn btn-ghost" href="/community-impact/score">Full score record <ArrowRight size={15}/></Link><Link className="btn btn-primary" href="/community-impact/recognition">Recognition and opportunities <Sparkles size={15}/></Link></div></header>
+ return <section className="mb-7 grid gap-4" aria-labelledby={headingId}>
+  <header className="flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">Your contribution journey</p><h2 id={headingId} className="h2">Community Impact</h2><p className="muted mt-1 max-w-2xl">A transparent record of verified service, professional contribution and measurable outcomes.</p></div><div className="flex flex-wrap gap-2"><Link className="btn btn-ghost" href="/community-impact/score">Full score record <ArrowRight size={15}/></Link><Link className="btn btn-primary" href="/community-impact/recognition">Recognition and opportunities <Sparkles size={15}/></Link></div></header>
   {soundPrompt?<div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--primary)]/40 bg-[var(--surface)] p-4"><div><strong className="flex items-center gap-2"><Volume2 size={17}/> A gentle welcome sound?</strong><p className="muted mt-1 text-sm">Enable a short, subtle sound when you choose. Browsers require this explicit action before audio can play.</p></div><div className="flex gap-2"><button type="button" className="btn btn-primary" onClick={()=>void enableSound()}>Enable sound</button><button type="button" className="btn btn-ghost" onClick={disableSound}>Not now</button></div></div>:null}
   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
    <div className="rounded-2xl border border-[var(--primary)]/40 bg-[var(--surface)] p-4"><p className="muted text-sm">Verified impact points</p><p className="mt-1 text-3xl font-semibold">{Number(data.score).toFixed(2)}</p><p className="muted mt-1 text-xs">Policy v{data.policyVersion} · private evaluation</p></div>

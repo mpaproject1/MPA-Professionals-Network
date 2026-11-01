@@ -1,5 +1,5 @@
 "use client";
-import {ArrowRight,BookOpen,CheckCircle2,Clock3,Compass,Filter,Globe2,HeartHandshake,Leaf,MapPin,Search,ShieldCheck,Users,X} from "lucide-react";
+import {ArrowRight,BookOpen,CheckCircle2,Clock3,Compass,Filter,FolderOpen,FilePlus2,ClipboardCheck,HeartHandshake,Leaf,MapPin,Search,ShieldCheck,Users,X} from "lucide-react";
 import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
 import {SupportAction} from "../../components/support-action";
@@ -34,10 +34,37 @@ export default function ServeCommunityPage(){
  const withdraw=async(id:string)=>{if(!token||!window.confirm("Withdraw this participation and revoke your contact-sharing consent?"))return;try{await api("/api/v1/me/serve-community/participations/"+id+"/withdraw",{method:"POST",body:JSON.stringify({reason:"Participant chose to withdraw participation and contact-sharing consent."})},token);await loadMine()}catch(error){setApplicationError(error instanceof Error?error.message:"We could not withdraw this participation.")}};
  const apply=async()=>{if(!selected||!token)return;setSubmitting(true);setApplicationError("");try{await api("/api/v1/serve-community/initiatives/"+selected.id+"/participations",{method:"POST",headers:{"X-Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({consent,contactConsent,consentVersion,privacyNoticeVersion:privacyVersion,applicationNote})},token);setApplicationSuccess("Your application has been submitted. The initiative owner will review it; you can withdraw while it remains active.");setConsent(false);setContactConsent(false);await loadMine()}catch(error){setApplicationError(error instanceof Error?error.message:"We could not submit your application. Please try again.")}finally{setSubmitting(false)}};
  return <main className="serve-community-page">
-  <section className="sc-hero"><div className="sc-hero-copy"><div className="sc-kicker"><span className="sc-kicker-dot"/><span>MPA · Serve-Community</span><span className="sc-kicker-divider"/>Community impact, made visible</div><h1>Good work grows<br/><span>when we do it together.</span></h1><p className="sc-hero-lead">A dedicated home for reviewed community initiatives, volunteering and shared progress. Discover where your skills, time and care can make a meaningful difference.</p><div className="sc-hero-actions"><a className="btn btn-primary" href="#discover">Explore initiatives <ArrowRight size={17}/></a><Link className="btn btn-ghost" href="/serve-community/manage">Propose an initiative <ArrowRight size={16}/></Link></div><div className="sc-hero-proof"><span><ShieldCheck size={16}/> Reviewed before publication</span><span><Users size={16}/> Participation by choice</span><span><Leaf size={16}/> Impact with purpose</span></div></div>
-   <div className="sc-hero-art" aria-hidden="true"><div className="sc-art-orbit sc-art-orbit-one"/><div className="sc-art-orbit sc-art-orbit-two"/><div className="sc-art-center"><HeartHandshake size={54} strokeWidth={1.35}/></div><span className="sc-art-node sc-art-node-one"><BookOpen size={22}/></span><span className="sc-art-node sc-art-node-two"><Users size={22}/></span><span className="sc-art-node sc-art-node-three"><Globe2 size={22}/></span><span className="sc-art-spark sc-art-spark-one"/><span className="sc-art-spark sc-art-spark-two"/></div>
+  <section className="sc-workspace-head" aria-labelledby="sc-workspace-title">
+    <div className="sc-workspace-heading">
+      <div>
+        <div className="sc-kicker"><span className="sc-kicker-dot"/><span>MPA · Serve-Community</span><span className="sc-kicker-divider"/>Community initiatives workspace</div>
+        <h1 id="sc-workspace-title">Serve the community.<br/><span>Make impact together.</span></h1>
+        <p>One focused space to discover approved initiatives, bring forward a proposal and record completed community impact.</p>
+      </div>
+      <div className="sc-workspace-status"><span className="sc-workspace-status-dot"/> MPA community workspace <span className="sc-workspace-status-separator"/> Private by default</div>
+    </div>
+    <div className="sc-folder-desk" aria-label="Serve-Community actions">
+      <a href="#discover" className="sc-folder sc-folder--explore">
+        <span className="sc-folder-tab"/>
+        <span className="sc-folder-icon"><Compass size={28}/></span>
+        <span className="sc-folder-copy"><strong>Explore initiatives</strong><small>Find reviewed opportunities and volunteer pathways</small></span>
+        <span className="sc-folder-open"><ArrowRight size={18}/></span>
+      </a>
+      <Link href="/serve-community/manage" className="sc-folder sc-folder--propose">
+        <span className="sc-folder-tab"/>
+        <span className="sc-folder-icon"><FilePlus2 size={28}/></span>
+        <span className="sc-folder-copy"><strong>Propose an initiative</strong><small>Prepare a programme for independent MPA review</small></span>
+        <span className="sc-folder-open"><ArrowRight size={18}/></span>
+      </Link>
+      <Link href="/community-impact/claims" className="sc-folder sc-folder--record">
+        <span className="sc-folder-tab"/>
+        <span className="sc-folder-icon"><ClipboardCheck size={28}/></span>
+        <span className="sc-folder-copy"><strong>Record community impact</strong><small>Submit an initiative, contribution or impact claim</small></span>
+        <span className="sc-folder-open"><ArrowRight size={18}/></span>
+      </Link>
+    </div>
+    <div className="sc-workspace-footnote"><ShieldCheck size={15}/> Public initiatives are independently reviewed. Participation and personal details remain private unless you explicitly consent.</div>
   </section>
-  <section className="sc-principles" aria-label="How Serve-Community works"><article><span className="sc-principle-icon"><CheckCircle2 size={19}/></span><div><strong>Reviewed initiatives</strong><p>Only independently approved community-benefit programmes appear in discovery.</p></div></article><article><span className="sc-principle-icon"><HeartHandshake size={19}/></span><div><strong>Meaningful participation</strong><p>Clear expectations, voluntary involvement and explicit consent.</p></div></article><article><span className="sc-principle-icon"><ShieldCheck size={19}/></span><div><strong>Respectful reporting</strong><p>Personal details and participation status stay private.</p></div></article></section>
   <section id="discover" className="sc-discover"><div className="sc-section-heading"><div><div className="eyebrow">Discover with purpose</div><h2 className="h2">Explore community initiatives</h2><p className="muted">Every result below is a real initiative approved for public discovery by an authorized MPA reviewer.</p></div><div className="sc-preview-label"><ShieldCheck size={15}/> Reviewed directory</div></div>
    <div className="sc-toolbar"><label className="sc-search"><Search size={18}/><span className="sr-only">Search approved initiatives</span><input aria-label="Search approved initiatives" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search causes, skills or themes…"/></label><div className="sc-filter-label"><Filter size={16}/> Explore by focus</div><div className="sc-category-tabs" role="group" aria-label="Filter initiatives by category">{categories.map(item=><button key={item.value||"all"} type="button" aria-pressed={category===item.value} className={category===item.value?"active":""} onClick={()=>setCategory(item.value)}>{item.label}</button>)}</div></div>
    <div className="sc-results-meta" aria-live="polite"><span>{loading?"Loading approved initiatives…":items.length+" approved "+(items.length===1?"initiative":"initiatives")}</span><span>Public, reviewed opportunities only</span></div>

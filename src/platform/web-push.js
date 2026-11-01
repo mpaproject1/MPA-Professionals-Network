@@ -49,6 +49,7 @@ export function encryptWebPushPayload(subscription,payload){
  return Buffer.concat([salt,recordSize,Buffer.from([senderPublic.length]),senderPublic,ciphertext]);
 }
 export function validPushEndpoint(value){
+ if(typeof value!=="string"||value.length>4096)return null;
  let url;try{url=new URL(String(value||""));}catch{return null;}
  if(url.protocol!=="https:"||url.username||url.password||url.port||url.hash)return null;
  const host=url.hostname.toLowerCase();
@@ -64,6 +65,10 @@ export async function registerPushSubscription(userId,input){
  const endpointHash=sha256(endpoint);
  await withTransaction(async db=>{
   const existing=(await db.query("SELECT id,user_id FROM notification_push_subscription WHERE endpoint_sha256=$1 FOR UPDATE",[endpointHash])).rows[0];
+  if(!existing||existing.user_id!==userId){
+   const activeCount=await db.query("SELECT count(*)::int count FROM notification_push_subscription WHERE user_id=$1 AND revoked_at IS NULL",[userId]);
+   if(Number(activeCount.rows[0]?.count)>=10)fail(429,"This account has reached the limit of 10 registered devices.","RATE_LIMITED");
+  }
   if(existing&&existing.user_id!==userId){
    // A browser endpoint belongs to one account at a time. Cancel queued deliveries
    // before transferring it so a later account cannot receive the prior user's alerts.

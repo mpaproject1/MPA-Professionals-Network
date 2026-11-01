@@ -256,6 +256,8 @@ try {
   const scoreColumnBaseline = await client.query("select table_name,column_name,udt_name,is_nullable,column_default from information_schema.columns where table_schema='public' and ((table_name='community_impact_score_source_link' and column_name='source_fingerprint') or (table_name='community_impact_contribution_assessment' and column_name='score_policy_version_id')) order by table_name,column_name");
   const scoreIndexNames = ["uq_community_impact_score_historical_fingerprint","uq_community_impact_score_ledger_single_reversal"];
   const scoreIndexBaseline = await client.query("select indexname,indexdef from pg_indexes where schemaname='public' and indexname=any($1::text[]) order by indexname",[scoreIndexNames]);
+  const pushTableNames = ["notification_push_subscription","notification_push_delivery"];
+  const pushTableBaseline = await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[]) order by table_name",[pushTableNames]);
 
   await client.query("begin");
   transactionOpen = true;
@@ -947,6 +949,8 @@ try {
   if(JSON.stringify(scoreIndexesAfterRollback.rows)!==JSON.stringify(scoreIndexBaseline.rows))throw new Error("Rollback rehearsal did not restore the pre-existing unified score index baseline exactly.");
   const scoreTriggersAfterRollback = await client.query("select t.tgname trigger_name,t.tgrelid::regclass::text relation,pg_get_triggerdef(t.oid) definition from pg_trigger t where not t.tgisinternal and t.tgname=any($1::text[]) order by t.tgname,t.tgrelid::regclass::text",[scoreTriggerNames]);
   if(JSON.stringify(scoreTriggersAfterRollback.rows)!==JSON.stringify(scoreTriggerBaseline.rows))throw new Error("Rollback rehearsal did not restore the pre-existing unified score trigger baseline exactly.");
+  const pushTablesAfterRollback = await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[]) order by table_name",[pushTableNames]);
+  if(JSON.stringify(pushTablesAfterRollback.rows)!==JSON.stringify(pushTableBaseline.rows))throw new Error("Rollback rehearsal did not restore the pre-existing Web Push table baseline exactly.");
   console.log("PASS: all listed migrations and post-migration assertions succeeded; rollback removed governance and unified score tables and their immutability triggers from the disposable transaction.");
   console.log("NOTE: this validates migration execution and existing column types/FK targets; it does not replace application-level integration tests.");
 } catch (error) {

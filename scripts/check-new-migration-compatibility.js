@@ -914,7 +914,7 @@ try {
   for(const required of ["notification_push_subscription_endpoint_hash_unique","notification_push_subscription_https","notification_push_subscription_hash","notification_push_delivery_status_valid","notification_push_delivery_attempts_valid","notification_push_delivery_unique"]){
     if(!pushConstraintNames.has(required))throw new Error("Web Push schema is missing required constraint "+required+".");
   }
-  const pushForeignKeys=await client.query("select conrelid::regclass::text source,confrelid::regclass::text target from pg_constraint where contype='f' and conrelid in ('public.notification_push_subscription'::regclass,'public.notification_push_delivery'::regclass)");
+  const pushForeignKeys=await client.query("select source.relname source,target.relname target from pg_constraint constraint_row join pg_class source on source.oid=constraint_row.conrelid join pg_class target on target.oid=constraint_row.confrelid where constraint_row.contype='f' and constraint_row.conrelid in ('public.notification_push_subscription'::regclass,'public.notification_push_delivery'::regclass)");
   const pushForeignKeyTargets=new Set(pushForeignKeys.rows.map(row=>row.source+"->"+row.target));
   for(const required of ["notification_push_subscription->app_user","notification_push_delivery->notification_event","notification_push_delivery->notification_push_subscription"]){
     if(!pushForeignKeyTargets.has(required))throw new Error("Web Push schema is missing required ownership foreign key "+required+".");

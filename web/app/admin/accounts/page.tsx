@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { DirectoryExportBuilder } from "../../../components/admin/directory-export-builder";
 import { FormFeedback } from "../../../components/form-feedback";
 import { OperationStatus } from "../../../components/operation-status";
-import { Badge, Card } from "../../../components/ui";
+import { Card } from "../../../components/ui";
 import { api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";

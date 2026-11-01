@@ -47,7 +47,7 @@ Required environment values for Web Push remain the existing `WEB_PUSH_VAPID_PUB
 
 ## Migration and validation
 
-Apply migrations with the repository's normal `npm run migrate` process. The new migrations are `999_community_contribution_campaigns.sql` and `9999_community_campaign_public_push_delivery.sql`; they are forward-only and do not rewrite notification history or assign member preferences.
+Apply migrations with the repository's normal `npm run migrate` process. The new migrations are `999_community_contribution_campaigns.sql` and `999z_community_campaign_public_push_delivery.sql`; they are forward-only and do not rewrite notification history or assign member preferences.
 
 Run:
 

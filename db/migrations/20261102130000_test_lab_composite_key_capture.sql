@@ -11,7 +11,7 @@ create table if not exists test_portfolio_composite_record (
 create index if not exists ix_test_portfolio_composite_lookup
  on test_portfolio_composite_record(portfolio_id,table_name);
 
-create or replace function test_lab_capture_owned_record() returns trigger language plpgsql as $
+create or replace function test_lab_capture_owned_record() returns trigger language plpgsql as $fn$
 declare row_data jsonb; portfolio uuid; entity uuid;
 begin
  row_data:=to_jsonb(new);
@@ -40,7 +40,8 @@ begin
   on conflict do nothing;
  end if;
  return new;
-end $;
+end;
+$fn$;
 
 create or replace function test_lab_capture_composite_owned_record() returns trigger language plpgsql as $$
 declare

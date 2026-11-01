@@ -1471,7 +1471,7 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 .mpa-jobs-page details.form-category{padding:10px 12px}
 .mpa-jobs-page details.form-category>summary{min-height:32px;display:flex;align-items:center;gap:6px;font-size:12px}
 .mpa-jobs-page .grid{gap:12px}
-.mpa-jobs-page #unused{scroll-margin-top:80px}
+
 .mpa-jobs-page [id$="-cards"]>.card{transition:transform .18s,box-shadow .18s}
 .mpa-jobs-page [id$="-cards"]>.card:hover{box-shadow:0 12px 28px rgba(8,28,48,.09)}
 .mpa-jobs-page fieldset{min-width:0;border:1px solid var(--border);border-radius:12px;padding:12px}

@@ -40,7 +40,7 @@ The public achievement section is embedded in the existing professional profile 
 
 - Members can self-nominate or nominate another member when the program permits it.
 - Members can nominate non-member community contributors; non-members are not automatically enrolled or given MPA membership.
-- Nominations include a contribution summary, evidence references and an optional related claim.
+- Nominations include a contribution summary, evidence references and an optional related claim. Evidence references are record identifiers/descriptions, not direct or private file URLs; linked claims must belong to the nominated member or match the non-member nominee contact email.
 - Opportunities that require verified contribution cannot be approved without a linked claim whose status is `verified`.
 - Only the assigned reviewer can decide an `under_review` nomination. The nominator and nominee cannot review or decide their own nomination.
 - Approval creates an award record; it does not automatically award score points.

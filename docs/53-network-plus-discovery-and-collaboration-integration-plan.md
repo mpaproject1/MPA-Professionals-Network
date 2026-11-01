@@ -387,3 +387,13 @@ The legacy classification flow is deliberately opt-in and owner-originated. No s
 - Corrected claim reviewer API field casing, guarded nullable evidence file identifiers, and typed the scoring-policy JSON variable.
 - Applied safe Biome fixes to import ordering, explicit button types, unused imports, the redundant fragment/ternary/boolean casts, and the type-only icon reference. No lint rules or CI gates were disabled.
 - Changes are on `feat/workstream-3-progress-members-workspace`. This record does not claim CI has passed: rerun the complete validation against the updated branch head and resolve any newly exposed diagnostics before treating the workstream as ready. No production database or deployment was touched.
+
+
+## CI remediation record — run 41268897280
+
+- Run 41268897280 executed on `feat/workstream-3-progress-members-workspace` at `d4bbd62bb807040a9bba5177e904ad3c272c75b0` and failed four jobs: Next.js build, Biome, disposable PostgreSQL legacy-schema upgrade, and TypeScript.
+- The build and TypeScript failures share one direct source cause: `web/app/organizations/workspace/page.tsx` still types its form handler as `FormEvent`, but the type import had been removed. The `FormEvent` type-only import is restored; no runtime behavior or form permissions changed.
+- The migration failure is independent: `20261101280000_community_impact_governed_taxonomies.sql` replaces the `reference_dataset.domain` check and attempts to validate it against pre-existing legacy rows. The expanded constraint is now added `NOT VALID`: existing legacy rows are preserved, while new or changed rows must satisfy the expanded allowed-domain list. No row data is deleted or rewritten. This leaves a future data-review/constraint-validation task rather than silently coercing historic taxonomy values.
+- Biome reports 23 blocking `assist/source/organizeImports` diagnostics across server, platform, tests and web files, plus 491 warnings. The warnings are not being suppressed and lint rules are not being weakened. The import-order blockers still require safe formatting-only corrections and a fresh Biome run; this remediation record does not claim the lint gate is fixed.
+- The workflow's legacy-schema baseline safety check behaved as designed. It is not an error to remove or bypass.
+- Changes remain on the existing branch. No production database, production deployment, merge, force-push or branch operation was performed. Build, TypeScript, migration and lint must be rerun on the new commit before declaring the run resolved.

@@ -62,7 +62,8 @@ const migrationNames = [
   "20261101250000_community_impact_recognition_program_governance.sql",
   "20261101260000_community_impact_recognition_lifecycle_guards.sql",
   "20261101270000_community_impact_notification_category.sql",
-  "20261101280000_community_impact_governed_taxonomies.sql"
+  "20261101280000_community_impact_governed_taxonomies.sql",
+  "20261101290000_community_impact_taxonomy_code_constraints.sql"
 ];
 const requiredCommunityImpactTaxonomyDatasets = ["community_impact_contribution_categories","community_impact_contribution_types","community_impact_contributor_roles","community_impact_evidence_types"];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
@@ -723,10 +724,14 @@ try {
 
   if(referralPolicy.rows[0].count!==0)throw new Error("Fresh referral migrations must not silently activate an unapproved scoring policy.");
 
+  const taxonomyConstraints=await client.query("select count(*)::int count from pg_constraint where conname=any($1::text[])",[["community_impact_claim_category_code_check","community_impact_claim_contribution_type_code_check","community_impact_claim_contribution_role_code_check","community_impact_claim_evidence_type_code_check"]]);
+  if(taxonomyConstraints.rows[0].count!==4)throw new Error("Community Impact claim classification columns must accept versioned taxonomy codes rather than fixed hard-coded lists.");
   const taxonomyRows=await client.query("select d.dataset_key,count(i.id)::int active_items from reference_dataset d join reference_dataset_version v on v.dataset_id=d.id and v.status='published' join reference_item i on i.dataset_version_id=v.id and i.active=true where d.dataset_key=any($1::text[]) group by d.dataset_key",[requiredCommunityImpactTaxonomyDatasets]);
    if(taxonomyRows.rowCount!==4||taxonomyRows.rows.some(row=>row.active_items<1))throw new Error("All four Community Impact governed taxonomies must contain active published reference values.");
    await client.query("rollback");
   transactionOpen = false;
+  const taxonomyConstraintRollback=await client.query("select count(*)::int count from pg_constraint where conname=any($1::text[])",[["community_impact_claim_category_code_check","community_impact_claim_contribution_type_code_check","community_impact_claim_contribution_role_code_check","community_impact_claim_evidence_type_code_check"]]);
+  if(taxonomyConstraintRollback.rows[0].count!==0)throw new Error("Rollback rehearsal left dynamic taxonomy constraints behind.");
   const taxonomyRollback=await client.query("select count(*)::int count from reference_dataset where dataset_key=any($1::text[])",[requiredCommunityImpactTaxonomyDatasets]);
   if(taxonomyRollback.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact taxonomy datasets behind.");
   const rollbackTables=await client.query("select count(*)::int count from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_identity_assurance_case","community_impact_identity_assurance_evidence","community_impact_identity_assurance_decision","community_impact_detection_policy_governance","community_impact_detection_policy_event","community_impact_offline_attribution","community_impact_offline_attribution_evidence","community_impact_claim_candidate_link","community_impact_reviewer_conflict","community_impact_contribution_assessment","community_impact_contribution_assessment_event","community_impact_retention_evaluation","community_impact_governance_event"]]);

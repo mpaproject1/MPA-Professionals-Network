@@ -43,8 +43,11 @@ self.addEventListener("activate", (event) => {
 function safeNotificationPath(value) {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/notifications";
   const path = value.split(/[?#]/)[0];
+  let decoded;
+  try { decoded = decodeURIComponent(path); } catch { return "/notifications"; }
+  if (decoded.includes("\\\\") || decoded.startsWith("//") || decoded.split("/").includes("..")) return "/notifications";
   const allowed = ["/notifications", "/serve-community", "/mentorship", "/jobs", "/members", "/track", "/membership", "/verification", "/organizations", "/services", "/dashboard", "/profile", "/community-impact/recognition"];
-  if (!allowed.some((route) => path === route || path.startsWith(route + "/"))) return "/notifications";
+  if (!allowed.some((route) => decoded === route || decoded.startsWith(route + "/"))) return "/notifications";
   for (let index = 0; index < value.length; index += 1) {
     const code = value.charCodeAt(index);
     if (value[index] === "\\" || code < 32 || code === 127) return "/notifications";

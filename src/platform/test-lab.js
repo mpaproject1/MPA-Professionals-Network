@@ -115,6 +115,34 @@ export async function createTestPortfolio(identity,input={},requestId=null){
    await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'payment_transaction',$2)",[portfolioId,payment.id]);
    await tx.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','simulated_payment_created',$2)",[portfolioId,{paymentId:payment.id,status,amount,currency:"ETB"}]);
   }
+  // Seed real membership-application records through the existing schema so testers can
+  // exercise member draft, submission, correction and payment-pending journeys.
+  const memberAccounts=accounts.filter(account=>account.role==="member");
+  const reviewerAccount=accounts.find(account=>account.role==="reviewer");
+  const basicProduct=(await tx.query("select id,price,currency from membership_product where product_code='BASIC' and active=true limit 1")).rows[0];
+  if(memberAccounts.length<4||!reviewerAccount||!basicProduct)throw fail(409,"Membership fixture prerequisites are missing; apply the membership migrations first.","TEST_FIXTURE_PREREQUISITE_MISSING");
+  const applicationStates=["draft","submitted","correction_required","payment_pending"];
+  const applicationIds=[];
+  for(let i=0;i<4;i++){
+   const status=applicationStates[i],account=memberAccounts[i];
+   const application=(await tx.query(`insert into membership_application(user_id,application_type,membership_product_id,status,submitted_at,reviewed_at,approved_at,data_snapshot,fee_snapshot)
+    values($1,'new',$2,$3,case when $3='draft' then null else now() end,case when $3 in ('correction_required','payment_pending') then now() else null end,case when $3='payment_pending' then now() else null end,$4,$5) returning id`,
+    [account.userId,basicProduct.id,status,{synthetic:true,testPortfolioId:portfolioId,persona:account.persona},{productCode:"BASIC",amount:Number(basicProduct.price),currency:basicProduct.currency}])).rows[0];
+   applicationIds.push(application.id);
+   if(status==="correction_required"){
+    await tx.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,'correction_required','Synthetic QA correction request.',$3)",[application.id,reviewerAccount.userId,[{field:"professionalProfile",status:"incomplete"}]]);
+    await tx.query("insert into membership_correction(application_id,requested_by,status,requested_fields,reviewer_note) values($1,$2,'open',$3,'Please complete the synthetic profile fields for this QA case.')",[application.id,reviewerAccount.userId,["professionalProfile"]]);
+   }
+   if(status==="payment_pending"){
+    await tx.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,'approved','Synthetic QA approval; payment remains pending.',$3)",[application.id,reviewerAccount.userId,[{field:"application",status:"approved"}]]);
+    const payment=(await tx.query(`insert into payment_transaction(provider,provider_transaction_id,idempotency_key,purpose,amount,currency,status,request_payload,response_payload)
+     values('test-simulator',$1,$2,'test_lab_simulation',$3,$4,'pending',$5,$6) returning id`,
+     [`QA-${prefix}-MEMBERSHIP-PAYMENT`,`test-lab:${portfolioId}:membership-payment`,Number(basicProduct.price),basicProduct.currency,{testPortfolioId:portfolioId,applicationId:application.id,simulated:true},{captured:true,noExternalProvider:true}])).rows[0];
+    const link=(await tx.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2) returning id",[application.id,payment.id])).rows[0];
+    await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'payment_transaction',$2),($1,'membership_application_payment',$3)",[portfolioId,payment.id,link.id]);
+    await tx.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','simulated_membership_payment_pending',$2)",[portfolioId,{paymentId:payment.id,applicationId:application.id,amount:Number(basicProduct.price),currency:basicProduct.currency}]);
+   }
+  }
  });
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'test_lab.portfolio.created','test_portfolio',$2,$3,'success',$4)",
   [identity.sub,portfolioId,requestId,{name,accountCount:accounts.length,expiryDays:days}]);

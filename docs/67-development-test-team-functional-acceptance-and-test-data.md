@@ -489,7 +489,7 @@ Delivered in the branch:
 - environment/database allowlist and production hard-block;
 - portfolio creation with synthetic role-based accounts;
 - encrypted-at-rest temporary credentials and authenticated XLSX export;
-- initial in-app welcome notifications, captured email outbox entries and simulated payment records;
+- initial in-app welcome notifications, captured email outbox entries, four membership application states and simulated payment records;
 - database ownership capture for UUID-keyed rows referencing test accounts;
 - child-first portfolio-scoped reset with foreign-key fail-closed behavior and private-local file cleanup;
 - automatic expiry disabling and session revocation;

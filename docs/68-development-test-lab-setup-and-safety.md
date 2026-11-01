@@ -33,7 +33,7 @@ The database name must exactly match PostgreSQL `current_database()`. A mismatch
 4. Set the environment variables above on the API process. Restart the API.
 5. Sign in using an existing system-administrator account (Test Lab does not create or export a system administrator).
 6. Open **Admin → Development Test Lab**.
-7. Create a portfolio. The initial fixture creates nine synthetic accounts: member, reviewer, verification reviewer, appeal reviewer, finance officer and support personas, with multiple member states. It also creates clearly simulated ETB payment records.
+7. Create a portfolio. The initial fixture creates nine synthetic accounts: member, reviewer, verification reviewer, appeal reviewer, finance officer and support personas. It also creates four real membership application records (draft, submitted, correction-required and payment-pending), review/correction history, in-app welcome notifications, captured email outbox entries and clearly simulated ETB payment records.
 8. Export the XLSX account workbook and distribute it through an approved secure channel only.
 9. Testers sign in with the role-specific accounts. Test accounts are automatically disabled and their sessions revoked after portfolio expiry; default expiry is 14 days, configurable up to 30 days.
 

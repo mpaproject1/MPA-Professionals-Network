@@ -1,4 +1,5 @@
 import { getPool, withTransaction } from "./db.js";
+import {enqueuePushDelivery} from "./web-push.js";
 
 export class NotificationProvider { async send(){throw new Error("No notification provider configured.");} }
 export class NotificationService { constructor(provider){this.provider=provider;} async send(command){return this.provider.send(command);} }
@@ -62,7 +63,9 @@ export async function createInAppNotification(db,userId,eventCode,resourceType,r
    values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
    on conflict (user_id,dedupe_key) where dedupe_key is not null do nothing returning id`,
    [userId,eventCode,resourceType||null,resourceId||null,payload,category,title,body,priority,actionRequired,actionUrl,dedupeKey]);
- return result.rows[0]||null;
+ const notification=result.rows[0]||null;
+ if(notification)await enqueuePushDelivery(db,notification.id,userId);
+ return notification;
 }
 
 export function parseNotificationFilters(input={}){

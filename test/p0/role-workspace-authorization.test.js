@@ -316,9 +316,9 @@ test("Serve-Community routes discovery into existing private workflows with comp
   assert.match(services, /api\/v1\/services/);
   assert.match(demand, /api\/v1\/marketplace-demand/);
   assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);
-  assert.match(shell, /const primaryHrefs=token\?\["\/about","\/jobs","\/network-plus","\/serve-community","\/members","\/learning"\]:\["\/about","\/jobs","\/serve-community"\]/);
+  assert.match(shell, /const primaryHrefs=token\?\["\/jobs","\/network-plus","\/serve-community","\/members","\/mentorship"\]:\["\/about","\/jobs","\/serve-community"\]/);
   assert.match(shell, /const desktopPrimary=visibleNav\.filter\(\(\[href\]\)=>primaryHrefs\.includes\(href\)\)/);
-  assert.match(shell, /const mobilePrimary=visibleNav\.filter\(\(\[href\]\)=>primaryHrefs\.includes\(href\)\)/);
+  assert.match(shell, /const mobilePrimaryHrefs=token\?\["\/jobs","\/members","\/network-plus","\/mentorship"\]:\["\/about","\/jobs","\/serve-community","\/login"\]/);
   assert.doesNotMatch(shell, /\["\/marketplace","Marketplace",Search\]/);
   assert.match(services, /Back to Serve-Community/);
   assert.match(mentorship, /Back to Serve-Community/);

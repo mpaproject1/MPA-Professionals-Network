@@ -62,7 +62,7 @@ test("member and organization discovery remain separate experiences with separat
   assert.match(organizationPage, /organizationType/);
   assert.match(organizationPage, /location/);
   assert.match(organizationPage, /read-only/i);
-  assert.match(landing, /href="\/network"/);
+  assert.match(landing, /href:\s*"\/network"/);
   assert.match(landing, /href="\/network-plus\/organizations"/);
 });
 

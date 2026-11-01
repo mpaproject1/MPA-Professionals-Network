@@ -1,7 +1,7 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {ArrowRight, BellRing, CheckCircle2, ShieldCheck, Sparkles, Volume2, VolumeX} from "lucide-react";
 import Link from "next/link";
-import {BellRing,CheckCircle2,Volume2,VolumeX,ShieldCheck,Sparkles,ArrowRight} from "lucide-react";
+import {useCallback, useEffect, useState} from "react";
 import {api} from "../lib/api";
 type Row=Record<string,any>;
 type Impact=Row&{score:number;policyVersion:number;dimensions:Row[];categoryBreakdown:Row[];items:Row[];claims:Row[];pendingClaims:Row[];detectedContributions:Row[];reminders:Row[]};
@@ -14,7 +14,7 @@ export function CommunityImpactWorkspacePanel({token}:{token:string}){
  async function enableSound(){try{const Ctx=window.AudioContext||(window as any).webkitAudioContext;if(!Ctx){setSoundAvailable(false);return}const ctx=new Ctx();await ctx.resume();const osc=ctx.createOscillator(),gain=ctx.createGain();osc.type="sine";osc.frequency.value=660;gain.gain.setValueAtTime(0.0001,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(0.045,ctx.currentTime+0.04);gain.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.22);osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+0.24);localStorage.setItem("mpa-impact-sound","enabled");setSound(true);setSoundPrompt(false);setSoundAvailable(true);setTimeout(()=>void ctx.close(),500)}catch{setSoundAvailable(false)}}
  function disableSound(){try{localStorage.setItem("mpa-impact-sound","disabled")}catch{}setSound(false)}
  if(loading)return <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5" aria-busy="true"><p className="muted">Loading your verified Community Impact record…</p></section>;
- if(error)return <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5"><p role="alert" className="text-sm">{error}</p><button className="btn btn-ghost mt-3" onClick={()=>void load()}>Retry</button></section>;
+ if(error)return <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5"><p role="alert" className="text-sm">{error}</p><button type="button" className="btn btn-ghost mt-3" onClick={()=>void load()}>Retry</button></section>;
  if(!data)return null;
  const max=Math.max(1,...data.categoryBreakdown.map(x=>Math.abs(Number(x.points)||0)));
  const totalWeight=data.dimensions.reduce((n,d)=>n+Number(d.weight||0),0);

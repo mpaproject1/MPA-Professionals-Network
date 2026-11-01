@@ -17,6 +17,19 @@ test("Test Lab reports capture mode only when explicitly configured",()=>{
  }
 });
 
+test("composite and non-UUID primary keys are captured and deleted only by their recorded key",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const migration=await readFile(new URL("../../db/migrations/20261102130000_test_lab_composite_key_capture.sql",import.meta.url),"utf8");
+ const service=await readFile(new URL("../../src/platform/test-lab.js",import.meta.url),"utf8");
+ assert.match(migration,/test_portfolio_composite_record/);
+ assert.match(migration,/test_lab_capture_composite_owned_record/);
+ assert.match(migration,/jsonb_object_agg\(a\.attname/);
+ assert.match(migration,/after insert or update on public/);
+ assert.match(service,/test_portfolio_composite_record where portfolio_id=\$1/);
+ assert.match(service,/to_jsonb\(t\) @> \$1::jsonb/);
+ assert.match(service,/delete from test_portfolio_composite_record where portfolio_id=\$1/);
+});
+ 
 test("credential workbook is a valid XLSX and preserves generated account credentials",()=>{
  const source=[{Email:"qa.member@example.test",Password:"random-secret-value!7",Persona:"Synthetic member",Role:"member"}];
  const workbook=createXlsx(source,Object.keys(source[0]));

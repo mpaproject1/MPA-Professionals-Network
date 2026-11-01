@@ -67,7 +67,7 @@ export function testLabConfiguration(){
 export async function listTestPortfolios(identity){
  requireSystemAdmin(identity);const db=getPool();await assertSafeEnvironment(db);
  return (await db.query(`select p.id,p.name,p.environment,p.database_name,p.branch_ref,p.commit_sha,p.status,p.created_at,p.expires_at,p.reset_at,
-  count(distinct a.user_id)::int account_count,count(distinct r.table_name||':'||r.entity_id)::int record_count,
+  count(distinct a.user_id)::int account_count,count(distinct r.table_name||':'||r.entity_id)::int + (select count(*)::int from test_portfolio_composite_record cr where cr.portfolio_id=p.id) record_count,
   (select count(*)::int from test_delivery_capture d where d.portfolio_id=p.id) captured_delivery_count
   from test_portfolio p left join test_portfolio_account a on a.portfolio_id=p.id
   left join test_portfolio_record r on r.portfolio_id=p.id
@@ -171,7 +171,7 @@ export async function previewTestPortfolioReset(identity,portfolioId){
  requireSystemAdmin(identity);const db=getPool();await assertSafeEnvironment(db);
  const p=(await db.query("select id,name,status from test_portfolio where id=$1",[portfolioId])).rows[0];
  if(!p||p.status!=="active")throw fail(404,"Active test portfolio not found.","NOT_FOUND");
- const records=(await db.query("select table_name,count(*)::int count from test_portfolio_record where portfolio_id=$1 group by table_name order by table_name",[portfolioId])).rows;
+ const records=(await db.query("select table_name,sum(record_count)::int count from (select table_name,count(*) record_count from test_portfolio_record where portfolio_id=$1 group by table_name union all select table_name,count(*) record_count from test_portfolio_composite_record where portfolio_id=$1 group by table_name) inventory group by table_name order by table_name",[portfolioId])).rows;
  const accounts=(await db.query("select count(*)::int count from test_portfolio_account where portfolio_id=$1",[portfolioId])).rows[0].count;
  const deliveries=(await db.query("select count(*)::int count from test_delivery_capture where portfolio_id=$1",[portfolioId])).rows[0].count;
  return {portfolio:p,accounts,deliveries,records,recordCount:records.reduce((n,r)=>n+r.count,0),requiresTypedConfirmation:p.name,warning:"Only records captured in this portfolio will be deleted. Any unregistered foreign-key dependency blocks reset."};

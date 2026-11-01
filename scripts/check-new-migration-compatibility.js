@@ -61,9 +61,10 @@ const migrationNames = [
   "20261101240000_community_impact_recognition_and_engagement.sql",
   "20261101250000_community_impact_recognition_program_governance.sql",
   "20261101260000_community_impact_recognition_lifecycle_guards.sql",
-  "20261101270000_community_impact_notification_category.sql"
+  "20261101270000_community_impact_notification_category.sql",
+  "20261101280000_community_impact_governed_taxonomies.sql"
 ];
-const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
+const requiredCommunityImpactTaxonomyDatasets = ["community_impact_contribution_categories","community_impact_contribution_types","community_impact_contributor_roles","community_impact_evidence_types"];\nconst migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
   ["app_user", "id", "uuid"],
   ["file_object", "id", "uuid"],

@@ -4,7 +4,7 @@ import {enqueuePushDelivery} from "./web-push.js";
 export class NotificationProvider { async send(){throw new Error("No notification provider configured.");} }
 export class NotificationService { constructor(provider){this.provider=provider;} async send(command){return this.provider.send(command);} }
 
-const CATEGORIES = new Set(["membership","verification","opportunities","recruitment","organizations","mentorship","services","events_learning","community_impact","security","system"]);
+const CATEGORIES = new Set(["membership","verification","opportunities","recruitment","organizations","mentorship","services","events_learning","community_impact","community_campaign","security","system"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 export function safeInternalUrl(value){const url=String(value||"");return url.startsWith("/")&&!url.startsWith("//")&&!url.includes("\\")&&![...url].some(ch=>ch.charCodeAt(0)<32||ch.charCodeAt(0)===127)?url:null;}

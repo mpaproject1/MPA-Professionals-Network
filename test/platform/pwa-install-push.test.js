@@ -67,7 +67,8 @@ test("PWA install shell registers service worker and exposes a standalone manife
  const config=JSON.parse(manifest);
  assert.equal(config.display,"standalone");
  assert.equal(config.scope,"/");
- assert.ok(config.icons.some(icon=>icon.src==="/brand/mpa-pwa-icon.svg"&&icon.purpose==="any maskable"));
+ assert.ok(config.icons.some(icon=>icon.src==="/brand/mpa-pwa-icon.svg"&&icon.sizes==="192x192 512x512"&&icon.purpose==="any maskable"));
+ assert.ok(config.icons.some(icon=>icon.src==="/brand/apple-touch-icon.png"&&icon.sizes==="180x180"));
  assert.ok(layout.includes('manifest:"/manifest.webmanifest"'));
  assert.ok(layout.includes('viewportFit:"cover"'));
  assert.ok(layout.includes('apple-touch-icon.png'));

@@ -48,9 +48,9 @@ function defaultActionUrl(category,resourceType,payload={}){
 }
 export async function createInAppNotification(db,userId,eventCode,resourceType,resourceId,payload={}){
  if(!userId)return null;
- const user=(await db.query("select coalesce(in_app_enabled,true) in_app_enabled,coalesce(in_app_categories,'{}'::jsonb) in_app_categories from notification_preference where user_id=$1",[userId])).rows[0]||{in_app_enabled:true,in_app_categories:{}};
+ const user=(await db.query("select coalesce(in_app_enabled,true) in_app_enabled,coalesce(in_app_categories,'{}'::jsonb) in_app_categories,coalesce(push_enabled,false) push_enabled from notification_preference where user_id=$1",[userId])).rows[0]||{in_app_enabled:true,in_app_categories:{},push_enabled:false};
  const category=notificationCategoryFor(eventCode,resourceType,payload),critical=category==="security"&&(payload.critical===true||payload.critical==="true");
- if(!critical&&(!user.in_app_enabled||user.in_app_categories?.[category]===false))return null;
+ if(!critical&&(!user.in_app_enabled||user.in_app_categories?.[category]===false)&&!user.push_enabled)return null;
  const title=String(payload.title||eventCode||"Update").split(/[._-]+/).filter(Boolean).map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join(" ").slice(0,180);
  const body=String(payload.message||payload.summary||payload.nextAction||payload.next_action||(payload.status?(`Status updated: ${String(payload.status).replace(/[_-]+/g," ").toLowerCase()}`):"There is an update to review in your MPA Network account.")).slice(0,1000);
  const priority=["low","normal","high","urgent"].includes(payload.priority)?payload.priority:(critical?"high":"normal");

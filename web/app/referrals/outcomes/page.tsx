@@ -2,6 +2,7 @@
 import {useCallback, useEffect, useState} from "react";
 import {api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
+
 type Item={id:string;status:string;created_at:string;candidate_consent_at:string|null;job_title:string;job_id:string};
 export default function ReferralOutcomesPage(){
  const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated),hydrateToken=useUiStore(s=>s.hydrateToken);

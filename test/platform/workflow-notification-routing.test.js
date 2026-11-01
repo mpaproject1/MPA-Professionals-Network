@@ -37,7 +37,7 @@ test("explicit push opt-in still queues alerts when the in-app feed is disabled"
  const db=fakeDb({in_app_enabled:false,in_app_categories:{services:false},push_enabled:true});
  const result=await createInAppNotification(db,"user-1","service.request_received","service_request","request-1",{nextAction:"Respond"});
  assert.equal(result.id,"notification-1");
- const delivery=db.calls.find(call=>call.sql.includes("insert into notification_push_delivery"));
+ const delivery=db.calls.find(call=>call.sql.toLowerCase().includes("insert into notification_push_delivery"));
  assert.ok(delivery);
  assert.deepEqual(delivery.params,["notification-1","user-1"]);
 });

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,service,server,privateFiles,compatibility,claimPage,reviewPage,adminWorkspace,retentionMigration,uploadHelper,taxonomyMigration,referenceService,referenceAdmin]=await Promise.all([
+const [migration,service,server,privateFiles,compatibility,claimPage,reviewPage,adminWorkspace,retentionMigration,uploadHelper,taxonomyMigration,taxonomyConstraintsMigration,referenceService,referenceAdmin]=await Promise.all([
  read("../../db/migrations/20261031180000_community_impact_manual_claims.sql"),
  read("../../src/platform/community-impact-claims.js"),
  read("../../server.js"),
@@ -14,6 +14,7 @@ const [migration,service,server,privateFiles,compatibility,claimPage,reviewPage,
  read("../../db/migrations/20261031170000_community_impact_retention_policy.sql"),
  read("../../web/lib/private-upload.ts"),
  read("../../db/migrations/20261101280000_community_impact_governed_taxonomies.sql"),
+ read("../../db/migrations/20261101290000_community_impact_taxonomy_code_constraints.sql"),
  read("../../src/platform/reference-portfolio.js"),
  read("../../web/app/admin/reference-portfolio/page.tsx")
 ]);
@@ -114,6 +115,10 @@ test("member and reviewer screens preserve private-by-default evidence boundarie
 test("Community Impact contribution taxonomies are editable through the versioned Reference Portfolio engine",()=>{
  for(const key of ["community_impact_contribution_categories","community_impact_contribution_types","community_impact_contributor_roles","community_impact_evidence_types"])assert.match(taxonomyMigration,new RegExp(key));
  assert.match(taxonomyMigration,/initial-governed-baseline/);
+ assert.match(taxonomyConstraintsMigration,/community_impact_claim_category_code_check/);
+ assert.match(taxonomyConstraintsMigration,/community_impact_claim_contribution_type_code_check/);
+ assert.match(taxonomyConstraintsMigration,/community_impact_claim_contribution_role_code_check/);
+ assert.match(taxonomyConstraintsMigration,/community_impact_claim_evidence_type_code_check/);
  assert.match(referenceService,/community_impact_%/);
  assert.match(referenceService,/reference_dataset_version v/);
  assert.match(service,/publishedTaxonomyCode/);

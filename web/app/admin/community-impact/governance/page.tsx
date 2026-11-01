@@ -8,13 +8,12 @@ import {AdminPageHeader} from "../../admin-page-header";
 type Row=Record<string,any>;
 type Me={user_id?:string;roles?:string[];permissions?:string[]};
 const label=(v:string)=>String(v||"").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
-const field=(v:any)=>v==null||v===""?"Not recorded":String(v);
 export default function CommunityImpactGovernancePage(){
  const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated),hydrateToken=useUiStore(s=>s.hydrateToken);
  const [scorePolicy,setScorePolicy]=useState<Row|null>(null),[me,setMe]=useState<Me>({}),[actorId,setActorId]=useState(""),[identity,setIdentity]=useState<Row[]>([]),[attributions,setAttributions]=useState<Row[]>([]),[candidates,setCandidates]=useState<Row[]>([]),[policies,setPolicies]=useState<Row[]>([]),[claims,setClaims]=useState<Row[]>([]),[assessments,setAssessments]=useState<Row[]>([]);
  const [busy,setBusy]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState(""),[tab,setTab]=useState("identity");
  const [decision,setDecision]=useState<Record<string,string>>({}),[reason,setReason]=useState<Record<string,string>>({}),[rationale,setRationale]=useState<Record<string,string>>({});
- const [reviewer,setReviewer]=useState<Record<string,string>>({}),[assessment,setAssessment]=useState<Record<string,string>>({});
+ const [reviewer,setReviewer]=useState<Record<string,string>>({}),[assessment]=useState<Record<string,string>>({});
  const [proposal,setProposal]=useState({candidateId:"",contributorUserId:"",contributionRole:"contributor",attributionShare:"100",rationale:""}),[evidenceFiles,setEvidenceFiles]=useState<File[]>([]);
  const [policy,setPolicy]=useState({sourceType:"offline_completed_project",rules:'{"enabled":true,"sourceEventCodes":["approve"],"sourceStatuses":["approved"],"parentStatuses":[],"attributionMode":"unattributed_until_evidenced","confidence":0,"requireContributorConfirmation":true,"defaultRole":null,"categoryMap":{"education":"education_skills","community_care":"community_care","digital_inclusion":"digital_inclusion","environment":"environment_sustainability","livelihoods":"livelihoods_economic_opportunity","accessibility":"accessibility_inclusion","other":"other_review_required"}}',rationale:""});
  const [approval,setApproval]=useState<Record<string,string>>({}),[activation,setActivation]=useState<Record<string,string>>({});

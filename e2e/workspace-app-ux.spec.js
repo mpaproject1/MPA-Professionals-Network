@@ -4,7 +4,7 @@ async function mockSignedInWorkspace(page) {
   await page.addInitScript(() => {
     window.sessionStorage.setItem("mpa-session-token", "e2e-workspace-session");
   });
-  await page.route("**/api/v1/**", async route => {
+  await page.route(/\/api\/v1\//, async route => {
     const url = new URL(route.request().url());
     const path = url.pathname;
     let data = {};
@@ -48,7 +48,7 @@ test.describe("MPA application workspace UX", () => {
     const more = desktop.getByRole("button", { name: "Open all signed-in destinations" });
     await more.focus();
     await expect(more).toBeFocused();
-    await page.keyboard.press("Enter");
+    await more.press("Enter");
     await expect(more).toHaveAttribute("aria-expanded", "true");
     const morePanel = page.locator("#desktop-more-menu");
     await expect(morePanel.getByRole("link", { name: "Membership" })).toBeVisible();

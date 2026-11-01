@@ -17,7 +17,7 @@ function present(row){
     actionUrl:safeInternalUrl(row.action_url),resourceType:row.resource_type,resourceId:row.resource_id,
     eventCode:row.event_code,createdAt:row.created_at,readAt:row.read_at,archivedAt:row.archived_at};
 }
-const NOTIFICATION_CATEGORIES=new Set(["membership","verification","opportunities","recruitment","organizations","mentorship","services","events_learning","community_impact","security","system"]);
+const NOTIFICATION_CATEGORIES=new Set(["membership","verification","opportunities","recruitment","organizations","mentorship","services","events_learning","community_impact","community_campaign","security","system"]);
 export function notificationCategoryFor(eventCode,resourceType,payload={}){
  const code=String(eventCode||"").toLowerCase(),type=String(resourceType||"").toLowerCase();
  if(code.startsWith("security.")||code.startsWith("security_")||type==="security_event"||type==="auth_session"||type==="one_time_session_link")return "security";

@@ -6,9 +6,10 @@ function fakeDb(preference={in_app_enabled:true,in_app_categories:{}}){
  const calls=[];
  return {calls,async query(sql,params=[]){
   calls.push({sql,params});
-  if(sql.startsWith("select coalesce(in_app_enabled"))return {rows:[preference]};
-  if(sql.includes("insert into notification_event"))return {rows:[{id:"notification-1"}]};
-  if(sql.includes("insert into notification_push_delivery"))return {rows:[],rowCount:0};
+  const normalized=sql.toLowerCase();
+  if(normalized.startsWith("select coalesce(in_app_enabled"))return {rows:[preference]};
+  if(normalized.includes("insert into notification_event"))return {rows:[{id:"notification-1"}]};
+  if(normalized.includes("insert into notification_push_delivery"))return {rows:[],rowCount:0};
   throw new Error(`Unexpected query in notification unit test: ${sql}`);
  }};
 }

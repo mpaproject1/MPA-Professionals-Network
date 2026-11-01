@@ -253,6 +253,52 @@ try {
     }
   }
   console.log("PASS: all manual-claim upload and evidence-removal CHECK constraints exist and are validated");
+
+  // Audit every declarative constraint created by the manual-claims migration:
+  // CHECK, FOREIGN KEY, PRIMARY KEY and UNIQUE constraints must all be present
+  // and validated. Partial unique indexes are checked separately below.
+  const manualClaimConstraintCounts = [
+    ["community_impact_claim",16,4,1,2],
+    ["community_impact_claim_consent",5,3,1,0],
+    ["community_impact_claim_evidence",8,4,1,1],
+    ["community_impact_claim_assignment",1,3,1,0],
+    ["community_impact_claim_decision",4,3,1,0],
+    ["community_impact_claim_appeal",5,6,1,1],
+    ["community_impact_claim_event",4,3,1,0],
+    ["private_upload_session",2,0,0,0]
+  ];
+  for (const [table,checks,foreignKeys,primaryKeys,uniqueConstraints] of manualClaimConstraintCounts) {
+    const result = await client.query(
+      "select contype, count(*)::int as count, bool_and(convalidated) as all_validated from pg_constraint where conrelid=$1::regclass and contype=any(array['c','f','p','u']) group by contype",
+      [`public.${table}`]
+    );
+    const counts = new Map(result.rows.map(row=>[row.contype,{count:row.count,validated:row.all_validated}]));
+    for (const [kind,expected] of [["c",checks],["f",foreignKeys],["p",primaryKeys],["u",uniqueConstraints]]) {
+      const actual=counts.get(kind);
+      if ((actual?.count||0)!==expected || (expected>0 && actual?.validated!==true)) {
+        throw new Error(`Manual-claims migration constraint audit failed for ${table}: expected ${expected} validated ${kind} constraints, found ${actual?.count||0}.`);
+      }
+    }
+  }
+  const manualClaimIndexes = [
+    "uq_community_impact_claim_evidence_url",
+    "uq_community_impact_claim_active_assignment",
+    "ix_community_impact_claim_owner",
+    "ix_community_impact_claim_queue",
+    "ix_community_impact_claim_evidence_claim",
+    "ix_community_impact_claim_reviewer",
+    "ix_community_impact_claim_decision_history",
+    "ix_community_impact_claim_appeal",
+    "ix_community_impact_claim_event_history",
+    "ix_private_upload_session_claim_purpose",
+    "ix_community_impact_claim_evidence_active",
+    "ix_community_impact_claim_consent_history"
+  ];
+  for (const name of manualClaimIndexes) {
+    const result=await client.query("select indexdef from pg_indexes where schemaname='public' and indexname=$1",[name]);
+    if(!result.rowCount) throw new Error(`Manual-claims migration index ${name} is missing.`);
+  }
+  console.log("PASS: all manual-claims CHECK, FOREIGN KEY, PRIMARY KEY, UNIQUE constraints and supporting indexes are present and validated");
   const postMigrationColumns = [
     ["network_plus_business","id","uuid"],
     ["network_plus_business","business_kind","text"],

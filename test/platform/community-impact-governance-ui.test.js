@@ -28,8 +28,14 @@ test("Administrator governance UI exposes identity, attribution, policy, COI, as
 });
 test("Disposable migration rehearsal includes the new migration and verifies rollback leaves no new governance objects",()=>{
  assert.match(migrationCheck,/20261101090000_community_impact_governance_completion\.sql/);
- assert.match(migrationCheck,/rollbackTables/);
- assert.match(migrationCheck,/rollbackTriggers/);
+ assert.match(migrationCheck,/communityImpactGovernanceTableNames/);
+ assert.match(migrationCheck,/communityImpactGovernanceTriggerNames/);
+ assert.match(migrationCheck,/governanceTableBaseline/);
+ assert.match(migrationCheck,/governanceTriggerBaseline/);
+ assert.match(migrationCheck,/scoreTableBaseline/);
+ assert.match(migrationCheck,/scoreTriggerBaseline/);
  assert.match(migrationCheck,/MIGRATION_CHECK_ALLOW_ROLLBACK/);
  assert.match(migrationCheck,/disposable test\/sandbox\/CI\/verification database/);
+ assert.match(migrationCheck,/Rollback rehearsal did not restore the pre-existing Community Impact governance table baseline exactly/);
+ assert.match(migrationCheck,/Rollback rehearsal did not restore the pre-existing Community Impact governance trigger baseline exactly/);
 });

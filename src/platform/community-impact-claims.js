@@ -1,9 +1,9 @@
 import {createHash,randomUUID} from "node:crypto";
 import {isIP} from "node:net";
-import {getPool,withTransaction} from "./db.js";
-import {createInAppNotification} from "./notifications.js";
-import {policyError} from "./identity-policy.js";
 import {assertClaimantIdentityAssured} from "./community-impact-governance.js";
+import {getPool,withTransaction} from "./db.js";
+import {policyError} from "./identity-policy.js";
+import {createInAppNotification} from "./notifications.js";
 
 const VISIBILITY=new Set(["private","member_visible","public_requested"]);
 const PUBLIC_CONSENT_VERSION="community-impact-public-profile-v1";

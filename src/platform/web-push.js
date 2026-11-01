@@ -173,7 +173,7 @@ export async function deliverCommunityCampaignPush(subscription,payload){
  if(!config)return {ok:false,retryable:false,code:"VAPID_NOT_CONFIGURED"};
  return deliverOne({endpoint:subscription.endpoint,p256dh:subscription.p256dh,auth_secret:subscription.auth_secret,notification_event_id:subscription.notification_event_id||"community-campaign",priority:"low",action_url:payload.url},config,{
   title:String(payload.title||"MPA · Community contribution").slice(0,100),
-  body:String(payload.body||"A new community contribution invitation is available.").slice(0,180),
+  body:String(payload.body||"A new community contribution invitation is available.").slice(0,3000),
   url:payload.url&&payload.url.startsWith("/")&&!payload.url.startsWith("//")?payload.url:"/notifications",
   notificationId:String(payload.notificationId||"community-campaign"),
   priority:"low"

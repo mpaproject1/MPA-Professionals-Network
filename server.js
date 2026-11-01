@@ -1,6 +1,6 @@
 import {randomUUID} from "node:crypto";
-import "./src/platform/load-env.js";
 import http from "node:http";
+import "./src/platform/load-env.js";
 import * as ethics from "./src/ethics/service.js";
 import * as membershipAdminBulk from "./src/membership/admin-bulk.js";
 import * as membershipCard from "./src/membership/card.js";

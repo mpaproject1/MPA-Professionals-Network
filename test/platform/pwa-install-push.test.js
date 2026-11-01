@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {createDecipheriv,createECDH,hkdfSync,randomBytes} from "node:crypto";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
-import {encryptWebPushPayload,validPushEndpoint} from "../../src/platform/web-push.js";
+import {encryptWebPushPayload,validPushEndpoint,getWebPushPublicConfiguration} from "../../src/platform/web-push.js";
 
 test("Web Push payload uses RFC 8291 aes128gcm framing and decrypts with the subscriber key",()=>{
  const client=createECDH("prime256v1");client.generateKeys();
@@ -14,10 +14,10 @@ test("Web Push payload uses RFC 8291 aes128gcm framing and decrypts with the sub
  assert.equal(recordSize,4096);
  assert.equal(keyLength,65);
  const shared=client.computeSecret(senderPublic);
- const info=Buffer.concat([Buffer.from("WebPush: info\0"),client.getPublicKey(),senderPublic]);
+ const info=Buffer.concat([Buffer.from("WebPush: info\\0"),client.getPublicKey(),senderPublic]);
  const ikm=Buffer.from(hkdfSync("sha256",shared,auth,info,32));
- const cek=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: aes128gcm\0"),16));
- const nonce=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: nonce\0"),12));
+ const cek=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: aes128gcm\\0"),16));
+ const nonce=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: nonce\\0"),12));
  const decipher=createDecipheriv("aes-128-gcm",cek,nonce);
  decipher.setAuthTag(ciphertext.subarray(-16));
  const clear=Buffer.concat([decipher.update(ciphertext.subarray(0,-16)),decipher.final()]);
@@ -25,9 +25,24 @@ test("Web Push payload uses RFC 8291 aes128gcm framing and decrypts with the sub
  assert.deepEqual(JSON.parse(clear.subarray(0,-1).toString("utf8")),input);
 });
 
+test("VAPID public configuration exposes only the matching public key",()=>{
+ const ecdh=createECDH("prime256v1");ecdh.generateKeys();
+ const prior={publicKey:process.env.WEB_PUSH_VAPID_PUBLIC_KEY,privateKey:process.env.WEB_PUSH_VAPID_PRIVATE_KEY,subject:process.env.WEB_PUSH_SUBJECT};
+ try{
+  process.env.WEB_PUSH_VAPID_PUBLIC_KEY=ecdh.getPublicKey().toString("base64url");
+  process.env.WEB_PUSH_VAPID_PRIVATE_KEY=ecdh.getPrivateKey().toString("base64url");
+  process.env.WEB_PUSH_SUBJECT="mailto:security@example.invalid";
+  assert.deepEqual(getWebPushPublicConfiguration(),{enabled:true,publicKey:ecdh.getPublicKey().toString("base64url")});
+ }finally{
+  if(prior.publicKey===undefined)delete process.env.WEB_PUSH_VAPID_PUBLIC_KEY;else process.env.WEB_PUSH_VAPID_PUBLIC_KEY=prior.publicKey;
+  if(prior.privateKey===undefined)delete process.env.WEB_PUSH_VAPID_PRIVATE_KEY;else process.env.WEB_PUSH_VAPID_PRIVATE_KEY=prior.privateKey;
+  if(prior.subject===undefined)delete process.env.WEB_PUSH_SUBJECT;else process.env.WEB_PUSH_SUBJECT=prior.subject;
+ }
+});
+
 test("push endpoint validation rejects insecure, local and non-provider endpoints",()=>{
- assert.equal(validPushEndpoint("https://fcm.googleapis.com/fcm/send/example")!==null,true);
- assert.equal(validPushEndpoint("https://updates.push.services.mozilla.com/wpush/v2/example")!==null,true);
+ assert.ok(validPushEndpoint("https://fcm.googleapis.com/fcm/send/example"));
+ assert.ok(validPushEndpoint("https://updates.push.services.mozilla.com/wpush/v2/example"));
  assert.equal(validPushEndpoint("http://fcm.googleapis.com/send/example"),null);
  assert.equal(validPushEndpoint("https://127.0.0.1/admin"),null);
  assert.equal(validPushEndpoint("https://localhost/push"),null);
@@ -47,12 +62,15 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.equal(config.display,"standalone");
  assert.equal(config.scope,"/");
  assert.ok(layout.includes('manifest:"/manifest.webmanifest"'));
- assert.match(shell,/serviceWorker\.register\("\/sw\.js"/);
+ assert.ok(shell.includes('serviceWorker.register("/sw.js"'));
  assert.ok(shell.includes('className="mobile-nav"'));
- assert.match(worker,/addEventListener\("push"/);
- assert.match(worker,/addEventListener\("notificationclick"/);
+ assert.ok(shell.includes('const mobilePrimaryHrefs=token?["/about","/jobs","/members","/learning"]'));
+ assert.ok(worker.includes('addEventListener("push"'));
+ assert.ok(worker.includes('addEventListener("notificationclick"'));
  assert.ok(worker.includes("Never intercept APIs"));
- assert.match(worker,/\/api\//);
+ assert.ok(worker.includes('"/api/"'));
+ assert.ok(checker.includes("pushTableBaseline"));
+ assert.ok(checker.includes("Web Push table baseline exactly"));
 });
 
 test("push migration is additive and delivery preferences require explicit opt-in",async()=>{
@@ -60,6 +78,6 @@ test("push migration is additive and delivery preferences require explicit opt-i
  assert.ok(migration.includes("CREATE TABLE IF NOT EXISTS notification_push_subscription"));
  assert.ok(migration.includes("CREATE TABLE IF NOT EXISTS notification_push_delivery"));
  assert.ok(migration.includes("ALTER COLUMN push_enabled SET DEFAULT false"));
- assert.match(migration,/UNIQUE\(notification_event_id,subscription_id\)/);
+ assert.ok(migration.includes("UNIQUE(notification_event_id,subscription_id)"));
  assert.doesNotMatch(migration,/DROP TABLE|TRUNCATE|DELETE FROM/i);
 });

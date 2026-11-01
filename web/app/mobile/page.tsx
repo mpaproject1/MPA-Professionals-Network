@@ -1,6 +1,6 @@
 "use client";
 
-import {ArrowRight,BookOpen,BriefcaseBusiness,Bell,Building2,GraduationCap,HeartHandshake,LayoutDashboard,ShieldCheck,UserRound} from "lucide-react";
+import {ArrowRight,Bell,BookOpen,BriefcaseBusiness,Building2,GraduationCap,HeartHandshake,LayoutDashboard,ShieldCheck,UserRound} from "lucide-react";
 import Link from "next/link";
 import {useEffect} from "react";
 import {useUiStore} from "../../lib/store";

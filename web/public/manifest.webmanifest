@@ -1,10 +1,10 @@
 {
-  "id": "/",
+  "id": "/mobile",
   "name": "MPA Professionals Network",
   "short_name": "MPA",
   "description": "Trusted professional network for Ethiopian Muslim professionals.",
   "lang": "en",
-  "start_url": "/",
+  "start_url": "/mobile",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

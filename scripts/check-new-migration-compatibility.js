@@ -218,6 +218,41 @@ try {
     await client.query(migration.sql);
     console.log(`PASS: ${migration.filename} applied inside rollback-only transaction`);
   }
+
+  // The manual-claims migration is replayed against an already-migrated schema.
+  // Verify that its three named CHECK constraints exist, are validated, and
+  // retain the intended invariants after the replay-safe drop/recreate.
+  const manualClaimChecks = [
+    ["private_upload_session","private_upload_session_purpose_scope_check"],
+    ["private_upload_session","private_upload_session_claim_retention_check"],
+    ["community_impact_claim_evidence","community_impact_claim_evidence_removal_check"]
+  ];
+  for (const [table,name] of manualClaimChecks) {
+    const result = await client.query(
+      "select pg_get_constraintdef(oid) as definition, convalidated from pg_constraint where conrelid=$1::regclass and conname=$2 and contype='c'",
+      [`public.${table}`,name]
+    );
+    if (!result.rows[0]?.convalidated) {
+      throw new Error(`Required validated CHECK constraint ${table}.${name} is missing or not validated.`);
+    }
+    const definition = result.rows[0].definition;
+    if (name === "private_upload_session_purpose_scope_check" &&
+        (!definition.includes("purpose") || !definition.includes("purpose_reference_id") ||
+         !definition.includes("community_impact_claim_evidence"))) {
+      throw new Error("Upload purpose scope constraint does not bind claim evidence uploads to a claim reference.");
+    }
+    if (name === "private_upload_session_claim_retention_check" &&
+        (!definition.includes("retention_policy_version_id") || !definition.includes("retention_rule_snapshot") ||
+         !definition.includes("community_impact_claim_evidence"))) {
+      throw new Error("Upload claim-retention constraint does not require a retention policy version and snapshot.");
+    }
+    if (name === "community_impact_claim_evidence_removal_check" &&
+        (!definition.includes("removed_at") || !definition.includes("removed_by") ||
+         !definition.includes("removal_reason"))) {
+      throw new Error("Evidence removal constraint does not require actor and reason metadata.");
+    }
+  }
+  console.log("PASS: all manual-claim upload and evidence-removal CHECK constraints exist and are validated");
   const postMigrationColumns = [
     ["network_plus_business","id","uuid"],
     ["network_plus_business","business_kind","text"],

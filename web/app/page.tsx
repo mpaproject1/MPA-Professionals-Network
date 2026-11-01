@@ -113,6 +113,7 @@ export default function Home() {
           >
             <Link href="/jobs" className={styles.primaryCta}>Browse the Job Portal <ArrowRight size={17} aria-hidden="true" /></Link>
             <Link href="/serve-community" className={styles.secondaryCta}>Explore Serve-Community</Link>
+            <Link href="/community-updates" className={styles.secondaryCta}>Get community invitations</Link>
           </motion.div>
           <div className={styles.trustSignals} aria-label="Network principles">
             <span><ShieldCheck size={16} aria-hidden="true" /> Evidence-led review</span>

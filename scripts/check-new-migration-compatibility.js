@@ -60,7 +60,8 @@ const migrationNames = [
   "20261101230000_community_impact_score_historical_dedup.sql",
   "20261101240000_community_impact_recognition_and_engagement.sql",
   "20261101250000_community_impact_recognition_program_governance.sql",
-  "20261101260000_community_impact_recognition_lifecycle_guards.sql"
+  "20261101260000_community_impact_recognition_lifecycle_guards.sql",
+  "20261101270000_community_impact_notification_category.sql"
 ];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [

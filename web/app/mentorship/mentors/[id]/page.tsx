@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeft, Bookmark, HeartHandshake, Languages, RefreshCw } from "lucide-react";
+import { ArrowLeft, Bookmark, HeartHandshake, Languages } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";

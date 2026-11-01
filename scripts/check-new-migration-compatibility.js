@@ -258,6 +258,7 @@ try {
   const scoreIndexBaseline = await client.query("select indexname,indexdef from pg_indexes where schemaname='public' and indexname=any($1::text[]) order by indexname",[scoreIndexNames]);
   const pushTableNames = ["notification_push_subscription","notification_push_delivery"];
   const pushTableBaseline = await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[]) order by table_name",[pushTableNames]);
+  const pushPreferenceDefaultBaseline=await client.query("select column_default from information_schema.columns where table_schema='public' and table_name='notification_preference' and column_name='push_enabled'");
 
   await client.query("begin");
   transactionOpen = true;
@@ -968,6 +969,8 @@ try {
   if(JSON.stringify(scoreTriggersAfterRollback.rows)!==JSON.stringify(scoreTriggerBaseline.rows))throw new Error("Rollback rehearsal did not restore the pre-existing unified score trigger baseline exactly.");
   const pushTablesAfterRollback = await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[]) order by table_name",[pushTableNames]);
   if(JSON.stringify(pushTablesAfterRollback.rows)!==JSON.stringify(pushTableBaseline.rows))throw new Error("Rollback rehearsal did not restore the pre-existing Web Push table baseline exactly.");
+  const pushPreferenceDefaultAfterRollback=await client.query("select column_default from information_schema.columns where table_schema='public' and table_name='notification_preference' and column_name='push_enabled'");
+  if(JSON.stringify(pushPreferenceDefaultAfterRollback.rows)!==JSON.stringify(pushPreferenceDefaultBaseline.rows))throw new Error("Rollback rehearsal did not restore the pre-existing notification push preference default exactly.");
   console.log("PASS: all listed migrations and post-migration assertions succeeded; rollback removed governance and unified score tables and their immutability triggers from the disposable transaction.");
   console.log("NOTE: this validates migration execution and existing column types/FK targets; it does not replace application-level integration tests.");
 } catch (error) {

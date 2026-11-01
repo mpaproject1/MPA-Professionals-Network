@@ -1510,3 +1510,4 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 @media(max-width:620px){.mpa-progressive-section{padding:9px}.mpa-progressive-section>summary{min-height:42px}.mpa-jobs-page .form-category input,.mpa-jobs-page .form-category select{width:100%}.mpa-mentorship-page input:not([type=checkbox]),.mpa-mentorship-page select,.mpa-mentorship-page textarea{width:100%;max-width:100%}}
 
 .desktop-more{position:relative;display:flex;align-items:center}.desktop-more-trigger:focus-visible,.desktop-more-panel a:focus-visible,.desktop-more-panel button:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 55%,transparent);outline-offset:2px}
+.mobile-nav--public{grid-template-columns:repeat(4,minmax(0,1fr))}.mobile-nav--signed-in{grid-template-columns:repeat(6,minmax(0,1fr))}

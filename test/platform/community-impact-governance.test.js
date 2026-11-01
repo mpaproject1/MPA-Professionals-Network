@@ -3,8 +3,9 @@ import {readFile} from "node:fs/promises";
 import test from "node:test";
 
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,service,claims,server,privateFiles]=await Promise.all([
+const [migration,forwardMigration,service,claims,server,privateFiles]=await Promise.all([
  read("../../db/migrations/20261101090000_community_impact_governance_completion.sql"),
+ read("../../db/migrations/20261102090000_community_impact_claim_candidate_one_to_one.sql"),
  read("../../src/platform/community-impact-governance.js"),
  read("../../src/platform/community-impact-claims.js"),
  read("../../server.js"),
@@ -30,7 +31,7 @@ test("Offline-project attribution is evidence-backed and does not infer the staf
  assert.match(service,/assignOfflineAttribution/);
  assert.match(service,/CONTRIBUTOR_CONFIRMATION_REQUIRED/);
  assert.match(service,/Combined contributor shares cannot exceed 100 percent/);
- assert.match(service,/select \\* from community_impact_detection_candidate where id=\\$1 and source_type='offline_completed_project'.*for update/s);
+ assert.match(service,/select \* from community_impact_detection_candidate where id=\$1 and source_type='offline_completed_project'.*for update/s);
  assert.match(service,/select coalesce\\(sum\\(attribution_share\\),0\\)::numeric total from community_impact_offline_attribution where candidate_id=\\$1/);
  assert.match(service,/community_impact.offline_attribution.review/);
 });
@@ -39,7 +40,7 @@ test("Claim-to-detection reconciliation is reviewer-controlled and rejects fuzzy
  assert.match(service,/no fuzzy or cross-person merge is allowed/i);
  assert.match(service,/attribution_status!=="confirmed"/);
  assert.match(migration,/unique\(claim_id\)/);
- assert.match(migration,/unique\(candidate_id\)/);
+ assert.match(forwardMigration,/unique\s*\(candidate_id\)/i);
 });
 test("Detection policies require separate proposer, approver and activator operations",()=>{
  assert.match(service,/proposeDetectionPolicy/);

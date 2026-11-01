@@ -56,9 +56,9 @@ test("PWA install shell registers service worker and exposes a standalone manife
 
 test("push migration is additive and delivery preferences require explicit opt-in",async()=>{
  const migration=await readFile(new URL("../../db/migrations/20261102110000_web_push_subscriptions_and_delivery.sql",import.meta.url),"utf8");
- assert.match(migration,/CREATE TABLE IF NOT EXISTS notification_push_subscription/);
- assert.match(migration,/CREATE TABLE IF NOT EXISTS notification_push_delivery/);
- assert.match(migration,/ALTER COLUMN push_enabled SET DEFAULT false/);
+ assert.ok(migration.includes("CREATE TABLE IF NOT EXISTS notification_push_subscription"));
+ assert.ok(migration.includes("CREATE TABLE IF NOT EXISTS notification_push_delivery"));
+ assert.ok(migration.includes("ALTER COLUMN push_enabled SET DEFAULT false"));
  assert.match(migration,/UNIQUE\(notification_event_id,subscription_id\)/);
  assert.doesNotMatch(migration,/DROP TABLE|TRUNCATE|DELETE FROM/i);
 });

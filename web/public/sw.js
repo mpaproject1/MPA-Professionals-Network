@@ -1,10 +1,11 @@
 /* MPA PWA foundation. Never cache API responses, authenticated pages, or user-specific data. */
 const CACHE_PREFIX = "mpa-pwa-";
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const STATIC_CACHE = `${CACHE_PREFIX}static-${CACHE_VERSION}`;
 const PRECACHE_URLS = [
   "/",
   "/manifest.webmanifest",
+  "/brand/mpa-pwa-icon.svg",
   "/brand/mpa-logo-light.svg",
   "/brand/mpa-logo-dark.svg",
   "/brand/mpa-favicon-light.svg",

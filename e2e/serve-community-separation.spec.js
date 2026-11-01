@@ -37,8 +37,9 @@ test.describe("Serve-Community approved initiative journey",()=>{
     owned.status="submitted";
     await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"submitted"}})});
   });
-  await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","owner-session"));
   await page.goto("/serve-community/manage");
+  await page.evaluate(()=>sessionStorage.setItem("mpa-session-token","owner-session"));
+  await page.reload();
   await expect(page.getByRole("heading",{name:"Create an initiative draft"})).toBeVisible();
   await page.getByRole("button",{name:"Reject optional"}).click();
   await page.getByLabel("Initiative title").fill("New community initiative proposal");

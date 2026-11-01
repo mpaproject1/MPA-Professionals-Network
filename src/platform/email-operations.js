@@ -4,6 +4,7 @@ import { classifyEmailDeliveryError, emailIdempotencyKey, emailRetryDelaySeconds
 import { renderBrandedEmail } from "./email-template.js";
 import { resendEmailVerification } from "./email-verification.js";
 import { createInAppNotification } from "./notifications.js";
+import { captureTestDelivery } from "./test-lab.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 async function requireAdmin(db,actorId){
@@ -93,6 +94,13 @@ export async function saveEmailDraft(actorId,input){
 async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,payload,providerMessageId=null,idempotencyKey=null}){
  htmlBody=renderBrandedEmail({subject,htmlBody,textBody,preheader:subject});
  const stableIdempotencyKey=emailIdempotencyKey(idempotencyKey);
+ if(process.env.TEST_LAB_ENABLED==="true"&&process.env.NODE_ENV==="production")fail(403,"Test Lab is forbidden in production; no email was sent.","TEST_LAB_PRODUCTION_BLOCKED");
+ if(process.env.TEST_DELIVERY_MODE==="capture"&&process.env.NODE_ENV==="production")fail(403,"Test delivery capture mode cannot run in production; no email was sent.","TEST_DELIVERY_PRODUCTION_BLOCKED");
+ if(process.env.TEST_LAB_ENABLED==="true"&&process.env.TEST_DELIVERY_MODE!=="capture")fail(503,"Test Lab requires TEST_DELIVERY_MODE=capture; no email was sent.","TEST_DELIVERY_CAPTURE_REQUIRED");
+ if(process.env.TEST_DELIVERY_MODE==="capture"&&process.env.NODE_ENV!=="production"){
+  await captureTestDelivery({channel:"email",recipient,eventCode:templateCode||"email",payload:{subject,textBody,htmlBody,payload}});
+  return {providerMessageId:"test-capture",provider:"test-capture",captured:true};
+ }
  const cfg=providerConfig();
  if(!cfg.ready)fail(503,"Email provider is not configured. Set PUBLIC_APP_URL and Resend or signed-webhook credentials in the server environment.","EMAIL_DELIVERY_NOT_CONFIGURED");
  if(cfg.provider==="resend"){
@@ -122,6 +130,15 @@ export async function queueEmailDraft(actorId,draftId,requestId){
 }
 export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=false}={}){
  const db=getPool();if(!system)await requireAdmin(db,actorId);
+ if(process.env.TEST_LAB_ENABLED==="true"&&process.env.NODE_ENV==="production")fail(403,"Test Lab is forbidden in production; no email was sent.","TEST_LAB_PRODUCTION_BLOCKED");
+ if(process.env.TEST_DELIVERY_MODE==="capture"&&process.env.NODE_ENV==="production")fail(403,"Test delivery capture mode cannot run in production; no email was sent.","TEST_DELIVERY_PRODUCTION_BLOCKED");
+ if(process.env.TEST_LAB_ENABLED==="true"&&process.env.TEST_DELIVERY_MODE!=="capture"&&process.env.NODE_ENV!=="production")fail(503,"Test Lab is enabled but outbound delivery is not safely configured. Set TEST_DELIVERY_MODE=capture; no email was sent.","TEST_DELIVERY_CAPTURE_REQUIRED");
+ if(process.env.TEST_DELIVERY_MODE==="capture"&&process.env.NODE_ENV!=="production"){
+  const batch=Math.min(Math.max(Number(limit)||20,1),50);
+  const rows=(await db.query("select id,recipient,template_code,payload from notification_outbox where channel='email' and status in ('pending','failed') and ($1::uuid is null or id=$1::uuid) order by created_at limit $2",[onlyId,batch])).rows;
+  for(const row of rows){await captureTestDelivery({channel:"email",recipient:row.recipient,eventCode:row.template_code,payload:{outboxId:row.id,payload:row.payload}});await db.query("update notification_outbox set status='sent',delivery_status='sent',sent_at=now(),provider_message_id='test-capture',last_error=null,locked_at=null,updated_at=now() where id=$1",[row.id]);}
+  return {processed:rows.length,results:rows.map(row=>({id:row.id,status:"captured"})),mode:"capture"};
+ }
  if(!providerConfig().ready)fail(503,"Email provider is not configured. Set server-side email credentials first.","EMAIL_DELIVERY_NOT_CONFIGURED");
  const batch=Math.min(Math.max(Number(limit)||20,1),50);
  const claimed=await withTransaction(async tx=>{

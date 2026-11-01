@@ -42,6 +42,7 @@ import * as serveCommunityInitiatives from "./src/platform/serve-community-initi
 import * as serveCommunityOfflineProjects from "./src/platform/serve-community-offline-projects.js";
 import * as stakeholderOutcomes from "./src/platform/stakeholder-outcomes.js";
 import * as supportBot from "./src/platform/support-bot.js";
+import * as testLab from "./src/platform/test-lab.js";
 import * as userAdmin from "./src/platform/user-admin.js";
 import * as volunteerPledges from "./src/platform/volunteer-pledges.js";
 import {disablePushForUser, getPushSubscriptionStatus, getWebPushPublicConfiguration, registerPushSubscription, removePushSubscription} from "./src/platform/web-push.js";
@@ -152,6 +153,11 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && req.url==="/readyz") return ok(res,{status:"ready",databaseConfigured:Boolean(config.databaseUrl)},requestId);
     const parts=pathParts(req.url);
     const p=parts.join("/");
+    if(p==="api/v1/admin/test-lab" && req.method==="GET"){const identity=await auth(req);anyRole(identity,["system_admin"]);return ok(res,{configuration:testLab.testLabConfiguration(),portfolios:await testLab.listTestPortfolios(identity)},requestId);}
+    if(p==="api/v1/admin/test-lab" && req.method==="POST"){const identity=await auth(req);anyRole(identity,["system_admin"]);if(testLab.testLabConfiguration().deliveryMode!=="capture")throw Object.assign(new Error("Set TEST_DELIVERY_MODE=capture before creating test portfolios. No outbound email, push or payment calls are permitted."),{statusCode:503,code:"TEST_DELIVERY_CAPTURE_REQUIRED"});return ok(res,await testLab.createTestPortfolio(identity,await body(req),requestId),requestId,201);}
+    if(parts.length===6 && p.startsWith("api/v1/admin/test-lab/") && parts[5]==="credentials.xlsx" && req.method==="GET"){const identity=await auth(req);anyRole(identity,["system_admin"]);const file=await testLab.exportTestPortfolioAccounts(identity,parts[4]);res.writeHead(200,{"content-type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":'attachment; filename="'+file.filename+'"',"cache-control":"no-store, private, max-age=0","pragma":"no-cache","expires":"0","x-request-id":requestId});return res.end(file.buffer);}
+    if(parts.length===6 && p.startsWith("api/v1/admin/test-lab/") && parts[5]==="reset-preview" && req.method==="GET"){const identity=await auth(req);anyRole(identity,["system_admin"]);return ok(res,await testLab.previewTestPortfolioReset(identity,parts[4]),requestId);}
+    if(parts.length===5 && p.startsWith("api/v1/admin/test-lab/") && req.method==="DELETE"){const identity=await auth(req);anyRole(identity,["system_admin"]);return ok(res,await testLab.resetTestPortfolio(identity,parts[4],await body(req),requestId),requestId);}
     if(req.method==="POST" && p==="api/v1/public/community-campaigns/opt-in") { await enforcePersistentRateLimit(req,"community-campaign-opt-in",10,3600000); return ok(res,await communityCampaigns.createPublicCampaignOptIn(await body(req)),requestId,201); }
     if(req.method==="POST" && p==="api/v1/public/community-campaigns/manage") { await enforcePersistentRateLimit(req,"community-campaign-manage",20,3600000); const b=await body(req); return ok(res,await communityCampaigns.managePublicCampaignOptIn(b.manageToken,b.enabled===true),requestId); }
     if(req.method==="POST" && p==="api/v1/payments/chapa/webhook") { const raw=await rawBody(req,1024*1024); return ok(res,await membership.handleChapaMembershipWebhook(raw,String(req.headers["x-chapa-signature"]||""),requestId),requestId); }
@@ -917,14 +923,16 @@ const membershipExpiryTimer=setInterval(()=>void runMembershipExpiry(),60*60*100
 membershipExpiryTimer.unref();
 // Bounded, unref'd dispatcher. Row-level locking in the outbox service coordinates multiple instances.
 let emailWorkerRunning=false;
+const testLabExpiryTimer=setInterval(async()=>{ try{const result=await testLab.expireTestPortfolioAccounts();if(result.expired)logger.info("test_lab.accounts.expired",{expired:result.expired});}catch(error){logger.warn("test_lab.expiry.failed",{code:error.code||"TEST_LAB_EXPIRY_FAILED"});} },10*60*1000);
+testLabExpiryTimer.unref();
 const emailWorkerTimer=setInterval(async()=>{
   if(emailWorkerRunning)return;
   emailWorkerRunning=true;
-  try { const result=await emailOperations.dispatchPendingSystemEmail(); if(result.processed)logger.info("email.outbox.dispatched",{processed:result.processed}); }
+  try { const result=process.env.TEST_DELIVERY_MODE==="capture"&&config.nodeEnv!=="production"?await emailOperations.dispatchEmailOutbox(null,{limit:20,system:true}):await emailOperations.dispatchPendingSystemEmail(); if(result.processed)logger.info("email.outbox.dispatched",{processed:result.processed,mode:result.mode||"provider"}); }
   catch(error){ logger.warn("email.outbox.dispatch_failed",{error:error.message,code:error.code||"EMAIL_DISPATCH_FAILED"}); }
   finally { emailWorkerRunning=false; }
 },30000);
 emailWorkerTimer.unref();
-server.listen(config.port,config.host,async()=>{ try { await bootstrapAdmin(); void runMembershipExpiry(); logger.info("server.started",{host:config.host,port:config.port,environment:config.nodeEnv,bootstrapAdmin:Boolean(config.bootstrapAdminEmail)}); } catch(error){ logger.error("bootstrap.admin.failed",{error:error.message}); if(config.nodeEnv==="production") process.exitCode=1; } });
+server.listen(config.port,config.host,async()=>{ try { await bootstrapAdmin(); void runMembershipExpiry(); void testLab.expireTestPortfolioAccounts(); logger.info("server.started",{host:config.host,port:config.port,environment:config.nodeEnv,bootstrapAdmin:Boolean(config.bootstrapAdminEmail)}); } catch(error){ logger.error("bootstrap.admin.failed",{error:error.message}); if(config.nodeEnv==="production") process.exitCode=1; } });
 export { server };
 

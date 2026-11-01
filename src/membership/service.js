@@ -751,6 +751,7 @@ export async function attachApplicationFile(applicationId,userId,input,requestId
 }
 
 function chapaConfig(){
+  if(process.env.TEST_DELIVERY_MODE==="capture"||process.env.TEST_LAB_ENABLED==="true")throw httpError(503,"Hosted payment provider calls are disabled in Test Lab. Use simulated test transactions; no live provider request was sent.","TEST_PAYMENT_CAPTURE_ONLY");
   const mode=String(process.env.CHAPA_EXPECTED_MODE||"test").trim().toLowerCase(),secret=String(process.env.CHAPA_SECRET_KEY||"").trim(),webhookSecret=String(process.env.CHAPA_WEBHOOK_SECRET||"").trim();
   if(!["test","live"].includes(mode))throw httpError(503,"CHAPA_EXPECTED_MODE must be test or live.","CHAPA_CONFIGURATION_INVALID");
   if(!secret)throw httpError(503,"Chapa checkout is not configured.","CHAPA_NOT_CONFIGURED");

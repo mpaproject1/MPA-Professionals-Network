@@ -31,6 +31,7 @@ const destinations: Destination[] = [
   { href: "/admin/referrals", label: "Member referrals", description: "Review employment referrals and govern referral recognition", icon: Users },
   { href: "/organizations", label: "Organizations", description: "Verification, evidence and partner workspace", icon: Building2 },
   { href: "/admin/reports", label: "Reports", description: "Reporting and exports", icon: FileBarChart },
+  { href: "/admin/test-lab", label: "Development Test Lab", description: "Create disposable test portfolios, export temporary credentials and safely reset test data", icon: ClipboardList },
   { href: "/admin/email", label: "Email operations", description: "Queues, templates and delivery", icon: Mail },
   { href: "/admin/security", label: "Admin security", description: "Passkeys and recovery", icon: Fingerprint },
   { href: "/admin/support", label: "Support", description: "Inquiries and knowledge base", icon: MessageSquareText },
@@ -81,8 +82,9 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     const financeConfig = Boolean(financeOfficer || permissions.includes("finance.manage"));
     const supportStaff = Boolean(roles?.includes("supporting_staff"));
     const offlineProjectAccess = Boolean(supportStaff || permissions.includes("serve_community.projects.manage"));
-    if (platformAdmin) return destinations.filter((item) => (item.href !== "/admin/community-impact/retention-policy" || roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.retention.manage", "community_impact.retention.approve"].includes(permission))) && (item.href !== "/admin/community-impact/claims" || roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.claim.review", "community_impact.claim.assign", "community_impact.claim.appeal_review"].includes(permission))) && (item.href !== "/admin/referrals" || roles?.some((role) => ["system_admin","admin","supporting_staff"].includes(role)) === true || permissions.includes("referral.manage")));
+    if (platformAdmin) return destinations.filter((item) => (item.href !== "/admin/test-lab" || roles?.includes("system_admin") === true) && (item.href !== "/admin/community-impact/retention-policy" || roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.retention.manage", "community_impact.retention.approve"].includes(permission))) && (item.href !== "/admin/community-impact/claims" || roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.claim.review", "community_impact.claim.assign", "community_impact.claim.appeal_review"].includes(permission))) && (item.href !== "/admin/referrals" || roles?.some((role) => ["system_admin","admin","supporting_staff"].includes(role)) === true || permissions.includes("referral.manage")));
     return destinations.filter((item) => {
+      if (item.href === "/admin/test-lab") return roles?.includes("system_admin") === true;
       if (["/admin/accounts", "/admin/account-governance", "/admin/experience", "/admin/members", "/admin/members/catalog", "/admin/membership-card", "/admin/reference-portfolio"].includes(item.href)) return false;
       if (item.href === "/admin/membership") return membershipReviewer;
       if (item.href === "/admin/finance") return financeAccess;

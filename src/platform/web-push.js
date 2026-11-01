@@ -129,6 +129,18 @@ async function deliverOne(row,config,customPayload=null){
  }catch(error){return {ok:false,retryable:true,code:error?.name==="TimeoutError"?"PUSH_TIMEOUT":"PUSH_NETWORK_ERROR"};}
 }
 export async function dispatchPendingPushNotifications(limit=50){
+ if(process.env.TEST_LAB_ENABLED==="true"&&process.env.NODE_ENV==="production")return {sent:0,failed:0,skipped:true,reason:"TEST_LAB_PRODUCTION_BLOCKED"};
+ if(process.env.TEST_DELIVERY_MODE==="capture"&&process.env.NODE_ENV==="production")return {sent:0,failed:0,skipped:true,reason:"TEST_DELIVERY_PRODUCTION_BLOCKED"};
+ if(process.env.TEST_LAB_ENABLED==="true"&&process.env.TEST_DELIVERY_MODE!=="capture"&&process.env.NODE_ENV!=="production")return {sent:0,failed:0,skipped:true,reason:"TEST_DELIVERY_CAPTURE_REQUIRED"};
+ if(process.env.TEST_DELIVERY_MODE==="capture"&&process.env.NODE_ENV!=="production"){
+  const db=getPool(),batch=Math.min(Math.max(Number(limit)||50,1),200);
+  const rows=(await db.query(`select d.id,d.notification_event_id,s.user_id,n.title,n.body,n.category,n.action_url
+   from notification_push_delivery d join notification_push_subscription s on s.id=d.subscription_id
+   join notification_event n on n.id=d.notification_event_id and n.user_id=s.user_id
+   where d.status='pending' order by d.created_at,d.id limit $1`,[batch])).rows;
+  for(const row of rows){const portfolio=(await db.query("select portfolio_id from test_portfolio_account where user_id=$1 limit 1",[row.user_id])).rows[0]?.portfolio_id||null;await captureTestDelivery({channel:"push",eventCode:row.category||"notification",payload:{notificationId:row.notification_event_id,title:row.title,body:row.body,actionUrl:row.action_url},portfolioId:portfolio});await db.query("update notification_push_delivery set status='sent',delivered_at=now(),last_error_code='TEST_CAPTURED',updated_at=now() where id=$1",[row.id]);}
+  return {sent:rows.length,failed:0,skipped:false,mode:"capture",captured:rows.length};
+ }
  const config=vapidConfig();if(!config)return {sent:0,failed:0,skipped:true,reason:"VAPID_NOT_CONFIGURED"};
  const db=getPool(),batch=Math.min(Math.max(Number(limit)||50,1),200);
  await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_EXPIRED',updated_at=now() WHERE status IN ('pending','sending') AND created_at<now()-interval '7 days'");
@@ -170,6 +182,14 @@ export async function dispatchPendingPushNotifications(limit=50){
 }
 
 export async function deliverCommunityCampaignPush(subscription,payload){
+ if(process.env.TEST_LAB_ENABLED==="true"&&process.env.NODE_ENV==="production")return {ok:false,retryable:false,code:"TEST_LAB_PRODUCTION_BLOCKED"};
+ if(process.env.TEST_LAB_ENABLED==="true"&&process.env.TEST_DELIVERY_MODE!=="capture")return {ok:false,retryable:false,code:"TEST_DELIVERY_CAPTURE_REQUIRED"};
+ if(process.env.TEST_DELIVERY_MODE==="capture"&&process.env.NODE_ENV!=="production"){
+  const userId=subscription.user_id||subscription.userId||null;
+  const portfolioId=userId?(await getPool().query("select portfolio_id from test_portfolio_account where user_id=$1 limit 1",[userId])).rows[0]?.portfolio_id||null:null;
+  await captureTestDelivery({channel:"push",eventCode:"community_campaign",payload:{title:payload.title,body:payload.body,url:payload.url},portfolioId});
+  return {ok:true,status:202,captured:true};
+ }
  const config=vapidConfig();
  if(!config)return {ok:false,retryable:false,code:"VAPID_NOT_CONFIGURED"};
  return deliverOne({endpoint:subscription.endpoint,p256dh:subscription.p256dh,auth_secret:subscription.auth_secret,notification_event_id:subscription.notification_event_id||"community-campaign",priority:"low",action_url:payload.url},config,{

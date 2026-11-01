@@ -52,7 +52,7 @@ test("push endpoint validation rejects insecure, local and non-provider endpoint
 });
 
 test("PWA install shell registers service worker and exposes a standalone manifest",async()=>{
- const [layout,shell,manifest,worker,checker,api,notifications,pushUi,appleIcon]=await Promise.all([
+ const [layout,shell,manifest,worker,checker,api,notifications,pushUi,appleIcon,mobilePage]=await Promise.all([
   readFile(new URL("../../web/app/layout.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/components/shell.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/public/manifest.webmanifest",import.meta.url),"utf8"),
@@ -61,7 +61,8 @@ test("PWA install shell registers service worker and exposes a standalone manife
   readFile(new URL("../../server.js",import.meta.url),"utf8"),
   readFile(new URL("../../src/platform/notifications.js",import.meta.url),"utf8"),
   readFile(new URL("../../web/components/push-notification-settings.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../../web/public/brand/apple-touch-icon.png",import.meta.url))
+  readFile(new URL("../../web/public/brand/apple-touch-icon.png",import.meta.url)),
+  readFile(new URL("../../web/app/mobile/page.tsx",import.meta.url),"utf8")
  ]);
  const config=JSON.parse(manifest);
  assert.equal(config.display,"standalone");
@@ -73,7 +74,12 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.equal(appleIcon.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
  assert.ok(shell.includes('serviceWorker.register("/sw.js"'));
  assert.ok(shell.includes('className="mobile-nav"'));
- assert.ok(shell.includes('const mobilePrimaryHrefs=token?["/about","/jobs","/members","/learning"]'));
+ assert.ok(mobilePage.includes("Your MPA, in your pocket."));
+ assert.ok(mobilePage.includes('href:"/mentorship"'));
+ assert.ok(mobilePage.includes('href:"/notifications"'));
+ assert.ok(shell.includes('const mobilePrimaryHrefs=token?["/jobs","/members","/learning"]'));
+ assert.ok(shell.includes('const mobileHomeNav:NavItem=["/mobile","Home",Home]'));
+ assert.equal(config.start_url,"/mobile");
  assert.ok(worker.includes('addEventListener("push"'));
  assert.ok(worker.includes('addEventListener("notificationclick"'));
  assert.ok(worker.includes("Never intercept APIs"));

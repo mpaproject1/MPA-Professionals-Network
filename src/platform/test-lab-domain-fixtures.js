@@ -62,7 +62,7 @@ export async function seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,
   [organization.id,members[1].userId]
  )).rows[0];
  await tx.query(
-  "insert into job_application(job_id,applicant_user_id,status,cover_letter,profile_snapshot,eligibility_snapshot,submitted_at) values($1,$2,'submitted','Synthetic QA application. No real employment application is made.',$3,$4,now())",
+  "insert into job_application(job_id,applicant_user_id,status,cover_letter,profile_snapshot,eligibility_snapshot,submitted_at) values($1,$2,'draft','Synthetic QA application draft. No real employment application is made.',$3,$4,null)",
   [job.id,members[0].userId,{synthetic:true},{synthetic:true,eligible:true}]
  );
 
@@ -71,7 +71,7 @@ export async function seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,
   [members[3].userId]
  )).rows[0];
  await tx.query(
-  "insert into service_request(service_listing_id,requester_user_id,provider_user_id,status,message) values($1,$2,$3,'requested','Synthetic QA service request; no real service is being commissioned.')",
+  "insert into service_request(service_listing_id,requester_user_id,provider_user_id,status,message) values($1,$2,$3,'draft','Synthetic QA service request draft; no real service is being commissioned.')",
   [service.id,members[0].userId,members[3].userId]
  );
 

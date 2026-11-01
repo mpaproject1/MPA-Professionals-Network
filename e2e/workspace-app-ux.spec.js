@@ -49,7 +49,9 @@ test.describe("MPA application workspace UX", () => {
     await more.focus();
     await expect(more).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(desktop.getByRole("link", { name: "Membership" })).toBeVisible();
+    await expect(more).toHaveAttribute("aria-expanded", "true");
+    const morePanel = page.locator("#desktop-more-menu");
+    await expect(morePanel.getByRole("link", { name: "Membership" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(more).toHaveAttribute("aria-expanded", "false");
 
@@ -90,7 +92,7 @@ test.describe("MPA application workspace UX", () => {
     await themeToggle.click();
     await expect.poll(() => page.locator("html").evaluate(node => node.classList.contains("dark"))).toBe(false);
     await page.emulateMedia({ reducedMotion: "reduce" });
-    const card = page.locator(".mpa-members-workspace .card").first();
+    const card = page.locator(".mpa-members-workspace section.card").first();
     await expect(card).toBeVisible();
     expect(await card.evaluate(node => getComputedStyle(node).transitionDuration)).toBe("0s");
   });

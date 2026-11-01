@@ -308,7 +308,6 @@ export default function Mentorship(){
        <label>Maximum active mentees<input type="number" min="1" max="50" value={mentorForm.maxActiveMentees} onChange={e=>setMentorForm(f=>({...f,maxActiveMentees:e.target.value}))}/></label>
        <label className="row" style={{gap:8,alignItems:"start"}}><input type="checkbox" checked={mentorForm.circleEnabled} onChange={e=>setMentorForm(f=>({...f,circleEnabled:e.target.checked}))}/><span>Enable an optional mentor circle. Participants may join or leave; you see only the aggregate active count, not a participant list.</span></label>
        {mentorForm.circleEnabled&&<label>Circle name (optional)<input maxLength={120} value={mentorForm.circleName} onChange={e=>setMentorForm(f=>({...f,circleName:e.target.value}))} placeholder="e.g. Leadership learning circle"/></label>}
-       <button className="btn btn-primary" type="submit" disabled={mentorSaving}>{mentorSaving?"Saving…":ownMentorProfile?"Save mentor profile":"Create mentor profile"}</button>
        </fieldset></details><button className="btn btn-primary" type="submit" disabled={mentorSaving}>{mentorSaving?"Saving…":ownMentorProfile?"Save mentor profile":"Create mentor profile"}</button>
      </form>
      {ownMentorProfile&&<div className="grid" style={{gap:10,marginTop:16}}>

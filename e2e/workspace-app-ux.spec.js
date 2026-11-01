@@ -43,7 +43,7 @@ test.describe("MPA application workspace UX", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/members");
     const desktop = page.getByRole("navigation", { name: "Main navigation" });
-    await expect(desktop.getByRole("link", { name: "Jobs" })).toBeVisible();
+    await expect(desktop.getByRole("link", { name: "Job Portal" })).toBeVisible();
     await expect(desktop.getByRole("link", { name: "Mentorship" })).toBeVisible();
     const more = desktop.getByRole("button", { name: "Open all signed-in destinations" });
     await more.focus();
@@ -70,6 +70,9 @@ test.describe("MPA application workspace UX", () => {
     await expect(page.getByRole("group", { name: "Find opportunities" })).toBeVisible();
     const refine = page.getByText(/Refine results/);
     await expect(refine).toBeVisible();
+    await refine.click();
+    await expect(page.getByLabel("Location")).toBeVisible();
+    await expect(page.getByLabel("Employment type")).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByRole("heading", { name: "Find your next professional opportunity." })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

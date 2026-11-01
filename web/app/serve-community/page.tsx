@@ -1,5 +1,5 @@
 "use client";
-import {ArrowRight,BookOpen,CheckCircle2,Clock3,Compass,Filter,FolderOpen,FilePlus2,ClipboardCheck,HeartHandshake,Leaf,MapPin,Search,ShieldCheck,Users,X} from "lucide-react";
+import {ArrowRight,Clock3,Compass,Filter,FilePlus2,ClipboardCheck,HeartHandshake,MapPin,Search,ShieldCheck,Users,X} from "lucide-react";
 import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
 import {SupportAction} from "../../components/support-action";

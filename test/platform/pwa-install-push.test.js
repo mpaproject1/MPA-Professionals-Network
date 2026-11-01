@@ -75,7 +75,7 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.ok(layout.includes('apple-touch-icon.png'));
  assert.equal(appleIcon.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
  assert.ok(shell.includes('serviceWorker.register("/sw.js"'));
- assert.ok(shell.includes('className="mobile-nav"'));
+ assert.match(shell,/className=\{token\?"mobile-nav mobile-nav--signed-in":"mobile-nav mobile-nav--public"\}/);
  assert.ok(mobilePage.includes("Your MPA, in your pocket."));
  assert.ok(mobilePage.includes('href:"/mentorship"'));
  assert.ok(mobilePage.includes('href:"/notifications"'));

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,service,server,privateFiles,compatibility,claimPage,reviewPage,adminWorkspace,retentionMigration,uploadHelper]=await Promise.all([
+const [migration,service,server,privateFiles,compatibility,claimPage,reviewPage,adminWorkspace,retentionMigration,uploadHelper,taxonomyMigration,referenceService,referenceAdmin]=await Promise.all([
  read("../../db/migrations/20261031180000_community_impact_manual_claims.sql"),
  read("../../src/platform/community-impact-claims.js"),
  read("../../server.js"),
@@ -12,7 +12,10 @@ const [migration,service,server,privateFiles,compatibility,claimPage,reviewPage,
  read("../../web/app/admin/community-impact/claims/page.tsx"),
  read("../../web/app/admin/admin-workspace.tsx"),
  read("../../db/migrations/20261031170000_community_impact_retention_policy.sql"),
- read("../../web/lib/private-upload.ts")
+ read("../../web/lib/private-upload.ts"),
+ read("../../db/migrations/20261101280000_community_impact_governed_taxonomies.sql"),
+ read("../../src/platform/reference-portfolio.js"),
+ read("../../web/app/admin/reference-portfolio/page.tsx")
 ]);
 test("Increment 3 creates separate private claim, evidence, assignment, decision, appeal and event records",()=>{
  for(const table of ["community_impact_claim","community_impact_claim_evidence","community_impact_claim_assignment","community_impact_claim_decision","community_impact_claim_appeal","community_impact_claim_event"])assert.match(migration,new RegExp("create table if not exists "+table,"i"));
@@ -92,7 +95,7 @@ test("claim and appeal APIs authenticate every operation",()=>{
 });
 test("member and reviewer screens preserve private-by-default evidence boundaries",()=>{
  assert.match(claimPage,/private draft/i);
- assert.match(claimPage,/mentorship_knowledge_sharing/);
+ assert.match(claimPage,/community_impact_contribution_categories/);
  assert.match(claimPage,/sustainedImpactSummary/);
  assert.match(claimPage,/beneficiaryCountMethod/);
  assert.match(claimPage,/External evidence URL/);
@@ -107,6 +110,22 @@ test("member and reviewer screens preserve private-by-default evidence boundarie
  assert.match(reviewPage,/Overturn original decision/);
  assert.match(reviewPage,/Open private evidence link/);
  assert.match(adminWorkspace,/Impact claim review/);
+});
+test("Community Impact contribution taxonomies are editable through the versioned Reference Portfolio engine",()=>{
+ for(const key of ["community_impact_contribution_categories","community_impact_contribution_types","community_impact_contributor_roles","community_impact_evidence_types"])assert.match(taxonomyMigration,new RegExp(key));
+ assert.match(taxonomyMigration,/initial-governed-baseline/);
+ assert.match(referenceService,/community_impact_%/);
+ assert.match(referenceService,/reference_dataset_version v/);
+ assert.match(service,/publishedTaxonomyCode/);
+ assert.match(service,/community_impact_contribution_categories/);
+ assert.match(service,/community_impact_contribution_types/);
+ assert.match(service,/community_impact_contributor_roles/);
+ assert.match(service,/community_impact_evidence_types/);
+ assert.doesNotMatch(service,/const CATEGORIES=new Set/);
+ assert.doesNotMatch(service,/const TYPES=new Set/);
+ assert.match(claimPage,/api\/v1\/professional-reference-data/);
+ assert.match(claimPage,/community_impact_contribution_categories/);
+ assert.match(referenceAdmin,/Reference Portfolio/);
 });
 test("retention migration has valid hash constraint and immutable policy version fields",()=>{
  assert.match(retentionMigration,/policy_hash text not null check\(policy_hash ~ '\^\[a-f0-9\]\{64\}\$'\)/);

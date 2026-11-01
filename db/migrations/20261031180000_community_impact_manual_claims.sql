@@ -61,6 +61,24 @@ create table if not exists community_impact_claim_consent (
  retention_rule_snapshot jsonb not null check(jsonb_typeof(retention_rule_snapshot)='object'),
  created_at timestamptz not null default now()
 );
+create table if not exists community_impact_claim_evidence (
+ id uuid primary key default gen_random_uuid(),
+ claim_id uuid not null references community_impact_claim(id) on delete restrict,
+ file_object_id uuid unique references file_object(id) on delete restrict,
+ evidence_type text not null check(evidence_type in('document','image','video','url','attestation','metric_source','other')),
+ evidence_url text check(evidence_url is null or length(evidence_url) between 12 and 2048),
+ label text not null check(length(trim(label)) between 3 and 120),
+ description text not null check(length(trim(description)) between 8 and 800),
+ source_date date,
+ uploaded_by uuid not null references app_user(id) on delete restrict,
+ retention_policy_version_id uuid not null references community_impact_retention_policy_version(id) on delete restrict,
+ retention_rule_snapshot jsonb not null check(jsonb_typeof(retention_rule_snapshot)='object'),
+ created_at timestamptz not null default now(),
+ check((file_object_id is not null and evidence_url is null) or (file_object_id is null and evidence_url is not null)),
+ check((evidence_type in('video','url') and evidence_url is not null) or (evidence_type not in('video','url') and file_object_id is not null))
+);
+create unique index if not exists uq_community_impact_claim_evidence_url on community_impact_claim_evidence(claim_id,evidence_url) where evidence_url is not null;
+create index if not exists ix_community_impact_claim_evidence_claim on community_impact_claim_evidence(claim_id,created_at);
 create table if not exists community_impact_claim_assignment (
  id uuid primary key default gen_random_uuid(),
  claim_id uuid not null references community_impact_claim(id) on delete restrict,
@@ -247,24 +265,6 @@ create or replace function community_impact_claim_consent_immutable() returns tr
 begin raise exception 'Community Impact consent history is immutable'; end; $ci$;
 drop trigger if exists trg_community_impact_claim_consent_immutable on community_impact_claim_consent;
 create trigger trg_community_impact_claim_consent_immutable before update or delete on community_impact_claim_consent for each row execute function community_impact_claim_consent_immutable();
-create table if not exists community_impact_claim_evidence (
- id uuid primary key default gen_random_uuid(),
- claim_id uuid not null references community_impact_claim(id) on delete restrict,
- file_object_id uuid unique references file_object(id) on delete restrict,
- evidence_type text not null check(evidence_type in('document','image','video','url','attestation','metric_source','other')),
- evidence_url text check(evidence_url is null or length(evidence_url) between 12 and 2048),
- label text not null check(length(trim(label)) between 3 and 120),
- description text not null check(length(trim(description)) between 8 and 800),
- source_date date,
- uploaded_by uuid not null references app_user(id) on delete restrict,
- retention_policy_version_id uuid not null references community_impact_retention_policy_version(id) on delete restrict,
- retention_rule_snapshot jsonb not null check(jsonb_typeof(retention_rule_snapshot)='object'),
- created_at timestamptz not null default now(),
- check((file_object_id is not null and evidence_url is null) or (file_object_id is null and evidence_url is not null)),
- check((evidence_type in('video','url') and evidence_url is not null) or (evidence_type not in('video','url') and file_object_id is not null))
-);
-create unique index if not exists uq_community_impact_claim_evidence_url on community_impact_claim_evidence(claim_id,evidence_url) where evidence_url is not null;
-create index if not exists ix_community_impact_claim_evidence_claim on community_impact_claim_evidence(claim_id,created_at);
 create table if not exists community_impact_claim_assignment (
  id uuid primary key default gen_random_uuid(),
  claim_id uuid not null references community_impact_claim(id) on delete restrict,

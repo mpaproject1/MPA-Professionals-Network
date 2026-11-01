@@ -192,7 +192,8 @@ export async function resetTestPortfolio(identity,portfolioId,input={},requestId
   const p=(await tx.query("select * from test_portfolio where id=$1 and status='active' for update",[portfolioId])).rows[0];
   if(!p)throw fail(409,"Portfolio was already reset or changed. Refresh the list.","INVALID_STATE");
   const registered=(await tx.query("select table_name,array_agg(entity_id) ids from test_portfolio_record where portfolio_id=$1 group by table_name",[portfolioId])).rows;
-  const tables=registered.map(x=>x.table_name);
+  const composite=(await tx.query("select table_name,primary_key from test_portfolio_composite_record where portfolio_id=$1 order by table_name,captured_at",[portfolioId])).rows;
+  const tables=[...new Set([...registered.map(x=>x.table_name),...composite.map(x=>x.table_name)])];
   const constraints=(await tx.query(`select child.relname child,parent.relname parent from pg_constraint c
    join pg_class child on child.oid=c.conrelid join pg_namespace cn on cn.oid=child.relnamespace
    join pg_class parent on parent.oid=c.confrelid join pg_namespace pn on pn.oid=parent.relnamespace
@@ -223,10 +224,19 @@ export async function resetTestPortfolio(identity,portfolioId,input={},requestId
   for(const table of ordered){
    if(!/^[a-z_][a-z0-9_]*$/.test(table))throw fail(409,"Unexpected table name in test portfolio registry; reset blocked.","TEST_RESET_SCOPE_INVALID");
    const row=registered.find(x=>x.table_name===table);
-   const d=await tx.query(`delete from public."${table}" where id=any($1::uuid[])`,[row.ids]);
-   deleted[table]=d.rowCount;
+   let count=0;
+   if(row){
+    const d=await tx.query(`delete from public."${table}" where id=any($1::uuid[])`,[row.ids]);
+    count+=d.rowCount;
+   }
+   for(const key of composite.filter(x=>x.table_name===table)){
+    const d=await tx.query(`delete from public."${table}" t where to_jsonb(t) @> $1::jsonb`,[key.primary_key]);
+    count+=d.rowCount;
+   }
+   deleted[table]=count;
   }
   await tx.query("delete from test_portfolio_record where portfolio_id=$1",[portfolioId]);
+  await tx.query("delete from test_portfolio_composite_record where portfolio_id=$1",[portfolioId]);
   await tx.query("delete from test_delivery_capture where portfolio_id=$1",[portfolioId]);
   await tx.query("update test_portfolio set status='reset',reset_at=now(),reset_by=$2,reset_reason=$3 where id=$1",[portfolioId,identity.sub,reason]);
   await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'test_lab.portfolio.reset','test_portfolio',$2,$3,'success',$4)",

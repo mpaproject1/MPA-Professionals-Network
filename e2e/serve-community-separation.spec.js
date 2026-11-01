@@ -12,7 +12,53 @@ test.describe("Serve-Community approved initiative journey",()=>{
  test("participants can withdraw and the private action uses the authenticated account",async({page})=>{await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","test-session-token"));await page.route("**/api/v1/serve-community/initiatives**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[],page:{limit:30,offset:0,total:0,hasMore:false}}})}));await page.route("**/api/v1/me/serve-community/participations",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[{id:"c15a2d90-32ef-4c30-9a7d-0fdd7a0e7a61",initiative_id:initiative.id,status:"submitted",title:initiative.title,category:initiative.category,created_at:initiative.publishedAt}]}})}));let withdrawal=null;await page.route("**/api/v1/me/serve-community/participations/*/withdraw",async route=>{withdrawal={headers:route.request().headers(),body:route.request().postDataJSON()};await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:"c15a2d90-32ef-4c30-9a7d-0fdd7a0e7a61",status:"withdrawn"}})})});page.on("dialog",dialog=>dialog.accept());await page.goto("/serve-community");await expect(page.getByRole("heading",{name:"My community participation"})).toBeVisible();await page.getByRole("button",{name:"Withdraw participation"}).click();await expect.poll(()=>withdrawal!==null).toBe(true);expect(withdrawal?.headers.authorization).toBe("Bearer test-session-token");expect(withdrawal?.body.reason).toContain("withdraw")});
 
 
- test("initiative owners can create a private draft and submit it for independent review",async({page})=>{let created=false,submitted=false,submissionRequest=null;const owned={id:initiative.id,title:"New community initiative proposal",category:"education",summary:"A community programme with practical learning and volunteer support.",description:"This programme will coordinate local volunteers to provide practical learning support for young people and community organisations.",delivery_mode:"flexible",location_label:null,capacity:null,eligibility:null,expected_commitment:null,status:submitted?"submitted":"draft",review_reason:null,created_at:initiative.publishedAt};await page.route("**/api/v1/me/serve-community/initiatives",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:created?[owned]:[]}})}));await page.route("**/api/v1/serve-community/initiatives",async route=>{if(route.request().method()==="POST"){expect(route.request().headers()["x-idempotency-key"]).toBeTruthy();expect(route.request().headers.authorization).toBe("Bearer owner-session");await route.fulfill({status:201,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"draft"}})});created=true;return}await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(listBody)})});await page.route("**/api/v1/serve-community/initiatives/*/submit",async route=>{submissionRequest=route.request().url();submitted=true;owned.status="submitted";await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"submitted"}})})});await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","owner-session"));await page.goto("/serve-community/manage");await page.getByRole("button",{name:"Reject optional"}).click();await page.getByLabel("Initiative title").fill("New community initiative proposal");await page.getByLabel("Short summary").fill("A community programme with practical learning and volunteer support.");await page.getByLabel("Full description").fill("This programme will coordinate local volunteers to provide practical learning support for young people and community organisations.");await page.getByRole("button",{name:"Save private draft"}).click();await expect(page.getByRole("heading",{name:"New community initiative proposal"})).toBeVisible();await page.getByRole("button",{name:"Submit for review"}).click();await expect.poll(()=>submissionRequest!==null).toBe(true)});
+ test("initiative owners can save a private draft, refresh, and submit the persisted draft for independent review",async({page})=>{
+  let created=false,submitted=false,ownerReads=0,submissionRequest=null;
+  const owned={id:initiative.id,title:"New community initiative proposal",category:"education",summary:"A community programme with practical learning and volunteer support.",description:"This programme will coordinate local volunteers to provide practical learning support for young people and community organisations.",delivery_mode:"flexible",location_label:null,capacity:null,eligibility:null,expected_commitment:null,status:"draft",review_reason:null,created_at:initiative.publishedAt};
+  await page.route("**/api/v1/me/serve-community/initiatives",async route=>{
+    expect(route.request().headers().authorization).toBe("Bearer owner-session");
+    ownerReads++;
+    await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:created?[owned]:[]}})});
+  });
+  await page.route("**/api/v1/serve-community/initiatives",async route=>{
+    if(route.request().method()==="POST"){
+      expect(route.request().headers()["x-idempotency-key"]).toBeTruthy();
+      expect(route.request().headers().authorization).toBe("Bearer owner-session");
+      await route.fulfill({status:201,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"draft"}})});
+      created=true;
+      return;
+    }
+    await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(listBody)});
+  });
+  await page.route("**/api/v1/serve-community/initiatives/*/submit",async route=>{
+    expect(route.request().headers().authorization).toBe("Bearer owner-session");
+    submissionRequest=route.request().url();
+    submitted=true;
+    owned.status="submitted";
+    await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"submitted"}})});
+  });
+  await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","owner-session"));
+  await page.goto("/serve-community/manage");
+  await expect(page.getByRole("heading",{name:"Create an initiative draft"})).toBeVisible();
+  await page.getByRole("button",{name:"Reject optional"}).click();
+  await page.getByLabel("Initiative title").fill("New community initiative proposal");
+  await page.getByLabel("Short summary").fill("A community programme with practical learning and volunteer support.");
+  await page.getByLabel("Full description").fill("This programme will coordinate local volunteers to provide practical learning support for young people and community organisations.");
+  await page.getByRole("button",{name:"Save private draft"}).click();
+  await expect(page.locator(".sc-owner-card").getByRole("heading",{name:"New community initiative proposal"})).toBeVisible();
+  await expect(page.locator(".sc-owner-card").getByText("draft",{exact:true})).toBeVisible();
+  await expect.poll(()=>ownerReads).toBeGreaterThan(1);
+
+  // A hard reload must retrieve the saved record from the owner endpoint, not local component state.
+  await page.reload();
+  await expect(page.getByRole("heading",{name:"Create an initiative draft"})).toBeVisible();
+  await expect(page.locator(".sc-owner-card").getByRole("heading",{name:"New community initiative proposal"})).toBeVisible();
+  await expect(page.locator(".sc-owner-card").getByText("draft",{exact:true})).toBeVisible();
+
+  await page.getByRole("button",{name:"Submit for review"}).click();
+  await expect.poll(()=>submissionRequest!==null).toBe(true);
+  expect(submitted).toBe(true);
+ });
  test("independent reviewers can approve an initiative through the restricted moderation page",async({page})=>{await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","reviewer-session"));const queue={data:{items:[{id:initiative.id,title:initiative.title,category:initiative.category,summary:initiative.summary,description:initiative.description,status:"submitted",submitted_at:initiative.publishedAt,ownerType:"member"}],limit:40,offset:0}};await page.route("**/api/v1/admin/serve-community/initiatives**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(queue)}));let decision=null;await page.route("**/api/v1/admin/serve-community/initiatives/*/review",async route=>{decision=route.request().postDataJSON();await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"approved"}})})});await page.goto("/admin/serve-community");await expect(page.getByRole("heading",{name:initiative.title})).toBeVisible();await page.getByLabel("Reason for decision").fill("The proposal demonstrates a clear public benefit and has an appropriate participation scope.");await page.getByRole("button",{name:"Approve"}).click();await expect.poll(()=>decision!==null).toBe(true);expect(decision).toMatchObject({decision:"approve"})});
 
 });

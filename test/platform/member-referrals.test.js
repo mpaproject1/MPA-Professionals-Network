@@ -1,6 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import test from "node:test";
 
 const migration=await readFile(new URL("../../db/migrations/20261031200000_member_referrals.sql",import.meta.url),"utf8");
 const applicationMigration=await readFile(new URL("../../db/migrations/20261031210000_job_application_referral_code.sql",import.meta.url),"utf8");

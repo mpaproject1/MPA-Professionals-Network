@@ -64,7 +64,8 @@ const migrationNames = [
   "20261101270000_community_impact_notification_category.sql",
   "20261101280000_community_impact_governed_taxonomies.sql"
 ];
-const requiredCommunityImpactTaxonomyDatasets = ["community_impact_contribution_categories","community_impact_contribution_types","community_impact_contributor_roles","community_impact_evidence_types"];\nconst migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
+const requiredCommunityImpactTaxonomyDatasets = ["community_impact_contribution_categories","community_impact_contribution_types","community_impact_contributor_roles","community_impact_evidence_types"];
+const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
 const requiredColumns = [
   ["app_user", "id", "uuid"],
   ["file_object", "id", "uuid"],
@@ -722,7 +723,9 @@ try {
 
   if(referralPolicy.rows[0].count!==0)throw new Error("Fresh referral migrations must not silently activate an unapproved scoring policy.");
 
-  await client.query("rollback");
+  await client.const taxonomyRows=await client.query("select d.dataset_key,count(i.id)::int active_items from reference_dataset d join reference_dataset_version v on v.dataset_id=d.id and v.status='published' join reference_item i on i.dataset_version_id=v.id and i.active=true where d.dataset_key=any($1::text[]) group by d.dataset_key",[requiredCommunityImpactTaxonomyDatasets]);
+   if(taxonomyRows.rowCount!==4||taxonomyRows.rows.some(row=>row.active_items<1))throw new Error("All four Community Impact governed taxonomies must contain active published reference values.");
+   query("rollback");
   transactionOpen = false;
   const rollbackTables=await client.query("select count(*)::int count from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_identity_assurance_case","community_impact_identity_assurance_evidence","community_impact_identity_assurance_decision","community_impact_detection_policy_governance","community_impact_detection_policy_event","community_impact_offline_attribution","community_impact_offline_attribution_evidence","community_impact_claim_candidate_link","community_impact_reviewer_conflict","community_impact_contribution_assessment","community_impact_contribution_assessment_event","community_impact_retention_evaluation","community_impact_governance_event"]]);
   if(rollbackTables.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact governance tables behind in the disposable transaction.");

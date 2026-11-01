@@ -30,6 +30,7 @@ import {createLogger} from "./src/platform/logger.js";
 import * as memberReferrals from "./src/platform/member-referrals.js";
 import {resolveNetworkPlusAccess} from "./src/platform/network-plus-access.js";
 import * as notifications from "./src/platform/notifications.js";
+import * as communityCampaigns from "./src/platform/community-campaigns.js";
 import {authorizePrivateUpload, confirmPrivateUpload, MAX_PRIVATE_UPLOAD_BYTES, readAuthorizedPrivateFile, receivePrivateUpload} from "./src/platform/private-file-storage.js";
 import * as publicOpportunity from "./src/platform/public-opportunity.js";
 import * as referencePortfolio from "./src/platform/reference-portfolio.js";
@@ -151,6 +152,8 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && req.url==="/readyz") return ok(res,{status:"ready",databaseConfigured:Boolean(config.databaseUrl)},requestId);
     const parts=pathParts(req.url);
     const p=parts.join("/");
+    if(req.method==="POST" && p==="api/v1/public/community-campaigns/opt-in") { await enforcePersistentRateLimit(req,"community-campaign-opt-in",10,3600000); return ok(res,await communityCampaigns.createPublicCampaignOptIn(await body(req)),requestId,201); }
+    if(req.method==="POST" && p==="api/v1/public/community-campaigns/manage") { await enforcePersistentRateLimit(req,"community-campaign-manage",20,3600000); const b=await body(req); return ok(res,await communityCampaigns.managePublicCampaignOptIn(b.manageToken,b.enabled===true),requestId); }
     if(req.method==="POST" && p==="api/v1/payments/chapa/webhook") { const raw=await rawBody(req,1024*1024); return ok(res,await membership.handleChapaMembershipWebhook(raw,String(req.headers["x-chapa-signature"]||""),requestId),requestId); }
      if(req.method==="GET" && p==="api/v1/public/membership-verification") { await enforcePersistentRateLimit(req,"membership-card-verify",60,60000); const q=query(req.url); return ok(res,await membershipCard.verifyMembershipCard(q.get("membershipNumber")||q.get("record"),q.get("token")),requestId); }
     if(req.method==="POST" && p==="api/v1/public/support-bot/message") { await enforcePersistentRateLimit(req,"public-support-bot",20,60000); const b=await body(req); let userId=null; if(req.headers.authorization?.startsWith("Bearer ")) { try { userId=(await auth(req)).sub; } catch {} } return ok(res,await supportBot.answerPublicQuestion(b,{visitorKey:b.visitorKey,pagePath:b.pagePath||"/",userId}),requestId,201); }
@@ -706,6 +709,16 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="PATCH" && p==="api/v1/me/profile") return ok(res,await membership.updateProfile(identity.sub,await body(req),requestId),requestId);
     if(req.method==="GET" && p==="api/v1/membership/history") return ok(res,await membership.history(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/membership/applications/me") return ok(res,await membership.listMyApplications(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/notifications/campaign-preferences") { const identity=await auth(req); const r=await getPool().query("select community_campaign_enabled from notification_preference where user_id=$1",[identity.sub]); return ok(res,{communityCampaignEnabled:Boolean(r.rows[0]?.community_campaign_enabled)},requestId); }
+    if(req.method==="PATCH" && p==="api/v1/notifications/campaign-preferences") { const identity=await auth(req); const b=await body(req); const enabled=b.communityCampaignEnabled===true; await getPool().query("insert into notification_preference(user_id,community_campaign_enabled,updated_at) values($1,$2,now()) on conflict(user_id) do update set community_campaign_enabled=excluded.community_campaign_enabled,updated_at=now()",[identity.sub,enabled]); return ok(res,{communityCampaignEnabled:enabled},requestId); }
+    if(req.method==="GET" && p==="api/v1/admin/community-campaigns/messages") { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); return ok(res,await communityCampaigns.listCampaignMessages(),requestId); }
+    if(req.method==="POST" && p==="api/v1/admin/community-campaigns/messages") { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); return ok(res,await communityCampaigns.saveCampaignMessage(identity.sub,await body(req),requestId),requestId,201); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/community-campaigns/messages/") && parts[6]==="submit") { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); return ok(res,await communityCampaigns.submitCampaignMessage(identity.sub,parts[5],requestId),requestId); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/community-campaigns/messages/") && parts[6]==="decision") { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); const b=await body(req); return ok(res,await communityCampaigns.decideCampaignMessage(identity.sub,parts[5],b.decision,b.note,requestId),requestId); }
+    if(req.method==="GET" && p==="api/v1/admin/community-campaigns/schedules") { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); return ok(res,await communityCampaigns.getCampaignSchedules(),requestId); }
+    if(req.method==="PATCH" && parts.length===6 && p.startsWith("api/v1/admin/community-campaigns/schedules/")) { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); return ok(res,await communityCampaigns.updateCampaignSchedule(identity.sub,parts[5],await body(req),requestId),requestId); }
+    if(req.method==="POST" && p==="api/v1/admin/community-campaigns/pause") { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); return ok(res,await communityCampaigns.pauseCampaign(identity.sub,requestId),requestId); }
+    if(req.method==="GET" && p==="api/v1/admin/community-campaigns/monitoring") { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); return ok(res,await communityCampaigns.getCampaignMonitoring(),requestId); }
     if(req.method==="GET" && p==="api/v1/notifications/push/public-key") return ok(res,getWebPushPublicConfiguration(),requestId);
     if(req.method==="GET" && p==="api/v1/notifications/push/status") return ok(res,await getPushSubscriptionStatus(identity.sub),requestId);
     if(req.method==="POST" && p==="api/v1/notifications/push/subscriptions") return ok(res,await registerPushSubscription(identity.sub,await body(req)),requestId,201);

@@ -115,9 +115,9 @@ export async function enqueuePushDelivery(db,notificationId,userId){
    WHERE s.user_id=$2 AND s.revoked_at IS NULL
    ON CONFLICT(notification_event_id,subscription_id) DO NOTHING`,[notificationId,userId]);
 }
-async function deliverOne(row,config){
+async function deliverOne(row,config,customPayload=null){
  const endpoint=validPushEndpoint(row.endpoint);if(!endpoint)return {ok:false,expired:true,status:410,code:"INVALID_ENDPOINT"};
- const payload={title:row.priority==="urgent"||row.priority==="high"?"MPA · Action needed":"MPA · New update",
+ const payload=customPayload||{title:row.priority==="urgent"||row.priority==="high"?"MPA · Action needed":"MPA · New update",
    body:row.priority==="urgent"||row.priority==="high"?"You have an important MPA update. Open the app to review it.":"You have a new MPA update. Open the app to review it.",
    url:row.action_url&&row.action_url.startsWith("/")&&!row.action_url.startsWith("//")?row.action_url:"/notifications",
    notificationId:row.notification_event_id,priority:row.priority};
@@ -140,13 +140,13 @@ export async function dispatchPendingPushNotifications(limit=50){
    FROM candidates c WHERE d.id=c.id RETURNING d.id,d.notification_event_id,d.subscription_id,d.attempts
  )
  SELECT c.id,c.notification_event_id,c.attempts,s.id subscription_id,s.endpoint,s.p256dh,s.auth_secret,s.revoked_at,p.push_enabled,
-   n.action_url,n.priority,n.read_at,n.archived_at
+   n.action_url,n.priority,n.read_at,n.archived_at,n.category,coalesce(p.community_campaign_enabled,false) community_campaign_enabled
  FROM claimed c JOIN notification_push_subscription s ON s.id=c.subscription_id
  JOIN notification_preference p ON p.user_id=s.user_id
  JOIN notification_event n ON n.id=c.notification_event_id AND n.user_id=s.user_id`,[batch]);
  let sent=0,failed=0;
  const processRow=async row=>{
-  if(row.revoked_at||row.push_enabled!==true||row.read_at||row.archived_at){
+  if(row.revoked_at||row.push_enabled!==true||row.read_at||row.archived_at||(row.category==="community_campaign"&&row.community_campaign_enabled!==true)){
    await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_SUPPRESSED',updated_at=now() WHERE id=$1",[row.id]);failed++;return;
   }
   const result=await deliverOne(row,config);
@@ -166,4 +166,16 @@ export async function dispatchPendingPushNotifications(limit=50){
   await Promise.all(claimed.rows.slice(offset,offset+10).map(processRow));
  }
  return {sent,failed,skipped:false};
+}
+
+export async function deliverCommunityCampaignPush(subscription,payload){
+ const config=vapidConfig();
+ if(!config)return {ok:false,retryable:false,code:"VAPID_NOT_CONFIGURED"};
+ return deliverOne({endpoint:subscription.endpoint,p256dh:subscription.p256dh,auth_secret:subscription.auth_secret,notification_event_id:subscription.notification_event_id||"community-campaign",priority:"low",action_url:payload.url},config,{
+  title:String(payload.title||"MPA · Community contribution").slice(0,100),
+  body:String(payload.body||"A new community contribution invitation is available.").slice(0,180),
+  url:payload.url&&payload.url.startsWith("/")&&!payload.url.startsWith("//")?payload.url:"/notifications",
+  notificationId:String(payload.notificationId||"community-campaign"),
+  priority:"low"
+ });
 }

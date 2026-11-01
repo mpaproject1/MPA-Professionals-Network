@@ -86,7 +86,7 @@ export async function createTestPortfolio(identity,input={},requestId=null){
  await withTransaction(async tx=>{
   const p=(await tx.query(`insert into test_portfolio(id,name,environment,database_name,branch_ref,commit_sha,created_by,expires_at,metadata)
    values($1,$2,$3,$4,$5,$6,$7,now()+($8::int*interval '1 day'),$9) returning id,name,expires_at`,
-   [portfolioId,name,process.env.NODE_ENV||"development",databaseName,branch,commit,identity.sub,days,{requestId,fixtureVersion:"1"}])).rows[0];
+   [portfolioId,name,process.env.NODE_ENV||"development",databaseName,branch,commit,identity.sub,days,{requestId,fixtureVersion:"2"}])).rows[0];
   for(let i=0;i<ROLE_FIXTURES.length;i++){
    const fixture=ROLE_FIXTURES[i],password=randomPassword(),email=makeEmail(prefix,fixture.role,i+1),username=`qa-${prefix}-${fixture.role.replace(/_/g,"-")}-${usernameToken()}`;
    const user=(await tx.query("insert into app_user(username,email,password_hash,status) values($1,$2,$3,'active') returning id,email,username",[username,email,hashPassword(password)])).rows[0];

@@ -3,7 +3,7 @@ ALTER TABLE reference_dataset DROP CONSTRAINT IF EXISTS reference_dataset_domain
 ALTER TABLE reference_dataset ADD CONSTRAINT reference_dataset_domain_check CHECK (domain IN (
  'geography','occupation','industry','education_level','qualification_type','field_of_study',
  'membership','verification','nationality','language','institution','experience_range','community_impact'
-));
+)) NOT VALID;
 
 INSERT INTO reference_dataset(dataset_key,name,description,domain,source_type,source_name,status)
 VALUES

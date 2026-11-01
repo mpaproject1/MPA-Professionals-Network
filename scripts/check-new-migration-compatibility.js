@@ -671,9 +671,23 @@ try {
     if (!row || !row.indexdef.toUpperCase().includes("CREATE UNIQUE INDEX")) {
       throw new Error(`Required unique index ${name} is missing or not unique.`);
     }
-    if (["ux_marketplace_demand_idempotency_hash","ux_mentorship_request_idempotency_hash","ux_service_request_idempotency_hash","ux_service_listing_idempotency_hash","ux_service_listing_pledge_idempotency_hash","ux_service_request_update_idempotency_hash","ux_talent_inquiry_idempotency_hash","uq_community_impact_claim_evidence_url","uq_community_impact_claim_active_assignment"].includes(name) &&
+    if (["ux_marketplace_demand_idempotency_hash","ux_mentorship_request_idempotency_hash","ux_service_request_idempotency_hash","ux_service_listing_idempotency_hash","ux_service_listing_pledge_idempotency_hash","ux_service_request_update_idempotency_hash","ux_talent_inquiry_idempotency_hash"].includes(name) &&
         (!row.indexdef.includes("request_idempotency_hash") || !row.indexdef.toLowerCase().includes("where"))) {
       throw new Error(`Idempotency index ${name} must uniquely index the request hash and exclude null keys.`);
+    }
+    if (name === "uq_community_impact_claim_evidence_url" &&
+        (!row.indexdef.toLowerCase().includes("claim_id") ||
+         !row.indexdef.toLowerCase().includes("evidence_url") ||
+         !row.indexdef.toLowerCase().includes("where") ||
+         !row.indexdef.toLowerCase().includes("is not null"))) {
+      throw new Error("Community Impact evidence URL uniqueness must be scoped to a claim and non-null URLs.");
+    }
+    if (name === "uq_community_impact_claim_active_assignment" &&
+        (!row.indexdef.toLowerCase().includes("claim_id") ||
+         !row.indexdef.toLowerCase().includes("active") ||
+         !row.indexdef.toLowerCase().includes("where") ||
+         !row.indexdef.toLowerCase().includes("true"))) {
+      throw new Error("Community Impact reviewer assignment uniqueness must allow only one active assignment per claim.");
     }
     if (name === "ux_mentorship_match_one_open_request" &&
         (!row.indexdef.toLowerCase().includes("where") ||

@@ -2,6 +2,7 @@
 
 import {BriefcaseBusiness, Building2, ClipboardList, RefreshCw, UserPlus} from "lucide-react";
 import {useCallback, useEffect, useMemo, useState} from "react";
+import type {FormEvent} from "react";
 import {FormFeedback} from "../../../components/form-feedback";
 import {OperationStatus} from "../../../components/operation-status";
 import {Badge, Card} from "../../../components/ui";

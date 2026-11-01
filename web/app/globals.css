@@ -1511,3 +1511,11 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 
 .desktop-more{position:relative;display:flex;align-items:center}.desktop-more-trigger:focus-visible,.desktop-more-panel a:focus-visible,.desktop-more-panel button:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 55%,transparent);outline-offset:2px}
 .mobile-nav--public{grid-template-columns:repeat(4,minmax(0,1fr))}.mobile-nav--signed-in{grid-template-columns:repeat(6,minmax(0,1fr))}
+
+@media(hover:hover){
+.mpa-members-workspace nav[aria-label="Your workspace shortcuts"]>a,.mpa-members-workspace ol[aria-label="Membership progress steps"] .card,.mpa-jobs-page [id$="-cards"]>.card,.mpa-mentorship-page>.grid>.card{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.mpa-members-workspace nav[aria-label="Your workspace shortcuts"]>a:hover,.mpa-members-workspace ol[aria-label="Membership progress steps"] .card:hover,.mpa-jobs-page [id$="-cards"]>.card:hover,.mpa-mentorship-page>.grid>.card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--primary) 45%,var(--border));box-shadow:0 12px 26px rgba(8,28,48,.09)}
+}
+.mpa-members-workspace nav[aria-label="Your workspace shortcuts"]>a>svg,.mpa-jobs-page .tagline svg,.mpa-mentorship-page .case-row svg{color:var(--primary);flex:none}
+.mpa-members-workspace .badge,.mpa-jobs-page .badge,.mpa-mentorship-page .badge{white-space:normal;line-height:1.35}
+.dark .mpa-members-workspace nav[aria-label="Your workspace shortcuts"]>a:hover,.dark .mpa-jobs-page [id$="-cards"]>.card:hover,.dark .mpa-mentorship-page>.grid>.card:hover{box-shadow:0 14px 30px rgba(0,0,0,.3)}

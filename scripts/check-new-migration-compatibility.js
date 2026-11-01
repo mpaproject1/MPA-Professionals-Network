@@ -260,7 +260,7 @@ try {
   const manualClaimConstraintCounts = [
     ["community_impact_claim",16,4,1,2],
     ["community_impact_claim_consent",5,3,1,0],
-    ["community_impact_claim_evidence",8,4,1,1],
+    ["community_impact_claim_evidence",8,5,1,1],
     ["community_impact_claim_assignment",1,3,1,0],
     ["community_impact_claim_decision",4,3,1,0],
     ["community_impact_claim_appeal",5,6,1,1],

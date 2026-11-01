@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {assertIndependentApprover,campaignContentDigest,campaignDeliveryKey,isApprovedContent,slotOccurrence,validateCampaignActionUrl,zonedLocalToUtc} from "../../src/platform/community-campaigns.js";
+import {validPushEndpoint} from "../../src/platform/web-push.js";
 
 test("campaign author and approver must be different people",()=>{
  assert.throws(()=>assertIndependentApprover("author-1","author-1"),error=>error.code==="AUTHOR_CANNOT_APPROVE");
@@ -61,4 +62,36 @@ test("migration seeds only draft content and leaves both weekly slots disabled",
  assert.match(sql,/unique\(schedule_id,message_version_id,slot_occurrence,recipient_type,recipient_id\)/);
  assert.match(sql,/status\)\s*select c\.id,v\.message_number,1/);
  assert.equal((sql.match(/gen_random_uuid\(\),'[^']+',\d+,1,/g)||[]).length,30);
+});
+
+test("invalid and non-HTTPS push endpoints are rejected",()=>{
+ assert.equal(validPushEndpoint("http://fcm.googleapis.com/push/id"),null);
+ assert.equal(validPushEndpoint("https://attacker.example/push/id"),null);
+ assert.equal(validPushEndpoint("https://user:pass@fcm.googleapis.com/push/id"),null);
+ assert.ok(validPushEndpoint("https://fcm.googleapis.com/fcm/send/example"));
+});
+
+test("public opt-in and push dispatcher enforce explicit consent, permission and retries",async()=>{
+ const service=await readFile(new URL("../../src/platform/community-campaigns.js",import.meta.url),"utf8");
+ const sender=await readFile(new URL("../../src/platform/web-push.js",import.meta.url),"utf8");
+ assert.match(service,/input\.permission!=="granted"\|\|input\.consent!==true/);
+ assert.match(service,/permission_granted=true/);
+ assert.match(service,/row\.attempts>=5/);
+ assert.match(service,/PUBLIC_OPT_OUT/);
+ assert.match(sender,/row\.category==="community_campaign"&&row\.community_campaign_enabled!==true/);
+ assert.match(sender,/row\.attempts>=5/);
+});
+
+test("service worker rejects non-allow-listed click-through routes",async()=>{
+ const worker=await readFile(new URL("../../web/public/sw.js",import.meta.url),"utf8");
+ assert.match(worker,/const allowed = \["\/notifications", "\/serve-community", "\/mentorship", "\/jobs"/);
+ assert.match(worker,/return "\/notifications";/);
+ assert.match(worker,/clients\.navigate\(target\)/);
+});
+
+test("campaign delivery never includes member identifiers in public push payload",async()=>{
+ const service=await readFile(new URL("../../src/platform/community-campaigns.js",import.meta.url),"utf8");
+ assert.match(service,/notificationId:row\.delivery_id/);
+ assert.match(service,/title:row\.notification_title/);
+ assert.doesNotMatch(service,/email:\s*row\.|memberName:\s*row\.|phone:\s*row\./);
 });

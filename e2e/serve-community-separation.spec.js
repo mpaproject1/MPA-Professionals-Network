@@ -24,8 +24,8 @@ test.describe("Serve-Community approved initiative journey",()=>{
     if(route.request().method()==="POST"){
       expect(route.request().headers()["x-idempotency-key"]).toBeTruthy();
       expect(route.request().headers().authorization).toBe("Bearer owner-session");
-      await route.fulfill({status:201,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"draft"}})});
       created=true;
+      await route.fulfill({status:201,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"draft"}})});
       return;
     }
     await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(listBody)});
@@ -58,6 +58,7 @@ test.describe("Serve-Community approved initiative journey",()=>{
   await page.getByRole("button",{name:"Submit for review"}).click();
   await expect.poll(()=>submissionRequest!==null).toBe(true);
   expect(submitted).toBe(true);
+  await expect(page.locator(".sc-owner-card").getByText("submitted",{exact:true})).toBeVisible();
  });
  test("independent reviewers can approve an initiative through the restricted moderation page",async({page})=>{await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","reviewer-session"));const queue={data:{items:[{id:initiative.id,title:initiative.title,category:initiative.category,summary:initiative.summary,description:initiative.description,status:"submitted",submitted_at:initiative.publishedAt,ownerType:"member"}],limit:40,offset:0}};await page.route("**/api/v1/admin/serve-community/initiatives**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(queue)}));let decision=null;await page.route("**/api/v1/admin/serve-community/initiatives/*/review",async route=>{decision=route.request().postDataJSON();await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"approved"}})})});await page.goto("/admin/serve-community");await expect(page.getByRole("heading",{name:initiative.title})).toBeVisible();await page.getByLabel("Reason for decision").fill("The proposal demonstrates a clear public benefit and has an appropriate participation scope.");await page.getByRole("button",{name:"Approve"}).click();await expect.poll(()=>decision!==null).toBe(true);expect(decision).toMatchObject({decision:"approve"})});
 

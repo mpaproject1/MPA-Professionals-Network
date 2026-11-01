@@ -58,7 +58,7 @@ export async function seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,
  );
 
  const job=(await tx.query(
-  "insert into job(organization_id,title,description,employment_type,work_mode,location_label,status,visibility,application_deadline,published_at,created_by,updated_by) values($1,'Synthetic QA Community Program Officer','Fictional vacancy used only to test discovery, eligibility and application workflows.','full_time','hybrid','Addis Ababa (synthetic)','published','public',now()+interval '30 days',now(),$2,$2) returning id",
+  "insert into job(organization_id,title,description,employment_type,work_mode,location_label,status,visibility,application_deadline,published_at,created_by,updated_by) values($1,'Synthetic QA Community Program Officer','Fictional vacancy used only to test discovery, eligibility and application workflows.','full_time','hybrid','Addis Ababa (synthetic)','pending_review','public',now()+interval '30 days',now(),$2,$2) returning id",
   [organization.id,members[1].userId]
  )).rows[0];
  await tx.query(
@@ -67,7 +67,7 @@ export async function seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,
  );
 
  const service=(await tx.query(
-  "insert into service_listing(provider_user_id,title,description,service_category,delivery_mode,pricing_model,visibility,status) values($1,'Synthetic QA Pro Bono Advisory','Fictional advisory service for testing the request and fulfilment workflow.','professional_advisory','remote','free','members','published') returning id",
+  "insert into service_listing(provider_user_id,title,description,service_category,delivery_mode,pricing_model,visibility,status) values($1,'Synthetic QA Pro Bono Advisory','Fictional advisory service for testing the request and fulfilment workflow.','professional_advisory','remote','free','members','draft') returning id",
   [members[3].userId]
  )).rows[0];
  await tx.query(

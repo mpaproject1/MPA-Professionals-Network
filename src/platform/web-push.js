@@ -149,7 +149,8 @@ export async function dispatchPendingPushNotifications(limit=50){
   if(row.revoked_at||row.push_enabled!==true||row.read_at||row.archived_at||(row.category==="community_campaign"&&row.community_campaign_enabled!==true)){
    await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_SUPPRESSED',updated_at=now() WHERE id=$1",[row.id]);failed++;return;
   }
-  const campaignPayload=row.category==="community_campaign"?{title:String(row.title||"MPA · Community contribution").slice(0,100),body:String(row.body||"A new community contribution invitation is available.").slice(0,3000),url:row.action_url&&row.action_url.startsWith("/")&&!row.action_url.startsWith("//")?row.action_url:"/notifications",notificationId:row.notification_event_id,priority:"low"}:null;\n  const result=await deliverOne(row,config,campaignPayload);
+  const campaignPayload=row.category==="community_campaign"?{title:String(row.title||"MPA · Community contribution").slice(0,100),body:String(row.body||"A new community contribution invitation is available.").slice(0,3000),url:row.action_url&&row.action_url.startsWith("/")&&!row.action_url.startsWith("//")?row.action_url:"/notifications",notificationId:row.notification_event_id,priority:"low"}:null;
+  const result=await deliverOne(row,config,campaignPayload);
   if(result.ok){
    await db.query("UPDATE notification_push_delivery SET status='sent',delivered_at=now(),last_status_code=$2,last_error_code=NULL,updated_at=now() WHERE id=$1",[row.id,result.status]);
    await db.query("UPDATE notification_push_subscription SET last_used_at=now() WHERE id=$1",[row.subscription_id]);sent++;return;

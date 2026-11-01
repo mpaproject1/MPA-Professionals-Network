@@ -178,7 +178,6 @@ export default function Mentorship(){
     {title:"Confirm sessions and track progress",description:"Agree session times, confirm proposed schedule changes, maintain shared goals and record session completion.",status:hasCompletedRelationship?"complete":hasActiveRelationship?"current":"upcoming"},
     {title:"Feedback and relationship outcomes",description:"Submit feedback after completed sessions and record the final relationship outcome before closure.",status:hasCompletedRelationship?"complete":hasActiveRelationship&&hasCompletedSession?"current":"upcoming"},
   ];
- const showPortalFeedback=["mentee","mentor","organization"].includes(portalMode);
  async function submit(e?:FormEvent){
     e?.preventDefault();if(requestStep==="OBJECTIVES"){if(goals.trim().length<10){setError("Please describe your primary goal in at least 10 characters.");return;}setRequestStep("CONSENT");setError("");return;}if(submitting)return;setError("");setNotice("");
     if(!privacyAcknowledged){setError("Review the confidentiality and matching boundaries before submitting.");return;}

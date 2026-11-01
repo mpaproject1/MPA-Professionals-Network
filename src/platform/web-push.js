@@ -142,7 +142,7 @@ export async function dispatchPendingPushNotifications(limit=50){
    n.action_url,n.priority
  FROM claimed c JOIN notification_push_subscription s ON s.id=c.subscription_id
  JOIN notification_preference p ON p.user_id=s.user_id
- JOIN notification_event n ON n.id=c.notification_event_id`,[batch]);
+ JOIN notification_event n ON n.id=c.notification_event_id AND n.user_id=s.user_id`,[batch]);
  let sent=0,failed=0;
  for(const row of claimed.rows){
   if(row.revoked_at||row.push_enabled!==true){await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_OPT_OUT',updated_at=now() WHERE id=$1",[row.id]);failed++;continue;}

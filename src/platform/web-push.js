@@ -64,8 +64,8 @@ export async function registerPushSubscription(userId,input){
  const expiration=Number.isFinite(input?.expirationTime)?new Date(input.expirationTime):null;
  const endpointHash=sha256(endpoint);
  await withTransaction(async db=>{
-  const existing=(await db.query("SELECT id,user_id FROM notification_push_subscription WHERE endpoint_sha256=$1 FOR UPDATE",[endpointHash])).rows[0];
-  if(!existing||existing.user_id!==userId){
+  const existing=(await db.query("SELECT id,user_id,revoked_at FROM notification_push_subscription WHERE endpoint_sha256=$1 FOR UPDATE",[endpointHash])).rows[0];
+  if(!existing||existing.user_id!==userId||existing.revoked_at){
    const activeCount=await db.query("SELECT count(*)::int count FROM notification_push_subscription WHERE user_id=$1 AND revoked_at IS NULL",[userId]);
    if(Number(activeCount.rows[0]?.count)>=10)fail(429,"This account has reached the limit of 10 registered devices.","RATE_LIMITED");
   }

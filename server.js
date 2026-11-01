@@ -16,10 +16,9 @@ import {requireRole, verifyToken, withCurrentRoles} from "./src/platform/auth.js
 import * as communityImpactClaims from "./src/platform/community-impact-claims.js";
 import * as communityImpactDetection from "./src/platform/community-impact-detection.js";
 import * as communityImpactGovernance from "./src/platform/community-impact-governance.js";
+import * as communityImpactRecognition from "./src/platform/community-impact-recognition.js";
 import * as communityImpactRetention from "./src/platform/community-impact-retention.js";
 import * as communityImpactScore from "./src/platform/community-impact-score.js";
-import * as communityImpactRecognition from "./src/platform/community-impact-recognition.js";
-import * as memberReferrals from "./src/platform/member-referrals.js";
 import {loadConfig, resolveAllowedOrigin} from "./src/platform/config.js";
 import {getPool} from "./src/platform/db.js";
 import * as directoryExports from "./src/platform/directory-exports.js";
@@ -28,6 +27,7 @@ import {resendEmailVerification, verifyEmailToken} from "./src/platform/email-ve
 import * as experience from "./src/platform/experience.js";
 import * as financeReceipts from "./src/platform/finance-receipts.js";
 import {createLogger} from "./src/platform/logger.js";
+import * as memberReferrals from "./src/platform/member-referrals.js";
 import {resolveNetworkPlusAccess} from "./src/platform/network-plus-access.js";
 import * as notifications from "./src/platform/notifications.js";
 import {authorizePrivateUpload, confirmPrivateUpload, MAX_PRIVATE_UPLOAD_BYTES, readAuthorizedPrivateFile, receivePrivateUpload} from "./src/platform/private-file-storage.js";

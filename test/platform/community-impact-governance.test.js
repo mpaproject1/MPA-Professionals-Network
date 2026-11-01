@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
+
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
 const [migration,service,claims,server,privateFiles]=await Promise.all([
  read("../../db/migrations/20261101090000_community_impact_governance_completion.sql"),

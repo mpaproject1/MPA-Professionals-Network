@@ -1,6 +1,7 @@
 import {getPool,withTransaction} from "./db.js";
-import {createInAppNotification} from "./notifications.js";
 import {policyError} from "./identity-policy.js";
+import {createInAppNotification} from "./notifications.js";
+
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const fail=(status,message,code="COMMUNITY_IMPACT_RECOGNITION_ERROR")=>{throw policyError(status,message,code)};
 const clean=(v,min,max,label)=>{const s=String(v??"").trim();if(s.length<min||s.length>max)fail(400,label+" must be between "+min+" and "+max+" characters.","VALIDATION_ERROR");return s};

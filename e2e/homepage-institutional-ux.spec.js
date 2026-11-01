@@ -110,17 +110,17 @@ test.describe("MPA installable mobile workspace", () => {
   test("PWA manifest, native install icon and service worker are available", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/mobile");
-    const manifestResponse = await page.request.get("/manifest.webmanifest");
+    const manifestResponse = await page.request.get(new URL("/manifest.webmanifest", page.url()).href);
     expect(manifestResponse.ok()).toBe(true);
     const manifest = await manifestResponse.json();
     expect(manifest.display).toBe("standalone");
     expect(manifest.start_url).toBe("/mobile");
     expect(manifest.icons.some((icon) => icon.src === "/brand/apple-touch-icon.png")).toBe(true);
     expect(manifest.icons.some((icon) => icon.src === "/brand/mpa-pwa-icon.svg")).toBe(true);
-    const iconResponse = await page.request.get("/brand/apple-touch-icon.png");
+    const iconResponse = await page.request.get(new URL("/brand/apple-touch-icon.png", page.url()).href);
     expect(iconResponse.ok()).toBe(true);
     expect(iconResponse.headers()["content-type"]).toContain("image/png");
-    const workerResponse = await page.request.get("/sw.js");
+    const workerResponse = await page.request.get(new URL("/sw.js", page.url()).href);
     expect(workerResponse.ok()).toBe(true);
     expect(await workerResponse.text()).toContain('addEventListener("push"');
     const registration = await page.evaluate(async () => {

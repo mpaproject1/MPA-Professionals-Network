@@ -28,7 +28,7 @@ test.describe("MPA application workspace UX", () => {
     await page.goto("/members");
     await expect(page.getByRole("heading", { name: /Welcome back, Test Member/ })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Your workspace shortcuts" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Membership progress" })).toBeVisible();
+    await expect(page.locator("#progress-title")).toBeVisible();
     const refresh = page.getByRole("button", { name: "Refresh your workspace status" });
     await refresh.focus();
     await expect(refresh).toBeFocused();
@@ -82,10 +82,10 @@ test.describe("MPA application workspace UX", () => {
     await mockSignedInWorkspace(page);
     await page.goto("/members");
     const themeToggle = page.getByRole("button", { name: "Toggle theme" });
-    const before = await page.locator("body").evaluate(node => getComputedStyle(node).backgroundColor);
+    const before = await page.locator("html").evaluate(node => getComputedStyle(node).getPropertyValue("--bg").trim());
     await themeToggle.click();
     await expect.poll(() => page.locator("html").evaluate(node => node.classList.contains("dark"))).toBe(true);
-    const after = await page.locator("body").evaluate(node => getComputedStyle(node).backgroundColor);
+    const after = await page.locator("html").evaluate(node => getComputedStyle(node).getPropertyValue("--bg").trim());
     expect(after).not.toBe(before);
     await themeToggle.click();
     await expect.poll(() => page.locator("html").evaluate(node => node.classList.contains("dark"))).toBe(false);

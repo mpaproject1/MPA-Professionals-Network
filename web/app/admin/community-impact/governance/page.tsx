@@ -1,7 +1,7 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {useCallback, useEffect, useState} from "react";
 import {api} from "../../../../lib/api";
-import {uploadPrivateFile,downloadPrivateFile} from "../../../../lib/private-upload";
+import {downloadPrivateFile, uploadPrivateFile} from "../../../../lib/private-upload";
 import {useUiStore} from "../../../../lib/store";
 import {AdminPageHeader} from "../../admin-page-header";
 

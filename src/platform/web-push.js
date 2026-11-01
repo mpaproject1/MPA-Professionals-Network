@@ -48,7 +48,7 @@ export function encryptWebPushPayload(subscription,payload){
  const recordSize=Buffer.alloc(4);recordSize.writeUInt32BE(4096);
  return Buffer.concat([salt,recordSize,Buffer.from([senderPublic.length]),senderPublic,ciphertext]);
 }
-function validPushEndpoint(value){
+export function validPushEndpoint(value){
  let url;try{url=new URL(String(value||""));}catch{return null;}
  if(url.protocol!=="https:"||url.username||url.password||url.port||url.hash)return null;
  const host=url.hostname.toLowerCase();

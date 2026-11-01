@@ -140,13 +140,13 @@ export async function dispatchPendingPushNotifications(limit=50){
    FROM candidates c WHERE d.id=c.id RETURNING d.id,d.notification_event_id,d.subscription_id,d.attempts
  )
  SELECT c.id,c.notification_event_id,c.attempts,s.id subscription_id,s.endpoint,s.p256dh,s.auth_secret,s.revoked_at,p.push_enabled,
-   n.action_url,n.priority,n.read_at,n.archived_at
+   n.action_url,n.priority,n.read_at,n.archived_at,n.category,coalesce(p.community_campaign_enabled,false) community_campaign_enabled
  FROM claimed c JOIN notification_push_subscription s ON s.id=c.subscription_id
  JOIN notification_preference p ON p.user_id=s.user_id
  JOIN notification_event n ON n.id=c.notification_event_id AND n.user_id=s.user_id`,[batch]);
  let sent=0,failed=0;
  const processRow=async row=>{
-  if(row.revoked_at||row.push_enabled!==true||row.read_at||row.archived_at){
+  if(row.revoked_at||row.push_enabled!==true||row.read_at||row.archived_at||(row.category==="community_campaign"&&row.community_campaign_enabled!==true)){
    await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_SUPPRESSED',updated_at=now() WHERE id=$1",[row.id]);failed++;return;
   }
   const result=await deliverOne(row,config);

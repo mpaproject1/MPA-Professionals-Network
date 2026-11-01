@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {createDecipheriv,createECDH,hkdfSync,randomBytes} from "node:crypto";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
-import {encryptWebPushPayload,validPushEndpoint,getWebPushPublicConfiguration} from "../../src/platform/web-push.js";
+import {encryptWebPushPayload,getWebPushPublicConfiguration,validPushEndpoint} from "../../src/platform/web-push.js";
 
 test("Web Push payload uses RFC 8291 aes128gcm framing and decrypts with the subscriber key",()=>{
  const client=createECDH("prime256v1");client.generateKeys();
@@ -79,7 +79,7 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.ok(mobilePage.includes("Your MPA, in your pocket."));
  assert.ok(mobilePage.includes('href:"/mentorship"'));
  assert.ok(mobilePage.includes('href:"/notifications"'));
- assert.ok(shell.includes('const mobilePrimaryHrefs=token?["/jobs","/members","/learning"]'));
+ assert.ok(shell.includes('const mobilePrimaryHrefs=token?["/jobs","/members","/network-plus","/mentorship"]'));
  assert.ok(shell.includes('const mobileHomeNav:NavItem=["/mobile","Home",Home]'));
  assert.equal(config.start_url,"/mobile");
  assert.ok(worker.includes('addEventListener("push"'));

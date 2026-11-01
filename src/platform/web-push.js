@@ -131,6 +131,7 @@ async function deliverOne(row,config){
 export async function dispatchPendingPushNotifications(limit=50){
  const config=vapidConfig();if(!config)return {sent:0,failed:0,skipped:true,reason:"VAPID_NOT_CONFIGURED"};
  const db=getPool(),batch=Math.min(Math.max(Number(limit)||50,1),200);
+ await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_EXPIRED',updated_at=now() WHERE status='pending' AND created_at<now()-interval '7 days'");
  const claimed=await db.query(`WITH candidates AS (
    SELECT id FROM notification_push_delivery WHERE (status='pending' AND available_at<=now()) OR (status='sending' AND updated_at<now()-interval '5 minutes')
    ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT $1
@@ -139,13 +140,13 @@ export async function dispatchPendingPushNotifications(limit=50){
    FROM candidates c WHERE d.id=c.id RETURNING d.id,d.notification_event_id,d.subscription_id,d.attempts
  )
  SELECT c.id,c.notification_event_id,c.attempts,s.id subscription_id,s.endpoint,s.p256dh,s.auth_secret,s.revoked_at,p.push_enabled,
-   n.action_url,n.priority
+   n.action_url,n.priority,n.read_at,n.archived_at
  FROM claimed c JOIN notification_push_subscription s ON s.id=c.subscription_id
  JOIN notification_preference p ON p.user_id=s.user_id
  JOIN notification_event n ON n.id=c.notification_event_id AND n.user_id=s.user_id`,[batch]);
  let sent=0,failed=0;
  for(const row of claimed.rows){
-  if(row.revoked_at||row.push_enabled!==true){await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_OPT_OUT',updated_at=now() WHERE id=$1",[row.id]);failed++;continue;}
+  if(row.revoked_at||row.push_enabled!==true||row.read_at||row.archived_at){await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_SUPPRESSED',updated_at=now() WHERE id=$1",[row.id]);failed++;continue;}
   const result=await deliverOne(row,config);
   if(result.ok){
    await db.query("UPDATE notification_push_delivery SET status='sent',delivered_at=now(),last_status_code=$2,last_error_code=NULL,updated_at=now() WHERE id=$1",[row.id,result.status]);

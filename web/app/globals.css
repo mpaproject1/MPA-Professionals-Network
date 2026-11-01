@@ -1494,3 +1494,17 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 @media(max-width:900px){.desktop-nav{display:none}.topbar{height:56px}.shell-main{padding:16px 13px 100px}.mobile-nav{grid-template-columns:repeat(6,minmax(0,1fr));min-height:62px;padding-bottom:max(4px,env(safe-area-inset-bottom));background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(18px);border-top:1px solid var(--border)}.mobile-nav>a,.mobile-nav>button{min-height:54px;gap:4px;font-size:10px}.mobile-nav svg{width:18px;height:18px}.mpa-members-workspace ol[aria-label="Membership progress steps"]{grid-template-columns:repeat(2,minmax(0,1fr))}.mpa-jobs-page .split{grid-template-columns:minmax(0,1fr)}.mpa-jobs-page .filter{position:static}.mpa-jobs-page .job-journey{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:620px){.shell-main{padding:12px 10px 94px}.topbar{padding:0 10px}.top-actions>.btn,.top-actions select{display:none}.mpa-members-workspace,.mpa-jobs-page,.mpa-mentorship-page{padding:0 1px 26px}.mpa-members-workspace .h1,.mpa-jobs-page .mpa-signature-intro .h1{font-size:27px}.mpa-members-workspace .card,.mpa-jobs-page .card,.mpa-mentorship-page .card{padding:13px;border-radius:13px}.mpa-members-workspace ol[aria-label="Membership progress steps"]{grid-template-columns:minmax(0,1fr)}.mpa-jobs-page .job-journey{grid-template-columns:minmax(0,1fr)}.mpa-jobs-page .split{gap:10px}.mpa-jobs-page .filter{padding:11px}.mpa-jobs-page [id$="-cards"]>.card{padding:13px}.mpa-mentorship-page .row{align-items:flex-start;flex-wrap:wrap}.mpa-mentorship-page fieldset{padding:10px!important}.desktop-more-panel{position:fixed;top:58px;left:10px;right:10px;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));max-height:calc(100dvh - 90px)}}
 @media(prefers-reduced-motion:reduce){.mpa-jobs-page *,.mpa-mentorship-page *,.mpa-members-workspace *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+
+.mpa-progressive-section{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:11px 13px}
+.mpa-progressive-section>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px;cursor:pointer;list-style:none;color:var(--text);font-size:13px;font-weight:750}
+.mpa-progressive-section>summary::-webkit-details-marker{display:none}
+.mpa-progressive-section>summary:after{content:"+";display:grid;width:25px;height:25px;flex:none;place-items:center;border:1px solid var(--border);border-radius:8px;color:var(--primary);font-size:17px}
+.mpa-progressive-section[open]>summary:after{content:"−"}
+.mpa-progressive-section>fieldset{margin-top:10px}
+.mpa-progressive-section:focus-within{border-color:color-mix(in srgb,var(--primary) 55%,var(--border))}
+.dark .mpa-members-workspace .card,.dark .mpa-jobs-page .card,.dark .mpa-mentorship-page .card{box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.dark .mpa-jobs-page .mpa-signature-intro,.dark .mpa-members-workspace>header{border-color:var(--border)}
+.dark .mpa-progressive-section,.dark .mpa-mentorship-page .case-row{background:color-mix(in srgb,var(--surface) 90%,var(--primary) 10%)}
+.dark .mpa-members-workspace .rounded-2xl{background:var(--surface)}
+@media(max-width:620px){.mpa-progressive-section{padding:9px}.mpa-progressive-section>summary{min-height:42px}.mpa-jobs-page .form-category input,.mpa-jobs-page .form-category select{width:100%}.mpa-mentorship-page input:not([type=checkbox]),.mpa-mentorship-page select,.mpa-mentorship-page textarea{width:100%;max-width:100%}}

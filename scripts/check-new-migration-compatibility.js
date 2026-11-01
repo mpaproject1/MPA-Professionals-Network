@@ -971,7 +971,7 @@ try {
   if(JSON.stringify(pushTablesAfterRollback.rows)!==JSON.stringify(pushTableBaseline.rows))throw new Error("Rollback rehearsal did not restore the pre-existing Web Push table baseline exactly.");
   const pushPreferenceDefaultAfterRollback=await client.query("select column_default from information_schema.columns where table_schema='public' and table_name='notification_preference' and column_name='push_enabled'");
   if(JSON.stringify(pushPreferenceDefaultAfterRollback.rows)!==JSON.stringify(pushPreferenceDefaultBaseline.rows))throw new Error("Rollback rehearsal did not restore the pre-existing notification push preference default exactly.");
-  console.log("PASS: all listed migrations and post-migration assertions succeeded; rollback removed governance and unified score tables and their immutability triggers from the disposable transaction.");
+  console.log("PASS: all listed migrations and post-migration assertions succeeded; rollback restored the exact pre-rehearsal taxonomy, governance, score and Web Push baselines.");
   console.log("NOTE: this validates migration execution and existing column types/FK targets; it does not replace application-level integration tests.");
 } catch (error) {
   if (transactionOpen) {

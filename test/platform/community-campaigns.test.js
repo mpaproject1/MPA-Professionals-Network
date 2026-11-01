@@ -94,7 +94,7 @@ test("service worker rejects non-allow-listed click-through routes",async()=>{
  const worker=await readFile(new URL("../../web/public/sw.js",import.meta.url),"utf8");
  assert.match(worker,/const allowed = \["\/notifications", "\/serve-community", "\/mentorship", "\/jobs"/);
  assert.match(worker,/return "\/notifications";/);
- assert.match(worker,/clients\.navigate\(target\)/);
+ assert.match(worker,/client\.navigate\(target\)/);
 });
 
 test("campaign delivery never includes member identifiers in public push payload",async()=>{

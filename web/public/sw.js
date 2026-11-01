@@ -1,9 +1,10 @@
 /* MPA PWA foundation. Never cache API responses, authenticated pages, or user-specific data. */
 const CACHE_PREFIX = "mpa-pwa-";
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 const STATIC_CACHE = `${CACHE_PREFIX}static-${CACHE_VERSION}`;
 const PRECACHE_URLS = [
   "/",
+  "/mobile",
   "/manifest.webmanifest",
   "/brand/mpa-pwa-icon.svg",
   "/brand/mpa-logo-light.svg",
@@ -106,6 +107,8 @@ self.addEventListener("fetch", (event) => {
       // Public landing page may have been precached. Never replay a private URL.
       const cachedHome = await caches.match("/");
       if (cachedHome && url.pathname === "/") return cachedHome;
+      const cachedMobileHome = await caches.match("/mobile");
+      if (cachedMobileHome && url.pathname === "/mobile") return cachedMobileHome;
       return new Response(
         "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"theme-color\" content=\"#0A3258\"><title>Offline · MPA</title><body style=\"font:16px system-ui;max-width:38rem;margin:12vh auto;padding:1.25rem;color:#0A3258\"><h1>You’re offline</h1><p>Reconnect to continue using MPA. Sign-in, forms, notifications, review decisions and account data require a live connection.</p><button onclick=\"location.reload()\">Try again</button></body></html>",
         { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }, status: 503 }

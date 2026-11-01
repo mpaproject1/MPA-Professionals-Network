@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useState} from "react";
 import {api} from "../../../../../lib/api";
 import {useUiStore} from "../../../../../lib/store";
-import {AdminPageHeader} from "../../../../admin-page-header";
+import {AdminPageHeader} from "../../../admin-page-header";
 type Row=Record<string,any>;
 const sources=["serve_community_participation","offline_completed_project","mentorship","professional_service","employment_referral","network_plus_collaboration","network_plus_partnership","historical_contribution"];
 export default function RecognitionProgramsAdminPage(){

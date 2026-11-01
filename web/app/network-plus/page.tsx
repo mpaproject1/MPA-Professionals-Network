@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, Handshake, Network, ShieldCheck, BriefcaseBusiness } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, Building2, Handshake, Network, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { NetworkPlusAccessGuard } from "../../components/network-plus-access-guard";
 

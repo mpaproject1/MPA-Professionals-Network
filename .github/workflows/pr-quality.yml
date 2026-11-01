@@ -123,20 +123,35 @@ jobs:
           DATABASE_URL="$UPGRADE_DATABASE_URL" bash scripts/ci-migration-upgrade.sh
       - name: Apply repository migrations to disposable CI database
         run: npm run migrate
-      - name: Verify migration compatibility in rollback-only transaction
-        run: npm run check:migrations:rollback
-      - name: Run every backend test file
+      - name: Verify migration compatibility and run every backend test file (collect all failures)
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          MIGRATION_STATUS=0
+          TEST_STATUS=0
+
+          echo "=== Rollback-only migration compatibility audit ==="
+          npm run check:migrations:rollback || MIGRATION_STATUS=$?
+
+          echo
+          echo "=== Complete backend test suite ==="
           mapfile -t TEST_FILES < <(find test tests -type f -name '*.test.js' -print 2>/dev/null | sort || true)
           if (( ${#TEST_FILES[@]} == 0 )); then
             echo "No backend .test.js files found; refusing a false-green result."
+            TEST_STATUS=1
+          else
+            printf 'Discovered %s backend test files.\\n' "${#TEST_FILES[@]}"
+            printf '%s\\n' "${TEST_FILES[@]}"
+            node --test "${TEST_FILES[@]}" || TEST_STATUS=$?
+          fi
+
+          echo
+          echo "=== Backend validation summary ==="
+          echo "Migration compatibility exit code: ${MIGRATION_STATUS}"
+          echo "Backend test suite exit code:       ${TEST_STATUS}"
+          if (( MIGRATION_STATUS != 0 || TEST_STATUS != 0 )); then
             exit 1
           fi
-          printf 'Discovered %s backend test files.\n' "${#TEST_FILES[@]}"
-          printf '%s\n' "${TEST_FILES[@]}"
-          node --test "${TEST_FILES[@]}"
 
   production-build:
     name: Next.js build, browser acceptance and membership card PDF validation (no deployment)

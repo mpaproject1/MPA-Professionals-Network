@@ -2,7 +2,7 @@
 
 import {ChevronLeft,ChevronRight,HelpCircle,PlayCircle,X} from "lucide-react";
 import {usePathname} from "next/navigation";
-import {useCallback,useEffect,useMemo,useRef,useState} from "react";
+import {useCallback,useEffect,useId,useMemo,useRef,useState} from "react";
 import {api} from "../lib/api";
 
 type Step={target?:string;title:string;text:string};
@@ -13,6 +13,7 @@ function visibleTarget(selector?:string):HTMLElement|null{
  try{return Array.from(document.querySelectorAll<HTMLElement>(selector)).find(el=>{const style=window.getComputedStyle(el);return style.display!=="none"&&style.visibility!=="hidden"&&el.getClientRects().length>0;})||null;}catch{return null;}
 }
 export function GuideLauncher(){
+ const idPrefix=useId();
  const pathname=usePathname()||"/";const [guides,setGuides]=useState<Guide[]>([]);
  const [open,setOpen]=useState(false);const [index,setIndex]=useState(0);const [cardPlacement,setCardPlacement]=useState<"top"|"bottom">("bottom");const launcherRef=useRef<HTMLButtonElement>(null);const headingRef=useRef<HTMLHeadingElement>(null);
  useEffect(()=>{let cancelled=false;setIndex(0);api<Guide[]>(`/api/v1/experience/guides?route=${encodeURIComponent(pathname)}`).then(rows=>{if(!cancelled)setGuides(Array.isArray(rows)?rows:[])}).catch(()=>{if(!cancelled)setGuides([])});return()=>{cancelled=true}},[pathname]);
@@ -29,12 +30,12 @@ export function GuideLauncher(){
   <button ref={launcherRef} type="button" id="mpa-help" data-guide-target="help-control" className="guide-help" aria-label="Show me around this screen" onClick={begin}><HelpCircle size={18}/> {pathname==="/members"?"Show me around":"Guide"}</button>
   {open?<div className="guide-overlay" data-testid="guide-overlay">
    {targetExists&&step?.target?<GuideSpotlight target={step.target}/>:null}
-   <aside className="guide-card" style={cardPlacement==="top"?{top:"calc(76px + env(safe-area-inset-top))",bottom:"auto"}:undefined} role="dialog" aria-modal="false" aria-labelledby="guide-title" aria-describedby="guide-description">
+   <aside className="guide-card" style={cardPlacement==="top"?{top:"calc(76px + env(safe-area-inset-top))",bottom:"auto"}:undefined} role="dialog" aria-modal="false" aria-labelledby={`${idPrefix}-guide-title`} aria-describedby={`${idPrefix}-guide-description`}>
     <div className="row"><span className="badge badge-green"><PlayCircle size={13}/> Guided tour</span><button type="button" className="icon-btn" onClick={close} aria-label="Close tour"><X size={17}/></button></div>
-    <div id="guide-title" className="eyebrow" style={{marginTop:14}}>{guide.title}</div>
+    <div id={`${idPrefix}-guide-title`} className="eyebrow" style={{marginTop:14}}>{guide.title}</div>
     <p className="muted" aria-live="polite">Step {index+1} of {steps.length}</p>
     <h2 id="guide-step-title" ref={headingRef} tabIndex={-1}>{step?.title||guide.title}</h2>
-    <p id="guide-description" className="muted">{step?.text||guide.description}</p>
+    <p id={`${idPrefix}-guide-description`} className="muted">{step?.text||guide.description}</p>
     {!targetExists&&step?.target?<p className="guide-fallback" role="status">That control is not visible in this layout. You can continue using this explanation; no page controls are blocked.</p>:null}
     <div className="guide-progress" aria-hidden="true">{steps.map((_,i)=><span key={i} className={i<=index?"done":""}/>)}</div>
     <div className="row" style={{marginTop:16,flexWrap:"wrap"}}>

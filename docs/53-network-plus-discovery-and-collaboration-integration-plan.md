@@ -377,3 +377,13 @@ The distinct Serve-Community initiative and consent-based participation domain h
 The legacy classification flow is deliberately opt-in and owner-originated. No service listing was converted or hidden. A legacy service can only be linked to a separately created initiative after owner proposal and independent reviewer approval; reversal changes only the mapping history and never mutates the source service listing.
 
 **Validation remains pending on the exact implementation head.** Do not merge or deploy until the migration compatibility rollback check, backend test suite, type/lint checks, production build and Playwright acceptance all pass. PR #18 remains draft.
+
+
+## CI remediation record — run 41267820253
+
+- Audited the failed run at source revision `c32ecaf4d00ffdd4449683e4d65a25f02a5ce754`; four jobs failed: Next.js build, backend legacy-schema migration verification, Biome lint and TypeScript.
+- Repaired the Community Impact manual-claim migration structure: restored the consent hash constraint and consent fields, created the private evidence table before its indexes/triggers/retention alterations, and removed a duplicated second copy of the claim tables and guards. Consent, evidence provenance, reviewer assignment, immutable history and retention controls remain enforced.
+- Removed the build-time dependency on fetching Google Fonts by using local/system font fallback variables; corrected both recognition admin header import paths.
+- Corrected claim reviewer API field casing, guarded nullable evidence file identifiers, and typed the scoring-policy JSON variable.
+- Applied safe Biome fixes to import ordering, explicit button types, unused imports, the redundant fragment/ternary/boolean casts, and the type-only icon reference. No lint rules or CI gates were disabled.
+- Changes are on `feat/workstream-3-progress-members-workspace`. This record does not claim CI has passed: rerun the complete validation against the updated branch head and resolve any newly exposed diagnostics before treating the workstream as ready. No production database or deployment was touched.

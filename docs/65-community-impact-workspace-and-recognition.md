@@ -85,8 +85,9 @@ System administrators retain access. Other staff require explicit permission gra
 - `20261101240000_community_impact_recognition_and_engagement.sql`
 - `20261101250000_community_impact_recognition_program_governance.sql`
 - `20261101260000_community_impact_recognition_lifecycle_guards.sql`
+- `20261101270000_community_impact_notification_category.sql`
 
-The disposable migration compatibility checker now includes all three recognition migrations and required recognition tables. Source-contract tests were added in `test/platform/community-impact-workspace-recognition.test.js` and included in `npm run test:community-impact`.
+The disposable migration compatibility checker now includes all four recognition and notification migrations and required recognition tables. Source-contract tests were added in `test/platform/community-impact-workspace-recognition.test.js` and included in `npm run test:community-impact`.
 
 ### Acceptance gates intentionally not claimed as passed
 

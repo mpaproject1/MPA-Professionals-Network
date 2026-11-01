@@ -1,6 +1,6 @@
 "use client";
-import {useCallback,useEffect,useMemo,useState} from "react";
-import {Copy,RefreshCw,Users,BriefcaseBusiness,LockKeyhole} from "lucide-react";
+import {BriefcaseBusiness, Copy, LockKeyhole, RefreshCw, Users} from "lucide-react";
+import {useCallback, useEffect, useMemo, useState} from "react";
 import {api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
 
@@ -22,7 +22,7 @@ export default function ReferralsPage(){
   {data&&<>
    <section className="card" style={{padding:22,marginBottom:18}}>
     <div className="flex items-center justify-between gap-3"><div><p className="eyebrow">Your member referral code</p><h2 className="h2" style={{letterSpacing:".08em"}}>{data.code.code}</h2><p className="muted">This code belongs to your active membership. Do not share account credentials.</p></div><span className="badge">{data.code.status}</span></div>
-    <div className="flex flex-wrap gap-2" style={{marginTop:12}}><button className="btn btn-primary" onClick={()=>void share("membership")}><Copy size={16}/> Copy membership invitation</button><button className="btn btn-ghost" onClick={()=>{void navigator.clipboard.writeText(window.location.origin+"/jobs?ref="+encodeURIComponent(data.code.code)).then(()=>setNotice("Job referral link copied. The candidate can apply to a specific vacancy and the code will be carried into the formal application."));}}><BriefcaseBusiness size={16}/> Copy code for a job referral</button><button className="btn btn-ghost" onClick={()=>void load()}><RefreshCw size={16}/> Refresh</button></div>
+    <div className="flex flex-wrap gap-2" style={{marginTop:12}}><button type="button" className="btn btn-primary" onClick={()=>void share("membership")}><Copy size={16}/> Copy membership invitation</button><button type="button" className="btn btn-ghost" onClick={()=>{void navigator.clipboard.writeText(window.location.origin+"/jobs?ref="+encodeURIComponent(data.code.code)).then(()=>setNotice("Job referral link copied. The candidate can apply to a specific vacancy and the code will be carried into the formal application."));}}><BriefcaseBusiness size={16}/> Copy code for a job referral</button><button type="button" className="btn btn-ghost" onClick={()=>void load()}><RefreshCw size={16}/> Refresh</button></div>
     <p className="muted" style={{marginTop:10}}>For a job referral, open the specific vacancy and use its share option. The code must be attached to that job's application; a membership registration link does not verify employment.</p>
    </section>
    {notice&&<p className="form-success" role="status">{notice}</p>}

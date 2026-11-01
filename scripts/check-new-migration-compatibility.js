@@ -206,6 +206,15 @@ try {
     return { filename, sql: migration.sql };
   });
 
+  // Capture objects that may already exist because this audit deliberately replays
+  // migrations over an installed schema. A rollback must restore that exact baseline,
+  // not erase objects that were present before the transaction.
+  const taxonomyConstraintNames = ["community_impact_claim_category_code_check","community_impact_claim_contribution_type_code_check","community_impact_claim_contribution_role_code_check","community_impact_claim_evidence_type_code_check"];
+  const taxonomyConstraintBaseline = await client.query(
+    "select conrelid::regclass::text relation,conname,pg_get_constraintdef(oid) definition,convalidated from pg_constraint where conname=any($1::text[]) order by conrelid::regclass::text,conname",
+    [taxonomyConstraintNames]
+  );
+
   await client.query("begin");
   transactionOpen = true;
   await client.query("set local lock_timeout = '5s'");
@@ -855,8 +864,11 @@ try {
    if(taxonomyRows.rowCount!==4||taxonomyRows.rows.some(row=>row.active_items<1))throw new Error("All four Community Impact governed taxonomies must contain active published reference values.");
    await client.query("rollback");
   transactionOpen = false;
-  const taxonomyConstraintRollback=await client.query("select count(*)::int count from pg_constraint where conname=any($1::text[])",[["community_impact_claim_category_code_check","community_impact_claim_contribution_type_code_check","community_impact_claim_contribution_role_code_check","community_impact_claim_evidence_type_code_check"]]);
-  if(taxonomyConstraintRollback.rows[0].count!==0)throw new Error("Rollback rehearsal left dynamic taxonomy constraints behind.");
+  const taxonomyConstraintRollback=await client.query(
+    "select conrelid::regclass::text relation,conname,pg_get_constraintdef(oid) definition,convalidated from pg_constraint where conname=any($1::text[]) order by conrelid::regclass::text,conname",
+    [taxonomyConstraintNames]
+  );
+  if(JSON.stringify(taxonomyConstraintRollback.rows)!==JSON.stringify(taxonomyConstraintBaseline.rows))throw new Error("Rollback rehearsal did not restore the pre-existing dynamic taxonomy constraints exactly.");
   const taxonomyRollback=await client.query("select count(*)::int count from reference_dataset where dataset_key=any($1::text[])",[requiredCommunityImpactTaxonomyDatasets]);
   if(taxonomyRollback.rows[0].count!==0)throw new Error("Rollback rehearsal left Community Impact taxonomy datasets behind.");
   const rollbackTables=await client.query("select count(*)::int count from information_schema.tables where table_schema='public' and table_name=any($1::text[])",[["community_impact_identity_assurance_case","community_impact_identity_assurance_evidence","community_impact_identity_assurance_decision","community_impact_detection_policy_governance","community_impact_detection_policy_event","community_impact_offline_attribution","community_impact_offline_attribution_evidence","community_impact_claim_candidate_link","community_impact_reviewer_conflict","community_impact_contribution_assessment","community_impact_contribution_assessment_event","community_impact_retention_evaluation","community_impact_governance_event"]]);

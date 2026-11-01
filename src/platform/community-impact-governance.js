@@ -70,7 +70,7 @@ export async function decideIdentityAssurance(actorUserId,caseId,input,requestId
 export async function assertClaimantIdentityAssured(db,userId){
  if(await activeMember(db,userId))return;
  const c=(await db.query("select status from community_impact_identity_assurance_case where user_id=$1 order by created_at desc limit 1",[userId])).rows[0];
- if(c?.status!=="verified")fail(409,"Non-member claimants must complete MPA identity assurance before submitting a contribution claim. This does not create membership.","IDENTITY_ASSURANCE_REQUIRED");
+ if(c?.status!=="verified")fail(409,"Non-member claimants must complete MPA identity assurance before submitting a contribution claim. Identity assurance does not create or grant membership.","IDENTITY_ASSURANCE_REQUIRED");
 }
 export async function proposeOfflineAttribution(userId,candidateId,input,requestId){
  await permission(getPool(),userId,"community_impact.detection.manage");

@@ -24,7 +24,7 @@ test("campaign destinations are restricted to verified same-origin MPA routes",(
  assert.equal(validateCampaignActionUrl("//evil.example/path"),null);
  assert.equal(validateCampaignActionUrl("https://evil.example"),null);
  assert.equal(validateCampaignActionUrl("/admin/users"),null);
- assert.equal(validateCampaignActionUrl("/jobs\\\\evil"),null);
+ assert.equal(validateCampaignActionUrl("/jobs\\\\evil"),null);\n assert.equal(validateCampaignActionUrl("/serve-community/%2e%2e/admin"),null);
 });
 
 test("Africa/Addis_Ababa Friday 15:00 resolves to 12:00 UTC",()=>{

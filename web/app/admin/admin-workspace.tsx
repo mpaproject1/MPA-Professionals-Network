@@ -21,7 +21,7 @@ const destinations: Destination[] = [
   { href: "/admin/membership", label: "Membership administration", description: "Plan versions, reviews and payments", icon: ShieldCheck },
   { href: "/admin/membership/payment-methods", label: "Payment methods", description: "Finance-only member payment configuration", icon: CreditCard },
   { href: "/admin/membership-card", label: "Membership card", description: "Credential appearance", icon: ShieldCheck },
-  { href: "/admin/reference-portfolio", label: "Reference data", description: "Governed profile options", icon: BookOpenCheck },
+  { href: "/admin/reference-portfolio", label: "Reference data & taxonomies", description: "Manage versioned education, professional and Community Impact classifications", icon: BookOpenCheck },
   { href: "/admin/marketplace", label: "Serve-Community review", description: "Demand and listing review", icon: ClipboardList },
   { href: "/admin/serve-community/offline-projects", label: "Completed projects", description: "Record and review completed offline community projects", icon: ClipboardList },
   { href: "/admin/community-impact/retention-policy", label: "Impact retention policy", description: "Propose and approve evidence-retention rules", icon: Scale },

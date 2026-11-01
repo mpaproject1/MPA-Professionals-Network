@@ -21,10 +21,15 @@ export async function seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,
   await mkdir(path.dirname(target),{recursive:true});
   await writeFile(target,body,{encoding:"utf8",flag:"wx",mode:0o600});
   createdFiles.push(key);
+  const checksum=digest(body),byteSize=Buffer.byteLength(body,"utf8");
   const row=(await tx.query(
    "insert into file_object(storage_provider,object_key,original_name,content_type,byte_size,checksum_sha256,visibility,created_by) values('private-local',$1,$2,'text/plain',$3,$4,'private',$5) returning id",
-   [key,fileName,Buffer.byteLength(body,"utf8"),digest(body),owner]
+   [key,fileName,byteSize,checksum,owner]
   )).rows[0];
+  await tx.query(
+   "insert into private_upload_session(user_id,object_key,original_name,content_type,expected_byte_size,expected_checksum_sha256,upload_token_sha256,status,actual_byte_size,actual_checksum_sha256,file_object_id,expires_at,uploaded_at,confirmed_at,purpose) values($1,$2,$3,'text/plain',$4,$5,$6,'confirmed',$4,$5,$7,now()+interval '30 days',now(),now(),'general')",
+   [owner,key,fileName,byteSize,checksum,digest("test-lab-upload:"+portfolioId+":"+fileName),row.id]
+  );
   return row.id;
  }
  const qualificationFile=await evidence(members[2].userId,"professional-qualification-evidence.txt",

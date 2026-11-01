@@ -140,7 +140,7 @@ export async function dispatchPendingPushNotifications(limit=50){
    FROM candidates c WHERE d.id=c.id RETURNING d.id,d.notification_event_id,d.subscription_id,d.attempts
  )
  SELECT c.id,c.notification_event_id,c.attempts,s.id subscription_id,s.endpoint,s.p256dh,s.auth_secret,s.revoked_at,p.push_enabled,
-   n.action_url,n.priority,n.read_at,n.archived_at,n.category,coalesce(p.community_campaign_enabled,false) community_campaign_enabled
+   n.action_url,n.priority,n.read_at,n.archived_at,n.category,n.title,n.body,coalesce(p.community_campaign_enabled,false) community_campaign_enabled
  FROM claimed c JOIN notification_push_subscription s ON s.id=c.subscription_id
  JOIN notification_preference p ON p.user_id=s.user_id
  JOIN notification_event n ON n.id=c.notification_event_id AND n.user_id=s.user_id`,[batch]);
@@ -149,7 +149,7 @@ export async function dispatchPendingPushNotifications(limit=50){
   if(row.revoked_at||row.push_enabled!==true||row.read_at||row.archived_at||(row.category==="community_campaign"&&row.community_campaign_enabled!==true)){
    await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_SUPPRESSED',updated_at=now() WHERE id=$1",[row.id]);failed++;return;
   }
-  const result=await deliverOne(row,config);
+  const campaignPayload=row.category==="community_campaign"?{title:String(row.title||"MPA · Community contribution").slice(0,100),body:String(row.body||"A new community contribution invitation is available.").slice(0,3000),url:row.action_url&&row.action_url.startsWith("/")&&!row.action_url.startsWith("//")?row.action_url:"/notifications",notificationId:row.notification_event_id,priority:"low"}:null;\n  const result=await deliverOne(row,config,campaignPayload);
   if(result.ok){
    await db.query("UPDATE notification_push_delivery SET status='sent',delivered_at=now(),last_status_code=$2,last_error_code=NULL,updated_at=now() WHERE id=$1",[row.id,result.status]);
    await db.query("UPDATE notification_push_subscription SET last_used_at=now() WHERE id=$1",[row.subscription_id]);sent++;return;

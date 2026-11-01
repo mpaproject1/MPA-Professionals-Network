@@ -52,7 +52,7 @@ test("push endpoint validation rejects insecure, local and non-provider endpoint
 });
 
 test("PWA install shell registers service worker and exposes a standalone manifest",async()=>{
- const [layout,shell,manifest,worker,checker,api,notifications,pushUi,appleIcon,mobilePage]=await Promise.all([
+ const [layout,shell,manifest,worker,checker,api,notifications,pushUi,appleIcon,mobilePage,pushService]=await Promise.all([
   readFile(new URL("../../web/app/layout.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/components/shell.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/public/manifest.webmanifest",import.meta.url),"utf8"),
@@ -62,7 +62,8 @@ test("PWA install shell registers service worker and exposes a standalone manife
   readFile(new URL("../../src/platform/notifications.js",import.meta.url),"utf8"),
   readFile(new URL("../../web/components/push-notification-settings.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/public/brand/apple-touch-icon.png",import.meta.url)),
-  readFile(new URL("../../web/app/mobile/page.tsx",import.meta.url),"utf8")
+  readFile(new URL("../../web/app/mobile/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../../src/platform/web-push.js",import.meta.url),"utf8")
  ]);
  const config=JSON.parse(manifest);
  assert.equal(config.display,"standalone");
@@ -91,6 +92,11 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.ok(checker.includes("Web Push table baseline exactly"));
  assert.ok(api.includes("api/v1/notifications/push/subscriptions"));
  assert.ok(api.includes("disablePushForUser(identity.sub)"));
+ assert.ok(api.includes("api/v1/notifications/push/subscriptions"));
+ assert.ok(pushService.includes("n.user_id=s.user_id"));
+ assert.ok(pushService.includes("PUSH_OPT_OUT"));
+ assert.ok(shell.includes("api(\"/api/v1/notifications/push/subscriptions\""));
+ assert.ok(shell.includes("await subscription.unsubscribe()"));
  assert.ok(notifications.includes("enqueuePushDelivery(db,notification.id,userId)"));
  assert.ok(pushUi.includes("Notification.requestPermission()"));
  assert.ok(pushUi.includes("userVisibleOnly:true"));

@@ -36,11 +36,12 @@ test("push endpoint validation rejects insecure, local and non-provider endpoint
 });
 
 test("PWA install shell registers service worker and exposes a standalone manifest",async()=>{
- const [layout,shell,manifest,worker]=await Promise.all([
+ const [layout,shell,manifest,worker,checker]=await Promise.all([
   readFile(new URL("../../web/app/layout.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/components/shell.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/public/manifest.webmanifest",import.meta.url),"utf8"),
-  readFile(new URL("../../web/public/sw.js",import.meta.url),"utf8")
+  readFile(new URL("../../web/public/sw.js",import.meta.url),"utf8"),
+  readFile(new URL("../../scripts/check-new-migration-compatibility.js",import.meta.url),"utf8")
  ]);
  const config=JSON.parse(manifest);
  assert.equal(config.display,"standalone");

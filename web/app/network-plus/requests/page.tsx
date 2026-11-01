@@ -112,7 +112,7 @@ export default function NetworkPlusRequestsPage(){
  const canAccept=selected?.canAccept&&(selected?.status==="submitted"||selected?.status==="under_review"||selected?.status==="clarification_requested");
  const recipientPending=selected?.participants?.some(p=>p.participant_role==="recipient_representative"&&p.consent_status==="pending");
 
- return <NetworkPlusAccessGuard><main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6">
+ return <NetworkPlusAccessGuard><main className="np-requests-workspace">
   <header className="grid gap-2"><div className="eyebrow">Network-Plus · Requests and collaboration</div><h1 className="h1">Requests that become collaboration only by agreement.</h1><p className="muted max-w-3xl">Create a typed request, submit it to the intended recipient, and wait for explicit acceptance. Submission is not a contract, commitment or active engagement. Private request records are visible only to participants and authorized support staff.</p></header>
   {error&&<div role="alert" className="rounded-xl border border-red-500/40 p-3 text-sm">{error}</div>}
   {notice&&<div role="status" className="rounded-xl border border-[var(--border)] p-3 text-sm">{notice}</div>}

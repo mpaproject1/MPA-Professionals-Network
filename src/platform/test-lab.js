@@ -4,6 +4,7 @@ import { rm } from "node:fs/promises";
 import { getPool, withTransaction } from "./db.js";
 import { hashPassword } from "../membership/identity.js";
 import { createXlsx } from "./xlsx.js";
+import { seedTestLabDomainFixtures } from "./test-lab-domain-fixtures.js";
 
 const ROLE_FIXTURES = [
  {persona:"Member — incomplete profile",name:["Amina","Yusuf"],role:"member"},
@@ -80,6 +81,8 @@ export async function createTestPortfolio(identity,input={},requestId=null){
  const commit=clean(input.commitSha||process.env.GIT_COMMIT_SHA||"",64)||null;
  const portfolioId=randomId(),prefix=portfolioId.replace(/-/g,"").slice(0,6);
  const accounts=[];
+ const syntheticFiles=[];
+ try {
  await withTransaction(async tx=>{
   const p=(await tx.query(`insert into test_portfolio(id,name,environment,database_name,branch_ref,commit_sha,created_by,expires_at,metadata)
    values($1,$2,$3,$4,$5,$6,$7,now()+($8::int*interval '1 day'),$9) returning id,name,expires_at`,
@@ -143,7 +146,12 @@ export async function createTestPortfolio(identity,input={},requestId=null){
     await tx.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','simulated_membership_payment_pending',$2)",[portfolioId,{paymentId:payment.id,applicationId:application.id,amount:Number(basicProduct.price),currency:basicProduct.currency}]);
    }
   }
+  await seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,createdFiles:syntheticFiles});
  });
+ } catch(error) {
+  await Promise.allSettled(syntheticFiles.map(key=>rm(safeStoragePath(key),{force:true})));
+  throw error;
+ }
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'test_lab.portfolio.created','test_portfolio',$2,$3,'success',$4)",
   [identity.sub,portfolioId,requestId,{name,accountCount:accounts.length,expiryDays:days}]);
  return {id:portfolioId,name,expiresAt:(await db.query("select expires_at from test_portfolio where id=$1",[portfolioId])).rows[0].expires_at,accountCount:accounts.length,accounts:accounts.map(({userId,...safe})=>safe),message:"Export the temporary credentials workbook separately. No email or push was sent."};

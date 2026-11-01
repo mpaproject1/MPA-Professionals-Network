@@ -3,6 +3,7 @@ import {ArrowRight, BellRing, CheckCircle2, ShieldCheck, Sparkles, Volume2, Volu
 import Link from "next/link";
 import {useCallback, useEffect, useState} from "react";
 import {api} from "../lib/api";
+
 type Row=Record<string,any>;
 type Impact=Row&{score:number;policyVersion:number;dimensions:Row[];categoryBreakdown:Row[];items:Row[];claims:Row[];pendingClaims:Row[];detectedContributions:Row[];reminders:Row[]};
 const label=(v:string)=>String(v||"Other").replaceAll("_"," ").replace(/\b\w/g,x=>x.toUpperCase());

@@ -24,10 +24,18 @@ test("campaign destinations are restricted to verified same-origin MPA routes",(
  assert.equal(validateCampaignActionUrl("//evil.example/path"),null);
  assert.equal(validateCampaignActionUrl("https://evil.example"),null);
  assert.equal(validateCampaignActionUrl("/admin/users"),null);
- assert.equal(validateCampaignActionUrl("/jobs\\\\evil"),null);\n assert.equal(validateCampaignActionUrl("/serve-community/%2e%2e/admin"),null);
+ assert.equal(validateCampaignActionUrl("/jobs\\\\evil"),null);
+ assert.equal(validateCampaignActionUrl("/serve-community/%2e%2e/admin"),null);
 });
 
-test("local schedule times accept only valid 24-hour HH:mm values",()=>{\n assert.equal(isValidLocalTime("15:00"),true);\n assert.equal(isValidLocalTime("09:00"),true);\n assert.equal(isValidLocalTime("25:00"),false);\n assert.equal(isValidLocalTime("9:00"),false);\n});\n\ntest("Africa/Addis_Ababa Friday 15:00 resolves to 12:00 UTC",()=>{
+test("local schedule times accept only valid 24-hour HH:mm values",()=>{
+ assert.equal(isValidLocalTime("15:00"),true);
+ assert.equal(isValidLocalTime("09:00"),true);
+ assert.equal(isValidLocalTime("25:00"),false);
+ assert.equal(isValidLocalTime("9:00"),false);
+});
+
+test("Africa/Addis_Ababa Friday 15:00 resolves to 12:00 UTC",()=>{
  const date=zonedLocalToUtc({year:2026,month:11,day:6,hour:15,minute:0},"Africa/Addis_Ababa");
  assert.equal(date.toISOString(),"2026-11-06T12:00:00.000Z");
 });

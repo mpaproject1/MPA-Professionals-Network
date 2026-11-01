@@ -81,6 +81,8 @@ export async function registerPushSubscription(userId,input){
 export async function removePushSubscription(userId,endpoint){
  const safe=validPushEndpoint(endpoint);if(!safe)fail(400,"The browser push endpoint is invalid.");
  const db=getPool();
+ const existing=await db.query("SELECT id FROM notification_push_subscription WHERE user_id=$1 AND endpoint_sha256=$2 AND revoked_at IS NULL",[userId,sha256(safe)]);
+ if(existing.rowCount)await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='SUBSCRIPTION_REVOKED',updated_at=now() WHERE subscription_id=ANY($1::uuid[]) AND status IN ('pending','sending')",[existing.rows.map(row=>row.id)]);
  await db.query("UPDATE notification_push_subscription SET revoked_at=coalesce(revoked_at,now()),updated_at=now() WHERE user_id=$1 AND endpoint_sha256=$2",[userId,sha256(safe)]);
  const active=await db.query("SELECT 1 FROM notification_push_subscription WHERE user_id=$1 AND revoked_at IS NULL LIMIT 1",[userId]);
  if(!active.rowCount)await db.query("INSERT INTO notification_preference(user_id,push_enabled,updated_at) VALUES($1,false,now()) ON CONFLICT(user_id) DO UPDATE SET push_enabled=false,updated_at=now()",[userId]);
@@ -88,7 +90,7 @@ export async function removePushSubscription(userId,endpoint){
 }
 export async function getPushSubscriptionStatus(userId){
  const db=getPool(),config=vapidConfig();
- const result=await db.query("SELECT count(*)::int active_devices FROM notification_push_subscription WHERE user_id=$1 AND revoked_at IS NULL",[userId]);
+ const result=await db.query("SELECT count(*)::int active_devices FROM notification_push_subscription s JOIN notification_preference p ON p.user_id=s.user_id AND p.push_enabled=true WHERE s.user_id=$1 AND s.revoked_at IS NULL",[userId]);
  return {configured:Boolean(config),enabled:Boolean(config)&&Number(result.rows[0]?.active_devices)>0,activeDevices:Number(result.rows[0]?.active_devices)||0};
 }
 export async function enqueuePushDelivery(db,notificationId,userId){
@@ -115,18 +117,20 @@ export async function dispatchPendingPushNotifications(limit=50){
  const config=vapidConfig();if(!config)return {sent:0,failed:0,skipped:true,reason:"VAPID_NOT_CONFIGURED"};
  const db=getPool(),batch=Math.min(Math.max(Number(limit)||50,1),200);
  const claimed=await db.query(`WITH candidates AS (
-   SELECT id FROM notification_push_delivery WHERE status='pending' AND available_at<=now()
+   SELECT id FROM notification_push_delivery WHERE (status='pending' AND available_at<=now()) OR (status='sending' AND updated_at<now()-interval '5 minutes')
    ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT $1
  ), claimed AS (
    UPDATE notification_push_delivery d SET status='sending',attempts=d.attempts+1,updated_at=now()
    FROM candidates c WHERE d.id=c.id RETURNING d.id,d.notification_event_id,d.subscription_id,d.attempts
  )
- SELECT c.id,c.notification_event_id,c.attempts,s.id subscription_id,s.endpoint,s.p256dh,s.auth_secret,
+ SELECT c.id,c.notification_event_id,c.attempts,s.id subscription_id,s.endpoint,s.p256dh,s.auth_secret,s.revoked_at,p.push_enabled,
    n.action_url,n.priority
  FROM claimed c JOIN notification_push_subscription s ON s.id=c.subscription_id
+ JOIN notification_preference p ON p.user_id=s.user_id
  JOIN notification_event n ON n.id=c.notification_event_id`,[batch]);
  let sent=0,failed=0;
  for(const row of claimed.rows){
+  if(row.revoked_at||row.push_enabled!==true){await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_OPT_OUT',updated_at=now() WHERE id=$1",[row.id]);failed++;continue;}
   const result=await deliverOne(row,config);
   if(result.ok){
    await db.query("UPDATE notification_push_delivery SET status='sent',delivered_at=now(),last_status_code=$2,last_error_code=NULL,updated_at=now() WHERE id=$1",[row.id,result.status]);

@@ -210,6 +210,10 @@ try {
   transactionOpen = true;
   await client.query("set local lock_timeout = '5s'");
   await client.query("set local statement_timeout = '60s'");
+  // This disposable rollback rehearsal runs against a schema that already has later migrations installed.
+  // Remove the later activation guard only inside this transaction so the historical detection migration
+  // is replayed in its original order; the governance migration below reinstalls the guard before assertions.
+  await client.query("drop trigger if exists trg_community_impact_detection_policy_activation_guard on community_impact_detection_active_policy");
   for (const migration of migrations) {
     await client.query(migration.sql);
     console.log(`PASS: ${migration.filename} applied inside rollback-only transaction`);

@@ -1423,3 +1423,11 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 .np-requests-workspace fieldset{border-color:var(--border);border-radius:12px;padding:11px}
 .np-requests-workspace .btn{min-height:38px;font-size:12px}
 @media(max-width:640px){.np-requests-workspace{padding:14px 11px 28px}.np-requests-workspace>div:last-of-type{grid-template-columns:minmax(0,1fr)!important}.np-requests-workspace .card{padding:13px}}
+
+
+.dark .sc-folder{background:linear-gradient(155deg,color-mix(in srgb,var(--surface) 84%,var(--folder-accent) 16%),var(--surface) 90%);box-shadow:0 9px 0 color-mix(in srgb,var(--folder-accent) 28%,transparent),0 17px 25px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.06)}
+.dark .sc-folder:before{background:color-mix(in srgb,var(--surface) 84%,var(--folder-accent) 16%)}
+.dark .sc-folder-icon{background:color-mix(in srgb,var(--surface) 75%,var(--folder-accent) 25%);border-color:color-mix(in srgb,var(--folder-accent) 45%,var(--border))}
+.dark .np-folder{background:linear-gradient(155deg,color-mix(in srgb,var(--surface) 84%,var(--np-accent) 16%),var(--surface) 90%);box-shadow:0 9px 0 color-mix(in srgb,var(--np-accent) 28%,transparent),0 18px 28px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.06)}
+.dark .np-folder:before{background:color-mix(in srgb,var(--surface) 84%,var(--np-accent) 16%)}
+.dark .np-folder-icon{background:color-mix(in srgb,var(--surface) 75%,var(--np-accent) 25%);border-color:color-mix(in srgb,var(--np-accent) 45%,var(--border))}

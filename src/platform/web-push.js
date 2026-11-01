@@ -1,5 +1,5 @@
 import {createHash,createPrivateKey,createECDH,createCipheriv,createSign,hkdfSync,randomBytes} from "node:crypto";
-import {getPool} from "./db.js";
+import {getPool,withTransaction} from "./db.js";
 
 const b64url=value=>Buffer.from(value).toString("base64url");
 const fromB64url=value=>Buffer.from(String(value||""),"base64url");
@@ -61,13 +61,21 @@ export async function registerPushSubscription(userId,input){
  if(!endpoint)fail(400,"This browser returned an unsupported push service endpoint.");
  if(fromB64url(p256dh).length!==65||fromB64url(p256dh)[0]!==4||fromB64url(auth).length<16||fromB64url(auth).length>32)fail(400,"The browser push subscription keys are invalid.");
  const expiration=Number.isFinite(input.expirationTime)?new Date(input.expirationTime):null;
- const db=getPool(),endpointHash=sha256(endpoint);
- await db.query(`INSERT INTO notification_push_subscription(user_id,endpoint,endpoint_sha256,p256dh,auth_secret,expiration_time,revoked_at,updated_at)
-   VALUES($1,$2,$3,$4,$5,$6,NULL,now())
-   ON CONFLICT(endpoint_sha256) DO UPDATE SET user_id=EXCLUDED.user_id,p256dh=EXCLUDED.p256dh,auth_secret=EXCLUDED.auth_secret,
-   expiration_time=EXCLUDED.expiration_time,revoked_at=NULL,updated_at=now()`,
-   [userId,endpoint,endpointHash,p256dh,auth,expiration]);
- await db.query("INSERT INTO notification_preference(user_id,push_enabled,updated_at) VALUES($1,true,now()) ON CONFLICT(user_id) DO UPDATE SET push_enabled=true,updated_at=now()",[userId]);
+ const endpointHash=sha256(endpoint);
+ await withTransaction(async db=>{
+  const existing=(await db.query("SELECT id,user_id FROM notification_push_subscription WHERE endpoint_sha256=$1 FOR UPDATE",[endpointHash])).rows[0];
+  if(existing&&existing.user_id!==userId){
+   // A browser endpoint belongs to one account at a time. Cancel queued deliveries
+   // before transferring it so a later account cannot receive the prior user's alerts.
+   await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='SUBSCRIPTION_REASSIGNED',updated_at=now() WHERE subscription_id=$1 AND status IN ('pending','sending')",[existing.id]);
+  }
+  await db.query(`INSERT INTO notification_push_subscription(user_id,endpoint,endpoint_sha256,p256dh,auth_secret,expiration_time,revoked_at,updated_at)
+    VALUES($1,$2,$3,$4,$5,$6,NULL,now())
+    ON CONFLICT(endpoint_sha256) DO UPDATE SET user_id=EXCLUDED.user_id,p256dh=EXCLUDED.p256dh,auth_secret=EXCLUDED.auth_secret,
+    expiration_time=EXCLUDED.expiration_time,revoked_at=NULL,updated_at=now()`,
+    [userId,endpoint,endpointHash,p256dh,auth,expiration]);
+  await db.query("INSERT INTO notification_preference(user_id,push_enabled,updated_at) VALUES($1,true,now()) ON CONFLICT(user_id) DO UPDATE SET push_enabled=true,updated_at=now()",[userId]);
+ });
  return getPushSubscriptionStatus(userId);
 }
 export async function removePushSubscription(userId,endpoint){

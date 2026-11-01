@@ -30,7 +30,7 @@ import {createLogger} from "./src/platform/logger.js";
 import * as memberReferrals from "./src/platform/member-referrals.js";
 import {resolveNetworkPlusAccess} from "./src/platform/network-plus-access.js";
 import * as notifications from "./src/platform/notifications.js";
-import {getWebPushPublicConfiguration,getPushSubscriptionStatus,registerPushSubscription,removePushSubscription} from "./src/platform/web-push.js";
+import {getWebPushPublicConfiguration,getPushSubscriptionStatus,registerPushSubscription,removePushSubscription,disablePushForUser} from "./src/platform/web-push.js";
 import {authorizePrivateUpload, confirmPrivateUpload, MAX_PRIVATE_UPLOAD_BYTES, readAuthorizedPrivateFile, receivePrivateUpload} from "./src/platform/private-file-storage.js";
 import * as publicOpportunity from "./src/platform/public-opportunity.js";
 import * as referencePortfolio from "./src/platform/reference-portfolio.js";
@@ -715,7 +715,7 @@ const server=http.createServer(async (req,res)=>{
      if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/notifications/") && parts[4]==="read") return ok(res,await notifications.markNotificationRead(identity.sub,parts[3],requestId),requestId);
      if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/notifications/") && parts[4]==="archive") return ok(res,await notifications.archiveNotification(identity.sub,parts[3],requestId),requestId);
      if(req.method==="GET" && p==="api/v1/notifications/preferences") return ok(res,await membership.notificationPreferences(identity.sub),requestId);
-    if(req.method==="PATCH" && p==="api/v1/notifications/preferences") return ok(res,await membership.notificationPreferences(identity.sub,await body(req)),requestId);
+    if(req.method==="PATCH" && p==="api/v1/notifications/preferences") { const b=await body(req); if(b.pushEnabled===false)await disablePushForUser(identity.sub); return ok(res,await membership.notificationPreferences(identity.sub,b),requestId); }
     if(req.method==="POST" && p==="api/v1/payments/chapa/verify") { const identity=await auth(req); requireRole(identity,"member"); const b=await body(req); return ok(res,await membership.verifyChapaMembershipPayment(b.merchantReference,requestId,identity.sub),requestId); }
      if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/membership/applications/") && parts[5]==="chapa-checkout") { const identity=await auth(req); requireRole(identity,"member"); return ok(res,await membership.initiateChapaMembershipPayment(parts[4],identity.sub,await body(req),requestId),requestId,201); }
      if(req.method==="POST" && p==="api/v1/membership/applications") {

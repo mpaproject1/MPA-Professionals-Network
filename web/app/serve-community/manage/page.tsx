@@ -1,5 +1,5 @@
 "use client";
-import {ArrowLeft,ArrowRight,ClipboardList,HeartHandshake,Plus,RefreshCw,Send,Users} from "lucide-react";
+import {ArrowLeft,ClipboardList,HeartHandshake,Plus,RefreshCw,Send,Users} from "lucide-react";
 import Link from "next/link";
 import type {FormEvent} from "react";
 import {useCallback,useEffect,useState} from "react";

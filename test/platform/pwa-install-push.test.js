@@ -14,10 +14,10 @@ test("Web Push payload uses RFC 8291 aes128gcm framing and decrypts with the sub
  assert.equal(recordSize,4096);
  assert.equal(keyLength,65);
  const shared=client.computeSecret(senderPublic);
- const info=Buffer.concat([Buffer.from("WebPush: info\\0"),client.getPublicKey(),senderPublic]);
+ const info=Buffer.concat([Buffer.from("WebPush: info\0"),client.getPublicKey(),senderPublic]);
  const ikm=Buffer.from(hkdfSync("sha256",shared,auth,info,32));
- const cek=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: aes128gcm\\0"),16));
- const nonce=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: nonce\\0"),12));
+ const cek=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: aes128gcm\0"),16));
+ const nonce=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: nonce\0"),12));
  const decipher=createDecipheriv("aes-128-gcm",cek,nonce);
  decipher.setAuthTag(ciphertext.subarray(-16));
  const clear=Buffer.concat([decipher.update(ciphertext.subarray(0,-16)),decipher.final()]);

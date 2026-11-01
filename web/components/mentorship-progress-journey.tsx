@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Card } from "./ui";
 
 export type MentorshipProgressStep = {
@@ -14,12 +15,13 @@ const STATUS_LABEL: Record<MentorshipProgressStep["status"], string> = {
 };
 
 export function MentorshipProgressJourney({ steps }: { steps: MentorshipProgressStep[] }) {
+  const headingId = useId();
   return (
     <Card>
-      <section aria-labelledby="mentorship-progress-title" className="grid" style={{ gap: 12 }}>
+      <section aria-labelledby={headingId} className="grid" style={{ gap: 12 }}>
         <div>
           <div className="eyebrow">Your mentorship journey</div>
-          <h2 id="mentorship-progress-title" className="h2">One clear path from discovery to outcomes</h2>
+          <h2 id={headingId} className="h2">One clear path from discovery to outcomes</h2>
           <p className="muted">Each stage follows saved requests, match decisions, confirmed sessions and recorded outcomes. A proposal is never shown as an accepted match or confirmed session.</p>
         </div>
         <ol className="grid" style={{ gap: 8, listStyle: "none", margin: 0, padding: 0 }}>

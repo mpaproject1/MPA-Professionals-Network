@@ -1,6 +1,6 @@
 "use client";
 
-import {Bookmark,Building2,Clock3,MapPin,RefreshCw, SlidersHorizontal,Users} from "lucide-react";
+import {Bookmark,Building2,Clock3,MapPin,Users} from "lucide-react";
 import {type FormEvent,useCallback,useEffect,useId,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";
 import { OperationStatus } from "../../components/operation-status";

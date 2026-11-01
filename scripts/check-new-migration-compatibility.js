@@ -221,21 +221,24 @@ try {
   // before BEGIN. Snapshot datasets, versions and items so rollback is checked
   // against the real pre-rehearsal state rather than an incorrect empty state.
   const taxonomyDataBaseline = await client.query(
-    `select 'dataset'::text entity,to_jsonb(d) row_data
-       from reference_dataset d
-      where d.dataset_key=any($1::text[])
-     union all
-     select 'version'::text entity,to_jsonb(v) row_data
-       from reference_dataset_version v
-       join reference_dataset d on d.id=v.dataset_id
-      where d.dataset_key=any($1::text[])
-     union all
-     select 'item'::text entity,to_jsonb(i) row_data
-       from reference_item i
-       join reference_dataset_version v on v.id=i.dataset_version_id
-       join reference_dataset d on d.id=v.dataset_id
-      where d.dataset_key=any($1::text[])
-     order by entity,row_data::text`,
+    `select entity,row_data
+       from (
+         select 'dataset'::text entity,to_jsonb(d) row_data
+           from reference_dataset d
+          where d.dataset_key=any($1::text[])
+         union all
+         select 'version'::text entity,to_jsonb(v) row_data
+           from reference_dataset_version v
+           join reference_dataset d on d.id=v.dataset_id
+          where d.dataset_key=any($1::text[])
+         union all
+         select 'item'::text entity,to_jsonb(i) row_data
+           from reference_item i
+           join reference_dataset_version v on v.id=i.dataset_version_id
+           join reference_dataset d on d.id=v.dataset_id
+          where d.dataset_key=any($1::text[])
+       ) taxonomy_rows
+      order by entity,row_data::text`,
     [requiredCommunityImpactTaxonomyDatasets]
   );
 

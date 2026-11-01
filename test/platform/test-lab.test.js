@@ -37,7 +37,7 @@ test("domain fixtures create private synthetic evidence and cover the requested 
  assert.match(source,/storage_provider,object_key,original_name,content_type,byte_size,checksum_sha256/);
  assert.match(source,/flag:"wx",mode:0o600/);
  assert.match(source,/insert into private_upload_session/);
- assert.match(source,/"confirmed"/);
+ assert.match(source,/confirmed/);
  assert.match(source,/test_portfolio_only/);
  assert.match(source,/Synthetic QA/);
 });

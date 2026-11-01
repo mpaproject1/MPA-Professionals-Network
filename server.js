@@ -30,6 +30,7 @@ import {createLogger} from "./src/platform/logger.js";
 import * as memberReferrals from "./src/platform/member-referrals.js";
 import {resolveNetworkPlusAccess} from "./src/platform/network-plus-access.js";
 import * as notifications from "./src/platform/notifications.js";
+import {getWebPushPublicConfiguration,getPushSubscriptionStatus,registerPushSubscription,removePushSubscription} from "./src/platform/web-push.js";
 import {authorizePrivateUpload, confirmPrivateUpload, MAX_PRIVATE_UPLOAD_BYTES, readAuthorizedPrivateFile, receivePrivateUpload} from "./src/platform/private-file-storage.js";
 import * as publicOpportunity from "./src/platform/public-opportunity.js";
 import * as referencePortfolio from "./src/platform/reference-portfolio.js";
@@ -705,6 +706,10 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="PATCH" && p==="api/v1/me/profile") return ok(res,await membership.updateProfile(identity.sub,await body(req),requestId),requestId);
     if(req.method==="GET" && p==="api/v1/membership/history") return ok(res,await membership.history(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/membership/applications/me") return ok(res,await membership.listMyApplications(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/notifications/push/public-key") return ok(res,getWebPushPublicConfiguration(),requestId);
+    if(req.method==="GET" && p==="api/v1/notifications/push/status") return ok(res,await getPushSubscriptionStatus(identity.sub),requestId);
+    if(req.method==="POST" && p==="api/v1/notifications/push/subscriptions") return ok(res,await registerPushSubscription(identity.sub,await body(req)),requestId,201);
+    if(req.method==="DELETE" && p==="api/v1/notifications/push/subscriptions") { const b=await body(req); return ok(res,await removePushSubscription(identity.sub,b.endpoint),requestId); }
     if(req.method==="GET" && p==="api/v1/notifications") { const q=query(req.url); return ok(res,await notifications.getNotificationInbox(identity.sub,{category:q.get("category")||"all",unreadOnly:q.get("unreadOnly")||"false",actionRequired:q.get("actionRequired")||"false",limit:q.get("limit")||30,offset:q.get("offset")||0}),requestId); }
      if(req.method==="POST" && p==="api/v1/notifications/read-all") return ok(res,await notifications.markAllNotificationsRead(identity.sub,requestId),requestId);
      if(req.method==="PATCH" && parts.length===5 && p.startsWith("api/v1/notifications/") && parts[4]==="read") return ok(res,await notifications.markNotificationRead(identity.sub,parts[3],requestId),requestId);

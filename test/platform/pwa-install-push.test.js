@@ -14,10 +14,10 @@ test("Web Push payload uses RFC 8291 aes128gcm framing and decrypts with the sub
  assert.equal(recordSize,4096);
  assert.equal(keyLength,65);
  const shared=client.computeSecret(senderPublic);
- const info=Buffer.concat([Buffer.from("WebPush: info\\0"),client.getPublicKey(),senderPublic]);
+ const info=Buffer.concat([Buffer.from("WebPush: info\0"),client.getPublicKey(),senderPublic]);
  const ikm=Buffer.from(hkdfSync("sha256",shared,auth,info,32));
- const cek=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: aes128gcm\\0"),16));
- const nonce=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: nonce\\0"),12));
+ const cek=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: aes128gcm\0"),16));
+ const nonce=Buffer.from(hkdfSync("sha256",ikm,salt,Buffer.from("Content-Encoding: nonce\0"),12));
  const decipher=createDecipheriv("aes-128-gcm",cek,nonce);
  decipher.setAuthTag(ciphertext.subarray(-16));
  const clear=Buffer.concat([decipher.update(ciphertext.subarray(0,-16)),decipher.final()]);
@@ -45,12 +45,12 @@ test("PWA install shell registers service worker and exposes a standalone manife
  const config=JSON.parse(manifest);
  assert.equal(config.display,"standalone");
  assert.equal(config.scope,"/");
- assert.match(layout,/manifest:"\\/manifest\\.webmanifest"/);
+ assert.ok(layout.includes('manifest:"/manifest.webmanifest"'));
  assert.match(shell,/serviceWorker\.register\("\/sw\.js"/);
- assert.match(shell,/className="mobile-nav"/);
+ assert.ok(shell.includes('className="mobile-nav"'));
  assert.match(worker,/addEventListener\("push"/);
  assert.match(worker,/addEventListener\("notificationclick"/);
- assert.match(worker,/Never intercept APIs/);
+ assert.ok(worker.includes("Never intercept APIs"));
  assert.match(worker,/\/api\//);
 });
 

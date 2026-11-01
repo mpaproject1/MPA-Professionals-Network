@@ -3,21 +3,28 @@ import { expect, test } from "@playwright/test";
 async function mockSignedInWorkspace(page) {
   await page.addInitScript(() => {
     window.sessionStorage.setItem("mpa-session-token", "e2e-workspace-session");
-  });
-  await page.route(/\/api\/v1\//, async route => {
-    const url = new URL(route.request().url());
-    const path = url.pathname;
-    let data = {};
-    if (path === "/api/v1/me") data = { user_id: "e2e-member", display_name: "Test Member", has_active_membership: true, completion_percent: 72, roles: ["member"] };
-    else if (path.includes("application-tracking")) data = { summary: { total: 0, active: 0, nextSteps: 0, jobApplications: 0 }, items: [] };
-    else if (path === "/api/v1/membership/applications/me") data = [];
-    else if (path === "/api/v1/membership/history") data = { memberships: [{ status: "active" }] };
-    else if (path.startsWith("/api/v1/notifications")) data = { items: [], counts: { unread: 0, action_required: 0 } };
-    else if (path === "/api/v1/organizations") data = [];
-    else if (path === "/api/v1/network-plus/access") data = { eligible: true, access: { member: true, organization: false } };
-    else if (path.startsWith("/api/v1/jobs")) data = { items: [], hasMore: false, total: 0 };
-    else data = {};
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data }) });
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const requestUrl = typeof input === "string" || input instanceof URL ? String(input) : input.url;
+      const url = new URL(requestUrl, window.location.href);
+      if (!url.pathname.startsWith("/api/v1/")) return nativeFetch(input, init);
+
+      const path = url.pathname.replace(/\\/+$/, "");
+      let data = {};
+      if (path === "/api/v1/me") data = { user_id: "e2e-member", display_name: "Test Member", has_active_membership: true, completion_percent: 72, roles: ["member"] };
+      else if (path.includes("application-tracking")) data = { summary: { total: 0, active: 0, nextSteps: 0, jobApplications: 0 }, items: [] };
+      else if (path === "/api/v1/membership/applications/me") data = [];
+      else if (path === "/api/v1/membership/history") data = { memberships: [{ status: "active" }] };
+      else if (path.startsWith("/api/v1/notifications")) data = { items: [], counts: { unread: 0, action_required: 0 } };
+      else if (path === "/api/v1/organizations") data = [];
+      else if (path === "/api/v1/network-plus/access") data = { eligible: true, access: { member: true, organization: false } };
+      else if (path.startsWith("/api/v1/jobs")) data = { items: [], hasMore: false, total: 0 };
+
+      return new Response(JSON.stringify({ data }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
   });
 }
 

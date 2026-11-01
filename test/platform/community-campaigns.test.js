@@ -103,3 +103,30 @@ test("campaign delivery never includes member identifiers in public push payload
  assert.match(service,/title:row\.notification_title/);
  assert.doesNotMatch(service,/email:\s*row\.|memberName:\s*row\.|phone:\s*row\./);
 });
+
+test("scheduler only fans out to opted-in active users and approved unchanged versions",async()=>{
+ const service=await readFile(new URL("../../src/platform/community-campaigns.js",import.meta.url),"utf8");
+ assert.match(service,/where u\.status='active' and p\.community_campaign_enabled=true/);
+ assert.match(service,/role_code in \('member','professional'\)/);
+ assert.match(service,/join community_campaign_approval a on a\.message_version_id=v\.id and a\.decision='approved'/);
+ assert.match(service,/v\.status='approved'/);
+ assert.match(service,/approved_content_sha256/);
+ assert.match(service,/where revoked_at is null and permission_granted=true and push_endpoint is not null/);
+});
+
+test("campaign delivery ledger and push queues have unique idempotency constraints",async()=>{
+ const migration=await readFile(new URL("../../db/migrations/999_community_contribution_campaigns.sql",import.meta.url),"utf8");
+ const publicMigration=await readFile(new URL("../../db/migrations/999z_community_campaign_public_push_delivery.sql",import.meta.url),"utf8");
+ assert.match(migration,/unique\(schedule_id,message_version_id,slot_occurrence,recipient_type,recipient_id\)/);
+ assert.match(migration,/unique\(delivery_id,subscription_id\)/);
+ assert.match(publicMigration,/unique\(delivery_id,subscriber_id\)/);
+});
+
+test("member campaign opt-out does not alter transactional push preferences",async()=>{
+ const server=await readFile(new URL("../../server.js",import.meta.url),"utf8");
+ const sender=await readFile(new URL("../../src/platform/web-push.js",import.meta.url),"utf8");
+ assert.match(server,/community_campaign_enabled/);
+ assert.match(sender,/row\.category==="community_campaign"&&row\.community_campaign_enabled!==true/);
+ assert.match(sender,/row\.push_enabled!==true/);
+ assert.doesNotMatch(sender,/community_campaign_enabled!==true\)\s*\{/);
+});

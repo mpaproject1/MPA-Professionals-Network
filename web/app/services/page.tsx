@@ -11,7 +11,6 @@ import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
 import { humanStatus } from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
-import {useSavedDiscoveryItems} from "../../lib/use-saved-discovery-items";
 
 type ServiceAnnouncement={id:string;listing_id:string;listing_title:string;title:string;body:string;audience:"public"|"members";status:string;created_at:string};
 type Service={id:string;title:string;description:string;approved_banner_url?:string|null;approved_banner_alt?:string|null;video_url?:string|null;service_category:string;delivery_mode?:string;location_label?:string;pricing_model:string;price_amount?:number|string|null;reference_price_amount?:number|string|null;impact_model?:string;lifecycle_status?:string;expires_at?:string|null;organizations_interested?:number;users_interested?:number;users_pledged?:number;organizations_pledged?:number;agreed_services?:number;active_deliveries?:number;verified_outcomes?:number;currency?:string|null;display_name?:string;provider_name?:string};
@@ -30,7 +29,6 @@ export default function Services(){
  const inFlightActions=useRef(new Set<string>());
  const claimAction=(key:string)=>{if(inFlightActions.current.has(key))return false;inFlightActions.current.add(key);return true;};
  const releaseAction=(key:string)=>{inFlightActions.current.delete(key);};
- const savedItems=useSavedDiscoveryItems();
  const [items,setItems]=useState<Service[]>([]);
  const [page,setPage]=useState(0);const [hasMore,setHasMore]=useState(false);const pageSize=20;
  const [announcements,setAnnouncements]=useState<ServiceAnnouncement[]>([]),[announcementFeedError,setAnnouncementFeedError]=useState("");

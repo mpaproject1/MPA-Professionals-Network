@@ -90,6 +90,10 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.ok(worker.includes('"/api/"'));
  assert.ok(checker.includes("pushTableBaseline"));
  assert.ok(checker.includes("Web Push table baseline exactly"));
+ assert.ok(checker.includes("pushPreferenceDefaultBaseline"));
+ assert.ok(checker.includes("notification push preference default exactly"));
+ assert.ok(pushService.includes("PUSH_SUPPRESSED"));
+ assert.ok(pushService.includes("PUSH_EXPIRED"));
  assert.ok(api.includes("api/v1/notifications/push/subscriptions"));
  assert.ok(api.includes("disablePushForUser(identity.sub)"));
  assert.ok(api.includes("api/v1/notifications/push/subscriptions"));

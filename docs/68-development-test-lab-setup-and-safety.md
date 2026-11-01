@@ -29,7 +29,7 @@ The database name must exactly match PostgreSQL `current_database()`. A mismatch
 
 1. Back up the disposable development database.
 2. Apply all committed migrations with the repository migration command.
-3. Confirm migration `20261102120000_test_lab_portfolios.sql` is recorded in `app_schema_migration`.
+3. Confirm migrations `20261102120000_test_lab_portfolios.sql` and `20261102130000_test_lab_composite_key_capture.sql` are recorded in `app_schema_migration`.
 4. Set the environment variables above on the API process. Restart the API.
 5. Sign in using an existing system-administrator account (Test Lab does not create or export a system administrator).
 6. Open **Admin → Development Test Lab**.
@@ -49,9 +49,7 @@ If Test Lab is enabled but capture mode is not configured, portfolio creation an
 
 ## Provenance and automatic capture
 
-The migration installs a database trigger on UUID-primary-key tables in the public schema. It detects references to a portfolio account by user UUID or test email and records the row in `test_portfolio_record`. This includes owned records created later by testers through ordinary application workflows, such as notifications, applications, organization records and private file metadata, provided those rows directly reference the test account.
-
-Rows without a UUID `id` primary key are not automatically tracked by the generic trigger. The reset service explicitly removes known account join/preference rows. If a workflow uses a non-UUID/composite-key table and its rows reference a test account, extend the migration/reset logic before enabling that workflow for the shared test team.
+The migrations install provenance triggers across public-schema tables. UUID `id` primary-key rows are registered in `test_portfolio_record`; composite and non-UUID primary-key rows are registered in `test_portfolio_composite_record` using primary-key columns only. Both triggers match explicit account-ownership/reference columns or the synthetic account email. Reset orders the union of registered tables using the live foreign-key graph, deletes only registered UUIDs or exact captured primary-key objects, and clears both registries. Known join/preference rows are explicitly handled before account deletion. Tables with no primary key cannot be safely captured by this mechanism and must be explicitly handled before a workflow writes to them.
 
 ## Reset procedure
 
@@ -76,7 +74,7 @@ The reset runs in a database transaction and deletes registered records child-fi
 - Keep the encryption key out of Git, issue comments, logs and the workbook.
 - Do not set a live Resend key or live payment credentials in a shared QA environment.
 - A test record that has been shared with or referenced by a non-test record intentionally blocks reset. Resolve that relationship safely; do not disable foreign-key constraints or force-delete.
-- The current fixture set is an account/security/payment foundation. The trigger automatically captures future records owned by test accounts, but it does not pre-populate every scenario entity (for example, complete job/mentorship/organization lifecycle fixtures). Those domain fixtures should be added through the owning domain services as a follow-up rather than inserting incomplete rows directly.
+- The currently seeded fixtures cover synthetic accounts, membership application states, notifications and simulated payments. The provenance triggers capture later records created through supported workflows, but they do not themselves pre-populate every scenario entity. Verification evidence, organization/job lifecycle, service/mentorship journeys, community initiatives/projects and donor-payment fixtures must be explicitly seeded and validated against their owning domain rules before this Test Lab is described as a complete end-to-end portfolio.
 
 ## Verification checklist
 

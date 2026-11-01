@@ -1,6 +1,6 @@
 "use client";
 
-import {BellRing, BellOff, ShieldCheck} from "lucide-react";
+import {BellOff, BellRing, ShieldCheck} from "lucide-react";
 import {useEffect, useState} from "react";
 import {ApiError,api} from "../lib/api";
 

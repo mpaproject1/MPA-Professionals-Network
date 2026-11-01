@@ -59,7 +59,7 @@ begin
  from test_portfolio_account a join test_portfolio p on p.id=a.portfolio_id and p.status='active'
  where exists(
   select 1 from jsonb_each_text(row_data) v
-  where (v.key in ('user_id','created_by','updated_by','owner_user_id','actor_user_id','reviewer_user_id','assigned_by','assigned_to_user_id','assignee_user_id','submitted_by','decided_by','reviewed_by','approved_by','rejected_by','requested_by','responded_by','completed_by','claimant_user_id','member_user_id','mentor_user_id','mentee_user_id','candidate_user_id','applicant_user_id','requester_user_id','provider_user_id','donor_user_id','volunteer_user_id','representative_user_id','organization_owner_user_id','recipient_user_id','invited_by') and v.value=a.user_id::text)
+  where (v.key in ('user_id','created_by','updated_by','owner_user_id','actor_user_id','reviewer_user_id','assigned_by','assigned_to_user_id','assignee_user_id','submitted_by','decided_by','reviewed_by','approved_by','rejected_by','requested_by','responded_by','completed_by','claimant_user_id','member_user_id','mentor_user_id','mentee_user_id','candidate_user_id','applicant_user_id','requester_user_id','provider_user_id','donor_user_id','volunteer_user_id','representative_user_id','organization_owner_user_id','recipient_user_id','invited_by','participant_user_id','payer_user_id','subject_user_id','uploaded_by','changed_by','reporter_user_id') and v.value=a.user_id::text)
      or (v.key in ('email','recipient','candidate_email','contact_email') and lower(v.value)=lower(a.email))
  )
  limit 1;

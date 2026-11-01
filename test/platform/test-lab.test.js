@@ -39,6 +39,8 @@ test("domain fixtures create private synthetic evidence and cover the requested 
  assert.match(source,/insert into private_upload_session/);
  assert.match(source,/confirmed/);
  assert.match(source,/test_portfolio_only/);
+ assert.match(source,/consent_at/);
+ assert.match(source,/test-lab-v1/);
  assert.match(source,/Synthetic QA/);
 });
  

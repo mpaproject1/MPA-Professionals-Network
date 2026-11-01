@@ -5,7 +5,7 @@
 ## Browser installation and mobile experience
 
 - `web/public/manifest.webmanifest` declares the MPA app identity, standalone display mode, scope, theme, and branded icon.
-- The application shell registers `/sw.js` on supported browsers and offers installation guidance. Chromium browsers may expose the native install prompt; iOS users can use Safari Share → Add to Home Screen.
+- The application shell registers `/sw.js` on supported browsers and offers installation guidance. The installed app starts at the dedicated `/mobile` workspace, which is a public, cacheable entry point. Chromium browsers may expose the native install prompt; iOS users can use Safari Share → Add to Home Screen.
 - Mobile navigation prioritizes four destinations and places remaining destinations in a dedicated More panel. Safe-area spacing keeps the fixed navigation clear of device home indicators.
 - The app continues to use the same account, backend, authorization and workflow routes on desktop and mobile; it does not create a second identity or data store.
 

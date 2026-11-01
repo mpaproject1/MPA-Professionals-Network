@@ -64,7 +64,8 @@ const migrationNames = [
   "20261101270000_community_impact_notification_category.sql",
   "20261101280000_community_impact_governed_taxonomies.sql",
   "20261101290000_community_impact_taxonomy_code_constraints.sql",
-  "20261102090000_community_impact_claim_candidate_one_to_one.sql"
+  "20261102090000_community_impact_claim_candidate_one_to_one.sql",
+  "20261102100000_community_impact_claim_candidate_many_to_one.sql"
 ];
 const requiredCommunityImpactTaxonomyDatasets = ["community_impact_contribution_categories","community_impact_contribution_types","community_impact_contributor_roles","community_impact_evidence_types"];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
@@ -821,8 +822,8 @@ try {
   if(impactTables.rowCount!==13)throw new Error("Community Impact governance migration did not create all 13 required tables.");
   const impactTriggers=await client.query("select count(*)::int count from pg_trigger where not tgisinternal and tgname=any($1::text[])",[["trg_community_impact_block_conflicted_assignment","trg_community_impact_block_conflicted_decision","trg_community_impact_policy_event_immutable","trg_community_impact_assessment_event_immutable","trg_community_impact_governance_event_immutable","trg_community_impact_detection_policy_activation_guard","trg_community_impact_offline_attribution_guard","trg_community_impact_identity_decision_immutable","trg_community_impact_identity_evidence_immutable","trg_community_impact_retention_evaluation_immutable","trg_community_impact_assessment_guard"]]);
   if(impactTriggers.rows[0].count!==11)throw new Error("Community Impact governance safety/immutability triggers are incomplete.");
-  const attributionConstraint=await client.query("select count(*)::int count from pg_constraint where conrelid='public.community_impact_claim_candidate_link'::regclass and contype='u'");
-  if(attributionConstraint.rows[0].count!==1)throw new Error("Claim reconciliation must enforce one link per claim while permitting distinct contributors to one project candidate.");
+  const attributionConstraints=await client.query("select conname,pg_get_constraintdef(oid) definition from pg_constraint where conrelid='public.community_impact_claim_candidate_link'::regclass and contype='u'");
+  if(attributionConstraints.rowCount!==1 || !/\\(claim_id\\)/i.test(attributionConstraints.rows[0]?.definition||"") || /\\(candidate_id\\)/i.test(attributionConstraints.rows[0]?.definition||""))throw new Error("Claim reconciliation must enforce one link per claim while permitting distinct claims/contributors to reference the same project candidate.");
   const impactPermissions=await client.query("select count(*)::int count from app_permission where permission_code=any($1::text[])",[["community_impact.identity.review","community_impact.offline_attribution.review","community_impact.detection_policy.manage","community_impact.detection_policy.approve","community_impact.claim.second_review","community_impact.retention.evaluate"]]);
   if(impactPermissions.rows[0].count!==6)throw new Error("Community Impact governance permission registration is incomplete.");
 

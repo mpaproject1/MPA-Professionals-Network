@@ -83,6 +83,8 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.ok(worker.includes('addEventListener("push"'));
  assert.ok(worker.includes('addEventListener("notificationclick"'));
  assert.ok(worker.includes("Never intercept APIs"));
+ assert.ok(worker.includes('"/mobile"'));
+ assert.ok(worker.includes("cachedMobileHome"));
  assert.ok(worker.includes('"/api/"'));
  assert.ok(checker.includes("pushTableBaseline"));
  assert.ok(checker.includes("Web Push table baseline exactly"));

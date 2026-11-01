@@ -58,7 +58,7 @@ export async function seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,
  );
 
  const job=(await tx.query(
-  "insert into job(organization_id,title,description,employment_type,work_mode,location_label,status,visibility,application_deadline,published_at,created_by,updated_by) values($1,'Synthetic QA Community Program Officer','Fictional vacancy used only to test discovery, eligibility and application workflows.','full_time','hybrid','Addis Ababa (synthetic)','pending_review','public',now()+interval '30 days',now(),$2,$2) returning id",
+  "insert into job(organization_id,title,description,employment_type,work_mode,location_label,status,visibility,application_deadline,published_at,created_by,updated_by) values($1,'Synthetic QA Community Program Officer','Fictional vacancy used only to test discovery, eligibility and application workflows.','full_time','hybrid','Addis Ababa (synthetic)','pending_review','public',now()+interval '30 days',null,$2,$2) returning id",
   [organization.id,members[1].userId]
  )).rows[0];
  await tx.query(
@@ -76,7 +76,7 @@ export async function seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,
  );
 
  await tx.query(
-  "insert into mentor_profile(user_id,headline,bio,expertise,languages,mentoring_modes,status,visibility) values($1,'Synthetic QA Mentor','Fictional mentor profile for workflow testing.',$2,$3,$4,'active','members') on conflict(user_id) do update set headline=excluded.headline,bio=excluded.bio,status='active'",
+  "insert into mentor_profile(user_id,headline,bio,expertise,languages,mentoring_modes,status,visibility) values($1,'Synthetic QA Mentor','Fictional mentor profile for workflow testing.',$2,$3,$4,'draft','members') on conflict(user_id) do update set headline=excluded.headline,bio=excluded.bio,status='draft'",
   [members[3].userId,["career development","project management"],["en"],["remote","hybrid"]]
  );
  const mentor=(await tx.query("select id from mentor_profile where user_id=$1",[members[3].userId])).rows[0];

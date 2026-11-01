@@ -73,7 +73,7 @@ export default function NetworkPlusOrganizationsPage() {
 
   return (
     <NetworkPlusAccessGuard>
-      <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6">
+      <main className="np-directory-workspace">
         <header className="grid gap-3">
           <Link className="btn btn-ghost w-fit" href="/network-plus"><ArrowLeft size={16} aria-hidden="true" /> Back to Network-Plus</Link>
           <div className="eyebrow">Network-Plus · Verified Organization Discovery</div>

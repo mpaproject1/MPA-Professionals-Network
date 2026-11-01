@@ -262,7 +262,7 @@ export default function MembersWorkspacePage() {
     { href: "/verification", label: "Professional verification", detail: "Eligible members", icon: GraduationCap, visible: active },
   ].filter((item) => item.visible);
 
-  return <main className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9">
+  return <main className="mpa-members-workspace">
     <header data-guide-target="workspace-overview" className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0"><div className="eyebrow">My MPA workspace</div><h1 className="h1">Welcome back, {name}.</h1><p className="muted max-w-3xl">See where things stand and continue with the next step. Progress reflects account and application records returned by the service, not pages you have opened.</p></div>
       <button id="refresh-workspace" type="button" className="btn btn-ghost shrink-0" onClick={() => void load()} disabled={loading} aria-label="Refresh your workspace status"><RefreshCw size={16} aria-hidden="true" /> {loading ? "Refreshing…" : "Refresh status"}</button>

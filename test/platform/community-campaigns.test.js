@@ -1,0 +1,64 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
+import {assertIndependentApprover,campaignContentDigest,campaignDeliveryKey,isApprovedContent,slotOccurrence,validateCampaignActionUrl,zonedLocalToUtc} from "../../src/platform/community-campaigns.js";
+
+test("campaign author and approver must be different people",()=>{
+ assert.throws(()=>assertIndependentApprover("author-1","author-1"),error=>error.code==="AUTHOR_CANNOT_APPROVE");
+ assert.equal(assertIndependentApprover("author-1","reviewer-2"),true);
+ assert.equal(assertIndependentApprover(null,"reviewer-2"),true);
+});
+
+test("editing any approved content invalidates its approval digest",()=>{
+ const version={status:"approved",internal_title:"A",notification_title:"B",body:"C",quran_text:"Q",hadith_text:"H",action_label:"Go",action_url:"/serve-community",audience:"all_opted_in"};
+ const approval={decision:"approved",approved_content_sha256:campaignContentDigest(version)};
+ assert.equal(isApprovedContent(version,approval),true);
+ assert.equal(isApprovedContent({...version,body:"Edited"},approval),false);
+ assert.equal(isApprovedContent({...version,status:"draft"},approval),false);
+});
+
+test("campaign destinations are restricted to verified same-origin MPA routes",()=>{
+ assert.equal(validateCampaignActionUrl("/serve-community"),"/serve-community");
+ assert.equal(validateCampaignActionUrl("/mentorship/opportunities"),"/mentorship/opportunities");
+ assert.equal(validateCampaignActionUrl("//evil.example/path"),null);
+ assert.equal(validateCampaignActionUrl("https://evil.example"),null);
+ assert.equal(validateCampaignActionUrl("/admin/users"),null);
+ assert.equal(validateCampaignActionUrl("/jobs\\\\evil"),null);
+});
+
+test("Africa/Addis_Ababa Friday 15:00 resolves to 12:00 UTC",()=>{
+ const date=zonedLocalToUtc({year:2026,month:11,day:6,hour:15,minute:0},"Africa/Addis_Ababa");
+ assert.equal(date.toISOString(),"2026-11-06T12:00:00.000Z");
+});
+
+test("Africa/Addis_Ababa Sunday 09:00 resolves to 06:00 UTC",()=>{
+ const date=zonedLocalToUtc({year:2026,month:11,day:8,hour:9,minute:0},"Africa/Addis_Ababa");
+ assert.equal(date.toISOString(),"2026-11-08T06:00:00.000Z");
+});
+
+test("slot boundaries do not fire before local wall-clock time",()=>{
+ const before=new Date("2026-11-06T11:59:59.000Z");
+ const at=new Date("2026-11-06T12:00:00.000Z");
+ const prior=slotOccurrence(before,5,"15:00","Africa/Addis_Ababa");
+ const current=slotOccurrence(at,5,"15:00","Africa/Addis_Ababa");
+ assert.equal(prior.toISOString(),"2026-10-30T12:00:00.000Z");
+ assert.equal(current.toISOString(),"2026-11-06T12:00:00.000Z");
+});
+
+test("idempotency key scopes a delivery to slot, version, occurrence and recipient",()=>{
+ const key=campaignDeliveryKey("slot-1","version-1","2026-11-06T12:00:00Z","member","user-1");
+ assert.equal(key,campaignDeliveryKey("slot-1","version-1","2026-11-06T12:00:00.000Z","member","user-1"));
+ assert.notEqual(key,campaignDeliveryKey("slot-2","version-1","2026-11-06T12:00:00Z","member","user-1"));
+ assert.notEqual(key,campaignDeliveryKey("slot-1","version-2","2026-11-06T12:00:00Z","member","user-1"));
+});
+
+test("migration seeds only draft content and leaves both weekly slots disabled",async()=>{
+ const sql=await readFile(new URL("../../db/migrations/999_community_contribution_campaigns.sql",import.meta.url),"utf8");
+ assert.match(sql,/default false/);
+ assert.match(sql,/community_campaign_enabled boolean not null default false/);
+ assert.match(sql,/friday_afternoon',5,'15:00'::time,'Africa\/Addis_Ababa',false/);
+ assert.match(sql,/sunday_morning',0,'09:00'::time,'Africa\/Addis_Ababa',false/);
+ assert.match(sql,/unique\(schedule_id,message_version_id,slot_occurrence,recipient_type,recipient_id\)/);
+ assert.match(sql,/status\)\s*select c\.id,v\.message_number,1/);
+ assert.equal((sql.match(/gen_random_uuid\(\),'[^']+',\d+,1,/g)||[]).length,30);
+});

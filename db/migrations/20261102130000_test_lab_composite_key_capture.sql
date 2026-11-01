@@ -11,6 +11,37 @@ create table if not exists test_portfolio_composite_record (
 create index if not exists ix_test_portfolio_composite_lookup
  on test_portfolio_composite_record(portfolio_id,table_name);
 
+create or replace function test_lab_capture_owned_record() returns trigger language plpgsql as $
+declare row_data jsonb; portfolio uuid; entity uuid;
+begin
+ row_data:=to_jsonb(new);
+ if row_data ? 'id' then
+  begin entity:=(row_data->>'id')::uuid; exception when others then return new; end;
+ else return new; end if;
+ select a.portfolio_id into portfolio
+ from test_portfolio_account a join test_portfolio p on p.id=a.portfolio_id and p.status='active'
+ where exists(
+  select 1 from jsonb_each_text(row_data) v
+  where (v.key in (
+   'user_id','created_by','updated_by','owner_user_id','actor_user_id','reviewer_user_id',
+   'assigned_by','assigned_to_user_id','assignee_user_id','submitted_by','decided_by',
+   'reviewed_by','approved_by','rejected_by','requested_by','responded_by','completed_by',
+   'claimant_user_id','member_user_id','mentor_user_id','mentee_user_id','candidate_user_id',
+   'applicant_user_id','requester_user_id','provider_user_id','donor_user_id','volunteer_user_id',
+   'representative_user_id','organization_owner_user_id','recipient_user_id','invited_by',
+   'participant_user_id','payer_user_id','subject_user_id','uploaded_by','changed_by','reporter_user_id'
+  ) and v.value=a.user_id::text)
+  or (v.key in ('email','recipient','candidate_email','contact_email') and lower(v.value)=lower(a.email))
+ )
+ limit 1;
+ if portfolio is not null then
+  insert into test_portfolio_record(portfolio_id,table_name,entity_id)
+  values(portfolio,TG_TABLE_NAME,entity)
+  on conflict do nothing;
+ end if;
+ return new;
+end $;
+
 create or replace function test_lab_capture_composite_owned_record() returns trigger language plpgsql as $$
 declare
  row_data jsonb;
@@ -39,7 +70,7 @@ begin
    'member_user_id','mentor_user_id','mentee_user_id','candidate_user_id',
    'applicant_user_id','requester_user_id','provider_user_id','donor_user_id',
    'volunteer_user_id','representative_user_id','organization_owner_user_id',
-   'recipient_user_id','invited_by','participant_user_id','reporter_user_id',
+   'recipient_user_id','invited_by','participant_user_id','payer_user_id','subject_user_id','uploaded_by','changed_by','reporter_user_id','participant_user_id','reporter_user_id',
    'payer_user_id','subject_user_id','opened_by','changed_by','submitted_by_user_id'
   ) and v.value=a.user_id::text)
   or (v.key in ('email','recipient','candidate_email','contact_email')

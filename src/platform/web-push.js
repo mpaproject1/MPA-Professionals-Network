@@ -61,7 +61,7 @@ export async function registerPushSubscription(userId,input){
  const p256dh=String(keys.p256dh||""),auth=String(keys.auth||"");
  if(!endpoint)fail(400,"This browser returned an unsupported push service endpoint.");
  if(fromB64url(p256dh).length!==65||fromB64url(p256dh)[0]!==4||fromB64url(auth).length<16||fromB64url(auth).length>32)fail(400,"The browser push subscription keys are invalid.");
- const expiration=Number.isFinite(input.expirationTime)?new Date(input.expirationTime):null;
+ const expiration=Number.isFinite(input?.expirationTime)?new Date(input.expirationTime):null;
  const endpointHash=sha256(endpoint);
  await withTransaction(async db=>{
   const existing=(await db.query("SELECT id,user_id FROM notification_push_subscription WHERE endpoint_sha256=$1 FOR UPDATE",[endpointHash])).rows[0];

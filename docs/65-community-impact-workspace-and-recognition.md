@@ -49,7 +49,7 @@ The public achievement section is embedded in the existing professional profile 
 
 ### Notifications and reminders
 
-- A claimant receives an in-app notification when a contribution claim becomes verified.
+- A claimant receives an in-app notification when a contribution claim becomes verified. Community Impact is a first-class notification filter and preference category in the existing notification center.
 - Clarification requests generate an action-required notification.
 - Nominees receive a notification when a member nomination is received; approved member nominees receive an award notification.
 - The member dashboard derives reminders for pending claims, missing evidence and detected source records from live database state. These reminders are not treated as achievements or score entries.

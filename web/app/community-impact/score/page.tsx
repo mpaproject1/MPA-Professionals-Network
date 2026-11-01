@@ -2,6 +2,7 @@
 import {useCallback, useEffect, useState} from "react";
 import {api} from "../../../lib/api";
 import {useUiStore} from "../../../lib/store";
+
 type Entry=Record<string,any>;
 type Score={score:number;awards:number;reversals:number;policyVersion:number;evaluationOnly:boolean;publicScoreEnabled:boolean;publicationStatus:string;dimensions:Entry[];items:Entry[]};
 const label=(v:string)=>String(v||"").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());

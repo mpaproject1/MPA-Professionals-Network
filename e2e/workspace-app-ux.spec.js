@@ -75,6 +75,23 @@ test.describe("MPA application workspace UX", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
+  test("light and dark themes remain readable and reduced-motion preferences are respected", async ({ page }) => {
+    await mockSignedInWorkspace(page);
+    await page.goto("/members");
+    const themeToggle = page.getByRole("button", { name: "Toggle theme" });
+    const before = await page.locator("body").evaluate(node => getComputedStyle(node).backgroundColor);
+    await themeToggle.click();
+    await expect.poll(() => page.locator("html").evaluate(node => node.classList.contains("dark"))).toBe(true);
+    const after = await page.locator("body").evaluate(node => getComputedStyle(node).backgroundColor);
+    expect(after).not.toBe(before);
+    await themeToggle.click();
+    await expect.poll(() => page.locator("html").evaluate(node => node.classList.contains("dark"))).toBe(false);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const card = page.locator(".mpa-members-workspace .card").first();
+    await expect(card).toBeVisible();
+    expect(await card.evaluate(node => getComputedStyle(node).transitionDuration)).toBe("0s");
+  });
+
   test("mentorship paths are presented as a compact two-path workspace on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/mentorship");

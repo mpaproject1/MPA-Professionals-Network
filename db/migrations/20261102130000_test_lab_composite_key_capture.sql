@@ -70,7 +70,7 @@ begin
       join pg_attribute a on a.attrelid=single_ix.indrelid
         and a.attnum=any(single_ix.indkey)
       where single_ix.indrelid=c.oid and single_ix.indisprimary
-        and single_ix.indnatts=1 and a.attname='id'
+        and a.attname='id'
         and a.atttypid='uuid'::regtype
     )
  loop

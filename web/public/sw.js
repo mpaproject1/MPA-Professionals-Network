@@ -38,7 +38,11 @@ self.addEventListener("activate", (event) => {
 });
 
 function safeNotificationPath(value) {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\\\") || /[\\u0000-\\u001f\\u007f]/.test(value)) return "/notifications";
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/notifications";
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (value[index] === "\\" || code < 32 || code === 127) return "/notifications";
+  }
   return value;
 }
 

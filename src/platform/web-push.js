@@ -145,12 +145,14 @@ export async function dispatchPendingPushNotifications(limit=50){
  JOIN notification_preference p ON p.user_id=s.user_id
  JOIN notification_event n ON n.id=c.notification_event_id AND n.user_id=s.user_id`,[batch]);
  let sent=0,failed=0;
- for(const row of claimed.rows){
-  if(row.revoked_at||row.push_enabled!==true||row.read_at||row.archived_at){await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_SUPPRESSED',updated_at=now() WHERE id=$1",[row.id]);failed++;continue;}
+ const processRow=async row=>{
+  if(row.revoked_at||row.push_enabled!==true||row.read_at||row.archived_at){
+   await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_SUPPRESSED',updated_at=now() WHERE id=$1",[row.id]);failed++;return;
+  }
   const result=await deliverOne(row,config);
   if(result.ok){
    await db.query("UPDATE notification_push_delivery SET status='sent',delivered_at=now(),last_status_code=$2,last_error_code=NULL,updated_at=now() WHERE id=$1",[row.id,result.status]);
-   await db.query("UPDATE notification_push_subscription SET last_used_at=now() WHERE id=$1",[row.subscription_id]);sent++;continue;
+   await db.query("UPDATE notification_push_subscription SET last_used_at=now() WHERE id=$1",[row.subscription_id]);sent++;return;
   }
   if(result.expired)await db.query("UPDATE notification_push_subscription SET revoked_at=now(),updated_at=now() WHERE id=$1",[row.subscription_id]);
   const terminal=result.expired||!result.retryable||row.attempts>=5;
@@ -158,6 +160,10 @@ export async function dispatchPendingPushNotifications(limit=50){
     last_status_code=$4,last_error_code=$5,updated_at=now() WHERE id=$1`,
     [row.id,terminal?"failed":"pending",row.attempts,result.status||null,result.code||"PUSH_DELIVERY_FAILED"]);
   failed++;
+ };
+ // Bound provider concurrency so one slow push service cannot serialize the whole batch.
+ for(let offset=0;offset<claimed.rows.length;offset+=10){
+  await Promise.all(claimed.rows.slice(offset,offset+10).map(processRow));
  }
  return {sent,failed,skipped:false};
 }

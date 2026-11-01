@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import {randomUUID} from "node:crypto";
 import test from "node:test";
 import * as membership from "../../src/membership/service.js";
-import {closePool} from "../../src/platform/db.js";
 import * as governance from "../../src/platform/community-impact-governance.js";
 import * as score from "../../src/platform/community-impact-score.js";
+import {closePool} from "../../src/platform/db.js";
 
 async function account(){
  const suffix=randomUUID(),digits=suffix.replace(/[^0-9]/g,"").slice(0,8).padEnd(8,"7");

@@ -3,9 +3,10 @@ import {readFile} from "node:fs/promises";
 import test from "node:test";
 
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,forwardMigration,service,claims,server,privateFiles]=await Promise.all([
+const [migration,forwardMigration,correctionMigration,service,claims,server,privateFiles]=await Promise.all([
  read("../../db/migrations/20261101090000_community_impact_governance_completion.sql"),
  read("../../db/migrations/20261102090000_community_impact_claim_candidate_one_to_one.sql"),
+ read("../../db/migrations/20261102100000_community_impact_claim_candidate_many_to_one.sql"),
  read("../../src/platform/community-impact-governance.js"),
  read("../../src/platform/community-impact-claims.js"),
  read("../../server.js"),
@@ -32,7 +33,7 @@ test("Offline-project attribution is evidence-backed and does not infer the staf
  assert.match(service,/CONTRIBUTOR_CONFIRMATION_REQUIRED/);
  assert.match(service,/Combined contributor shares cannot exceed 100 percent/);
  assert.match(service,/select \* from community_impact_detection_candidate where id=\$1 and source_type='offline_completed_project'.*for update/s);
- assert.match(service,/select coalesce\\(sum\\(attribution_share\\),0\\)::numeric total from community_impact_offline_attribution where candidate_id=\\$1/);
+ assert.match(service,/select coalesce\(sum\(attribution_share\),0\)::numeric total from community_impact_offline_attribution where candidate_id=\$1/);
  assert.match(service,/community_impact.offline_attribution.review/);
 });
 test("Claim-to-detection reconciliation is reviewer-controlled and rejects fuzzy or cross-person merges",()=>{
@@ -41,6 +42,7 @@ test("Claim-to-detection reconciliation is reviewer-controlled and rejects fuzzy
  assert.match(service,/attribution_status!=="confirmed"/);
  assert.match(migration,/unique\(claim_id\)/);
  assert.match(forwardMigration,/unique\s*\(candidate_id\)/i);
+ assert.match(correctionMigration,/drop constraint if exists community_impact_claim_candidate_link_candidate_id_key/i);
 });
 test("Detection policies require separate proposer, approver and activator operations",()=>{
  assert.match(service,/proposeDetectionPolicy/);
@@ -64,6 +66,6 @@ test("Retention evaluation is non-destructive and does not authorize deletion",(
  assert.match(server,/communityImpactGovernance\.evaluateRetention/);
 });
 test("Identity and offline-attribution evidence remain private and reviewer-scoped",()=>{
- assert.match(privateFiles,/community_impact_identity\.review/);
+ assert.match(privateFiles,/community_impact\.identity\.review/);
  assert.match(privateFiles,/community_impact\.offline_attribution\.review/);
 });

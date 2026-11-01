@@ -45,18 +45,45 @@ export async function getCampaignMonitoring(){
  return {slots:slots.rows,counts:counts.rows,recent:recent.rows,pushCounts:pushCounts.rows,publicPushCounts:publicPushCounts.rows,auditEvents:auditEvents.rows,pushFailures:pushFailures.rows};
 }
 async function eligibleMembers(db,audience){const filter=audience==="professionals"?"and exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('member','professional'))":"";return (await db.query("select u.id from app_user u join notification_preference p on p.user_id=u.id where u.status='active' and p.community_campaign_enabled=true "+filter+" order by u.id")).rows.map(x=>x.id);}
-export async function runDueCommunityCampaignSlots(now=new Date()){const db=getPool(),slots=(await db.query("select s.*,c.status campaign_status,c.starts_at,c.ends_at from community_campaign_schedule s join community_campaign c on c.id=s.campaign_id where s.enabled=true and c.status='active'")).rows;let processed=0,skipped=0;for(const slot of slots){const occurrence=slotOccurrence(now,slot.day_of_week,slot.local_time,slot.timezone);if(now-occurrence<0||now-occurrence>60000)continue;const v=(await db.query("select v.* from community_campaign_message_version v join community_campaign_approval a on a.message_version_id=v.id and a.decision='approved' where v.id=$1 and v.status='approved'",[slot.selected_message_version_id])).rows[0];if(!v){skipped++;await db.query("insert into community_campaign_audit_event(action,resource_type,resource_id,outcome,reason_code) values('slot.skipped','community_campaign_schedule',$1,'skipped','NO_APPROVED_CONTENT')",[slot.id]);continue;}const a=(await db.query("select approved_content_sha256 from community_campaign_approval where message_version_id=$1",[v.id])).rows[0];if(a.approved_content_sha256!==campaignContentDigest(v)){skipped++;continue;}for(const userId of await eligibleMembers(db,v.audience)){await withTransaction(async tx=>{const ins=await tx.query("insert into community_campaign_delivery(schedule_id,message_version_id,slot_occurrence,recipient_type,recipient_id) values($1,$2,$3,'member',$4) on conflict do nothing returning id",[slot.id,v.id,occurrence,userId]);if(!ins.rowCount)return;const event=await tx.query("insert into notification_event(user_id,event_code,resource_type,resource_id,payload,category,title,body,priority,action_required,action_url,dedupe_key) values($1,'community_campaign.sent','community_campaign',$2,$3,'community_campaign',$4,$5,'low',false,$6,$7) on conflict(user_id,dedupe_key) where dedupe_key is not null do nothing returning id",[userId,v.id,{messageVersionId:v.id},v.notification_title,v.body+" "+v.quran_text+" "+renderHadithCitation(v.hadith_text),v.action_url,"campaign:"+slot.id+":"+occurrence.toISOString()+":"+v.id]);if(!event.rowCount){await tx.query("update community_campaign_delivery set status='skipped',reason_code='DUPLICATE_INBOX_EVENT' where id=$1",[ins.rows[0].id]);return;}await tx.query("update community_campaign_delivery set status='sent',notification_event_id=$2,delivered_at=now() where id=$1",[ins.rows[0].id,event.rows[0].id]);await enqueuePushDelivery(tx,event.rows[0].id,userId);});}
-if(v.audience!=="professionals"){
- const subscribers=(await db.query("select id,push_endpoint,endpoint_sha256,p256dh,auth_secret from community_campaign_public_subscriber where revoked_at is null and permission_granted=true and push_endpoint is not null")).rows;
- for(const subscriber of subscribers){
-  await withTransaction(async tx=>{
-   const ins=await tx.query("insert into community_campaign_delivery(schedule_id,message_version_id,slot_occurrence,recipient_type,recipient_id,status) values($1,$2,$3,'public_subscriber',$4,'sent') on conflict do nothing returning id",[slot.id,v.id,occurrence,subscriber.id]);
-   if(!ins.rowCount)return;
-   await tx.query("insert into community_campaign_public_push_delivery(delivery_id,subscriber_id) values($1,$2) on conflict do nothing",[ins.rows[0].id,subscriber.id]);
+export async function runDueCommunityCampaignSlots(now=new Date()){
+ const db=getPool(),slots=(await db.query("select s.id from community_campaign_schedule s join community_campaign c on c.id=s.campaign_id where s.enabled=true and c.status='active'")).rows;
+ let processed=0,skipped=0;
+ for(const ref of slots){
+  const result=await withTransaction(async tx=>{
+   // Lock the slot for the whole fan-out. Pause/disable takes the same row lock,
+   // so a pause cannot race with a late recipient insert.
+   const slot=(await tx.query("select s.*,c.status campaign_status from community_campaign_schedule s join community_campaign c on c.id=s.campaign_id where s.id=$1 for update of s,c",[ref.id])).rows[0];
+   if(!slot||slot.enabled!==true||slot.campaign_status!=="active")return "not_due";
+   const occurrence=slotOccurrence(now,slot.day_of_week,slot.local_time,slot.timezone);
+   if(now-occurrence<0||now-occurrence>60000)return "not_due";
+   const version=(await tx.query("select v.* from community_campaign_message_version v join community_campaign_approval a on a.message_version_id=v.id and a.decision='approved' where v.id=$1 and v.status='approved'",[slot.selected_message_version_id])).rows[0];
+   if(!version){await audit(tx,null,"slot.skipped","community_campaign_schedule",slot.id,null,{slot:slot.slot_key},"NO_APPROVED_CONTENT");return "skipped";}
+   const approval=(await tx.query("select approved_content_sha256 from community_campaign_approval where message_version_id=$1",[version.id])).rows[0];
+   if(!approval||approval.approved_content_sha256!==campaignContentDigest(version)){await audit(tx,null,"slot.skipped","community_campaign_schedule",slot.id,null,{slot:slot.slot_key},"CONTENT_DIGEST_MISMATCH");return "skipped";}
+   const recipients=await eligibleMembers(tx,version.audience);
+   for(const userId of recipients){
+    const inserted=await tx.query("insert into community_campaign_delivery(schedule_id,message_version_id,slot_occurrence,recipient_type,recipient_id,status) values($1,$2,$3,'member',$4,'pending') on conflict do nothing returning id",[slot.id,version.id,occurrence,userId]);
+    if(!inserted.rowCount)continue;
+    const event=await tx.query("insert into notification_event(user_id,event_code,resource_type,resource_id,payload,category,title,body,priority,action_required,action_url,dedupe_key) values($1,'community_campaign.sent','community_campaign',$2,$3,'community_campaign',$4,$5,'low',false,$6,$7) on conflict(user_id,dedupe_key) where dedupe_key is not null do nothing returning id",[userId,version.id,{messageVersionId:version.id},version.notification_title,version.body+"\n\n"+version.quran_text+"\n\n"+renderHadithCitation(version.hadith_text),version.action_url,"campaign:"+slot.id+":"+occurrence.toISOString()+":"+version.id]);
+    if(!event.rowCount){await tx.query("update community_campaign_delivery set status='skipped',reason_code='DUPLICATE_INBOX_EVENT',updated_at=now() where id=$1",[inserted.rows[0].id]);continue;}
+    await tx.query("update community_campaign_delivery set status='sent',notification_event_id=$2,delivered_at=now(),updated_at=now() where id=$1",[inserted.rows[0].id,event.rows[0].id]);
+    await enqueuePushDelivery(tx,event.rows[0].id,userId);
+   }
+   if(version.audience!=="professionals"){
+    const subscribers=(await tx.query("select id from community_campaign_public_subscriber where revoked_at is null and permission_granted=true and push_endpoint is not null")).rows;
+    for(const subscriber of subscribers){
+     const inserted=await tx.query("insert into community_campaign_delivery(schedule_id,message_version_id,slot_occurrence,recipient_type,recipient_id,status) values($1,$2,$3,'public_subscriber',$4,'sent') on conflict do nothing returning id",[slot.id,version.id,occurrence,subscriber.id]);
+     if(inserted.rowCount)await tx.query("insert into community_campaign_public_push_delivery(delivery_id,subscriber_id) values($1,$2) on conflict do nothing",[inserted.rows[0].id,subscriber.id]);
+    }
+   }
+   await tx.query("update community_campaign_schedule set last_run_at=$2,updated_at=now() where id=$1",[slot.id,now]);
+   await audit(tx,null,"slot.fanned_out","community_campaign_schedule",slot.id,null,{slot:slot.slot_key,messageVersionId:version.id,memberRecipients:recipients.length});
+   return "processed";
   });
+  if(result==="processed")processed++;else if(result==="skipped")skipped++;
  }
+ return {processed,skipped};
 }
-await db.query("update community_campaign_schedule set last_run_at=$2 where id=$1",[slot.id,now]);processed++;}return {processed,skipped};}
 export async function createPublicCampaignOptIn(input){const endpoint=validPushEndpoint(input.subscription?.endpoint);if(!endpoint)fail(400,"A valid browser push subscription is required for public campaign opt-in.");if(input.permission!=="granted"||input.consent!==true)fail(400,"Explicit consent and granted browser permission are required for public push.");const token=randomBytes(32).toString("base64url"),keys=input.subscription?.keys||{},b64=value=>Buffer.from(String(value||""),"base64url");if(b64(keys.p256dh).length!==65||b64(keys.auth).length<16||b64(keys.auth).length>32)fail(400,"Invalid push subscription keys.");await getPool().query("insert into community_campaign_public_subscriber(consent_token_sha256,consented_at,push_endpoint,endpoint_sha256,p256dh,auth_secret,permission_granted) values($1,now(),$2,$3,$4,$5,true) on conflict(endpoint_sha256) where endpoint_sha256 is not null and revoked_at is null do update set consent_token_sha256=excluded.consent_token_sha256,consented_at=now(),push_endpoint=excluded.push_endpoint,p256dh=excluded.p256dh,auth_secret=excluded.auth_secret,permission_granted=true,updated_at=now()",[sha(token),endpoint,sha(endpoint),keys.p256dh,keys.auth]);return {manageToken:token,subscribed:true};}
 export async function managePublicCampaignOptIn(token,enabled){return withTransaction(async db=>{const r=await db.query("update community_campaign_public_subscriber set revoked_at=case when $2 then null else now() end,permission_granted=$2,updated_at=now() where consent_token_sha256=$1 returning id,revoked_at",[sha(String(token||"")),enabled===true]);if(!r.rowCount)fail(404,"Subscription not found.","NOT_FOUND");if(!enabled)await db.query("update community_campaign_public_push_delivery set status='skipped',last_error_code='PUBLIC_OPT_OUT',updated_at=now() where subscriber_id=$1 and status in ('pending','sending')",[r.rows[0].id]);return {subscribed:!r.rows[0].revoked_at};});}
 

@@ -40,7 +40,7 @@ export async function seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,
  const program=(await tx.query("select id from verification_program where program_code='PROFESSIONAL_VERIFICATION' and active=true limit 1")).rows[0];
  if(!program)throw new Error("Professional verification program is missing; apply the verification migrations.");
  const verificationCase=(await tx.query(
-  "insert into verification_case(program_id,subject_user_id,status,purpose_snapshot,opened_by,assigned_reviewer_id,assigned_at,submitted_at) values($1,$2,'evidence_required','Synthetic professional verification QA case',$3,$3,now(),now()) returning id",
+  "insert into verification_case(program_id,subject_user_id,status,purpose_snapshot,opened_by,assigned_reviewer_id,assigned_at,submitted_at,consent_at,consent_by,consent_version) values($1,$2,'evidence_required','Synthetic professional verification QA case',$3,$3,now(),now(),now(),$2,'test-lab-v1') returning id",
   [program.id,members[2].userId,reviewer.userId]
  )).rows[0];
  await tx.query(

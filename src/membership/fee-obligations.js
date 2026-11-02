@@ -259,14 +259,14 @@ export async function previewMembershipPaymentImport(identity,input={},requestId
   if(!row.errors.length){
    const found=x.application_id
     ?await db.query("select o.id,o.currency,b.outstanding_balance,a.user_id from membership_fee_obligation o join membership_fee_obligation_balance b on b.obligation_id=o.id join membership_application a on a.id=o.application_id where o.application_id=$1",[x.application_id])
-    :await db.query("select o.id,o.currency,b.outstanding_balance,mr.user_id from membership_fee_obligation o join membership_fee_obligation_balance b on b.obligation_id=o.id join membership_record mr on mr.id=o.membership_record_id where mr.membership_number=$1",[x.membership_number]);
+    :await db.query("select o.id,o.currency,b.outstanding_balance,mr.user_id from membership_record mr join membership_fee_obligation o on (o.membership_record_id=mr.id or o.application_id=mr.application_id) join membership_fee_obligation_balance b on b.obligation_id=o.id where mr.membership_number=$1",[x.membership_number]);
    obligation=found.rows[0]||null;
    if(!obligation)row.errors.push("No matching fee obligation was found. Create/confirm the obligation before importing receipts.");
    else if(code!==obligation.currency)row.errors.push("currency does not match the fee obligation.");
    else if(amount>Number(obligation.outstanding_balance))row.errors.push("amount exceeds the current outstanding balance.");
    const method=(await db.query("select * from membership_payment_method where method_code=$1 and enabled=true",[methodCode])).rows[0];
    if(!method)row.errors.push("payment_method_code is not an enabled Finance payment method.");
-   else{try{assertMembershipPaymentMethodAvailable(method,code);if(method.method_type==="chapa")row.errors.push("Hosted checkout cannot be imported as a manual receipt.");if(method.requires_evidence&&!x.evidence_file_id)row.errors.push("This method requires evidence_file_id.");}catch(error){row.errors.push(error.message);}}
+   else{try{assertMembershipPaymentMethodAvailable(method,code);if(method.method_type==="chapa")row.errors.push("Hosted checkout cannot be imported as a manual receipt.");if(method.requires_evidence&&!x.evidence_file_id)row.errors.push("This method requires evidence_file_id.");if(x.evidence_file_id){try{await validateEvidence(db,identity.sub,x.evidence_file_id);}catch(error){row.errors.push(error.message);}}}catch(error){row.errors.push(error.message);}}
    const reused=await db.query("select id from payment_transaction where lower(coalesce(purpose_reference,''))=lower($1) and status<>'cancelled' limit 1",[ref]);
    if(reused.rowCount)row.errors.push("Payment reference is already allocated to another payment.");
   }

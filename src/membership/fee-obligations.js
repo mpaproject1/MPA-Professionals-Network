@@ -100,7 +100,7 @@ export async function listFeeObligations(identity,filters={}){
  return {rows:rows.map(row=>({...row,pending_receipts:row.receipts||[],pending_dispositions:row.items||[]})),legacyRecords,totalsByCurrency,total:rows.length};
 }
 export async function exportFeeObligations(identity,filters={},requestId){
- const result=await listFeeObligations(identity,filters);
+ const result=await listFeeObligations(identity,{...filters,limit:50000});
  const columns=["member_name","email","membership_number","tracking_reference","product_name","currency","amount_due","verified_cash","approved_non_cash","outstanding_balance","due_date","status"];
  const rows=result.rows.map(row=>Object.fromEntries(columns.map(key=>[key,row[key]??""])));
  const buffer=createXlsx(rows,columns);

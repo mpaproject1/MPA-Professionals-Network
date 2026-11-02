@@ -39,6 +39,7 @@ create table if not exists membership_geography_unit (
   check (effective_to is null or effective_from is null or effective_to >= effective_from),
   check ((unit_level='country' and parent_id is null and country_iso3 is not null and country_iso3 ~ '^[A-Z]{3}$' and country_m49 is not null and country_m49 ~ '^[0-9]{3}$')
       or (unit_level<>'country' and parent_id is not null and country_iso3 is null and country_m49 is null))
+);
 create index if not exists membership_geography_unit_parent_idx on membership_geography_unit(version_id,parent_id,unit_level,active);
 create index if not exists membership_geography_unit_lookup_idx on membership_geography_unit(version_id,unit_level,active,label);
 

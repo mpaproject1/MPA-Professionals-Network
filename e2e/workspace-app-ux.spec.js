@@ -24,6 +24,11 @@ async function mockSignedInWorkspace(page) {
     });
   });
 }
+// These tests use page.route() for deterministic API fixtures. The app shell registers
+// /sw.js; block service workers in this suite so a controlled page cannot bypass
+// Playwright routing. PWA registration is covered by the dedicated installability tests.
+test.use({ serviceWorkers: "block" });
+
 test.describe("MPA application workspace UX", () => {
   test("member workspace is compact, keyboard reachable and responsive", async ({ page }) => {
     await mockSignedInWorkspace(page);

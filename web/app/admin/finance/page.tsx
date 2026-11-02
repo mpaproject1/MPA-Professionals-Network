@@ -305,12 +305,12 @@ export default function FinanceWorkspacePage() {
       {rows.length === 0 ? <OperationStatus state="info" title="No membership payments in this queue" detail="No matching payment records were returned. Refresh to check the current source records." /> : rows.map(payment => <article key={payment.payment_id} className="case-row" style={{ alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }} className="grid">
           <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-            <div><strong>{payment.product_name || payment.product_code} · {payment.application_type}</strong><p className="muted">Application {payment.tracking_reference || payment.application_id}</p></div>
+            <div><strong>{payment.product_name || payment.product_code} · {payment.application_type === "legacy_import" ? "Historical membership" : payment.application_type}</strong><p className="muted">Application {payment.tracking_reference || payment.application_id}</p></div>
             <Badge tone={payment.payment_status === "succeeded" ? "green" : payment.payment_status === "pending" ? "gold" : "slate"}>{payment.payment_status.replaceAll("_", " ")}</Badge>
           </div>
           <div className="grid grid-2">
             <p><span className="muted">Amount</span><br/><b>{payment.currency} {payment.amount}</b></p>
-            <p><span className="muted">Application state</span><br/><b>{payment.application_status.replaceAll("_", " ")}</b></p>
+            <p><span className="muted">{payment.application_type === "legacy_import" ? "Membership state" : "Application state"}</span><br/><b>{payment.application_status.replaceAll("_", " ")}</b></p>
             <p><span className="muted">Channel / source</span><br/><b>{payment.channel} · {payment.source}</b></p>
             <p><span className="muted">Payment reference</span><br/><b>{payment.payment_reference || payment.purpose_reference || "Not supplied"}</b></p>
             <p><span className="muted">Submitted</span><br/><b>{dateLabel(payment.created_at)}</b></p>

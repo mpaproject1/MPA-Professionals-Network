@@ -6,6 +6,7 @@ import { hashPassword, normalizeEmail, normalizePhone } from "./identity.js";
 
 function problem(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e}
 const IMPORT_ROLES=["system_admin","admin","membership_reviewer","finance_officer"];
+const MEMBER_IMPORT_XLSX_COLUMNS=["legacy_member_id","email","phone","full_name","gender","membership_number","membership_type","product_code","amount_paid","payment_currency","status","registered_date","start_date","end_date","approved_membership","approval_reference","payment_reference","payment_date","payment_method","payment_evidence_reference","education_background","location_or_address","residence_type","country_iso3","region_or_federal_city","zone_or_sub_city","district_or_town","street_address","diaspora_area","qualification","field_of_study","department","volunteer_pledge","volunteer_services","volunteer_hours_per_week","notes"];
 function assertImportAuthority(identity){
  const roles=identity?.roles||[],permissions=identity?.permissions||[];
  if(!roles.some(r=>IMPORT_ROLES.includes(r))&&!permissions.includes("members.import"))throw problem(403,"Membership import/export requires an authorized administrator.","FORBIDDEN");

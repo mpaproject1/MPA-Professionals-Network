@@ -952,7 +952,7 @@ Do not mark this workstream complete until all of the following are evidenced:
 
 **Branch:** `feat/workstream-3-progress-members-workspace`  
 **PR:** #18  
-**Latest implementation head at this entry:** `b8dfc4f3b68bbd561703496c5d016107a9f37589`
+**Latest implementation head at this entry:** `d9718be9f0fb49ef1114c8e693306115a2ac6bb2`
 
 ### Implemented in source
 
@@ -966,7 +966,7 @@ Do not mark this workstream complete until all of the following are evidenced:
 
 ### Validation status — do not infer a pass
 
-- Exact latest head: `b8dfc4f3b68bbd561703496c5d016107a9f37589`.
+- Exact latest head: `d9718be9f0fb49ef1114c8e693306115a2ac6bb2`.
 - GitHub Actions workflow-run lookup for this exact SHA returned no runs; exact-SHA combined commit status returned no status entries. This is **pending/unverified**, not a pass.
 - No PostgreSQL, backend, Biome, TypeScript, production build or Playwright result is claimed for these commits.
 - The new lifecycle test requires the disposable PostgreSQL service configured in PR Quality. It has been committed but not executed in this environment.

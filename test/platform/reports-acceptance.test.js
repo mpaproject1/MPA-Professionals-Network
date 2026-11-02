@@ -157,8 +157,18 @@ test("membership dashboard aggregates and monthly trend are available only throu
       assert.ok(Number.isFinite(Number(row.Activated)));
     }
 
+    const performance = await runReport(reviewer, "membership-reviewer-performance", {
+      from: "2020-01-01", to: new Date().toISOString().slice(0, 10)
+    }, requestIds[2]);
+    assert.ok(Array.isArray(performance.rows));
+    for (const row of performance.rows) {
+      assert.ok(Number.isFinite(Number(row.Decisions)));
+      assert.ok(Number.isFinite(Number(row.Approved)));
+      assert.ok(Number.isFinite(Number(row.Rejected)));
+    }
+
     await assert.rejects(
-      runReport(financeOnly, "membership-status", {}, requestIds[2]),
+      runReport(financeOnly, "membership-status", {}, randomUUID()),
       error => error.code === "REPORT_FORBIDDEN"
     );
   } finally {

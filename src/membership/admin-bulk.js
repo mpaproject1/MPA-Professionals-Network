@@ -33,13 +33,14 @@ function csvRows(csv){
 }
 function parseDate(v){if(!v)return null;if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;const d=new Date(`${v}T00:00:00Z`);return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v?v:null;}
 function cleanRow(row){
- const x=row.raw,errors=[];
- const email=normalizeEmail(x.email),fullName=String(x.full_name||"").trim().replace(/\s+/g," "),membershipNumber=String(x.membership_number||"").trim(),productCode=String(x.product_code||"").trim().toUpperCase(),status=String(x.status||"").trim().toLowerCase();
- const startDate=parseDate(x.start_date),endDate=parseDate(x.end_date),approved=String(x.approved_membership||"").trim().toLowerCase(),paidAmountText=String(x.payment_amount||"").trim(),paidAmount=paidAmountText?Number(paidAmountText):null,paidCurrency=String(x.payment_currency||"").trim().toUpperCase()||null,paymentReference=String(x.payment_reference||"").trim()||null;
- if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))errors.push("Enter a valid email address.");
+ const x=row.raw,errors=[],modern=Object.hasOwn(x,"gender")||Object.hasOwn(x,"registered_date")||Object.hasOwn(x,"amount_paid");
+ const email=normalizeEmail(x.email),fullName=String(x.full_name||"").trim().replace(/\\s+/g," "),membershipNumber=String(x.membership_number||"").trim(),productCode=String(x.product_code||x.membership_type||"").trim().toUpperCase(),status=String(x.status||"").trim().toLowerCase();
+ const phone=normalizePhone(x.phone),gender=String(x.gender||"").trim().toLowerCase(),registeredDate=parseDate(x.registered_date||x.start_date);
+ const startDate=parseDate(x.start_date),endDate=parseDate(x.end_date),approved=String(x.approved_membership||"").trim().toLowerCase(),paidAmountText=String(x.amount_paid??x.payment_amount??"").trim(),paidAmount=paidAmountText?Number(paidAmountText):null,paidCurrency=String(x.payment_currency||"").trim().toUpperCase()||null,paymentReference=String(x.payment_reference||"").trim()||null;
+ if(!email||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))errors.push("Enter a valid email address.");
  if(!fullName||fullName.split(" ").length<2)errors.push("Enter first and last name in full_name.");
  if(!membershipNumber)errors.push("Membership number is required.");
- if(!/^[A-Z0-9_-]{2,32}$/.test(productCode))errors.push("Product code must contain 2–32 letters, digits, _ or -.");
+ if(!/^[A-Z0-9_-]{2,32}$/.test(productCode))errors.push("Membership type must resolve to a configured product code.");
  if(!["active","expired","pending","suspended","cancelled"].includes(status))errors.push("Status must be active, expired, pending, suspended or cancelled.");
  if(!startDate)errors.push("start_date must use YYYY-MM-DD.");
  if(x.end_date&&!endDate)errors.push("end_date must use YYYY-MM-DD or be blank.");
@@ -49,11 +50,15 @@ function cleanRow(row){
  if(!String(x.approval_reference||"").trim())errors.push("Provide the MPA approval register, minute, resolution or other source reference for audit traceability.");
  if(status==="active"&&approved!=="yes")errors.push("Active membership requires explicit confirmation that MPA already approved the member.");
  if(status==="active"&&endDate&&endDate<new Date().toISOString().slice(0,10))errors.push("An expired end date cannot be imported as active.");
- if(paidAmountText&&(!Number.isFinite(paidAmount)||paidAmount<=0||!/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/.test(paidAmountText)))errors.push("payment_amount must be a positive amount with up to two decimal places.");
+ if(modern&&!phone)errors.push("phone is required.");
+ if(modern&&!["male","female"].includes(gender))errors.push("gender must be male or female.");
+ if(modern&&!registeredDate)errors.push("registered_date must use YYYY-MM-DD.");
+ if(modern&&!paidAmountText)errors.push("amount_paid is required; enter 0 when no amount has been received.");
+ if(paidAmountText&&(!Number.isFinite(paidAmount)||paidAmount<0||!/^(?:0|[1-9]\\d{0,11})(?:\\.\\d{1,2})?$/.test(paidAmountText)))errors.push("amount_paid must be zero or a positive amount with up to two decimal places.");
  if(paidCurrency&&!/^[A-Z]{3}$/.test(paidCurrency))errors.push("payment_currency must be a three-letter ISO currency code.");
  if(paymentReference&&paymentReference.length<4)errors.push("payment_reference must contain at least four characters.");
- if(((paidAmount??0)>0||paidCurrency||paymentReference)&&(!paidAmountText||!paidCurrency||!paymentReference))errors.push("If historical payment details are supplied, include payment_amount, payment_currency and payment_reference together.");
- return {...row,email,phone:normalizePhone(x.phone),fullName,membershipNumber,productCode,status,startDate,endDate,paidAmount,paidCurrency,paymentReference,approved:approved==="yes",legacyMemberId:String(x.legacy_member_id||"").trim()||null,approvalReference:String(x.approval_reference||"").trim()||null,notes:String(x.notes||"").trim()||null,errors};
+ if(paymentReference&&(!paidAmountText||!paidCurrency))errors.push("If a historical payment reference is supplied, include amount_paid and payment_currency.");
+ return {...row,email,phone,gender,registeredDate,fullName,membershipNumber,productCode,status,startDate,endDate,paidAmount,paidCurrency,paymentReference,approved:approved==="yes",legacyMemberId:String(x.legacy_member_id||"").trim()||null,approvalReference:String(x.approval_reference||"").trim()||null,notes:String(x.notes||"").trim()||null,errors};
 }
 function audit(db,actor,action,type,id,requestId,metadata={}){return db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,JSON.stringify(metadata)]);}
 export function memberImportTemplate(identity){
@@ -67,10 +72,12 @@ export async function previewMemberImport(identity,{filename="mpa-members.csv",c
  if(Buffer.byteLength(csv)>5*1024*1024)throw problem(413,"Member import CSV must be 5 MiB or smaller.","IMPORT_TOO_LARGE");
  const rows=csvRows(csv).map(cleanRow),db=getPool();
  const productCodes=[...new Set(rows.map(r=>r.productCode).filter(Boolean))];
- const products=(await db.query("select product_code from membership_product where active=true and product_code=any($1::text[])",[productCodes])).rows.map(r=>r.product_code);
+ const productRows=(await db.query("select product_code,currency from membership_product where active=true and product_code=any($1::text[])",[productCodes])).rows;
+ const products=productRows.map(r=>r.product_code),productCurrency=new Map(productRows.map(r=>[r.product_code,String(r.currency||"").toUpperCase()]));
  const seenEmail=new Set(),seenMembership=new Set(),seenLegacyId=new Set();
  for(const row of rows){
   if(!products.includes(row.productCode))row.errors.push("Unknown or inactive membership product code.");
+  if(row.paidAmount!==null&&!row.paidCurrency&&productCurrency.has(row.productCode))row.paidCurrency=productCurrency.get(row.productCode);
   const ek=row.email.toLowerCase(),mk=row.membershipNumber.toLowerCase();
   if(seenEmail.has(ek))row.errors.push("Email is repeated in this file.");seenEmail.add(ek);
   if(seenMembership.has(mk))row.errors.push("Membership number is repeated in this file.");seenMembership.add(mk);

@@ -83,9 +83,9 @@ export default function MembershipCenterPage() {
   const [generatedAt, setGeneratedAt] = useState("");
 
   const canFinance = roles.some(role => ["system_admin", "finance_officer"].includes(role)) || permissions.some(permission => ["finance.view", "finance.payment.verify", "finance.manage"].includes(permission));
-  const canManagePaymentMethods = roles.includes("system_admin") || permissions.includes("finance.manage");
+  const canManagePaymentMethods = roles.some(role => ["system_admin", "finance_officer"].includes(role)) || permissions.includes("finance.manage");
   const canReview = roles.some(role => ["system_admin", "admin", "reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review");
-  const canViewMemberRecords = roles.some(role => ["system_admin", "admin"].includes(role)) || permissions.some(permission => ["members.view", "members.manage"].includes(permission));
+  const canViewMemberRecords = roles.some(role => ["system_admin", "admin", "membership_reviewer"].includes(role)) || permissions.some(permission => ["members.view", "members.manage"].includes(permission));
   const canImportExport = roles.some(role => ["system_admin", "admin", "membership_reviewer", "finance_officer"].includes(role)) || permissions.includes("members.import");
   const canManageCards = roles.some(role => ["system_admin", "reviewer"].includes(role)) || permissions.some(permission => ["members.view", "members.manage"].includes(permission));
   const canViewReports = canReview || permissions.includes("reports.view") || roles.some(role => ["system_admin", "admin"].includes(role));

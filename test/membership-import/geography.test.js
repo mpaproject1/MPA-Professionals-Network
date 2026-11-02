@@ -89,6 +89,7 @@ test("PostgreSQL geography workbook preview, apply, publish, member selectors an
   assert.equal(residence.admin_level_1_code,"ET-REG-"+suffix);
   assert.equal(residence.geography_version_id,applied.versionId);
   const summary=await getMemberGeographySummary(identity);
+  assert.equal(summary.publishedVersion.id,applied.versionId,"aggregation must use the exact published geography version used by profile selectors");
   assert.ok(summary.ethiopiaLevel1.some(row=>row.unit_code==="ET-REG-"+suffix&&Number(row.member_count)>=1));
  }finally{
   await db.query("delete from member_residence where user_id=$1",[userId]);

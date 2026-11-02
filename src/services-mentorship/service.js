@@ -1314,7 +1314,7 @@ export async function listMyMentorshipLearningProgress(userId){
   const db=getPool();
   return (await db.query(`select a.id,a.mentorship_id,a.title,a.instructions,a.due_at,a.status,a.created_at,a.updated_at,
     m.mentor_user_id,m.mentee_user_id,$1::uuid viewer_user_id,
-    s.id submission_id,s.version,s.status submission_status,s.submitted_at,
+    s.id submission_id,s.version,s.status submission_status,s.submitted_at,coalesce(s.submitted_at,a.updated_at) last_activity_at,
     review.decision latest_review_decision,review.feedback latest_review_feedback
     from mentorship_learning_activity a join mentorship m on m.id=a.mentorship_id
     left join lateral (select id,version,status,submitted_at from mentorship_learning_submission where activity_id=a.id and submitted_by=m.mentee_user_id order by version desc limit 1) s on true

@@ -91,7 +91,7 @@ export async function saveMyResidence(userId,input={},requestId){
  await withTransaction(async tx=>{
   const version=(await tx.query("select id from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0];
   if(!version)throw fail(409,"Member geography reference data has not yet been published. Contact an administrator.","GEOGRAPHY_NOT_PUBLISHED");
-  const country=(await tx.query("select id,unit_level,country_iso3 from membership_geography_unit where version_id=$1 and unit_level='country' and country_iso3=$2 and active=true",[version.id,countryCode])).rows[0];
+  const country=(await tx.query("select id,unit_level,country_iso3 from membership_geography_unit where version_id=$1 and unit_level='country' and country_iso3=$2 and active=true and metadata->>'residenceSelectable' is distinct from 'false'",[version.id,countryCode])).rows[0];
   if(!country)throw fail(400,"The selected country is not in the current published reference version.","COUNTRY_NOT_FOUND");
   if(type==="ethiopia"&&country.country_iso3!=="ETH")throw fail(400,"Choose Ethiopia as the country for an Ethiopian residence.","COUNTRY_MISMATCH");
   if(type==="diaspora"&&country.country_iso3==="ETH")throw fail(400,"Choose Ethiopia as residence type for an Ethiopian location.","COUNTRY_MISMATCH");

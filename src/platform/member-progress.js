@@ -4,6 +4,7 @@ const SOURCE_DEFINITIONS = [
   ["mentorshipRequests", "Mentorship", "/mentorship", "mentorship_request"],
   ["mentorshipMatches", "Mentorship", "/mentorship", "mentorship_match"],
   ["mentorships", "Mentorship", "/mentorship", "mentorship_relationship"],
+  ["mentorshipSessions", "Mentorship", "/mentorship", "mentorship_session"],
   ["organizationMentorshipRequests", "Mentorship", "/mentorship", "organization_mentorship"],
   ["verificationCases", "Verification", "/verification", "verification"],
   ["referenceRequests", "Verification", "/verification", "reference_request"],
@@ -66,11 +67,11 @@ function mapRecord(record, definition, index) {
   const [source, baseCategory, href, baseDomain] = definition;
   const domain = source === "applications" ? String(record.type || baseDomain) : baseDomain;
   const category = source === "applications" ? ({ membership: "Membership", job: "Jobs", organization: "Organizations" }[domain] || baseCategory) : baseCategory;
-  const status = source === "recognitionAwards" ? "awarded" : normalizedStatus(record);
+  const status = source === "recognitionAwards" ? "awarded" : normalizedStatus(record, domain);
   const id = safeId(first(record, ["id", "request_id", "case_id", "application_id", "claim_id", "attribution_id"]));
   if (!id) return null;
   const title = String(first(record, ["title", "service_title", "job_title", "program_title", "program_name", "project_title", "subject", "goals", "name"]) || category + " request");
-  const createdAt = asDate(first(record, ["submitted_at", "submittedAt", "created_at", "createdAt", "requested_at", "proposed_at"]));
+  const createdAt = asDate(first(record, ["submitted_at", "submittedAt", "created_at", "createdAt", "requested_at", "proposed_at"]));\n  const scheduledAt = asDate(first(record, ["scheduled_start_at", "scheduledAt"]));
   const updatedAt = asDate(first(record, ["updated_at", "updatedAt", "last_activity_at", "lastActivityAt", "reviewed_at", "responded_at"])) || createdAt;
   const statusLabel = String(first(record, ["statusLabel", "status_label", "decision_label"]) || status.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase()));
   const nextAction = responsibility(status);
@@ -83,11 +84,11 @@ function mapRecord(record, definition, index) {
     category,
     type: domain,
     title,
-    description: String(first(record, ["summary", "description", "service_category", "category"]) || ""),
+    description: String(first(record, ["summary", "description", "service_category", "category", "agenda"]) || ""),
     status,
     statusLabel,
     responsibility: nextAction,
-    nextAction: ({ member_action: "Your response is needed", mpa_action: "Waiting for MPA review", external_response: "Waiting for another participant", in_progress: "Engagement in progress", completed: "Completed", closed: "Closed", unknown: "Current status unavailable" })[nextAction],
+    nextAction: domain === "mentorship_session" && nextAction === "in_progress" ? "Attend your confirmed session" : ({ member_action: "Your response is needed", mpa_action: "Waiting for MPA review", external_response: "Waiting for another participant", in_progress: "Engagement in progress", completed: "Completed", closed: "Closed", unknown: "Current status unavailable" })[nextAction],
     createdAt,
     submittedAt: createdAt,
     updatedAt,

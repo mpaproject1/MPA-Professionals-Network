@@ -768,3 +768,23 @@ The implementation status in Section 21 is historical and must not be read as co
 **Revised order:** (1) inspect branch head and map existing schemas/services/tests; (2) establish disposable PostgreSQL CI test path; (3) design additive geography, fee-balance and payment-intake migrations from the real schema; (4) implement shared server-side services and authorization; (5) implement reference-data/member/payment workbook templates and parsers; (6) implement profile/import/Finance UI and reminders; (7) complete Membership Center dashboards, filters and exports using authoritative data; (8) run focused tests, clean/upgrade migration tests, full backend/lint/typecheck/build and Playwright; (9) record exact PR checks and unresolved limitations.
 
 **Implementation safety:** do not fabricate country or Ethiopian administrative data, payment verification, balance waivers, member activation or reminder delivery. If an authoritative source, existing schema invariant or CI capability is unavailable, document the blocker and implement a safe staged workflow rather than inventing data or weakening validation.
+
+
+## 24. Progress log — 2026-11-02
+
+### Completed in this update
+- Recorded and approved the product-owner's geographic hierarchy, UN M49-aligned country reference, expanded membership import contract, partial-payment/balance disposition rules, Finance bulk payment intake and one-by-one verification requirements in Sections 22–23.
+- Committed as `f39fd8e4ec927b064da836c15271b9582280c0da`.
+- Inspected the PR #18 branch's existing membership bulk-import service, legacy Finance verification service, membership service, reference portfolio service, profile UI, Membership Center and PR quality workflow.
+- Confirmed the current PR quality workflow already provisions PostgreSQL 16 as a disposable CI service and a separate disposable PostgreSQL database for migration-upgrade validation. The workflow runs repository migrations and backend tests; it also runs Biome, TypeScript, production build and selected Playwright browser acceptance.
+- Confirmed current legacy member import has a distinct historical-register contract (including membership number, product code and approval reference) and stores source row payloads; imported payment data is currently treated as historical evidence for later Finance verification, not as verified cash. The existing Finance legacy-payment verification action requires positive amount, currency, reference, date, method and evidence and records into the shared payment ledger.
+
+### Not yet implemented or validated
+- No application-code change for the newly approved geography, partial-payment, balance-disposition or Finance bulk-payment requirements is included in commit f39fd8e.
+- The existing legacy import contract does not yet match the newly approved expanded member template and must be reconciled without weakening its duplicate checks, audit requirements, membership-number/product validation or Finance payment gate.
+- The existing historical payment verification flow is not yet an installment/balance workflow and does not implement sponsored, honored-member or volunteer-valuation adjustments.
+- No geographic schema, authoritative reference workbook, member profile capture, geographic filters or geographic analytics have been delivered by this update.
+- No end-to-end test run is claimed for this documentation-only commit. The workflow-run lookup did not return a PR-triggered run for this commit; obtain the current PR check state separately.
+
+### Next implementation checkpoint
+Trace exact payment application and membership-record schemas, all payment creation/verification/reversal routes, member profile persistence, import template download/preview/apply routes, reference dataset migration conventions and notification scheduler APIs. Then design additive migrations against those exact schemas before implementing the new workflows. Do not treat this documentation update as completion of the feature.

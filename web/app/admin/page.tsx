@@ -181,7 +181,8 @@ export default function AdminPage() {
     !isPlatformAdmin &&
     !roles.includes("supporting_staff") &&
     !roles.includes("reviewer") &&
-    !permissions.includes("jobs.review")
+    !roles.includes("membership_reviewer") &&
+    !permissions.some(permission => ["jobs.review", "membership.review", "membership.activate", "members.view", "members.manage"].includes(permission))
   )
     return (
       <div className="auth-page">

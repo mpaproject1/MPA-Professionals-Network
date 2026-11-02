@@ -10,6 +10,7 @@ import {
   previewMembershipPaymentImport,
   recordBalanceDisposition,
   recordMembershipReceipt,
+  scheduleMembershipFeeReminders,
   reverseMembershipRecordReceipt,
   verifyMembershipReceipt,
 } from "../../src/membership/fee-obligations.js";
@@ -121,6 +122,16 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.equal(pendingApplication.status,"payment_pending","application approval must not make a partially paid application ready to activate");
  assert.equal((await db.query("select id from membership_record where application_id=$1",[app.id])).rowCount,0,"no membership record may be activated while the fee balance remains due");
 
+ const dueDate=(await db.query("select ((now() at time zone 'Africa/Addis_Ababa')::date+3)::text due_date")).rows[0].due_date;
+ await db.query("insert into notification_preference(user_id,in_app_enabled,push_enabled,in_app_categories) values($1,false,false,$2::jsonb) on conflict(user_id) do update set in_app_enabled=false,push_enabled=false,in_app_categories=$2::jsonb",[applicantId,JSON.stringify({membership:false})]);
+ const willPayLater=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"will_pay_later",amount:700,currency:"ETB",dueDate,remark:"Member requested a short payment extension",idempotencyKey:"fee_will_pay_"+suffix.slice(0,32)},"fee-will-pay-"+suffix);
+ assert.equal(willPayLater.disposition.status,"active");
+ const reminderRun=await scheduleMembershipFeeReminders(500);
+ assert.ok(reminderRun.suppressed>=1,"a member who opted out of both in-app and push reminders must be suppressed");
+ const queuedReminder=(await db.query("select status,member_delivery_status,member_delivery_note from membership_fee_reminder where obligation_id=(select id from membership_fee_obligation where application_id=$1)",[app.id])).rows[0];
+ assert.equal(queuedReminder.status,"queued","Finance queue can retain its staff reminder even when the member opted out");
+ assert.equal(queuedReminder.member_delivery_status,"suppressed");
+ assert.match(queuedReminder.member_delivery_note,/opted|disabled/i);
  const disposition=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"sponsored",amount:700,currency:"ETB",remark:"Test sponsor covers remaining fee",details:{sponsorName:"Disposable test sponsor"},evidenceFileId:evidence.id,idempotencyKey:"fee_sponsor_"+suffix.slice(0,32)},"fee-sponsor-record-"+suffix);
  assert.equal(disposition.disposition.status,"pending");
  const dispositionReplay=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"sponsored",amount:700,currency:"ETB",remark:"Test sponsor covers remaining fee",details:{sponsorName:"Disposable test sponsor"},evidenceFileId:evidence.id,idempotencyKey:"fee_sponsor_"+suffix.slice(0,32)},"fee-sponsor-replay-"+suffix);
@@ -130,6 +141,8 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.deepEqual(approverEvidence.bytes,evidenceBytes,"a separate Finance approver must be able to inspect the private evidence before deciding");
  await assert.rejects(decideBalanceDisposition(applicantFinance,disposition.disposition.id,{decision:"approved",note:"Self approval attempt"},"fee-sponsor-self-approve-"+suffix),error=>error.code==="MAKER_CHECKER_REQUIRED");
  await decideBalanceDisposition(approverFinance,disposition.disposition.id,{decision:"approved",note:"Independent Finance approval"},"fee-sponsor-approve-"+suffix);
+ const cancelledReminder=(await db.query("select status from membership_fee_reminder where obligation_id=(select id from membership_fee_obligation where application_id=$1)",[app.id])).rows[0];
+ assert.equal(cancelledReminder.status,"cancelled","full approved non-cash settlement must cancel outstanding reminders");
  const adjustment=(await db.query("select id,details from membership_fee_adjustment where obligation_id=(select id from membership_fee_obligation where application_id=$1) and status='approved' order by created_at desc limit 1",[app.id])).rows[0];
  assert.ok(adjustment?.id,"approval must create an immutable approved adjustment");
  assert.equal(adjustment.details.evidenceFileId,evidence.id,"approved adjustment must retain the private evidence reference");

@@ -57,7 +57,7 @@ function normalizedStatus(record, domain) {
 }
 function responsibility(status, domain, record) {
   if (domain === "job" && status === "interview") return "member_action";
-  if (domain === "job" && status === "offer") return record.offer_approval_status === "pending" ? "mpa_action" : "member_action";
+  if (domain === "job" && status === "offer") return (record.offer_approval_status || record.details?.offerApprovalStatus) === "pending" ? "mpa_action" : "member_action";
   if (domain === "job" && status === "accepted") return "external_response";
   if (domain === "mentorship_match") {
     if (["proposed", "matched"].includes(status)) return "member_action";
@@ -74,7 +74,7 @@ function responsibility(status, domain, record) {
   if (COMPLETED.has(status)) return "completed";
   if (ACTIVE.has(status)) return "in_progress";
   if (status === "unknown") return "unknown";
-  if (["submitted", "pending", "requested", "matching", "in_review", "under_review", "screening", "shortlisted", "awaiting_review", "proposed_to_mentor"].includes(status)) return "mpa_action";
+  if (["submitted", "pending", "requested", "matching", "in_review", "under_review", "screening", "shortlisted", "awaiting_review", "paid", "pending_review", "proposed_to_mentor"].includes(status)) return "mpa_action";
   return "external_response";
 }
 function safeId(value) {
@@ -116,13 +116,13 @@ function mapRecord(record, definition) {
     closed: "Closed",
     unknown: "Current status unavailable",
   }[state];
-  const nextAction = domain === "mentorship_session" && state === "in_progress"
+  const nextAction = first(record, ["nextAction", "next_action"]) || (domain === "mentorship_session" && state === "in_progress"
     ? "Attend your confirmed session"
     : domain === "mentorship_activity" && state === "member_action"
       ? (record.submission_status === "changes_requested" ? "Improve and resubmit your work" : "Complete the assigned activity")
       : domain === "mentorship_activity" && state === "external_response"
         ? "Waiting for the other participant to review or submit work"
-        : defaultNextAction;
+        : defaultNextAction);
   return {
     id: domain + ":" + id,
     domain,

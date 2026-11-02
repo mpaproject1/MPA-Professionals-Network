@@ -85,26 +85,33 @@ test("PostgreSQL Finance XLSX intake applies valid rows independently and preser
  const app=await membership.createApplication(applicant.user.id,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:"fee_bulk_app_"+suffix.slice(0,32)},"fee-bulk-create-app-"+suffix);
  const identity={sub:financeUser.user.id,roles:["finance_officer"],permissions:[]},methodCode="bulk_"+suffix.slice(0,8);
  await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'cash','Bulk XLSX test',true,'ETB','Disposable Finance intake method',false) on conflict(method_code) do update set enabled=true,currency='ETB',requires_evidence=false",[methodCode]);
+ const evidenceMethodCode="ev_"+suffix.slice(0,8);
+ await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'bank_transfer','Evidence-required bulk test',true,'ETB','Evidence required',true) on conflict(method_code) do update set enabled=true,currency='ETB',requires_evidence=true",[evidenceMethodCode]);
  const headers=parseXlsxRows(membershipPaymentImportTemplate(identity)).headers;
  const reference="bulk-reference-"+suffix;
  const rows=[
   {application_id:app.id,membership_number:"",amount:"300",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:methodCode,payment_reference:reference,evidence_reference:"",evidence_file_id:"",payer_note:"Valid row"},
   {application_id:app.id,membership_number:"",amount:"200",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:methodCode,payment_reference:reference,evidence_reference:"",evidence_file_id:"",payer_note:"Duplicate reference row"},
+  {application_id:"",membership_number:"MISSING-"+suffix,amount:"100",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:methodCode,payment_reference:"unmatched-"+suffix,evidence_reference:"",evidence_file_id:"",payer_note:"Unmatched member"},
+  {application_id:app.id,membership_number:"",amount:"100",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:evidenceMethodCode,payment_reference:"evidence-required-"+suffix,evidence_reference:"",evidence_file_id:"",payer_note:"Evidence missing"},
  ];
  const workbook=createXlsx(rows,headers);
  const preview=await previewMembershipPaymentImport(identity,{filename:"bulk-fee-test.xlsx",xlsxBase64:workbook.toString("base64")},"fee-bulk-preview-"+suffix);
- assert.equal(preview.rowCount,2);
- assert.equal(preview.errorCount,1);
+ assert.equal(preview.rowCount,4);
+ assert.equal(preview.errorCount,3);
  assert.equal(preview.canApply,false);
  assert.equal(preview.rows[0].errors.length,0);
  assert.ok(preview.rows[1].errors.some(error=>/duplicated in this workbook/i.test(error)));
+ assert.ok(preview.rows[2].errors.some(error=>/no matching fee obligation/i.test(error)));
+ assert.ok(preview.rows[3].errors.some(error=>/requires evidence_file_id/i.test(error)));
  await assert.rejects(applyMembershipPaymentImport(identity,preview.batchId,{reason:"Apply test batch without partial option"},"fee-bulk-denied-"+suffix),error=>error.code==="IMPORT_NOT_VALIDATED");
  const applied=await applyMembershipPaymentImport(identity,preview.batchId,{reason:"Apply valid rows and retain row failures",applyValidRows:true},"fee-bulk-apply-"+suffix);
  assert.equal(applied.createdCount,1);
- assert.equal(applied.errorCount,1);
+ assert.equal(applied.errorCount,3);
+ assert.equal(applied.skippedCount,3);
  assert.equal(applied.partial,true);
  assert.deepEqual(applied.createdRows,[2]);
- assert.equal(applied.failedRows[0].rowNumber,3);
+ assert.deepEqual(applied.failedRows.map(row=>row.rowNumber),[3,4,5]);
  const pending=(await db.query("select pt.id,pt.status,pt.source from payment_transaction pt join membership_fee_obligation_payment op on op.payment_transaction_id=pt.id where op.obligation_id=(select id from membership_fee_obligation where application_id=$1)",[app.id])).rows;
  assert.equal(pending.length,1);
  assert.equal(pending[0].status,"pending");

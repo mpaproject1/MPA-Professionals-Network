@@ -36,6 +36,7 @@ type TrackingItem = {
 type Tracking = {
   summary?: { total?: number; active?: number; nextSteps?: number; jobApplications?: number };
   items?: TrackingItem[];
+  errors?: { source: string; category: string; message: string }[];
 };
 type Application = {
   id: string;
@@ -127,7 +128,7 @@ export default function MembersWorkspacePage() {
       applications: results[2].status === "fulfilled" && Array.isArray(results[2].value) ? results[2].value as Application[] : [],
       history: results[3].status === "fulfilled" ? results[3].value as MembershipHistory : {},
       inbox: results[4].status === "fulfilled" ? results[4].value as Inbox : {},
-      errors: failures,
+      errors: [...failures, ...(results[1].status === "fulfilled" && (results[1].value as Tracking).errors?.length ? ["Some progress sections"] : [])],
     });
     setLoading(false);
   }, [token]);
@@ -294,8 +295,34 @@ export default function MembersWorkspacePage() {
         </div>
       </section>
 
+      <section aria-labelledby="member-activity-title" className="mb-7">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div><div className="eyebrow">Your professional life at MPA</div><h2 id="member-activity-title" className="h2">Everything in one place</h2><p className="muted">Open a space, continue an activity or check a response without searching across separate portals.</p></div>
+          <Link className="btn btn-ghost" href="/track">View all progress <ArrowRight size={15}/></Link>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {[
+            {href:"/membership",title:"Membership",detail:"Join, renew and manage"},
+            {href:"/profile",title:"My Career",detail:"Profile, skills and credentials"},
+            {href:"/jobs",title:"Opportunities",detail:"Jobs and professional openings"},
+            {href:"/mentorship",title:"My Mentorship",detail:"Goals, guidance and learning"},
+            {href:"/services",title:"Services",detail:"Request or provide expertise"},
+            {href:"/network",title:"Network",detail:"Professional connections"},
+            {href:"/serve-community",title:"Contributions",detail:"Initiatives and volunteering"},
+            {href:"/track",title:"My Progress",detail:"Requests and responses"},
+          ].map((item) => <Link key={item.href} href={item.href} className="flex min-h-24 flex-col justify-between rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 transition hover:border-[var(--primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+            <strong>{item.title}</strong><span className="muted text-sm">{item.detail}</span><span className="text-sm underline underline-offset-4">Open space <ArrowRight size={13} className="inline"/></span>
+          </Link>)}
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          <Card><span className="muted text-sm">All records</span><div className="metric">{data.tracking.summary?.total ?? "—"}</div></Card>
+          <Card><span className="muted text-sm">Needs your attention</span><div className="metric">{data.tracking.summary?.nextSteps ?? "—"}</div></Card>
+          <Card><span className="muted text-sm">Waiting or active</span><div className="metric">{data.tracking.summary?.active ?? "—"}</div></Card>
+        </div>
+      </section>
+
       <section aria-labelledby="progress-title" className="mb-7">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><div className="eyebrow">Your journey</div><h2 id="progress-title" data-guide-target="workspace-progress" className="h2">Membership progress</h2></div><span className="muted text-sm">{journey.filter((step) => step.state === "complete").length} of {journey.length} steps confirmed</span></div>
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><div className="eyebrow">Your journey</div><h2 id="progress-title" data-guide-target="workspace-progress" className="h2">Membership setup</h2></div><span className="muted text-sm">{journey.filter((step) => step.state === "complete").length} of {journey.length} steps confirmed</span></div>
         <ol className="grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-5" aria-label="Membership progress steps">
           {journey.map((step, index) => {
             const completed = step.state === "complete";

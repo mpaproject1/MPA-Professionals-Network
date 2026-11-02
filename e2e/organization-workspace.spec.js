@@ -114,7 +114,7 @@ test.describe("MPA organization app entry and navigation", () => {
     })]);
     await page.goto("/organizations");
     await expect(page.getByText("Changes requested").first()).toBeVisible();
-    await expect(page.getByText(/Please attach the current trade license/)).toBeVisible();
+    await expect(page.getByText(/Please attach the current trade license/).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Continue verification" })).toHaveAttribute("href", "/organizations#org-evidence");
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
   });

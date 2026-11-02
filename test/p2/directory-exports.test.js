@@ -8,6 +8,8 @@ import { exportDirectory, listDirectoryExportFields, previewDirectoryExport } fr
 const admin = { sub: "directory-export-admin", roles: ["system_admin"], permissions: [] };
 const memberAdmin = { sub: "directory-export-member-admin", roles: ["membership_reviewer"], permissions: [] };
 const support = { sub: "directory-export-support", roles: ["supporting_staff"], permissions: [] };
+const finance = { sub: "directory-export-finance", roles: ["finance_officer"], permissions: [] };
+const memberView = { sub: "directory-export-member-view", roles: [], permissions: ["members.view"] };
 
 test("directory export field catalogues preserve role boundaries and never offer unapproved profile fields", () => {
   const memberFields = listDirectoryExportFields(memberAdmin, "members").fields.map(field => field.key);
@@ -16,6 +18,8 @@ test("directory export field catalogues preserve role boundaries and never offer
   assert.equal(memberFields.includes("gender"), false);
   assert.equal(memberFields.includes("private_evidence"), false);
   assert.throws(() => listDirectoryExportFields(support, "members"), error => error.statusCode === 403);
+  assert.throws(() => listDirectoryExportFields(finance, "members"), error => error.statusCode === 403);
+  assert.ok(listDirectoryExportFields(memberView, "members").fields.some(field => field.key === "membership_number"));
   assert.throws(() => listDirectoryExportFields(support, "accounts"), error => error.statusCode === 403);
   const accountFields = listDirectoryExportFields(admin, "accounts").fields.map(field => field.key);
   assert.ok(accountFields.includes("account_reference"));

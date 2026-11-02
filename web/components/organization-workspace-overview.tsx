@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -138,6 +139,8 @@ export function OrganizationWorkspaceOverview({
   });
   const attention = organizations.filter((item) => item.verification_case_status === "correction_required");
   const hasVerifiedOrganization = verified.length > 0;
+  const [activeFolderKey, setActiveFolderKey] = useState("publishing");
+  const activeFolder = folders.find((folder) => folder.key === activeFolderKey) || folders[0];
 
   if (organizations.length === 0) {
     return (
@@ -209,25 +212,52 @@ export function OrganizationWorkspaceOverview({
               })}
             </div>
           ) : null}
-          <div className={styles.folderShelf} aria-label="Organization workspace folders">
+          <div className={styles.folderShelf} role="tablist" aria-label="Organization workspace folders">
             {folders.map((folder) => {
               const Icon = folder.icon;
+              const selected = activeFolder.key === folder.key;
               return (
-                <article className={`${styles.folder} ${styles[folder.tone] || ""}`} key={folder.key}>
-                  <div className={styles.folderTab} aria-hidden="true" />
-                  <div className={styles.folderHeader}>
+                <button
+                  className={`${styles.folder} ${styles[folder.tone] || ""} ${selected ? styles.folderActive : ""}`}
+                  key={folder.key}
+                  type="button"
+                  role="tab"
+                  id={`organization-folder-${folder.key}`}
+                  aria-selected={selected}
+                  aria-controls="organization-folder-panel"
+                  onClick={() => setActiveFolderKey(folder.key)}
+                >
+                  <span className={styles.folderTab} aria-hidden="true" />
+                  <span className={styles.folderHeader}>
                     <span className={styles.folderIcon}><Icon size={19} aria-hidden="true"/></span>
                     <span className={styles.toolCount}>{folder.links.length} tools</span>
-                  </div>
-                  <h3>{folder.title}</h3>
-                  <p>{folder.description}</p>
-                  <ul>
-                    {folder.links.map((item) => <li key={item.href + item.label}><Link href={item.href}>{item.label}<span aria-hidden="true">↗</span></Link></li>)}
-                  </ul>
-                </article>
+                  </span>
+                  <span className={styles.folderTitle}>{folder.title}</span>
+                  <span className={styles.folderDescription}>{folder.description}</span>
+                </button>
               );
             })}
           </div>
+          <section
+            className={styles.folderPanel}
+            id="organization-folder-panel"
+            role="tabpanel"
+            aria-labelledby={`organization-folder-${activeFolder.key}`}
+          >
+            <div className={styles.folderPanelHeading}>
+              <span className={styles.eyebrow}>Selected folder</span>
+              <h3>{activeFolder.title}</h3>
+              <p>{activeFolder.description}</p>
+            </div>
+            <div className={styles.folderActions}>
+              {activeFolder.links.map((item, index) => (
+                <Link className={styles.folderAction} href={item.href} key={item.href + item.label}>
+                  <span><strong>{item.label}</strong><small>{index === 0 ? "Open this workspace" : "Continue to this function"}</small></span>
+                  <span aria-hidden="true">↗</span>
+                </Link>
+              ))}
+            </div>
+          </section>
         </>
       )}
     </section>

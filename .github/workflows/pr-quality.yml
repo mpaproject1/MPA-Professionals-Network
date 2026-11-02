@@ -225,6 +225,7 @@ jobs:
             e2e/network-plus-discovery.spec.js \
             e2e/serve-community-separation.spec.js \
             e2e/workspace-app-ux.spec.js \
+            e2e/organization-workspace.spec.js \
             --max-failures=0 \
             --reporter=list,html,json 
 

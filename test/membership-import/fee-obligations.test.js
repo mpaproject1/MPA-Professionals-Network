@@ -14,6 +14,7 @@ import {
 import { parseXlsxRows } from "../../src/platform/xlsx.js";
 
 const admin={sub:"system-admin",roles:["system_admin"],permissions:[]};
+const member={sub:"member-user",roles:["member"],permissions:[]};
 const finance={sub:"finance-officer",roles:["finance_officer"],permissions:[]};
 const requestId="00000000-0000-4000-8000-000000000001";
 const paymentId="00000000-0000-4000-8000-000000000002";
@@ -65,6 +66,6 @@ test("Finance payment template contains only pending-intake fields and requires 
  assert.equal(rows.length,0);
 });
 
-test("member fee queue does not grant Finance access from a system administrator role alone",async()=>{
- await assert.rejects(listFeeObligations(admin,{}),error=>error.statusCode===403&&error.code==="FORBIDDEN");
+test("ordinary members cannot access the Finance fee obligation queue",async()=>{
+ await assert.rejects(listFeeObligations(member,{}),error=>error.statusCode===403&&error.code==="FORBIDDEN");
 });

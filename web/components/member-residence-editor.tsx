@@ -34,7 +34,7 @@ export function MemberResidenceEditor(){
  if(loading)return <Card><OperationStatus state="loading" title="Loading residence" detail="Loading the published member geography reference data."/></Card>;
  return <Card>
   <div className="panel-heading"><div><h2>Residence</h2><p>Choose the country or area where you currently live. Street address is optional and is not shown in geographic summaries.</p></div><MapPinned size={19}/></div>
-  {!reference.version?<OperationStatus state="warning" title="Location reference data is not published yet" detail="You can complete this section after MPA imports and publishes the country and Ethiopian administrative reference workbook."/>:<>
+  {!reference.version?<OperationStatus state="info" title="Location reference data is not published yet" detail="You can complete this section after MPA imports and publishes the country and Ethiopian administrative reference workbook."/>:<>
    <div className="form-grid">
     <label>Residence type<select value={type} onChange={event=>{const next=event.target.value as "ethiopia"|"diaspora";setType(next);setCountry(next==="ethiopia"?"ETH":"");setLevel1("");setLevel2("");setLevel3("");}}><option value="ethiopia">Ethiopia</option><option value="diaspora">Diaspora</option></select></label>
     {type==="diaspora"&&<label>Country<select value={country} onChange={event=>setCountry(event.target.value)}><option value="">Choose country or area</option>{reference.countries.filter(item=>item.country_iso3!=="ETH").map(item=><option key={item.id} value={item.country_iso3||item.unit_code}>{item.label}</option>)}</select></label>}

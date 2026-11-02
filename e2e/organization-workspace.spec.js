@@ -242,6 +242,17 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(tabs.getByRole("tab", { name: /Exploring/ })).toBeVisible();
   });
 
+  test("recruiter role sees recruitment publishing and reviewing but not mentorship or team administration", async ({ page }) => {
+    await mockOrganizationApi(page, [organization({ role_code: "recruiter" })]);
+    await page.goto("/organizations");
+    await expect(page.getByRole("tab", { name: /Publishing/ })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /Reviewing/ })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /Organization/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Job" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Professional service" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Mentorship" })).toHaveCount(0);
+  });
+
   test("finance and event roles retain outcome reporting without publishing or team controls", async ({ page }) => {
     await mockOrganizationApi(page, [organization({ role_code: "finance" })]);
     await page.goto("/organizations");

@@ -538,12 +538,10 @@ export default function Organizations() {
   return (
     <div className="grid mpa-experience mpa-organizations">
       <div>
-        <div className="eyebrow">Partner workspace</div>
-        <h1 className="h1">Build a trusted organization profile.</h1>
+        <div className="eyebrow">MPA Organization</div>
+        <h1 className="h1">Unified organization workspace</h1>
         <p className="muted">
-          Register an organization, review its current verification state and
-          continue through server-governed due diligence. Verified status is
-          never assumed by the interface.
+          Your organization at a glance. Here is what needs attention next.
         </p>
       </div>
 

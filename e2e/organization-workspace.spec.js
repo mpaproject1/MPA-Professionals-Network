@@ -90,6 +90,13 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("heading", { name: "Your organization at a glance" })).toBeVisible();
     const tabs = page.getByRole("tablist", { name: "Organization workspace folders" });
     await expect(tabs.getByRole("tab")).toHaveCount(6);
+    const publishing = tabs.getByRole("tab", { name: /Publishing/ });
+    const reviewing = tabs.getByRole("tab", { name: /Reviewing/ });
+    await publishing.focus();
+    await expect(publishing).toBeFocused();
+    await publishing.press("ArrowRight");
+    await expect(reviewing).toBeFocused();
+    await expect(reviewing).toHaveAttribute("aria-selected", "true");
     const reports = tabs.getByRole("tab", { name: /Reports/ });
     await reports.focus();
     await expect(reports).toBeFocused();
@@ -98,6 +105,17 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("tabpanel").getByRole("link", { name: /Impact and outcomes/ })).toHaveAttribute("href", "/organizations/reports");
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test("read-only organization members do not see publishing, reviewing or team-administration folders", async ({ page }) => {
+    await mockOrganizationApi(page, [organization({ role_code: "read_only" })]);
+    await page.goto("/organizations");
+    const tabs = page.getByRole("tablist", { name: "Organization workspace folders" });
+    await expect(tabs.getByRole("tab")).toHaveCount(3);
+    await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /Reviewing/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /Organization/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /Exploring/ })).toBeVisible();
   });
 
   test("legacy workspace URL redirects to the canonical organization entry", async ({ page }) => {

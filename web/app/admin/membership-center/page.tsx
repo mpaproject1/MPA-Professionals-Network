@@ -93,6 +93,7 @@ export default function MembershipCenterPage() {
   const canManageCards = roles.some(role => ["system_admin", "reviewer"].includes(role)) || permissions.some(permission => ["members.view", "members.manage"].includes(permission));
   const canViewReports = canReview || permissions.includes("reports.view") || roles.some(role => ["system_admin", "admin"].includes(role));
   const canViewReviewerPerformance = roles.some(role => ["system_admin", "admin", "membership_reviewer"].includes(role)) || permissions.includes("reports.sensitive");
+  const canManageGeography = roles.some(role => ["system_admin", "admin", "platform_admin"].includes(role)) || permissions.includes("members.geography.manage");
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 
@@ -212,6 +213,7 @@ export default function MembershipCenterPage() {
     ...(canReview ? [["Applications", "/admin/membership", false] as [string, string, boolean]] : []),
     ...(canViewMemberRecords ? [["Members", "/admin/members/catalog", false] as [string, string, boolean]] : []),
     ...(canImportExport ? [["Import & export", "/admin/members", false] as [string, string, boolean]] : []),
+    ...(canManageGeography ? [["Geography", "/admin/membership-geography", false] as [string, string, boolean]] : []),
     ...(canReview ? [["Renewals & expiry", "/admin/reports?report=membership-status", false] as [string, string, boolean]] : []),
     ...(canFinance ? [["Finance payments", "/admin/finance", false] as [string, string, boolean]] : []),
     ...(canManageCards ? [["Membership cards", "/admin/membership-cards", false] as [string, string, boolean]] : []),

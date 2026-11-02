@@ -1022,7 +1022,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 
 **Branch:** `feat/workstream-3-progress-members-workspace`  
 **PR:** #18  
-**Implementation head recorded before this documentation update:** `76226f961f6398a6fd2535c33a4856a445b00513`  
+**Implementation head recorded before this documentation update:** `345b59de4c52d488a03a430aca982da4ac759c56`  
 **Scope:** WP3 workbook/geography operational proof; WP4 Finance intake, reminders, reporting and authorization.
 
 ### WP3 — workbook and geography
@@ -1034,7 +1034,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 - `scripts/validate-member-geography-reference.js` validates the generated workbook before artifact upload: required columns, unique codes, ISO-alpha3 and M49 formats, parent relationships, row-level HTTPS provenance, the 12-region/two-city count, and exclusion of unsupported lower levels.
 - `.github/workflows/member-geography-reference.yml` now runs on manual dispatch, its weekly schedule, and relevant changes on this PR branch. It generates the XLSX and manifest, runs the structural validator, then uploads the artifact.
 - Geography preview now requires a primary HTTPS source URL and row-level HTTPS provenance. The preview metadata retains all source URLs; applying creates a draft version with the captured provenance. Publishing fails closed if any active row lacks source name, source version or an HTTPS source URL.
-- The admin geography screen captures the primary source URL. Member geography aggregation is scoped to the exact currently published version and reports how many saved residences still reference an older version. The admin summary shows the published version and the stale-profile count.
+- The admin geography screen captures the primary source URL. Member geography aggregation is scoped to the exact currently published version and reports how many saved residences still reference an older version. The admin summary shows the published version and the stale-profile count. Member-facing selectors call Addis Ababa and Dire Dawa chartered cities, while the existing database enum `federal_city` is retained as an internal compatibility value.
 - `test/membership-import/geography.test.js` now covers XLSX round-trip structure, missing primary source URL, malformed parent rejection, preview, draft apply, publish, profile selector data, saving a member residence and aggregation against the published version. Its cleanup also removes fixture audit rows before deleting the test account.
 
 #### Source boundary and operational proof still pending
@@ -1076,7 +1076,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 
 ### Current validation and outstanding gates
 
-- Current PR head before this documentation commit: `76226f961f6398a6fd2535c33a4856a445b00513`. The exact-head workflow lookup returned no Actions run or commit-status entries. The latest recorded PR Quality run remains an older failure on `491c554ae1e589d8358f54f2d1789e96f646b97e`, not this implementation head.
+- Current PR head before this documentation commit: `345b59de4c52d488a03a430aca982da4ac759c56`. The exact-head workflow lookup returned no Actions run or commit-status entries. The latest recorded PR Quality run remains an older failure on `491c554ae1e589d8358f54f2d1789e96f646b97e`, not this implementation head.
 - No local test suite, PostgreSQL migration run, Biome, TypeScript, production build or Playwright result is claimed. All new integration tests and migrations remain **committed but unverified** until PR Quality executes against the final head.
 - The available GitHub connection supports run inspection and reruns but does not expose a workflow-dispatch action. The branch pushes made through this connection have not produced a new Actions run. Start PR Quality and the geography-reference workflow from GitHub Actions if automatic runs remain suppressed.
 - Do not enable Zone/Sub-city/District/Town selectors until an authoritative source dataset, source license, release date, stable codes and parent mappings are independently verified and imported.

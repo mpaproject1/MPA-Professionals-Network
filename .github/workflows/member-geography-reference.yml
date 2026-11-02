@@ -1,0 +1,36 @@
+name: Member geography reference workbook
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  generate-reference:
+    name: Generate current UN M49 and Ethiopia geography workbook
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate workbook from published reference sources
+        run: node scripts/generate-member-geography-reference.js artifacts/member-geography-reference.xlsx
+      - name: Upload versioned reference workbook
+        uses: actions/upload-artifact@v4
+        with:
+          name: member-geography-reference-${{ github.run_id }}
+          path: |
+            artifacts/member-geography-reference.xlsx
+            artifacts/member-geography-reference.manifest.json
+          if-no-files-found: error
+          retention-days: 30

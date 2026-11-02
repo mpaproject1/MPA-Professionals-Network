@@ -71,10 +71,10 @@ export default function OrganizationReportsPage() {
       const list = Array.isArray(rows) ? rows : [];
       setOrganizations(list);
       const requestedId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("organizationId") || "" : "";
-      setOrganizationId(current => requestedId && list.some(org => org.id === requestedId)
-        ? requestedId
-        : current && list.some(org => org.id === current)
-          ? current
+      setOrganizationId(current => current && list.some(org => org.id === current)
+        ? current
+        : requestedId && list.some(org => org.id === requestedId)
+          ? requestedId
           : (list.find(org => org.verification_status === "verified") || list[0])?.id || "");
     } catch (cause) {
       setOrganizations([]);

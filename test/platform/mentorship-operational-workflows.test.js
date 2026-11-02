@@ -18,6 +18,9 @@ test("mentorship operational workflows require explicit sharing and preserve par
     source("../../web/app/admin/page.tsx"),
     source("../../web/app/admin/email/page.tsx"),
     source("../../web/app/admin/mentorship-interest/page.tsx"),
+    source("../../db/migrations/20261102140000_mentorship_learning_activities.sql"),
+    source("../../web/components/mentorship-learning-activities.tsx"),
+    source("../../src/platform/member-progress.js"),
   ]);
 
   assert.match(migration, /share_with_eligible_mentors boolean NOT NULL DEFAULT false/);

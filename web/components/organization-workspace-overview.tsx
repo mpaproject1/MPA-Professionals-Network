@@ -263,7 +263,7 @@ export function OrganizationWorkspaceOverview({
             const status = statusFor(organization);
             const caseState = organization.verification_case_status || organization.verification_status || "draft";
             const evidenceSubmitted = ["submitted", "in_review", "pending", "correction_required", "verified", "rejected"].includes(caseState) || organization.verification_status === "pending" || organization.verification_status === "verified";
-            const decisionRecorded = ["verified", "rejected"].includes(caseState) || organization.verification_status === "verified";
+            const decisionRecorded = ["verified", "rejected", "correction_required"].includes(caseState) || organization.verification_status === "verified";
             return (
               <article className={styles.statusCard} key={organization.id}>
                 <div className={styles.statusTop}>

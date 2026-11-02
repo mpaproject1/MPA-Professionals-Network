@@ -106,7 +106,7 @@ export default function MembersWorkspacePage() {
     setError("");
     const results = await Promise.allSettled([
       api<Me>("/api/v1/me", {}, token),
-      api<Tracking>("/api/v1/me/application-tracking?limit=5", {}, token),
+      api<Tracking>("/api/v1/me/progress?limit=5", {}, token),
       api<Application[]>("/api/v1/membership/applications/me", {}, token),
       api<MembershipHistory>("/api/v1/membership/history", {}, token),
       api<Inbox>("/api/v1/notifications?limit=5", {}, token),

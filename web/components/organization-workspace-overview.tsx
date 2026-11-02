@@ -12,6 +12,7 @@ import {
   Network,
   UsersRound,
 } from "lucide-react";
+import { api } from "../lib/api";
 import styles from "./organization-workspace-overview.module.css";
 
 type Organization = {
@@ -25,6 +26,21 @@ type Organization = {
   verification_submitted_at?: string | null;
   verification_decision_reason?: string | null;
   missing_evidence?: string[];
+};
+
+type OrganizationOutcomes = {
+  jobs: {
+    id: string;
+    title: string;
+    status: string;
+    applications: number;
+    active_pipeline: number;
+    offers: number;
+    accepted_offers: number;
+    hires: number;
+    scheduled_interviews: number;
+  }[];
+  requisitions: { id: string; title: string; status: string; headcount: number; published_jobs: number }[];
 };
 
 type OrganizationAccess = {
@@ -152,6 +168,7 @@ function statusFor(organization: Organization) {
 export function OrganizationWorkspaceOverview({
   organizations,
   organizationAccess,
+  token,
   authenticated,
   organizationLookupReady,
   onRetry,
@@ -159,6 +176,7 @@ export function OrganizationWorkspaceOverview({
 }: {
   organizations: Organization[];
   organizationAccess: OrganizationAccess[];
+  token: string;
   authenticated: boolean;
   organizationLookupReady: boolean;
   onRetry: () => void;
@@ -182,6 +200,37 @@ export function OrganizationWorkspaceOverview({
     setSelectedOrganizationId((current) => workspaceReady.some((item) => item.id === current) ? current : workspaceReady[0].id);
   }, [workspaceReady]);
   const selectedOrganization = workspaceReady.find((item) => item.id === selectedOrganizationId) || workspaceReady[0];
+  const [outcomes, setOutcomes] = useState<OrganizationOutcomes | null>(null);
+  const [outcomesState, setOutcomesState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  useEffect(() => {
+    let cancelled = false;
+    if (!token || !selectedOrganizationId) {
+      setOutcomes(null);
+      setOutcomesState("idle");
+      return () => { cancelled = true; };
+    }
+    setOutcomes(null);
+    setOutcomesState("loading");
+    api<OrganizationOutcomes>(`/api/v1/organizations/${encodeURIComponent(selectedOrganizationId)}/outcomes`, {}, token)
+      .then((data) => {
+        if (cancelled) return;
+        if (!data || !Array.isArray(data.jobs) || !Array.isArray(data.requisitions)) throw new Error("Invalid organization outcomes response");
+        setOutcomes(data);
+        setOutcomesState("ready");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setOutcomes(null);
+        setOutcomesState("error");
+      });
+    return () => { cancelled = true; };
+  }, [token, selectedOrganizationId]);
+  const outcomeSummary = outcomes ? {
+    openJobs: outcomes.jobs.filter((job) => job.status === "published").length,
+    applications: outcomes.jobs.reduce((sum, job) => sum + (Number.isFinite(job.applications) ? job.applications : 0), 0),
+    activePipeline: outcomes.jobs.reduce((sum, job) => sum + (Number.isFinite(job.active_pipeline) ? job.active_pipeline : 0), 0),
+    hires: outcomes.jobs.reduce((sum, job) => sum + (Number.isFinite(job.hires) ? job.hires : 0), 0),
+  } : null;
   const activeRoles = selectedOrganization ? [selectedOrganization.role_code || ""] : [];
   const visibleFolders = folders.filter((folder) => !folder.allowedRoles || folder.allowedRoles.some((role) => activeRoles.includes(role)));
   const activeFolder = visibleFolders.find((folder) => folder.key === activeFolderKey) || visibleFolders[0];
@@ -284,6 +333,25 @@ export function OrganizationWorkspaceOverview({
         <div className={styles.metric}><span>Awaiting review</span><strong>{awaiting.length.toString().padStart(2, "0")}</strong></div>
         <div className={styles.metric}><span>Need attention</span><strong>{attention.length.toString().padStart(2, "0")}</strong></div>
       </div>
+      <section className={styles.activitySummary} aria-label="Live organization recruitment activity">
+        <div className={styles.activityHeading}>
+          <div><h3>Recruitment activity</h3><p>Authorized, organization-scoped totals. Applicant identities are not shown.</p></div>
+          {outcomesState === "loading" ? <span role="status">Loading live activity…</span> : null}
+        </div>
+        {outcomesState === "ready" && outcomeSummary ? (
+          <>
+            <div className={styles.metrics}>
+              <div className={styles.metric}><span>Published jobs</span><strong>{outcomeSummary.openJobs}</strong></div>
+              <div className={styles.metric}><span>Applications received</span><strong>{outcomeSummary.applications}</strong></div>
+              <div className={styles.metric}><span>Active pipeline</span><strong>{outcomeSummary.activePipeline}</strong></div>
+              <div className={styles.metric}><span>Hires recorded</span><strong>{outcomeSummary.hires}</strong></div>
+            </div>
+            {outcomes && outcomes.jobs.length === 0 && outcomes.requisitions.length === 0 ? <p className={styles.activityEmpty}>No recruitment activity has been recorded for this organization yet.</p> : null}
+          </>
+        ) : outcomesState === "error" ? (
+          <p className={styles.activityEmpty}>Live recruitment totals are not available for this organization or role. No placeholder figures are displayed.</p>
+        ) : null}
+      </section>
 
       {!hasVerifiedOrganization ? (
         <div className={styles.statusList}>

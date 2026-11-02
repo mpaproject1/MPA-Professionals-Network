@@ -1011,7 +1011,7 @@ async function runPushDelivery(){
   pushWorkerRunning=true;
   try {
     const result=await dispatchPendingPushNotifications(Number(process.env.PUSH_DELIVERY_BATCH_SIZE)||50);
-    if(result.sent||result.failed||result.skipped)logger.info("push.outbox.dispatched",{sent:result.sent||0,failed:result.failed||0,skipped:Boolean(result.skipped),reason:result.reason||null,mode:result.mode||"provider"});
+    if(result.sent||result.failed)logger.info("push.outbox.dispatched",{sent:result.sent||0,failed:result.failed||0,mode:result.mode||"provider"});
   } catch(error) {
     logger.warn("push.outbox.dispatch_failed",{error:error.message,code:error.code||"PUSH_DELIVERY_FAILED"});
   } finally { pushWorkerRunning=false; }

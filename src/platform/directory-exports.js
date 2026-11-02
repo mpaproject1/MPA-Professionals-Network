@@ -129,7 +129,7 @@ function buildQuery(kind, identity, filters) {
   if (kind === "members") {
     dateColumn = "mr.created_at";
     select = `mr.id, u.account_reference, p.display_name full_name, u.status account_status, u.email, p.phone,
-      mr.membership_number, case when mr.status in ('merged','cancelled','suspended') then mr.status when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end membership_status, mp.product_code, mp.name product_name, mr.start_date, mr.end_date,
+      mr.membership_number, case when mr.status in ('merged','cancelled','suspended') then mr.status when mr.source='legacy_import' and not exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=mr.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded') then 'payment_verification_required' else mr.status end membership_status, mp.product_code, mp.name product_name, mr.start_date, mr.end_date,
       mr.source_import_id import_batch, mr.source import_source, mr.created_at record_created_at`;
     fromSql = `membership_record mr
       left join app_user u on u.id=mr.user_id
@@ -137,16 +137,16 @@ function buildQuery(kind, identity, filters) {
       left join membership_product mp on mp.id=mr.membership_product_id`;
     clauses.push(`($${args.length + 1}::date is null or mr.created_at >= $${args.length + 1}::date)`); args.push(filters.from || null);
     clauses.push(`($${args.length + 1}::date is null or mr.created_at < ($${args.length + 1}::date + interval '1 day'))`); args.push(filters.to || null);
-    clauses.push(`($${args.length + 1}='' or (case when mr.status in ('merged','cancelled','suspended') then mr.status when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end)=${args.length + 1})`); args.push(filters.status);
+    clauses.push(`($${args.length + 1}='' or (case when mr.status in ('merged','cancelled','suspended') then mr.status when mr.source='legacy_import' and not exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=mr.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded') then 'payment_verification_required' else mr.status end)=${args.length + 1})`); args.push(filters.status);
     clauses.push(`($${args.length + 1}='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(u.account_reference,'')||' '||coalesce(mr.membership_number,'')) like lower('%'||$${args.length + 1}||'%'))`); args.push(filters.q);
-    if (filters.membershipStatus) { clauses.push(`(case when mr.status in ('merged','cancelled','suspended') then mr.status when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end)=${args.length + 1}`); args.push(filters.membershipStatus); }
+    if (filters.membershipStatus) { clauses.push(`(case when mr.status in ('merged','cancelled','suspended') then mr.status when mr.source='legacy_import' and not exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=mr.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded') then 'payment_verification_required' else mr.status end)=${args.length + 1}`); args.push(filters.membershipStatus); }
     if (batchFilter) { clauses.push(`mr.source_import_id::text=$${args.length + 1}`); args.push(filters.importBatch); }
     if (orgFilter) { clauses.push(`exists(select 1 from organization_membership om where om.user_id=u.id and om.organization_id::text=$${args.length + 1} and om.status='active')`); args.push(filters.organizationId); }
   } else {
     dateColumn = "u.created_at";
     const membershipState = `case when not exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status<>'merged') then 'not_enrolled'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='active' and mr.start_date is not null and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date) and (mr.source<>'legacy_import' or exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id))) then 'active'
-      when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id)) then 'payment_verification_required'
+      when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.source='legacy_import' and not exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=mr.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded')) then 'payment_verification_required'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='pending') then 'pending'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='suspended') then 'suspended'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and (mr.status='expired' or (mr.status='active' and mr.end_date<current_date))) then 'expired' else 'unknown' end`;

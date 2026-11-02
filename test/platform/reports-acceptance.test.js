@@ -195,6 +195,38 @@ test("membership dashboard aggregates and monthly trend are available only throu
       runReport(financeOnly, "membership-status", {}, randomUUID()),
       error => error.code === "REPORT_FORBIDDEN"
     );
+
+    const feeBalances=await runReport(financeOnly,"membership-fee-balance-by-currency",{from:"2000-01-01"},randomUUID());
+    assert.equal(feeBalances.report.id,"membership-fee-balance-by-currency");
+    for(const row of feeBalances.rows){
+      assert.ok(["ETB","USD","EUR","GBP"].includes(String(row.Currency))||/^[A-Z]{3}$/.test(String(row.Currency)));
+      for(const key of ["Obligations","Fee due","Verified cash","Approved non-cash","Outstanding"])assert.ok(Number.isFinite(Number(row[key])),key);
+    }
+    const feeAgeing=await runReport(financeOnly,"membership-fee-ageing",{from:"2000-01-01"},randomUUID());
+    for(const row of feeAgeing.rows){
+      assert.ok(["Not yet due","Due today","Overdue 1–30 days","Overdue 31–60 days","Overdue 61+ days","No due date"].includes(row["Age band"]));
+      assert.ok(Number.isFinite(Number(row.Outstanding)));
+    }
+    const memberSettlement=await runReport(reviewer,"membership-fee-settlement-activity",{},randomUUID());
+    assert.equal(memberSettlement.report.id,"membership-fee-settlement-activity");
+    for(const row of memberSettlement.rows){
+      assert.ok(Object.hasOwn(row,"Records"));
+      assert.equal(Object.hasOwn(row,"Amount"),false,"membership roles must not receive fee amounts");
+      assert.equal(Object.hasOwn(row,"Currency"),false,"membership roles must not receive Finance currency totals");
+    }
+    await assert.rejects(
+      runReport(reviewer,"membership-fee-dispositions",{},randomUUID()),
+      error=>error.code==="REPORT_FORBIDDEN"
+    );
+    const financeExport=await exportReport(financeOnly,"membership-fee-dispositions",{},"xlsx",randomUUID());
+    assert.equal(financeExport.contentType,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    assert.equal(financeExport.buffer.subarray(0,2).toString("ascii"),"PK");
+    const membershipExport=await exportReport(reviewer,"membership-fee-settlement-activity",{},"xlsx",randomUUID());
+    assert.equal(membershipExport.contentType,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    const memberSheet=readZipEntry(membershipExport.buffer,"xl/worksheets/sheet1.xml");
+    assert.equal(memberSheet.includes("Amount"),false);
+    assert.equal(memberSheet.includes("Currency"),false);
+
   } finally {
     await getPool().query("delete from audit_log where request_id::text = any($1::text[])", [requestIds]);
   }

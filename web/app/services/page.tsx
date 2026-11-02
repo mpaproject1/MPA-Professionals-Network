@@ -75,7 +75,7 @@ export default function Services(){
  },[token]);
  const loadProviderWorkspace=useCallback(async()=>{
    if(!token){setMyListings([]);setOrganizations([]);return;}
-   try{const [listings,orgs]=await Promise.all([api<ProviderListing[]>("/api/v1/me/service-listings",{},token),api<Org[]>("/api/v1/organizations",{},token)]);setMyListings(Array.isArray(listings)?listings:[]);setOrganizations(Array.isArray(orgs)?orgs:[]);}
+   try{const [listings,orgs]=await Promise.all([api<ProviderListing[]>("/api/v1/me/service-listings",{},token),api<Org[]>("/api/v1/organizations",{},token)]);setMyListings(Array.isArray(listings)?listings:[]);const organizationRows=Array.isArray(orgs)?orgs:[];setOrganizations(organizationRows);const requestedOrganizationId=typeof window!=="undefined"?new URLSearchParams(window.location.search).get("organizationId")||"":"";setProviderForm(current=>({...current,organizationId:current.organizationId&&organizationRows.some(org=>org.id===current.organizationId)?current.organizationId:requestedOrganizationId&&organizationRows.some(org=>org.id===requestedOrganizationId)?requestedOrganizationId:current.organizationId}));}
    catch(e){setError(e instanceof ApiError?e.message:"Your provider workspace could not be loaded.");}
  },[token]);
  const loadRequests=useCallback(async()=>{

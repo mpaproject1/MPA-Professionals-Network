@@ -1310,6 +1310,19 @@ export async function listMentorshipLearningActivities(mentorshipId,userId){
     from mentorship_learning_activity a where a.mentorship_id=$1 and a.status='published' order by a.due_at nulls last,a.created_at desc`,[mentorshipId,m.mentee_user_id])).rows;
 }
 
+export async function listMyMentorshipLearningProgress(userId){
+  const db=getPool();
+  return (await db.query(`select a.id,a.mentorship_id,a.title,a.instructions,a.due_at,a.status,a.created_at,a.updated_at,
+    m.mentor_user_id,m.mentee_user_id,$1::uuid viewer_user_id,
+    s.id submission_id,s.version,s.status submission_status,s.submitted_at,
+    review.decision latest_review_decision,review.feedback latest_review_feedback
+    from mentorship_learning_activity a join mentorship m on m.id=a.mentorship_id
+    left join lateral (select id,version,status,submitted_at from mentorship_learning_submission where activity_id=a.id and submitted_by=m.mentee_user_id order by version desc limit 1) s on true
+    left join lateral (select decision,feedback from mentorship_learning_review where submission_id=s.id order by created_at desc limit 1) review on true
+    where a.status='published' and (m.mentor_user_id=$1 or m.mentee_user_id=$1)
+    order by a.due_at nulls last,a.created_at desc limit 200`,[userId])).rows;
+}
+
 export async function createMentorshipLearningActivity(mentorshipId,userId,input,requestId){
   return withTransaction(async db=>{
     const m=await mentorshipParticipant(db,mentorshipId,userId);

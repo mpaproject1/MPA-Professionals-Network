@@ -682,7 +682,7 @@ export default function Organizations() {
           </Card>
           )}
 
-          {(organizations.length > 0 || organizationLookupReady) && (organizations.length === 0 || organizations.some((org) => org.verification_status !== "verified") || activeOrganizationFolder === "organization") && (
+          {(organizations.length > 0 || (organizationLookupReady && organizationAccess.length === 0)) && (organizations.length === 0 || organizations.some((org) => org.verification_status !== "verified") || activeOrganizationFolder === "organization") && (
           <Card id="your-organizations">
             <div className="row">
               <div>

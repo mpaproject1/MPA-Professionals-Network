@@ -227,11 +227,20 @@ export default function FinanceWorkspacePage() {
     setError("");
     setNotice("");
     try {
-      await api("/api/v1/payments/" + payment.payment_id + "/reverse", {
-        method: "POST",
-        body: JSON.stringify({ type: reversalTypes[payment.payment_id] || "refund", reason }),
-      }, token);
-      setNotice("Payment refund/reversal recorded. Any linked active membership is handled by the existing reversal workflow.");
+      const reversalType = reversalTypes[payment.payment_id] || "refund";
+      if (payment.application_type === "legacy_import") {
+        await api("/api/v1/finance/membership/legacy-payment-verification/" + payment.payment_id + "/reverse", {
+          method: "POST",
+          body: JSON.stringify({ reversalType, reason }),
+        }, token);
+        setNotice("Historical payment reversal recorded. The legacy membership no longer qualifies for a verified-paid status or an unclaimed invitation.");
+      } else {
+        await api("/api/v1/payments/" + payment.payment_id + "/reverse", {
+          method: "POST",
+          body: JSON.stringify({ type: reversalType, reason }),
+        }, token);
+        setNotice("Payment refund/reversal recorded. Any linked active membership is handled by the existing reversal workflow.");
+      }
       await load();
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : "Payment reversal could not be recorded.");

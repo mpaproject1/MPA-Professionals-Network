@@ -130,3 +130,38 @@ test("administrative audit report applies date, outcome and search filters to kn
     );
   }
 });
+
+test("membership dashboard aggregates and monthly trend are available only through membership reporting authority", async t => {
+  if (!process.env.DATABASE_URL) {
+    t.skip("requires the disposable PostgreSQL database configured by PR Quality");
+    return;
+  }
+  const requestIds = [randomUUID(), randomUUID(), randomUUID()];
+  const reviewer = { sub: null, roles: ["membership_reviewer"], permissions: [] };
+  const permissionOnly = { sub: null, roles: [], permissions: ["membership.review"] };
+  const financeOnly = { sub: null, roles: ["finance_officer"], permissions: [] };
+  try {
+    const status = await runReport(reviewer, "membership-status", {}, requestIds[0]);
+    assert.ok(Array.isArray(status.rows));
+    assert.equal(status.report.id, "membership-status");
+
+    const monthly = await runReport(permissionOnly, "membership-applications", {
+      from: "2020-01-01", to: new Date().toISOString().slice(0, 10), groupBy: "month"
+    }, requestIds[1]);
+    assert.ok(Array.isArray(monthly.rows));
+    for (const row of monthly.rows) {
+      assert.match(String(row.Month), /^\\d{4}-\\d{2}$/);
+      assert.ok(Number.isFinite(Number(row.Applications)));
+      assert.ok(Number.isFinite(Number(row.Submitted)));
+      assert.ok(Number.isFinite(Number(row.Reviewed)));
+      assert.ok(Number.isFinite(Number(row.Activated)));
+    }
+
+    await assert.rejects(
+      runReport(financeOnly, "membership-status", {}, requestIds[2]),
+      error => error.code === "REPORT_FORBIDDEN"
+    );
+  } finally {
+    await getPool().query("delete from audit_log where request_id::text = any($1::text[])", [requestIds]);
+  }
+});

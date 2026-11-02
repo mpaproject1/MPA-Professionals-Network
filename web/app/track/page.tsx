@@ -35,6 +35,7 @@ type Tracking = {
   summary: { total: number; active: number; nextSteps: number; jobApplications: number; memberships?: number; organizations?: number };
   counts?: { needsAttention?: number; waiting?: number; inProgress?: number; completed?: number };
   errors?: { source: string; category: string; message: string }[];
+  totalFiltered?: number;
   limit: number;
   offset: number;
   hasMore: boolean;

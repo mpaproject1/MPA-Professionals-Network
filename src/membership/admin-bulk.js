@@ -152,8 +152,12 @@ export async function claimMemberInvitation({token,password}){
  if(typeof password!=="string"||password.length<10)throw problem(400,"Choose a password with at least 10 characters.","PASSWORD_TOO_SHORT");
  const tokenHash=createHash("sha256").update(token).digest("hex");
  return withTransaction(async tx=>{
-  const inv=(await tx.query("select id,user_id,expires_at,consumed_at from member_invitation where token_hash=$1 for update",[tokenHash])).rows[0];
+  const inv=(await tx.query("select id,user_id,import_id,expires_at,consumed_at from member_invitation where token_hash=$1 for update",[tokenHash])).rows[0];
   if(!inv||inv.consumed_at||new Date(inv.expires_at)<=new Date())throw problem(400,"This invitation is invalid, expired or already used. Contact MPA support for a new invitation.","INVITATION_EXPIRED");
+  if(inv.import_id){
+    const financeVerified=await tx.query(`select 1 from membership_record mr join membership_legacy_payment_verification v on v.membership_id=mr.id where mr.user_id=$1 and mr.source_import_id=$2 and mr.source='legacy_import' limit 1`,[inv.user_id,inv.import_id]);
+    if(!financeVerified.rowCount)throw problem(409,"Finance must verify the historical membership payment before this imported member account can be claimed.","PAYMENT_VERIFICATION_REQUIRED");
+  }
   await tx.query("update app_user set password_hash=$2,updated_at=now() where id=$1",[inv.user_id,hashPassword(password)]);
   await tx.query("update member_invitation set consumed_at=now() where id=$1",[inv.id]);
   await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,'membership.invitation_claimed','app_user',$1,'success',$2)",[inv.user_id,JSON.stringify({invitationId:inv.id})]);

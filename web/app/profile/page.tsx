@@ -20,6 +20,7 @@ import { ApiError, api } from "../../lib/api";
 import { hasProfessionalIdentity } from "../../lib/identity-capabilities";
 import { useUiStore } from "../../lib/store";
 import GuidedProfessionalProfile from "./guided-professional-profile";
+import { MemberResidenceEditor } from "../../components/member-residence-editor";
 import styles from "./profile.module.css";
 
 type Profile = {
@@ -495,6 +496,7 @@ export default function Profile() {
             <a href="#notification-preferences">Notifications</a>
             <a href="#account-preferences">Account preferences</a>
           </nav>
+          <section id="member-residence" aria-label="Member residence"><MemberResidenceEditor /></section>
           <section className={styles.completionCard} aria-labelledby={`${profileId}-completion-title`}>
             <div className={styles.completionHeading}><div><div className="eyebrow">Your progress</div><h2 id={`${profileId}-completion-title`}>Profile completion</h2></div><strong>{profile ? `${Math.max(0,Math.min(100,Number(profile.completion_percent)||0))}%` : loading ? "Loading…" : "Not available"}</strong></div>
             {profile ? <progress className={styles.completionTrack} max={100} value={Math.max(0,Math.min(100,Number(profile.completion_percent)||0))} aria-label={`Profile ${Math.max(0,Math.min(100,Number(profile.completion_percent)||0))}% complete`} /> : <div className={styles.completionUnavailable} role="status">Profile completion is shown when your account record has loaded.</div>}

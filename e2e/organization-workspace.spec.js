@@ -100,6 +100,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("heading", { name: "Confirming your organization access" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Register your organization" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Register an organization" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Your organizations" })).toHaveCount(0);
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
   });
 

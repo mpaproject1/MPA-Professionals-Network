@@ -579,6 +579,7 @@ export default function Organizations() {
       ) : (
         <>
           
+          {(organizations.length > 0 || (organizationLookupReady && organizationAccess.length === 0)) && (
           <Card id="org-registration">
             <div className="row">
               <div>
@@ -676,6 +677,7 @@ export default function Organizations() {
                 </div>
               ))}
           </Card>
+          )}
 
           <Card id="your-organizations">
             <div className="row">

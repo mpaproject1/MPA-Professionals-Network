@@ -83,6 +83,8 @@ export default function MembershipCenterPage() {
   const [generatedAt, setGeneratedAt] = useState("");
 
   const canFinance = roles.some(role => ["system_admin", "finance_officer"].includes(role)) || permissions.some(permission => ["finance.view", "finance.payment.verify", "finance.manage"].includes(permission));
+  const canManagePaymentMethods = roles.includes("system_admin") || permissions.includes("finance.manage");
+  const canViewFinanceReports = roles.some(role => ["system_admin", "admin", "finance_officer"].includes(role)) || permissions.includes("finance.view");
   const canReview = roles.some(role => ["system_admin", "admin", "reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review");
   const canViewMemberRecords = roles.some(role => ["system_admin", "admin"].includes(role)) || permissions.some(permission => ["members.view", "members.manage"].includes(permission));
   const canImportExport = roles.some(role => ["system_admin", "admin", "membership_reviewer", "finance_officer"].includes(role)) || permissions.includes("members.import");
@@ -116,8 +118,8 @@ export default function MembershipCenterPage() {
       setMembership(memberResult);
       setMonthlyApplications(monthlyResult);
       setGeneratedAt(appResult.generatedAt || memberResult.generatedAt || "");
-      const financeAllowed = currentRoles.some(role => ["system_admin", "finance_officer"].includes(role)) ||
-        currentPermissions.some(permission => ["finance.view", "finance.payment.verify", "finance.manage"].includes(permission));
+      const financeAllowed = currentRoles.some(role => ["system_admin", "admin", "finance_officer"].includes(role)) ||
+        currentPermissions.includes("finance.view");
       setFinanceAvailable(financeAllowed);
       if (financeAllowed) {
         try {
@@ -191,7 +193,7 @@ export default function MembershipCenterPage() {
     ...(canFinance ? [["Finance payments", "/admin/finance", false] as [string, string, boolean]] : []),
     ...(canManageCards ? [["Membership cards", "/admin/membership-cards", false] as [string, string, boolean]] : []),
     ...(canViewMemberRecords ? [["Plans & settings", "/admin/membership", false] as [string, string, boolean]] : []),
-    ...(canFinance ? [["Payment methods", "/admin/membership/payment-methods", false] as [string, string, boolean]] : []),
+    ...(canManagePaymentMethods ? [["Payment methods", "/admin/membership/payment-methods", false] as [string, string, boolean]] : []),
     ...(canViewReports ? [["Reports", "/admin/reports?category=Membership", false] as [string, string, boolean]] : []),
   ] as [string, string, boolean][];
 

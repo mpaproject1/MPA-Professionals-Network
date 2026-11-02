@@ -37,7 +37,7 @@ async function mockOrganizationApi(page, organizations) {
 }
 
 test.describe("MPA organization app entry and navigation", () => {
-  test("unregistered account sees benefits and one registration action before operational tools", async ({ page }) => {
+  test("authenticated unregistered account sees benefits and a progressive registration action before operational tools", async ({ page }) => {
     await mockOrganizationApi(page, []);
     await page.goto("/organizations");
     await expect(page.getByRole("heading", { name: /Bring your organization into a trusted professional network/ })).toBeVisible();

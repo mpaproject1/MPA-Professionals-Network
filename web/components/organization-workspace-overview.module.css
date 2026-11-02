@@ -196,6 +196,48 @@
   margin: 0;
 }
 
+.nextAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .85rem;
+  border: 1px solid color-mix(in srgb, #97c024 38%, var(--border));
+  border-radius: .8rem;
+  padding: .85rem;
+  background: color-mix(in srgb, #97c024 7%, var(--surface));
+}
+
+.nextAction > div {
+  display: grid;
+  gap: .2rem;
+}
+
+.nextAction strong {
+  color: var(--text);
+  font-size: .86rem;
+}
+
+.nextAction p {
+  color: var(--muted);
+  font-size: .75rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.nextAction a {
+  color: var(--primary);
+  font-size: .76rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nextAction a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .statusList {
   display: grid;
   gap: .7rem;

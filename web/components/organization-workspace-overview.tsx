@@ -261,12 +261,20 @@ export function OrganizationWorkspaceOverview({
         <div className={styles.statusList}>
           {organizations.map((organization) => {
             const status = statusFor(organization);
+            const caseState = organization.verification_case_status || organization.verification_status || "draft";
+            const evidenceSubmitted = ["submitted", "in_review", "pending", "correction_required", "verified", "rejected"].includes(caseState) || organization.verification_status === "pending" || organization.verification_status === "verified";
+            const decisionRecorded = ["verified", "rejected"].includes(caseState) || organization.verification_status === "verified";
             return (
               <article className={styles.statusCard} key={organization.id}>
                 <div className={styles.statusTop}>
-                  <div><strong>{organization.display_name || organization.legal_name}</strong><span>{organization.tracking_reference || "Application reference pending"}{organization.role_code ? ` · ${organization.role_code.replaceAll("_", " ")}` : ""}</span></div>
+                  <div><strong>{organization.display_name || organization.legal_name}</strong><span>{organization.tracking_reference || "Application reference pending"}{organization.role_code ? ` · ${organization.role_code.replaceAll("_", " ")}` : ""}{organization.verification_submitted_at ? ` · Submitted ${new Date(organization.verification_submitted_at).toLocaleDateString()}` : ""}</span></div>
                   <span className={`${styles.statusPill} ${styles[status.tone] || ""}`}>{status.label}</span>
                 </div>
+                <ol className={styles.verificationTimeline} aria-label="Organization verification progress">
+                  <li className={styles.stageComplete}>Profile created</li>
+                  <li className={evidenceSubmitted ? styles.stageComplete : styles.stageCurrent}>Evidence submitted</li>
+                  <li className={decisionRecorded ? styles.stageComplete : ""}>MPA decision</li>
+                </ol>
                 <p>{status.detail}</p>
                 {organization.verification_decision_reason ? <p className={styles.reviewNote}><strong>Reviewer feedback:</strong> {organization.verification_decision_reason}</p> : null}
                 {(organization.missing_evidence || []).length > 0 && status.tone !== "pending" ? <p className={styles.reviewNote}><strong>Outstanding:</strong> {(organization.missing_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ")}</p> : null}

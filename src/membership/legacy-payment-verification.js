@@ -71,6 +71,7 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
       for update of mr
     `, [membershipId])).rows[0];
     if (!membership) throw problem(404, "Imported membership record was not found.", "NOT_FOUND");
+    if (membership.status === "merged") throw problem(409, "Merged duplicate membership records cannot receive independent payment verification.", "MEMBERSHIP_MERGED");
 
     const existing = (await tx.query(
       "select id,payment_reference from membership_legacy_payment_verification where membership_id=$1 for update",

@@ -45,7 +45,7 @@ Verification remains a server decision. A completed profile, folder visit or pro
 
 ## Dashboard data integrity
 
-The overview summary counts are derived from the authenticated account's returned organization records: linked organizations, verified organizations, awaiting-review cases and correction-required cases. No illustrative recruitment counts, opportunity views, pipeline charts or impact figures are presented as production data. Detailed reports remain the source for authorized outcomes.
+The overview registration counts are derived from the authenticated account's returned organization records: linked organizations, verified organizations, awaiting-review cases and correction-required/rejected cases. For the selected verified organization, the dashboard also calls `GET /api/v1/organizations/:id/outcomes` and displays server-returned aggregate published-job, application, active-pipeline and hire totals. Applicant identities are not loaded into the dashboard. If the endpoint is unavailable or denied, no placeholder figures are displayed. The current outcomes API does not provide equivalent organization-scoped aggregate counts for service and mentorship activity, so those figures are not fabricated; detailed reports remain the source for authorized outcomes.
 
 ## Authorization and privacy
 

@@ -76,7 +76,7 @@ test("ordinary members cannot access the Finance fee obligation queue",async()=>
 
 test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker non-cash settlement and reversal reopening",async t=>{
  if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
- const db=getPool(),suffix=randomUUID(),digits=suffix.replace(/\\D/g,"").slice(0,8).padEnd(8,"7");
+ const db=getPool(),suffix=randomUUID(),digits=suffix.replace(/\D/g,"").slice(0,8).padEnd(8,"7");
  const applicantEmail="fee-lifecycle-"+suffix+"@example.test";
  const financeEmail="fee-approver-"+suffix+"@example.test";
  const applicant=await membership.register({email:applicantEmail,password:"FeeLifecycleSecurePassword!2026",firstName:"Fee",lastName:"Lifecycle",phone:"09"+digits},"fee-lifecycle-register-"+suffix);

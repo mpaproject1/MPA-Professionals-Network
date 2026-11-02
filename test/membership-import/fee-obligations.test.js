@@ -55,6 +55,10 @@ test("non-cash dispositions require a supported reason and idempotency key",asyn
  await assert.rejects(recordBalanceDisposition(finance,{dispositionType:"unknown",amount:500,currency:"ETB",remark:"A sufficiently detailed note",idempotencyKey:"disposition-key-0001",applicationId:paymentId},requestId),error=>error.statusCode===400&&error.code==="INVALID_DISPOSITION");
 });
 
+test("non-cash settlements require confirmed private supporting evidence",async()=>{
+ await assert.rejects(recordBalanceDisposition(finance,{dispositionType:"sponsored",amount:500,currency:"ETB",remark:"A documented sponsor contribution",details:{sponsorName:"Test sponsor"},idempotencyKey:"disposition-evidence-0001",applicationId:paymentId},requestId),error=>error.statusCode===400&&error.code==="EVIDENCE_REQUIRED");
+});
+
 test("bulk payment import cannot be applied by a system administrator without Finance import authority",async()=>{
  await assert.rejects(applyMembershipPaymentImport(admin,paymentId,{reason:"test import apply"},requestId),error=>error.statusCode===403&&error.code==="FORBIDDEN");
 });
@@ -119,7 +123,9 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.equal(disposition.disposition.status,"pending");
  await assert.rejects(decideBalanceDisposition(applicantFinance,disposition.disposition.id,{decision:"approved",note:"Self approval attempt"},"fee-sponsor-self-approve-"+suffix),error=>error.code==="MAKER_CHECKER_REQUIRED");
  await decideBalanceDisposition(approverFinance,disposition.disposition.id,{decision:"approved",note:"Independent Finance approval"},"fee-sponsor-approve-"+suffix);
- const adjustment=(await db.query("select id from membership_fee_adjustment where obligation_id=(select id from membership_fee_obligation where application_id=$1) and status='approved' order by created_at desc limit 1",[app.id])).rows[0];
+ const adjustment=(await db.query("select id,details from membership_fee_adjustment where obligation_id=(select id from membership_fee_obligation where application_id=$1) and status='approved' order by created_at desc limit 1",[app.id])).rows[0];
+ assert.equal(adjustment.details.evidenceFileId,evidence.id,"approved adjustment must retain the private evidence reference");
+ assert.equal(adjustment.details.sponsorSource,"manual","manual sponsor body must be retained as a clearly labelled snapshot");
  assert.ok(adjustment?.id,"approval must create an immutable approved adjustment");
  await assert.rejects(db.query("update membership_fee_adjustment set status='reversed' where id=$1",[adjustment.id]),/approved membership fee adjustments are immutable/i);
  balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];

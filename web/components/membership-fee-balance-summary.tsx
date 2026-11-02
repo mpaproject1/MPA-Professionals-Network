@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { ApiError, api } from "../lib/api";
 import { useUiStore } from "../lib/store";
@@ -10,8 +10,8 @@ type Row={currency:string;amount_due:string|number;verified_cash:string|number;a
 function total(rows:Row[],field:keyof Row,currency:string){return rows.filter(row=>row.currency===currency).reduce((sum,row)=>sum+Number(row[field]||0),0);}
 export function MembershipFeeBalanceSummary(){
  const token=useUiStore(state=>state.token);const [rows,setRows]=useState<Row[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
- async function load(){if(!token)return;setLoading(true);setError("");try{const result=await api<{rows:Row[]}>("/api/v1/finance/membership/fee-obligations",{},token);setRows(result.rows||[]);}catch(cause){setError(cause instanceof ApiError?cause.message:"Fee balance summary is unavailable.");}finally{setLoading(false);}}
- useEffect(()=>{void load();},[token]);
+ const load=useCallback(async()=>{if(!token)return;setLoading(true);setError("");try{const result=await api<{rows:Row[]}>("/api/v1/finance/membership/fee-obligations",{},token);setRows(result.rows||[]);}catch(cause){setError(cause instanceof ApiError?cause.message:"Fee balance summary is unavailable.");}finally{setLoading(false);}},[token]);
+ useEffect(()=>{void load();},[load]);
  const currencies=[...new Set(rows.map(row=>row.currency))];
  return <Card><div className="panel-heading"><div><h2>Membership fee balances</h2><p>Verified cash, approved non-cash coverage and remaining dues are reported separately.</p></div><button className="btn btn-ghost" type="button" disabled={loading} onClick={()=>void load()}><RefreshCw size={15}/></button></div>
  {loading?<OperationStatus state="loading" title="Loading fee balances" detail="Retrieving Finance-authoritative obligation totals."/>:error?<OperationStatus state="error" title="Fee balances unavailable" detail={error}/>:rows.length?<>

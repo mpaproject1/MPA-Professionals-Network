@@ -1,5 +1,5 @@
 "use client";
-import {Bookmark,Clock3,HeartHandshake,Languages,Search,Target} from "lucide-react";
+import {ArrowRight,Bookmark,Clock3,HeartHandshake,Languages,Search,Target} from "lucide-react";
 import Link from "next/link";
 import {type FormEvent,useCallback,useEffect,useRef,useState} from "react";
 import {DiscoveryPagination} from "../../components/discovery-pagination";

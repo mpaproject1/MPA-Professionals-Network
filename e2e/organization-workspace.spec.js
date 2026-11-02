@@ -93,6 +93,32 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
   });
 
+  test("case actively in review remains locked against resubmission", async ({ page }) => {
+    await mockOrganizationApi(page, [organization({
+      verification_status: "pending",
+      verification_case_status: "in_review",
+    })]);
+    await page.goto("/organizations");
+    await expect(page.getByText("Under review").first()).toBeVisible();
+    await expect(page.getByText(/awaiting an authorized MPA review/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Continue verification" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Submit for verification" })).toBeDisabled();
+  });
+
+  test("correction-required case shows reviewer feedback and the permitted next action", async ({ page }) => {
+    await mockOrganizationApi(page, [organization({
+      verification_status: "unverified",
+      verification_case_status: "correction_required",
+      verification_decision_reason: "Please attach the current trade license.",
+      missing_evidence: ["trade_license"],
+    })]);
+    await page.goto("/organizations");
+    await expect(page.getByText("Changes requested").first()).toBeVisible();
+    await expect(page.getByText(/Please attach the current trade license/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Continue verification" })).toHaveAttribute("href", "/organizations#org-evidence");
+    await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
+  });
+
   test("verified organization opens six keyboard-accessible folder tabs and their existing destinations", async ({ page }) => {
     await mockOrganizationApi(page, [organization()]);
     await page.setViewportSize({ width: 1440, height: 900 });

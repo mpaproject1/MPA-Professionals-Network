@@ -140,6 +140,7 @@ test("membership dashboard aggregates and monthly trend are available only throu
   const reviewer = { sub: null, roles: ["membership_reviewer"], permissions: [] };
   const permissionOnly = { sub: null, roles: [], permissions: ["membership.review"] };
   const financeOnly = { sub: null, roles: ["finance_officer"], permissions: [] };
+  const systemAdmin = { sub: null, roles: ["system_admin"], permissions: [] };
   try {
     const status = await runReport(reviewer, "membership-status", {}, requestIds[0]);
     assert.ok(Array.isArray(status.rows));
@@ -221,6 +222,11 @@ test("membership dashboard aggregates and monthly trend are available only throu
     const financeExport=await exportReport(financeOnly,"membership-fee-dispositions",{},"xlsx",randomUUID());
     assert.equal(financeExport.contentType,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     assert.equal(financeExport.buffer.subarray(0,2).toString("ascii"),"PK");
+    const systemAdminFeeReport=await runReport(systemAdmin,"membership-fee-balance-by-currency",{from:"2000-01-01"},randomUUID());
+    assert.ok(Array.isArray(systemAdminFeeReport.rows),"system admin must be able to view Finance fee totals");
+    const systemAdminExport=await exportReport(systemAdmin,"membership-fee-balance-by-currency",{},"xlsx",randomUUID());
+    assert.equal(systemAdminExport.contentType,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    assert.equal(systemAdminExport.buffer.subarray(0,2).toString("ascii"),"PK");
     const membershipExport=await exportReport(reviewer,"membership-fee-settlement-activity",{},"xlsx",randomUUID());
     assert.equal(membershipExport.contentType,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     const memberSheet=readZipEntry(membershipExport.buffer,"xl/worksheets/sheet1.xml");

@@ -155,7 +155,7 @@ export async function claimMemberInvitation({token,password}){
   const inv=(await tx.query("select id,user_id,import_id,expires_at,consumed_at from member_invitation where token_hash=$1 for update",[tokenHash])).rows[0];
   if(!inv||inv.consumed_at||new Date(inv.expires_at)<=new Date())throw problem(400,"This invitation is invalid, expired or already used. Contact MPA support for a new invitation.","INVITATION_EXPIRED");
   if(inv.import_id){
-    const financeVerified=await tx.query(`select 1 from membership_record mr join membership_legacy_payment_verification v on v.membership_id=mr.id where mr.user_id=$1 and mr.source_import_id=$2 and mr.source='legacy_import' limit 1`,[inv.user_id,inv.import_id]);
+    const financeVerified=await tx.query(`select 1 from membership_record mr join payment_reconciliation pr on pr.membership_id=mr.id join payment_transaction pt on pt.id=pr.payment_transaction_id where mr.user_id=$1 and mr.source_import_id=$2 and mr.source='legacy_import' and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' limit 1`,[inv.user_id,inv.import_id]);
     if(!financeVerified.rowCount)throw problem(409,"Finance must verify the historical membership payment before this imported member account can be claimed.","PAYMENT_VERIFICATION_REQUIRED");
   }
   await tx.query("update app_user set password_hash=$2,updated_at=now() where id=$1",[inv.user_id,hashPassword(password)]);

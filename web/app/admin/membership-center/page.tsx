@@ -205,17 +205,17 @@ export default function MembershipCenterPage() {
     </section>
 
     <section className={styles.kpiGrid} aria-label="Membership key performance indicators">
-      <Kpi label="Applications received" value={appCount} detail="Created in the selected period" icon={Activity}/>
-      <Kpi label="Awaiting review" value={pending} detail="Submitted, in review or needs information" icon={CalendarDays} tone="lemon"/>
-      <Kpi label="Approved" value={approved} detail="Approved and subsequent paid/activated stages" icon={ShieldCheck} tone="blue"/>
-      <Kpi label="Paid applications" value={paid} detail="Finance-verified lifecycle stage" icon={CreditCard}/>
-      <Kpi label="Active members" value={activeMembers} detail="Current recorded active membership stock" icon={Users} tone="blue"/>
-      <Kpi label="Expired memberships" value={expiredMembers} detail="Current records with expired status" icon={CalendarDays} tone="muted"/>
+      <Kpi label="Applications received" value={applications ? appCount : "—"} detail="Created in the selected period" icon={Activity}/>
+      <Kpi label="Awaiting review" value={applications ? pending : "—"} detail="Submitted, in review or needs information" icon={CalendarDays} tone="lemon"/>
+      <Kpi label="Approved" value={applications ? approved : "—"} detail="Approved and subsequent paid/activated stages" icon={ShieldCheck} tone="blue"/>
+      <Kpi label="Paid applications" value={applications ? paid : "—"} detail="Finance-verified lifecycle stage" icon={CreditCard}/>
+      <Kpi label="Active members" value={membership ? activeMembers : "—"} detail="Current recorded active membership stock; payment status is not inferred" icon={Users} tone="blue"/>
+      <Kpi label="Expired memberships" value={membership ? expiredMembers : "—"} detail="Current records with expired status" icon={CalendarDays} tone="muted"/>
     </section>
 
     <section className={styles.chartGrid} aria-label="Membership analysis charts">
-      <Card><BarList title="Application pipeline" rows={statusChart} labelKey="Status" valueKey="Applications" empty="No applications matched this period."/></Card>
-      <Card><BarList title="Current membership by plan" rows={planChart} labelKey="Product" valueKey="Members" empty="No membership records were returned."/></Card>
+      <Card><BarList title="Application pipeline" rows={statusChart} labelKey="Status" valueKey="Applications" empty={applications ? "No applications matched this period." : "Application report unavailable; retry after checking access."}/></Card>
+      <Card><BarList title="Current membership by plan" rows={planChart} labelKey="Product" valueKey="Members" empty={membership ? "No membership records were returned." : "Membership report unavailable; retry after checking access."}/></Card>
       <Card><BarList title="Applications by membership plan" rows={applicationPlanChart} labelKey="Product" valueKey="Applications" empty="No applications matched this period."/></Card>
       <Card>
         <div className={styles.chartHeading}><h3>Membership health</h3><span>Current stock</span></div>

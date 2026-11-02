@@ -44,7 +44,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("button", { name: "Register your organization" })).toBeVisible();
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
     await page.getByRole("button", { name: "Register your organization" }).click();
-    await expect(page).toHaveURL(/\/login\?next=%2Forganizations|\/login\?next=\/organizations/);
+    await expect(page.getByRole("heading", { name: "Step 1 — Entity profile" })).toBeVisible();
   });
 
   test("pending organization sees the authoritative status and no operational folder shelf", async ({ page }) => {

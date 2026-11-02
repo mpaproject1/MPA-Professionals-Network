@@ -94,6 +94,41 @@
   text-decoration: none;
 }
 
+.dashboardActions {
+  display: grid;
+  justify-items: end;
+  gap: .45rem;
+}
+
+.organizationSwitcher {
+  display: grid;
+  gap: .2rem;
+  min-width: min(220px, 42vw);
+}
+
+.organizationSwitcher span {
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 750;
+}
+
+.organizationSwitcher select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: .65rem;
+  background: var(--surface);
+  color: var(--text);
+  padding: .5rem .65rem;
+  font: inherit;
+  font-size: .78rem;
+}
+
+.organizationSwitcher select:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .refreshLink:hover,
 .folder li a:hover {
   text-decoration: underline;
@@ -454,6 +489,8 @@
   .folderShelf,
   .folderActions { grid-template-columns: minmax(0, 1fr); }
   .dashboardHeader { display: grid; }
+  .dashboardActions { justify-items: stretch; }
+  .organizationSwitcher { min-width: 0; }
   .refreshLink { justify-self: start; }
   .folderDescription { min-height: 0; }
   .gateAction { align-items: stretch; }

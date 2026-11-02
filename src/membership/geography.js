@@ -3,7 +3,7 @@ import { getPool, withTransaction } from "../platform/db.js";
 import { createXlsx, parseXlsxRows } from "../platform/xlsx.js";
 
 const SOURCE = "UNSD M49 / MPA Ethiopian administrative reference";
-const COLUMNS = ["unit_code","label","unit_level","parent_code","country_iso3","country_m49","source_name","source_version","effective_from","effective_to","active"];
+const COLUMNS = ["unit_code","label","unit_level","parent_code","country_iso3","country_m49","source_name","source_version","effective_from","effective_to","active","metadata"];
 const LEVELS = new Set(["country","region","federal_city","zone","sub_city","district","town"]);
 const ALLOWED = {
   region: new Set(["country:ETH"]),
@@ -20,10 +20,11 @@ function authorized(identity){const roles=identity?.roles||[],permissions=identi
 function parseRows(rows){
  const seen=new Set();
  return rows.map((source,index)=>{
-  const row={};for(const key of COLUMNS)row[key]=clean(source[key],key==="label"?180:240);
+ const row={};for(const key of COLUMNS)row[key]=clean(source[key],key==="metadata"?2000:key==="label"?180:240);
   row.unit_code=row.unit_code.toUpperCase();row.unit_level=row.unit_level.toLowerCase();row.parent_code=row.parent_code.toUpperCase();
   row.country_iso3=row.country_iso3.toUpperCase();row.country_m49=row.country_m49?row.country_m49.padStart(3,"0"):"";
   row.active=row.active===""||row.active.toLowerCase()==="true"||row.active==="1"||row.active.toLowerCase()==="yes";
+  try{row.metadata=row.metadata?JSON.parse(row.metadata):{};if(!row.metadata||typeof row.metadata!=="object"||Array.isArray(row.metadata))throw new Error("metadata must be a JSON object.");}catch{row.errors.push("metadata must be a valid JSON object when supplied.");row.metadata={};}
   row.rowNumber=index+2;row.errors=[];
   if(!/^[A-Z0-9][A-Z0-9._-]{1,79}$/.test(row.unit_code))row.errors.push("unit_code must be 2–80 letters, digits, dots, underscores or dashes.");
   if(!row.label)row.errors.push("label is required.");
@@ -63,7 +64,7 @@ export async function listMemberGeography(identity){
  const version=(await db.query("select id,version_label,source_name,source_version,published_at from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0];
  if(!version)return {version:null,countries:[],regions:[],federalCities:[],children:[]};
  const rows=(await db.query("select id,unit_code,label,unit_level,parent_id,country_iso3,country_m49 from membership_geography_unit where version_id=$1 and active=true order by label",[version.id])).rows;
- return {version,countries:rows.filter(row=>row.unit_level==="country"),regions:rows.filter(row=>row.unit_level==="region"),federalCities:rows.filter(row=>row.unit_level==="federal_city"),children:rows.filter(row=>!["country","region","federal_city"].includes(row.unit_level))};
+ return {version,countries:rows.filter(row=>row.unit_level==="country"&&row.metadata?.residenceSelectable!==false),regions:rows.filter(row=>row.unit_level==="region"),federalCities:rows.filter(row=>row.unit_level==="federal_city"),children:rows.filter(row=>!["country","region","federal_city"].includes(row.unit_level))};
 }
 export async function getMyResidence(userId){
  const row=(await getPool().query(`select r.*,c.country_iso3 country_code,c.label country_name,
@@ -144,8 +145,8 @@ export async function applyMemberGeographyImport(identity,batchId,input={},reque
    if(!ready.length)throw fail(409,"The workbook contains a circular or unresolved parent hierarchy.","GEOGRAPHY_PARENT_CYCLE");
    for(const row of ready){
     const data=row.row_data,parentId=data.parent_code?inserted.get(String(data.parent_code).toUpperCase()):null;
-    const created=(await tx.query(`insert into membership_geography_unit(version_id,unit_code,label,unit_level,parent_id,country_iso3,country_m49,source_name,source_version,effective_from,effective_to,active,created_at)
-     values($1,$2,$3,$4,$5,$6,$7,$8,$9,nullif($10,'')::date,nullif($11,'')::date,$12,now()) returning id`,
+    const created=(await tx.query(`insert into membership_geography_unit(version_id,unit_code,label,unit_level,parent_id,country_iso3,country_m49,source_name,source_version,effective_from,effective_to,active,metadata,created_at)
+     values($1,$2,$3,$4,$5,$6,$7,$8,$9,nullif($10,'')::date,nullif($11,'')::date,$12,$13::jsonb,now()) returning id`,
     [version.id,data.unit_code,data.label,data.unit_level,parentId,data.country_iso3||null,data.country_m49||null,data.source_name||batch.source_name,data.source_version||batch.source_version,data.effective_from||"",data.effective_to||"",data.active!==false])).rows[0];
     inserted.set(String(data.unit_code).toUpperCase(),created.id);
    }

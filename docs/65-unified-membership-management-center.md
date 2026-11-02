@@ -1022,7 +1022,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 
 **Branch:** `feat/workstream-3-progress-members-workspace`  
 **PR:** #18  
-**Implementation head recorded before this documentation update:** `4e5522c8043ec918b0dd8b90f9bf6e2f3b344b10`  
+**Implementation head recorded before this documentation update:** `76226f961f6398a6fd2535c33a4856a445b00513`  
 **Scope:** WP3 workbook/geography operational proof; WP4 Finance intake, reminders, reporting and authorization.
 
 ### WP3 — workbook and geography
@@ -1035,7 +1035,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 - `.github/workflows/member-geography-reference.yml` now runs on manual dispatch, its weekly schedule, and relevant changes on this PR branch. It generates the XLSX and manifest, runs the structural validator, then uploads the artifact.
 - Geography preview now requires a primary HTTPS source URL and row-level HTTPS provenance. The preview metadata retains all source URLs; applying creates a draft version with the captured provenance. Publishing fails closed if any active row lacks source name, source version or an HTTPS source URL.
 - The admin geography screen captures the primary source URL. Member geography aggregation is scoped to the exact currently published version and reports how many saved residences still reference an older version. The admin summary shows the published version and the stale-profile count.
-- `test/membership-import/geography.test.js` now covers XLSX round-trip structure, missing primary source URL, malformed parent rejection, preview, draft apply, publish, profile selector data, saving a member residence and aggregation against the published version.
+- `test/membership-import/geography.test.js` now covers XLSX round-trip structure, missing primary source URL, malformed parent rejection, preview, draft apply, publish, profile selector data, saving a member residence and aggregation against the published version. Its cleanup also removes fixture audit rows before deleting the test account.
 
 #### Source boundary and operational proof still pending
 
@@ -1064,7 +1064,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 - Reminder eligibility and due-date ageing use the `Africa/Addis_Ababa` civil date rather than the PostgreSQL host timezone.
 - The scheduler checks member notification preferences. Full opt-out is recorded as `suppressed`; an available inbox event is recorded as `in_app`; push-only delivery remains `queued`. The UI and server logs no longer describe a queued event as a sent push.
 - Reminder keys remain idempotent by obligation, due date and outstanding balance. Stale-balance reminders are cancelled; full settlement cancels queued reminders; a cash reversal that reopens a balance can queue a new reminder for the new amount.
-- The server now runs the existing Web Push outbox dispatcher on a bounded 30-second interval. This enables delivery processing, but **actual device delivery has not been independently demonstrated in this workstream**; do not report push as sent until the provider/device result is verified.
+- The server now runs the existing Web Push outbox dispatcher on a bounded 30-second interval. Reminder worker logs explicitly describe queued/in-app/suppressed states and do not claim push delivery. This enables delivery processing, but **actual device delivery has not been independently demonstrated in this workstream**; do not report push as sent until the provider/device result is verified.
 - PostgreSQL tests now cover an Addis-date boundary, member opt-out suppression, idempotent scheduler rerun, in-app state, full non-cash settlement cancellation and reminder re-queue after a cash reversal.
 
 #### Reports and access boundaries
@@ -1076,7 +1076,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 
 ### Current validation and outstanding gates
 
-- Current PR head before this documentation commit: `4e5522c8043ec918b0dd8b90f9bf6e2f3b344b10`. The exact-head workflow lookup returned no Actions run or commit-status entries. The latest recorded PR Quality run remains an older failure on `491c554ae1e589d8358f54f2d1789e96f646b97e`, not this implementation head.
+- Current PR head before this documentation commit: `76226f961f6398a6fd2535c33a4856a445b00513`. The exact-head workflow lookup returned no Actions run or commit-status entries. The latest recorded PR Quality run remains an older failure on `491c554ae1e589d8358f54f2d1789e96f646b97e`, not this implementation head.
 - No local test suite, PostgreSQL migration run, Biome, TypeScript, production build or Playwright result is claimed. All new integration tests and migrations remain **committed but unverified** until PR Quality executes against the final head.
 - The available GitHub connection supports run inspection and reruns but does not expose a workflow-dispatch action. The branch pushes made through this connection have not produced a new Actions run. Start PR Quality and the geography-reference workflow from GitHub Actions if automatic runs remain suppressed.
 - Do not enable Zone/Sub-city/District/Town selectors until an authoritative source dataset, source license, release date, stable codes and parent mappings are independently verified and imported.

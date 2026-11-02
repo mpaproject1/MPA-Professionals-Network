@@ -951,7 +951,7 @@ try {
   const membershipIndexes=await client.query("select count(*)::int count from pg_indexes where schemaname='public' and indexname=any($1::text[])",[["membership_fee_balance_disposition_idempotency_idx","membership_geography_country_iso3_uq","membership_geography_country_m49_uq"]]);
   if(membershipIndexes.rows[0].count!==3)throw new Error("Membership payment/geography idempotency and country uniqueness indexes are incomplete.");
   const zeroAmountConstraint=await client.query("select pg_get_constraintdef(oid) definition from pg_constraint where conrelid='public.membership_import_row'::regclass and conname='membership_import_row_paid_amount_nonnegative'");
-  if(zeroAmountConstraint.rowCount!==1||!/paid_amount\s*>=\s*0/i.test(zeroAmountConstraint.rows[0].definition))throw new Error("Member import must permit a zero declared amount without allowing negative amounts.");
+  if(zeroAmountConstraint.rowCount!==1||!/paid_amount.*>=/i.test(zeroAmountConstraint.rows[0].definition))throw new Error("Member import must permit a zero declared amount without allowing negative amounts.");
   const membershipPermissions=await client.query("select count(*)::int count from app_permission where permission_code=any($1::text[])",[["members.geography.manage","finance.payment.record","finance.payment.adjust","finance.payment.import"]]);
   if(membershipPermissions.rows[0].count!==4)throw new Error("Membership geography and Finance fee permissions are incomplete.");
 

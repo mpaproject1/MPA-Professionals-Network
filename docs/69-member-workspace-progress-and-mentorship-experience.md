@@ -39,6 +39,7 @@ The endpoint composes existing authenticated domain services using independent s
 - Network Plus collaboration requests.
 - Serve-Community participations and member-owned initiatives.
 - Member referrals and candidate employment referrals.
+- Recognition nominations and awarded achievements.
 
 A source that rejects is reported in `errors`; successful sources remain available. Missing or failed sources are not represented as completed or silently converted to successful empty results. Source-level errors are intentionally generic and do not expose database or reviewer details.
 

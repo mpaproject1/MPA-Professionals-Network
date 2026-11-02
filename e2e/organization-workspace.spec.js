@@ -178,6 +178,12 @@ test.describe("MPA organization app entry and navigation", () => {
     await reports.press("Enter");
     await expect(reports).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tabpanel").getByRole("link", { name: /Impact and outcomes/ })).toHaveAttribute("href", "/organizations/reports?organizationId=org-e2e-1");
+    await tabs.getByRole("tab", { name: /Reviewing/ }).click();
+    await expect(page.getByRole("heading", { name: "Public job inquiries" })).toBeVisible();
+    await tabs.getByRole("tab", { name: /Publishing/ }).click();
+    await expect(page.getByRole("heading", { name: "Public job inquiries" })).toHaveCount(0);
+    await tabs.getByRole("tab", { name: /^Organization/ }).click();
+    await expect(page.getByRole("heading", { name: "Organization registration" })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });

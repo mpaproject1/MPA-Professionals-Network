@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import test from "node:test";
 import {
   applyMembershipPaymentImport,
@@ -12,6 +13,8 @@ import {
   verifyMembershipReceipt,
 } from "../../src/membership/fee-obligations.js";
 import { parseXlsxRows } from "../../src/platform/xlsx.js";
+import * as membership from "../../src/membership/service.js";
+import { getPool } from "../../src/platform/db.js";
 
 const admin={sub:"system-admin",roles:["system_admin"],permissions:[]};
 const member={sub:"member-user",roles:["member"],permissions:[]};
@@ -68,4 +71,64 @@ test("Finance payment template contains only pending-intake fields and requires 
 
 test("ordinary members cannot access the Finance fee obligation queue",async()=>{
  await assert.rejects(listFeeObligations(member,{}),error=>error.statusCode===403&&error.code==="FORBIDDEN");
+});
+
+
+test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker non-cash settlement and reversal reopening",async t=>{
+ if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
+ const db=getPool(),suffix=randomUUID(),digits=suffix.replace(/\\D/g,"").slice(0,8).padEnd(8,"7");
+ const applicantEmail="fee-lifecycle-"+suffix+"@example.test";
+ const financeEmail="fee-approver-"+suffix+"@example.test";
+ const applicant=await membership.register({email:applicantEmail,password:"FeeLifecycleSecurePassword!2026",firstName:"Fee",lastName:"Lifecycle",phone:"09"+digits},"fee-lifecycle-register-"+suffix);
+ const financeUser=await membership.register({email:financeEmail,password:"FeeApproverSecurePassword!2026",firstName:"Finance",lastName:"Approver",phone:"08"+digits},"fee-approver-register-"+suffix);
+ const applicantId=applicant.user.id,financeId=financeUser.user.id;
+ const applicantFinance={sub:applicantId,roles:["finance_officer"],permissions:[]};
+ const approverFinance={sub:financeId,roles:["finance_officer"],permissions:[]};
+ const reviewer=applicantId;
+ const methodCode="fee_cash_"+suffix.slice(0,8);
+ const app=await membership.createApplication(applicantId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:"fee_app_"+suffix.slice(0,32)},"fee-lifecycle-application-"+suffix);
+ await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='reviewer' on conflict do nothing",[reviewer]);
+ await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'cash','Fee lifecycle cash test',true,'ETB','Disposable PostgreSQL test method',false) on conflict(method_code) do update set enabled=true,currency='ETB',requires_evidence=false",[methodCode]);
+
+ const before=(await db.query("select fee_snapshot,amount_due,currency from membership_fee_obligation where application_id=$1",[app.id])).rows[0];
+ assert.equal(Number(before.amount_due),1200);
+ assert.equal(before.currency,"ETB");
+ const receipt=await recordMembershipReceipt(applicantFinance,{applicationId:app.id,amount:500,currency:"ETB",paymentMethodCode:methodCode,reference:"fee-partial-"+suffix,receivedDate:new Date().toISOString().slice(0,10),idempotencyKey:"fee_receipt_"+suffix.slice(0,32)},"fee-partial-record-"+suffix);
+ assert.equal(receipt.payment.status,"pending");
+ const replay=await recordMembershipReceipt(applicantFinance,{applicationId:app.id,amount:500,currency:"ETB",paymentMethodCode:methodCode,reference:"fee-partial-"+suffix,receivedDate:new Date().toISOString().slice(0,10),idempotencyKey:"fee_receipt_"+suffix.slice(0,32)},"fee-partial-replay-"+suffix);
+ assert.equal(replay.payment.id,receipt.payment.id);
+ assert.equal(replay.alreadyRecorded,true);
+ await assert.rejects(recordMembershipReceipt(applicantFinance,{applicationId:app.id,amount:701,currency:"ETB",paymentMethodCode:methodCode,reference:"fee-overpay-"+suffix,receivedDate:new Date().toISOString().slice(0,10),idempotencyKey:"fee_overpay_"+suffix.slice(0,32)}),error=>error.code==="AMOUNT_EXCEEDS_BALANCE");
+ await assert.rejects(recordMembershipReceipt(applicantFinance,{applicationId:app.id,amount:100,currency:"USD",paymentMethodCode:methodCode,reference:"fee-wrong-currency-"+suffix,receivedDate:new Date().toISOString().slice(0,10),idempotencyKey:"fee_wrong_currency_"+suffix.slice(0,32)}),error=>error.code==="PAYMENT_CURRENCY_MISMATCH");
+ await verifyMembershipReceipt(approverFinance,receipt.payment.id,{decision:"approved",note:"Verified test cash receipt"},"fee-partial-verify-"+suffix);
+ let balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];
+ assert.equal(Number(balance.verified_cash),500);
+ assert.equal(Number(balance.approved_non_cash),0);
+ assert.equal(Number(balance.outstanding_balance),700);
+
+ const disposition=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"sponsored",amount:700,currency:"ETB",remark:"Test sponsor covers remaining fee",details:{sponsorName:"Disposable test sponsor"},idempotencyKey:"fee_sponsor_"+suffix.slice(0,32)},"fee-sponsor-record-"+suffix);
+ assert.equal(disposition.disposition.status,"pending");
+ await assert.rejects(decideBalanceDisposition(applicantFinance,disposition.disposition.id,{decision:"approved",note:"Self approval attempt"},"fee-sponsor-self-approve-"+suffix),error=>error.code==="MAKER_CHECKER_REQUIRED");
+ await decideBalanceDisposition(approverFinance,disposition.disposition.id,{decision:"approved",note:"Independent Finance approval"},"fee-sponsor-approve-"+suffix);
+ balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];
+ assert.equal(Number(balance.verified_cash),500,"non-cash sponsorship must not be counted as cash");
+ assert.equal(Number(balance.approved_non_cash),700);
+ assert.equal(Number(balance.outstanding_balance),0);
+ const after=(await db.query("select fee_snapshot,amount_due,currency from membership_fee_obligation where application_id=$1",[app.id])).rows[0];
+ assert.deepEqual(after.fee_snapshot,before.fee_snapshot,"settlement must not mutate the immutable application fee snapshot");
+ assert.equal(Number(after.amount_due),1200);
+
+ await membership.reviewApplication(app.id,reviewer,{decision:"approved",note:"Test application approved after independent payment settlement."},"fee-lifecycle-review-"+suffix);
+ const activated=await membership.activateApplication(app.id,reviewer,"fee-lifecycle-activate-"+suffix);
+ assert.equal(activated.status,"active");
+
+ await membership.reverseMembershipPayment(receipt.payment.id,financeId,{reason:"Test reversal reopens the remaining fee obligation."},"fee-lifecycle-reverse-"+suffix);
+ balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];
+ assert.equal(Number(balance.verified_cash),0);
+ assert.equal(Number(balance.approved_non_cash),700);
+ assert.equal(Number(balance.outstanding_balance),500);
+ const member=(await db.query("select status from membership_record where application_id=$1",[app.id])).rows[0];
+ assert.equal(member.status,"suspended","reversal of a verified cash receipt must suspend active membership while a balance remains due");
+ const appStatus=(await db.query("select status from membership_application where id=$1",[app.id])).rows[0].status;
+ assert.equal(appStatus,"activated","reversal must not rewrite the historical activation event/status; membership access is suspended");
 });

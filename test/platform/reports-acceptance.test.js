@@ -136,7 +136,7 @@ test("membership dashboard aggregates and monthly trend are available only throu
     t.skip("requires the disposable PostgreSQL database configured by PR Quality");
     return;
   }
-  const requestIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+  const requestIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()];
   const reviewer = { sub: null, roles: ["membership_reviewer"], permissions: [] };
   const permissionOnly = { sub: null, roles: [], permissions: ["membership.review"] };
   const financeOnly = { sub: null, roles: ["finance_officer"], permissions: [] };
@@ -163,6 +163,13 @@ test("membership dashboard aggregates and monthly trend are available only throu
       assert.ok(Number.isFinite(Number(row.Applications)));
       assert.ok(Number.isFinite(Number(row["Median age days"])));
       assert.ok(Number.isFinite(Number(row["Oldest age days"])));
+    }
+
+    const renewals = await runReport(reviewer, "membership-renewal-pipeline", {}, requestIds[5]);
+    assert.ok(Array.isArray(renewals.rows));
+    for (const row of renewals.rows) {
+      assert.ok(Number.isFinite(Number(row.Members)));
+      assert.ok(["Overdue", "Due in 30 days", "Due in 31–60 days", "Due in 61–90 days"].includes(row["Renewal window"]));
     }
 
     const performance = await runReport(reviewer, "membership-reviewer-performance", {

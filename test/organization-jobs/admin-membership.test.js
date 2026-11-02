@@ -79,6 +79,17 @@ test("platform organization membership changes validate authority, reasons, role
   assert.equal(updated.status, "suspended");
   assert.equal(updated.audited, true);
 
+  const activeOrganizations = await organizationJobs.listMyOrganizations(member.id);
+  assert.deepEqual(activeOrganizations, [], "suspended members must not receive active organization workspace access");
+  const accessIndex = await organizationJobs.listMyOrganizationAccess(member.id);
+  assert.equal(accessIndex.length, 1, "the account can see the minimal relationship needed to explain its access state");
+  assert.equal(accessIndex[0].id, org.id);
+  assert.equal(accessIndex[0].membership_status, "suspended");
+  assert.equal(accessIndex[0].role_code, "read_only");
+  assert.equal("email" in accessIndex[0], false, "inactive access lookup must not disclose organization contact details");
+  assert.equal("phone" in accessIndex[0], false, "inactive access lookup must not disclose organization contact details");
+  assert.equal("address_text" in accessIndex[0], false, "inactive access lookup must not disclose organization address details");
+
   const auditRows = await db.query(
     "select action, metadata from audit_log where request_id in ($1,$2) order by action",
     [addRequestId, updateRequestId]

@@ -32,6 +32,8 @@ test("member CSV and XLSX templates round-trip with the same governed import col
  const xlsx=memberImportXlsxTemplate(identity);
  assert.equal(xlsx.subarray(0,2).toString("ascii"),"PK");
  assert.deepEqual(parseXlsxRows(xlsx).headers,csv.trim().split(","));
+ const excelDate=parseXlsxRows(createXlsx([{received_date:"45200"}],["received_date"])).rows[0].received_date;
+ assert.equal(excelDate,"2023-10-01","Excel serial dates must round-trip to ISO civil dates before validation");
 });
 
 test("PostgreSQL historical member XLSX import preserves approval and payment safeguards",async t=>{

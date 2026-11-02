@@ -138,7 +138,6 @@ export async function applyMemberGeographyImport(identity,batchId,input={},reque
   const versionLabel=clean(input.versionLabel||("geo-"+new Date().toISOString().slice(0,10)+"-"+batchId.slice(0,8)),100);
   const version=(await tx.query("insert into membership_geography_version(version_label,source_name,source_url,source_version,status,created_by,metadata) values($1,$2,$3,$4,'draft',$5,$6) returning id",
    [versionLabel,batch.source_name,input.sourceUrl||null,batch.source_version,identity.sub,JSON.stringify({batchId,reason})])).rows[0];
-  const byCode=new Map(rows.map(row=>[String(row.row_data.unit_code).toUpperCase(),row.row_data]));
   const inserted=new Map();let remaining=[...rows];
   while(remaining.length){
    const ready=remaining.filter(row=>!row.row_data.parent_code||inserted.has(String(row.row_data.parent_code).toUpperCase()));

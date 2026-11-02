@@ -355,7 +355,7 @@ export async function scheduleMembershipFeeReminders(batchSize=100){
    if(!reminder)continue;
    const message="A membership balance of "+item.currency+" "+Number(item.outstanding_balance).toFixed(2)+" remains due"+(Number(item.days_until_due)>0?" in "+item.days_until_due+" day(s)":" (overdue)")+". Record or confirm your next payment to update the balance.";
    const preference=(await tx.query("select coalesce(in_app_enabled,true) in_app_enabled,coalesce(in_app_categories,'{}'::jsonb) in_app_categories,coalesce(push_enabled,false) push_enabled from notification_preference where user_id=$1",[item.user_id])).rows[0]||{in_app_enabled:true,in_app_categories:{},push_enabled:false};
-   const optedOut=!preference.in_app_enabled&&preference.in_app_categories?.membership!==true&&!preference.push_enabled;
+   const optedOut=(!preference.in_app_enabled||preference.in_app_categories?.membership===false)&&!preference.push_enabled;
    const memberNotification=item.user_id&&!optedOut?await createInAppNotification(tx,item.user_id,"membership.balance_due","membership_fee_obligation",item.obligation_id,{category:"membership",title:"Membership balance reminder",message,actionRequired:true,priority:"normal",actionUrl:"/membership",dedupeKey:key}):null;
    const memberDeliveryStatus=optedOut||!item.user_id?"suppressed":"queued";
    const memberDeliveryNote=optedOut?"Member disabled in-app and push notifications; no member reminder was queued.":!item.user_id?"No linked member account; only the Finance queue is notified.":"Member notification event queued in-app; push delivery is not represented as sent.";

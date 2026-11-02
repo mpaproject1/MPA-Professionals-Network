@@ -59,7 +59,7 @@ test("geography preview requires an HTTPS primary source before creating an impo
 test("PostgreSQL geography workbook preview, apply, publish, member selectors and aggregation use one published version",async t=>{
  if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
  const db=getPool(),suffix=randomUUID().replace(/-/g,"").slice(0,10).toUpperCase(),digits=suffix.replace(/\D/g,"").slice(0,8).padEnd(8,"7");
- const created=await membership.register({email:"geography-"+suffix+"@example.test",password:"GeographySecurePassword!2026",firstName:"Geo",lastName:"Fixture",phone:"06"+digits},"geography-user-"+suffix);
+ const created=await membership.register({email:"geography-"+suffix+"@example.test",password:"GeographySecurePassword!2026",firstName:"Geo",lastName:"Fixture",phone:"09"+digits},"geography-user-"+suffix);
  const userId=created.user.id,identity={sub:userId,roles:["system_admin"],permissions:[]};
  const previousPublished=(await db.query("select id from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0]?.id||null;
  const batchIds=[],versionIds=[];

@@ -176,7 +176,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(reports).toBeFocused();
     await reports.press("Enter");
     await expect(reports).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("tabpanel").getByRole("link", { name: /Impact and outcomes/ })).toHaveAttribute("href", "/organizations/reports");
+    await expect(page.getByRole("tabpanel").getByRole("link", { name: /Impact and outcomes/ })).toHaveAttribute("href", "/organizations/reports?organizationId=org-e2e-1");
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });

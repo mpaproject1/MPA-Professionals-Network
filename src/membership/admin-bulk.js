@@ -65,6 +65,38 @@ export function memberImportTemplate(identity){
  assertImportAuthority(identity);
  return "legacy_member_id,email,phone,full_name,membership_number,product_code,status,start_date,end_date,approved_membership,approval_reference,notes,payment_reference,payment_amount,payment_currency,payment_date,payment_method,payment_evidence_reference\r\n";
 }
+async function validateImportedResidence(db,row){
+ const raw=row.raw,hasStructured=Boolean(String(raw.residence_type||"").trim()||String(raw.country_iso3||"").trim()||String(raw.region_or_federal_city||"").trim()||String(raw.zone_or_sub_city||"").trim()||String(raw.district_or_town||"").trim());
+ if(!hasStructured)return;
+ const countryCode=String(raw.country_iso3||"").trim().toUpperCase(),type=String(raw.residence_type||(countryCode==="ETH"?"ethiopia":"diaspora")).trim().toLowerCase();
+ if(!/^[A-Z]{3}$/.test(countryCode)){row.errors.push("Structured location requires a valid country_iso3 code.");return;}
+ if(!["ethiopia","diaspora"].includes(type)){row.errors.push("residence_type must be Ethiopia or Diaspora.");return;}
+ const version=(await db.query("select id from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0];
+ if(!version){row.errors.push("Structured location cannot be imported until a geography reference version is published.");return;}
+ const country=(await db.query("select id,country_iso3 from membership_geography_unit where version_id=$1 and unit_level='country' and country_iso3=$2 and active=true",[version.id,countryCode])).rows[0];
+ if(!country){row.errors.push("country_iso3 is not present in the current published geography version.");return;}
+ if(type==="ethiopia"){
+  if(countryCode!=="ETH"||!String(raw.region_or_federal_city||"").trim()){row.errors.push("Ethiopian location requires country ETH and a Region or Federal City code.");return;}
+  const a1=(await db.query("select id,unit_level,parent_id from membership_geography_unit where version_id=$1 and unit_code=$2 and active=true",[version.id,String(raw.region_or_federal_city).trim().toUpperCase()])).rows[0];
+  if(!a1||!["region","federal_city"].includes(a1.unit_level)||a1.parent_id!==country.id){row.errors.push("region_or_federal_city must be a valid Ethiopian Region or Federal City code.");return;}
+  const second=String(raw.zone_or_sub_city||"").trim().toUpperCase(),third=String(raw.district_or_town||"").trim().toUpperCase();let a2=null;
+  if(second){a2=(await db.query("select id,unit_level,parent_id from membership_geography_unit where version_id=$1 and unit_code=$2 and active=true",[version.id,second])).rows[0];if(!a2||a2.parent_id!==a1.id||(a1.unit_level==="region"&&a2.unit_level!=="zone")||(a1.unit_level==="federal_city"&&a2.unit_level!=="sub_city"))row.errors.push("zone_or_sub_city must be a child of the selected Region or Federal City with the matching administrative level.");}
+  if(third){const a3=(await db.query("select id,unit_level,parent_id from membership_geography_unit where version_id=$1 and unit_code=$2 and active=true",[version.id,third])).rows[0];if(!a2||!a3||a3.parent_id!==a2.id||!["district","town"].includes(a3.unit_level))row.errors.push("district_or_town must be a District or Town belonging to the selected Zone or Sub-city.");}
+  if(String(raw.diaspora_area||"").trim())row.errors.push("diaspora_area is only valid for Diaspora residence.");
+ }else if(countryCode==="ETH"||String(raw.region_or_federal_city||"").trim()||String(raw.zone_or_sub_city||"").trim()||String(raw.district_or_town||"").trim()||String(raw.street_address||"").trim())row.errors.push("Diaspora location uses a non-Ethiopian country and optional diaspora_area; do not enter Ethiopian administrative units or street address.");
+}
+async function saveImportedResidence(tx,userId,raw){
+ const countryCode=String(raw.country_iso3||"").trim().toUpperCase();if(!countryCode)return;
+ const type=String(raw.residence_type||(countryCode==="ETH"?"ethiopia":"diaspora")).trim().toLowerCase();
+ const version=(await tx.query("select id from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0];
+ if(!version)throw problem(409,"Geography reference version changed after import preview; preview the member import again.","GEOGRAPHY_VERSION_CHANGED");
+ const country=(await tx.query("select id from membership_geography_unit where version_id=$1 and unit_level='country' and country_iso3=$2 and active=true",[version.id,countryCode])).rows[0];
+ if(!country)throw problem(409,"Imported country reference is no longer available; preview the member import again.","GEOGRAPHY_VERSION_CHANGED");
+ async function unit(code){if(!code)return null;const found=(await tx.query("select id from membership_geography_unit where version_id=$1 and unit_code=$2 and active=true",[version.id,String(code).trim().toUpperCase()])).rows[0];if(!found)throw problem(409,"Imported administrative reference changed after preview; preview the member import again.","GEOGRAPHY_VERSION_CHANGED");return found.id;}
+ const level1=type==="ethiopia"?await unit(raw.region_or_federal_city):null,level2=type==="ethiopia"?await unit(raw.zone_or_sub_city):null,level3=type==="ethiopia"?await unit(raw.district_or_town):null;
+ await tx.query("insert into member_residence(user_id,residence_type,geography_version_id,country_unit_id,admin_level_1_id,admin_level_2_id,admin_level_3_id,diaspora_area,street_address,locality_note,updated_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()) on conflict(user_id) do update set residence_type=excluded.residence_type,geography_version_id=excluded.geography_version_id,country_unit_id=excluded.country_unit_id,admin_level_1_id=excluded.admin_level_1_id,admin_level_2_id=excluded.admin_level_2_id,admin_level_3_id=excluded.admin_level_3_id,diaspora_area=excluded.diaspora_area,street_address=excluded.street_address,locality_note=excluded.locality_note,updated_at=now()",
+ [userId,type,version.id,country.id,level1,level2,level3,type==="diaspora"?String(raw.diaspora_area||raw.location_or_address||"").trim()||null:null,type==="ethiopia"?String(raw.street_address||"").trim()||null:null,String(raw.location_or_address||"").trim()||null]);
+}
 export async function previewMemberImport(identity,{filename="mpa-members.csv",csv="",xlsxBase64="",sourceSystem="MPA approved member register"}={},requestId){
  assertImportAuthority(identity);
  if(xlsxBase64){if(String(xlsxBase64).length>12*1024*1024)throw problem(413,"Member import XLSX must be 9 MiB or smaller.","IMPORT_TOO_LARGE");csv=xlsxAsCsv(xlsxBase64);}
@@ -77,6 +109,7 @@ export async function previewMemberImport(identity,{filename="mpa-members.csv",c
  const seenEmail=new Set(),seenMembership=new Set(),seenLegacyId=new Set();
  for(const row of rows){
   if(!products.includes(row.productCode))row.errors.push("Unknown or inactive membership product code.");
+  await validateImportedResidence(db,row);
   if(row.paidAmount!==null&&!row.paidCurrency&&productCurrency.has(row.productCode))row.paidCurrency=productCurrency.get(row.productCode);
   const ek=row.email.toLowerCase(),mk=row.membershipNumber.toLowerCase();
   if(seenEmail.has(ek))row.errors.push("Email is repeated in this file.");seenEmail.add(ek);
@@ -138,6 +171,7 @@ export async function applyMemberImport(identity,importId,{reason=""}={},request
     await tx.query("insert into notification_outbox(channel,recipient,template_code,payload) values('email',$1,'mpa_member_invitation',$2)",[row.email,JSON.stringify({displayName:row.full_name,invitationToken:token,claimPath:`/member-invitation/claim?token=${token}`,expiresInDays:7,importBatchId:importId})]);
    }
    const member=(await tx.query("insert into membership_record(user_id,legacy_member_id,membership_product_id,membership_number,status,start_date,end_date,source,source_import_id,legacy_payload) values($1,$2,$3,$4,$5,$6,$7,'legacy_import',$8,$9) returning id",[userId,row.legacy_member_id,product.id,row.membership_number,row.status,row.start_date,row.end_date,importId,row.raw_payload])).rows[0];
+    if(row.raw_payload?.country_iso3)await saveImportedResidence(tx,userId,row.raw_payload);
    await tx.query("insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'legacy_member_imported',now(),$2,'legacy_import',$3)",[member.id,identity.sub,JSON.stringify({importId,rowNumber:row.row_number,approvalConfirmed:row.raw_payload?.approved_membership==="yes",approvalReference:row.raw_payload?.approval_reference||null,reason:why,paymentImported:false})]);
    await tx.query("update membership_import_row set match_status='applied',matched_user_id=$2,matched_membership_id=$3,match_reason=coalesce(match_reason,'account created from approved-member import'),diagnostics='[]'::jsonb where id=$1",[row.id,userId,member.id]);
    await audit(tx,identity.sub,"membership.import.row_applied","membership_record",member.id,requestId,{importId,rowNumber:row.row_number,email:row.email,membershipNumber:row.membership_number,status:row.status,accountCreated:accountCreatedForRow,reason:why});

@@ -197,7 +197,7 @@ export default function FinanceWorkspacePage() {
         method: "POST",
         body: JSON.stringify(draft),
       }, token);
-      setNotice("Historical payment verified by Finance. The imported member invitation can now be claimed; no membership review decision was changed.");
+      setNotice("Historical payment verification recorded. Any outstanding invitation for this imported membership is now eligible to be claimed; no membership review decision was changed.");
       await load();
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : "Historical membership payment verification could not be recorded.");

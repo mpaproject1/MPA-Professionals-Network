@@ -84,7 +84,7 @@ export async function listFeeObligations(identity,filters={}){
   from membership_record mr join membership_product mp on mp.id=mr.membership_product_id
   left join app_user u on u.id=mr.user_id left join person p on p.user_id=u.id
   where mr.source='legacy_import' and mr.status<>'merged'
-  and not exists(select 1 from membership_fee_obligation o where o.membership_record_id=mr.id)
+  and not exists(select 1 from membership_fee_obligation o where o.membership_record_id=mr.id or o.application_id=mr.application_id)
   and ($1='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||mr.membership_number) like lower('%'||$1||'%'))
   order by mr.created_at desc limit 200`,[q])).rows;
  return {rows:rows.map(row=>({...row,pending_receipts:row.receipts||[],pending_dispositions:row.items||[]})),legacyRecords,total:rows.length};

@@ -163,6 +163,7 @@ export async function verifyMembershipReceipt(identity,paymentId,input={},reques
   const payment=(await db.query("select * from payment_transaction where id=$1 for update",[paymentId])).rows[0];
   if(!obligation||!payment)throw problem(404,"Payment or fee obligation not found.","NOT_FOUND");
   if(payment.source!=="finance_manual_record"&&payment.source!=="finance_bulk_import")throw problem(409,"Only pending Finance-entered membership receipts can be verified here.","INVALID_PAYMENT_SOURCE");
+  if(payment.submitted_by&&payment.submitted_by===identity.sub)throw problem(403,"A different Finance officer must verify a receipt entered by this account (maker/checker separation).","MAKER_CHECKER_REQUIRED");
   if(payment.status!=="pending")throw problem(409,"Only pending receipts can be verified; this record has already been decided.","PAYMENT_NOT_PENDING");
   if((await db.query("select 1 from membership_payment_reversal where payment_transaction_id=$1",[paymentId])).rowCount)throw problem(409,"A reversed receipt cannot be verified again.","PAYMENT_ALREADY_REVERSED");
   if(payment.currency!==obligation.currency)throw problem(409,"Payment currency no longer matches the fee obligation.","PAYMENT_CURRENCY_MISMATCH");

@@ -696,7 +696,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="PATCH" && parts.length===4 && p.startsWith("api/v1/opportunity-inquiries/")) { const identity=await auth(req); const b=await body(req); return ok(res,await publicOpportunity.decideInquiry(parts[3],identity.sub,b,requestId,req.headers["x-idempotency-key"]),requestId); }
     if(req.method==="GET" && p==="api/v1/me/progress") {
       const q=query(req.url);
-      const keys=["applications","serviceRequests","mentorshipRequests","mentorshipMatches","mentorships","organizationMentorshipRequests","verificationCases","referenceRequests","communityImpactClaims","talentInquiries","networkPlusRequests","initiativeParticipations","memberInitiatives","referrals","candidateReferrals"];
+      const keys=["applications","serviceRequests","mentorshipRequests","mentorshipMatches","mentorships","organizationMentorshipRequests","verificationCases","referenceRequests","communityImpactClaims","talentInquiries","networkPlusRequests","initiativeParticipations","memberInitiatives","referrals","candidateReferrals","recognitionNominations","recognitionAwards"];
       const calls=[
         () => applicationTracking.getApplicationTracking(identity.sub,{limit:100,offset:0}),
         () => servicesMentorship.listMyServiceRequests(identity.sub),
@@ -714,8 +714,11 @@ const server=http.createServer(async (req,res)=>{
         () => memberReferrals.listMyReferrals(identity.sub),
         () => memberReferrals.listMyCandidateReferrals(identity.sub)
       ];
+      calls.push(() => communityImpactRecognition.listMyRecognition(identity.sub));
       const settled=await Promise.allSettled(calls.map(call=>Promise.resolve().then(call)));
-      const sources=Object.fromEntries(keys.map((key,index)=>[key,settled[index]]));
+      const sources=Object.fromEntries(keys.slice(0,15).map((key,index)=>[key,settled[index]]));
+      sources.recognitionNominations=settled[15];
+      sources.recognitionAwards=settled[15];
       return ok(res,memberProgress.buildMemberProgress(sources,{limit:q.get("limit")||50,offset:q.get("offset")||0,view:q.get("view")||"all",category:q.get("category")||"all"}),requestId);
     }
     if(req.method==="GET" && p==="api/v1/me/application-tracking") { const q=query(req.url); return ok(res,await applicationTracking.getApplicationTracking(identity.sub,{limit:q.get("limit")||undefined,offset:q.get("offset")||undefined,reference:q.get("reference")||undefined}),requestId); }

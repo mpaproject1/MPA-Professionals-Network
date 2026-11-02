@@ -52,7 +52,8 @@ function responsibility(status, domain, record) {
   }
   if (domain === "mentorship_request" && ["requested", "submitted", "matching", "matched"].includes(status)) return status === "matched" ? "member_action" : "mpa_action";
   if (domain === "organization_mentorship" && ["submitted", "pending", "requested"].includes(status)) return "external_response";
-  if (MEMBER_ACTION.has(status)) return "member_action";\n  if (EXTERNAL_WAIT.has(status)) return "external_response";
+  if (MEMBER_ACTION.has(status)) return "member_action";
+  if (EXTERNAL_WAIT.has(status)) return "external_response";
   if (CLOSED.has(status)) return "closed";
   if (COMPLETED.has(status)) return "completed";
   if (ACTIVE.has(status)) return "in_progress";
@@ -72,7 +73,9 @@ function mapRecord(record, definition, index) {
   const id = safeId(first(record, ["id", "request_id", "case_id", "application_id", "claim_id", "attribution_id"]));
   if (!id) return null;
   const title = domain === "mentorship_session" ? String(first(record, ["agenda"]) || "Mentorship session") : String(first(record, ["title", "service_title", "job_title", "program_title", "program_name", "project_title", "subject", "goals", "name"]) || category + " request");
-  const createdAt = asDate(first(record, ["submitted_at", "submittedAt", "created_at", "createdAt", "requested_at", "proposed_at"]));\n  const scheduledAt = asDate(first(record, ["scheduled_start_at", "scheduledAt"]));\n  const dueAt = asDate(first(record, ["due_at", "dueAt", "deadline_at"]));
+  const createdAt = asDate(first(record, ["submitted_at", "submittedAt", "created_at", "createdAt", "requested_at", "proposed_at"]));
+  const scheduledAt = asDate(first(record, ["scheduled_start_at", "scheduledAt"]));
+  const dueAt = asDate(first(record, ["due_at", "dueAt", "deadline_at"]));
   const updatedAt = asDate(first(record, ["last_activity_at", "lastActivityAt", "updated_at", "updatedAt", "reviewed_at", "responded_at", "submitted_at"])) || createdAt;
   const statusLabel = String(first(record, ["statusLabel", "status_label", "decision_label"]) || status.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase()));
   const nextAction = responsibility(status);
@@ -95,7 +98,8 @@ function mapRecord(record, definition, index) {
     updatedAt,
     trackingReference: trackingReference ? String(trackingReference) : null,
     href,
-    historyAvailable: history.length > 0,\n    history,
+    historyAvailable: history.length > 0,
+    history,
   };
 }
 function priority(item) {

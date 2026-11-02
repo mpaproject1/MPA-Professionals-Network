@@ -5,6 +5,7 @@ import {
   applyMembershipPaymentImport,
   decideBalanceDisposition,
   listFeeObligations,
+  listSponsoringOrganizations,
   membershipPaymentImportTemplate,
   previewMembershipPaymentImport,
   recordBalanceDisposition,

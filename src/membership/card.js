@@ -25,6 +25,7 @@ function tokenMatches(expected,supplied){
   return a.length===b.length&&timingSafeEqual(a,b);
 }
 export function getMembershipCardStatus(row, now=new Date()) {
+  if(row.source==="legacy_import" && !row.legacy_payment_verified) return "payment_verification_required";
   if(["revoked","cancelled","merged"].includes(row.status)) return "revoked";
   if(row.status==="suspended") return "suspended";
   const today=now.toISOString().slice(0,10);
@@ -45,7 +46,7 @@ async function settings(db=getPool()){
 }
 export async function getMyMembershipCard(userId){
   const db=getPool();
-  const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,
+  const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,exists(select 1 from membership_legacy_payment_verification v where v.membership_id=m.id) legacy_payment_verified,
       p.name membership_type,coalesce((a.fee_snapshot->>'renewalRequired')::boolean,p.renewal_required) renewal_required,
       coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m
@@ -54,7 +55,7 @@ export async function getMyMembershipCard(userId){
     join app_user u on u.id=m.user_id
     left join person on person.user_id=u.id
     where m.user_id=$1 and m.status<>'pending'
-    order by (m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)) desc,m.start_date desc nulls last,m.created_at desc
+    order by (m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and (m.source<>'legacy_import' or exists(select 1 from membership_legacy_payment_verification v where v.membership_id=m.id))) desc,m.start_date desc nulls last,m.created_at desc
     limit 1`,[userId]);
   const row=r.rows[0];
   if(!row) throw fail(404,"No membership record is available for this account. Complete membership approval and activation first.","MEMBERSHIP_NOT_FOUND");
@@ -91,8 +92,8 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
 }
 export async function listEligibleMembershipCardsForAdmin({q="",limit=50,offset=0}={}){
   const search=String(q||"").trim().slice(0,100),pageSize=Math.min(Math.max(Number(limit)||50,1),100),start=Math.max(Number(offset)||0,0),db=getPool();
-  const result=await db.query("select m.membership_number,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name,p.name membership_type,m.start_date,m.end_date from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name))) like lower('%'||$1||'%')) order by m.membership_number limit $2 offset $3",[search,pageSize,start]);
-  const total=Number((await db.query("select count(*)::int count from membership_record m left join person on person.user_id=m.user_id where m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(person.display_name,'')) like lower('%'||$1||'%'))",[search])).rows[0]?.count||0);
+  const result=await db.query("select m.membership_number,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name,p.name membership_type,m.start_date,m.end_date from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and (m.source<>'legacy_import' or exists(select 1 from membership_legacy_payment_verification v where v.membership_id=m.id)) and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name))) like lower('%'||$1||'%')) order by m.membership_number limit $2 offset $3",[search,pageSize,start]);
+  const total=Number((await db.query("select count(*)::int count from membership_record m left join person on person.user_id=m.user_id where m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and (m.source<>'legacy_import' or exists(select 1 from membership_legacy_payment_verification v where v.membership_id=m.id)) and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(person.display_name,'')) like lower('%'||$1||'%'))",[search])).rows[0]?.count||0);
   return {items:result.rows.map(row=>({membershipNumber:row.membership_number,memberName:row.member_name||"MPA Member",membershipType:row.membership_type,startDate:row.start_date,endDate:row.end_date})),total,limit:pageSize,offset:start,hasMore:start+result.rows.length<total};
 }
 export async function getMembershipCardsForAdmin(membershipNumbers,actorId,requestId){
@@ -100,7 +101,7 @@ export async function getMembershipCardsForAdmin(membershipNumbers,actorId,reque
   if(membershipNumbers.length>100)throw fail(413,"Select no more than 100 members per print batch.","CARD_BATCH_LIMIT");
   const numbers=[...new Set(membershipNumbers.map(value=>String(value||"").trim().toUpperCase()).filter(Boolean))];
   if(numbers.length!==membershipNumbers.length||numbers.some(value=>value.length>100||/\p{Cc}/u.test(value)||/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value)||/^MPA-(MEM|APP|REF)-/i.test(value)))throw fail(400,"Select unique canonical membership numbers, not internal account or record references.","INVALID_CARD_SELECTION");
-  const db=getPool(),rows=(await db.query("select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where upper(m.membership_number)=any($1::text[]) and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) order by m.membership_number",[numbers])).rows;
+  const db=getPool(),rows=(await db.query("select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where upper(m.membership_number)=any($1::text[]) and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and (m.source<>'legacy_import' or exists(select 1 from membership_legacy_payment_verification v where v.membership_id=m.id)) order by m.membership_number",[numbers])).rows;
   const byNumber=new Map(rows.map(row=>[String(row.membership_number).toUpperCase(),row])),cardSettings=await settings(db);
   const cards=rows.map(row=>cardPayload(row,cardSettings)),skipped=numbers.filter(number=>!byNumber.has(number)).map(membershipNumber=>({membershipNumber,reason:"No active eligible membership was found. Check the membership ID or membership status."}));
   const batchReference=randomUUID();

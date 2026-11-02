@@ -41,7 +41,7 @@ function cleanRow(row){
  if(!fullName||fullName.split(" ").length<2)errors.push("Enter first and last name in full_name.");
  if(!membershipNumber)errors.push("Membership number is required.");
  if(!/^[A-Z0-9_-]{2,32}$/.test(productCode))errors.push("Membership type must resolve to a configured product code.");
- if(!["active","expired","pending","suspended","cancelled"].includes(status))errors.push("Status must be active, expired, pending, suspended or cancelled.");
+ if(!["active","expired","suspended","cancelled","merged"].includes(status))errors.push("Status must be active, expired, suspended, cancelled or merged.");
  if(!startDate)errors.push("start_date must use YYYY-MM-DD.");
  if(x.end_date&&!endDate)errors.push("end_date must use YYYY-MM-DD or be blank.");
  if(startDate&&endDate&&endDate<startDate)errors.push("end_date cannot be before start_date.");

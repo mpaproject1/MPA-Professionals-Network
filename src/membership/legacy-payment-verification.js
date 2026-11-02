@@ -83,6 +83,8 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
       throw problem(409, "A Finance-approved historical payment is already linked to this membership.", "PAYMENT_ALREADY_VERIFIED");
     }
 
+    const reusedReference = (await tx.query("select membership_id from membership_legacy_payment_verification where lower(payment_reference)=lower($1) for update", [paymentReference])).rows[0];
+    if (reusedReference && reusedReference.membership_id !== membershipId) throw problem(409, "This payment reference is already allocated to another membership record.", "PAYMENT_REFERENCE_ALREADY_USED");
     const verification = (await tx.query(`
       insert into membership_legacy_payment_verification
         (membership_id,payment_reference,amount,currency,payment_date,payment_method,evidence_reference,finance_note,verified_by)
@@ -93,6 +95,7 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
     await tx.query(
       "update member_invitation set expires_at=greatest(expires_at,now()+interval '7 days') where user_id=$1 and import_id=$2 and consumed_at is null",
       [membership.user_id, membership.source_import_id]
+    const outstandingInvitation = await tx.query("select id from member_invitation where user_id=$1 and import_id=$2 and consumed_at is null", [membership.user_id, membership.source_import_id]);
     );
     await tx.query(
       "insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'legacy_payment_verified',now(),$2,'legacy_import',$3)",
@@ -102,6 +105,6 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
       "insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.legacy_payment_verified','membership_record',$2,$3,'success',$4)",
       [identity.sub, membershipId, requestId, JSON.stringify({ verificationId: verification.id, membershipNumber: membership.membership_number, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference })]
     );
-    return { membershipId, verificationId: verification.id, verifiedAt: verification.verified_at, claimUnlocked: true };
+    return { membershipId, verificationId: verification.id, verifiedAt: verification.verified_at, claimUnlocked: outstandingInvitation.rowCount > 0 };
   });
 }

@@ -55,12 +55,7 @@ function validateHierarchy(rows){
 }
 export function memberGeographyImportTemplate(identity){
  authorized(identity);
- const sample=[
-  {unit_code:"ETH",label:"Ethiopia",unit_level:"country",parent_code:"",country_iso3:"ETH",country_m49:"231",source_name:"UNSD M49",source_version:"Current M49 release",effective_from:"",effective_to:"",active:"true"},
-  {unit_code:"ADDIS_ABABA",label:"Addis Ababa",unit_level:"federal_city",parent_code:"ETH",country_iso3:"",country_m49:"",source_name:"Authoritative Ethiopian administrative source",source_version:"Replace with source release",effective_from:"",effective_to:"",active:"true"},
-  {unit_code:"ADDIS_SUBCITY_EXAMPLE",label:"Replace with verified sub-city",unit_level:"sub_city",parent_code:"ADDIS_ABABA",country_iso3:"",country_m49:"",source_name:"Authoritative Ethiopian administrative source",source_version:"Replace with source release",effective_from:"",effective_to:"",active:"false"},
- ];
- return createXlsx(sample,COLUMNS);
+ return createXlsx([],COLUMNS);
 }
 export async function listMemberGeography(identity){
  if(!identity?.sub)throw fail(401,"Sign in to view member residence reference data.","UNAUTHORIZED");
@@ -71,7 +66,7 @@ export async function listMemberGeography(identity){
  return {version,countries:rows.filter(row=>row.unit_level==="country"),regions:rows.filter(row=>row.unit_level==="region"),federalCities:rows.filter(row=>row.unit_level==="federal_city"),children:rows.filter(row=>!["country","region","federal_city"].includes(row.unit_level))};
 }
 export async function getMyResidence(userId){
- const row=(await getPool().query(`select r.*,c.unit_code country_code,c.label country_name,
+ const row=(await getPool().query(`select r.*,c.country_iso3 country_code,c.label country_name,
   a1.unit_code admin_level_1_code,a1.label admin_level_1_label,a1.unit_level admin_level_1_type,
   a2.unit_code admin_level_2_code,a2.label admin_level_2_label,a2.unit_level admin_level_2_type,
   a3.unit_code admin_level_3_code,a3.label admin_level_3_label,a3.unit_level admin_level_3_type
@@ -92,7 +87,7 @@ export async function saveMyResidence(userId,input={},requestId){
  if(!/^[A-Z]{3}$/.test(countryCode))throw fail(400,"Choose a country from the published reference list.","COUNTRY_REQUIRED");
  if(type==="ethiopia"&&(!level1||area))throw fail(400,"Choose a Region or Federal City for Ethiopian residence.","ETHIOPIA_LEVEL1_REQUIRED");
  if(type==="diaspora"&&(level1||level2||level3||street))throw fail(400,"Diaspora residence uses country and optional area only.","DIASPORA_HIERARCHY_INVALID");
- return withTransaction(async tx=>{
+ await withTransaction(async tx=>{
   const version=(await tx.query("select id from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0];
   if(!version)throw fail(409,"Member geography reference data has not yet been published. Contact an administrator.","GEOGRAPHY_NOT_PUBLISHED");
   const country=(await tx.query("select id,unit_level,country_iso3 from membership_geography_unit where version_id=$1 and unit_level='country' and country_iso3=$2 and active=true",[version.id,countryCode])).rows[0];
@@ -111,8 +106,8 @@ export async function saveMyResidence(userId,input={},requestId){
    diaspora_area=excluded.diaspora_area,street_address=excluded.street_address,locality_note=excluded.locality_note,updated_at=now()`,
   [userId,type,version.id,country.id,a1?.id||null,a2?.id||null,a3?.id||null,area,street,locality]);
   await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'member.residence_updated','member_residence',$1,$2,'success',$3)",[userId,requestId,JSON.stringify({residenceType:type,countryCode,hasStreetAddress:Boolean(street)})]);
-  return getMyResidence(userId);
  });
+ return getMyResidence(userId);
 }
 export async function previewMemberGeographyImport(identity,input={},requestId){
  authorized(identity);

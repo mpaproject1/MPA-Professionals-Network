@@ -197,6 +197,10 @@
   color: #a13d3d;
 }
 
+:global(.dark) .verified { color: #a8e6b3; }
+:global(.dark) .pending { color: #f2d18a; }
+:global(.dark) .attention { color: #ffb6b6; }
+
 .draft {
   background: rgba(91, 116, 139, .13);
   color: var(--muted);

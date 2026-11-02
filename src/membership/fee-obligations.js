@@ -306,32 +306,55 @@ export async function applyMembershipPaymentImport(identity,batchId,input={},req
  return withTransaction(async db=>{
   const batch=(await db.query("select * from membership_payment_import_batch where id=$1 for update",[batchId])).rows[0];
   if(!batch)throw problem(404,"Payment import batch not found.","NOT_FOUND");
-  if(batch.status==="applied")return {batchId,alreadyApplied:true,createdCount:0};
-  if(batch.status!=="validated"||batch.error_count!==0)throw problem(409,"Only a validated, error-free payment batch can be applied.","IMPORT_NOT_VALIDATED");
-  const rows=(await db.query("select * from membership_payment_import_row where batch_id=$1 order by row_number for update",[batchId])).rows;let createdCount=0;
-  for(const row of rows){
-   const x=row.row_data,obligation=(await db.query("select * from membership_fee_obligation where id=$1 for update",[x.obligationId])).rows[0];
-   if(!obligation)throw problem(409,"A fee obligation changed after preview; no payment batch was applied.","OBLIGATION_CHANGED");
-   const balance=await balanceFor(db,obligation.id);
-   if(Number(x.amount)>Number(balance.outstanding_balance))throw problem(409,"A payment row now exceeds the outstanding balance; create a fresh preview.","AMOUNT_EXCEEDS_BALANCE");
-   const method=(await db.query("select * from membership_payment_method where method_code=$1 and enabled=true for share",[x.payment_method_code])).rows[0];
-   if(!method)throw problem(409,"A configured payment method changed after preview; create a fresh batch.","PAYMENT_METHOD_UNAVAILABLE");
-   if(method.requires_evidence&&!x.evidence_file_id)throw problem(409,"Required payment evidence is missing from a bulk row.","PAYMENT_EVIDENCE_REQUIRED");
-   if(x.evidence_file_id)await validateEvidence(db,identity.sub,x.evidence_file_id);
-   const snapshot=buildMembershipPaymentMethodSnapshot(method),channel=method.method_type==="bank_transfer"?"bank_transfer":method.method_type==="cash"?"cash":"other";
-   const idempotencyKey="bulk-membership:"+batchId+":"+row.row_number;
-   const payment=(await db.query(`insert into payment_transaction(provider,idempotency_key,purpose,amount,currency,status,request_payload,channel,submitted_by,purpose_reference,source,payment_method_code,payment_method_snapshot,evidence_file_id)
-    values('manual',$1,'membership',$2,$3,'pending',$4::jsonb,$5,$6,$7,'finance_bulk_import',$8,$9::jsonb,$10) returning id`,
-    [idempotencyKey,money(x.amount),x.currency,JSON.stringify({receivedDate:x.received_date,reference:x.payment_reference,evidenceReference:x.evidence_reference,payerNote:x.payer_note,importBatchId:batchId,importRow:row.row_number,methodSnapshot:snapshot}),channel,identity.sub,x.payment_reference,x.payment_method_code,JSON.stringify(snapshot),x.evidence_file_id||null])).rows[0];
-   if(obligation.application_id)await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2) on conflict do nothing",[obligation.application_id,payment.id]);
-   await db.query("insert into membership_fee_obligation_payment(obligation_id,payment_transaction_id,linked_by) values($1,$2,$3) on conflict(payment_transaction_id) do nothing",[obligation.id,payment.id,identity.sub]);
-   await db.query("update membership_payment_import_row set status='created',payment_transaction_id=$1 where id=$2",[payment.id,row.id]);
-   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_bulk_receipt_created','payment_transaction',$2,$3,'success',$4)",[identity.sub,payment.id,requestId,JSON.stringify({batchId,rowNumber:row.row_number,obligationId:obligation.id,amount:x.amount,currency:x.currency,verificationRequired:true,reason})]);
-   createdCount++;
+  if(batch.status==="applied"){
+   const count=(await db.query("select count(*)::int count from membership_payment_import_row where batch_id=$1 and status='created'",[batchId])).rows[0]?.count||0;
+   return {batchId,alreadyApplied:true,createdCount:Number(count),verificationRequired:true};
   }
-  await db.query("update membership_payment_import_batch set status='applied',applied_at=now() where id=$1",[batchId]);
-  await notifyFinance(db,"membership.bulk_payment_import_applied","membership_payment_import_batch",batchId,{message:createdCount+" pending membership receipts were created from a Finance import. Each receipt requires individual verification.",actionUrl:"/admin/finance"});
-  return {batchId,status:"applied",createdCount,verificationRequired:true};
+  const applyValidRows=input.applyValidRows===true;
+  if(batch.status==="previewed"&&!applyValidRows)throw problem(409,"This batch has row errors. Explicitly apply valid rows to preserve the rejected rows for correction.","IMPORT_NOT_VALIDATED");
+  if(!["validated","previewed"].includes(batch.status))throw problem(409,"This payment batch is not ready to apply.","INVALID_IMPORT_STATE");
+  const rows=(await db.query("select * from membership_payment_import_row where batch_id=$1 order by row_number for update",[batchId])).rows;
+  let createdCount=0,skippedCount=0,failedCount=0;
+  for(const row of rows){
+   if(row.status==="error"||row.status==="unmatched"||row.status==="duplicate"||(Array.isArray(row.errors)&&row.errors.length)){
+    skippedCount++;continue;
+   }
+   if(row.status==="created"&&row.payment_transaction_id){skippedCount++;continue;}
+   await db.query("savepoint membership_payment_import_row");
+   try{
+    const x=row.row_data,obligation=(await db.query("select * from membership_fee_obligation where id=$1 for update",[x.obligationId])).rows[0];
+    if(!obligation)throw problem(409,"A fee obligation changed after preview; this row was not applied.","OBLIGATION_CHANGED");
+    const balance=await balanceFor(db,obligation.id);
+    if(Number(x.amount)>Number(balance.outstanding_balance))throw problem(409,"A payment row now exceeds the outstanding balance; create a fresh preview.","AMOUNT_EXCEEDS_BALANCE");
+    const method=(await db.query("select * from membership_payment_method where method_code=$1 and enabled=true for share",[x.payment_method_code])).rows[0];
+    if(!method)throw problem(409,"A configured payment method changed after preview; create a fresh batch.","PAYMENT_METHOD_UNAVAILABLE");
+    if(method.requires_evidence&&!x.evidence_file_id)throw problem(409,"Required payment evidence is missing from a bulk row.","PAYMENT_EVIDENCE_REQUIRED");
+    if(x.evidence_file_id)await validateEvidence(db,identity.sub,x.evidence_file_id);
+    const snapshot=buildMembershipPaymentMethodSnapshot(method),channel=method.method_type==="bank_transfer"?"bank_transfer":method.method_type==="cash"?"cash":"other";
+    const idempotencyKey="bulk-membership:"+batchId+":"+row.row_number;
+    const payment=(await db.query(`insert into payment_transaction(provider,idempotency_key,purpose,amount,currency,status,request_payload,channel,submitted_by,purpose_reference,source,payment_method_code,payment_method_snapshot,evidence_file_id)
+     values('manual',$1,'membership',$2,$3,'pending',$4::jsonb,$5,$6,$7,'finance_bulk_import',$8,$9::jsonb,$10) returning id`,
+     [idempotencyKey,money(x.amount),x.currency,JSON.stringify({receivedDate:x.received_date,reference:x.payment_reference,evidenceReference:x.evidence_reference,payerNote:x.payer_note,importBatchId:batchId,importRow:row.row_number,methodSnapshot:snapshot}),channel,identity.sub,x.payment_reference,x.payment_method_code,JSON.stringify(snapshot),x.evidence_file_id||null])).rows[0];
+    if(obligation.application_id)await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2) on conflict do nothing",[obligation.application_id,payment.id]);
+    await db.query("insert into membership_fee_obligation_payment(obligation_id,payment_transaction_id,linked_by) values($1,$2,$3) on conflict(payment_transaction_id) do nothing",[obligation.id,payment.id,identity.sub]);
+    await db.query("update membership_payment_import_row set status='created',payment_transaction_id=$1 where id=$2",[payment.id,row.id]);
+    await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_bulk_receipt_created','payment_transaction',$2,$3,'success',$4)",[identity.sub,payment.id,requestId,JSON.stringify({batchId,rowNumber:row.row_number,obligationId:obligation.id,amount:x.amount,currency:x.currency,verificationRequired:true,reason})]);
+    await db.query("release savepoint membership_payment_import_row");
+    createdCount++;
+   }catch(error){
+    await db.query("rollback to savepoint membership_payment_import_row");
+    await db.query("release savepoint membership_payment_import_row");
+    const message=String(error?.message||"This payment row could not be applied.").slice(0,500),code=String(error?.code||"ROW_APPLY_FAILED").slice(0,80);
+    await db.query("update membership_payment_import_row set status='error',errors=$1::jsonb where id=$2",[JSON.stringify([message]),row.id]);
+    await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_bulk_receipt_row_failed','membership_payment_import_row',$2,$3,'failure',$4)",[identity.sub,row.id,requestId,JSON.stringify({batchId,rowNumber:row.row_number,code,message,reason})]);
+    failedCount++;
+   }
+  }
+  if(createdCount===0&&failedCount===0)throw problem(409,"There are no valid, unapplied rows in this batch.","NO_VALID_ROWS");
+  const remainingErrors=(await db.query("select count(*)::int count from membership_payment_import_row where batch_id=$1 and status='error'",[batchId])).rows[0]?.count||0;
+  await db.query("update membership_payment_import_batch set status='applied',error_count=$2,applied_at=now() where id=$1",[batchId,Number(remainingErrors)]);
+  await notifyFinance(db,"membership.bulk_payment_import_applied","membership_payment_import_batch",batchId,{message:createdCount+" pending membership receipts were created; "+(Number(remainingErrors)+skippedCount)+" row(s) remain for correction or review. Each created receipt requires individual verification.",actionUrl:"/admin/finance"});
+  return {batchId,status:"applied",createdCount,skippedCount,failedCount,errorCount:Number(remainingErrors),partial:Number(remainingErrors)>0||skippedCount>0,verificationRequired:true};
  });
 }
 export async function scheduleMembershipFeeReminders(batchSize=100){

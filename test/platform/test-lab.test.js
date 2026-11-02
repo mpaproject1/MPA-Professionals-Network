@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
 import { testLabConfiguration } from "../../src/platform/test-lab.js";
+import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
 
 test("Test Lab reports capture mode only when explicitly configured",()=>{
  const before={nodeEnv:process.env.NODE_ENV,enabled:process.env.TEST_LAB_ENABLED,delivery:process.env.TEST_DELIVERY_MODE};

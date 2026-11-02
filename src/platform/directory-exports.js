@@ -145,7 +145,7 @@ function buildQuery(kind, identity, filters) {
   } else {
     dateColumn = "u.created_at";
     const membershipState = `case when not exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status<>'merged') then 'not_enrolled'
-      when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='active' and mr.start_date is not null and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date) and (mr.source<>'legacy_import' or exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id))) then 'active'
+      when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='active' and mr.start_date is not null and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date) and (mr.source<>'legacy_import' or exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=mr.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded'))) then 'active'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.source='legacy_import' and not exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=mr.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded')) then 'payment_verification_required'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='pending') then 'pending'
       when exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='suspended') then 'suspended'

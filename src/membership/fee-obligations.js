@@ -57,7 +57,9 @@ async function paymentMethod(db,methodCode,code){
 }
 async function notifyFinance(db,eventCode,resourceType,resourceId,payload){
  const staff=(await db.query("select distinct ur.user_id from app_user_role ur join app_role r on r.id=ur.role_id where r.role_code='finance_officer' union select distinct up.user_id from app_user_permission up where up.permission_code in ('finance.payment.verify','finance.manage')")).rows;
- for(const user of staff)await createInAppNotification(db,user.user_id,eventCode,resourceType,resourceId,{category:"membership",reviewerQueue:true,actionRequired:true,priority:"high",...payload});
+ const ids=[];
+ for(const user of staff){const notification=await createInAppNotification(db,user.user_id,eventCode,resourceType,resourceId,{category:"membership",reviewerQueue:true,actionRequired:true,priority:"high",...payload});if(notification?.id)ids.push(notification.id);}
+ return ids;
 }
 export async function listFeeObligations(identity,filters={}){
  const roles=identity?.roles||[],permissions=identity?.permissions||[];
@@ -182,7 +184,7 @@ export async function verifyMembershipReceipt(identity,paymentId,input={},reques
    if(member?.user_id&&Number(updated.outstanding_balance)===0)await db.query("update member_invitation set expires_at=greatest(expires_at,now()+interval '7 days') where user_id=$1 and import_id=$2 and consumed_at is null",[member.user_id,member.source_import_id]);
    if(member?.user_id)await createInAppNotification(db,member.user_id,"membership.payment_"+decision,"payment_transaction",paymentId,{category:"membership",message:Number(updated.outstanding_balance)>0?"Finance updated your membership payment record. Remaining balance: "+payment.currency+" "+Number(updated.outstanding_balance).toFixed(2)+".":"Finance verified the membership fee in full; your account invitation can now be claimed.",actionUrl:"/membership",eventVersion:requestId||paymentId});
   }
-  await db.query("update membership_fee_reminder set status='cancelled' where obligation_id=$1 and status='scheduled' and $2::numeric=0",[obligation.id,updated.outstanding_balance]);
+  await db.query("update membership_fee_reminder set status='cancelled' where obligation_id=$1 and status in ('scheduled','queued') and $2::numeric=0",[obligation.id,updated.outstanding_balance]);
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_receipt_verified','payment_transaction',$2,$3,'success',$4)",[identity.sub,paymentId,requestId,JSON.stringify({decision,obligationId:obligation.id,amount:payment.amount,currency:payment.currency,outstandingBalance:updated.outstanding_balance})]);
   return {paymentId,decision,balance:updated};
  });
@@ -228,7 +230,7 @@ export async function decideBalanceDisposition(identity,dispositionId,input={},r
    await db.query("update membership_fee_obligation set status=case when $2::numeric=0 then 'settled' else 'open' end,updated_at=now() where id=$1",[row.obligation_id,updated.outstanding_balance]);
    if(obligation.application_id&&Number(updated.outstanding_balance)===0){const app=(await db.query("select approved_at,status from membership_application where id=$1 for update",[obligation.application_id])).rows[0];if(app?.approved_at&&["approved","payment_pending","paid"].includes(app.status)&&app.status!=="activated")await db.query("update membership_application set status='paid',updated_at=now() where id=$1",[obligation.application_id]);}
    if(obligation.membership_record_id&&Number(updated.outstanding_balance)===0){const member=(await db.query("select user_id,source_import_id from membership_record where id=$1",[obligation.membership_record_id])).rows[0];if(member?.user_id)await db.query("update member_invitation set expires_at=greatest(expires_at,now()+interval '7 days') where user_id=$1 and import_id=$2 and consumed_at is null",[member.user_id,member.source_import_id]);}
-   await db.query("update membership_fee_reminder set status='cancelled' where obligation_id=$1 and status='scheduled' and $2::numeric=0",[row.obligation_id,updated.outstanding_balance]);
+   await db.query("update membership_fee_reminder set status='cancelled' where obligation_id=$1 and status in ('scheduled','queued') and $2::numeric=0",[row.obligation_id,updated.outstanding_balance]);
   }
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_balance_disposition_decided','membership_fee_balance_disposition',$2,$3,'success',$4)",[identity.sub,dispositionId,requestId,JSON.stringify({decision,obligationId:row.obligation_id,dispositionType:row.disposition_type,amount:row.amount,currency:row.currency,note})]);
   return {dispositionId,decision,balance:await balanceFor(db,row.obligation_id)};
@@ -314,22 +316,22 @@ export async function scheduleMembershipFeeReminders(batchSize=100){
  const limit=Math.min(Math.max(Number(batchSize)||100,1),500),db=getPool();
  return withTransaction(async tx=>{
   const obligations=(await tx.query(`select b.obligation_id,b.application_id,b.membership_record_id,b.outstanding_balance,b.currency,o.due_date,
-   coalesce(a.user_id,mr.user_id) user_id
+   coalesce(a.user_id,mr.user_id) user_id,(o.due_date-current_date) days_until_due
    from membership_fee_obligation_balance b join membership_fee_obligation o on o.id=b.obligation_id
    left join membership_application a on a.id=o.application_id
    left join membership_record mr on mr.id=o.membership_record_id
-   where b.outstanding_balance>0 and o.status='open' and o.due_date is not null and o.due_date<=current_date
-   and exists(select 1 from membership_fee_balance_disposition d where d.obligation_id=o.id and d.disposition_type='will_pay_later' and d.status='active' and d.due_date<=current_date)
+   where b.outstanding_balance>0 and o.status='open' and o.due_date is not null and o.due_date<=current_date+3
+   and exists(select 1 from membership_fee_balance_disposition d where d.obligation_id=o.id and d.disposition_type='will_pay_later' and d.status='active' and d.due_date<=current_date+3)
    order by o.due_date limit $1 for update of o skip locked`,[limit])).rows;
   let sent=0;
   for(const item of obligations){
    const key="membership-balance:"+item.obligation_id+":"+String(item.due_date)+":"+Number(item.outstanding_balance).toFixed(2);
    const reminder=(await tx.query("insert into membership_fee_reminder(obligation_id,reminder_key,due_balance,currency,scheduled_for,status) values($1,$2,$3,$4,now(),'queued') on conflict(reminder_key) do nothing returning id",[item.obligation_id,key,item.outstanding_balance,item.currency])).rows[0];
    if(!reminder)continue;
-   const message="A membership balance of "+item.currency+" "+Number(item.outstanding_balance).toFixed(2)+" remains due. Record or confirm your next payment to update the balance.";
-   if(item.user_id)await createInAppNotification(tx,item.user_id,"membership.balance_due","membership_fee_obligation",item.obligation_id,{category:"membership",title:"Membership balance reminder",message,actionRequired:true,priority:"normal",actionUrl:"/membership",dedupeKey:key});
-   await notifyFinance(tx,"membership.balance_due_staff","membership_fee_obligation",item.obligation_id,{message:"Member balance "+item.currency+" "+Number(item.outstanding_balance).toFixed(2)+" is due. Review the Finance obligation.",actionUrl:"/admin/finance",dedupeKey:key});
-   await tx.query("update membership_fee_reminder set status='sent',sent_at=now() where id=$1",[reminder.id]);sent++;
+   const message="A membership balance of "+item.currency+" "+Number(item.outstanding_balance).toFixed(2)+" remains due"+(Number(item.days_until_due)>0?" in "+item.days_until_due+" day(s)":" (overdue)")+". Record or confirm your next payment to update the balance.";
+   const memberNotification=item.user_id?await createInAppNotification(tx,item.user_id,"membership.balance_due","membership_fee_obligation",item.obligation_id,{category:"membership",title:"Membership balance reminder",message,actionRequired:true,priority:"normal",actionUrl:"/membership",dedupeKey:key}):null;
+   const staffNotifications=await notifyFinance(tx,"membership.balance_due_staff","membership_fee_obligation",item.obligation_id,{message:"Member balance "+item.currency+" "+Number(item.outstanding_balance).toFixed(2)+" is due. Review the Finance obligation.",actionUrl:"/admin/finance",dedupeKey:key});
+   await tx.query("update membership_fee_reminder set status='queued',member_outbox_id=$1,staff_outbox_id=$2 where id=$3",[memberNotification?.id||null,staffNotifications[0]||null,reminder.id]);sent++;
   }
   await tx.query("update membership_fee_reminder r set status='cancelled' from membership_fee_obligation_balance b where r.obligation_id=b.obligation_id and r.status in ('scheduled','queued') and b.outstanding_balance=0");
   return {processed:obligations.length,sent};

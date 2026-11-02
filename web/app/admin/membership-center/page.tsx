@@ -12,11 +12,11 @@ import styles from "./membership-center.module.css";
 type ReportRow = Record<string, string | number | null>;
 type ReportResult = { report?: { title?: string; definition?: string }; generatedAt?: string; rows: ReportRow[]; totals?: Record<string, number> };
 type Me = { roles?: string[]; permissions?: string[] };
-type Filters = { from: string; to: string; q: string; status: string };
+type Filters = { from: string; to: string; q: string; status: string; memberStatus: string };
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentYear = () => new Date().getFullYear();
-const initialFilters = (): Filters => ({ from: `${currentYear()}-01-01`, to: today(), q: "", status: "" });
+const initialFilters = (): Filters => ({ from: `${currentYear()}-01-01`, to: today(), q: "", status: "", memberStatus: "" });
 const number = (value: unknown) => Number(value || 0);
 const clean = (value: unknown) => String(value ?? "").toLowerCase().replaceAll("_", " ");
 const appPending = new Set(["submitted", "in_review", "correction_required"]);
@@ -111,7 +111,7 @@ export default function MembershipCenterPage() {
       const [appResult, memberResult, monthlyResult] = await Promise.all([
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status }) }, token),
         // Current member stock is deliberately unbounded by the application-period filter.
-        api<ReportResult>("/api/v1/admin/reports/membership-status/run", { method: "POST", body: JSON.stringify({}) }, token),
+        api<ReportResult>("/api/v1/admin/reports/membership-status/run", { method: "POST", body: JSON.stringify({ q: nextFilters.q, status: nextFilters.memberStatus }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status, groupBy: "month" }) }, token),
       ]);
       if (!Array.isArray(appResult?.rows) || !Array.isArray(memberResult?.rows) || !Array.isArray(monthlyResult?.rows)) throw new Error("Membership reporting returned an incomplete response. No KPI values have been inferred.");
@@ -222,6 +222,7 @@ export default function MembershipCenterPage() {
         <label>From<input type="date" value={filters.from} onChange={event => setFilters(current => ({ ...current, from: event.target.value }))}/></label>
         <label>To<input type="date" value={filters.to} onChange={event => setFilters(current => ({ ...current, to: event.target.value }))}/></label>
         <label>Application stage<select value={filters.status} onChange={event => setFilters(current => ({ ...current, status: event.target.value }))}><option value="">All stages</option><option value="submitted">Submitted</option><option value="in_review">In review</option><option value="correction_required">Needs information</option><option value="approved">Approved</option><option value="payment_pending">Payment pending</option><option value="paid">Paid</option><option value="activated">Activated</option><option value="rejected">Rejected</option><option value="withdrawn">Withdrawn</option></select></label>
+        <label>Member status<select value={filters.memberStatus} onChange={event => setFilters(current => ({ ...current, memberStatus: event.target.value }))}><option value="">All member statuses</option><option value="active">Active</option><option value="expired">Expired</option><option value="not_yet_active">Not yet active</option><option value="pending">Pending</option><option value="suspended">Suspended</option><option value="cancelled">Cancelled</option></select></label>
         <label className={styles.searchFilter}>Plan / application search<input value={filters.q} onChange={event => setFilters(current => ({ ...current, q: event.target.value }))} placeholder="Search plan or application type"/></label>
         <button className="btn btn-primary" type="button" onClick={() => void load(filters)} disabled={busy}>{busy ? "Applying…" : "Apply filters"}</button>
       </div>
@@ -293,7 +294,7 @@ export default function MembershipCenterPage() {
         <div className={styles.exportActions}>
           <button className="btn btn-ghost" type="button" disabled={Boolean(exporting)} onClick={async()=>{if(!token)return;setExporting("csv");setError("");try{await downloadReport(token,"membership-applications",filters,"csv");}catch(cause){setError(cause instanceof Error?cause.message:"CSV export failed.");}finally{setExporting("");}}}><Download size={16}/>{exporting==="csv"?"Preparing…":"Download CSV"}</button>
           <button className="btn btn-primary" type="button" disabled={Boolean(exporting)} onClick={async()=>{if(!token)return;setExporting("xlsx");setError("");try{await downloadReport(token,"membership-applications",filters,"xlsx");}catch(cause){setError(cause instanceof Error?cause.message:"Excel export failed.");}finally{setExporting("");}}}><ArrowDownToLine size={16}/>{exporting==="xlsx"?"Preparing…":"Download Excel"}</button>
-          <button className="btn btn-ghost" type="button" disabled={Boolean(exporting)} onClick={async()=>{if(!token)return;setExporting("status");setError("");try{await downloadReport(token,"membership-status",{from:"",to:"",q:"",status:""},"xlsx");}catch(cause){setError(cause instanceof Error?cause.message:"Membership stock export failed.");}finally{setExporting("");}}}><Download size={16}/>{exporting==="status"?"Preparing…":"Export member status summary"}</button>
+          <button className="btn btn-ghost" type="button" disabled={Boolean(exporting)} onClick={async()=>{if(!token)return;setExporting("status");setError("");try{await downloadReport(token,"membership-status",{from:"",to:"",q:filters.q,status:filters.memberStatus,memberStatus:filters.memberStatus},"xlsx");}catch(cause){setError(cause instanceof Error?cause.message:"Membership stock export failed.");}finally{setExporting("");}}}><Download size={16}/>{exporting==="status"?"Preparing…":"Export member status summary"}</button>
           {canViewReviewerPerformance && <button className="btn btn-ghost" type="button" disabled={Boolean(exporting)} onClick={async()=>{if(!token)return;setExporting("reviewers");setError("");try{await downloadReport(token,"membership-reviewer-performance",{from:filters.from,to:filters.to,q:"",status:""},"xlsx");}catch(cause){setError(cause instanceof Error?cause.message:"Reviewer report export failed.");}finally{setExporting("");}}}><Download size={16}/>{exporting==="reviewers"?"Preparing…":"Export reviewer performance"}</button>}
         </div>
       </div>

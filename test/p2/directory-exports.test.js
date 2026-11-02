@@ -18,7 +18,10 @@ test("directory export field catalogues preserve role boundaries and never offer
   assert.equal(memberFields.includes("gender"), false);
   assert.equal(memberFields.includes("private_evidence"), false);
   assert.throws(() => listDirectoryExportFields(support, "members"), error => error.statusCode === 403);
-  assert.throws(() => listDirectoryExportFields(finance, "members"), error => error.statusCode === 403);
+  const financeMemberFields = listDirectoryExportFields(finance, "members").fields.map(field => field.key);
+  assert.ok(financeMemberFields.includes("membership_number"));
+  assert.equal(financeMemberFields.includes("email"), false);
+  assert.equal(financeMemberFields.includes("phone"), false);
   assert.ok(listDirectoryExportFields(memberView, "members").fields.some(field => field.key === "membership_number"));
   assert.throws(() => listDirectoryExportFields(support, "accounts"), error => error.statusCode === 403);
   const accountFields = listDirectoryExportFields(admin, "accounts").fields.map(field => field.key);

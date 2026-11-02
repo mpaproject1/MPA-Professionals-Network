@@ -815,6 +815,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/finance/membership/payments") { const identity=await auth(req); assertFinancePaymentQueueAccess(identity); return ok(res,await membership.listMembershipPaymentsForFinance(),requestId); }
     if(req.method==="GET" && p==="api/v1/finance/membership/legacy-payment-verification") { const identity=await auth(req); return ok(res,await legacyMembershipPayments.listLegacyMembershipPaymentVerificationQueue(identity),requestId); }
     if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/finance/membership/legacy-payment-verification/") && parts[6]==="verify") { const identity=await auth(req); return ok(res,await legacyMembershipPayments.verifyLegacyMembershipPayment(identity,parts[5],await body(req),requestId),requestId); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/finance/membership/legacy-payment-verification/") && parts[6]==="reverse") { const identity=await auth(req); return ok(res,await legacyMembershipPayments.reverseLegacyMembershipPayment(identity,parts[5],await body(req),requestId),requestId); }
     if(req.method==="GET" && p==="api/v1/review/membership/applications") {
       assertMembershipReviewQueueAccess(identity);
       return ok(res,await membership.listApplicationsForReview(),requestId);

@@ -24,9 +24,9 @@ export function assertFinancePaymentQueueAccess(identity) {
 }
 
 export function assertPaymentVerificationAccess(identity) {
-  return assertAccess(identity, ["finance_officer", "system_admin"], ["finance.payment.verify", "finance.manage"], "Finance payment verification permission required.");
+  return assertAccess(identity, ["finance_officer"], ["finance.payment.verify", "finance.manage"], "Finance payment verification permission required.");
 }
 
 export function assertPaymentReversalAccess(identity) {
-  return assertAccess(identity, ["finance_officer", "system_admin"], ["finance.payment.reverse", "finance.manage"], "Finance payment reversal permission required.");
+  return assertAccess(identity, ["finance_officer"], ["finance.payment.reverse", "finance.manage"], "Finance payment reversal permission required.");
 }

@@ -280,7 +280,7 @@ export default function Track() {
                   <p className="muted" style={{ margin: 0 }}>{item.subtitle || item.description || item.category}</p>
                   <p className="muted" style={{ margin: "4px 0 0" }}>Reference: {item.trackingReference || "Not assigned yet"}</p>{item.trackingReference&&<button type="button" className="btn btn-ghost" onClick={()=>void copyReference(item.trackingReference||"")}><ClipboardCopy size={15}/> Copy reference</button>}{copyNotice&&<p className="muted" role="status">{copyNotice}</p>}
                 </div>
-                <span className="badge">{item.statusLabel || humanStatus(item.status)}</span>
+                <div className="row" style={{gap:6,flexWrap:"wrap",alignItems:"center"}}><span className="badge">{item.statusLabel || humanStatus(item.status)}</span>{item.responsibility&&<Badge>{({member_action:"Needs your action",mpa_action:"Waiting for MPA",external_response:"Waiting for another party",in_progress:"In progress",completed:"Completed",closed:"Closed",unknown:"Status unavailable"})[item.responsibility]}</Badge>}</div>
               </div>
               <div className="track-card-grid">
                 <div><span>Last updated</span><b>{dateLabel(item.updatedAt, true)}</b></div>

@@ -19,10 +19,11 @@ const SOURCE_DEFINITIONS = [
 ];
 
 const ARRAY_KEYS = ["items", "rows", "records", "applications", "cases", "requests", "participations", "claims", "referrals", "matches", "mentorships", "inquiries", "initiatives"];
-const MEMBER_ACTION = new Set(["correction_required", "changes_requested", "action_required", "awaiting_member", "pending_member", "needs_response", "needs_acceptance", "proposed"]);
+const MEMBER_ACTION = new Set(["draft", "correction_required", "changes_requested", "action_required", "awaiting_member", "pending_member", "needs_response", "needs_acceptance", "proposed", "payment_pending", "payment_required", "awaiting_confirmation"]);
 const CLOSED = new Set(["rejected", "declined", "withdrawn", "cancelled", "canceled", "expired", "closed"]);
 const COMPLETED = new Set(["completed", "complete", "verified", "approved", "activated", "hired", "fulfilled", "delivered"]);
 const ACTIVE = new Set(["active", "accepted", "in_progress", "in progress", "matched", "enrolled", "ongoing", "scheduled"]);
+const EXTERNAL_WAIT = new Set(["awaiting_response", "waiting_for_response", "awaiting_provider", "pending_provider", "pending_mentor", "pending_organization", "waiting_for_employer", "awaiting_employer", "awaiting_another_party"]);
 
 function rowsOf(value) {
   if (Array.isArray(value)) return value;
@@ -49,7 +50,7 @@ function responsibility(status, domain, record) {
   }
   if (domain === "mentorship_request" && ["requested", "submitted", "matching", "matched"].includes(status)) return status === "matched" ? "member_action" : "mpa_action";
   if (domain === "organization_mentorship" && ["submitted", "pending", "requested"].includes(status)) return "external_response";
-  if (MEMBER_ACTION.has(status)) return "member_action";
+  if (MEMBER_ACTION.has(status)) return "member_action";\n  if (EXTERNAL_WAIT.has(status)) return "external_response";
   if (CLOSED.has(status)) return "closed";
   if (COMPLETED.has(status)) return "completed";
   if (ACTIVE.has(status)) return "in_progress";
@@ -68,7 +69,7 @@ function mapRecord(record, definition, index) {
   const status = source === "recognitionAwards" ? "awarded" : normalizedStatus(record);
   const id = safeId(first(record, ["id", "request_id", "case_id", "application_id", "claim_id", "attribution_id"]));
   if (!id) return null;
-  const title = String(first(record, ["title", "service_title", "job_title", "program_name", "project_title", "subject", "goals", "name"]) || category + " request");
+  const title = String(first(record, ["title", "service_title", "job_title", "program_title", "program_name", "project_title", "subject", "goals", "name"]) || category + " request");
   const createdAt = asDate(first(record, ["submitted_at", "submittedAt", "created_at", "createdAt", "requested_at", "proposed_at"]));
   const updatedAt = asDate(first(record, ["updated_at", "updatedAt", "last_activity_at", "lastActivityAt", "reviewed_at", "responded_at"])) || createdAt;
   const statusLabel = String(first(record, ["statusLabel", "status_label", "decision_label"]) || status.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase()));

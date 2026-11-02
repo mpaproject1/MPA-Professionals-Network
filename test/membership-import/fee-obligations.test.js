@@ -121,6 +121,9 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
 
  const disposition=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"sponsored",amount:700,currency:"ETB",remark:"Test sponsor covers remaining fee",details:{sponsorName:"Disposable test sponsor"},evidenceFileId:evidence.id,idempotencyKey:"fee_sponsor_"+suffix.slice(0,32)},"fee-sponsor-record-"+suffix);
  assert.equal(disposition.disposition.status,"pending");
+ const dispositionReplay=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"sponsored",amount:700,currency:"ETB",remark:"Test sponsor covers remaining fee",details:{sponsorName:"Disposable test sponsor"},evidenceFileId:evidence.id,idempotencyKey:"fee_sponsor_"+suffix.slice(0,32)},"fee-sponsor-replay-"+suffix);
+ assert.equal(dispositionReplay.disposition.id,disposition.disposition.id,"replaying the same evidenced non-cash request must not create another settlement");
+ assert.equal(dispositionReplay.alreadyRecorded,true);
  await assert.rejects(decideBalanceDisposition(applicantFinance,disposition.disposition.id,{decision:"approved",note:"Self approval attempt"},"fee-sponsor-self-approve-"+suffix),error=>error.code==="MAKER_CHECKER_REQUIRED");
  await decideBalanceDisposition(approverFinance,disposition.disposition.id,{decision:"approved",note:"Independent Finance approval"},"fee-sponsor-approve-"+suffix);
  const adjustment=(await db.query("select id,details from membership_fee_adjustment where obligation_id=(select id from membership_fee_obligation where application_id=$1) and status='approved' order by created_at desc limit 1",[app.id])).rows[0];

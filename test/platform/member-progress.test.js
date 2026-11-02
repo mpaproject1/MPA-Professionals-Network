@@ -107,3 +107,17 @@ test("mentorship learning activities assign responsibility from submission and r
   assert.equal(result.items.find(item => item.recordId === "activity-4").responsibility, "completed");
   assert.equal(result.items.find(item => item.recordId === "activity-1").dueAt, "2026-11-10T00:00:00.000Z");
 });
+
+test("application progress preserves employer and membership payment responsibility", () => {
+  const result = buildMemberProgress({
+    applications: { status: "fulfilled", value: { items: [
+      { id: "offer-pending", type: "job", status: "offer", details: { offerApprovalStatus: "pending" } },
+      { id: "offer-rejected", type: "job", status: "offer", details: { offerApprovalStatus: "rejected" } },
+      { id: "membership-paid", type: "membership", status: "paid", next_action: "Await activation" },
+    ] } },
+  });
+  assert.equal(result.items.find(item => item.recordId === "offer-pending").responsibility, "mpa_action");
+  assert.equal(result.items.find(item => item.recordId === "offer-rejected").responsibility, "external_response");
+  assert.equal(result.items.find(item => item.recordId === "membership-paid").responsibility, "mpa_action");
+  assert.equal(result.items.find(item => item.recordId === "membership-paid").nextAction, "Await activation");
+});

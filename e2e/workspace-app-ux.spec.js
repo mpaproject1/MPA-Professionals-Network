@@ -30,6 +30,9 @@ test.describe("MPA application workspace UX", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/members");
     await expect(page.getByRole("heading", { name: /Welcome back, Test Member/ })).toBeVisible();
+    // The welcome heading renders before the account-backed workspace data. Wait for
+    // the progress section as the explicit signal that the workspace has hydrated.
+    await expect(page.locator("#progress-title")).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Your workspace shortcuts" })).toBeVisible();
     await expect(page.locator("#progress-title")).toBeVisible();
     const refresh = page.getByRole("button", { name: "Refresh your workspace status" });
@@ -86,6 +89,8 @@ test.describe("MPA application workspace UX", () => {
   test("light and dark themes remain readable and reduced-motion preferences are respected", async ({ page }) => {
     await mockSignedInWorkspace(page);
     await page.goto("/members");
+    // Theme and motion checks target the rendered member cards, not the loading shell.
+    await expect(page.locator("#progress-title")).toBeVisible();
     const themeToggle = page.getByRole("button", { name: "Toggle theme" });
     const before = await page.locator("html").evaluate(node => getComputedStyle(node).getPropertyValue("--bg").trim());
     await themeToggle.click();

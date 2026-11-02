@@ -1017,3 +1017,67 @@ For sponsorship, Finance must link an existing registered sponsoring organizatio
 ### Validation status
 
 The source and migration changes are committed. The latest PR Quality workflow lookup did not return a run for implementation SHA `c5e79db774996cfbe8096e8d005c3bbe89c8ed45`; the most recent workflow-dispatch runs are for older SHAs. This is pending/unverified, not a pass. The migration, PostgreSQL integration test, TypeScript, Biome, production build and Playwright checks have not been executed against this latest implementation head. The available GitHub connection exposes run inspection and rerun actions but no workflow-dispatch action, so a fresh exact-head run still needs to be started from GitHub Actions before merge.
+
+## 29. WP3 workbook/geography and WP4 Finance operational completion — 2026-11-03
+
+**Branch:** `feat/workstream-3-progress-members-workspace`  
+**PR:** #18  
+**Implementation head recorded before this documentation update:** `3fe042cc815888a302eef767875ce51c938ed491`  
+**Scope:** WP3 workbook/geography operational proof; WP4 Finance intake, reminders, reporting and authorization.
+
+### WP3 — workbook and geography
+
+#### Implemented in source
+
+- `scripts/generate-member-geography-reference.js` now records separate M49 and Ethiopian administrative-structure source URLs, retrieval date, row counts, and explicit coverage limits in the manifest.
+- The Ethiopian top-level records are 12 regions and two federal cities. Their `ET-REG-*` / `ET-FED-*` identifiers are explicitly documented as MPA internal stable identifiers, not official Ethiopian government codes.
+- `scripts/validate-member-geography-reference.js` validates the generated workbook before artifact upload: required columns, unique codes, ISO-alpha3 and M49 formats, parent relationships, row-level HTTPS provenance, the 12-region/two-city count, and exclusion of unsupported lower levels.
+- `.github/workflows/member-geography-reference.yml` now runs on manual dispatch, its weekly schedule, and relevant changes on this PR branch. It generates the XLSX and manifest, runs the structural validator, then uploads the artifact.
+- Geography preview now requires a primary HTTPS source URL and row-level HTTPS provenance. The preview metadata retains all source URLs; applying creates a draft version with the captured provenance. Publishing fails closed if any active row lacks source name, source version or an HTTPS source URL.
+- The admin geography screen captures the primary source URL. Member geography aggregation is scoped to the exact currently published version and reports how many saved residences still reference an older version. The admin summary shows the published version and the stale-profile count.
+- `test/membership-import/geography.test.js` now covers XLSX round-trip structure, missing primary source URL, malformed parent rejection, preview, draft apply, publish, profile selector data, saving a member residence and aggregation against the published version.
+
+#### Source boundary and operational proof still pending
+
+- The generator uses UN M49 for country/area codes and the Permanent Committee on Geographical Names (PCGN) reference cited by the UK Home Office Ethiopia CPIN for the 12 regions and two federal cities. The Ethiopian level-one codes are MPA-generated identifiers, not government codes. <Link url="https://unstats.un.org/unsd/methodology/m49/overview/" title="UN M49"/>; <Link url="https://www.gov.uk/government/publications/ethiopia-country-policy-and-information-notes/country-policy-and-information-note-internal-relocation-ethiopia-september-2025-accessible" title="Ethiopia CPIN / PCGN reference"/>.
+- No authoritative, licensed and versioned Ethiopian Zone, Sub-city, District or Town dataset has been verified and imported. Those levels remain unavailable; no lower-level records have been invented.
+- The workbook workflow has been configured to run on relevant branch changes, but GitHub returned no run/artifact for the current implementation head. Therefore the generated workbook structure, codes and manifest have **not yet been inspected from an actual workflow artifact**. The database-backed preview/apply/publish integration test is committed but not executed here.
+
+#### Member import round-trip and historical safeguards
+
+- The server already exposed an XLSX template route, but its service implementation was missing. Added `memberImportXlsxTemplate` and the XLSX-to-CSV conversion used by preview; corrected the CSV template line ending.
+- Added PostgreSQL coverage for both CSV and XLSX preview using the same columns and approval/product rules. The test checks the imported membership number and product, preserves the source register's historical Active status as source data, confirms no payment transaction or verified receipt is created from `amount_paid` / historical payment references, verifies export reports `payment_verification_required`, and confirms invitation claim remains blocked until Finance settles the historical obligation.
+- Historical import remains distinct from Finance verification: source status and payment amount do not create a verified cash receipt or unlock account claim.
+
+### WP4 — Finance intake, reminders, reporting and authorization
+
+#### Finance payment intake
+
+- Added a CSV template/download and CSV preview path alongside the existing XLSX template. The CSV parser handles quoted fields, escaped quotes, CRLF and UTF-8 BOM; both formats use the same required-column and row validation.
+- Bulk apply now supports an explicit **Apply valid rows only** path. Each row is isolated by a database savepoint. Preview-invalid rows remain unapplied; a row that becomes invalid after preview is rolled back independently, marked as an error and audited without discarding other valid receipts.
+- The batch response returns created and failed row numbers and error details. The Finance UI retains the outcome and marks created rows as pending verification.
+- Every imported receipt is created as `pending`; bulk intake does not verify or activate a membership. A different Finance user is now required to verify a Finance-entered receipt; self-verification fails with `MAKER_CHECKER_REQUIRED`.
+- Added integration scenarios for CSV/XLSX preview, duplicate references within a workbook, unmatched membership, evidence-required method, method disabled after preview, partial row failure, batch replay, duplicate re-upload, pending-only creation and separate Finance verification.
+
+#### Reminders and notification state
+
+- Reminder eligibility and due-date ageing use the `Africa/Addis_Ababa` civil date rather than the PostgreSQL host timezone.
+- The scheduler checks member notification preferences. Full opt-out is recorded as `suppressed`; an available inbox event is recorded as `in_app`; push-only delivery remains `queued`. The UI and server logs no longer describe a queued event as a sent push.
+- Reminder keys remain idempotent by obligation, due date and outstanding balance. Stale-balance reminders are cancelled; full settlement cancels queued reminders; a cash reversal that reopens a balance can queue a new reminder for the new amount.
+- The server now runs the existing Web Push outbox dispatcher on a bounded 30-second interval. This enables delivery processing, but **actual device delivery has not been independently demonstrated in this workstream**; do not report push as sent until the provider/device result is verified.
+- PostgreSQL tests now cover an Addis-date boundary, member opt-out suppression, idempotent scheduler rerun, in-app state, full non-cash settlement cancellation and reminder re-queue after a cash reversal.
+
+#### Reports and access boundaries
+
+- Added Finance-only reports for fee obligations grouped by currency (fee due, verified cash, approved non-cash and outstanding), ageing by currency and non-cash disposition detail.
+- Added a membership-operations aggregate with disposition counts only; it excludes transaction amounts, currency totals, sponsor details, evidence references and private remarks.
+- XLSX export uses the same report authorization and data projection as on-screen reports. Tests cover Finance access to detailed reports, membership-review access to aggregate-only reporting, denial of detailed Finance reports to membership reviewers, and XLSX masking.
+- The current role catalogue contains `finance_officer`, `membership_reviewer`, `reviewer`, `admin` and `system_admin`, but no separately assignable `supervisor` role. No new supervisor role or Finance permission has been invented. A supervisor access matrix remains a role-design decision before granting any additional scope.
+
+### Current validation and outstanding gates
+
+- Current PR head before this documentation commit: `3fe042cc815888a302eef767875ce51c938ed491`. The exact-head workflow lookup returned no Actions run or commit-status entries. The latest recorded PR Quality run remains an older failure on `491c554ae1e589d8358f54f2d1789e96f646b97e`, not this implementation head.
+- No local test suite, PostgreSQL migration run, Biome, TypeScript, production build or Playwright result is claimed. All new integration tests and migrations remain **committed but unverified** until PR Quality executes against the final head.
+- The available GitHub connection supports run inspection and reruns but does not expose a workflow-dispatch action. The branch pushes made through this connection have not produced a new Actions run. Start PR Quality and the geography-reference workflow from GitHub Actions if automatic runs remain suppressed.
+- Do not enable Zone/Sub-city/District/Town selectors until an authoritative source dataset, source license, release date, stable codes and parent mappings are independently verified and imported.
+- Do not merge or deploy on the basis of these implementation commits alone. Complete the exact-head migration, backend, Biome, TypeScript, build and browser gates; inspect the geography workbook artifact; verify actual device push delivery; and resolve the supervisor role scope before declaring WP3/WP4 complete.

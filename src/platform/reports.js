@@ -112,7 +112,7 @@ async function fetchRows(db,id,f,identity){
    else 'Overdue 61+ days' end age_band
   from membership_fee_obligation_balance b join membership_fee_obligation o on o.id=b.obligation_id
   left join membership_application a on a.id=o.application_id left join membership_record mr on mr.id=o.membership_record_id
-  where b.outstanding_balance>0 and o.status='open'
+  where b.outstanding_balance>0 and o.status='open' and ($3='' or o.status=$3)
    and ($1::date is null or o.created_at >= $1::date) and ($2::date is null or o.created_at < ($2::date+interval '1 day'))
    and ($4='' or lower(coalesce(a.tracking_reference,'')||' '||coalesce(mr.membership_number,'')||' '||o.id::text) like lower('%'||$4||'%'))
  ) select currency,age_band,count(*)::int obligations,coalesce(sum(outstanding_balance),0)::numeric(14,2) outstanding

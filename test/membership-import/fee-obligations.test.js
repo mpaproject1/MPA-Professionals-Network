@@ -15,7 +15,7 @@ import {
 import { parseXlsxRows } from "../../src/platform/xlsx.js";
 import * as membership from "../../src/membership/service.js";
 import { getPool } from "../../src/platform/db.js";
-import { authorizePrivateUpload, receivePrivateUpload, confirmPrivateUpload } from "../../src/platform/private-file-storage.js";
+import { authorizePrivateUpload, receivePrivateUpload, confirmPrivateUpload, readAuthorizedPrivateFile } from "../../src/platform/private-file-storage.js";
 
 const admin={sub:"system-admin",roles:["system_admin"],permissions:[]};
 const member={sub:"member-user",roles:["member"],permissions:[]};
@@ -124,6 +124,8 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  const dispositionReplay=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"sponsored",amount:700,currency:"ETB",remark:"Test sponsor covers remaining fee",details:{sponsorName:"Disposable test sponsor"},evidenceFileId:evidence.id,idempotencyKey:"fee_sponsor_"+suffix.slice(0,32)},"fee-sponsor-replay-"+suffix);
  assert.equal(dispositionReplay.disposition.id,disposition.disposition.id,"replaying the same evidenced non-cash request must not create another settlement");
  assert.equal(dispositionReplay.alreadyRecorded,true);
+ const approverEvidence=await readAuthorizedPrivateFile(financeId,evidence.id,["finance_officer"]);
+ assert.deepEqual(approverEvidence.bytes,evidenceBytes,"a separate Finance approver must be able to inspect the private evidence before deciding");
  await assert.rejects(decideBalanceDisposition(applicantFinance,disposition.disposition.id,{decision:"approved",note:"Self approval attempt"},"fee-sponsor-self-approve-"+suffix),error=>error.code==="MAKER_CHECKER_REQUIRED");
  await decideBalanceDisposition(approverFinance,disposition.disposition.id,{decision:"approved",note:"Independent Finance approval"},"fee-sponsor-approve-"+suffix);
  const adjustment=(await db.query("select id,details from membership_fee_adjustment where obligation_id=(select id from membership_fee_obligation where application_id=$1) and status='approved' order by created_at desc limit 1",[app.id])).rows[0];

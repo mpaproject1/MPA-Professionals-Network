@@ -49,7 +49,7 @@ function cleanRow(row){
 function audit(db,actor,action,type,id,requestId,metadata={}){return db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,JSON.stringify(metadata)]);}
 export function memberImportTemplate(identity){
  assertImportAuthority(identity);
- return "legacy_member_id,email,phone,full_name,membership_number,product_code,status,start_date,end_date,approved_membership,approval_reference,notes,payment_reference,payment_amount,payment_currency,payment_date,payment_method,payment_evidence_reference\\r\\n";
+ return "legacy_member_id,email,phone,full_name,membership_number,product_code,status,start_date,end_date,approved_membership,approval_reference,notes,payment_reference,payment_amount,payment_currency,payment_date,payment_method,payment_evidence_reference\r\n";
 }
 export async function previewMemberImport(identity,{filename="mpa-members.csv",csv="",sourceSystem="MPA approved member register"}={},requestId){
  assertImportAuthority(identity);

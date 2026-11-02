@@ -128,6 +128,17 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(tabs.getByRole("tab", { name: /Exploring/ })).toBeVisible();
   });
 
+  test("finance and event roles retain outcome reporting without publishing or team controls", async ({ page }) => {
+    await mockOrganizationApi(page, [organization({ role_code: "finance" })]);
+    await page.goto("/organizations");
+    const tabs = page.getByRole("tablist", { name: "Organization workspace folders" });
+    await expect(tabs.getByRole("tab")).toHaveCount(3);
+    await expect(tabs.getByRole("tab", { name: /Reports/ })).toBeVisible();
+    await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /Reviewing/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /Organization/ })).toHaveCount(0);
+  });
+
   test("legacy workspace URL redirects to the canonical organization entry", async ({ page }) => {
     await mockOrganizationApi(page, [organization()]);
     await page.goto("/organizations/workspace?source=legacy");

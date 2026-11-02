@@ -189,6 +189,11 @@ export async function verifyMembershipReceipt(identity,paymentId,input={},reques
   return {paymentId,decision,balance:updated};
  });
 }
+export async function listSponsoringOrganizations(identity){
+ financeAdjust(identity);
+ const db=getPool();
+ return (await db.query("select id,display_name from organization order by lower(display_name) limit 500")).rows;
+}
 export async function recordBalanceDisposition(identity,input={},requestId){
  financeAdjust(identity);
  const type=clean(input.dispositionType,40),remark=clean(input.remark,1000),amount=money(input.amount),code=currency(input.currency),dueDate=clean(input.dueDate,10),idem=clean(input.idempotencyKey,100);
@@ -196,19 +201,31 @@ export async function recordBalanceDisposition(identity,input={},requestId){
  if(!Number.isFinite(amount)||amount<=0||!code||remark.length<8||! /^[A-Za-z0-9_-]{16,100}$/.test(idem))throw problem(400,"Enter the balance amount, currency, meaningful remark and unique idempotency key.","DISPOSITION_DETAILS_REQUIRED");
  if(type==="will_pay_later"&&!validDate(dueDate))throw problem(400,"Will-pay-later requires a due date in YYYY-MM-DD format.","DUE_DATE_REQUIRED");
  const details=input.details&&typeof input.details==="object"?input.details:{};
- if(type==="sponsored"&&clean(details.sponsorName,180).length<2)throw problem(400,"Enter the sponsor name for sponsored balance coverage.","SPONSOR_REQUIRED");
+ if(type!=="will_pay_later"&&!clean(input.evidenceFileId,64))throw problem(400,"Attach private supporting evidence for this non-cash settlement.","EVIDENCE_REQUIRED");
+ if(type==="sponsored"&&!clean(details.sponsorOrganizationId,64)&&clean(details.sponsorName,180).length<2)throw problem(400,"Select a registered sponsoring body or enter its name manually.","SPONSOR_REQUIRED");
  if(type==="honored_member"&&clean(details.approvalReference,180).length<4)throw problem(400,"Enter the honor approval reference.","HONOR_APPROVAL_REQUIRED");
  if(type==="volunteer_activity_valuated"&&(clean(details.activityReference,180).length<4||clean(details.valuationDescription,500).length<8))throw problem(400,"Enter the volunteer activity reference and valuation description.","VOLUNTEER_VALUATION_REQUIRED");
  return withTransaction(async db=>{
   const obligation=await obligationFor(db,input,identity.sub);
+  const evidenceFileId=type==="will_pay_later"?null:clean(input.evidenceFileId,64);
+  if(evidenceFileId)await validateEvidence(db,identity.sub,evidenceFileId);
+  let normalizedDetails={...details};
+  if(type==="sponsored"&&clean(details.sponsorOrganizationId,64)){
+   const sponsor=(await db.query("select id,display_name from organization where id=$1",[clean(details.sponsorOrganizationId,64)])).rows[0];
+   if(!sponsor)throw problem(400,"The selected sponsoring body is no longer registered.","SPONSOR_ORGANIZATION_NOT_FOUND");
+   normalizedDetails={...normalizedDetails,sponsorOrganizationId:sponsor.id,sponsorName:sponsor.display_name,sponsorSource:"registered_organization"};
+  }else if(type==="sponsored"){
+   normalizedDetails={...normalizedDetails,sponsorName:clean(details.sponsorName,180),sponsorSource:"manual"};
+  }
+  if(evidenceFileId)normalizedDetails={...normalizedDetails,evidenceFileId};
   const existing=(await db.query("select * from membership_fee_balance_disposition where idempotency_key=$1 for update",[idem])).rows[0];
   if(existing){if(existing.obligation_id!==obligation.id||existing.disposition_type!==type||Number(existing.amount)!==amount||existing.currency!==code)throw problem(409,"This disposition idempotency key was used for different details.","IDEMPOTENCY_CONFLICT");return {disposition:existing,alreadyRecorded:true,approvalRequired:type!=="will_pay_later",balance:await balanceFor(db,obligation.id)};}
   const balance=await balanceFor(db,obligation.id);
   if(code!==obligation.currency||amount>Number(balance.outstanding_balance))throw problem(409,"Disposition amount must use the obligation currency and cannot exceed its outstanding balance.","DISPOSITION_EXCEEDS_BALANCE");
   const status=type==="will_pay_later"?"active":"pending";
-  const row=(await db.query("insert into membership_fee_balance_disposition(obligation_id,disposition_type,amount,currency,status,due_date,remark,details,requested_by,idempotency_key) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *",[obligation.id,type,amount,code,status,type==="will_pay_later"?dueDate:null,remark,JSON.stringify(details),identity.sub,idem])).rows[0];
+  const row=(await db.query("insert into membership_fee_balance_disposition(obligation_id,disposition_type,amount,currency,status,due_date,remark,details,requested_by,idempotency_key) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *",[obligation.id,type,amount,code,status,type==="will_pay_later"?dueDate:null,remark,JSON.stringify(normalizedDetails),identity.sub,idem])).rows[0];
   if(type==="will_pay_later"){await db.query("update membership_fee_obligation set due_date=$1,status='open',updated_at=now() where id=$2",[dueDate,obligation.id]);await db.query("update membership_fee_reminder set status='cancelled' where obligation_id=$1 and status in ('scheduled','queued')",[obligation.id]);}
-  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_balance_disposition_recorded','membership_fee_balance_disposition',$2,$3,'success',$4)",[identity.sub,row.id,requestId,JSON.stringify({obligationId:obligation.id,type,amount,currency:code,dueDate:dueDate||null,status,remark})]);
+  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_balance_disposition_recorded','membership_fee_balance_disposition',$2,$3,'success',$4)",[identity.sub,row.id,requestId,JSON.stringify({obligationId:obligation.id,type,amount,currency:code,dueDate:dueDate||null,status,remark,details:normalizedDetails})]);
   return {disposition:row,approvalRequired:type!=="will_pay_later",balance};
  });
 }

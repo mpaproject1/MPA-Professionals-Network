@@ -7,6 +7,7 @@ import {
   listFeeObligations,
   listSponsoringOrganizations,
   membershipPaymentImportTemplate,
+  membershipPaymentImportCsvTemplate,
   previewMembershipPaymentImport,
   recordBalanceDisposition,
   recordMembershipReceipt,
@@ -70,6 +71,13 @@ test("bulk payment preview requires an XLSX workbook",async()=>{
  await assert.rejects(previewMembershipPaymentImport(finance,{xlsxBase64:""},requestId),error=>error.statusCode===400&&error.code==="XLSX_REQUIRED");
 });
 
+test("Finance CSV template matches the XLSX intake contract",()=>{
+ const csv=membershipPaymentImportCsvTemplate(finance);
+ const xlsx=parseXlsxRows(membershipPaymentImportTemplate(finance));
+ assert.ok(csv.endsWith("\r\n"));
+ assert.deepEqual(csv.trim().split(","),xlsx.headers);
+});
+
 test("Finance payment template contains only pending-intake fields and requires member, amount, currency, date, method and reference",()=>{
  const workbook=membershipPaymentImportTemplate(finance);
  const {headers,rows}=parseXlsxRows(workbook);
@@ -95,6 +103,11 @@ test("PostgreSQL Finance XLSX intake applies valid rows independently and preser
   {application_id:"",membership_number:"MISSING-"+suffix,amount:"100",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:methodCode,payment_reference:"unmatched-"+suffix,evidence_reference:"",evidence_file_id:"",payer_note:"Unmatched member"},
   {application_id:app.id,membership_number:"",amount:"100",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:evidenceMethodCode,payment_reference:"evidence-required-"+suffix,evidence_reference:"",evidence_file_id:"",payer_note:"Evidence missing"},
  ];
+  const csvRows=[headers,...rows].map(record=>record.map(value=>{const text=String(value??"");return /[",\r\n]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;}).join(",")).join("\r\n")+"\r\n";
+ const csvPreview=await previewMembershipPaymentImport(identity,{filename:"bulk-fee-test.csv",csv:csvRows},"fee-bulk-csv-preview-"+suffix);
+ assert.equal(csvPreview.rowCount,4);
+ assert.equal(csvPreview.errorCount,3);
+ assert.ok(csvPreview.rows[2].errors.some(error=>/no matching fee obligation/i.test(error)));
  const workbook=createXlsx(rows,headers);
  const preview=await previewMembershipPaymentImport(identity,{filename:"bulk-fee-test.xlsx",xlsxBase64:workbook.toString("base64")},"fee-bulk-preview-"+suffix);
  assert.equal(preview.rowCount,4);

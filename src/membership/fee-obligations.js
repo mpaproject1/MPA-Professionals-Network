@@ -158,7 +158,7 @@ export async function verifyMembershipReceipt(identity,paymentId,input={},reques
   await db.query("update membership_fee_obligation set status=case when $2::numeric=0 then 'settled' else 'open' end,updated_at=now() where id=$1",[obligation.id,updated.outstanding_balance]);
   if(obligation.application_id){
    const app=(await db.query("select user_id,approved_at,status from membership_application where id=$1 for update",[obligation.application_id])).rows[0];
-   if(app?.approved_at&&Number(updated.outstanding_balance)===0&&app.status!=="activated")await db.query("update membership_application set status='paid',updated_at=now() where id=$1",[obligation.application_id]);
+   if(app?.approved_at&&["approved","payment_pending","paid"].includes(app.status)&&Number(updated.outstanding_balance)===0&&app.status!=="activated")await db.query("update membership_application set status='paid',updated_at=now() where id=$1",[obligation.application_id]);
    await createInAppNotification(db,app.user_id,"membership.payment_"+decision,"payment_transaction",paymentId,{category:"membership",message:decision==="approved"?"Finance verified a membership payment. Your remaining balance has been recalculated.":"Finance recorded a decision on your membership payment.",actionUrl:"/membership",eventVersion:requestId||paymentId});
   }else{
    const user=(await db.query("select user_id from membership_record where id=$1",[obligation.membership_record_id])).rows[0];
@@ -187,7 +187,7 @@ export async function recordBalanceDisposition(identity,input={},requestId){
   if(code!==obligation.currency||amount>Number(balance.outstanding_balance))throw problem(409,"Disposition amount must use the obligation currency and cannot exceed its outstanding balance.","DISPOSITION_EXCEEDS_BALANCE");
   const status=type==="will_pay_later"?"active":"pending";
   const row=(await db.query("insert into membership_fee_balance_disposition(obligation_id,disposition_type,amount,currency,status,due_date,remark,details,requested_by,idempotency_key) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *",[obligation.id,type,amount,code,status,type==="will_pay_later"?dueDate:null,remark,JSON.stringify(details),identity.sub,idem])).rows[0];
-  if(type==="will_pay_later")await db.query("update membership_fee_obligation set due_date=$1,status='open',updated_at=now() where id=$2",[dueDate,obligation.id]);
+  if(type==="will_pay_later"){await db.query("update membership_fee_obligation set due_date=$1,status='open',updated_at=now() where id=$2",[dueDate,obligation.id]);await db.query("update membership_fee_reminder set status='cancelled' where obligation_id=$1 and status in ('scheduled','queued')",[obligation.id]);}
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_balance_disposition_recorded','membership_fee_balance_disposition',$2,$3,'success',$4)",[identity.sub,row.id,requestId,JSON.stringify({obligationId:obligation.id,type,amount,currency:code,dueDate:dueDate||null,status,remark})]);
   return {disposition:row,approvalRequired:type!=="will_pay_later",balance};
  });
@@ -208,7 +208,7 @@ export async function decideBalanceDisposition(identity,dispositionId,input={},r
    await db.query("insert into membership_fee_adjustment(obligation_id,adjustment_type,amount,currency,status,remark,details,requested_by,approved_by,approved_at,decision_note) values($1,$2,$3,$4,'approved',$5,$6,$7,$8,now(),$9)",[row.obligation_id,row.disposition_type,row.amount,row.currency,row.remark,row.details,row.requested_by,identity.sub,note||null]);
    const updated=await balanceFor(db,row.obligation_id);
    await db.query("update membership_fee_obligation set status=case when $2::numeric=0 then 'settled' else 'open' end,updated_at=now() where id=$1",[row.obligation_id,updated.outstanding_balance]);
-   if(obligation.application_id&&Number(updated.outstanding_balance)===0){const app=(await db.query("select approved_at,status from membership_application where id=$1 for update",[obligation.application_id])).rows[0];if(app?.approved_at&&app.status!=="activated")await db.query("update membership_application set status='paid',updated_at=now() where id=$1",[obligation.application_id]);}
+   if(obligation.application_id&&Number(updated.outstanding_balance)===0){const app=(await db.query("select approved_at,status from membership_application where id=$1 for update",[obligation.application_id])).rows[0];if(app?.approved_at&&["approved","payment_pending","paid"].includes(app.status)&&app.status!=="activated")await db.query("update membership_application set status='paid',updated_at=now() where id=$1",[obligation.application_id]);}
    await db.query("update membership_fee_reminder set status='cancelled' where obligation_id=$1 and status='scheduled' and $2::numeric=0",[row.obligation_id,updated.outstanding_balance]);
   }
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_balance_disposition_decided','membership_fee_balance_disposition',$2,$3,'success',$4)",[identity.sub,dispositionId,requestId,JSON.stringify({decision,obligationId:row.obligation_id,dispositionType:row.disposition_type,amount:row.amount,currency:row.currency,note})]);

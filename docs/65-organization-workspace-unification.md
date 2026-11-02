@@ -17,7 +17,7 @@ The organization experience is one registration-first app entry with six functio
 | Organization | `/organizations/team`, `/organizations#org-registration`, `/organizations#org-evidence` | Team roles, profile registration, private verification evidence and status |
 | Connections | `/service-demand`, `/mentorship`, `/network` | Community needs, mentorship and professional connections |
 
-The folder shelf uses accessible tabs and a shared selected-folder panel. Each action opens the existing focused workflow. The original organization team and permission page is preserved at `/organizations/team`; the old `/organizations/workspace` path is now a compatibility redirect.
+The folder shelf uses accessible tabs and a shared selected-folder panel. Each action opens the existing focused workflow. When an account has multiple verified organizations, the dashboard selector scopes the selected folder's links to that organization; recruitment, reports and team administration accept the selected `organizationId` query as an initial selection while retaining the user's ability to change it in the destination page. Folder visibility is recalculated for the selected organization's role rather than unioning permissions across organizations. The original organization team and permission page is preserved at `/organizations/team`; the old `/organizations/workspace` path is now a query-preserving compatibility redirect.
 
 ## Registration and access gate
 
@@ -52,7 +52,7 @@ The overview summary counts are derived from the authenticated account's returne
 - The folder shelf is navigation, not an authorization boundary. Existing server routes and service functions remain authoritative.
 - `listMyOrganizations` continues to expose active memberships only.
 - `listMyOrganizationAccess` is a minimal account relationship index; it does not return email, phone, address, evidence, roster or reviewer-only information.
-- Organization role assignments remain scoped to the organization. Multiple organizations remain separate records; the team workspace retains its organization selector.
+- Organization role assignments remain scoped to the organization. Multiple organizations remain separate records; the dashboard, recruitment, reporting and team workspaces provide organization selection without treating membership in one organization as authority over another.
 - Folder visibility uses the existing organization role vocabulary: publishing is limited to owner/administrator/recruiter/project-manager, reviewing to owner/administrator/recruiter, and team administration to owner/administrator. Read-only, event-manager and finance roles retain only the general discovery, organization outcome-report and connection destinations currently supported by their server-side access. Existing API/service authorization remains authoritative even when a folder is visible.
 - Verification evidence upload and submission controls are shown only to active owners/administrators. The UI does not offer an action that the existing API will reject for recruiter, project-manager or read-only members.
 - Candidate, evidence, report and service/mentorship data continue to use their existing role and organization-scope checks.

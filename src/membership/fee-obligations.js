@@ -13,6 +13,8 @@ function clean(value,max=240){return String(value??"").trim().slice(0,max);}
 function validDate(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;const d=new Date(value+"T00:00:00Z");return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===value;}
 function money(value){const n=Number(value);return Number.isFinite(n)?Math.round((n+Number.EPSILON)*100)/100:NaN;}
 function currency(value){const c=clean(value,3).toUpperCase();return /^[A-Z]{3}$/.test(c)?c:null;}
+function isUuid(value){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value||""));}
+function sameDetails(a,b){const left=a&&typeof a==="object"?a:{},right=b&&typeof b==="object"?b:{};const keys=value=>Object.keys(value).sort().map(key=>[key,value[key]]);return JSON.stringify(keys(left))===JSON.stringify(keys(right));}
 async function ensureApplicationObligation(db,applicationId,actorId){
  const app=(await db.query("select id,user_id,fee_snapshot from membership_application where id=$1 for update",[applicationId])).rows[0];
  if(!app)throw problem(404,"Membership application not found.","NOT_FOUND");
@@ -202,6 +204,8 @@ export async function recordBalanceDisposition(identity,input={},requestId){
  if(type==="will_pay_later"&&!validDate(dueDate))throw problem(400,"Will-pay-later requires a due date in YYYY-MM-DD format.","DUE_DATE_REQUIRED");
  const details=input.details&&typeof input.details==="object"?input.details:{};
  if(type!=="will_pay_later"&&!clean(input.evidenceFileId,64))throw problem(400,"Attach private supporting evidence for this non-cash settlement.","EVIDENCE_REQUIRED");
+ if(type!=="will_pay_later"&&!isUuid(clean(input.evidenceFileId,64)))throw problem(400,"The supporting evidence reference is invalid.","INVALID_EVIDENCE");
+ if(type==="sponsored"&&clean(details.sponsorOrganizationId,64)&&!isUuid(clean(details.sponsorOrganizationId,64)))throw problem(400,"The registered sponsoring-body reference is invalid.","INVALID_SPONSOR_ORGANIZATION");
  if(type==="sponsored"&&!clean(details.sponsorOrganizationId,64)&&clean(details.sponsorName,180).length<2)throw problem(400,"Select a registered sponsoring body or enter its name manually.","SPONSOR_REQUIRED");
  if(type==="honored_member"&&clean(details.approvalReference,180).length<4)throw problem(400,"Enter the honor approval reference.","HONOR_APPROVAL_REQUIRED");
  if(type==="volunteer_activity_valuated"&&(clean(details.activityReference,180).length<4||clean(details.valuationDescription,500).length<8))throw problem(400,"Enter the volunteer activity reference and valuation description.","VOLUNTEER_VALUATION_REQUIRED");
@@ -219,7 +223,7 @@ export async function recordBalanceDisposition(identity,input={},requestId){
   }
   if(evidenceFileId)normalizedDetails={...normalizedDetails,evidenceFileId};
   const existing=(await db.query("select * from membership_fee_balance_disposition where idempotency_key=$1 for update",[idem])).rows[0];
-  if(existing){if(existing.obligation_id!==obligation.id||existing.disposition_type!==type||Number(existing.amount)!==amount||existing.currency!==code)throw problem(409,"This disposition idempotency key was used for different details.","IDEMPOTENCY_CONFLICT");return {disposition:existing,alreadyRecorded:true,approvalRequired:type!=="will_pay_later",balance:await balanceFor(db,obligation.id)};}
+  if(existing){if(existing.obligation_id!==obligation.id||existing.disposition_type!==type||Number(existing.amount)!==amount||existing.currency!==code||existing.remark!==remark||!sameDetails(existing.details,normalizedDetails))throw problem(409,"This disposition idempotency key was used for different details.","IDEMPOTENCY_CONFLICT");return {disposition:existing,alreadyRecorded:true,approvalRequired:type!=="will_pay_later",balance:await balanceFor(db,obligation.id)};}
   const balance=await balanceFor(db,obligation.id);
   if(code!==obligation.currency||amount>Number(balance.outstanding_balance))throw problem(409,"Disposition amount must use the obligation currency and cannot exceed its outstanding balance.","DISPOSITION_EXCEEDS_BALANCE");
   const status=type==="will_pay_later"?"active":"pending";

@@ -135,6 +135,7 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.equal(adjustment.details.evidenceFileId,evidence.id,"approved adjustment must retain the private evidence reference");
  assert.equal(adjustment.details.sponsorSource,"manual","manual sponsor body must be retained as a clearly labelled snapshot");
  await assert.rejects(db.query("update membership_fee_adjustment set status='reversed' where id=$1",[adjustment.id]),/approved membership fee adjustments are immutable/i);
+ await assert.rejects(db.query("update membership_fee_balance_disposition set status='rejected' where id=$1",[disposition.disposition.id]),/approved membership fee dispositions are immutable/i);
  balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];
  assert.equal(Number(balance.verified_cash),500,"non-cash sponsorship must not be counted as cash");
  assert.equal(Number(balance.approved_non_cash),700);

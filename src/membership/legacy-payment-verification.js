@@ -94,7 +94,6 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
     `, [membershipId, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference, financeNote, identity.sub])).rows[0];
 
     await tx.query(
-    await tx.query(
       "update member_invitation set expires_at=greatest(expires_at,now()+interval '7 days') where user_id=$1 and import_id=$2 and consumed_at is null",
       [membership.user_id, membership.source_import_id]
     );

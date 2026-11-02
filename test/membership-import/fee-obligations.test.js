@@ -19,6 +19,7 @@ import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import { getPool } from "../../src/platform/db.js";
+import { runReport } from "../../src/platform/reports.js";
 import { authorizePrivateUpload, receivePrivateUpload, confirmPrivateUpload, readAuthorizedPrivateFile } from "../../src/platform/private-file-storage.js";
 
 const admin={sub:"system-admin",roles:["system_admin"],permissions:[]};
@@ -225,6 +226,10 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.equal(Number(balance.verified_cash),500,"non-cash sponsorship must not be counted as cash");
  assert.equal(Number(balance.approved_non_cash),700);
  assert.equal(Number(balance.outstanding_balance),0);
+ const detailedReport=await runReport(approverFinance,"membership-fee-dispositions",{q:"Disposable test sponsor"},"fee-report-dispositions-"+suffix);
+ assert.ok(detailedReport.rows.some(row=>row["Sponsor / reference"]==="Disposable test sponsor"&&Number(row.Amount)===700&&row.Status==="approved"),"Finance disposition report must expose the approved sponsor record and its remark");
+ const balanceReport=await runReport(approverFinance,"membership-fee-balance-by-currency",{q:app.trackingReference},"fee-report-balance-"+suffix);
+ assert.ok(balanceReport.rows.some(row=>row.Currency==="ETB"&&Number(row["Verified cash"])===500&&Number(row["Approved non-cash"])===700&&Number(row.Outstanding)===0),"currency totals must keep verified cash and non-cash coverage separate");
  const after=(await db.query("select fee_snapshot,amount_due,currency from membership_fee_obligation where application_id=$1",[app.id])).rows[0];
  assert.deepEqual(after.fee_snapshot,before.fee_snapshot,"settlement must not mutate the immutable application fee snapshot");
  assert.equal(Number(after.amount_due),1200);

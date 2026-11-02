@@ -327,7 +327,7 @@ export default function FinanceWorkspacePage() {
             <p><span className="muted">Reconciliation</span><br/><b>{payment.reconciliation_status || "Not recorded"}</b></p>
           </div>
           {payment.verification_note && <p className="muted">Payment note: {payment.verification_note}</p>}
-          {canIssueVoucher && payment.payment_status === "succeeded" && !payment.reversed && <button type="button" className="btn btn-primary" disabled={busy === payment.payment_id} onClick={() => void issueMembershipVoucher(payment)}>Issue QR payment voucher</button>}
+          {canIssueVoucher && payment.payment_status === "succeeded" && !payment.reversed && payment.application_type !== "legacy_import" && <button type="button" className="btn btn-primary" disabled={busy === payment.payment_id} onClick={() => void issueMembershipVoucher(payment)}>Issue QR payment voucher</button>}
 
           {payment.reconciliation_note && <p className="muted">Reconciliation note: {payment.reconciliation_note}</p>}
           {payment.reversed && <p className="form-error" role="status">A refund or reversal is already recorded for this payment.</p>}

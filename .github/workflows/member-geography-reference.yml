@@ -1,6 +1,14 @@
 name: Member geography reference workbook
 
 on:
+  push:
+    branches:
+      - feat/workstream-3-progress-members-workspace
+    paths:
+      - '.github/workflows/member-geography-reference.yml'
+      - 'scripts/generate-member-geography-reference.js'
+      - 'scripts/validate-member-geography-reference.js'
+      - 'src/platform/xlsx.js'
   workflow_dispatch:
   schedule:
     - cron: "17 4 * * 1"

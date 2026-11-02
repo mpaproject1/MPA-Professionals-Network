@@ -50,11 +50,17 @@ type LegacyMembershipPayment = {
   imported_payment_date?: string | null;
   imported_payment_method?: string | null;
   imported_evidence_reference?: string | null;
+  confirmed_fee_amount?: string | number | null;
+  fee_currency?: string | null;
+  verified_cash?: string | number | null;
+  approved_non_cash?: string | number | null;
+  outstanding_balance?: string | number | null;
   invitation_expires_at?: string | null;
   invitation_claimed_at?: string | null;
 };
-type LegacyPaymentDraft = { amount: string; currency: string; paymentReference: string; paymentDate: string; paymentMethod: string; evidenceReference: string; financeNote: string };
+type LegacyPaymentDraft = { feeAmount: string; amount: string; currency: string; paymentReference: string; paymentDate: string; paymentMethod: string; evidenceReference: string; financeNote: string };
 const legacyDraft = (item: LegacyMembershipPayment): LegacyPaymentDraft => ({
+  feeAmount: item.confirmed_fee_amount == null ? "" : String(item.confirmed_fee_amount),
   amount: item.imported_payment_amount || "",
   currency: (item.imported_payment_currency || "").toUpperCase(),
   paymentReference: item.imported_payment_reference || "",
@@ -261,7 +267,7 @@ export default function FinanceWorkspacePage() {
     {notice && <p className="form-success" role="status" aria-live="polite">{notice}</p>}
     <Card>
       <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
-        <div><h2 className="h2">Historical member payment verification</h2><p className="muted">Legacy-import invitations remain locked until Finance verifies the historical dues payment and records the evidence reference. A system administrator role alone cannot approve this payment.</p></div>
+        <div><h2 className="h2">Historical member payment verification</h2><p className="muted">Record the original fee due separately from each actual installment. Partial receipts reduce the outstanding balance but do not unlock the account invitation until the fee is fully settled by verified cash or an approved non-cash disposition.</p></div>
         <Badge tone={legacyPayments.length ? "warning" : "slate"}>{legacyPayments.length} awaiting Finance</Badge>
       </div>
       {legacyQueueError ? <OperationStatus state="error" title="Historical payment queue unavailable" detail={legacyQueueError} /> : legacyPayments.length === 0 ? <OperationStatus state="info" title="No imported membership payments awaiting verification" detail="No unverified legacy membership records were returned from the authoritative source." /> : <div className="grid" style={{gap:12}}>
@@ -269,7 +275,7 @@ export default function FinanceWorkspacePage() {
           const draft = legacyDrafts[item.membership_id] || legacyDraft(item);
           return <article key={item.membership_id} className="case-row" style={{display:"grid",gap:12}}>
             <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
-              <div><strong>{item.member_name || "Imported member"} · {item.membership_number}</strong><p className="muted">{item.email || "No email recorded"} · {item.product_name} ({item.product_code})</p><p className="muted">Imported {dateLabel(item.imported_at)} · Record status {item.membership_status.replaceAll("_"," ")}</p></div>
+              <div><strong>{item.member_name || "Imported member"} · {item.membership_number}</strong><p className="muted">{item.email || "No email recorded"} · {item.product_name} ({item.product_code})</p><p className="muted">Imported {dateLabel(item.imported_at)} · Record status {item.membership_status.replaceAll("_"," ")} · Fee due {item.confirmed_fee_amount==null?"not yet confirmed":Number(item.confirmed_fee_amount).toFixed(2)+" "+item.fee_currency} · Outstanding {item.outstanding_balance==null?"not yet calculated":Number(item.outstanding_balance).toFixed(2)+" "+item.fee_currency}</p></div>
               <Badge tone="warning">{item.invitation_claimed_at ? "Previously claimed · review record" : item.invitation_expires_at ? "Invitation awaiting claim" : "No invitation recorded"}</Badge>
             </div>
             {canVerify ? <form className="form-stack" onSubmit={event => void verifyLegacyPayment(event,item)}>

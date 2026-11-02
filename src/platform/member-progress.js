@@ -1,9 +1,9 @@
 const SOURCE_DEFINITIONS = [
   ["applications", "Applications", "/track", "application"],
   ["serviceRequests", "Services", "/services", "service"],
-  ["mentorshipRequests", "Mentorship", "/mentorship", "mentorship"],
+  ["mentorshipRequests", "Mentorship", "/mentorship", "mentorship_request"],
   ["mentorshipMatches", "Mentorship", "/mentorship", "mentorship_match"],
-  ["mentorships", "Mentorship", "/mentorship", "mentorship"],
+  ["mentorships", "Mentorship", "/mentorship", "mentorship_relationship"],
   ["organizationMentorshipRequests", "Mentorship", "/mentorship", "organization_mentorship"],
   ["verificationCases", "Verification", "/verification", "verification"],
   ["referenceRequests", "Verification", "/verification", "reference_request"],

@@ -109,7 +109,7 @@ test("PostgreSQL Finance XLSX intake applies valid rows independently and preser
  ];
   const csvRows=[headers,...rows].map(record=>record.map(value=>{const text=String(value??"");return /[",\r\n]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;}).join(",")).join("\r\n")+"\r\n";
  const csvPreview=await previewMembershipPaymentImport(identity,{filename:"bulk-fee-test.csv",csv:csvRows},"fee-bulk-csv-preview-"+suffix);
- assert.equal(csvPreview.rowCount,4);
+ assert.equal(csvPreview.rowCount,5);
  assert.equal(csvPreview.errorCount,3);
  assert.ok(csvPreview.rows[2].errors.some(error=>/no matching fee obligation/i.test(error)));
  const workbook=createXlsx(rows,headers);

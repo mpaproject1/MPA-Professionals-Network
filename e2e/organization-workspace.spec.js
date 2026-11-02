@@ -147,10 +147,19 @@ test.describe("MPA organization app entry and navigation", () => {
       display_name: "Second MPA Institution",
       role_code: "read_only",
       tracking_reference: "ORG-TEST-002",
+    }), organization({
+      id: "org-e2e-pending",
+      legal_name: "Pending MPA Institution",
+      display_name: "Pending MPA Institution",
+      role_code: "owner",
+      verification_status: "pending",
+      verification_case_status: "submitted",
+      tracking_reference: "ORG-TEST-PENDING",
     })]);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/organizations");
     await expect(page.getByRole("heading", { name: "Your organization at a glance" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your organizations" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recruitment activity" })).toBeVisible();
     await expect(page.getByText("Applications received")).toBeVisible();
     await expect(page.getByRole("link", { name: /Open task/ })).toHaveAttribute("href", "/recruitment?organizationId=org-e2e-1#candidate-pipeline");

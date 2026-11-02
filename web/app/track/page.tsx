@@ -36,6 +36,7 @@ type Tracking = {
   counts?: { needsAttention?: number; waiting?: number; inProgress?: number; completed?: number };
   errors?: { source: string; category: string; message: string }[];
   totalFiltered?: number;
+  history?: { status: string; at: string | null }[];
   limit: number;
   offset: number;
   hasMore: boolean;
@@ -287,6 +288,7 @@ export default function Track() {
                 <span className="timeline-dot" />
                 <div><b>{item.statusLabel || humanStatus(item.status)}</b><p className="muted">Started {dateLabel(item.submittedAt || item.createdAt)}</p></div>
               </div>
+              {item.history?.length ? <details className="case-row"><summary>View recorded history ({item.history.length})</summary><ol className="grid" style={{gap:8,marginTop:10}}>{item.history.map((event,index)=><li key={index}><b>{humanStatus(event.status)}</b><p className="muted">{dateLabel(event.at,true)}</p></li>)}</ol></details> : null}
               {item.type === "job" && progressErrors[item.id] && <FormFeedback kind="error" message={progressErrors[item.id]} onRetry={() => void load()} retryLabel="Refresh job progress" />}
               {item.type === "job" && jobProgress[item.id] && <section className="grid" aria-label="Job application details" style={{ gap: 10, marginTop: 12 }}>
                 <div className="case-row"><b>Recruitment history</b>{jobProgress[item.id].events.length ? jobProgress[item.id].events.map((event, index) => <div className="tracker-line" key={index}><span className="timeline-dot" /><div><b>{humanStatus(event.to_status)}</b><p className="muted">{dateLabel(event.created_at, true)}</p></div></div>) : <p className="muted">No additional stage events have been recorded yet.</p>}</div>

@@ -550,6 +550,7 @@ export default function Organizations() {
           <OrganizationWorkspaceOverview
             organizations={organizations}
             organizationAccess={organizationAccess}
+            token={token}
             authenticated={Boolean(token)}
             organizationLookupReady={organizationLookupReady}
             onRetry={() => void load()}

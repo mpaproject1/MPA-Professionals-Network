@@ -75,6 +75,7 @@ export default function MembershipCenterPage() {
   const [applications, setApplications] = useState<ReportResult | null>(null);
   const [membership, setMembership] = useState<ReportResult | null>(null);
   const [monthlyApplications, setMonthlyApplications] = useState<ReportResult | null>(null);
+  const [reviewerPerformance, setReviewerPerformance] = useState<ReportResult | null>(null);
   const [finance, setFinance] = useState<ReportResult | null>(null);
   const [financeAvailable, setFinanceAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -89,6 +90,7 @@ export default function MembershipCenterPage() {
   const canImportExport = roles.some(role => ["system_admin", "admin", "membership_reviewer", "finance_officer"].includes(role)) || permissions.includes("members.import");
   const canManageCards = roles.some(role => ["system_admin", "reviewer"].includes(role)) || permissions.some(permission => ["members.view", "members.manage"].includes(permission));
   const canViewReports = canReview || permissions.includes("reports.view") || roles.some(role => ["system_admin", "admin"].includes(role));
+  const canViewReviewerPerformance = roles.some(role => ["system_admin", "admin", "membership_reviewer"].includes(role)) || permissions.includes("reports.sensitive");
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 
@@ -104,7 +106,7 @@ export default function MembershipCenterPage() {
         currentPermissions.some(permission => ["membership.review", "membership.activate", "members.view", "members.manage", "reports.view"].includes(permission));
       setRoles(currentRoles);
       setPermissions(currentPermissions);
-      if (!allowed) { setAccess("denied"); setApplications(null); setMembership(null); setMonthlyApplications(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
+      if (!allowed) { setAccess("denied"); setApplications(null); setMembership(null); setMonthlyApplications(null); setReviewerPerformance(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
 
       const [appResult, memberResult, monthlyResult] = await Promise.all([
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status }) }, token),
@@ -117,6 +119,11 @@ export default function MembershipCenterPage() {
       setMembership(memberResult);
       setMonthlyApplications(monthlyResult);
       setGeneratedAt(appResult.generatedAt || memberResult.generatedAt || "");
+      if (currentRoles.some(role => ["system_admin", "admin", "membership_reviewer"].includes(role)) || currentPermissions.includes("reports.sensitive")) {
+        try {
+          setReviewerPerformance(await api<ReportResult>("/api/v1/admin/reports/membership-reviewer-performance/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to }) }, token));
+        } catch { setReviewerPerformance(null); }
+      } else setReviewerPerformance(null);
       const financeAllowed = currentRoles.some(role => ["system_admin", "admin", "finance_officer"].includes(role)) ||
         currentPermissions.includes("finance.view");
       setFinanceAvailable(financeAllowed);
@@ -132,6 +139,7 @@ export default function MembershipCenterPage() {
       setApplications(null);
       setMembership(null);
       setMonthlyApplications(null);
+      setReviewerPerformance(null);
       setFinance(null);
       setFinanceAvailable(false);
       setGeneratedAt("");
@@ -141,13 +149,14 @@ export default function MembershipCenterPage() {
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!token) { setAccess("signin"); setRoles([]); setPermissions([]); setApplications(null); setMembership(null); setMonthlyApplications(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
+    if (!token) { setAccess("signin"); setRoles([]); setPermissions([]); setApplications(null); setMembership(null); setMonthlyApplications(null); setReviewerPerformance(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
     setAccess("loading");
     void load(initialFilters());
   }, [hydrated, token, load]);
 
   const appRows = applications?.rows || [];
   const memberRows = membership?.rows || [];
+  const reviewerRows = reviewerPerformance?.rows || [];
   const appCount = useMemo(() => appRows.reduce((sum, row) => sum + number(row.Applications), 0), [appRows]);
   const pending = useMemo(() => appRows.filter(row => appPending.has(String(row.Status))).reduce((sum, row) => sum + number(row.Applications), 0), [appRows]);
   const approved = useMemo(() => appRows.filter(row => appApproved.has(String(row.Status))).reduce((sum, row) => sum + number(row.Applications), 0), [appRows]);
@@ -229,6 +238,7 @@ export default function MembershipCenterPage() {
 
     <section className={styles.chartGrid} aria-label="Membership analysis charts">
       <Card><BarList title="Applications by month" rows={monthlyApplications?.rows || []} labelKey="Month" valueKey="Applications" empty={monthlyApplications ? "No applications matched this period." : "Monthly trend report unavailable."}/>
+      {canViewReviewerPerformance && <BarList title="Review decisions by staff" rows={reviewerRows} labelKey="Reviewer" valueKey="Decisions" empty={reviewerPerformance ? "No review decisions were recorded in this period." : "Reviewer performance report unavailable."}/>}
       <BarList title="Application pipeline" rows={statusChart} labelKey="Status" valueKey="Applications" empty={applications ? "No applications matched this period." : "Application report unavailable; retry after checking access."}/></Card>
       <Card><BarList title="Current membership by plan" rows={planChart} labelKey="Product" valueKey="Members" empty={membership ? "No membership records were returned." : "Membership report unavailable; retry after checking access."}/></Card>
       <Card><BarList title="Applications by membership plan" rows={applicationPlanChart} labelKey="Product" valueKey="Applications" empty="No applications matched this period."/></Card>

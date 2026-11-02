@@ -69,7 +69,7 @@ export async function listFeeObligations(identity,filters={}){
  const status=clean(filters.status,20),q=clean(filters.q,100);
  const db=getPool();
  const limit=Math.min(Math.max(Number(filters.limit)||500,1),50000);
- const rows=(await db.query(`select b.*,o.created_at,o.due_date,case when o.due_date<current_date then current_date-o.due_date else 0 end days_past_due,reminders.last_status reminder_status,reminders.last_member_delivery_status,reminders.last_member_delivery_note,reminders.last_sent_at,disp.summary disposition_summary,
+ const rows=(await db.query(`select b.*,o.created_at,o.due_date,case when o.due_date<(now() at time zone 'Africa/Addis_Ababa')::date then (now() at time zone 'Africa/Addis_Ababa')::date-o.due_date else 0 end days_past_due,reminders.last_status reminder_status,reminders.last_member_delivery_status,reminders.last_member_delivery_note,reminders.last_sent_at,disp.summary disposition_summary,
   a.tracking_reference,a.status application_status,a.user_id,
   mr.membership_number,mr.status membership_status,
   coalesce(p.display_name,concat_ws(' ',p.first_name,p.last_name)) member_name,u.email,
@@ -88,14 +88,14 @@ export async function listFeeObligations(identity,filters={}){
   order by (b.outstanding_balance>0) desc,o.due_date nulls last,o.created_at desc limit $3`,[status,q,limit])).rows;
  const totalsByCurrency=(await db.query(`select b.currency,count(*)::int obligation_count,count(*) filter(where b.outstanding_balance>0)::int outstanding_count,
   coalesce(sum(b.amount_due),0)::numeric(14,2) amount_due,coalesce(sum(b.verified_cash),0)::numeric(14,2) verified_cash,
-  coalesce(sum(b.approved_non_cash),0)::numeric(14,2) approved_non_cash,coalesce(sum(b.outstanding_balance),0)::numeric(14,2) outstanding_balance,coalesce(sum(b.outstanding_balance) filter(where o.due_date<current_date),0)::numeric(14,2) overdue_balance
+  coalesce(sum(b.approved_non_cash),0)::numeric(14,2) approved_non_cash,coalesce(sum(b.outstanding_balance),0)::numeric(14,2) outstanding_balance,coalesce(sum(b.outstanding_balance) filter(where o.due_date<(now() at time zone 'Africa/Addis_Ababa')::date),0)::numeric(14,2) overdue_balance
   from membership_fee_obligation_balance b join membership_fee_obligation o on o.id=b.obligation_id
   left join membership_application a on a.id=o.application_id
   left join membership_record mr on mr.id=o.membership_record_id or (o.application_id is not null and mr.application_id=o.application_id)
   left join app_user u on u.id=coalesce(a.user_id,mr.user_id) left join person p on p.user_id=u.id
   where ($1='' or o.status=$1) and ($2='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(mr.membership_number,'')||' '||coalesce(a.tracking_reference,'')) like lower('%'||$2||'%'))
   group by b.currency order by b.currency`,[status,q])).rows;
- const ageingByCurrency=(await db.query(`select b.currency,case when o.due_date is null then 'no_due_date' when o.due_date>=current_date then 'not_due' when current_date-o.due_date<=30 then '1_30_days' when current_date-o.due_date<=60 then '31_60_days' when current_date-o.due_date<=90 then '61_90_days' else 'over_90_days' end ageing_bucket,count(*)::int obligation_count,coalesce(sum(b.outstanding_balance),0)::numeric(14,2) outstanding_balance
+ const ageingByCurrency=(await db.query(`select b.currency,case when o.due_date is null then 'no_due_date' when o.due_date>=(now() at time zone 'Africa/Addis_Ababa')::date then 'not_due' when (now() at time zone 'Africa/Addis_Ababa')::date-o.due_date<=30 then '1_30_days' when (now() at time zone 'Africa/Addis_Ababa')::date-o.due_date<=60 then '31_60_days' when (now() at time zone 'Africa/Addis_Ababa')::date-o.due_date<=90 then '61_90_days' else 'over_90_days' end ageing_bucket,count(*)::int obligation_count,coalesce(sum(b.outstanding_balance),0)::numeric(14,2) outstanding_balance
   from membership_fee_obligation_balance b join membership_fee_obligation o on o.id=b.obligation_id
   where b.outstanding_balance>0 group by b.currency,ageing_bucket order by b.currency,ageing_bucket`)).rows;
  const dispositionsByType=(await db.query(`select d.currency,d.disposition_type,d.status,count(*)::int record_count,coalesce(sum(d.amount),0)::numeric(14,2) amount

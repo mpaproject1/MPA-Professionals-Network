@@ -8,11 +8,11 @@ import {
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
-import { JourneyGuide } from "../../components/journey-guide";
 import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
+import { OrganizationWorkspaceOverview } from "../../components/organization-workspace-overview";
 
 type Inquiry = {
   id: string;
@@ -518,38 +518,10 @@ export default function Organizations() {
           continue through server-governed due diligence. Verified status is
           never assumed by the interface.
         </p>
-        <a className="btn btn-ghost mt-3 inline-flex" href="/organizations/workspace">Open my organization workspace</a>
+        <a className="btn btn-ghost mt-3 inline-flex" href="/organizations/team">Manage team & access</a>
       </div>
-      <details className="mpa-collapsible-guide">
-        <summary>Why partner with MPA · Explore benefits</summary>
-      <Card>
-        <div className="eyebrow">Why partner with MPA</div>
-        <h2 className="h2">A more trusted way to connect with professionals</h2>
-        <p className="muted">MPA is a nonprofit professional network. Organization participation helps connect employers, institutions and professionals through clearer identity checks, permission-based information sharing and accountable opportunity workflows—not a promise of hiring results.</p>
-        <div className="grid grid-2" style={{gap:14,marginTop:14}}>
-          <section className="membership-plan"><h3 className="h2">A verified organization presence</h3><p className="muted">Submit legal identity and supporting evidence for review. Where verification is approved, your organization can present a more credible profile; approval is recorded and is never automatic.</p></section>
-          <section className="membership-plan"><h3 className="h2">Publish and manage opportunities</h3><p className="muted">Eligible organization roles can manage supported job and opportunity workflows, with publication and access governed by organization verification, permissions and posting scope.</p></section>
-          <section className="membership-plan"><h3 className="h2">Reach professionals responsibly</h3><p className="muted">Use the talent and inquiry workflows available to your role. Candidate details are limited by profile visibility and consent; private contact information is not a general directory download.</p></section>
-          <section className="membership-plan"><h3 className="h2">Keep decisions and next steps clear</h3><p className="muted">Review incoming inquiries, record supported decisions and follow the available status history. A public inquiry is not treated as a formal job application unless the relevant workflow records that transition.</p></section>
-          <section className="membership-plan"><h3 className="h2">Support a shared professional ecosystem</h3><p className="muted">Participate in a nonprofit network that supports professional development, mentorship and clearer connections between institutions and talent, while retaining responsibility for fair recruitment and selection.</p></section>
-        </div>
-      </Card>
-      </details>
-      <section className="grid" aria-label="Organization progress journey">
-      <JourneyGuide
-        eyebrow="Employer / recruiter"
-        title="Verify → Publish → Review → Report"
-        description="Use the organization identity you are authorized to represent. Verification, moderation and hiring decisions remain explicit recorded steps."
-        primaryLabel={token ? "Continue organization setup" : "Sign in to begin"}
-        primaryHref={token ? "#org-registration" : "/login?next=/organizations"}
-        steps={[
-          { title: "Verify", description: "Register the legal identity and institutional contact, then upload the required private evidence. Structured TIN and representative identity fields are not yet supported by the current registration API.", href: token ? "#org-registration" : "/login?next=/organizations", action: "Register organization" },
-          { title: "Publish", description: "After verification, prepare a vacancy or paid project with clear eligibility and terms.", href: "/recruitment", action: "Open recruitment" },
-          { title: "Review", description: "Review applicants for your own opportunities and respond to moderation or correction requests.", href: "/recruitment", action: "Review applicants" },
-          { title: "Report", description: "Record interview decisions, hiring outcomes and follow-up feedback through the authorized workflow.", href: "/recruitment", action: "Track hiring" },
-        ]}
-      />
-      </section>
+
+
       {!token ? (
         <Card>
           <h2 className="h2">Sign in to manage an organization</h2>
@@ -661,58 +633,19 @@ export default function Organizations() {
                 </div>
               ))}
           </Card>
-          <Card>
-            <div className="row">
-              <div>
-                <div className="h2">Organization workspace hub</div>
-                <p className="muted">Open the existing task-specific workspaces. Actions remain subject to the selected organization's server-side role, verification state, and record scope.</p>
-              </div>
-              <Building2 color="var(--primary)" />
-            </div>
-            {organizations.length === 0 ? <p className="muted">Register an organization to see its next steps here. No activity or impact figures are assumed.</p> : <div className="grid grid-2" style={{ gap: 12 }}>
-              {organizations.map(org => {
-                const verified = org.verification_status === "verified";
-                const waiting = org.verification_case_status === "submitted" || org.verification_case_status === "pending" || org.verification_status === "pending";
-                return <section className="membership-plan" key={org.id}>
-                  <div className="row" style={{ alignItems: "flex-start", gap: 10 }}>
-                    <Building2 size={20} color="var(--primary)" />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <h3 className="h2">{org.display_name}</h3>
-                      <p className="muted">{verified ? "Verified institution" : waiting ? "Verification under review" : "Verification not complete"} · {org.role_code || "Organization member"}</p>
-                    </div>
-                    <Badge>{verified ? "Verified" : waiting ? "Under review" : "Setup required"}</Badge>
-                  </div>
-                  <div className="grid" style={{ gap: 8, marginTop: 12 }}>
-                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                      <span><b>Recruitment & hiring</b><small className="muted" style={{ display: "block" }}>Organization-scoped jobs and candidate pipeline</small></span>
-                      {verified ? <a className="btn btn-ghost" href="/recruitment">Open recruitment</a> : <span className="muted">Available after verification</span>}
-                    </div>
-                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                      <span><b>Community needs</b><small className="muted" style={{ display: "block" }}>Submit and follow a community-service request</small></span>
-                      <a className="btn btn-ghost" href="/service-demand">Open Serve-Community</a>
-                    </div>
-                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                      <span><b>Mentorship programs</b><small className="muted" style={{ display: "block" }}>Organization offers and requests</small></span>
-                      {verified ? <a className="btn btn-ghost" href="/mentorship">Open mentorship</a> : <span className="muted">Available after verification</span>}
-                    </div>
-                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                      <span><b>Services directory</b><small className="muted" style={{ display: "block" }}>Discover services; organization-owned publishing is not represented as available here</small></span>
-                      <a className="btn btn-ghost" href="/services">Browse services</a>
-                    </div>
-                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                      <span><b>Volunteer desk</b><small className="muted" style={{ display: "block" }}>Organization-scoped volunteer drives and skill dispatch are not implemented as a verified workflow yet</small></span>
-                      <Badge>Not available</Badge>
-                    </div>
-                    <div className="row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                      <span><b>Impact & outcome reports</b><small className="muted" style={{ display: "block" }}>View server-returned recruitment and requisition outcomes; print or save the loaded report as PDF</small></span>
-                      <a className="btn btn-ghost" href="/organizations/reports">Open report</a>
-                    </div>
-                  </div>
-                </section>;
-              })}
-            </div>}
-          </Card>
-          <Card>
+          <OrganizationWorkspaceOverview
+            organizations={organizations}
+            onRegister={() => {
+              if (!token) {
+                window.location.assign("/login?next=/organizations");
+                return;
+              }
+              setRegistrationStep(1);
+              setShowForm(true);
+              document.getElementById("org-registration")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          />
+          <Card id="your-organizations">
             <div className="row">
               <div>
                 <div className="h2">Your organizations</div>
@@ -989,7 +922,7 @@ export default function Organizations() {
               })}
             </Card>
           )}
-          <Card>
+          <Card id="org-inquiries">
             <div className="row">
               <div>
                 <div className="h2">Public job inquiries</div>

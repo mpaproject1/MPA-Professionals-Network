@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, MapPinned, RefreshCw } from "lucide-react";
 import { ApiError, api } from "../lib/api";
 import { useUiStore } from "../lib/store";
@@ -10,8 +10,8 @@ type Group={country_code?:string;country_name?:string;unit_code?:string;label?:s
 type Summary={residenceTypes:{residence_type:string;member_count:number}[];countries:Group[];ethiopiaLevel1:Group[];ethiopiaLevel2:Group[];ethiopiaLevel3:Group[];generatedAt:string};
 export function MemberGeographySummary(){
  const token=useUiStore(state=>state.token);const [data,setData]=useState<Summary|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState("");
- async function load(){if(!token)return;setLoading(true);setError("");try{setData(await api<Summary>("/api/v1/admin/member-geography/summary",{},token));}catch(cause){setError(cause instanceof ApiError?cause.message:"Member geography summary is unavailable.");}finally{setLoading(false);}}
- useEffect(()=>{void load();},[token]);
+ const load=useCallback(async()=>{if(!token)return;setLoading(true);setError("");try{setData(await api<Summary>("/api/v1/admin/member-geography/summary",{},token));}catch(cause){setError(cause instanceof ApiError?cause.message:"Member geography summary is unavailable.");}finally{setLoading(false);}},[token]);
+ useEffect(()=>{void load();},[load]);
  return <Card><div className="panel-heading"><div><h2>Member geography</h2><p>Aggregate residence data from member profiles. Street addresses and individual-level details are excluded.</p></div><MapPinned size={20}/></div>
  {loading?<OperationStatus state="loading" title="Loading geographic summary" detail="Aggregating member-selected residence locations."/>:error?<OperationStatus state="error" title="Geography summary unavailable" detail={error}/>:data?<>
   <div className="grid grid-3">{data.residenceTypes.map(item=><div className="case-row" key={item.residence_type}><p className="muted">{item.residence_type==="ethiopia"?"Ethiopia":"Diaspora"}</p><h3>{item.member_count.toLocaleString()}</h3><p className="muted">Member profile(s)</p></div>)}</div>

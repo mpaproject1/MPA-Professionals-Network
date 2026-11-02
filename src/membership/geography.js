@@ -24,8 +24,8 @@ function parseRows(rows){
   row.unit_code=row.unit_code.toUpperCase();row.unit_level=row.unit_level.toLowerCase();row.parent_code=row.parent_code.toUpperCase();
   row.country_iso3=row.country_iso3.toUpperCase();row.country_m49=row.country_m49?row.country_m49.padStart(3,"0"):"";
   row.active=row.active===""||row.active.toLowerCase()==="true"||row.active==="1"||row.active.toLowerCase()==="yes";
-  try{row.metadata=row.metadata?JSON.parse(row.metadata):{};if(!row.metadata||typeof row.metadata!=="object"||Array.isArray(row.metadata))throw new Error("metadata must be a JSON object.");}catch{row.errors.push("metadata must be a valid JSON object when supplied.");row.metadata={};}
   row.rowNumber=index+2;row.errors=[];
+  try{row.metadata=row.metadata?JSON.parse(row.metadata):{};if(!row.metadata||typeof row.metadata!=="object"||Array.isArray(row.metadata))throw new Error("metadata must be a JSON object.");}catch{row.errors.push("metadata must be a valid JSON object when supplied.");row.metadata={};}
   if(!/^[A-Z0-9][A-Z0-9._-]{1,79}$/.test(row.unit_code))row.errors.push("unit_code must be 2–80 letters, digits, dots, underscores or dashes.");
   if(!row.label)row.errors.push("label is required.");
   if(!LEVELS.has(row.unit_level))row.errors.push("unit_level must be country, region, federal_city, zone, sub_city, district or town.");
@@ -147,7 +147,7 @@ export async function applyMemberGeographyImport(identity,batchId,input={},reque
     const data=row.row_data,parentId=data.parent_code?inserted.get(String(data.parent_code).toUpperCase()):null;
     const created=(await tx.query(`insert into membership_geography_unit(version_id,unit_code,label,unit_level,parent_id,country_iso3,country_m49,source_name,source_version,effective_from,effective_to,active,metadata,created_at)
      values($1,$2,$3,$4,$5,$6,$7,$8,$9,nullif($10,'')::date,nullif($11,'')::date,$12,$13::jsonb,now()) returning id`,
-    [version.id,data.unit_code,data.label,data.unit_level,parentId,data.country_iso3||null,data.country_m49||null,data.source_name||batch.source_name,data.source_version||batch.source_version,data.effective_from||"",data.effective_to||"",data.active!==false])).rows[0];
+    [version.id,data.unit_code,data.label,data.unit_level,parentId,data.country_iso3||null,data.country_m49||null,data.source_name||batch.source_name,data.source_version||batch.source_version,data.effective_from||"",data.effective_to||"",data.active!==false,JSON.stringify(data.metadata||{})])).rows[0];
     inserted.set(String(data.unit_code).toUpperCase(),created.id);
    }
    const done=new Set(ready.map(row=>row.row_number));remaining=remaining.filter(row=>!done.has(row.row_number));

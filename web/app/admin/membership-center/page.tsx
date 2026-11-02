@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, ArrowDownToLine, ArrowRight, CalendarDays, CreditCard, Download, MapPinned, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowRight, BarChart3, CalendarDays, CreditCard, Download, MapPinned, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { Badge, Card } from "../../../components/ui";
 import { OperationStatus } from "../../../components/operation-status";
 import { ApiError, api } from "../../../lib/api";
@@ -161,6 +161,11 @@ export default function MembershipCenterPage() {
   const pending = useMemo(() => appRows.filter(row => appPending.has(String(row.Status))).reduce((sum, row) => sum + number(row.Applications), 0), [appRows]);
   const approved = useMemo(() => appRows.filter(row => appApproved.has(String(row.Status))).reduce((sum, row) => sum + number(row.Applications), 0), [appRows]);
   const paid = useMemo(() => appRows.filter(row => appPaid.has(String(row.Status))).reduce((sum, row) => sum + number(row.Applications), 0), [appRows]);
+  const rejected = useMemo(() => appRows.filter(row => row.Status === "rejected").reduce((sum, row) => sum + number(row.Applications), 0), [appRows]);
+  const withdrawn = useMemo(() => appRows.filter(row => row.Status === "withdrawn").reduce((sum, row) => sum + number(row.Applications), 0), [appRows]);
+  const approvalRate = approved + rejected > 0 ? `${(approved / (approved + rejected) * 100).toFixed(1)}%` : "—";
+  const paidConversion = approved > 0 ? `${(paid / approved * 100).toFixed(1)}%` : "—";
+  const awaitingPayment = Math.max(0, approved - paid);
   const activeMembers = useMemo(() => memberRows.filter(row => row.Status === "active").reduce((sum, row) => sum + number(row.Members), 0), [memberRows]);
   const expiredMembers = useMemo(() => memberRows.filter(row => row.Status === "expired").reduce((sum, row) => sum + number(row.Members), 0), [memberRows]);
   const statusChart = useMemo(() => {
@@ -232,6 +237,10 @@ export default function MembershipCenterPage() {
       <Kpi label="Awaiting review" value={applications ? pending : "—"} detail="Submitted, in review or needs information" icon={CalendarDays} tone="lemon"/>
       <Kpi label="Approved" value={applications ? approved : "—"} detail="Approved and subsequent paid/activated stages" icon={ShieldCheck} tone="blue"/>
       <Kpi label="Paid applications" value={applications ? paid : "—"} detail="Finance-verified lifecycle stage" icon={CreditCard}/>
+      <Kpi label="Approved awaiting payment" value={applications ? awaitingPayment : "—"} detail="Approved applications not yet in paid/activated state" icon={CreditCard} tone="lemon"/>
+      <Kpi label="Approval rate" value={applications ? approvalRate : "—"} detail="Approved / approved plus rejected; withdrawals excluded" icon={BarChart3} tone="blue"/>
+      <Kpi label="Paid conversion" value={applications ? paidConversion : "—"} detail="Paid or activated / approved lifecycle applications" icon={Activity}/>
+      <Kpi label="Rejected / withdrawn" value={applications ? rejected + withdrawn : "—"} detail={applications ? `${rejected.toLocaleString()} rejected · ${withdrawn.toLocaleString()} withdrawn` : "Application report unavailable"} icon={CalendarDays} tone="muted"/>
       <Kpi label="Active members" value={membership ? activeMembers : "—"} detail="Current recorded active membership stock; payment status is not inferred" icon={Users} tone="blue"/>
       <Kpi label="Expired memberships" value={membership ? expiredMembers : "—"} detail="Current records with expired status" icon={CalendarDays} tone="muted"/>
     </section>

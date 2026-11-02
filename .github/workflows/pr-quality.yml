@@ -194,6 +194,8 @@ jobs:
         env:
           WEB_BASE_URL: http://127.0.0.1:3001
           PORT: 3001
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
         run: |
           set -euo pipefail
           npm run start --workspace @mpa/web > /tmp/mpa-web.log 2>&1 &
@@ -204,8 +206,42 @@ jobs:
             if curl -fsS "$WEB_BASE_URL/" >/dev/null; then READY=1; break; fi
             sleep 2
           done
-          if [ "$READY" != "1" ]; then cat /tmp/mpa-web.log; exit 1; fi
-          npx playwright test e2e/support-bot-movement.spec.js e2e/ui-guide-tour.spec.js e2e/homepage-institutional-ux.spec.js e2e/membership-card-print.spec.js e2e/registration-human-verification.spec.js e2e/network-plus-discovery.spec.js e2e/serve-community-separation.spec.js e2e/workspace-app-ux.spec.js
+          if [ "$READY" != "1" ]; then
+            echo "Production server did not become ready; server log follows."
+            cat /tmp/mpa-web.log
+            exit 1
+          fi
+
+          echo "=== Browser acceptance: run every selected spec and collect every failure ==="
+          # Do not use --max-failures: Playwright must continue through the complete
+          # selected suite. Preserve a machine-readable report, HTML report, failure
+          # screenshots, videos and traces for post-run diagnosis.
+          npx playwright test \
+            e2e/support-bot-movement.spec.js \
+            e2e/ui-guide-tour.spec.js \
+            e2e/homepage-institutional-ux.spec.js \
+            e2e/membership-card-print.spec.js \
+            e2e/registration-human-verification.spec.js \
+            e2e/network-plus-discovery.spec.js \
+            e2e/serve-community-separation.spec.js \
+            e2e/workspace-app-ux.spec.js \
+            --max-failures=0 \
+            --reporter=list,html,json \
+            --screenshot=only-on-failure \
+            --video=retain-on-failure 2>&1 | tee /tmp/mpa-playwright.log
+
+      - name: Upload complete browser diagnostics (reports, traces, screenshots, videos and server logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
+            /tmp/mpa-playwright.log
+            /tmp/mpa-web.log
+          if-no-files-found: warn
+          retention-days: 14
 
 
 # Browser role journeys are temporarily excluded from required PR CI because the

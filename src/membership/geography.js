@@ -22,7 +22,7 @@ function parseRows(rows){
  return rows.map((source,index)=>{
   const row={};for(const key of COLUMNS)row[key]=clean(source[key],key==="label"?180:240);
   row.unit_code=row.unit_code.toUpperCase();row.unit_level=row.unit_level.toLowerCase();row.parent_code=row.parent_code.toUpperCase();
-  row.country_iso3=row.country_iso3.toUpperCase();row.country_m49=row.country_m49.padStart(3,"0");
+  row.country_iso3=row.country_iso3.toUpperCase();row.country_m49=row.country_m49?row.country_m49.padStart(3,"0"):"";
   row.active=row.active===""||row.active.toLowerCase()==="true"||row.active==="1"||row.active.toLowerCase()==="yes";
   row.rowNumber=index+2;row.errors=[];
   if(!/^[A-Z0-9][A-Z0-9._-]{1,79}$/.test(row.unit_code))row.errors.push("unit_code must be 2–80 letters, digits, dots, underscores or dashes.");

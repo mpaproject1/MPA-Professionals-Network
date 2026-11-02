@@ -120,8 +120,8 @@ test.describe("MPA organization app entry and navigation", () => {
 
   test("legacy workspace URL redirects to the canonical organization entry", async ({ page }) => {
     await mockOrganizationApi(page, [organization()]);
-    await page.goto("/organizations/workspace");
-    await expect(page).toHaveURL(/\/organizations$/);
+    await page.goto("/organizations/workspace?source=legacy");
+    await expect(page).toHaveURL(/\/organizations\?source=legacy$/);
     await expect(page.getByRole("heading", { name: "Your organization at a glance" })).toBeVisible();
   });
 

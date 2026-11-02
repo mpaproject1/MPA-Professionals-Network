@@ -119,7 +119,7 @@ export default function FinanceWorkspacePage() {
       }
       setCanVerify(financeRole || permissions.some(permission => ["finance.payment.verify", "finance.manage"].includes(permission)));
       setCanReverse(financeRole || permissions.some(permission => ["finance.payment.reverse", "finance.manage"].includes(permission)));
-      setCanIssueVoucher(financeRole || permissions.some(permission => ["finance.voucher.issue", "finance.manage"].includes(permission)));
+      setCanIssueVoucher(financeRole || platformAdmin || roles.includes("admin") || permissions.some(permission => ["finance.voucher.issue", "finance.manage"].includes(permission)));
       const payments = await api<Payment[]>("/api/v1/finance/membership/payments", {}, token);
       setRows(Array.isArray(payments) ? payments : []);
       setLegacyQueueError("");

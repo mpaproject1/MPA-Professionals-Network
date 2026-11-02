@@ -603,3 +603,27 @@ The Membership Center is complete only when:
 - Full CI and disposable PostgreSQL/browser acceptance pass on the exact PR #18 head.
 
 **Implementation boundary:** This document defines the proposed product and engineering plan only. It does not authorize production data changes, payment activation, deployment or weakening any existing PR #18 security/validation gate.
+
+---
+
+## 21. Implementation status on PR #18 (2026-11-02)
+
+The following implementation has been committed to the target branch:
+
+- Added `/admin/membership-center` with a compact membership navigation shell.
+- Consolidated the global admin entry point so membership register, application operations, imports/exports, cards and payment settings are reached through Membership Center rather than appearing as unrelated global admin workspaces.
+- Added period filters, month/year shortcuts, application-stage and member-status filters, plan search, CSV/XLSX application exports and aggregate member-status export.
+- Added application funnel/status, monthly application trend, plan distribution, current member stock, open-application ageing and supervisor-scoped reviewer decision analytics.
+- Added aggregate reporting permissions for membership reviewers and explicit membership permissions. Reviewer performance is treated as restricted staff-performance data.
+- Added report acceptance coverage for membership aggregate access, monthly trends, backlog ageing, reviewer performance and Finance/report permission separation.
+- Kept Finance payment operations and payment-method configuration under their existing Finance permissions. Finance-only roles do not receive member-catalogue PII access; limited non-PII membership export fields remain available under the existing export route.
+- Added navigation back to Membership Center from membership operations, member catalogue, card and account-governance surfaces where the user's scope permits it.
+
+### Known implementation boundaries
+
+1. **Geographic filters are not enabled yet.** The current person/membership source schema does not persist a governed country/region/zone/woreda/city hierarchy. The dashboard deliberately does not fabricate location counts or use a generic text search as a location filter. MPA must approve the canonical hierarchy and the application/profile capture fields before geographic analysis can be implemented reliably.
+2. **Active member stock is a current recorded-status count, not proof of payment by itself.** The existing `membership-status` report explicitly does not infer payment approval. Paid application counts use the payment-driven application states; imported historical membership records need Finance-approved historical payment evidence before they can be described as verified paid memberships.
+3. **The existing membership activation service requires an approved application and a succeeded, non-reversed linked payment.** The Account and Team workspace does not expose a manual membership-claim control. The separate legacy-import invitation flow must be reviewed against a future Finance-approved historical-payment evidence workflow before claiming the payment gate covers every imported legacy account invitation.
+4. **Validation is not complete until PR Quality runs against the latest PR #18 head.** The new report and authorization tests have been added, but no current-head GitHub Actions result is recorded in this implementation update. Do not merge or deploy based on documentation or code commits alone.
+
+These boundaries are intentional: missing location and legacy payment evidence must be solved with authoritative data and Finance controls, not guessed values or an administrator override.

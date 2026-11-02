@@ -240,6 +240,15 @@ export function OrganizationWorkspaceOverview({
     const query = new URLSearchParams({ organizationId: selectedOrganizationId }).toString();
     return `${path}?${query}${hash ? `#${hash}` : ""}`;
   };
+  const nextAction = outcomeSummary
+    ? outcomeSummary.openJobs === 0
+      ? { title: "Publish your first job opportunity", detail: "Start with a role your organization is ready to recruit for.", href: "/recruitment" }
+      : outcomeSummary.applications === 0
+        ? { title: "Share your published opportunities", detail: "Your jobs are live. Help eligible professionals discover them.", href: "/recruitment" }
+        : outcomeSummary.activePipeline > 0
+          ? { title: "Review the active candidate pipeline", detail: `${outcomeSummary.activePipeline} application(s) are in screening, shortlisting or interview stages.`, href: "/recruitment#candidate-pipeline" }
+          : { title: "Review recruitment outcomes", detail: "Check recorded applications, offers and hires before planning the next opportunity.", href: "/organizations/reports" }
+    : null;
 
   if (organizations.length === 0 && authenticated && !organizationLookupReady) {
     return (
@@ -347,6 +356,12 @@ export function OrganizationWorkspaceOverview({
               <div className={styles.metric}><span>Hires recorded</span><strong>{outcomeSummary.hires}</strong></div>
             </div>
             {outcomes && outcomes.jobs.length === 0 && outcomes.requisitions.length === 0 ? <p className={styles.activityEmpty}>No recruitment activity has been recorded for this organization yet.</p> : null}
+            {nextAction ? (
+              <div className={styles.nextAction}>
+                <div><span className={styles.eyebrow}>Recommended next action</span><strong>{nextAction.title}</strong><p>{nextAction.detail}</p></div>
+                <Link href={organizationHref(nextAction.href)}>Open task <span aria-hidden="true">↗</span></Link>
+              </div>
+            ) : null}
           </>
         ) : outcomesState === "error" ? (
           <p className={styles.activityEmpty}>Live recruitment totals are not available for this organization or role. No placeholder figures are displayed.</p>

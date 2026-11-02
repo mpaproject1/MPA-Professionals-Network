@@ -171,3 +171,17 @@ export async function publishMemberGeographyVersion(identity,versionId,input={},
   return {versionId,status:"published",counts};
  });
 }
+
+export async function getMemberGeographySummary(identity){
+ const roles=identity?.roles||[],permissions=identity?.permissions||[];
+ if(!roles.some(role=>["system_admin","admin","membership_reviewer","reviewer"].includes(role))&&!permissions.some(permission=>["members.view","members.manage","reports.view","members.geography.manage"].includes(permission)))throw fail(403,"Membership geography reporting permission is required.","FORBIDDEN");
+ const db=getPool();
+ const [residenceTypes,countries,level1,level2,level3]=await Promise.all([
+  db.query("select residence_type,count(*)::int member_count from member_residence group by residence_type order by residence_type"),
+  db.query("select c.country_iso3 country_code,c.country_m49 m49_code,c.label country_name,count(*)::int member_count from member_residence r join membership_geography_unit c on c.id=r.country_unit_id group by c.country_iso3,c.country_m49,c.label order by member_count desc,c.label"),
+  db.query("select u.unit_level,u.unit_code,u.label,count(*)::int member_count from member_residence r join membership_geography_unit u on u.id=r.admin_level_1_id group by u.unit_level,u.unit_code,u.label order by member_count desc,u.label"),
+  db.query("select u.unit_level,u.unit_code,u.label,p.label parent_label,count(*)::int member_count from member_residence r join membership_geography_unit u on u.id=r.admin_level_2_id left join membership_geography_unit p on p.id=u.parent_id group by u.unit_level,u.unit_code,u.label,p.label order by member_count desc,u.label"),
+  db.query("select u.unit_level,u.unit_code,u.label,p.label parent_label,count(*)::int member_count from member_residence r join membership_geography_unit u on u.id=r.admin_level_3_id left join membership_geography_unit p on p.id=u.parent_id group by u.unit_level,u.unit_code,u.label,p.label order by member_count desc,u.label")
+ ]);
+ return {residenceTypes:residenceTypes.rows,countries:countries.rows,ethiopiaLevel1:level1.rows,ethiopiaLevel2:level2.rows,ethiopiaLevel3:level3.rows,generatedAt:new Date().toISOString()};
+}

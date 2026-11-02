@@ -9,6 +9,10 @@ function assertImportAuthority(identity){
  const roles=identity?.roles||[],permissions=identity?.permissions||[];
  if(!roles.some(r=>IMPORT_ROLES.includes(r))&&!permissions.includes("members.import"))throw problem(403,"Membership import/export requires an authorized administrator.","FORBIDDEN");
 }
+function assertMemberCatalogAuthority(identity){
+ const roles=identity?.roles||[],permissions=identity?.permissions||[];
+ if(!roles.some(role=>["system_admin","admin","membership_reviewer"].includes(role))&&!permissions.some(permission=>["members.view","members.manage"].includes(permission)))throw problem(403,"Member catalogue access requires membership-view authority; Finance payment roles do not grant the member directory.","FORBIDDEN");
+}
 function csvRows(csv){
  const rows=[];let row=[],field="",quoted=false;
  const input=String(csv||"").replace(/^\uFEFF/,"");
@@ -158,7 +162,7 @@ export async function claimMemberInvitation({token,password}){
 }
 
 export async function listMemberCatalog(identity,{q="",status="",limit=25,offset=0}={}) {
- assertImportAuthority(identity);
+ assertMemberCatalogAuthority(identity);
  const db=getPool();
  const search=String(q||"").trim().slice(0,120), state=String(status||"").trim().slice(0,30);
  const pageSize=Math.min(Math.max(Number(limit)||25,1),100), start=Math.max(Number(offset)||0,0);

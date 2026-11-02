@@ -852,3 +852,97 @@ Trace exact payment application and membership-record schemas, all payment creat
 - Confirm all role-based pages and exports against the existing role/permission fixtures. No live staging deployment is available, so deployment-level manual verification remains unavailable.
 
 **Completion rule:** this log records implementation, not a passing release. Mark the workstream complete only after the latest PR checks pass, the geography reference workbook is imported and published, and the listed payment/import/browser scenarios have recorded test evidence.
+
+
+## 26. Source audit and revised implementation plan — 2026-11-03
+
+**Audit scope:** source code, service modules, route/UI integration, migration/test coverage, workflow configuration and current PR branch metadata. This section supersedes stale status statements in Sections 23–25 wherever they conflict. It does not convert source presence into a claim of successful runtime validation.
+
+**Audited branch:** feat/workstream-3-progress-members-workspace  
+**Audited branch head:** 2351db050bd6302b680c3d9b3032dd2b279d5171  
+**PR:** #18  
+**Important commit-history correction:** branch head 2351db0 is documentation-only. Commit c1848a014a9d349043b81a21cd9f47767da4edf2, previously labelled the latest implementation commit in Section 25, changes the migration compatibility rehearsal script only; it is not the commit that introduced all feature code. The feature implementation exists in earlier commits. Keep future progress entries tied to the exact changed files and commit SHA rather than attributing the entire implementation to one commit.
+
+### 26.1 Revised implementation status from source inspection
+
+| Area | Source-level finding | Current assessment |
+|---|---|---|
+| Fee-obligation ledger and payment lifecycle | Service code exists for obligation balances, Finance receipt verification, non-cash dispositions, approval separation, balance recalculation and reminder cancellation. Application paid-stage and activation checks use the balance rather than a single receipt. | Implemented in source; database-backed lifecycle and edge-case certification still required. |
+| Payment reversal/reopening | Reversal paths recalculate obligations; historical/direct reversal handling can reopen balances and suspend affected active imported memberships. | Present in source; verify every route and state transition end to end, including repeated reversal/replay and account-claim lockout. |
+| Non-cash dispositions | Will-pay-later, sponsored, honored-member and volunteer-activity valuation are represented separately from cash. Non-cash approval uses maker/checker separation. | Implemented in source; policy and authorized reversal/revocation lifecycle for an already-approved adjustment remains an explicit decision/test gap. |
+| Finance bulk payment intake | XLSX template, preview/apply flow, row matching, duplicate/idempotency checks, evidence/method validation and pending-only receipt creation exist. Individual Finance verification remains required. | Implemented in source; real workbook round-trip, database apply, duplicate replay and one-by-one verification require execution evidence. |
+| Geography schema and profile capture | Versioned reference tables, hierarchy validation, residence persistence, profile APIs/editor and privacy-safe aggregation exist. Ethiopia and Diaspora capture paths are represented. | Implemented in source; first reference version still needs operational import/publication. Lower-level Ethiopia data remains unavailable until supplied by an authoritative source. |
+| Geography reference workbook | Workflow generates a workbook from UN M49 country/area data and initial Ethiopian regional/federal-city units. Admin preview/apply-to-draft and separate publish flow exist. | Workflow artifact generation and publication have not been verified for this branch head. Zones, Sub-cities, Districts and Towns must not be fabricated. |
+| Expanded member import | XLSX/CSV template and parsing/storage mapping include optional education, qualification, field, department, volunteer and structured residence fields while retaining historical import safeguards. | Implemented in source; verify workbook round-trip, validation, preview/apply, existing-member merge behavior and replay against disposable PostgreSQL. |
+| Balance reminders and reports | Scheduled worker queues member and Finance-team in-app notifications, checks preferences and deduplicates. Fee totals by currency, ageing, disposition summaries and permission-scoped export code exist. | Implemented in source; queued in-app notification is not proof of push delivery. Verify scheduler timing, idempotency, preference behavior, settlement/reversal handling and export permissions. |
+| Membership Center | Dashboard shell and navigation exist, but most navigation still routes to separate legacy workspaces. Fee-balance and geography summary components are imported but not rendered. Ageing/renewal report requests do not consistently receive the dashboard's selected filters. | Partially integrated; this is a concrete remaining product implementation task, not merely a test-certification task. |
+| Dashboard copy and geography filters | Some dashboard explanatory copy still describes geography as unpersisted/unstructured despite the new schema and APIs. | Update copy and expose only geography filters backed by published, valid reference data. |
+| Automated tests | Contract/authorization/workbook tests and migration rehearsal assertions exist. The inspected tests do not establish full database transaction coverage for all new workflows. | Test coverage is present but insufficient evidence of end-to-end correctness until the full suites and scenario tests execute. |
+| CI / release | PR Quality workflow is configured to provision disposable PostgreSQL and run migrations, backend tests, Biome, TypeScript, production build and selected Playwright tests. | No passing check result was observed for audited head 2351db0. Older workflow runs are not evidence for this head. No live staging verification is claimed. |
+
+### 26.2 Concrete Membership Center gaps found in source
+
+1. The Membership Center remains primarily a dashboard and launchpad. Applications, member catalogue, import/export, geography, renewals, Finance, cards, configuration and reports continue to live behind separate routes. Preserve those routes for compatibility, but complete the in-center navigation and workflow composition promised in Sections 4–5.
+2. MembershipFeeBalanceSummary and MemberGeographySummary are imported in the Membership Center page but are not rendered. Integrate them in appropriate dashboard sections with role-aware empty/loading/error states and permission-safe data.
+3. The selected dashboard filter state is not consistently passed to ageing and renewal report requests. Define one validated filter/query contract and apply it to KPIs, charts, queues, report requests and exports. Do not silently show unfiltered report data beside filtered KPIs.
+4. Replace stale geography explanatory copy with the actual persisted hierarchy and publication behavior. Disable unsupported lower-level selections until authoritative reference data is published.
+5. Keep Finance mutations in the Finance workspace and preserve server-side permission checks. The Membership Center should present status and safe handoffs, not duplicate Finance authority.
+
+### 26.3 Revised next implementation plan — ordered work packages
+
+**WP0 — Reconcile branch and capture a reproducible baseline**
+- Re-read the current branch head before editing; preserve all existing commits and do not reset or force-push.
+- Map each feature claim to exact source files, migrations, routes, permissions and tests. Correct any remaining progress-log statements that confuse planned, coded, executed and passed.
+- Run the current PR checks and record their exact run IDs, head SHA, status and failing step. A missing run is pending/unverified, never a pass.
+
+**WP1 — Finish Membership Center integration**
+- Render the fee-obligation and geography summary components in the dashboard; verify their API loading, empty, error and authorization states.
+- Implement the local Membership Center navigation/sections and connect existing workflows without deleting or breaking legacy URLs, report deep links or role boundaries.
+- Introduce one shared validated filter model for date basis/range, lifecycle status, search and supported geography. Pass it consistently to dashboard metrics, ageing/renewal reports, tables and exports.
+- Remove stale copy and ensure unsupported geographic levels are visibly unavailable rather than represented as selectable data.
+- Add component/API/browser tests for navigation, filter propagation, role-scoped visibility and legacy-route compatibility.
+
+**WP2 — Database-backed payment lifecycle verification and fixes**
+- Against a disposable PostgreSQL database, test clean migration and upgrade from the supported prior schema.
+- Exercise the complete path: obligation creation for online and historical records; partial receipt; Finance verification; balance recalculation; full settlement; approved non-cash adjustment; rejection; payment reversal; reopening; renewal/activation; account claim/link eligibility.
+- Include exact invariants: fee snapshot is immutable; currencies never mix; imported amount/status never becomes verified cash; unverified/reversed payment never unlocks claim or activation; non-cash credit is never reported as cash; duplicate requests/replays do not double-apply.
+- Inspect every payment creation, verification, reversal and activation/claim route. Add integration tests where existing tests only assert input contracts or authorization.
+- Decide with the product owner whether approved non-cash adjustments can be revoked. If yes, implement a separately authorized, maker/checker-controlled reversal with immutable audit and balance recomputation; if no, document the policy and enforce the prohibition.
+
+**WP3 — Complete workbook and geography operational proof**
+- Execute the geography reference-data workflow; inspect generated workbook structure, codes, parent relationships and provenance.
+- Upload through the admin preview flow, validate rejected malformed workbooks, apply to draft, publish, and verify profile selectors and aggregation against the published version.
+- Source authoritative Ethiopian Zone/Sub-city/District/Town reference data before enabling those levels. Do not infer or invent lower-level records.
+- Run actual XLSX/CSV round trips for expanded member import and Finance payment intake: template download, preview, row errors, apply, duplicate re-upload, partial failure and audit.
+- Verify historical import preserves membership number/product/approval checks and never promotes historical amount or Active status into verified payment/activation.
+
+**WP4 — Finance intake, reminders, reporting and authorization**
+- Verify Finance bulk intake creates pending-only receipts and that each receipt must be individually verified or rejected.
+- Test maker/checker restrictions, evidence/method requirements, duplicate references, row/batch idempotency and unmatched-row handling.
+- Test will-pay-later reminders across timezone boundaries, preference opt-out, scheduler retries, deduplication, full settlement, approved waiver/coverage and reversal/reopening.
+- Confirm reminder state is described accurately as queued/in-app unless actual push delivery is independently demonstrated.
+- Test report totals by currency, ageing, non-cash disposition reporting and XLSX export masking/permissions across Finance, membership, supervisor and system-admin roles.
+
+**WP5 — Full quality and release gate**
+- Run migration clean-install and upgrade rehearsal on disposable PostgreSQL.
+- Run complete backend tests, Biome, TypeScript, production build and the full relevant Playwright suite; fix root causes without weakening assertions, lint rules, permissions or validation.
+- Add/execute browser acceptance for Membership Center integration, member import, geography publication, installment settlement, non-cash maker/checker, Finance bulk intake, reversal/reopening and claim/activation gates.
+- Re-run checks on the final branch head and record the exact successful run IDs and SHA. Older runs do not certify newer commits.
+- Perform staging smoke tests only when a real staging deployment is available; otherwise explicitly retain deployment verification as a release blocker rather than claiming it passed.
+
+### 26.4 Completion criteria
+
+Do not mark this workstream complete until all of the following are evidenced:
+
+- [ ] Membership Center renders fee and geography summaries and provides the promised integrated navigation while preserving legacy URLs and authorization boundaries.
+- [ ] One filter contract drives all dashboard metrics, ageing/renewal reports, tables and exports.
+- [ ] Clean and upgrade migrations pass on disposable PostgreSQL.
+- [ ] Payment, partial balance, non-cash disposition, reversal/reopening, activation and account-claim invariants pass database-backed tests.
+- [ ] Both workbooks pass actual download/preview/apply/replay tests; Finance intake remains pending-only until individual verification.
+- [ ] Geography reference workbook is generated, inspected, imported and published; lower administrative levels remain unavailable until authoritative data is supplied.
+- [ ] Reminder scheduling, timezone behavior, preferences, deduplication, settlement and reversal are tested; delivery claims match the actual channel.
+- [ ] Role/permission tests and protected exports pass for each relevant role.
+- [ ] Full backend, Biome, TypeScript, production build and relevant Playwright checks pass on the final recorded branch SHA.
+- [ ] Any staging/deployment check not performed is explicitly listed as outstanding.
+
+**Next coding priority:** WP1 (Membership Center integration and consistent filter propagation) can proceed in parallel with the WP0 baseline capture. In parallel, WP2 should add database-backed lifecycle tests before any further payment-state refactor. Then complete WP3–WP5 in order. Do not create another planning-only update in place of these implementation and verification tasks.

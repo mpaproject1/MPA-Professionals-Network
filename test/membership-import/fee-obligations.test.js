@@ -80,8 +80,8 @@ test("Finance payment template contains only pending-intake fields and requires 
 test("PostgreSQL Finance XLSX intake applies valid rows independently and preserves row failures",async t=>{
  if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
  const db=getPool(),suffix=randomUUID(),digits=suffix.replace(/\D/g,"").slice(0,8).padEnd(8,"7");
- const applicant=await membership.register({email:"fee-bulk-app-"+suffix+"@example.test",password:"BulkApplicantSecurePassword!2026",firstName:"Bulk",lastName:"Applicant",phone:"05"+digits},"fee-bulk-app-"+suffix);
- const financeUser=await membership.register({email:"fee-bulk-finance-"+suffix+"@example.test",password:"BulkFinanceSecurePassword!2026",firstName:"Bulk",lastName:"Finance",phone:"04"+digits},"fee-bulk-finance-"+suffix);
+ const applicant=await membership.register({email:"fee-bulk-app-"+suffix+"@example.test",password:"BulkApplicantSecurePassword!2026",firstName:"Bulk",lastName:"Applicant",phone:"09"+digits},"fee-bulk-app-"+suffix);
+ const financeUser=await membership.register({email:"fee-bulk-finance-"+suffix+"@example.test",password:"BulkFinanceSecurePassword!2026",firstName:"Bulk",lastName:"Finance",phone:"07"+digits},"fee-bulk-finance-"+suffix);
  const app=await membership.createApplication(applicant.user.id,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:"fee_bulk_app_"+suffix.slice(0,32)},"fee-bulk-create-app-"+suffix);
  const identity={sub:financeUser.user.id,roles:["finance_officer"],permissions:[]},methodCode="bulk_"+suffix.slice(0,8);
  await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'cash','Bulk XLSX test',true,'ETB','Disposable Finance intake method',false) on conflict(method_code) do update set enabled=true,currency='ETB',requires_evidence=false",[methodCode]);

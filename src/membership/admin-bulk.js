@@ -56,7 +56,7 @@ function cleanRow(row){
  if(modern&&!paidAmountText)errors.push("amount_paid is required; enter 0 when no amount has been received.");
  if(paidAmountText&&(!Number.isFinite(paidAmount)||paidAmount<0||!/^(?:0|[1-9]\\d{0,11})(?:\\.\\d{1,2})?$/.test(paidAmountText)))errors.push("amount_paid must be zero or a positive amount with up to two decimal places.");
  if(paidCurrency&&!/^[A-Z]{3}$/.test(paidCurrency))errors.push("payment_currency must be a three-letter ISO currency code.");
- if(paidAmount>0&&!paidCurrency)errors.push("payment_currency is required when amount_paid is greater than zero.");
+
  if(paymentReference&&paymentReference.length<4)errors.push("payment_reference must contain at least four characters.");
  if(paymentReference&&(!paidAmountText||!paidCurrency))errors.push("If a historical payment reference is supplied, include amount_paid and payment_currency.");
  return {...row,email,phone,gender,registeredDate,fullName,membershipNumber,productCode,status,startDate,endDate,paidAmount,paidCurrency,paymentReference,approved:approved==="yes",legacyMemberId:String(x.legacy_member_id||"").trim()||null,approvalReference:String(x.approval_reference||"").trim()||null,notes:String(x.notes||"").trim()||null,errors};
@@ -112,6 +112,7 @@ export async function previewMemberImport(identity,{filename="mpa-members.csv",c
   if(!products.includes(row.productCode))row.errors.push("Unknown or inactive membership product code.");
   await validateImportedResidence(db,row);
   if(row.paidAmount!==null&&!row.paidCurrency&&productCurrency.has(row.productCode))row.paidCurrency=productCurrency.get(row.productCode);
+  if(row.paidAmount!==null&&!row.paidCurrency)row.errors.push("Payment currency is required when the configured membership plan does not provide one.");
   const ek=row.email.toLowerCase(),mk=row.membershipNumber.toLowerCase();
   if(seenEmail.has(ek))row.errors.push("Email is repeated in this file.");seenEmail.add(ek);
   if(seenMembership.has(mk))row.errors.push("Membership number is repeated in this file.");seenMembership.add(mk);

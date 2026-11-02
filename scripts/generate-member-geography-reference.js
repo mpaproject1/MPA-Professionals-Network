@@ -51,7 +51,7 @@ async function main(){
  for(const [code,label,level] of regions)rows.push({unit_code:code,label,unit_level:level,parent_code:"ETH",country_iso3:"",country_m49:"",source_name:"UK Home Office CPIN / Permanent Committee on Geographical Names (PCGN)",source_version:"Ethiopia regional structure reference, September 2025",effective_from:"",effective_to:"",active:"true",metadata:JSON.stringify({sourceUrl:"https://www.gov.uk/government/publications/ethiopia-country-policy-and-information-notes/country-policy-and-information-note-internal-relocation-ethiopia-september-2025-accessible",classification:"Ethiopian region or federal city"})});
  const buffer=createXlsx(rows,COLUMNS),output=resolve(process.argv[2]||"artifacts/member-geography-reference.xlsx");
  await mkdir(dirname(output),{recursive:true});await writeFile(output,buffer);
- const manifest={source:M49_URL,retrievedAt,countryOrAreaCount:countries.length,ethiopiaRegionAndCityCount:regions.length,rows:rows.length,output};
+ const manifest={source:M49_URL,retrievedAt,countryOrAreaCount:countries.length,ethiopiaRegionCount:regions.filter(([, ,level])=>level==="region").length,ethiopiaFederalCityCount:regions.filter(([, ,level])=>level==="federal_city").length,ethiopiaRegionAndCityCount:regions.length,lowerAdministrativeLevelsIncluded:0,sourceUrls:[M49_URL,"https://www.gov.uk/government/publications/ethiopia-country-policy-and-information-notes/country-policy-and-information-note-internal-relocation-ethiopia-september-2025-accessible"],rows:rows.length,output};
  await writeFile(output.replace(/\.xlsx$/i,".manifest.json"),JSON.stringify(manifest,null,2)+"\n");
  process.stdout.write(JSON.stringify(manifest)+"\n");
 }

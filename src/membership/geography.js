@@ -26,6 +26,7 @@ function parseRows(rows){
   row.active=row.active===""||row.active.toLowerCase()==="true"||row.active==="1"||row.active.toLowerCase()==="yes";
   row.rowNumber=index+2;row.errors=[];
   try{row.metadata=row.metadata?JSON.parse(row.metadata):{};if(!row.metadata||typeof row.metadata!=="object"||Array.isArray(row.metadata))throw new Error("metadata must be a JSON object.");}catch{row.errors.push("metadata must be a valid JSON object when supplied.");row.metadata={};}
+  const rowSourceUrl=clean(row.metadata.sourceUrl,1000);if(!/^https:\/\//i.test(rowSourceUrl))row.errors.push("metadata.sourceUrl must be an HTTPS source URL for every reference row.");
   if(!/^[A-Z0-9][A-Z0-9._-]{1,79}$/.test(row.unit_code))row.errors.push("unit_code must be 2–80 letters, digits, dots, underscores or dashes.");
   if(!row.label)row.errors.push("label is required.");
   if(!LEVELS.has(row.unit_level))row.errors.push("unit_level must be country, region, federal_city, zone, sub_city, district or town.");
@@ -124,6 +125,7 @@ export async function previewMemberGeographyImport(identity,input={},requestId){
  const base64=String(input.xlsxBase64||"");
  if(!base64||base64.length>12*1024*1024)throw fail(400,"Upload a valid geography XLSX workbook up to 9 MiB.","XLSX_REQUIRED");
  let parsed;try{parsed=parseXlsxRows(Buffer.from(base64,"base64"));}catch(error){throw fail(400,error.message||"The geography workbook could not be read.","XLSX_INVALID");}
+ const sourceUrl=clean(input.sourceUrl,1000);if(!/^https:\/\//i.test(sourceUrl))throw fail(400,"Provide the HTTPS URL for the primary source used by this reference workbook.","SOURCE_URL_REQUIRED");
  const headers=parsed.headers.map(h=>h.trim());
  const missing=COLUMNS.filter(column=>!headers.includes(column));
  if(missing.length)throw fail(400,"The workbook is missing columns: "+missing.join(", "),"MISSING_COLUMNS");
@@ -132,7 +134,7 @@ export async function previewMemberGeographyImport(identity,input={},requestId){
  const batchId=randomUUID();
  await withTransaction(async tx=>{
   await tx.query("insert into membership_geography_import_batch(id,filename,source_name,source_version,status,row_count,error_count,imported_by,metadata) values($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-   [batchId,clean(input.filename||"member-geography.xlsx",255),clean(input.sourceName||SOURCE,180),clean(input.sourceVersion||"unspecified",120),errors?"previewed":"validated",rows.length,errors,identity.sub,JSON.stringify({requestId,columns:headers})]);
+   [batchId,clean(input.filename||"member-geography.xlsx",255),clean(input.sourceName||SOURCE,180),clean(input.sourceVersion||"unspecified",120),errors?"previewed":"validated",rows.length,errors,identity.sub,JSON.stringify({requestId,columns:headers,sourceUrl,sourceUrls:[...new Set(rows.map(row=>clean(row.metadata?.sourceUrl,1000)).filter(Boolean))]})]);
   for(const row of rows)await tx.query("insert into membership_geography_import_row(batch_id,row_number,row_data,errors) values($1,$2,$3,$4)",[batchId,row.rowNumber,JSON.stringify(Object.fromEntries(COLUMNS.map(key=>[key,row[key]])),),JSON.stringify(row.errors)]);
  });
  return {batchId,rowCount:rows.length,errorCount:errors,canApply:errors===0,rows:rows.map(row=>({rowNumber:row.rowNumber,code:row.unit_code,label:row.label,level:row.unit_level,parentCode:row.parent_code,errors:row.errors}))};
@@ -147,7 +149,7 @@ export async function applyMemberGeographyImport(identity,batchId,input={},reque
   const rows=(await tx.query("select row_number,row_data,errors from membership_geography_import_row where batch_id=$1 order by row_number for update",[batchId])).rows;
   const versionLabel=clean(input.versionLabel||("geo-"+new Date().toISOString().slice(0,10)+"-"+batchId.slice(0,8)),100);
   const version=(await tx.query("insert into membership_geography_version(version_label,source_name,source_url,source_version,status,created_by,metadata) values($1,$2,$3,$4,'draft',$5,$6) returning id",
-   [versionLabel,batch.source_name,input.sourceUrl||null,batch.source_version,identity.sub,JSON.stringify({batchId,reason})])).rows[0];
+   [versionLabel,batch.source_name,(typeof batch.metadata==="string"?JSON.parse(batch.metadata):batch.metadata||{}).sourceUrl,batch.source_version,identity.sub,JSON.stringify({batchId,reason,sourceUrls:(typeof batch.metadata==="string"?JSON.parse(batch.metadata):batch.metadata||{}).sourceUrls||[]})])).rows[0];
   const inserted=new Map();let remaining=[...rows];
   while(remaining.length){
    const ready=remaining.filter(row=>!row.row_data.parent_code||inserted.has(String(row.row_data.parent_code).toUpperCase()));
@@ -173,6 +175,9 @@ export async function publishMemberGeographyVersion(identity,versionId,input={},
   if(!version)throw fail(404,"Geography version not found.","NOT_FOUND");
   if(version.status==="published")return {versionId,status:"published",alreadyPublished:true};
   if(version.status!=="draft")throw fail(409,"Only a draft geography version can be published.","INVALID_VERSION_STATE");
+  if(!/^https:\/\//i.test(String(version.source_url||"")))throw fail(409,"A published geography version must retain an HTTPS primary source URL.","GEOGRAPHY_SOURCE_REQUIRED");
+  const provenance=(await tx.query("select count(*)::int total,count(*) filter(where coalesce(source_name,'')='' or coalesce(source_version,'')='' or not (metadata ? 'sourceUrl') or coalesce(metadata->>'sourceUrl','') not like 'https://%')::int incomplete from membership_geography_unit where version_id=$1 and active=true",[versionId])).rows[0];
+  if(provenance.incomplete>0)throw fail(409,"Every active geography row must retain source name, source version and an HTTPS row-level source URL.","GEOGRAPHY_ROW_PROVENANCE_REQUIRED");
   const counts=(await tx.query("select count(*)::int total,count(*) filter(where unit_level='country')::int countries,count(*) filter(where unit_level in ('region','federal_city'))::int ethiopia_level1 from membership_geography_unit where version_id=$1 and active=true",[versionId])).rows[0];
   if(!counts.countries||!counts.ethiopia_level1)throw fail(409,"A publishable geography version must include country references and Ethiopian regions/federal cities.","GEOGRAPHY_VERSION_INCOMPLETE");
   await tx.query("update membership_geography_version set status='retired' where status='published'");

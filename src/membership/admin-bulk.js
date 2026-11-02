@@ -52,7 +52,7 @@ function cleanRow(row){
  if(paidAmountText&&(!Number.isFinite(paidAmount)||paidAmount<=0||!/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/.test(paidAmountText)))errors.push("payment_amount must be a positive amount with up to two decimal places.");
  if(paidCurrency&&!/^[A-Z]{3}$/.test(paidCurrency))errors.push("payment_currency must be a three-letter ISO currency code.");
  if(paymentReference&&paymentReference.length<4)errors.push("payment_reference must contain at least four characters.");
- if((paidAmountText||paidCurrency||paymentReference)&&(!paidAmountText||!paidCurrency||!paymentReference))errors.push("If historical payment details are supplied, include payment_amount, payment_currency and payment_reference together.");
+ if(((paidAmount??0)>0||paidCurrency||paymentReference)&&(!paidAmountText||!paidCurrency||!paymentReference))errors.push("If historical payment details are supplied, include payment_amount, payment_currency and payment_reference together.");
  return {...row,email,phone:normalizePhone(x.phone),fullName,membershipNumber,productCode,status,startDate,endDate,paidAmount,paidCurrency,paymentReference,approved:approved==="yes",legacyMemberId:String(x.legacy_member_id||"").trim()||null,approvalReference:String(x.approval_reference||"").trim()||null,notes:String(x.notes||"").trim()||null,errors};
 }
 function audit(db,actor,action,type,id,requestId,metadata={}){return db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,JSON.stringify(metadata)]);}

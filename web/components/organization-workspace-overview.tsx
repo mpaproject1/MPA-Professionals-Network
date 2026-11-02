@@ -65,6 +65,16 @@ type Folder = {
   links: { label: string; href: string }[];
 };
 
+const publishingOptions = [
+  { key: "job", label: "Job", title: "Publish a job opportunity", detail: "Create or manage vacancies, candidate stages, interviews and offers.", href: "/recruitment" },
+  { key: "service", label: "Professional service", title: "Offer a professional service", detail: "Publish and manage service offers through the existing eligibility and request workflows.", href: "/services" },
+  { key: "mentorship", label: "Mentorship", title: "Offer mentorship", detail: "Publish mentorship opportunities and manage matching, sessions and outcomes.", href: "/mentorship" },
+];
+const reviewingOptions = [
+  { key: "candidates", label: "Candidate pipeline", title: "Review job applications", detail: "Screen candidates, coordinate interviews and record recruitment decisions.", href: "/recruitment#candidate-pipeline" },
+  { key: "inquiries", label: "Public inquiries", title: "Review public job inquiries", detail: "Triage early interest before it becomes a formal eligible application.", href: "/organizations#org-inquiries" },
+];
+
 const folders: Folder[] = [
   {
     key: "publishing",
@@ -195,6 +205,8 @@ export function OrganizationWorkspaceOverview({
   const attention = organizations.filter((item) => ["correction_required", "rejected"].includes(item.verification_case_status || ""));
   const hasVerifiedOrganization = workspaceReady.length > 0;
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
+  const [publishingType, setPublishingType] = useState("job");
+  const [reviewingType, setReviewingType] = useState("candidates");
   useEffect(() => {
     if (workspaceReady.length === 0) {
       setSelectedOrganizationId("");
@@ -459,14 +471,40 @@ export function OrganizationWorkspaceOverview({
               <h3>{activeFolder.title}</h3>
               <p>{activeFolder.description}</p>
             </div>
-            <div className={styles.folderActions}>
-              {activeFolder.links.map((item, index) => (
-                <Link className={styles.folderAction} href={organizationHref(item.href)} key={item.href + item.label}>
-                  <span><strong>{item.label}</strong><small>{index === 0 ? "Open this workspace" : "Continue to this function"}</small></span>
-                  <span aria-hidden="true">↗</span>
-                </Link>
-              ))}
-            </div>
+            {activeFolder.key === "publishing" ? (
+              <div className={styles.workflowPanel}>
+                <div className={styles.workflowTypeSelector} role="group" aria-label="Choose opportunity type">
+                  {publishingOptions.map((option) => (
+                    <button key={option.key} type="button" aria-pressed={publishingType === option.key} className={publishingType === option.key ? styles.workflowTypeActive : ""} onClick={() => setPublishingType(option.key)}>{option.label}</button>
+                  ))}
+                </div>
+                {(() => {
+                  const option = publishingOptions.find((item) => item.key === publishingType) || publishingOptions[0];
+                  return <div className={styles.workflowAction}><div><strong>{option.title}</strong><p>{option.detail}</p></div><Link href={organizationHref(option.href)}>Continue <span aria-hidden="true">↗</span></Link></div>;
+                })()}
+              </div>
+            ) : activeFolder.key === "reviewing" ? (
+              <div className={styles.workflowPanel}>
+                <div className={styles.workflowTypeSelector} role="group" aria-label="Choose review queue">
+                  {reviewingOptions.map((option) => (
+                    <button key={option.key} type="button" aria-pressed={reviewingType === option.key} className={reviewingType === option.key ? styles.workflowTypeActive : ""} onClick={() => setReviewingType(option.key)}>{option.label}</button>
+                  ))}
+                </div>
+                {(() => {
+                  const option = reviewingOptions.find((item) => item.key === reviewingType) || reviewingOptions[0];
+                  return <div className={styles.workflowAction}><div><strong>{option.title}</strong><p>{option.detail}</p></div><Link href={organizationHref(option.href)}>Open review <span aria-hidden="true">↗</span></Link></div>;
+                })()}
+              </div>
+            ) : (
+              <div className={styles.folderActions}>
+                {activeFolder.links.map((item, index) => (
+                  <Link className={styles.folderAction} href={organizationHref(item.href)} key={item.href + item.label}>
+                    <span><strong>{item.label}</strong><small>{index === 0 ? "Open this workspace" : "Continue to this function"}</small></span>
+                    <span aria-hidden="true">↗</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </section>
         </>
       )}

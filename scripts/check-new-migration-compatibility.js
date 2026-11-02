@@ -66,6 +66,12 @@ const migrationNames = [
   "20261101290000_community_impact_taxonomy_code_constraints.sql",
   "20261102090000_community_impact_claim_candidate_one_to_one.sql",
   "20261102100000_community_impact_claim_candidate_many_to_one.sql"
+  "20261102150000_membership_geography_and_fee_obligations.sql",
+  "20261102160000_membership_fee_dispositions_and_backfill.sql",
+  "20261102170000_membership_fee_disposition_idempotency.sql",
+  "20261102180000_membership_fee_balance_currency_integrity.sql",
+  "20261102190000_membership_geography_country_uniqueness.sql",
+  "20261102200000_membership_import_allow_zero_declared_amount.sql"
 ];
 const requiredCommunityImpactTaxonomyDatasets = ["community_impact_contribution_categories","community_impact_contribution_types","community_impact_contributor_roles","community_impact_evidence_types"];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));
@@ -101,6 +107,20 @@ const requiredColumns = [
   ["verification_reference_request", "requested_at", "timestamptz"],
   ["verification_case", "id", "uuid"],
   ["professional_profile", "id", "uuid"],
+  ["membership_geography_version","id","uuid"],
+  ["membership_geography_unit","version_id","uuid"],
+  ["membership_geography_unit","unit_code","text"],
+  ["membership_geography_unit","metadata","jsonb"],
+  ["member_residence","user_id","uuid"],
+  ["member_residence","country_unit_id","uuid"],
+  ["membership_fee_obligation","application_id","uuid"],
+  ["membership_fee_obligation","membership_record_id","uuid"],
+  ["membership_fee_obligation","amount_due","numeric"],
+  ["membership_fee_obligation_payment","payment_transaction_id","uuid"],
+  ["membership_fee_balance_disposition","idempotency_key","text"],
+  ["membership_fee_adjustment","approved_by","uuid"],
+  ["membership_fee_reminder","member_outbox_id","uuid"],
+  ["membership_import_row","paid_amount","numeric"],
   ["community_impact_recognition_program", "id", "uuid"],
   ["community_impact_recognition_nomination", "id", "uuid"],
   ["community_impact_achievement_award", "id", "uuid"],

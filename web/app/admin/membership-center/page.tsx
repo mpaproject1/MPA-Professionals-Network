@@ -101,6 +101,11 @@ export default function MembershipCenterPage() {
 
   const load = useCallback(async (nextFilters: Filters) => {
     if (!token) return;
+    if (nextFilters.from && nextFilters.to && nextFilters.from > nextFilters.to) {
+      setError("The reporting start date must be on or before the end date.");
+      setAccess("allowed");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -237,7 +242,7 @@ export default function MembershipCenterPage() {
         <label>To<input type="date" value={filters.to} onChange={event => setFilters(current => ({ ...current, to: event.target.value }))}/></label>
         <label>Application stage<select value={filters.status} onChange={event => setFilters(current => ({ ...current, status: event.target.value }))}><option value="">All stages</option><option value="submitted">Submitted</option><option value="in_review">In review</option><option value="correction_required">Needs information</option><option value="approved">Approved</option><option value="payment_pending">Payment pending</option><option value="paid">Paid</option><option value="activated">Activated</option><option value="rejected">Rejected</option><option value="withdrawn">Withdrawn</option></select></label>
         <label>Member status<select value={filters.memberStatus} onChange={event => setFilters(current => ({ ...current, memberStatus: event.target.value }))}><option value="">All member statuses</option><option value="active">Active</option><option value="expired">Expired</option><option value="payment_verification_required">Finance verification required</option><option value="not_yet_active">Not yet active</option><option value="pending">Pending</option><option value="suspended">Suspended</option><option value="cancelled">Cancelled</option></select></label>
-        <label className={styles.searchFilter}>Plan / application search<input value={filters.q} onChange={event => setFilters(current => ({ ...current, q: event.target.value }))} placeholder="Search plan or application type"/></label>
+        <label className={styles.searchFilter}>Plan / application search<input value={filters.q} onChange={event => setFilters(current => ({ ...current, q: event.target.value.slice(0, 100) }))} placeholder="Search plan or application type"/></label>
         <button className="btn btn-primary" type="button" onClick={() => void load(filters)} disabled={busy}>{busy ? "Applying…" : "Apply filters"}</button>
       </div>
       <div className={styles.periodShortcuts}>

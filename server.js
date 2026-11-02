@@ -4,6 +4,7 @@ import http from "node:http";
 import * as ethics from "./src/ethics/service.js";
 import * as membershipAdminBulk from "./src/membership/admin-bulk.js";
 import * as membershipGeography from "./src/membership/geography.js";
+import * as membershipFeeObligations from "./src/membership/fee-obligations.js";
 import * as legacyMembershipPayments from "./src/membership/legacy-payment-verification.js";
 import * as membershipCard from "./src/membership/card.js";
 import { assertMembershipPaymentMethodAdmin } from "./src/membership/payment-method-policy.js";

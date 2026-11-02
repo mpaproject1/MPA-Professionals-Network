@@ -1335,6 +1335,7 @@ export async function createMentorshipLearningActivity(mentorshipId,userId,input
     if(input.dueAt){dueAt=new Date(input.dueAt);if(Number.isNaN(dueAt.getTime()))throw error(400,"Choose a valid activity due date.","VALIDATION_ERROR");}
     const row=(await db.query("insert into mentorship_learning_activity(mentorship_id,created_by,title,instructions,due_at) values($1,$2,$3,$4,$5) returning id,mentorship_id,title,instructions,due_at,status,created_at,updated_at",[mentorshipId,userId,title,instructions,dueAt])).rows[0];
     await audit(db,userId,"mentorship.learning_activity_created","mentorship_learning_activity",row.id,requestId);
+    await createInAppNotification(db,m.mentee_user_id,"mentorship.learning_activity_created","mentorship_learning_activity",row.id,{title:"New mentorship activity",message:"Your mentor has published a practical activity for your agreed professional goal.",actionRequired:true,nextAction:"Open My Mentorship to review and complete this activity.",dedupeKey:"mentorship-learning-activity:"+row.id});
     return row;
   });
 }
@@ -1353,6 +1354,7 @@ export async function submitMentorshipLearningActivity(activityId,userId,input,r
     const version=Number(latest?.version||0)+1;
     const row=(await db.query("insert into mentorship_learning_submission(activity_id,submitted_by,version,response) values($1,$2,$3,$4) returning id,activity_id,version,response,status,submitted_at",[activityId,userId,version,response])).rows[0];
     await audit(db,userId,"mentorship.learning_submission_created","mentorship_learning_submission",row.id,requestId,{version});
+    await createInAppNotification(db,activity.mentor_user_id,"mentorship.learning_submission_created","mentorship_learning_submission",row.id,{title:"Mentee submitted practical work",message:"A new version of a mentorship activity is ready for your review.",actionRequired:true,nextAction:"Open My Mentorship to review the submitted work.",dedupeKey:"mentorship-learning-submission:"+row.id});
     return row;
   });
 }
@@ -1372,6 +1374,7 @@ export async function reviewMentorshipLearningSubmission(submissionId,userId,inp
     const review=(await db.query("insert into mentorship_learning_review(submission_id,reviewer_user_id,decision,feedback) values($1,$2,$3,$4) returning id,submission_id,decision,feedback,created_at",[submissionId,userId,input.decision,feedback])).rows[0];
     await db.query("update mentorship_learning_submission set status=$1,updated_at=now() where id=$2",[input.decision,submissionId]);
     await audit(db,userId,"mentorship.learning_submission_reviewed","mentorship_learning_submission",submissionId,requestId,{decision:input.decision,reviewId:review.id});
+    await createInAppNotification(db,submission.submitted_by,"mentorship.learning_submission_reviewed","mentorship_learning_submission",submissionId,{title:input.decision==="accepted"?"Mentor accepted your work":"Mentor requested an improvement",message:feedback,actionRequired:input.decision==="changes_requested",nextAction:input.decision==="accepted"?"Review the mentor feedback and continue to your next goal.":"Review the feedback and submit an improved version.",dedupeKey:"mentorship-learning-review:"+review.id});
     return review;
   });
 }

@@ -11,7 +11,7 @@ const ALLOWED = {
   zone: new Set(["region"]),
   sub_city: new Set(["federal_city"]),
   district: new Set(["zone","sub_city"]),
-  town: new Set(["region","zone","federal_city","sub_city"]),
+  town: new Set(["zone","sub_city"]),
 };
 function fail(statusCode,message,code="BUSINESS_RULE"){return Object.assign(new Error(message),{statusCode,code});}
 function clean(value,max=240){return String(value??"").trim().slice(0,max);}

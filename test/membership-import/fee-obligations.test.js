@@ -188,7 +188,7 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.equal(queuedReminder.status,"queued","Finance queue can retain its staff reminder even when the member opted out");
  assert.equal(queuedReminder.member_delivery_status,"suppressed");
  assert.match(queuedReminder.member_delivery_note,/opted|disabled/i);
- const retry=await scheduleMembershipFeeReminders(500);
+ await scheduleMembershipFeeReminders(500);
  const reminderCount=(await db.query("select count(*)::int count from membership_fee_reminder where obligation_id=(select id from membership_fee_obligation where application_id=$1)",[app.id])).rows[0].count;
  assert.equal(reminderCount,1,"re-running the scheduler must not duplicate the same date/balance reminder");
  const disposition=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"sponsored",amount:700,currency:"ETB",remark:"Test sponsor covers remaining fee",details:{sponsorName:"Disposable test sponsor"},evidenceFileId:evidence.id,idempotencyKey:"fee_sponsor_"+suffix.slice(0,32)},"fee-sponsor-record-"+suffix);

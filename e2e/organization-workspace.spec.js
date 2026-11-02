@@ -33,6 +33,10 @@ async function mockOrganizationApi(page, organizations, organizationAccess = org
     else if (path === "/api/v1/opportunity-inquiries") data = [];
     else if (/^\/api\/v1\/organizations\/[^/]+\/jobs$/.test(path)) data = [];
     else if (/^\/api\/v1\/organizations\/[^/]+\/users$/.test(path)) data = [];
+    else if (/^\/api\/v1\/organizations\/[^/]+\/outcomes$/.test(path)) data = {
+      jobs: [{ id: "job-e2e", title: "E2E opportunity", status: "published", applications: 5, active_pipeline: 2, offers: 1, accepted_offers: 1, hires: 1, scheduled_interviews: 0 }],
+      requisitions: [],
+    };
     else if (path === "/api/v1/organizations/org-e2e-1") {
       data = { ...organization(), users: [] };
     } else if (path === "/api/v1/organizations/org-e2e-1/users") data = [];
@@ -147,6 +151,8 @@ test.describe("MPA organization app entry and navigation", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/organizations");
     await expect(page.getByRole("heading", { name: "Your organization at a glance" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recruitment activity" })).toBeVisible();
+    await expect(page.getByText("Applications received")).toBeVisible();
     const organizationSwitcher = page.getByRole("combobox", { name: "Choose active organization" });
     await expect(organizationSwitcher).toBeEnabled();
     await expect(organizationSwitcher).toHaveValue("org-e2e-1");

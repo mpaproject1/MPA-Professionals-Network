@@ -1022,7 +1022,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 
 **Branch:** `feat/workstream-3-progress-members-workspace`  
 **PR:** #18  
-**Implementation head recorded before this documentation update:** `3fe042cc815888a302eef767875ce51c938ed491`  
+**Implementation head recorded before this documentation update:** `4e5522c8043ec918b0dd8b90f9bf6e2f3b344b10`  
 **Scope:** WP3 workbook/geography operational proof; WP4 Finance intake, reminders, reporting and authorization.
 
 ### WP3 — workbook and geography
@@ -1053,11 +1053,11 @@ The source and migration changes are committed. The latest PR Quality workflow l
 
 #### Finance payment intake
 
-- Added a CSV template/download and CSV preview path alongside the existing XLSX template. The CSV parser handles quoted fields, escaped quotes, CRLF and UTF-8 BOM; both formats use the same required-column and row validation.
+- Added a CSV template/download and CSV preview path alongside the existing XLSX template. The CSV parser handles quoted fields, escaped quotes, CRLF and UTF-8 BOM; both formats use the same required-column and row validation. Excel serial dates are normalized before Finance row validation.
 - Bulk apply now supports an explicit **Apply valid rows only** path. Each row is isolated by a database savepoint. Preview-invalid rows remain unapplied; a row that becomes invalid after preview is rolled back independently, marked as an error and audited without discarding other valid receipts.
 - The batch response returns created and failed row numbers and error details. The Finance UI retains the outcome and marks created rows as pending verification.
 - Every imported receipt is created as `pending`; bulk intake does not verify or activate a membership. A different Finance user is now required to verify a Finance-entered receipt; self-verification fails with `MAKER_CHECKER_REQUIRED`.
-- Added integration scenarios for CSV/XLSX preview, duplicate references within a workbook, unmatched membership, evidence-required method, method disabled after preview, partial row failure, batch replay, duplicate re-upload, pending-only creation and separate Finance verification.
+- Added integration scenarios for CSV/XLSX preview, quoted CSV fields, duplicate references within a workbook, unmatched membership, evidence-required method, method disabled after preview, savepoint-isolated partial row failure, batch replay, duplicate re-upload, pending-only creation, self-verification denial and separate Finance verification.
 
 #### Reminders and notification state
 
@@ -1076,7 +1076,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 
 ### Current validation and outstanding gates
 
-- Current PR head before this documentation commit: `3fe042cc815888a302eef767875ce51c938ed491`. The exact-head workflow lookup returned no Actions run or commit-status entries. The latest recorded PR Quality run remains an older failure on `491c554ae1e589d8358f54f2d1789e96f646b97e`, not this implementation head.
+- Current PR head before this documentation commit: `4e5522c8043ec918b0dd8b90f9bf6e2f3b344b10`. The exact-head workflow lookup returned no Actions run or commit-status entries. The latest recorded PR Quality run remains an older failure on `491c554ae1e589d8358f54f2d1789e96f646b97e`, not this implementation head.
 - No local test suite, PostgreSQL migration run, Biome, TypeScript, production build or Playwright result is claimed. All new integration tests and migrations remain **committed but unverified** until PR Quality executes against the final head.
 - The available GitHub connection supports run inspection and reruns but does not expose a workflow-dispatch action. The branch pushes made through this connection have not produced a new Actions run. Start PR Quality and the geography-reference workflow from GitHub Actions if automatic runs remain suppressed.
 - Do not enable Zone/Sub-city/District/Town selectors until an authoritative source dataset, source license, release date, stable codes and parent mappings are independently verified and imported.

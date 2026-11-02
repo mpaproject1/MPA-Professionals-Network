@@ -85,6 +85,7 @@ export default function Track() {
   const [copyNotice, setCopyNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [progressView, setProgressView] = useState<"all" | "attention" | "waiting" | "progress" | "history">("all");
+  const [progressCategory, setProgressCategory] = useState("all");
 
   async function copyReference(value: string) { const ref=String(value||"").trim(); if(!ref){setCopyNotice("No display reference is available yet.");return;} try { await navigator.clipboard.writeText(ref); setCopyNotice("Reference copied to clipboard."); } catch { setCopyNotice("Clipboard access is unavailable. Select the displayed reference and copy it manually."); } }
   async function respondToInterview(interviewId: string, status: "accepted" | "declined") {
@@ -146,7 +147,7 @@ export default function Track() {
     setError("");
     try {
       const page = await api<Tracking>(
-        `/api/v1/me/progress?limit=${PAGE_SIZE}&offset=${offset}&view=${progressView}`,
+        `/api/v1/me/progress?limit=${PAGE_SIZE}&offset=${offset}&view=${progressView}&category=${encodeURIComponent(progressCategory)}`,
         {},
         token,
       );
@@ -177,7 +178,7 @@ export default function Track() {
     } finally {
       setLoading(false);
     }
-  }, [token, progressView]);
+  }, [token, progressView, progressCategory]);
 
   useEffect(() => {
     void load();
@@ -225,7 +226,7 @@ export default function Track() {
         <Card>
           <div className="eyebrow">Application tracking</div>
           <h1 className="h1">Know where your application stands.</h1>
-          <p className="muted">Sign in to see membership, organization and job applications in one timeline. We show current status and the next useful action without exposing reviewer-only notes.</p>
+          <p className="muted">Sign in to see all your applications, service requests, verification, mentorship, networking, community participation and responses in one place. We show current status and the next useful action without exposing reviewer-only notes.</p>
           {error && <FormFeedback kind="error" message={error} onRetry={() => window.location.reload()} retryLabel="Try private link again" />}
           <div className="landing-actions">
             <Link className="btn btn-primary" href="/login?next=/track">Sign in to track</Link>
@@ -265,7 +266,8 @@ export default function Track() {
         ))}
       </div>
 
-      <nav className="row" aria-label="Progress filters" style={{ gap: 8, flexWrap: "wrap" }}>{([["all","All"],["attention","Needs my attention"],["waiting","Waiting for response"],["progress","In progress"],["history","History"]] as const).map(([value,label])=><button key={value} type="button" className={progressView===value?"btn btn-primary":"btn btn-ghost"} aria-pressed={progressView===value} onClick={()=>setProgressView(value)}>{label}</button>)}</nav>\n      {data?.errors?.length ? <div className="case-row" role="status"><b>Some progress sections are temporarily unavailable.</b><p className="muted">{data.errors.map(e=>e.category).filter((v,i,a)=>a.indexOf(v)===i).join(", ")} could not be loaded. Other records remain visible; refresh to retry.</p></div> : null}\n      <section className="grid" aria-label="Member progress" style={{ gap: 12 }}>
+      <nav className="row" aria-label="Progress filters" style={{ gap: 8, flexWrap: "wrap" }}>{([["all","All"],["attention","Needs my attention"],["waiting","Waiting for response"],["progress","In progress"],["history","History"]] as const).map(([value,label])=><button key={value} type="button" className={progressView===value?"btn btn-primary":"btn btn-ghost"} aria-pressed={progressView===value} onClick={()=>setProgressView(value)}>{label}</button>)}</nav>\n      {data?.errors?.length ? <div className="case-row" role="status"><b>Some progress sections are temporarily unavailable.</b><p className="muted">{data.errors.map(e=>e.category).filter((v,i,a)=>a.indexOf(v)===i).join(", ")} could not be loaded. Other records remain visible; refresh to retry.</p></div> : null}\n      <label className="row" style={{gap:8,flexWrap:"wrap"}}>Category <select aria-label="Filter progress by category" value={progressCategory} onChange={event=>setProgressCategory(event.target.value)}><option value="all">All categories</option><option value="membership">Membership</option><option value="jobs">Jobs</option><option value="organizations">Organizations</option><option value="services">Services</option><option value="mentorship">Mentorship</option><option value="verification">Verification</option><option value="record_claims">Record claims</option><option value="networking">Networking</option><option value="collaboration">Collaboration</option><option value="initiatives">Initiatives</option><option value="referrals">Referrals</option><option value="recognition">Recognition</option></select></label>
+      <section className="grid" aria-label="Member progress" style={{ gap: 12 }}>
         {loading && !data && <Card><OperationStatus state="loading" title="Loading your application progress" detail="We’re gathering your membership, organization and job application updates. Your saved applications are not being changed." /></Card>}
         {(data?.items || []).map((item) => {
           const action = actionFor(item);

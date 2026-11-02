@@ -21,7 +21,7 @@ const SOURCE_DEFINITIONS = [
 const ARRAY_KEYS = ["items", "rows", "records", "applications", "cases", "requests", "participations", "claims", "referrals", "matches", "mentorships", "inquiries", "initiatives"];
 const MEMBER_ACTION = new Set(["draft", "correction_required", "changes_requested", "action_required", "awaiting_member", "pending_member", "needs_response", "needs_acceptance", "proposed", "payment_pending", "payment_required", "awaiting_confirmation"]);
 const CLOSED = new Set(["rejected", "declined", "withdrawn", "cancelled", "canceled", "expired", "closed"]);
-const COMPLETED = new Set(["completed", "complete", "verified", "approved", "activated", "hired", "fulfilled", "delivered"]);
+const COMPLETED = new Set(["completed", "complete", "verified", "approved", "activated", "hired", "fulfilled", "delivered", "awarded"]);
 const ACTIVE = new Set(["active", "accepted", "in_progress", "in progress", "matched", "enrolled", "ongoing", "scheduled"]);
 const EXTERNAL_WAIT = new Set(["awaiting_response", "waiting_for_response", "awaiting_provider", "pending_provider", "pending_mentor", "pending_organization", "waiting_for_employer", "awaiting_employer", "awaiting_another_party"]);
 

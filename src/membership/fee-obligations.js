@@ -52,7 +52,7 @@ async function archiveFeeReminderEvents(db,obligationId,reason,balance=null,erro
  const params=balance===null?[obligationId]:[obligationId,balance];
  await db.query("update notification_push_delivery set status='cancelled',last_error_code=$"+(params.length+1)+",updated_at=now() where status='pending' and notification_event_id in (select member_outbox_id from membership_fee_reminder where obligation_id=$1 and status in ('scheduled','queued')"+predicate+" and member_outbox_id is not null)",[...params,errorCode]);
  await db.query("update notification_event set archived_at=coalesce(archived_at,now()) where id in (select member_outbox_id from membership_fee_reminder where obligation_id=$1 and status in ('scheduled','queued')"+predicate+" and member_outbox_id is not null)",params);
- await db.query("update membership_fee_reminder set status='cancelled',member_delivery_note=$"+(params.length+1)+" where obligation_id=$1 and status in ('scheduled','queued')"+predicate,[...params,reason]);
+ await db.query("update membership_fee_reminder set status='cancelled',member_delivery_status='superseded',member_delivery_note=$"+(params.length+1)+" where obligation_id=$1 and status in ('scheduled','queued')"+predicate,[...params,reason]);
 }
 async function validateEvidence(db,userId,fileId){
  if(!fileId)return false;
@@ -415,7 +415,7 @@ export async function scheduleMembershipFeeReminders(batchSize=100){
    const key="membership-balance:"+item.obligation_id+":"+String(item.due_date)+":"+Number(item.outstanding_balance).toFixed(2);
    await tx.query("update notification_push_delivery set status='cancelled',last_error_code='REMINDER_SUPERSEDED',updated_at=now() where status='pending' and notification_event_id in (select member_outbox_id from membership_fee_reminder where obligation_id=$1 and status in ('scheduled','queued') and due_balance<>$2 and member_outbox_id is not null)",[item.obligation_id,item.outstanding_balance]);
    await tx.query("update notification_event set archived_at=coalesce(archived_at,now()) where id in (select member_outbox_id from membership_fee_reminder where obligation_id=$1 and status in ('scheduled','queued') and due_balance<>$2 and member_outbox_id is not null)",[item.obligation_id,item.outstanding_balance]);
-   await tx.query("update membership_fee_reminder set status='cancelled',member_delivery_note='Balance changed before delivery; a current reminder will be queued if still due.' where obligation_id=$1 and status in ('scheduled','queued') and due_balance<>$2",[item.obligation_id,item.outstanding_balance]);
+   await tx.query("update membership_fee_reminder set status='cancelled',member_delivery_status='superseded',member_delivery_note='Balance changed before delivery; a current reminder will be queued if still due.' where obligation_id=$1 and status in ('scheduled','queued') and due_balance<>$2",[item.obligation_id,item.outstanding_balance]);
    const reminder=(await tx.query("insert into membership_fee_reminder(obligation_id,reminder_key,due_balance,currency,scheduled_for,status) values($1,$2,$3,$4,now(),'queued') on conflict(reminder_key) do nothing returning id",[item.obligation_id,key,item.outstanding_balance,item.currency])).rows[0];
    if(!reminder)continue;
    const message="A membership balance of "+item.currency+" "+Number(item.outstanding_balance).toFixed(2)+" remains due"+(Number(item.days_until_due)>0?" in "+item.days_until_due+" day(s)":" (overdue)")+". Record or confirm your next payment to update the balance.";
@@ -433,7 +433,7 @@ export async function scheduleMembershipFeeReminders(batchSize=100){
   }
   await tx.query("update notification_push_delivery set status='cancelled',last_error_code='REMINDER_SETTLED',updated_at=now() where status='pending' and notification_event_id in (select r.member_outbox_id from membership_fee_reminder r join membership_fee_obligation_balance b on b.obligation_id=r.obligation_id where r.status in ('scheduled','queued') and b.outstanding_balance=0 and r.member_outbox_id is not null)");
   await tx.query("update notification_event set archived_at=coalesce(archived_at,now()) where id in (select r.member_outbox_id from membership_fee_reminder r join membership_fee_obligation_balance b on b.obligation_id=r.obligation_id where r.status in ('scheduled','queued') and b.outstanding_balance=0 and r.member_outbox_id is not null)");
-  await tx.query("update membership_fee_reminder r set status='cancelled',member_delivery_note='Balance fully settled before reminder delivery.' from membership_fee_obligation_balance b where r.obligation_id=b.obligation_id and r.status in ('scheduled','queued') and b.outstanding_balance=0");
+  await tx.query("update membership_fee_reminder r set status='cancelled',member_delivery_status='superseded',member_delivery_note='Balance fully settled before reminder delivery.' from membership_fee_obligation_balance b where r.obligation_id=b.obligation_id and r.status in ('scheduled','queued') and b.outstanding_balance=0");
   return {processed:obligations.length,queued,suppressed};
  });
 }

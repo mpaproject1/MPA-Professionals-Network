@@ -1,7 +1,7 @@
 import { getPool } from "./db.js";
 import { makeXlsx } from "./reports.js";
 
-const MEMBER_ROLES = ["system_admin", "admin", "membership_reviewer", "finance_officer"];
+const MEMBER_ROLES = ["system_admin", "admin", "membership_reviewer"];
 const ACCOUNT_ROLES = ["system_admin", "admin", "platform_admin"];
 const MAX_ROWS = 20000;
 const PAGE_SIZE = 500;
@@ -18,7 +18,7 @@ function isPlatformAdmin(identity) { return roles(identity).some(role => ACCOUNT
 function canViewOrganizations(identity) { return isPlatformAdmin(identity) || permissions(identity).includes("organizations.manage"); }
 function authorize(identity, kind) {
   if (kind === "members") {
-    if (!roles(identity).some(role => MEMBER_ROLES.includes(role)) && !permissions(identity).includes("members.import")) {
+    if (!roles(identity).some(role => MEMBER_ROLES.includes(role)) && !permissions(identity).some(permission => ["members.view", "members.export"].includes(permission))) {
       throw fail(403, "Member directory export requires the same authorized membership-administration access as the member catalogue.", "FORBIDDEN");
     }
     return;
@@ -72,7 +72,7 @@ const PRESETS = [
 
 function allowedFields(identity, kind) {
   authorize(identity, kind);
-  const canSeeSensitive = isPlatformAdmin(identity) || (kind === "members" && roles(identity).some(role => MEMBER_ROLES.includes(role))) || permissions(identity).some(code => ["users.view", "members.import", "members.export"].includes(code));
+  const canSeeSensitive = isPlatformAdmin(identity) || (kind === "members" && roles(identity).some(role => MEMBER_ROLES.includes(role))) || permissions(identity).some(code => ["users.view", "members.export"].includes(code));
   return DEFINITIONS[kind].filter(field => (!field.sensitive || canSeeSensitive) && (!field.organization || canViewOrganizations(identity)));
 }
 export function listDirectoryExportFields(identity, kind) {

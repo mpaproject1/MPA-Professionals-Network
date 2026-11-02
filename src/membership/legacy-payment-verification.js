@@ -31,7 +31,7 @@ export async function listLegacyMembershipPaymentVerificationQueue(identity) {
       where user_id=mr.user_id and import_id=mr.source_import_id
       order by created_at desc limit 1
     ) inv on true
-    where mr.source='legacy_import'
+    where mr.source='legacy_import' and mr.status<>'merged'
       and not exists (
         select 1 from membership_legacy_payment_verification v
         where v.membership_id=mr.id

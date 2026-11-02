@@ -330,7 +330,7 @@ export function OrganizationWorkspaceOverview({
       <div className={styles.metrics} aria-label="Organization registration summary">
         <div className={styles.metric}><span>Organizations linked</span><strong>{organizations.length.toString().padStart(2, "0")}</strong></div>
         <div className={styles.metric}><span>Verified</span><strong>{verified.length.toString().padStart(2, "0")}</strong></div>
-        <div className={styles.metric}><span>Awaiting review</span><strong>{awaiting.length.toString().padStart(2, "0")}</strong></div>
+        <div className={styles.metric}><span>Org. cases awaiting review</span><strong>{awaiting.length.toString().padStart(2, "0")}</strong></div>
         <div className={styles.metric}><span>Need attention</span><strong>{attention.length.toString().padStart(2, "0")}</strong></div>
       </div>
       <section className={styles.activitySummary} aria-label="Live organization recruitment activity">

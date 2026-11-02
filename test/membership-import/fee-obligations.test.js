@@ -14,6 +14,7 @@ import {
 } from "../../src/membership/fee-obligations.js";
 import { parseXlsxRows } from "../../src/platform/xlsx.js";
 import * as membership from "../../src/membership/service.js";
+import * as organizationJobs from "../../src/organization-jobs/service.js";
 import { getPool } from "../../src/platform/db.js";
 import { authorizePrivateUpload, receivePrivateUpload, confirmPrivateUpload, readAuthorizedPrivateFile } from "../../src/platform/private-file-storage.js";
 
@@ -162,6 +163,7 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  
  const zeroApplicant=await membership.register({email:"fee-zero-"+suffix+"@example.test",password:"ZeroCashSecurePassword!2026",firstName:"Zero",lastName:"Cash",phone:"08"+digits},"fee-zero-register-"+suffix);
  const zeroApplicantId=zeroApplicant.user.id;
+ const sponsorOrg=await organizationJobs.registerOrganization(zeroApplicantId,{legalName:"Fee Sponsor "+suffix,displayName:"Fee Sponsor "+suffix},"fee-sponsor-organization-"+suffix);
  await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='reviewer' on conflict do nothing",[zeroApplicantId]);
  const zeroApp=await membership.createApplication(zeroApplicantId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:"fee_zero_app_"+suffix.slice(0,32)},"fee-zero-application-"+suffix);
  const zeroEvidenceBytes=Buffer.from("Full sponsorship approval evidence for zero-cash membership settlement.");
@@ -169,8 +171,13 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  await receivePrivateUpload(zeroApplicantId,zeroUpload.uploadId,zeroUpload.uploadToken,zeroEvidenceBytes);
  const zeroEvidence=await confirmPrivateUpload(zeroApplicantId,zeroUpload.uploadId);
  const zeroFinance={sub:zeroApplicantId,roles:["finance_officer"],permissions:[]};
- const fullSponsorship=await recordBalanceDisposition(zeroFinance,{applicationId:zeroApp.id,dispositionType:"sponsored",amount:1200,currency:"ETB",remark:"Full product fee covered by sponsor",details:{sponsorName:"Full fee sponsor"},evidenceFileId:zeroEvidence.id,idempotencyKey:"fee_zero_sponsor_"+suffix.slice(0,32)},"fee-zero-sponsor-"+suffix);
+ const sponsorChoices=await listSponsoringOrganizations(zeroFinance);
+ assert.ok(sponsorChoices.some(item=>item.id===sponsorOrg.id),"registered sponsoring bodies must be available to Finance");
+ const fullSponsorship=await recordBalanceDisposition(zeroFinance,{applicationId:zeroApp.id,dispositionType:"sponsored",amount:1200,currency:"ETB",remark:"Full product fee covered by sponsor",details:{sponsorOrganizationId:sponsorOrg.id},evidenceFileId:zeroEvidence.id,idempotencyKey:"fee_zero_sponsor_"+suffix.slice(0,32)},"fee-zero-sponsor-"+suffix);
  await decideBalanceDisposition(approverFinance,fullSponsorship.disposition.id,{decision:"approved",note:"Full fee sponsorship independently verified."},"fee-zero-sponsor-approve-"+suffix);
+ const zeroAdjustment=(await db.query("select details from membership_fee_adjustment where obligation_id=(select id from membership_fee_obligation where application_id=$1) and status='approved'",[zeroApp.id])).rows[0];
+ assert.equal(zeroAdjustment.details.sponsorSource,"registered_organization");
+ assert.equal(zeroAdjustment.details.sponsorOrganizationId,sponsorOrg.id);
  const zeroBalance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[zeroApp.id])).rows[0];
  assert.equal(Number(zeroBalance.verified_cash),0,"full sponsorship must not create a cash receipt");
  assert.equal(Number(zeroBalance.approved_non_cash),1200);

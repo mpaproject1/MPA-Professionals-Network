@@ -135,6 +135,7 @@ function mapRecord(record, definition) {
     status,
     statusLabel,
     responsibility: state,
+    responsibleParty: ({ member_action: "You", mpa_action: "MPA review team", external_response: "Another participant", in_progress: "Active engagement", completed: "Recorded outcome", closed: "Closed", unknown: "Not confirmed" })[state],
     nextAction,
     createdAt,
     submittedAt: createdAt,
@@ -186,7 +187,7 @@ export function buildMemberProgress(sourceResults, { limit = 50, offset = 0, vie
     if (view === "progress") return item.responsibility === "in_progress";
     if (view === "history") return ["completed", "closed"].includes(item.responsibility);
     return true;
-  }).sort((a, b) => priority(a) - priority(b) || (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  }).sort((a, b) => {\n    const rank = priority(a) - priority(b);\n    if (rank) return rank;\n    const aDue = a.responsibility === "member_action" && a.dueAt ? Date.parse(a.dueAt) : Number.POSITIVE_INFINITY;\n    const bDue = b.responsibility === "member_action" && b.dueAt ? Date.parse(b.dueAt) : Number.POSITIVE_INFINITY;\n    if (aDue !== bDue) return aDue - bDue;\n    return (b.updatedAt || "").localeCompare(a.updatedAt || "");\n  });
   const pageSize = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 100);
   const pageOffset = Math.max(Number.parseInt(offset, 10) || 0, 0);
   const counts = {

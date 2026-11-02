@@ -94,10 +94,11 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
     `, [membershipId, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference, financeNote, identity.sub])).rows[0];
 
     await tx.query(
+    await tx.query(
       "update member_invitation set expires_at=greatest(expires_at,now()+interval '7 days') where user_id=$1 and import_id=$2 and consumed_at is null",
       [membership.user_id, membership.source_import_id]
-    const outstandingInvitation = await tx.query("select id from member_invitation where user_id=$1 and import_id=$2 and consumed_at is null", [membership.user_id, membership.source_import_id]);
     );
+    const outstandingInvitation = await tx.query("select id from member_invitation where user_id=$1 and import_id=$2 and consumed_at is null", [membership.user_id, membership.source_import_id]);
     await tx.query(
       "insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'legacy_payment_verified',now(),$2,'legacy_import',$3)",
       [membershipId, identity.sub, JSON.stringify({ verificationId: verification.id, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference })]

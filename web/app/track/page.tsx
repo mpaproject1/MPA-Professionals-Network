@@ -16,17 +16,25 @@ type Item = {
   trackingReference?: string;
   type: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   status: string;
   statusLabel: string;
   updatedAt: string;
   submittedAt: string | null;
   nextAction: string;
-  details: Record<string, unknown>;
+  responsibility?: "member_action" | "mpa_action" | "external_response" | "in_progress" | "completed" | "closed" | "unknown";
+  href?: string;
+  category?: string;
+  recordId?: string;
+  createdAt?: string | null;
+  description?: string;
+  details?: Record<string, unknown>;
 };
 type Tracking = {
   items: Item[];
-  summary: { total: number; active: number; nextSteps: number; jobApplications: number };
+  summary: { total: number; active: number; nextSteps: number; jobApplications: number; memberships?: number; organizations?: number };
+  counts?: { needsAttention?: number; waiting?: number; inProgress?: number; completed?: number };
+  errors?: { source: string; category: string; message: string }[];
   limit: number;
   offset: number;
   hasMore: boolean;
@@ -45,11 +53,9 @@ type JobProgress = {
 const PAGE_SIZE = 20;
 
 function actionFor(item: Item) {
-  if (item.nextAction === "No action required") return null;
-  if (item.type === "membership") return { href: "/membership", label: "Open membership" };
-  if (item.type === "organization") return { href: "/organizations", label: "Open organization" };
-  if (item.type === "job") return { href: "/jobs", label: "Open opportunities" };
-  return { href: "/dashboard", label: "Open dashboard" };
+  if (["completed", "closed"].includes(item.responsibility || "") || item.nextAction === "No action required") return null;
+  const href = item.href && item.href.startsWith("/") && !item.href.startsWith("//") ? item.href : ({ membership: "/membership", organization: "/organizations", job: "/jobs" }[item.type] || "/dashboard");
+  return { href, label: item.responsibility === "member_action" ? "Continue and respond" : "Open " + (item.category || item.type).toLowerCase() };
 }
 
 function dateLabel(value?: string | null, includeTime = false) {
@@ -76,6 +82,7 @@ export default function Track() {
   const [error, setError] = useState("");
   const [copyNotice, setCopyNotice] = useState("");
   const [loading, setLoading] = useState(true);
+  const [progressView, setProgressView] = useState<"all" | "attention" | "waiting" | "progress" | "history">("all");
 
   async function copyReference(value: string) { const ref=String(value||"").trim(); if(!ref){setCopyNotice("No display reference is available yet.");return;} try { await navigator.clipboard.writeText(ref); setCopyNotice("Reference copied to clipboard."); } catch { setCopyNotice("Clipboard access is unavailable. Select the displayed reference and copy it manually."); } }
   async function respondToInterview(interviewId: string, status: "accepted" | "declined") {
@@ -137,7 +144,7 @@ export default function Track() {
     setError("");
     try {
       const page = await api<Tracking>(
-        `/api/v1/me/application-tracking?limit=${PAGE_SIZE}&offset=${offset}`,
+        `/api/v1/me/progress?limit=${PAGE_SIZE}&offset=${offset}&view=${progressView}`,
         {},
         token,
       );
@@ -149,11 +156,11 @@ export default function Track() {
         : page;
       dataRef.current = next;
       setData(next);
-      const jobItems = page.items.filter((item) => item.type === "job");
+      const jobItems = page.items.filter((item) => item.type === "job" || item.type === "job_application");
       if (jobItems.length) {
         const progressRows = await Promise.all(jobItems.map(async (item) => {
           try {
-            const progress = await api<JobProgress>("/api/v1/job-applications/" + encodeURIComponent(item.id) + "/progress", {}, token);
+            const progress = await api<JobProgress>("/api/v1/job-applications/" + encodeURIComponent(item.recordId || item.id) + "/progress", {}, token);
             setProgressErrors((current) => { const next = { ...current }; delete next[item.id]; return next; });
             return [item.id, progress] as const;
           } catch (cause) {
@@ -168,7 +175,7 @@ export default function Track() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, progressView]);
 
   useEffect(() => {
     void load();
@@ -256,7 +263,7 @@ export default function Track() {
         ))}
       </div>
 
-      <section className="grid" aria-label="Application progress" style={{ gap: 12 }}>
+      <nav className="row" aria-label="Progress filters" style={{ gap: 8, flexWrap: "wrap" }}>{([["all","All"],["attention","Needs my attention"],["waiting","Waiting for response"],["progress","In progress"],["history","History"]] as const).map(([value,label])=><button key={value} type="button" className={progressView===value?"btn btn-primary":"btn btn-ghost"} aria-pressed={progressView===value} onClick={()=>setProgressView(value)}>{label}</button>)}</nav>\n      {data?.errors?.length ? <div className="case-row" role="status"><b>Some progress sections are temporarily unavailable.</b><p className="muted">{data.errors.map(e=>e.category).filter((v,i,a)=>a.indexOf(v)===i).join(", ")} could not be loaded. Other records remain visible; refresh to retry.</p></div> : null}\n      <section className="grid" aria-label="Member progress" style={{ gap: 12 }}>
         {loading && !data && <Card><OperationStatus state="loading" title="Loading your application progress" detail="We’re gathering your membership, organization and job application updates. Your saved applications are not being changed." /></Card>}
         {(data?.items || []).map((item) => {
           const action = actionFor(item);
@@ -266,18 +273,18 @@ export default function Track() {
                 <div style={{ minWidth: 0, flex: "1 1 260px" }}>
                   <Badge>{item.type.replaceAll("_", " ")}</Badge>
                   <h2 className="h2" style={{ margin: "8px 0 4px" }}>{item.title}</h2>
-                  <p className="muted" style={{ margin: 0 }}>{item.subtitle}</p>
+                  <p className="muted" style={{ margin: 0 }}>{item.subtitle || item.description || item.category}</p>
                   <p className="muted" style={{ margin: "4px 0 0" }}>Reference: {item.trackingReference || "Not assigned yet"}</p>{item.trackingReference&&<button type="button" className="btn btn-ghost" onClick={()=>void copyReference(item.trackingReference||"")}><ClipboardCopy size={15}/> Copy reference</button>}{copyNotice&&<p className="muted" role="status">{copyNotice}</p>}
                 </div>
                 <span className="badge">{item.statusLabel || humanStatus(item.status)}</span>
               </div>
               <div className="track-card-grid">
                 <div><span>Last updated</span><b>{dateLabel(item.updatedAt, true)}</b></div>
-                <div><span>Next step</span><b>{item.nextAction || "Check back for updates"}</b></div>
+                <div><span>What happens next</span><b>{item.nextAction || (item.responsibility === "member_action" ? "Your response is needed" : item.responsibility === "external_response" ? "Waiting for another participant" : item.responsibility === "mpa_action" ? "Waiting for MPA review" : "Continue your journey")}</b></div>
               </div>
               <div className="tracker-line">
                 <span className="timeline-dot" />
-                <div><b>{item.statusLabel || humanStatus(item.status)}</b><p className="muted">Submitted {dateLabel(item.submittedAt)}</p></div>
+                <div><b>{item.statusLabel || humanStatus(item.status)}</b><p className="muted">Started {dateLabel(item.submittedAt || item.createdAt)}</p></div>
               </div>
               {item.type === "job" && progressErrors[item.id] && <FormFeedback kind="error" message={progressErrors[item.id]} onRetry={() => void load()} retryLabel="Refresh job progress" />}
               {item.type === "job" && jobProgress[item.id] && <section className="grid" aria-label="Job application details" style={{ gap: 10, marginTop: 12 }}>
@@ -306,7 +313,7 @@ export default function Track() {
         })}
         {!loading && !error && data?.items.length === 0 && (
           <div>
-            <EmptyState title="No applications to show yet" description="When you submit a membership, organization or job application, its progress will appear here." actionHref="/membership" actionLabel="Explore membership" />
+            <EmptyState title="No progress records to show yet" description="When you apply, request a service, submit a claim, join an initiative or begin mentorship, its progress will appear here." actionHref="/membership" actionLabel="Explore membership" />
             <p className="mt-2"><Link className="btn btn-ghost" href="/jobs">Browse opportunities</Link></p>
           </div>
         )}
@@ -315,7 +322,7 @@ export default function Track() {
             <button className="btn btn-ghost" type="button" onClick={() => void load(true)} disabled={loading}>
               {loading ? "Loading applications…" : "Load more applications"}
             </button>
-            <span className="muted">Showing {data.items.length} of {data.summary.total}</span>
+            <span className="muted">Showing {data.items.length} of {data.totalFiltered ?? data.summary.total}</span>
           </div>
         )}
       </section>

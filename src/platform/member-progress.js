@@ -40,13 +40,19 @@ function asDate(value) {
 function normalizedStatus(record) {
   return String(first(record, ["status", "state", "application_status", "verification_status", "consent_status"]) || "unknown").toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
 }
-function responsibility(status) {
+function responsibility(status, domain, record) {
+  if (domain === "mentorship_match") {
+    if (["proposed", "matched"].includes(status)) return "member_action";
+    if (status === "accepted") return "external_response";
+  }
+  if (domain === "mentorship_request" && ["requested", "submitted", "matching", "matched"].includes(status)) return status === "matched" ? "member_action" : "mpa_action";
+  if (domain === "organization_mentorship" && ["submitted", "pending", "requested"].includes(status)) return "external_response";
   if (MEMBER_ACTION.has(status)) return "member_action";
   if (CLOSED.has(status)) return "closed";
   if (COMPLETED.has(status)) return "completed";
   if (ACTIVE.has(status)) return "in_progress";
   if (status === "unknown") return "unknown";
-  if (["submitted", "pending", "in_review", "under_review", "screening", "shortlisted", "awaiting_review", "proposed_to_mentor"].includes(status)) return "mpa_action";
+  if (["submitted", "pending", "requested", "matching", "in_review", "under_review", "screening", "shortlisted", "awaiting_review", "proposed_to_mentor"].includes(status)) return "mpa_action";
   return "external_response";
 }
 function safeId(value) {
@@ -84,7 +90,7 @@ function mapRecord(record, definition, index) {
     updatedAt,
     trackingReference: trackingReference ? String(trackingReference) : null,
     href,
-    historyAvailable: Boolean(first(record, ["status_history", "events", "timeline", "history"])),
+    historyAvailable: history.length > 0,\n    history,
   };
 }
 function priority(item) {

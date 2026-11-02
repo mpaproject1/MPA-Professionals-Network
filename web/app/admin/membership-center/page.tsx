@@ -7,6 +7,8 @@ import { OperationStatus } from "../../../components/operation-status";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";
+import { MembershipFeeBalanceSummary } from "../../../components/membership-fee-balance-summary";
+import { MemberGeographySummary } from "../../../components/member-geography-summary";
 import styles from "./membership-center.module.css";
 
 type ReportRow = Record<string, string | number | null>;

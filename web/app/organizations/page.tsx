@@ -521,6 +521,19 @@ export default function Organizations() {
         <a className="btn btn-ghost mt-3 inline-flex" href="/organizations/team">Manage team & access</a>
       </div>
 
+          <OrganizationWorkspaceOverview
+            organizations={organizations}
+            onRegister={() => {
+              if (!token) {
+                window.location.assign("/login?next=/organizations");
+                return;
+              }
+              setRegistrationStep(1);
+              setShowForm(true);
+              document.getElementById("org-registration")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          />
+
 
       {!token ? (
         <Card>
@@ -633,18 +646,7 @@ export default function Organizations() {
                 </div>
               ))}
           </Card>
-          <OrganizationWorkspaceOverview
-            organizations={organizations}
-            onRegister={() => {
-              if (!token) {
-                window.location.assign("/login?next=/organizations");
-                return;
-              }
-              setRegistrationStep(1);
-              setShowForm(true);
-              document.getElementById("org-registration")?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-          />
+
           <Card id="your-organizations">
             <div className="row">
               <div>

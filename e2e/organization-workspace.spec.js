@@ -193,6 +193,19 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("combobox", { name: "Organization workspace" })).toHaveValue("org-e2e-2");
   });
 
+  test("dashboard does not fabricate recruitment totals when the authorized outcome API is unavailable", async ({ page }) => {
+    await mockOrganizationApi(page, [organization()]);
+    await page.route("**/api/v1/organizations/*/outcomes", (route) => route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "FORBIDDEN", message: "Not permitted." } }),
+    }));
+    await page.goto("/organizations");
+    await expect(page.getByText(/Live recruitment totals are not available/)).toBeVisible();
+    await expect(page.getByText("Applications received", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Active pipeline", { exact: true })).toHaveCount(0);
+  });
+
   test("read-only organization members do not see publishing, reviewing or team-administration folders", async ({ page }) => {
     await mockOrganizationApi(page, [organization({ role_code: "read_only" })]);
     await page.goto("/organizations");

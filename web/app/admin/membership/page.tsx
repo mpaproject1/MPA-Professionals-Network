@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { OperationStatus } from "../../../components/operation-status";
 import { Card } from "../../../components/ui";
+import { AdminPageHeader } from "../admin-page-header";
 import { api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 import MembershipWorkspace from "../../membership/workspace";
@@ -54,5 +55,5 @@ export default function MembershipAdministrationPage() {
     return <Card><h1 className="h1">You do not have access to this workspace</h1><p className="muted">Membership application review and activation are available only to authorized membership reviewers and administrators. Finance authority does not grant membership decision access. Your account and membership records have not been changed.</p><a className="btn btn-ghost" href="/membership">Return to my membership</a></Card>;
   }
 
-  return <><div className="grid">{canManageMethods && <Card><div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><div><h2 className="h2">Finance configuration</h2><p className="muted">Manage member-facing bank, Telebirr and manual payment instructions.</p></div><a className="btn btn-ghost" href="/admin/membership/payment-methods">Payment methods</a></div></Card>}</div><MembershipWorkspace adminWorkspace /></>;
+  return <><div className="grid"><AdminPageHeader eyebrow="MPA · Membership management" title="Membership applications" description="Review eligibility decisions and complete authorized membership lifecycle actions. Finance verification remains a separate workflow." actions={<a className="btn btn-primary" href="/admin/membership-center">Membership Center dashboard</a>} />{canManageMethods && <Card><div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><div><h2 className="h2">Finance configuration</h2><p className="muted">Manage member-facing bank, Telebirr and manual payment instructions.</p></div><a className="btn btn-ghost" href="/admin/membership/payment-methods">Payment methods</a></div></Card>}</div><MembershipWorkspace adminWorkspace /></>;
 }

@@ -169,6 +169,8 @@ export function OrganizationWorkspaceOverview({
   organizations,
   organizationAccess,
   token,
+  activeFolderKey,
+  onActiveFolderChange,
   authenticated,
   organizationLookupReady,
   onRetry,
@@ -177,6 +179,8 @@ export function OrganizationWorkspaceOverview({
   organizations: Organization[];
   organizationAccess: OrganizationAccess[];
   token: string;
+  activeFolderKey: string;
+  onActiveFolderChange: (key: string) => void;
   authenticated: boolean;
   organizationLookupReady: boolean;
   onRetry: () => void;
@@ -190,7 +194,6 @@ export function OrganizationWorkspaceOverview({
   });
   const attention = organizations.filter((item) => ["correction_required", "rejected"].includes(item.verification_case_status || ""));
   const hasVerifiedOrganization = workspaceReady.length > 0;
-  const [activeFolderKey, setActiveFolderKey] = useState("publishing");
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
   useEffect(() => {
     if (workspaceReady.length === 0) {
@@ -234,6 +237,11 @@ export function OrganizationWorkspaceOverview({
   const activeRoles = selectedOrganization ? [selectedOrganization.role_code || ""] : [];
   const visibleFolders = folders.filter((folder) => !folder.allowedRoles || folder.allowedRoles.some((role) => activeRoles.includes(role)));
   const activeFolder = visibleFolders.find((folder) => folder.key === activeFolderKey) || visibleFolders[0];
+  useEffect(() => {
+    if (visibleFolders.length > 0 && !visibleFolders.some((folder) => folder.key === activeFolderKey)) {
+      onActiveFolderChange(visibleFolders[0].key);
+    }
+  }, [visibleFolders, activeFolderKey, onActiveFolderChange]);
   const organizationHref = (href: string) => {
     const [path, hash] = href.split("#");
     if (!selectedOrganizationId || !["/recruitment", "/organizations/reports", "/organizations/team"].includes(path)) return href;
@@ -418,7 +426,7 @@ export function OrganizationWorkspaceOverview({
                   aria-selected={selected}
                   aria-controls="organization-folder-panel"
                   tabIndex={selected ? 0 : -1}
-                  onClick={() => setActiveFolderKey(folder.key)}
+                  onClick={() => onActiveFolderChange(folder.key)}
                   onKeyDown={(event) => {
                     if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(event.key)) return;
                     event.preventDefault();

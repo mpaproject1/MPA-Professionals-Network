@@ -14,6 +14,8 @@ const SOURCE_DEFINITIONS = [
   ["memberInitiatives", "Initiatives", "/serve-community/manage", "initiative"],
   ["referrals", "Referrals", "/referrals", "referral"],
   ["candidateReferrals", "Referrals", "/referrals/outcomes", "employment_referral"],
+  ["recognitionNominations", "Recognition", "/community-impact/recognition", "recognition_nomination"],
+  ["recognitionAwards", "Recognition", "/community-impact/recognition", "recognition_award"],
 ];
 
 const ARRAY_KEYS = ["items", "rows", "records", "applications", "cases", "requests", "participations", "claims", "referrals", "matches", "mentorships", "inquiries", "initiatives"];
@@ -63,7 +65,7 @@ function mapRecord(record, definition, index) {
   const [source, baseCategory, href, baseDomain] = definition;
   const domain = source === "applications" ? String(record.type || baseDomain) : baseDomain;
   const category = source === "applications" ? ({ membership: "Membership", job: "Jobs", organization: "Organizations" }[domain] || baseCategory) : baseCategory;
-  const status = normalizedStatus(record);
+  const status = source === "recognitionAwards" ? "awarded" : normalizedStatus(record);
   const id = safeId(first(record, ["id", "request_id", "case_id", "application_id", "claim_id", "attribution_id"]));
   if (!id) return null;
   const title = String(first(record, ["title", "service_title", "job_title", "program_name", "project_title", "subject", "goals", "name"]) || category + " request");
@@ -114,7 +116,8 @@ export function buildMemberProgress(sourceResults, { limit = 50, offset = 0, vie
       continue;
     }
     availableSources.push(key);
-    for (const [index, record] of rowsOf(result.value).entries()) {
+    const sourceRows = key === "recognitionNominations" ? (result.value?.nominations || []) : key === "recognitionAwards" ? (result.value?.awards || []) : rowsOf(result.value);
+    for (const [index, record] of sourceRows.entries()) {
       const item = mapRecord(record, definition, index);
       if (item) items.push(item);
     }

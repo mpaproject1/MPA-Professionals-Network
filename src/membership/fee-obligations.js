@@ -105,19 +105,19 @@ export async function recordMembershipReceipt(identity,input={},requestId){
  if(reference.length<4)throw problem(400,"Enter a receipt, bank or transaction reference of at least four characters.","PAYMENT_REFERENCE_REQUIRED");
  if(!/^[A-Za-z0-9_-]{16,100}$/.test(idem))throw problem(400,"Provide a unique idempotency key of 16–100 letters, digits, underscores or dashes.","IDEMPOTENCY_KEY_REQUIRED");
  return withTransaction(async db=>{
-  const obligation=await obligationFor(db,input,identity.sub),balance=await balanceFor(db,obligation.id);
+  const obligation=await obligationFor(db,input,identity.sub),key="finance-membership:"+idem;
+  const existing=(await db.query("select pt.id,pt.amount,pt.currency,pt.status,pt.purpose_reference,op.obligation_id from payment_transaction pt left join membership_fee_obligation_payment op on op.payment_transaction_id=pt.id where pt.idempotency_key=$1 for update of pt",[key])).rows[0];
+  if(existing){
+   if(Number(existing.amount)!==amount||existing.currency!==code||existing.purpose_reference!==reference||existing.obligation_id!==obligation.id)throw problem(409,"This idempotency key was used for a different receipt or obligation.","IDEMPOTENCY_CONFLICT");
+   return {payment:existing,alreadyRecorded:true,obligationId:obligation.id};
+  }
+  const balance=await balanceFor(db,obligation.id);
   if(code!==obligation.currency)throw problem(400,"Receipt currency must match the fee obligation currency.","PAYMENT_CURRENCY_MISMATCH");
   if(amount>Number(balance.outstanding_balance))throw problem(409,"The receipt exceeds the current outstanding balance. Refresh the obligation before recording.","AMOUNT_EXCEEDS_BALANCE");
   const method=await paymentMethod(db,methodCode,code);
   if(method.method_type==="chapa")throw problem(400,"Hosted checkout cannot be recorded as a manual Finance receipt.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
   if(method.requires_evidence&&!evidenceFileId)throw problem(400,"This payment method requires private receipt evidence.","PAYMENT_EVIDENCE_REQUIRED");
   if(evidenceFileId)await validateEvidence(db,identity.sub,evidenceFileId);
-  const key="finance-membership:"+idem;
-  const existing=(await db.query("select id,amount,currency,status,purpose_reference from payment_transaction where idempotency_key=$1 for update",[key])).rows[0];
-  if(existing){
-   if(Number(existing.amount)!==amount||existing.currency!==code||existing.purpose_reference!==reference)throw problem(409,"This idempotency key was used for a different receipt.","IDEMPOTENCY_CONFLICT");
-   return {payment:existing,alreadyRecorded:true,obligationId:obligation.id};
-  }
   const reused=(await db.query("select id from payment_transaction where lower(coalesce(purpose_reference,''))=lower($1) and status<>'cancelled' limit 1 for update",[reference])).rows[0];
   if(reused)throw problem(409,"This payment reference is already used by another payment record.","PAYMENT_REFERENCE_ALREADY_USED");
   const snapshot=buildMembershipPaymentMethodSnapshot(method),channel=method.method_type==="bank_transfer"?"bank_transfer":method.method_type==="cash"?"cash":"other";
@@ -171,19 +171,22 @@ export async function verifyMembershipReceipt(identity,paymentId,input={},reques
 }
 export async function recordBalanceDisposition(identity,input={},requestId){
  financeAdjust(identity);
- const type=clean(input.dispositionType,40),remark=clean(input.remark,1000),amount=money(input.amount),code=currency(input.currency),dueDate=clean(input.dueDate,10);
+ const type=clean(input.dispositionType,40),remark=clean(input.remark,1000),amount=money(input.amount),code=currency(input.currency),dueDate=clean(input.dueDate,10),idem=clean(input.idempotencyKey,100);
  if(!["will_pay_later","sponsored","honored_member","volunteer_activity_valuated"].includes(type))throw problem(400,"Choose a supported balance disposition.","INVALID_DISPOSITION");
- if(!Number.isFinite(amount)||amount<=0||!code||remark.length<8)throw problem(400,"Enter the balance amount, currency and a meaningful remark.","DISPOSITION_DETAILS_REQUIRED");
+ if(!Number.isFinite(amount)||amount<=0||!code||remark.length<8||! /^[A-Za-z0-9_-]{16,100}$/.test(idem))throw problem(400,"Enter the balance amount, currency, meaningful remark and unique idempotency key.","DISPOSITION_DETAILS_REQUIRED");
  if(type==="will_pay_later"&&!validDate(dueDate))throw problem(400,"Will-pay-later requires a due date in YYYY-MM-DD format.","DUE_DATE_REQUIRED");
  const details=input.details&&typeof input.details==="object"?input.details:{};
  if(type==="sponsored"&&clean(details.sponsorName,180).length<2)throw problem(400,"Enter the sponsor name for sponsored balance coverage.","SPONSOR_REQUIRED");
  if(type==="honored_member"&&clean(details.approvalReference,180).length<4)throw problem(400,"Enter the honor approval reference.","HONOR_APPROVAL_REQUIRED");
  if(type==="volunteer_activity_valuated"&&(clean(details.activityReference,180).length<4||clean(details.valuationDescription,500).length<8))throw problem(400,"Enter the volunteer activity reference and valuation description.","VOLUNTEER_VALUATION_REQUIRED");
  return withTransaction(async db=>{
-  const obligation=await obligationFor(db,input,identity.sub),balance=await balanceFor(db,obligation.id);
+  const obligation=await obligationFor(db,input,identity.sub);
+  const existing=(await db.query("select * from membership_fee_balance_disposition where idempotency_key=$1 for update",[idem])).rows[0];
+  if(existing){if(existing.obligation_id!==obligation.id||existing.disposition_type!==type||Number(existing.amount)!==amount||existing.currency!==code)throw problem(409,"This disposition idempotency key was used for different details.","IDEMPOTENCY_CONFLICT");return {disposition:existing,alreadyRecorded:true,approvalRequired:type!=="will_pay_later",balance:await balanceFor(db,obligation.id)};}
+  const balance=await balanceFor(db,obligation.id);
   if(code!==obligation.currency||amount>Number(balance.outstanding_balance))throw problem(409,"Disposition amount must use the obligation currency and cannot exceed its outstanding balance.","DISPOSITION_EXCEEDS_BALANCE");
   const status=type==="will_pay_later"?"active":"pending";
-  const row=(await db.query("insert into membership_fee_balance_disposition(obligation_id,disposition_type,amount,currency,status,due_date,remark,details,requested_by) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *",[obligation.id,type,amount,code,status,type==="will_pay_later"?dueDate:null,remark,JSON.stringify(details),identity.sub])).rows[0];
+  const row=(await db.query("insert into membership_fee_balance_disposition(obligation_id,disposition_type,amount,currency,status,due_date,remark,details,requested_by,idempotency_key) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *",[obligation.id,type,amount,code,status,type==="will_pay_later"?dueDate:null,remark,JSON.stringify(details),identity.sub,idem])).rows[0];
   if(type==="will_pay_later")await db.query("update membership_fee_obligation set due_date=$1,status='open',updated_at=now() where id=$2",[dueDate,obligation.id]);
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_balance_disposition_recorded','membership_fee_balance_disposition',$2,$3,'success',$4)",[identity.sub,row.id,requestId,JSON.stringify({obligationId:obligation.id,type,amount,currency:code,dueDate:dueDate||null,status,remark})]);
   return {disposition:row,approvalRequired:type!=="will_pay_later",balance};

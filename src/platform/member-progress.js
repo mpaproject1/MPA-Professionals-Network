@@ -43,6 +43,9 @@ function asDate(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 function normalizedStatus(record, domain) {
+  if (domain === "mentorship_session" && record.change_proposal_status === "pending") {
+    return record.change_proposed_by === record.viewer_user_id ? "awaiting_response" : "awaiting_member";
+  }
   if (domain === "mentorship_session" && record.coordination_status === "proposed") {
     return record.proposed_by === record.viewer_user_id ? "awaiting_response" : "awaiting_member";
   }

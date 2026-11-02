@@ -65,7 +65,24 @@ function cleanRow(row){
 function audit(db,actor,action,type,id,requestId,metadata={}){return db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,JSON.stringify(metadata)]);}
 export function memberImportTemplate(identity){
  assertImportAuthority(identity);
- return MEMBER_IMPORT_XLSX_COLUMNS.join(",")+"\\r\\n";
+ return MEMBER_IMPORT_XLSX_COLUMNS.join(",")+"\r\n";
+}
+
+export function memberImportXlsxTemplate(identity){
+ assertImportAuthority(identity);
+ return createXlsx([],MEMBER_IMPORT_XLSX_COLUMNS);
+}
+
+function csvCell(value){
+ const text=String(value??"");
+ return /[",\r\n]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;
+}
+
+function xlsxAsCsv(base64){
+ let parsed;
+ try{parsed=parseXlsxRows(Buffer.from(String(base64||""),"base64"));}catch(error){throw problem(400,error.message||"The member workbook could not be read.","INVALID_XLSX");}
+ if(!parsed.headers?.length)throw problem(400,"The member workbook has no column headings.","MISSING_COLUMNS");
+ return [parsed.headers.map(csvCell).join(","),...parsed.rows.map(row=>parsed.headers.map(header=>csvCell(row[header])).join(","))].join("\r\n")+"\r\n";
 }
 async function validateImportedResidence(db,row){
  const raw=row.raw,hasStructured=Boolean(String(raw.residence_type||"").trim()||String(raw.country_iso3||"").trim()||String(raw.region_or_federal_city||"").trim()||String(raw.zone_or_sub_city||"").trim()||String(raw.district_or_town||"").trim());

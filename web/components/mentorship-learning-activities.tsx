@@ -113,6 +113,7 @@ export function MentorshipLearningActivities({ mentorshipId, role, token }: { me
             <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><b>{activity.title}</b><Badge>{activity.status}</Badge></div>
             <p>{activity.instructions}</p>
             {activity.due_at ? <p className="muted">Due {new Date(activity.due_at).toLocaleDateString()}</p> : null}
+            {activity.submissions?.length > 1 ? <details className="case-row"><summary>Previous submissions and feedback ({activity.submissions.length - 1})</summary><div className="grid" style={{gap:8,marginTop:10}}>{activity.submissions.slice(1).map(submission=><div key={submission.id}><div className="row" style={{justifyContent:"space-between",flexWrap:"wrap"}}><b>Version {submission.version}</b><Badge>{submission.status.replaceAll("_"," ")}</Badge></div><p>{submission.response}</p>{submission.reviews.map(review=><div className="case-row" key={review.id}><b>{review.decision.replaceAll("_"," ")}</b><p>{review.feedback}</p><p className="muted">{new Date(review.createdAt).toLocaleString()}</p></div>)}</div>)}</div></details> : null}
             {latest ? <div className="grid" style={{ gap: 8 }}>
               <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><b>Latest submission · v{latest.version}</b><Badge>{latest.status.replaceAll("_", " ")}</Badge></div>
               <p>{latest.response}</p>

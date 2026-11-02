@@ -281,11 +281,13 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  const zeroDueDate=(await db.query("select ((now() at time zone 'Africa/Addis_Ababa')::date+2)::text due_date")).rows[0].due_date;
  await recordBalanceDisposition(zeroFinance,{applicationId:zeroApp.id,dispositionType:"will_pay_later",amount:1200,currency:"ETB",dueDate:zeroDueDate,remark:"Member requested a short extension",idempotencyKey:"fee_zero_willpay_"+suffix.slice(0,28)},"fee-zero-willpay-"+suffix);
  await scheduleMembershipFeeReminders(500);
- const inAppReminder=(await db.query("select member_delivery_status,member_delivery_note from membership_fee_reminder where obligation_id=(select id from membership_fee_obligation where application_id=$1)",[zeroApp.id])).rows[0];
+ const inAppReminder=(await db.query("select member_delivery_status,member_delivery_note,member_outbox_id from membership_fee_reminder where obligation_id=(select id from membership_fee_obligation where application_id=$1)",[zeroApp.id])).rows[0];
  assert.equal(inAppReminder.member_delivery_status,"in_app","default member preference should place a reminder in the in-app inbox");
  assert.match(inAppReminder.member_delivery_note,/in the member inbox/i);
  const fullSponsorship=await recordBalanceDisposition(zeroFinance,{applicationId:zeroApp.id,dispositionType:"sponsored",amount:1200,currency:"ETB",remark:"Full product fee covered by sponsor",details:{sponsorOrganizationId:sponsorOrg.id},evidenceFileId:zeroEvidence.id,idempotencyKey:"fee_zero_sponsor_"+suffix.slice(0,32)},"fee-zero-sponsor-"+suffix);
  await decideBalanceDisposition(approverFinance,fullSponsorship.disposition.id,{decision:"approved",note:"Full fee sponsorship independently verified."},"fee-zero-sponsor-approve-"+suffix);
+ const archivedReminderEvent=(await db.query("select archived_at from notification_event where id=$1",[inAppReminder.member_outbox_id])).rows[0];
+ assert.ok(archivedReminderEvent?.archived_at,"full settlement must archive the stale in-app balance reminder");
  const zeroAdjustment=(await db.query("select details from membership_fee_adjustment where obligation_id=(select id from membership_fee_obligation where application_id=$1) and status='approved'",[zeroApp.id])).rows[0];
  assert.equal(zeroAdjustment.details.sponsorSource,"registered_organization");
  assert.equal(zeroAdjustment.details.sponsorOrganizationId,sponsorOrg.id);

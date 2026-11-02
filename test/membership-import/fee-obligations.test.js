@@ -99,7 +99,7 @@ test("PostgreSQL Finance XLSX intake applies valid rows independently and preser
  const headers=parseXlsxRows(membershipPaymentImportTemplate(identity)).headers;
  const reference="bulk-reference-"+suffix;
  const rows=[
-  {application_id:app.id,membership_number:"",amount:"300",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:methodCode,payment_reference:reference,evidence_reference:"",evidence_file_id:"",payer_note:"Valid row"},
+  {application_id:app.id,membership_number:"",amount:"300",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:methodCode,payment_reference:reference,evidence_reference:"",evidence_file_id:"",payer_note:"Valid, row"},
   {application_id:app.id,membership_number:"",amount:"200",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:methodCode,payment_reference:reference,evidence_reference:"",evidence_file_id:"",payer_note:"Duplicate reference row"},
   {application_id:"",membership_number:"MISSING-"+suffix,amount:"100",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:methodCode,payment_reference:"unmatched-"+suffix,evidence_reference:"",evidence_file_id:"",payer_note:"Unmatched member"},
   {application_id:app.id,membership_number:"",amount:"100",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:evidenceMethodCode,payment_reference:"evidence-required-"+suffix,evidence_reference:"",evidence_file_id:"",payer_note:"Evidence missing"},

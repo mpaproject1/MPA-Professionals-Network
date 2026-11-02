@@ -631,3 +631,140 @@ The following implementation has been committed to the target branch:
 4. **Validation is not complete until PR Quality runs against the latest PR #18 head.** The new report and authorization tests have been added, but no current-head GitHub Actions result is recorded in this implementation update. Do not merge or deploy based on documentation or code commits alone.
 
 These boundaries are intentional: missing location and legacy payment evidence must be solved with authoritative data and Finance controls, not guessed values or an administrator override.
+
+---
+
+## 22. Approved implementation addendum — geography, bulk membership and partial payments (2026-11-02)
+
+**Decision status:** Approved by the product owner. These requirements extend and supersede conflicting assumptions in earlier sections. They do not relax authorization, payment evidence, data validation or audit controls.
+
+### 22.1 Development and test environment
+
+- No live development/staging deployment is available.
+- Use GitHub Actions and GitHub-supported development facilities available to the repository. Prefer existing CI services, service containers, workflow artifacts and disposable PostgreSQL service containers.
+- Provision a clean, disposable PostgreSQL database for migration and integration tests. Use synthetic fixtures only. Never use production member data, production credentials, live payment credentials or real member contact addresses in tests.
+- Payment tests use a sandbox or deterministic payment simulation. Email and push tests use capture/fake transports and must not deliver externally.
+- Add automated tests for payment, import and geographic workflows. If a GitHub-hosted environment or required secret is unavailable, document the exact limitation and keep tests deterministic; do not silently skip a security assertion.
+- Test fixture data must be clearly marked, excluded from normal management KPIs and production-like exports by default, and removable through an isolated test cleanup mechanism.
+
+### 22.2 Authoritative member geography
+
+Member profile capture and the reference-data database must use a governed hierarchical location model. Geography is member-provided; do not infer residence from IP address, nationality, telephone prefix or unrelated fields.
+
+**Residence choice:** Ethiopia or Diaspora.
+
+**Ethiopia**
+1. Region or Federal City (the two federal cities are Addis Ababa and Dire Dawa).
+2. If a federal city is selected: Sub-city. If a region is selected: Zone.
+3. District/Woreda or Town, as appropriate to the selected parent.
+4. Specific street/address is optional free text.
+
+The data model must preserve administrative level and parent-child relationship, not flatten labels into one city/region string. A valid child must belong to the selected parent. Federal-city selection must not expose Zone; regional selection must not expose Sub-city. Towns and districts must be represented with their correct parent and level. Street address is optional and has field-level privacy controls.
+
+**Diaspora**
+1. Select a country from a maintained international country/area reference list aligned with the current UN M49 country/area standard and UN-recognized sovereign/observer-state coverage. Store stable codes, canonical names, source/version and last-updated date; do not hard-code a stale dropdown in the UI.
+2. Specific area of residence (state/province/city/region or local description) is optional free text. Do not require a detailed street address.
+
+The reference-data import process must support a documented Excel workbook template with separate sheets for Ethiopian administrative units and international countries/areas, stable codes, parent codes, level/type, display name, source, source version and effective dates. Validate duplicates, missing parents, invalid level transitions and orphan children before apply. Provide preview, error report, versioned apply, audit event and forward-correction procedure. The accepting database schema must enforce stable identifiers and parent relationships. Keep source dataset and template in the repository with update instructions; do not invent Ethiopian lower-level administrative units where no authoritative source is available. Where source data is incomplete or disputed, allow an explicitly labelled member-entered locality fallback without treating it as a governed reference unit.
+
+Profile, application, member import, member register filters, reports and exports must use the same normalized location IDs and hierarchy. Geographic analytics aggregate at the selected level and never expose optional street addresses in aggregate reports.
+
+### 22.3 Bulk membership import contract
+
+Update both the downloadable Excel template and server-side parser/validator/storage contract. Requested columns:
+
+| Field | Requirement |
+|---|---|
+| Full Name | Required, subject to existing validation |
+| Email | Required, subject to existing validation |
+| Phone | Required, subject to existing validation |
+| Gender | Required, subject to existing validation |
+| Membership type | Required, must resolve to a configured plan |
+| Amount paid | Required numeric value; zero is permitted only for a clearly identified unpaid/pending case and never implies payment verification |
+| Status | Required; controlled values mapped to supported lifecycle states (e.g. Active, Expired, Pending), never free-form or a way to fabricate activation |
+| Registered Date | Required, valid date with documented timezone/date interpretation |
+| Education Background | Optional |
+| Location or Address | Optional; structured Ethiopia/Diaspora columns preferred, legacy free text retained only as an unverified locality note |
+| Qualification | Optional |
+| Field of Study | Optional |
+| Department | Optional |
+| Volunteer pledge fields | Optional; map only to existing governed pledge fields and preserve explicit yes/no/unknown values |
+
+The existing system's mandatory-field validation remains authoritative. No optional field may become mandatory as a side effect. Missing required fields, invalid plan, unsupported status, invalid date, duplicate identity and malformed amounts must produce row-specific errors before apply. A historical Active status or Amount paid cell must never create a verified payment or unlock activation/account claim. Import creates a clearly labelled historical/pending record and routes payment evidence to Finance for verification through the shared ledger. Preserve original row number, source batch, importer, timestamp and audit trail. Preview shows insert/update/skip/error counts and impact before authorized apply.
+
+### 22.4 Partial payment, outstanding balance and balance disposition
+
+Finance must be able to record the actual amount received, independent of configured product price. The immutable fee snapshot remains the reference amount due at application time; Finance must not overwrite the product price to make a partial payment appear complete.
+
+For each fee obligation, record:
+- Fee snapshot amount and currency.
+- Actual amount received and currency.
+- Verified amount (only after Finance verification).
+- Outstanding balance, calculated server-side as amount due less eligible verified payments and authorized balance adjustments.
+- Payment reference, method, received date, evidence and Finance verification actor/time.
+- Balance disposition and authorization/audit trail.
+- Due date and reminder state where a balance remains payable.
+
+A partial payment (e.g. ETB 500 against ETB 1,200) is a valid payment record. It must not be rejected merely because it is below the plan price. After verification, record ETB 500 verified and ETB 700 outstanding. Membership reviewer/admin makes the separate eligibility/approval/rejection decision under membership permissions; that decision does not falsify the amount received or grant Finance verification.
+
+**Outstanding balance disposition** must be explicit:
+- **Will pay later (will_pay_later):** balance remains due and collectible; record due date/remark, create or update pending balance obligation, and schedule reminders to member and responsible MPA team using existing preferences and deduplication. Recalculate outstanding balance whenever a further payment is verified. Stop reminders when settled, waived or otherwise closed.
+- **Sponsored (sponsored):** record sponsor/coverage details and amount covered; require configured authorized approval and supporting remark/evidence. Do not record sponsor coverage as cash received.
+- **Honored Member (honored_member):** record approved honor-based exemption and reason; require authorized approval and remark. Do not record exempted balance as cash received.
+- **Volunteer Activity Valuated (volunteer_activity_valuated):** record approved valuation, activity reference, valuation amount/currency, approver and remark. This is a non-cash settlement/credit, not a payment transaction.
+- A controlled unresolved/none state may be used while Finance review is pending; it must not silently clear the due amount.
+
+All dispositions require remark and actor/timestamp. Non-cash settlement/waiver is represented separately from cash payment transactions, with immutable adjustment/approval events. Only authorized users may approve sponsorship, honored-member exemption or volunteer valuation; a free-text remark alone must not waive debt. Keep original fee, cash received, verified cash, covered/credited amount and remaining balance separately reportable. Never make balance zero merely because an application was approved.
+
+A will-pay-later balance remains pending and appears in due reports/reminders. If a member pays in installments, balance is recalculated from verified receipts and approved non-cash adjustments. Reminders stop after full settlement or valid authorized waiver/coverage. Reminder scheduling is idempotent, preference-aware, timezone-aware and auditable.
+
+### 22.5 Finance bulk payment intake and one-by-one verification
+
+Finance may upload a bulk payment workbook to create pending payment records. This is intake only:
+- Define a separate template with required member/application reference, actual amount, currency, received date, payment method, payment reference and evidence reference/attachment as required by the selected method. Optional payer/reference notes may be included subject to privacy controls.
+- Validate each row against an existing member/application/fee obligation, amount/currency/date format, duplicate reference, duplicate file row and configured payment method. Unsafe unmatched rows go to an explicit unmatched/error queue.
+- Preview all rows and validation outcomes before creating records. A successful import creates pending/unverified records only; it must not mark a payment succeeded, verified, reconciled, settled or eligible for activation.
+- Finance opens and approves/verifies each payment record individually after checking evidence. No bulk verification, auto-approval, or imported spreadsheet status can replace Finance decision.
+- Each verification is permission-checked, audited and linked to the exact obligation. Reversals/refunds continue through the existing shared ledger.
+- Imported rows are idempotent using stable import batch/row identity and provider/reference uniqueness where available. Re-upload must not duplicate records.
+- Membership reviewers see only minimum payment status/balance needed for their decision. Finance-only evidence and mutation controls remain Finance-restricted.
+
+### 22.6 Required reports and exports
+
+Add role-scoped views for fee snapshot, amount received, verified amount, balance due and disposition by currency; partial payments and outstanding ageing; balances due later and reminder delivery state; sponsored, honored-member and volunteer-activity settlements separately from cash collections; Finance bulk intake batches (pending, individually verified, rejected, unmatched, duplicate). Exports retain UI permission, filter and masking rules. Do not expose bank evidence, payer details, optional street address or private remarks to unauthorized roles.
+
+### 22.7 Acceptance tests added by this addendum
+
+- Ethiopia/Diaspora choice and conditional field hierarchy behave correctly.
+- Federal City shows Sub-city; Region shows Zone; invalid cross-parent child IDs are rejected server-side.
+- Country list uses versioned reference data; unknown/stale codes are rejected or explicitly routed for reference-data review.
+- Geographic workbook preview rejects duplicate codes, missing parents, invalid levels and orphan children; apply is audited and safe to retry.
+- Member import requires mandatory columns while accepting optional education, location and volunteer fields.
+- Required Amount paid is preserved as supplied and never implies Finance verification.
+- Historical Active status in a spreadsheet cannot activate membership or bypass payment gate.
+- Partial payment computes correct outstanding balance without altering fee snapshot.
+- Will-pay-later remains due; reminders are scheduled once; further verified installments recalculate balance; settled balances stop reminders.
+- Sponsorship, honored-member exemption and volunteer valuation are non-cash adjustments with required approver, evidence/remark and audit; never included in cash collections.
+- Unauthorized users cannot approve balance waiver, verify payment, or use bulk upload to bypass individual Finance review.
+- Finance bulk intake creates pending-only records; each is separately verified; duplicate/replayed imports are idempotent.
+- Finance, membership reviewer and system-admin negative permission tests prove authority split.
+- Disposable PostgreSQL migration tests, backend integration tests, workbook tests and browser workflows pass in CI.
+
+## 23. Revised delivery sequence and progress ledger
+
+The implementation status in Section 21 is historical and must not be read as completion of this approved addendum. Update this ledger with commit links and exact CI run evidence as work proceeds.
+
+| Workstream | Current recorded status | Remaining evidence required |
+|---|---|---|
+| Membership Center shell/navigation and existing dashboard/report consolidation | Partially implemented; see Section 21 | Inspect latest branch, complete route compatibility and role-scoped workflows |
+| Application review and shared claim/activation payment guard | Existing safeguards and historical-import guard are recorded; completeness not yet certified | Trace every claim/link/activation/import path and add invariant/negative tests |
+| Geography schema, Excel workbook, profile hierarchy and analytics | Not implemented/verified | Canonical source, versioned import, parent constraints, UI, API, reports and tests |
+| Expanded member import template and storage mapping | Existing historical import exists; requested expanded fields not verified | Template/parser/preview/apply/database mapping and workbook round-trip tests |
+| Partial payment and balance disposition | Not implemented/verified | Additive ledger model, Finance UI/API, approval rules, reminders and reconciliation |
+| Finance bulk payment intake | Not implemented/verified | Pending-only import, row matching, deduplication and one-by-one Finance verification |
+| Disposable PostgreSQL and GitHub Actions validation | User authorizes GitHub-supported facilities; execution evidence not recorded here | Clean-schema and upgrade-path migrations, backend, lint/typecheck/build and Playwright |
+| Documentation and operational runbooks | This approved addendum | Keep progress entries current with commit SHA, test commands/results and unresolved blockers |
+
+**Revised order:** (1) inspect branch head and map existing schemas/services/tests; (2) establish disposable PostgreSQL CI test path; (3) design additive geography, fee-balance and payment-intake migrations from the real schema; (4) implement shared server-side services and authorization; (5) implement reference-data/member/payment workbook templates and parsers; (6) implement profile/import/Finance UI and reminders; (7) complete Membership Center dashboards, filters and exports using authoritative data; (8) run focused tests, clean/upgrade migration tests, full backend/lint/typecheck/build and Playwright; (9) record exact PR checks and unresolved limitations.
+
+**Implementation safety:** do not fabricate country or Ethiopian administrative data, payment verification, balance waivers, member activation or reminder delivery. If an authoritative source, existing schema invariant or CI capability is unavailable, document the blocker and implement a safe staged workflow rather than inventing data or weakening validation.

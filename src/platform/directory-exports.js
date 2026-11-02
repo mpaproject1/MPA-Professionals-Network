@@ -18,7 +18,7 @@ function isPlatformAdmin(identity) { return roles(identity).some(role => ACCOUNT
 function canViewOrganizations(identity) { return isPlatformAdmin(identity) || permissions(identity).includes("organizations.manage"); }
 function authorize(identity, kind) {
   if (kind === "members") {
-    if (!roles(identity).some(role => MEMBER_ROLES.includes(role)) && !permissions(identity).some(permission => ["members.view", "members.export", "members.import"].includes(permission))) {
+    if (!roles(identity).some(role => [...MEMBER_ROLES, "finance_officer"].includes(role)) && !permissions(identity).some(permission => ["members.view", "members.export", "members.import"].includes(permission))) {
       throw fail(403, "Member directory export requires the same authorized membership-administration access as the member catalogue.", "FORBIDDEN");
     }
     return;

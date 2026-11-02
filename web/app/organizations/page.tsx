@@ -713,24 +713,24 @@ export default function Organizations() {
                         {org.legal_name}
                         {org.role_code ? ` · ${org.role_code}` : ""}
                         <div className="muted">Application reference: {org.tracking_reference || "Pending"} · Last updated: {org.updated_at ? new Date(org.updated_at).toLocaleString() : "Not yet recorded"}</div>
-                        <div className="muted">Current status: {org.verification_case_status === "submitted" || org.verification_case_status === "pending" || org.verification_status === "pending" ? "Awaiting review" : org.verification_case_status === "correction_required" ? "Correction required" : org.verification_status === "verified" ? "Completed — organization verified" : (org.verification_case_status || org.verification_status || "draft").replaceAll("_", " ")}</div><div className="muted">Next action: {org.verification_case_status === "correction_required" ? "Provide the requested corrections" : org.verification_case_status === "submitted" || org.verification_case_status === "pending" || org.verification_status === "pending" ? "Wait for organization review; resubmission is unavailable while awaiting review" : org.verification_status === "verified" ? "Manage approved organization activities" : "Complete required evidence and submit for verification"}</div>
+                        <div className="muted">Current status: {org.verification_case_status === "submitted" || org.verification_case_status === "in_review" || org.verification_case_status === "pending" || org.verification_status === "pending" ? "Awaiting review" : org.verification_case_status === "correction_required" ? "Correction required" : org.verification_status === "verified" ? "Completed — organization verified" : (org.verification_case_status || org.verification_status || "draft").replaceAll("_", " ")}</div><div className="muted">Next action: {org.verification_case_status === "correction_required" ? "Provide the requested corrections" : org.verification_case_status === "submitted" || org.verification_case_status === "in_review" || org.verification_case_status === "pending" || org.verification_status === "pending" ? "Wait for organization review; resubmission is unavailable while awaiting review" : org.verification_status === "verified" ? "Manage approved organization activities" : "Complete required evidence and submit for verification"}</div>
                       </div>
                     </div>
                     <Badge>
-                      {org.verification_case_status === "submitted" || org.verification_case_status === "pending" || org.verification_status === "pending" ? "Awaiting review" : org.verification_case_status === "correction_required" ? "Correction required" : org.verification_status === "verified" ? "Completed" : (org.verification_case_status || org.verification_status || "unverified").replaceAll("_", " ")}
+                      {org.verification_case_status === "submitted" || org.verification_case_status === "in_review" || org.verification_case_status === "pending" || org.verification_status === "pending" ? "Awaiting review" : org.verification_case_status === "correction_required" ? "Correction required" : org.verification_status === "verified" ? "Completed" : (org.verification_case_status || org.verification_status || "unverified").replaceAll("_", " ")}
                     </Badge>
                   </div>
                   <p className="muted">
                     {org.verification_case_status==="correction_required"
                       ? "Changes are needed before this organization can be verified."
-                      : org.verification_case_status==="submitted"||org.verification_status==="pending"
+                      : org.verification_case_status==="submitted"||org.verification_case_status==="in_review"||org.verification_status==="pending"
                         ? "Your evidence has been submitted. Publishing stays locked until the review is approved."
                         : org.verification_status==="verified"
                           ? "This organization is verified. You can manage approved hiring and public offers under this identity."
                           : "Build trust by completing the required evidence checklist and submitting it for review."}
                   </p>
                   {org.verification_decision_reason&&<p aria-live="polite" aria-atomic="true"><b>Latest review note:</b> {org.verification_decision_reason}</p>}
-                  {(org.missing_evidence||[]).length>0&&org.verification_case_status!=="submitted"&&org.verification_case_status!=="pending"&&org.verification_status!=="pending"&&<div className="form-error" aria-live="polite" aria-atomic="true"><b>Still needed:</b> {(org.missing_evidence||[]).map(item=>item.replaceAll("_"," ")).join(", ")}. Upload these documents before submitting for review.</div>}
+                  {(org.missing_evidence||[]).length>0&&org.verification_case_status!=="submitted"&&org.verification_case_status!=="in_review"&&org.verification_case_status!=="pending"&&org.verification_status!=="pending"&&<div className="form-error" aria-live="polite" aria-atomic="true"><b>Still needed:</b> {(org.missing_evidence||[]).map(item=>item.replaceAll("_"," ")).join(", ")}. Upload these documents before submitting for review.</div>}
                   {(org.required_evidence||[]).length>0&&<p className="muted">Required evidence: {(org.required_evidence||[]).map(item=>item.replaceAll("_"," ")).join(", ")}. Uploaded evidence: {(org.verification_evidence||[]).map(item=>item.evidenceType.replaceAll("_"," ")).filter((item,index,all)=>all.indexOf(item)===index).join(", ")||"none recorded"}.</p>}
                   <div className="row" style={{flexWrap:"wrap",gap:8}}>
                     {org.verification_status==="verified" ? <>
@@ -741,7 +741,7 @@ export default function Organizations() {
                         <a className="btn btn-ghost" href="/mentorship">Manage mentorship offers</a>
                       </> : null}
                     </> : ["owner","administrator"].includes(org.role_code || "") ? <button className="btn btn-ghost" type="button" onClick={() => {setEvidenceOrg(org.id);document.getElementById("org-evidence")?.scrollIntoView({behavior:"smooth",block:"start"});}}>Complete trust checklist</button> : <span className="muted">Verification actions are available to the organization owner or administrator.</span>}
-                    {["owner","administrator"].includes(org.role_code || "") ? <button className="btn btn-ghost" type="button" onClick={() => void submitVerification(org)} disabled={org.verification_status==="verified"||org.verification_case_status==="submitted"||org.verification_case_status==="pending"}>
+                    {["owner","administrator"].includes(org.role_code || "") ? <button className="btn btn-ghost" type="button" onClick={() => void submitVerification(org)} disabled={org.verification_status==="verified"||org.verification_case_status==="submitted"||org.verification_case_status==="in_review"||org.verification_case_status==="pending"}>
                       Submit for verification
                     </button> : null}
                   </div>

@@ -79,6 +79,13 @@ export async function recordJobApplicationStage(db,applicationId,status,actorUse
  const rows=(await db.query("select id,status from member_referral_attribution where referral_type='employment' and job_application_id=$1 for update",[applicationId])).rows;
  for(const row of rows){await db.query("update member_referral_attribution set status=$1,updated_at=now() where id=$2",[eventCode,row.id]);await event(db,row.id,eventCode,row.status,eventCode,actorUserId);}
 }
+export async function listMyReferralProgress(userId){
+ const db=getPool();
+ const items=(await db.query(`select a.id,a.referral_type,a.status,a.created_at,a.job_id,j.title job_title
+ from member_referral_attribution a left join job j on j.id=a.job_id
+ where a.referrer_user_id=$1 order by a.created_at desc limit 100`,[userId])).rows;
+ return {items};
+}
 export async function listMyCandidateReferrals(userId){
  const db=getPool();
  const rows=(await db.query(`select a.id,a.status,a.created_at,a.candidate_consent_at,j.title job_title,j.id job_id

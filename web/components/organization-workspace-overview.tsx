@@ -66,9 +66,9 @@ type Folder = {
 };
 
 const publishingOptions = [
-  { key: "job", label: "Job", title: "Publish a job opportunity", detail: "Create or manage vacancies, candidate stages, interviews and offers.", href: "/recruitment" },
-  { key: "service", label: "Professional service", title: "Offer a professional service", detail: "Publish and manage service offers through the existing eligibility and request workflows.", href: "/services" },
-  { key: "mentorship", label: "Mentorship", title: "Offer mentorship", detail: "Publish mentorship opportunities and manage matching, sessions and outcomes.", href: "/mentorship" },
+  { key: "job", label: "Job", title: "Publish a job opportunity", detail: "Create or manage vacancies, candidate stages, interviews and offers.", href: "/recruitment", allowedRoles: ["owner", "administrator", "recruiter", "project_manager"] },
+  { key: "service", label: "Professional service", title: "Offer a professional service", detail: "Publish and manage service offers through the existing eligibility and request workflows.", href: "/services", allowedRoles: ["owner", "administrator", "recruiter", "project_manager"] },
+  { key: "mentorship", label: "Mentorship", title: "Offer mentorship", detail: "Publish mentorship opportunities and manage matching, sessions and outcomes.", href: "/mentorship", allowedRoles: ["owner", "administrator", "project_manager"] },
 ];
 const reviewingOptions = [
   { key: "candidates", label: "Candidate pipeline", title: "Review job applications", detail: "Screen candidates, coordinate interviews and record recruitment decisions.", href: "/recruitment#candidate-pipeline" },
@@ -248,6 +248,7 @@ export function OrganizationWorkspaceOverview({
   } : null;
   const activeRoles = selectedOrganization ? [selectedOrganization.role_code || ""] : [];
   const visibleFolders = workspaceReady.length === 0 ? [] : folders.filter((folder) => !folder.allowedRoles || folder.allowedRoles.some((role) => activeRoles.includes(role)));
+  const visiblePublishingOptions = publishingOptions.filter((option) => option.allowedRoles.some((role) => activeRoles.includes(role)));
   const activeFolder = visibleFolders.find((folder) => folder.key === activeFolderKey) || visibleFolders[0];
   useEffect(() => {
     if (visibleFolders.length > 0 && !visibleFolders.some((folder) => folder.key === activeFolderKey)) {
@@ -474,12 +475,12 @@ export function OrganizationWorkspaceOverview({
             {activeFolder.key === "publishing" ? (
               <div className={styles.workflowPanel}>
                 <div className={styles.workflowTypeSelector} role="group" aria-label="Choose opportunity type">
-                  {publishingOptions.map((option) => (
+                  {visiblePublishingOptions.map((option) => (
                     <button key={option.key} type="button" aria-pressed={publishingType === option.key} className={publishingType === option.key ? styles.workflowTypeActive : ""} onClick={() => setPublishingType(option.key)}>{option.label}</button>
                   ))}
                 </div>
                 {(() => {
-                  const option = publishingOptions.find((item) => item.key === publishingType) || publishingOptions[0];
+                  const option = visiblePublishingOptions.find((item) => item.key === publishingType) || visiblePublishingOptions[0];
                   return <div className={styles.workflowAction}><div><strong>{option.title}</strong><p>{option.detail}</p></div><Link href={organizationHref(option.href)}>Continue <span aria-hidden="true">↗</span></Link></div>;
                 })()}
               </div>

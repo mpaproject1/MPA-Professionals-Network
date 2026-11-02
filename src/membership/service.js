@@ -722,7 +722,8 @@ export async function listApplicationsForReview(){
 
 export async function listMembershipPaymentsForFinance(){
  const db=getPool();
- const result=await db.query(`select pt.id payment_id,pt.status payment_status,pt.amount,pt.currency,pt.channel,pt.source,pt.purpose_reference,
+ const result=await db.query(`select * from (
+  select pt.id payment_id,pt.status payment_status,pt.amount,pt.currency,pt.channel,pt.source,pt.purpose_reference,
    pt.request_payload->>'reference' payment_reference,pt.created_at,pt.verified_at,pt.verification_note,
    ma.id application_id,ma.tracking_reference,ma.application_type,ma.status application_status,
    mp.product_code,mp.name product_name,pr.reconciliation_status,pr.note reconciliation_note,
@@ -733,8 +734,20 @@ export async function listMembershipPaymentsForFinance(){
   join membership_product mp on mp.id=ma.membership_product_id
   left join payment_reconciliation pr on pr.payment_transaction_id=pt.id
   where pt.status in ('pending','succeeded','failed','refunded')
-  order by case when pt.status='pending' then 0 else 1 end,pt.created_at desc
-  limit 500`);
+  union all
+  select pt.id payment_id,pt.status payment_status,pt.amount,pt.currency,pt.channel,pt.source,pt.purpose_reference,
+   pt.request_payload->>'reference' payment_reference,pt.created_at,pt.verified_at,pt.verification_note,
+   null::uuid application_id,mr.membership_number tracking_reference,'legacy_import'::text application_type,mr.status application_status,
+   mp.product_code,mp.name product_name,pr.reconciliation_status,pr.note reconciliation_note,
+   (pt.status='refunded') reversed
+  from payment_transaction pt
+  join payment_reconciliation pr on pr.payment_transaction_id=pt.id
+  join membership_record mr on mr.id=pr.membership_id and mr.source='legacy_import'
+  join membership_product mp on mp.id=mr.membership_product_id
+  where pt.source='legacy_import' and pt.status in ('succeeded','refunded')
+ ) finance_membership_payments
+ order by case when payment_status='pending' then 0 else 1 end,created_at desc
+ limit 500`);
  return result.rows;
 }
 

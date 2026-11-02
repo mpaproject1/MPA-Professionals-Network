@@ -100,6 +100,15 @@ export async function saveMyResidence(userId,input={},requestId){
   if(a1&&(!["region","federal_city"].includes(a1.unit_level)||a1.parent_id!==country.id))throw fail(400,"Choose a Region or Federal City belonging to Ethiopia.","GEOGRAPHY_PARENT_MISMATCH");
   if(a2&&((a1.unit_level==="region"&&a2.unit_level!=="zone")||(a1.unit_level==="federal_city"&&a2.unit_level!=="sub_city")||a2.parent_id!==a1.id))throw fail(400,"Choose a Zone for a Region or a Sub-city for a Federal City.","GEOGRAPHY_PARENT_MISMATCH");
   if(a3&&(!a2||!["district","town"].includes(a3.unit_level)||a3.parent_id!==a2.id))throw fail(400,"Choose a District or Town belonging to the selected Zone or Sub-city.","GEOGRAPHY_PARENT_MISMATCH");
+  if(a1){
+   const expected=a1.unit_level==="region"?"zone":"sub_city";
+   const available=(await tx.query("select 1 from membership_geography_unit where version_id=$1 and parent_id=$2 and unit_level=$3 and active=true limit 1",[version.id,a1.id,expected])).rowCount>0;
+   if(available&&!a2)throw fail(400,"Choose a "+(expected==="zone"?"Zone":"Sub-city")+" from the published hierarchy.","GEOGRAPHY_LEVEL2_REQUIRED");
+  }
+  if(a2){
+   const available=(await tx.query("select 1 from membership_geography_unit where version_id=$1 and parent_id=$2 and unit_level in ('district','town') and active=true limit 1",[version.id,a2.id])).rowCount>0;
+   if(available&&!a3)throw fail(400,"Choose a District or Town from the published hierarchy.","GEOGRAPHY_LEVEL3_REQUIRED");
+  }
   await tx.query(`insert into member_residence(user_id,residence_type,geography_version_id,country_unit_id,admin_level_1_id,admin_level_2_id,admin_level_3_id,diaspora_area,street_address,locality_note,updated_at)
    values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now())
    on conflict(user_id) do update set residence_type=excluded.residence_type,geography_version_id=excluded.geography_version_id,country_unit_id=excluded.country_unit_id,

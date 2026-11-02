@@ -15,7 +15,7 @@ const verifiedLegacyPayment = `not exists (
   where pr.membership_id=mr.id
     and pr.reconciliation_status='matched'
     and pt.source='legacy_import'
-    and pt.status='succeeded'
+    and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)
 )`;
 
 export async function listLegacyMembershipPaymentVerificationQueue(identity) {
@@ -86,7 +86,7 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
       from payment_reconciliation pr
       join payment_transaction pt on pt.id=pr.payment_transaction_id
       where pr.membership_id=$1 and pr.reconciliation_status='matched'
-        and pt.source='legacy_import' and pt.status='succeeded'
+        and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)
       order by pt.created_at desc limit 1
       for update of pt
     `, [membershipId])).rows[0];

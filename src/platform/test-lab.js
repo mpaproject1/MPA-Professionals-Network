@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
-import path from "node:path";
 import { rm } from "node:fs/promises";
-import { getPool, withTransaction } from "./db.js";
+import path from "node:path";
+
 import { hashPassword } from "../membership/identity.js";
-import { createXlsx } from "./xlsx.js";
+import { getPool, withTransaction } from "./db.js";
 import { seedTestLabDomainFixtures } from "./test-lab-domain-fixtures.js";
+import { createXlsx } from "./xlsx.js";
 
 const ROLE_FIXTURES = [
  {persona:"Member — incomplete profile",name:["Amina","Yusuf"],role:"member"},

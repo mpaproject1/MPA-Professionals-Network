@@ -1300,6 +1300,63 @@ export async function updateMentorshipGoal(goalId,userId,input,requestId){
   });
 }
 
+export async function listMentorshipLearningActivities(mentorshipId,userId){
+  const db=getPool(),m=await mentorshipParticipant(db,mentorshipId,userId);
+  return (await db.query(`select a.id,a.mentorship_id,a.title,a.instructions,a.due_at,a.status,a.created_at,a.updated_at,
+    coalesce((select jsonb_agg(jsonb_build_object(
+      'id',s.id,'version',s.version,'response',s.response,'status',s.status,'submittedAt',s.submitted_at,
+      'reviews',coalesce((select jsonb_agg(jsonb_build_object('id',r.id,'decision',r.decision,'feedback',r.feedback,'createdAt',r.created_at) order by r.created_at) from mentorship_learning_review r where r.submission_id=s.id),'[]'::jsonb)
+    ) order by s.version desc) from mentorship_learning_submission s where s.activity_id=a.id and s.submitted_by=$2),'[]'::jsonb) submissions
+    from mentorship_learning_activity a where a.mentorship_id=$1 and a.status='published' order by a.due_at nulls last,a.created_at desc`,[mentorshipId,m.mentee_user_id])).rows;
+}
+
+export async function createMentorshipLearningActivity(mentorshipId,userId,input,requestId){
+  return withTransaction(async db=>{
+    const m=await mentorshipParticipant(db,mentorshipId,userId);
+    if(m.mentor_user_id!==userId)throw error(403,"Only the assigned mentor can create learning activities.","FORBIDDEN");
+    if(m.status!=="active")throw error(409,"Learning activities can only be created in an active mentorship.","INVALID_STATE");
+    const title=String(input.title||"").trim(),instructions=String(input.instructions||"").trim();
+    if(title.length<4||title.length>180)throw error(400,"Activity title must contain 4 to 180 characters.","VALIDATION_ERROR");
+    if(instructions.length<10||instructions.length>4000)throw error(400,"Activity instructions must contain 10 to 4,000 characters.","VALIDATION_ERROR");
+    let dueAt=null;
+    if(input.dueAt){dueAt=new Date(input.dueAt);if(Number.isNaN(dueAt.getTime()))throw error(400,"Choose a valid activity due date.","VALIDATION_ERROR");}
+    const row=(await db.query("insert into mentorship_learning_activity(mentorship_id,created_by,title,instructions,due_at) values($1,$2,$3,$4,$5) returning id,mentorship_id,title,instructions,due_at,status,created_at,updated_at",[mentorshipId,userId,title,instructions,dueAt])).rows[0];
+    await audit(db,userId,"mentorship.learning_activity_created","mentorship_learning_activity",row.id,requestId);
+    return row;
+  });
+}
+
+export async function submitMentorshipLearningActivity(activityId,userId,input,requestId){
+  return withTransaction(async db=>{
+    const activity=(await db.query("select a.*,m.mentor_user_id,m.mentee_user_id,m.status mentorship_status from mentorship_learning_activity a join mentorship m on m.id=a.mentorship_id where a.id=$1 for update",[activityId])).rows[0];
+    if(!activity)throw error(404,"Learning activity not found.","NOT_FOUND");
+    if(activity.mentee_user_id!==userId)throw error(403,"Only the assigned mentee can submit this activity.","FORBIDDEN");
+    if(activity.mentorship_status!=="active"||activity.status!=="published")throw error(409,"This learning activity is not accepting submissions.","INVALID_STATE");
+    const response=String(input.response||"").trim();
+    if(response.length<10||response.length>10000)throw error(400,"Your practical work must contain 10 to 10,000 characters.","VALIDATION_ERROR");
+    const version=Number((await db.query("select coalesce(max(version),0)::int version from mentorship_learning_submission where activity_id=$1 and submitted_by=$2",[activityId,userId])).rows[0].version)+1;
+    const row=(await db.query("insert into mentorship_learning_submission(activity_id,submitted_by,version,response) values($1,$2,$3,$4) returning id,activity_id,version,response,status,submitted_at",[activityId,userId,version,response])).rows[0];
+    await audit(db,userId,"mentorship.learning_submission_created","mentorship_learning_submission",row.id,requestId,{version});
+    return row;
+  });
+}
+
+export async function reviewMentorshipLearningSubmission(submissionId,userId,input,requestId){
+  return withTransaction(async db=>{
+    const submission=(await db.query("select s.*,a.mentorship_id,m.mentor_user_id,m.status mentorship_status from mentorship_learning_submission s join mentorship_learning_activity a on a.id=s.activity_id join mentorship m on m.id=a.mentorship_id where s.id=$1 for update",[submissionId])).rows[0];
+    if(!submission)throw error(404,"Learning submission not found.","NOT_FOUND");
+    if(submission.mentor_user_id!==userId)throw error(403,"Only the assigned mentor can review this submission.","FORBIDDEN");
+    if(submission.mentorship_status!=="active")throw error(409,"This mentorship is not active.","INVALID_STATE");
+    if(!["accepted","changes_requested"].includes(input.decision))throw error(400,"Choose accepted or changes requested.","VALIDATION_ERROR");
+    const feedback=String(input.feedback||"").trim();
+    if(feedback.length<5||feedback.length>3000)throw error(400,"Feedback must contain 5 to 3,000 characters.","VALIDATION_ERROR");
+    const review=(await db.query("insert into mentorship_learning_review(submission_id,reviewer_user_id,decision,feedback) values($1,$2,$3,$4) returning id,submission_id,decision,feedback,created_at",[submissionId,userId,input.decision,feedback])).rows[0];
+    await db.query("update mentorship_learning_submission set status=$1,updated_at=now() where id=$2",[input.decision,submissionId]);
+    await audit(db,userId,"mentorship.learning_submission_reviewed","mentorship_learning_submission",submissionId,requestId,{decision:input.decision,reviewId:review.id});
+    return review;
+  });
+}
+
 export async function getMentorship(mentorshipId,userId){
   const db=getPool(); const m=await mentorshipParticipant(db,mentorshipId,userId);
   const sessions=(await db.query("select * from mentorship_session where mentorship_id=$1 order by scheduled_start_at",[mentorshipId])).rows;

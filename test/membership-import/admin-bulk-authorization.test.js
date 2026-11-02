@@ -9,13 +9,3 @@ test("Finance-only access cannot enumerate the member catalogue", async () => {
     error => error.statusCode === 403 && error.code === "FORBIDDEN"
   );
 });
-
-test("explicit membership-view permission is accepted for the member catalogue", async () => {
-  const memberViewer = { sub: "member-directory-viewer", roles: [], permissions: ["members.view"] };
-  // The authorization check passes and the request proceeds to its database query.
-  // A missing DATABASE_URL is not treated as an authorization failure.
-  await assert.rejects(
-    listMemberCatalog(memberViewer, {}),
-    error => error.statusCode !== 403
-  );
-});

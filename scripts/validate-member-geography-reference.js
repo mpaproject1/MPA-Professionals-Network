@@ -30,6 +30,7 @@ for(const row of workbook.rows){
   assert.equal(String(row.country_m49||""),"");
   assert.ok(byCode.has("ETH")||workbook.rows.some(candidate=>candidate.unit_code==="ETH"),"Ethiopia parent must be present.");
   assert.ok(["region","federal_city"].includes(row.unit_level),"Unverified lower administrative levels must not be generated.");
+  assert.match(String(metadata.codeSystem||""),/MPA internal stable identifier/i,"Ethiopian level-one codes must be explicitly labelled as MPA internal codes, not official government codes.");
  }
 }
 assert.ok(byCode.has("ETH"),"The workbook must contain Ethiopia (ETH).");

@@ -354,7 +354,9 @@ export async function applyMembershipPaymentImport(identity,batchId,input={},req
   const remainingErrors=(await db.query("select count(*)::int count from membership_payment_import_row where batch_id=$1 and status='error'",[batchId])).rows[0]?.count||0;
   await db.query("update membership_payment_import_batch set status='applied',error_count=$2,applied_at=now() where id=$1",[batchId,Number(remainingErrors)]);
   await notifyFinance(db,"membership.bulk_payment_import_applied","membership_payment_import_batch",batchId,{message:createdCount+" pending membership receipts were created; "+(Number(remainingErrors)+skippedCount)+" row(s) remain for correction or review. Each created receipt requires individual verification.",actionUrl:"/admin/finance"});
-  return {batchId,status:"applied",createdCount,skippedCount,failedCount,errorCount:Number(remainingErrors),partial:Number(remainingErrors)>0||skippedCount>0,verificationRequired:true};
+  const createdRows=(await db.query("select row_number from membership_payment_import_row where batch_id=$1 and status='created' order by row_number",[batchId])).rows.map(row=>row.row_number);
+  const failedRows=(await db.query("select row_number,errors from membership_payment_import_row where batch_id=$1 and status='error' order by row_number",[batchId])).rows.map(row=>({rowNumber:row.row_number,errors:row.errors}));
+  return {batchId,status:"applied",createdCount,skippedCount,failedCount,errorCount:Number(remainingErrors),partial:Number(remainingErrors)>0||skippedCount>0,createdRows,failedRows,verificationRequired:true};
  });
 }
 export async function scheduleMembershipFeeReminders(batchSize=100){

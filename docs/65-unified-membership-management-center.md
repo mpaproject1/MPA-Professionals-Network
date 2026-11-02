@@ -946,3 +946,41 @@ Do not mark this workstream complete until all of the following are evidenced:
 - [ ] Any staging/deployment check not performed is explicitly listed as outstanding.
 
 **Next coding priority:** WP1 (Membership Center integration and consistent filter propagation) can proceed in parallel with the WP0 baseline capture. In parallel, WP2 should add database-backed lifecycle tests before any further payment-state refactor. Then complete WP3–WP5 in order. Do not create another planning-only update in place of these implementation and verification tasks.
+
+
+## 27. Implementation progress — 2026-11-03
+
+**Branch:** `feat/workstream-3-progress-members-workspace`  
+**PR:** #18  
+**Latest implementation head at this entry:** `b8dfc4f3b68bbd561703496c5d016107a9f37589`
+
+### Implemented in source
+
+- Rendered `MembershipFeeBalanceSummary` for Finance-authorized Membership Center users. It continues to use the Finance-owned endpoint and does not introduce payment mutation controls into the membership dashboard.
+- Rendered `MemberGeographySummary` for authorized member-record viewers and removed the obsolete dashboard message claiming residence hierarchy is not persisted.
+- Application queue-ageing report now receives the dashboard's selected application date range, application lifecycle status and search term.
+- Renewal pipeline now accepts a member lifecycle status and a bounded search term. Its date semantics remain an explicitly labelled rolling 90-day expiry snapshot; application-created dates are not misapplied to membership expiry dates.
+- Added server-side report-filter normalization for the member lifecycle status used by the renewal report.
+- Added client-side date-range validation and capped dashboard search input to the report service's 100-character search contract.
+- Added database-backed regression coverage in `test/membership-import/fee-obligations.test.js` for a real PostgreSQL lifecycle: ETB 500 partial receipt, duplicate replay, overpayment and currency rejection, independent non-cash sponsorship approval, maker/checker rejection, no activation while the fee remains due, successful settlement/activation, payment reversal and balance reopening, suspension while a balance remains due, and rejected non-cash proposal not reducing the balance.
+
+### Validation status — do not infer a pass
+
+- Exact latest head: `b8dfc4f3b68bbd561703496c5d016107a9f37589`.
+- GitHub Actions workflow-run lookup for this exact SHA returned no runs; exact-SHA combined commit status returned no status entries. This is **pending/unverified**, not a pass.
+- No PostgreSQL, backend, Biome, TypeScript, production build or Playwright result is claimed for these commits.
+- The new lifecycle test requires the disposable PostgreSQL service configured in PR Quality. It has been committed but not executed in this environment.
+- WP1 is improved but not fully complete: legacy workflows remain separate routes; no new in-center workflow tabs or geography filter controls have been introduced. The shared filters are propagated only to reports whose query semantics support them. The renewal report remains a current rolling expiry view.
+- WP2 still needs full route-by-route audit and additional test coverage for historical imported obligations, account claim/link after reversal, all relevant legacy reversal routes and repeated/idempotent reversal behavior.
+
+### Product-owner decision required before finalizing non-cash adjustment lifecycle
+
+The schema supports a `reversed` adjustment state, but the current application service has no authorized reversal action for an already-approved non-cash adjustment. Do not silently change an approved sponsorship, honored-member exemption or volunteer valuation. The next implementation step depends on the policy decision: either permit a separately authorized, audited, maker/checker compensating reversal, or make approved adjustments immutable and explicitly prohibit reversal. Record the decision and then enforce it in the service, API, migration constraints and tests.
+
+### Next execution steps
+
+1. Obtain the product-owner decision above.
+2. Run PR Quality against the latest branch head and fix failures without weakening checks; capture the exact workflow run ID and job/step diagnostics.
+3. Complete the remaining database-backed historical-import, claim/link, reversal and repeat-request scenarios.
+4. Finish the in-center navigation/section integration and add browser coverage for role visibility, filters, legacy route compatibility and summary loading/error states.
+5. Re-run all checks on the final SHA and update this log with actual results only.

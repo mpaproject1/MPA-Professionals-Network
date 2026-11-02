@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
 import { assertFinancePaymentQueueAccess, assertPaymentVerificationAccess } from "../platform/workspace-authorization.js";
 
@@ -7,6 +8,15 @@ function problem(statusCode, message, code = "BUSINESS_RULE") {
 
 const METHODS = new Set(["bank_transfer", "telebirr", "cash", "mobile_money", "other"]);
 const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+const verifiedLegacyPayment = `not exists (
+  select 1
+  from payment_reconciliation pr
+  join payment_transaction pt on pt.id=pr.payment_transaction_id
+  where pr.membership_id=mr.id
+    and pr.reconciliation_status='matched'
+    and pt.source='legacy_import'
+    and pt.status='succeeded'
+)`;
 
 export async function listLegacyMembershipPaymentVerificationQueue(identity) {
   assertFinancePaymentQueueAccess(identity);
@@ -32,10 +42,7 @@ export async function listLegacyMembershipPaymentVerificationQueue(identity) {
       order by created_at desc limit 1
     ) inv on true
     where mr.source='legacy_import' and mr.status<>'merged'
-      and not exists (
-        select 1 from membership_legacy_payment_verification v
-        where v.membership_id=mr.id
-      )
+      and ${verifiedLegacyPayment}
     order by mr.created_at desc
     limit 500
   `);
@@ -44,7 +51,8 @@ export async function listLegacyMembershipPaymentVerificationQueue(identity) {
 
 export async function verifyLegacyMembershipPayment(identity, membershipId, input = {}, requestId) {
   assertPaymentVerificationAccess(identity);
-  const amount = Number(input.amount);
+  const amountText = String(input.amount ?? "").trim();
+  const amount = Number(amountText);
   const currency = String(input.currency || "").trim().toUpperCase();
   const paymentReference = String(input.paymentReference || "").trim().slice(0, 180);
   const paymentDate = String(input.paymentDate || "").trim();
@@ -52,7 +60,7 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
   const evidenceReference = String(input.evidenceReference || "").trim().slice(0, 300);
   const financeNote = String(input.financeNote || "").trim().slice(0, 1000) || null;
 
-  if (!Number.isFinite(amount) || amount <= 0 || !/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/.test(String(input.amount || "").trim())) {
+  if (!Number.isFinite(amount) || amount <= 0 || !/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/.test(amountText)) {
     throw problem(400, "Enter the amount confirmed against the historical payment evidence.", "INVALID_AMOUNT");
   }
   if (!/^[A-Z]{3}$/.test(currency)) throw problem(400, "Currency must be a three-letter ISO code.", "INVALID_CURRENCY");
@@ -73,26 +81,47 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
     if (!membership) throw problem(404, "Imported membership record was not found.", "NOT_FOUND");
     if (membership.status === "merged") throw problem(409, "Merged duplicate membership records cannot receive independent payment verification.", "MEMBERSHIP_MERGED");
 
-    const existing = (await tx.query(
-      "select id,payment_reference from membership_legacy_payment_verification where membership_id=$1 for update",
-      [membershipId]
-    )).rows[0];
+    const existing = (await tx.query(`
+      select pt.id,pt.purpose_reference,pt.verified_at
+      from payment_reconciliation pr
+      join payment_transaction pt on pt.id=pr.payment_transaction_id
+      where pr.membership_id=$1 and pr.reconciliation_status='matched'
+        and pt.source='legacy_import' and pt.status='succeeded'
+      order by pt.created_at desc limit 1
+      for update of pt
+    `, [membershipId])).rows[0];
     if (existing) {
-      if (existing.payment_reference.toLowerCase() === paymentReference.toLowerCase()) {
-        return { membershipId, alreadyVerified: true, verificationId: existing.id };
+      if (String(existing.purpose_reference || "").toLowerCase() === paymentReference.toLowerCase()) {
+        return { membershipId, alreadyVerified: true, paymentTransactionId: existing.id, verifiedAt: existing.verified_at };
       }
-      throw problem(409, "A Finance-approved historical payment is already linked to this membership.", "PAYMENT_ALREADY_VERIFIED");
+      throw problem(409, "A Finance-approved historical payment is already reconciled to this membership.", "PAYMENT_ALREADY_VERIFIED");
     }
 
-    const reusedReference = (await tx.query("select membership_id from membership_legacy_payment_verification where lower(payment_reference)=lower($1) for update", [paymentReference])).rows[0];
-    if (reusedReference && reusedReference.membership_id !== membershipId) throw problem(409, "This payment reference is already allocated to another membership record.", "PAYMENT_REFERENCE_ALREADY_USED");
-    const verification = (await tx.query(`
-      insert into membership_legacy_payment_verification
-        (membership_id,payment_reference,amount,currency,payment_date,payment_method,evidence_reference,finance_note,verified_by)
-      values($1,$2,$3,$4,$5,$6,$7,$8,$9)
-      returning id,verified_at
-    `, [membershipId, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference, financeNote, identity.sub])).rows[0];
+    const reusedReference = (await tx.query(
+      "select id from payment_transaction where source='legacy_import' and lower(coalesce(purpose_reference,''))=lower($1) and status='succeeded' for update",
+      [paymentReference]
+    )).rows[0];
+    if (reusedReference) throw problem(409, "This payment reference is already allocated to another imported payment.", "PAYMENT_REFERENCE_ALREADY_USED");
 
+    const channel = paymentMethod === "bank_transfer" ? "bank_transfer" : paymentMethod === "cash" ? "cash" : "other";
+    const idempotencyKey = "legacy-membership-payment:" + createHash("sha256").update(`${membershipId}:${paymentReference.toLowerCase()}`).digest("hex");
+    const payload = { reference: paymentReference, paymentMethod, paymentDate, evidenceReference, legacyMembershipId: membershipId, membershipNumber: membership.membership_number };
+    const payment = (await tx.query(`
+      insert into payment_transaction
+        (provider,idempotency_key,purpose,amount,currency,status,request_payload,channel,submitted_by,
+         verified_by,verified_at,verification_note,purpose_reference,source,completed_at)
+      values('manual',$1,'membership_fee',$2,$3,'succeeded',$4,$5,$6,$6,now(),$7,$8,'legacy_import',now())
+      returning id,verified_at
+    `, [idempotencyKey, amount, currency, JSON.stringify(payload), channel, identity.sub, financeNote || evidenceReference, paymentReference])).rows[0];
+
+    await tx.query(
+      "insert into payment_verification(payment_transaction_id,verifier_user_id,decision,evidence_checked,note) values($1,$2,'approved',$3,$4)",
+      [payment.id, identity.sub, JSON.stringify([{ type: "historical_payment_reference", reference: paymentReference, evidenceReference, paymentDate, paymentMethod }]), financeNote || evidenceReference]
+    );
+    await tx.query(
+      "insert into payment_reconciliation(payment_transaction_id,membership_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,$2,'matched',$3,now(),$4)",
+      [payment.id, membershipId, identity.sub, `Finance verified historical membership dues for ${membership.membership_number}.`]
+    );
     await tx.query(
       "update member_invitation set expires_at=greatest(expires_at,now()+interval '7 days') where user_id=$1 and import_id=$2 and consumed_at is null",
       [membership.user_id, membership.source_import_id]
@@ -100,12 +129,12 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
     const outstandingInvitation = await tx.query("select id from member_invitation where user_id=$1 and import_id=$2 and consumed_at is null", [membership.user_id, membership.source_import_id]);
     await tx.query(
       "insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'legacy_payment_verified',now(),$2,'legacy_import',$3)",
-      [membershipId, identity.sub, JSON.stringify({ verificationId: verification.id, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference })]
+      [membershipId, identity.sub, JSON.stringify({ paymentTransactionId: payment.id, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference })]
     );
     await tx.query(
       "insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.legacy_payment_verified','membership_record',$2,$3,'success',$4)",
-      [identity.sub, membershipId, requestId, JSON.stringify({ verificationId: verification.id, membershipNumber: membership.membership_number, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference })]
+      [identity.sub, membershipId, requestId, JSON.stringify({ paymentTransactionId: payment.id, membershipNumber: membership.membership_number, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference })]
     );
-    return { membershipId, verificationId: verification.id, verifiedAt: verification.verified_at, claimUnlocked: outstandingInvitation.rowCount > 0 };
+    return { membershipId, paymentTransactionId: payment.id, verifiedAt: payment.verified_at, claimUnlocked: outstandingInvitation.rowCount > 0 };
   });
 }

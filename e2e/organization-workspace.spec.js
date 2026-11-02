@@ -120,11 +120,26 @@ test.describe("MPA organization app entry and navigation", () => {
   });
 
   test("verified organization opens six keyboard-accessible folder tabs and their existing destinations", async ({ page }) => {
-    await mockOrganizationApi(page, [organization()]);
+    await mockOrganizationApi(page, [organization(), organization({
+      id: "org-e2e-2",
+      legal_name: "Second MPA Institution",
+      display_name: "Second MPA Institution",
+      role_code: "read_only",
+      tracking_reference: "ORG-TEST-002",
+    })]);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/organizations");
     await expect(page.getByRole("heading", { name: "Your organization at a glance" })).toBeVisible();
+    const organizationSwitcher = page.getByRole("combobox", { name: "Choose active organization" });
+    await expect(organizationSwitcher).toBeEnabled();
+    await expect(organizationSwitcher).toHaveValue("org-e2e-1");
     const tabs = page.getByRole("tablist", { name: "Organization workspace folders" });
+    await expect(tabs.getByRole("tab")).toHaveCount(6);
+    await expect(page.getByRole("tabpanel").getByRole("link", { name: /Jobs and recruitment/ })).toHaveAttribute("href", "/recruitment?organizationId=org-e2e-1");
+    await organizationSwitcher.selectOption("org-e2e-2");
+    await expect(tabs.getByRole("tab")).toHaveCount(3);
+    await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
+    await organizationSwitcher.selectOption("org-e2e-1");
     await expect(tabs.getByRole("tab")).toHaveCount(6);
     const publishing = tabs.getByRole("tab", { name: /Publishing/ });
     const reviewing = tabs.getByRole("tab", { name: /Reviewing/ });

@@ -103,7 +103,7 @@ export default function MembershipCenterPage() {
         currentPermissions.some(permission => ["membership.review", "membership.activate", "members.view", "members.manage", "reports.view"].includes(permission));
       setRoles(currentRoles);
       setPermissions(currentPermissions);
-      if (!allowed) { setAccess("denied"); setApplications(null); setMembership(null); return; }
+      if (!allowed) { setAccess("denied"); setApplications(null); setMembership(null); setMonthlyApplications(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
 
       const [appResult, memberResult, monthlyResult] = await Promise.all([
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status }) }, token),
@@ -125,6 +125,8 @@ export default function MembershipCenterPage() {
           setFinance(financeResult);
         } catch { setFinance(null); }
       } else setFinance(null);
+      setFinanceAvailable(false);
+      setGeneratedAt("");
       setAccess("allowed");
     } catch (cause) {
       setError(cause instanceof ApiError || cause instanceof Error ? cause.message : "Membership dashboard could not be loaded.");
@@ -138,7 +140,7 @@ export default function MembershipCenterPage() {
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!token) { setAccess("signin"); return; }
+    if (!token) { setAccess("signin"); setRoles([]); setPermissions([]); setApplications(null); setMembership(null); setMonthlyApplications(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
     setAccess("loading");
     void load(initialFilters());
   }, [hydrated, token, load]);

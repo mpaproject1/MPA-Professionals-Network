@@ -36,7 +36,7 @@ type OrganizationAccess = {
   membership_status: string;
 };
 
-const WORKSPACE_ROLES = ["owner", "administrator", "recruiter", "project_manager", "read_only"];
+const WORKSPACE_ROLES = ["owner", "administrator", "recruiter", "project_manager", "read_only", "event_manager", "finance"];
 const VERIFICATION_MANAGER_ROLES = ["owner", "administrator"];
 
 type Folder = {

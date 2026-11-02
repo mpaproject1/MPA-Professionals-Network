@@ -12,7 +12,14 @@ const organization = (overrides = {}) => ({
   ...overrides,
 });
 
-async function mockOrganizationApi(page, organizations) {
+async function mockOrganizationApi(page, organizations, organizationAccess = organizations.map((item) => ({
+  id: item.id,
+  display_name: item.display_name,
+  legal_name: item.legal_name,
+  verification_status: item.verification_status,
+  role_code: item.role_code || "owner",
+  membership_status: "active",
+}))) {
   await page.addInitScript(() => {
     window.sessionStorage.setItem("mpa-session-token", "e2e-organization-session");
   });
@@ -21,6 +28,7 @@ async function mockOrganizationApi(page, organizations) {
     const path = url.pathname.replace(/\/+$/, "");
     let data = {};
     if (path === "/api/v1/organizations") data = organizations;
+    else if (path === "/api/v1/me/organization-access") data = organizationAccess;
     else if (path === "/api/v1/me") data = { user_id: "e2e-org-user", roles: ["member"] };
     else if (path === "/api/v1/opportunity-inquiries") data = [];
     else if (path === "/api/v1/organizations/org-e2e-1") {
@@ -45,6 +53,22 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
     await page.getByRole("button", { name: "Register your organization" }).click();
     await expect(page.getByRole("heading", { name: "Step 1 — Entity profile" })).toBeVisible();
+  });
+
+  test("inactive organization membership is not mistaken for an unregistered account", async ({ page }) => {
+    await mockOrganizationApi(page, [], [{
+      id: "org-e2e-suspended",
+      display_name: "Former Organization",
+      legal_name: "Former Organization PLC",
+      role_code: "read_only",
+      membership_status: "suspended",
+      verification_status: "verified",
+    }]);
+    await page.goto("/organizations");
+    await expect(page.getByRole("heading", { name: "Organization access is not active" })).toBeVisible();
+    await expect(page.getByText("suspended", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Register your organization" })).toHaveCount(0);
+    await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
   });
 
   test("pending organization sees the authoritative status and no operational folder shelf", async ({ page }) => {

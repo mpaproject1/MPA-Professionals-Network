@@ -148,7 +148,7 @@ export async function reverseLegacyMembershipPayment(identity, paymentId, input 
 
   return withTransaction(async tx => {
     const row = (await tx.query(`
-      select pt.id payment_id,pt.status payment_status,pr.membership_id,mr.membership_number,mr.id membership_id
+      select pt.id payment_id,pt.status payment_status,mr.membership_number,mr.id membership_id
       from payment_transaction pt
       join payment_reconciliation pr on pr.payment_transaction_id=pt.id
       join membership_record mr on mr.id=pr.membership_id
@@ -157,17 +157,23 @@ export async function reverseLegacyMembershipPayment(identity, paymentId, input 
     `, [paymentId])).rows[0];
     if (!row) throw problem(404, "Historical membership payment was not found.", "NOT_FOUND");
     if (row.payment_status !== "succeeded") throw problem(409, "Only a Finance-verified historical payment can be reversed.", "PAYMENT_NOT_REVERSIBLE");
+    const reversal = (await tx.query(`
+      insert into membership_payment_reversal
+        (payment_transaction_id,application_id,membership_record_id,reversal_type,reason,evidence_reference,reversed_by,metadata)
+      values($1,null,$2,$3,$4,$5,$6,$7)
+      returning id
+    `, [paymentId, row.membership_id, reversalType, reason, evidenceReference, identity.sub, JSON.stringify({ source: "legacy_import" })])).rows[0];
 
     await tx.query("update payment_transaction set status='refunded',updated_at=now(),completed_at=coalesce(completed_at,now()),verification_note=$1 where id=$2", [reason, paymentId]);
     await tx.query("update payment_reconciliation set reconciliation_status='disputed',reconciled_by=$1,reconciled_at=now(),note=concat_ws(' | ',note,$2::text) where payment_transaction_id=$3", [identity.sub, `Historical ${reversalType} recorded: ${reason}`, paymentId]);
     await tx.query(
       "insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'legacy_payment_reversed',now(),$2,'legacy_import',$3)",
-      [row.membership_id, identity.sub, JSON.stringify({ paymentId, reversalType, reason, evidenceReference })]
+      [row.membership_id, identity.sub, JSON.stringify({ paymentId, reversalId: reversal.id, reversalType, reason, evidenceReference })]
     );
     await tx.query(
       "insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.legacy_payment_reversed','payment_transaction',$2,$3,'success',$4)",
-      [identity.sub, paymentId, requestId, JSON.stringify({ membershipId: row.membership_id, membershipNumber: row.membership_number, reversalType, reason, evidenceReference })]
+      [identity.sub, paymentId, requestId, JSON.stringify({ membershipId: row.membership_id, membershipNumber: row.membership_number, reversalId: reversal.id, reversalType, reason, evidenceReference })]
     );
-    return { paymentId, membershipId: row.membership_id, status: "refunded", reconciliationStatus: "disputed" };
+    return { paymentId, reversalId: reversal.id, membershipId: row.membership_id, status: "refunded", reconciliationStatus: "disputed" };
   });
 }

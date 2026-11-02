@@ -124,7 +124,7 @@ export async function setMyProfilePicture(userId,fileObjectId,requestId){
       from app_user u join person p on p.user_id=u.id
       join professional_profile pr on pr.person_id=p.id
       where u.id=$1 and u.account_type='professional'
-        and exists(select 1 from membership_record m where m.user_id=u.id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date))
+        and exists(select 1 from membership_record m where m.user_id=u.id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and (m.source<>'legacy_import' or exists(select 1 from membership_legacy_payment_verification v where v.membership_id=m.id)))
       for update of pr`,[userId])).rows[0];
     if(!owner) throw fail(403,"An active professional membership is required to change the profile picture.","MEMBERSHIP_REQUIRED");
     const file=(await db.query("select f.id,f.created_by,f.content_type,f.visibility from file_object f join private_upload_session s on s.file_object_id=f.id and s.status='confirmed' where f.id=$1",[fileObjectId])).rows[0];
@@ -139,7 +139,7 @@ export async function removeMyProfilePicture(userId,requestId){
   return withTransaction(async db=>{
     const r=await db.query(`update professional_profile pr set profile_picture_file_id=null,updated_at=now()
       from person p where p.id=pr.person_id and p.user_id=$1
-      and exists(select 1 from membership_record m where m.user_id=$1 and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date))
+      and exists(select 1 from membership_record m where m.user_id=$1 and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) and (m.source<>'legacy_import' or exists(select 1 from membership_legacy_payment_verification v where v.membership_id=m.id)))
       returning pr.id`,[userId]);
     if(!r.rows[0]) throw fail(403,"An active professional membership is required to change the profile picture.","MEMBERSHIP_REQUIRED");
     await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'profile.picture_removed','professional_profile',$2,$3,'success','{}')",[userId,r.rows[0].id,requestId]);
@@ -196,7 +196,7 @@ export async function rotateMembershipCardVerification(recordId,actorId,requestI
 export async function verifyMembershipCard(identifier,token){
   if(typeof identifier!=="string"||!identifier.trim()||identifier.length>100||typeof token!=="string") return {valid:false,status:"invalid",message:"This membership ID could not be verified."};
   const db=getPool();
-  const row=(await db.query(`select m.id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,
+  const row=(await db.query(`select m.id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,exists(select 1 from membership_legacy_payment_verification v where v.membership_id=m.id) legacy_payment_verified,
       p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m join membership_product p on p.id=m.membership_product_id
     join person on person.user_id=m.user_id

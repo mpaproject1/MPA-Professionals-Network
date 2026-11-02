@@ -138,7 +138,7 @@ export async function exportMembers(identity,{q="",status="",format="csv"}={},re
  const rows=(await getPool().query(`select mr.legacy_member_id,mr.membership_number,membership_product.product_code,membership_product.name product_name,mr.status,mr.start_date,mr.end_date,mr.source,u.account_reference,u.email,p.phone,p.display_name full_name,mr.created_at
  from membership_record mr left join app_user u on u.id=mr.user_id left join person p on p.user_id=mr.user_id left join membership_product on membership_product.id=mr.membership_product_id
  where ($1='' or lower(coalesce(p.display_name,'')) like lower('%'||$1||'%') or lower(coalesce(u.email,'')) like lower('%'||$1||'%') or lower(coalesce(u.account_reference,'')) like lower('%'||$1||'%') or lower(mr.membership_number) like lower('%'||$1||'%'))
- and ($2='' or mr.status=$2) order by mr.created_at desc limit 10000`,[String(q).slice(0,120),String(status).slice(0,30)])).rows;
+ and ($2='' or (case when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end)=$2) order by mr.created_at desc limit 10000`,[String(q).slice(0,120),String(status).slice(0,30)])).rows;
  const headers=["account_reference","legacy_member_id","email","phone","full_name","membership_number","product_code","product_name","status","start_date","end_date","source","created_at"];
  const esc=v=>{let s=v==null?"":v instanceof Date?v.toISOString().slice(0,10):String(v);if(typeof v==="string"&&/^[\s]*[=+\-@]/.test(s))s=`'${s}`;return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;};
  const csv=`${[headers.join(","),...rows.map(row=>headers.map(h=>esc(row[h])).join(","))].join("\r\n")}\r\n`;
@@ -174,7 +174,7 @@ export async function listMemberCatalog(identity,{q="",status="",limit=25,offset
  const args=[search,state];
  const total=Number((await db.query(`select count(*)::int count from membership_record mr left join app_user u on u.id=mr.user_id left join person p on p.user_id=u.id left join membership_product on membership_product.id=mr.membership_product_id where ${where}`,args)).rows[0]?.count||0);
  const items=(await db.query(`
-  select mr.id,mr.user_id,mr.membership_number,membership_product.product_code,membership_product.name product_name,mr.status,mr.start_date,mr.end_date,mr.source,mr.created_at,
+  select mr.id,mr.user_id,mr.membership_number,membership_product.product_code,membership_product.name product_name,case when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end status,mr.start_date,mr.end_date,mr.source,mr.created_at,
    u.account_reference,u.email,u.status account_status,p.phone,p.display_name full_name
   from membership_record mr left join app_user u on u.id=mr.user_id left join person p on p.user_id=mr.user_id left join membership_product on membership_product.id=mr.membership_product_id
   where ${where} order by mr.created_at desc limit ${pageSize} offset ${start}

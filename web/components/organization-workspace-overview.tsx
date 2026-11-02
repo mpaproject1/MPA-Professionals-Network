@@ -235,7 +235,7 @@ export function OrganizationWorkspaceOverview({
     hires: outcomes.jobs.reduce((sum, job) => sum + (Number.isFinite(job.hires) ? job.hires : 0), 0),
   } : null;
   const activeRoles = selectedOrganization ? [selectedOrganization.role_code || ""] : [];
-  const visibleFolders = folders.filter((folder) => !folder.allowedRoles || folder.allowedRoles.some((role) => activeRoles.includes(role)));
+  const visibleFolders = workspaceReady.length === 0 ? [] : folders.filter((folder) => !folder.allowedRoles || folder.allowedRoles.some((role) => activeRoles.includes(role)));
   const activeFolder = visibleFolders.find((folder) => folder.key === activeFolderKey) || visibleFolders[0];
   useEffect(() => {
     if (visibleFolders.length > 0 && !visibleFolders.some((folder) => folder.key === activeFolderKey)) {

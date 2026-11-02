@@ -261,15 +261,44 @@ export async function decideBalanceDisposition(identity,dispositionId,input={},r
 }
 const PAYMENT_IMPORT_COLUMNS=["application_id","membership_number","amount","currency","received_date","payment_method_code","payment_reference","evidence_reference","evidence_file_id","payer_note"];
 export function membershipPaymentImportTemplate(identity){financeImport(identity);return createXlsx([],PAYMENT_IMPORT_COLUMNS);}
-function parsePaymentRows(base64){
- let parsed;try{parsed=parseXlsxRows(Buffer.from(String(base64||""),"base64"));}catch(error){throw problem(400,error.message||"The payment workbook could not be read.","INVALID_XLSX");}
- const missing=PAYMENT_IMPORT_COLUMNS.slice(0,7).filter(key=>!parsed.headers.includes(key));
- if(missing.length)throw problem(400,"The payment workbook is missing required columns: "+missing.join(", "),"MISSING_COLUMNS");
- return parsed.rows.map((raw,index)=>({rowNumber:index+2,raw:Object.fromEntries(PAYMENT_IMPORT_COLUMNS.map(key=>[key,clean(raw[key],500)])),errors:[]}));
+export function membershipPaymentImportCsvTemplate(identity){financeImport(identity);return PAYMENT_IMPORT_COLUMNS.join(",")+"\r\n";}
+function parseCsvRecords(text){
+ const records=[];let fields=[],value="",quoted=false;
+ for(let i=0;i<text.length;i++){
+  const ch=text[i];
+  if(quoted){
+   if(ch==='"'&&text[i+1]==='"'){value+='"';i++;}
+   else if(ch==='"')quoted=false;
+   else value+=ch;
+  }else if(ch==='"'){quoted=true;}
+  else if(ch===","){fields.push(value);value="";}
+  else if(ch==="\n"||ch==="\r"){
+   if(ch==="\r"&&text[i+1]==="\n")i++;
+   fields.push(value);value="";
+   if(fields.some(cell=>String(cell).trim()))records.push(fields);
+   fields=[];
+  }else value+=ch;
+ }
+ if(quoted)throw problem(400,"The CSV contains an unterminated quoted field.","INVALID_CSV");
+ if(value.length||fields.length){fields.push(value);if(fields.some(cell=>String(cell).trim()))records.push(fields);}
+ return records;
+}
+function parsePaymentRows({xlsxBase64="",csv=""}={}){
+ let headers=[],records=[];
+ if(xlsxBase64){
+  let parsed;try{parsed=parseXlsxRows(Buffer.from(String(xlsxBase64),"base64"));}catch(error){throw problem(400,error.message||"The payment workbook could not be read.","INVALID_XLSX");}
+  headers=parsed.headers.map(value=>String(value).trim());records=parsed.rows.map(row=>headers.map(header=>String(row[header]??"")));
+ }else{
+  const parsed=parseCsvRecords(String(csv||"").replace(/^\uFEFF/,""));
+  headers=(parsed.shift()||[]).map(value=>String(value).trim());records=parsed;
+ }
+ const missing=PAYMENT_IMPORT_COLUMNS.slice(0,7).filter(key=>!headers.includes(key));
+ if(missing.length)throw problem(400,"The payment import is missing required columns: "+missing.join(", "),"MISSING_COLUMNS");
+ return records.map((values,index)=>({rowNumber:index+2,raw:Object.fromEntries(PAYMENT_IMPORT_COLUMNS.map(key=>[key,clean(values[headers.indexOf(key)]??"",500)])),errors:[]}));
 }
 export async function previewMembershipPaymentImport(identity,input={},requestId){
- financeImport(identity);const base64=String(input.xlsxBase64||"");if(!base64||base64.length>12*1024*1024)throw problem(400,"Upload an XLSX payment workbook up to 9 MiB.","XLSX_REQUIRED");
- const rows=parsePaymentRows(base64),db=getPool(),seen=new Set(),result=[];
+ financeImport(identity);const base64=String(input.xlsxBase64||""),csv=String(input.csv||"");if(base64&&base64.length>12*1024*1024)throw problem(413,"Payment XLSX must be 9 MiB or smaller.","IMPORT_TOO_LARGE");if(!base64&&!csv.trim())throw problem(400,"Upload an XLSX or CSV payment file.","IMPORT_FILE_REQUIRED");if(!base64&&Buffer.byteLength(csv)>5*1024*1024)throw problem(413,"Payment CSV must be 5 MiB or smaller.","IMPORT_TOO_LARGE");
+ const rows=parsePaymentRows({xlsxBase64:base64,csv}),db=getPool(),seen=new Set(),result=[];
  for(const row of rows){
   const x=row.raw,amount=money(x.amount),code=currency(x.currency),ref=clean(x.payment_reference,180),methodCode=clean(x.payment_method_code,40).toLowerCase();
   if(Boolean(x.application_id)===Boolean(x.membership_number))row.errors.push("Provide exactly one application_id or membership_number.");

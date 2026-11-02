@@ -22,3 +22,9 @@ test("membership card status reflects current dates and lifecycle status",()=>{
   assert.equal(getMembershipCardStatus({status:"cancelled",start_date:"2026-01-01",end_date:null},now),"revoked");
   assert.equal(getMembershipCardStatus({status:"merged",start_date:"2026-01-01",end_date:null},now),"revoked");
 });
+
+test("unverified legacy imports are not treated as active card-eligible memberships",()=>{
+  const now=new Date("2026-10-15T12:00:00.000Z");
+  assert.equal(getMembershipCardStatus({source:"legacy_import",legacy_payment_verified:false,status:"active",start_date:"2026-01-01",end_date:"2026-12-31"},now),"payment_verification_required");
+  assert.equal(getMembershipCardStatus({source:"legacy_import",legacy_payment_verified:true,status:"active",start_date:"2026-01-01",end_date:"2026-12-31"},now),"active");
+});

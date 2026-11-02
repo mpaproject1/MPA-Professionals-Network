@@ -30,7 +30,7 @@ function parseDate(v){if(!v)return null;if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return
 function cleanRow(row){
  const x=row.raw,errors=[];
  const email=normalizeEmail(x.email),fullName=String(x.full_name||"").trim().replace(/\s+/g," "),membershipNumber=String(x.membership_number||"").trim(),productCode=String(x.product_code||"").trim().toUpperCase(),status=String(x.status||"").trim().toLowerCase();
- const startDate=parseDate(x.start_date),endDate=parseDate(x.end_date),approved=String(x.approved_membership||"").trim().toLowerCase();
+ const startDate=parseDate(x.start_date),endDate=parseDate(x.end_date),approved=String(x.approved_membership||"").trim().toLowerCase(),paidAmountText=String(x.payment_amount||"").trim(),paidAmount=paidAmountText?Number(paidAmountText):null,paidCurrency=String(x.payment_currency||"").trim().toUpperCase()||null,paymentReference=String(x.payment_reference||"").trim()||null;
  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))errors.push("Enter a valid email address.");
  if(!fullName||fullName.split(" ").length<2)errors.push("Enter first and last name in full_name.");
  if(!membershipNumber)errors.push("Membership number is required.");
@@ -44,7 +44,11 @@ function cleanRow(row){
  if(!String(x.approval_reference||"").trim())errors.push("Provide the MPA approval register, minute, resolution or other source reference for audit traceability.");
  if(status==="active"&&approved!=="yes")errors.push("Active membership requires explicit confirmation that MPA already approved the member.");
  if(status==="active"&&endDate&&endDate<new Date().toISOString().slice(0,10))errors.push("An expired end date cannot be imported as active.");
- return {...row,email,phone:normalizePhone(x.phone),fullName,membershipNumber,productCode,status,startDate,endDate,approved:approved==="yes",legacyMemberId:String(x.legacy_member_id||"").trim()||null,approvalReference:String(x.approval_reference||"").trim()||null,notes:String(x.notes||"").trim()||null,errors};
+ if(paidAmountText&&(!Number.isFinite(paidAmount)||paidAmount<=0||!/^(?:0|[1-9]\\d{0,11})(?:\\.\\d{1,2})?$/.test(paidAmountText)))errors.push("payment_amount must be a positive amount with up to two decimal places.");
+ if(paidCurrency&&!/^[A-Z]{3}$/.test(paidCurrency))errors.push("payment_currency must be a three-letter ISO currency code.");
+ if(paymentReference&&paymentReference.length<4)errors.push("payment_reference must contain at least four characters.");
+ if((paidAmountText||paidCurrency||paymentReference)&&(!paidAmountText||!paidCurrency||!paymentReference))errors.push("If historical payment details are supplied, include payment_amount, payment_currency and payment_reference together.");
+ return {...row,email,phone:normalizePhone(x.phone),fullName,membershipNumber,productCode,status,startDate,endDate,paidAmount,paidCurrency,paymentReference,approved:approved==="yes",legacyMemberId:String(x.legacy_member_id||"").trim()||null,approvalReference:String(x.approval_reference||"").trim()||null,notes:String(x.notes||"").trim()||null,errors};
 }
 function audit(db,actor,action,type,id,requestId,metadata={}){return db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,JSON.stringify(metadata)]);}
 export function memberImportTemplate(identity){
@@ -76,8 +80,8 @@ export async function previewMemberImport(identity,{filename="mpa-members.csv",c
   const imp=(await tx.query("insert into membership_import(filename,source_system,status,row_count,matched_count,new_count,conflict_count,created_by) values($1,$2,'validated',$3,$4,$5,$6,$7) returning id",[String(filename).slice(0,255),String(sourceSystem).slice(0,160),rows.length,rows.filter(r=>r.match&&!r.errors.length).length,rows.filter(r=>!r.match&&!r.errors.length).length,rows.filter(r=>r.errors.length).length,identity.sub])).rows[0];
   for(const row of rows){
    const matchStatus=row.errors.length?"conflict":row.match?"matched":"new";
-   await tx.query("insert into membership_import_row(import_id,row_number,legacy_member_id,email,phone,membership_number,full_name,product_code,status,start_date,end_date,raw_payload,match_status,matched_user_id,match_reason,diagnostics) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)",
-    [imp.id,row.rowNumber,row.legacyMemberId,row.email,row.phone,row.membershipNumber,row.fullName,row.productCode,row.status,row.startDate,row.endDate,row.raw,matchStatus,row.match?.userId||null,row.match?.matchReason||null,JSON.stringify(row.errors)]);
+   await tx.query("insert into membership_import_row(import_id,row_number,legacy_member_id,email,phone,membership_number,full_name,product_code,status,start_date,end_date,paid_amount,paid_currency,payment_reference,raw_payload,match_status,matched_user_id,match_reason,diagnostics) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)",
+    [imp.id,row.rowNumber,row.legacyMemberId,row.email,row.phone,row.membershipNumber,row.fullName,row.productCode,row.status,row.startDate,row.endDate,row.paidAmount,row.paidCurrency,row.paymentReference,row.raw,matchStatus,row.match?.userId||null,row.match?.matchReason||null,JSON.stringify(row.errors)]);
   }
   await audit(tx,identity.sub,"membership.import.previewed","membership_import",imp.id,requestId,{rowCount:rows.length,matchedCount:rows.filter(r=>r.match&&!r.errors.length).length,newCount:rows.filter(r=>!r.match&&!r.errors.length).length,conflictCount:rows.filter(r=>r.errors.length).length,filename:String(filename).slice(0,255)});
   return imp.id;

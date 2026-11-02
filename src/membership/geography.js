@@ -63,7 +63,7 @@ export async function listMemberGeography(identity){
  const db=getPool();
  const version=(await db.query("select id,version_label,source_name,source_version,published_at from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0];
  if(!version)return {version:null,countries:[],regions:[],federalCities:[],children:[]};
- const rows=(await db.query("select id,unit_code,label,unit_level,parent_id,country_iso3,country_m49 from membership_geography_unit where version_id=$1 and active=true order by label",[version.id])).rows;
+ const rows=(await db.query("select id,unit_code,label,unit_level,parent_id,country_iso3,country_m49,metadata from membership_geography_unit where version_id=$1 and active=true order by label",[version.id])).rows;
  return {version,countries:rows.filter(row=>row.unit_level==="country"&&row.metadata?.residenceSelectable!==false),regions:rows.filter(row=>row.unit_level==="region"),federalCities:rows.filter(row=>row.unit_level==="federal_city"),children:rows.filter(row=>!["country","region","federal_city"].includes(row.unit_level))};
 }
 export async function getMyResidence(userId){

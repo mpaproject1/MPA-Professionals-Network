@@ -29,6 +29,7 @@ type Item = {
   createdAt?: string | null;
   description?: string;
   details?: Record<string, unknown>;
+  history?: { status: string; at: string | null }[];
 };
 type Tracking = {
   items: Item[];
@@ -36,7 +37,6 @@ type Tracking = {
   counts?: { needsAttention?: number; waiting?: number; inProgress?: number; completed?: number };
   errors?: { source: string; category: string; message: string }[];
   totalFiltered?: number;
-  history?: { status: string; at: string | null }[];
   limit: number;
   offset: number;
   hasMore: boolean;
@@ -159,7 +159,7 @@ export default function Track() {
         : page;
       dataRef.current = next;
       setData(next);
-      const jobItems = page.items.filter((item) => item.type === "job" || item.type === "job_application");
+      const jobItems = page.items.filter((item) => item.type === "job");
       if (jobItems.length) {
         const progressRows = await Promise.all(jobItems.map(async (item) => {
           try {

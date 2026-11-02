@@ -29,6 +29,7 @@ import * as experience from "./src/platform/experience.js";
 import * as financeReceipts from "./src/platform/finance-receipts.js";
 import {createLogger} from "./src/platform/logger.js";
 import * as memberReferrals from "./src/platform/member-referrals.js";
+import * as memberProgress from "./src/platform/member-progress.js";
 import {resolveNetworkPlusAccess} from "./src/platform/network-plus-access.js";
 import * as notifications from "./src/platform/notifications.js";
 import {authorizePrivateUpload, confirmPrivateUpload, MAX_PRIVATE_UPLOAD_BYTES, readAuthorizedPrivateFile, receivePrivateUpload} from "./src/platform/private-file-storage.js";
@@ -693,6 +694,30 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/me/opportunity-inquiries/") && parts[5]==="sharing-consent") { const identity=await auth(req); return ok(res,await publicOpportunity.updateLinkedSharingConsent(parts[4],identity.sub,await body(req),requestId),requestId); }
     if(req.method==="GET" && p==="api/v1/opportunity-inquiries") { const identity=await auth(req); return ok(res,await publicOpportunity.listInquiries(identity.sub,{type:query(req.url).get("type"),status:query(req.url).get("status")}),requestId); }
     if(req.method==="PATCH" && parts.length===4 && p.startsWith("api/v1/opportunity-inquiries/")) { const identity=await auth(req); const b=await body(req); return ok(res,await publicOpportunity.decideInquiry(parts[3],identity.sub,b,requestId,req.headers["x-idempotency-key"]),requestId); }
+    if(req.method==="GET" && p==="api/v1/me/progress") {
+      const q=query(req.url);
+      const keys=["applications","serviceRequests","mentorshipRequests","mentorshipMatches","mentorships","organizationMentorshipRequests","verificationCases","referenceRequests","communityImpactClaims","talentInquiries","networkPlusRequests","initiativeParticipations","memberInitiatives","referrals","candidateReferrals"];
+      const calls=[
+        () => applicationTracking.getApplicationTracking(identity.sub,{limit:100,offset:0}),
+        () => servicesMentorship.listMyServiceRequests(identity.sub),
+        () => servicesMentorship.listMyMentorshipRequests(identity.sub),
+        () => servicesMentorship.listMyMentorshipMatches(identity.sub),
+        () => servicesMentorship.listMyMentorships(identity.sub),
+        () => organizationMentorshipOffers.listMyOrganizationMentorshipRequests(identity.sub),
+        () => verification.listCases({viewerId:identity.sub,subjectUserId:identity.sub}),
+        () => verification.listMyReferenceRequests(identity.sub),
+        () => communityImpactClaims.listMyClaims(identity.sub),
+        () => talent.listTalentInquiries(identity.sub),
+        () => networkPlusRequests.listNetworkPlusRequests(identity.sub,{limit:100,offset:0}),
+        () => serveCommunityInitiatives.listMyParticipations(identity.sub),
+        () => serveCommunityInitiatives.listMyInitiatives(identity.sub),
+        () => memberReferrals.listMyReferrals(identity.sub),
+        () => memberReferrals.listMyCandidateReferrals(identity.sub)
+      ];
+      const settled=await Promise.allSettled(calls.map(call=>Promise.resolve().then(call)));
+      const sources=Object.fromEntries(keys.map((key,index)=>[key,settled[index]]));
+      return ok(res,memberProgress.buildMemberProgress(sources,{limit:q.get("limit")||50,offset:q.get("offset")||0,view:q.get("view")||"all",category:q.get("category")||"all"}),requestId);
+    }
     if(req.method==="GET" && p==="api/v1/me/application-tracking") { const q=query(req.url); return ok(res,await applicationTracking.getApplicationTracking(identity.sub,{limit:q.get("limit")||undefined,offset:q.get("offset")||undefined,reference:q.get("reference")||undefined}),requestId); }
     if(req.method==="GET" && p==="api/v1/admin/support/knowledge") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin","admin","platform_admin","supporting_staff"],["support.knowledge.manage","support.inquiries.manage"]); return ok(res,await supportBot.adminGetKnowledge(),requestId); }
     if(req.method==="POST" && p==="api/v1/admin/support/knowledge/categories") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin","admin","platform_admin"],["support.knowledge.manage"]); return ok(res,await supportBot.adminSaveCategory(identity.sub,await body(req),requestId),requestId,201); }

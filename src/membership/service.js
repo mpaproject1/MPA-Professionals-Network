@@ -651,6 +651,7 @@ export async function reverseMembershipPayment(paymentId,actorId,input,requestId
     ])).rows[0];
     await db.query("update payment_transaction set status='refunded',updated_at=now(),completed_at=coalesce(completed_at,now()),verification_note=$1 where id=$2",[reason,paymentId]);
     await db.query("update payment_reconciliation set reconciliation_status='disputed',reconciled_by=$1,reconciled_at=now(),note=concat_ws(' | ',note,$2::text) where payment_transaction_id=$3",[actorId,`Refund/reversal recorded: ${reason}`,paymentId]);
+    await db.query("update membership_fee_obligation set status='open',updated_at=now() where application_id=$1",[row.application_id]);
     const suspended=(await db.query("update membership_record set status='suspended',updated_at=now() where application_id=$1 and status='active' returning id,user_id",[row.application_id])).rows;
     if(row.application_status==="paid"){
       await db.query("update membership_application set status='payment_pending',updated_at=now() where id=$1",[row.application_id]);

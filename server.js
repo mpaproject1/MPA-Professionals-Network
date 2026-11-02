@@ -49,7 +49,7 @@ import * as supportBot from "./src/platform/support-bot.js";
 import * as testLab from "./src/platform/test-lab.js";
 import * as userAdmin from "./src/platform/user-admin.js";
 import * as volunteerPledges from "./src/platform/volunteer-pledges.js";
-import {disablePushForUser, getPushSubscriptionStatus, getWebPushPublicConfiguration, registerPushSubscription, removePushSubscription} from "./src/platform/web-push.js";
+import {disablePushForUser, dispatchPendingPushNotifications, getPushSubscriptionStatus, getWebPushPublicConfiguration, registerPushSubscription, removePushSubscription} from "./src/platform/web-push.js";
 import {beginAdminPasskeyAuthentication, beginAdminPasskeyRegistration, finishAdminPasskeyAuthentication, finishAdminPasskeyRegistration, listAdminPasskeys, recoverAdminPasskey, revokeAdminPasskey} from "./src/platform/webauthn.js";
 import {assertFinancePaymentQueueAccess,assertMembershipActivationAccess,assertMembershipReviewAccess,assertMembershipReviewQueueAccess,assertPaymentReversalAccess,assertPaymentVerificationAccess} from "./src/platform/workspace-authorization.js";
 import * as marketplaceDemand from "./src/services-mentorship/demand.js";
@@ -1004,6 +1004,20 @@ membershipFeeReminderTimer.unref();
 let emailWorkerRunning=false;
 const testLabExpiryTimer=setInterval(async()=>{ try{const result=await testLab.expireTestPortfolioAccounts();if(result.expired)logger.info("test_lab.accounts.expired",{expired:result.expired});}catch(error){logger.warn("test_lab.expiry.failed",{code:error.code||"TEST_LAB_EXPIRY_FAILED"});} },10*60*1000);
 testLabExpiryTimer.unref();
+let pushWorkerRunning=false;
+async function runPushDelivery(){
+  if(pushWorkerRunning)return;
+  pushWorkerRunning=true;
+  try {
+    const result=await dispatchPendingPushNotifications(Number(process.env.PUSH_DELIVERY_BATCH_SIZE)||50);
+    if(result.sent||result.failed||result.skipped)logger.info("push.outbox.dispatched",{sent:result.sent||0,failed:result.failed||0,skipped:Boolean(result.skipped),reason:result.reason||null,mode:result.mode||"provider"});
+  } catch(error) {
+    logger.warn("push.outbox.dispatch_failed",{error:error.message,code:error.code||"PUSH_DELIVERY_FAILED"});
+  } finally { pushWorkerRunning=false; }
+}
+void runPushDelivery();
+const pushWorkerTimer=setInterval(()=>void runPushDelivery(),30000);
+pushWorkerTimer.unref();
 const emailWorkerTimer=setInterval(async()=>{
   if(emailWorkerRunning)return;
   emailWorkerRunning=true;

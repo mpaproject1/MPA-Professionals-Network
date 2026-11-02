@@ -128,6 +128,24 @@ export async function listMyOrganizations(userId){
   where om.user_id=$1 and om.status='active' order by o.created_at desc`,[userId])).rows;
 }
 
+/**
+ * Minimal organization relationship index for the authenticated account.
+ * Unlike listMyOrganizations(), this includes suspended/removed relationships
+ * so the UI can distinguish "not registered" from "access is not active".
+ * It intentionally omits contact details, evidence, reviewer notes and rosters.
+ */
+export async function listMyOrganizationAccess(userId) {
+ const db=getPool();
+ return (await db.query(`
+  select o.id,o.display_name,o.legal_name,o.verification_status,
+   om.role_code,om.status as membership_status,om.created_at as membership_created_at
+  from organization_membership om
+  join organization o on o.id=om.organization_id
+  where om.user_id=$1
+  order by om.created_at desc,o.display_name
+ `,[userId])).rows;
+}
+
 export async function listMyJobAssignments(userId){
  const db=getPool();
  return (await db.query("select jt.id team_assignment_id,j.id job_id,j.title job_title,j.status job_status,j.organization_id,o.display_name organization_name,jt.role_code,jt.created_at assigned_at from job_team_member jt join job j on j.id=jt.job_id join organization o on o.id=j.organization_id join organization_membership om on om.organization_id=j.organization_id and om.user_id=jt.user_id and om.status='active' where jt.user_id=$1 and jt.active=true order by o.display_name,j.title,jt.role_code",[userId])).rows;

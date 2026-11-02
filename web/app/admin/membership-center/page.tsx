@@ -172,6 +172,7 @@ export default function MembershipCenterPage() {
   const awaitingPayment = Math.max(0, approved - paid);
   const activeMembers = useMemo(() => memberRows.filter(row => row.Status === "active").reduce((sum, row) => sum + number(row.Members), 0), [memberRows]);
   const expiredMembers = useMemo(() => memberRows.filter(row => row.Status === "expired").reduce((sum, row) => sum + number(row.Members), 0), [memberRows]);
+  const legacyPaymentRequired = useMemo(() => memberRows.filter(row => row.Status === "payment_verification_required").reduce((sum, row) => sum + number(row.Members), 0), [memberRows]);
   const statusChart = useMemo(() => {
     const totals = new Map<string, number>();
     for (const row of appRows) totals.set(clean(row.Status), (totals.get(clean(row.Status)) || 0) + number(row.Applications));
@@ -226,7 +227,7 @@ export default function MembershipCenterPage() {
         <label>From<input type="date" value={filters.from} onChange={event => setFilters(current => ({ ...current, from: event.target.value }))}/></label>
         <label>To<input type="date" value={filters.to} onChange={event => setFilters(current => ({ ...current, to: event.target.value }))}/></label>
         <label>Application stage<select value={filters.status} onChange={event => setFilters(current => ({ ...current, status: event.target.value }))}><option value="">All stages</option><option value="submitted">Submitted</option><option value="in_review">In review</option><option value="correction_required">Needs information</option><option value="approved">Approved</option><option value="payment_pending">Payment pending</option><option value="paid">Paid</option><option value="activated">Activated</option><option value="rejected">Rejected</option><option value="withdrawn">Withdrawn</option></select></label>
-        <label>Member status<select value={filters.memberStatus} onChange={event => setFilters(current => ({ ...current, memberStatus: event.target.value }))}><option value="">All member statuses</option><option value="active">Active</option><option value="expired">Expired</option><option value="not_yet_active">Not yet active</option><option value="pending">Pending</option><option value="suspended">Suspended</option><option value="cancelled">Cancelled</option></select></label>
+        <label>Member status<select value={filters.memberStatus} onChange={event => setFilters(current => ({ ...current, memberStatus: event.target.value }))}><option value="">All member statuses</option><option value="active">Active</option><option value="expired">Expired</option><option value="payment_verification_required">Finance verification required</option><option value="not_yet_active">Not yet active</option><option value="pending">Pending</option><option value="suspended">Suspended</option><option value="cancelled">Cancelled</option></select></label>
         <label className={styles.searchFilter}>Plan / application search<input value={filters.q} onChange={event => setFilters(current => ({ ...current, q: event.target.value }))} placeholder="Search plan or application type"/></label>
         <button className="btn btn-primary" type="button" onClick={() => void load(filters)} disabled={busy}>{busy ? "Applying…" : "Apply filters"}</button>
       </div>
@@ -248,6 +249,7 @@ export default function MembershipCenterPage() {
       <Kpi label="Rejected / withdrawn" value={applications ? rejected + withdrawn : "—"} detail={applications ? `${rejected.toLocaleString()} rejected · ${withdrawn.toLocaleString()} withdrawn` : "Application report unavailable"} icon={CalendarDays} tone="muted"/>
       <Kpi label="Active members" value={membership ? activeMembers : "—"} detail="Current recorded active membership stock; payment status is not inferred" icon={Users} tone="blue"/>
       <Kpi label="Expired memberships" value={membership ? expiredMembers : "—"} detail="Current records with expired status" icon={CalendarDays} tone="muted"/>
+      <Kpi label="Legacy payment verification required" value={membership ? legacyPaymentRequired : "—"} detail="Imported records not yet approved by Finance; account claim remains locked" icon={ShieldCheck} tone="lemon"/>
     </section>
 
     <section className={styles.chartGrid} aria-label="Membership analysis charts">

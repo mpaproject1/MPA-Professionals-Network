@@ -35,8 +35,8 @@ for(const row of workbook.rows){
 }
 assert.ok(byCode.has("ETH"),"The workbook must contain Ethiopia (ETH).");
 const levelOne=workbook.rows.filter(row=>row.parent_code==="ETH");
-assert.equal(levelOne.length,14,"Expected the sourced 12 Ethiopian regions and two federal cities.");
+assert.equal(levelOne.length,14,"Expected the sourced 12 Ethiopian regions and two chartered cities.");
 assert.equal(levelOne.filter(row=>row.unit_level==="region").length,12);
 assert.equal(levelOne.filter(row=>row.unit_level==="federal_city").length,2);
-const manifest={file,rows:workbook.rows.length,countries:workbook.rows.filter(row=>row.unit_level==="country").length,ethiopiaRegions:12,ethiopiaFederalCities:2,lowerAdministrativeLevelsIncluded:0,sourceUrls:[...new Set(workbook.rows.map(row=>(typeof row.metadata==="string"?JSON.parse(row.metadata):row.metadata).sourceUrl))]};
+const manifest={file,rows:workbook.rows.length,countries:workbook.rows.filter(row=>row.unit_level==="country").length,ethiopiaRegions:12,ethiopiaCharteredCities:2,lowerAdministrativeLevelsIncluded:0,sourceUrls:[...new Set(workbook.rows.map(row=>(typeof row.metadata==="string"?JSON.parse(row.metadata):row.metadata).sourceUrl))]};
 process.stdout.write(JSON.stringify(manifest,null,2)+"\n");

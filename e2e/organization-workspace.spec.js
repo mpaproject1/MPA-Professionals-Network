@@ -45,6 +45,16 @@ async function mockOrganizationApi(page, organizations, organizationAccess = org
 }
 
 test.describe("MPA organization app entry and navigation", () => {
+  test("signed-out visitors see the organization benefits before being sent to sign-in", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.sessionStorage.removeItem("mpa-session-token");
+    });
+    await page.goto("/organizations");
+    await expect(page.getByRole("heading", { name: /Bring your organization into a trusted professional network/ })).toBeVisible();
+    await page.getByRole("button", { name: "Register your organization" }).click();
+    await expect(page).toHaveURL(/\/login\?next=\/organizations/);
+  });
+
   test("authenticated unregistered account sees benefits and a progressive registration action before operational tools", async ({ page }) => {
     await mockOrganizationApi(page, []);
     await page.goto("/organizations");

@@ -44,7 +44,7 @@ function cleanRow(row){
  if(!String(x.approval_reference||"").trim())errors.push("Provide the MPA approval register, minute, resolution or other source reference for audit traceability.");
  if(status==="active"&&approved!=="yes")errors.push("Active membership requires explicit confirmation that MPA already approved the member.");
  if(status==="active"&&endDate&&endDate<new Date().toISOString().slice(0,10))errors.push("An expired end date cannot be imported as active.");
- if(paidAmountText&&(!Number.isFinite(paidAmount)||paidAmount<=0||!/^(?:0|[1-9]\\d{0,11})(?:\\.\\d{1,2})?$/.test(paidAmountText)))errors.push("payment_amount must be a positive amount with up to two decimal places.");
+ if(paidAmountText&&(!Number.isFinite(paidAmount)||paidAmount<=0||!/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/.test(paidAmountText)))errors.push("payment_amount must be a positive amount with up to two decimal places.");
  if(paidCurrency&&!/^[A-Z]{3}$/.test(paidCurrency))errors.push("payment_currency must be a three-letter ISO currency code.");
  if(paymentReference&&paymentReference.length<4)errors.push("payment_reference must contain at least four characters.");
  if((paidAmountText||paidCurrency||paymentReference)&&(!paidAmountText||!paidCurrency||!paymentReference))errors.push("If historical payment details are supplied, include payment_amount, payment_currency and payment_reference together.");

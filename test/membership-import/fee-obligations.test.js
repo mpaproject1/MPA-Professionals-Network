@@ -80,7 +80,7 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  const applicantEmail="fee-lifecycle-"+suffix+"@example.test";
  const financeEmail="fee-approver-"+suffix+"@example.test";
  const applicant=await membership.register({email:applicantEmail,password:"FeeLifecycleSecurePassword!2026",firstName:"Fee",lastName:"Lifecycle",phone:"09"+digits},"fee-lifecycle-register-"+suffix);
- const financeUser=await membership.register({email:financeEmail,password:"FeeApproverSecurePassword!2026",firstName:"Finance",lastName:"Approver",phone:"08"+digits},"fee-approver-register-"+suffix);
+ const financeUser=await membership.register({email:financeEmail,password:"FeeApproverSecurePassword!2026",firstName:"Finance",lastName:"Approver",phone:"07"+digits},"fee-approver-register-"+suffix);
  const applicantId=applicant.user.id,financeId=financeUser.user.id;
  const applicantFinance={sub:applicantId,roles:["finance_officer"],permissions:[]};
  const approverFinance={sub:financeId,roles:["finance_officer"],permissions:[]};
@@ -105,6 +105,10 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.equal(Number(balance.verified_cash),500);
  assert.equal(Number(balance.approved_non_cash),0);
  assert.equal(Number(balance.outstanding_balance),700);
+ await membership.reviewApplication(app.id,reviewer,{decision:"approved",note:"Test application approved while a fee balance remains due."},"fee-lifecycle-review-"+suffix);
+ const pendingApplication=(await db.query("select status from membership_application where id=$1",[app.id])).rows[0];
+ assert.equal(pendingApplication.status,"payment_pending","application approval must not make a partially paid application ready to activate");
+ assert.equal((await db.query("select id from membership_record where application_id=$1",[app.id])).rowCount,0,"no membership record may be activated while the fee balance remains due");
 
  const disposition=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"sponsored",amount:700,currency:"ETB",remark:"Test sponsor covers remaining fee",details:{sponsorName:"Disposable test sponsor"},idempotencyKey:"fee_sponsor_"+suffix.slice(0,32)},"fee-sponsor-record-"+suffix);
  assert.equal(disposition.disposition.status,"pending");
@@ -118,7 +122,8 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.deepEqual(after.fee_snapshot,before.fee_snapshot,"settlement must not mutate the immutable application fee snapshot");
  assert.equal(Number(after.amount_due),1200);
 
- await membership.reviewApplication(app.id,reviewer,{decision:"approved",note:"Test application approved after independent payment settlement."},"fee-lifecycle-review-"+suffix);
+ const settledApplication=(await db.query("select status from membership_application where id=$1",[app.id])).rows[0];
+ assert.equal(settledApplication.status,"paid","independent non-cash approval should settle the balance without pretending cash was received");
  const activated=await membership.activateApplication(app.id,reviewer,"fee-lifecycle-activate-"+suffix);
  assert.equal(activated.status,"active");
 
@@ -131,4 +136,8 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.equal(member.status,"suspended","reversal of a verified cash receipt must suspend active membership while a balance remains due");
  const appStatus=(await db.query("select status from membership_application where id=$1",[app.id])).rows[0].status;
  assert.equal(appStatus,"activated","reversal must not rewrite the historical activation event/status; membership access is suspended");
+ const rejected=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"sponsored",amount:100,currency:"ETB",remark:"Rejected test sponsor proposal",details:{sponsorName:"Rejected test sponsor"},idempotencyKey:"fee_reject_"+suffix.slice(0,32)},"fee-rejected-record-"+suffix);
+ await decideBalanceDisposition(approverFinance,rejected.disposition.id,{decision:"rejected",note:"Supporting approval was not provided."},"fee-rejected-decision-"+suffix);
+ balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];
+ assert.equal(Number(balance.outstanding_balance),500,"a rejected non-cash disposition must not reduce the outstanding balance");
 });

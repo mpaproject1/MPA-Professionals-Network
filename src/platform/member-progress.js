@@ -72,8 +72,8 @@ function mapRecord(record, definition, index) {
   const id = safeId(first(record, ["id", "request_id", "case_id", "application_id", "claim_id", "attribution_id"]));
   if (!id) return null;
   const title = domain === "mentorship_session" ? String(first(record, ["agenda"]) || "Mentorship session") : String(first(record, ["title", "service_title", "job_title", "program_title", "program_name", "project_title", "subject", "goals", "name"]) || category + " request");
-  const createdAt = asDate(first(record, ["submitted_at", "submittedAt", "created_at", "createdAt", "requested_at", "proposed_at"]));\n  const scheduledAt = asDate(first(record, ["scheduled_start_at", "scheduledAt"]));
-  const updatedAt = asDate(first(record, ["updated_at", "updatedAt", "last_activity_at", "lastActivityAt", "reviewed_at", "responded_at"])) || createdAt;
+  const createdAt = asDate(first(record, ["submitted_at", "submittedAt", "created_at", "createdAt", "requested_at", "proposed_at"]));\n  const scheduledAt = asDate(first(record, ["scheduled_start_at", "scheduledAt"]));\n  const dueAt = asDate(first(record, ["due_at", "dueAt", "deadline_at"]));
+  const updatedAt = asDate(first(record, ["last_activity_at", "lastActivityAt", "updated_at", "updatedAt", "reviewed_at", "responded_at", "submitted_at"])) || createdAt;
   const statusLabel = String(first(record, ["statusLabel", "status_label", "decision_label"]) || status.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase()));
   const nextAction = responsibility(status);
   const trackingReference = first(record, ["tracking_reference", "trackingReference", "reference", "display_reference"]);

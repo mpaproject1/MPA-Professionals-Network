@@ -159,4 +159,23 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  await decideBalanceDisposition(approverFinance,rejected.disposition.id,{decision:"rejected",note:"Supporting approval was not provided."},"fee-rejected-decision-"+suffix);
  balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];
  assert.equal(Number(balance.outstanding_balance),500,"a rejected non-cash disposition must not reduce the outstanding balance");
+ 
+ const zeroApplicant=await membership.register({email:"fee-zero-"+suffix+"@example.test",password:"ZeroCashSecurePassword!2026",firstName:"Zero",lastName:"Cash",phone:"08"+digits},"fee-zero-register-"+suffix);
+ const zeroApplicantId=zeroApplicant.user.id;
+ await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='reviewer' on conflict do nothing",[zeroApplicantId]);
+ const zeroApp=await membership.createApplication(zeroApplicantId,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:"fee_zero_app_"+suffix.slice(0,32)},"fee-zero-application-"+suffix);
+ const zeroEvidenceBytes=Buffer.from("Full sponsorship approval evidence for zero-cash membership settlement.");
+ const zeroUpload=await authorizePrivateUpload(zeroApplicantId,{fileName:"full-sponsorship-evidence.txt",contentType:"text/plain",byteSize:zeroEvidenceBytes.length});
+ await receivePrivateUpload(zeroApplicantId,zeroUpload.uploadId,zeroUpload.uploadToken,zeroEvidenceBytes);
+ const zeroEvidence=await confirmPrivateUpload(zeroApplicantId,zeroUpload.uploadId);
+ const zeroFinance={sub:zeroApplicantId,roles:["finance_officer"],permissions:[]};
+ const fullSponsorship=await recordBalanceDisposition(zeroFinance,{applicationId:zeroApp.id,dispositionType:"sponsored",amount:1200,currency:"ETB",remark:"Full product fee covered by sponsor",details:{sponsorName:"Full fee sponsor"},evidenceFileId:zeroEvidence.id,idempotencyKey:"fee_zero_sponsor_"+suffix.slice(0,32)},"fee-zero-sponsor-"+suffix);
+ await decideBalanceDisposition(approverFinance,fullSponsorship.disposition.id,{decision:"approved",note:"Full fee sponsorship independently verified."},"fee-zero-sponsor-approve-"+suffix);
+ const zeroBalance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[zeroApp.id])).rows[0];
+ assert.equal(Number(zeroBalance.verified_cash),0,"full sponsorship must not create a cash receipt");
+ assert.equal(Number(zeroBalance.approved_non_cash),1200);
+ assert.equal(Number(zeroBalance.outstanding_balance),0,"approved full sponsorship must settle the fee with zero cash");
+ await membership.reviewApplication(zeroApp.id,zeroApplicantId,{decision:"approved",note:"Approved after full sponsored settlement."},"fee-zero-review-"+suffix);
+ const zeroActivated=await membership.activateApplication(zeroApp.id,zeroApplicantId,"fee-zero-activate-"+suffix);
+ assert.equal(zeroActivated.status,"active");
 });

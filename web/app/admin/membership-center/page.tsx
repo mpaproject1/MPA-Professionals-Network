@@ -82,6 +82,11 @@ export default function MembershipCenterPage() {
   const [generatedAt, setGeneratedAt] = useState("");
 
   const canFinance = roles.some(role => ["system_admin", "finance_officer"].includes(role)) || permissions.some(permission => ["finance.view", "finance.payment.verify", "finance.manage"].includes(permission));
+  const canReview = roles.some(role => ["system_admin", "admin", "reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review");
+  const canViewMemberRecords = roles.some(role => ["system_admin", "admin"].includes(role)) || permissions.some(permission => ["members.view", "members.manage"].includes(permission));
+  const canImportExport = roles.some(role => ["system_admin", "admin", "membership_reviewer", "finance_officer"].includes(role)) || permissions.includes("members.import");
+  const canManageCards = roles.some(role => ["system_admin", "reviewer"].includes(role)) || permissions.some(permission => ["members.view", "members.manage"].includes(permission));
+  const canViewReports = canReview || permissions.includes("reports.view") || roles.some(role => ["system_admin", "admin"].includes(role));
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 
@@ -176,15 +181,15 @@ export default function MembershipCenterPage() {
 
   const nav = [
     ["Overview", "/admin/membership-center", true],
-    ["Applications", "/admin/membership", false],
-    ["Members", "/admin/members/catalog", false],
-    ["Import & export", "/admin/members", false],
-    ["Renewals & expiry", "/admin/reports?report=membership-status", false],
+    ...(canReview ? [["Applications", "/admin/membership", false] as [string, string, boolean]] : []),
+    ...(canViewMemberRecords ? [["Members", "/admin/members/catalog", false] as [string, string, boolean]] : []),
+    ...(canImportExport ? [["Import & export", "/admin/members", false] as [string, string, boolean]] : []),
+    ...(canReview ? [["Renewals & expiry", "/admin/reports?report=membership-status", false] as [string, string, boolean]] : []),
     ...(canFinance ? [["Finance payments", "/admin/finance", false] as [string, string, boolean]] : []),
-    ["Membership cards", "/admin/membership-cards", false],
-    ["Plans & settings", "/admin/membership", false],
+    ...(canManageCards ? [["Membership cards", "/admin/membership-cards", false] as [string, string, boolean]] : []),
+    ...(canViewMemberRecords ? [["Plans & settings", "/admin/membership", false] as [string, string, boolean]] : []),
     ...(canFinance ? [["Payment methods", "/admin/membership/payment-methods", false] as [string, string, boolean]] : []),
-    ["Reports", "/admin/reports?category=Membership", false],
+    ...(canViewReports ? [["Reports", "/admin/reports?category=Membership", false] as [string, string, boolean]] : []),
   ] as [string, string, boolean][];
 
   return <div className={styles.page}>

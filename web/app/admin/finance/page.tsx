@@ -57,7 +57,7 @@ const legacyDraft = (item: LegacyMembershipPayment): LegacyPaymentDraft => ({
   amount: item.imported_payment_amount || "",
   currency: (item.imported_payment_currency || "").toUpperCase(),
   paymentReference: item.imported_payment_reference || "",
-  paymentDate: /^\\d{4}-\\d{2}-\\d{2}$/.test(item.imported_payment_date || "") ? item.imported_payment_date! : "",
+  paymentDate: /^\d{4}-\d{2}-\d{2}$/.test(item.imported_payment_date || "") ? item.imported_payment_date! : "",
   paymentMethod: ["bank_transfer", "telebirr", "cash", "mobile_money", "other"].includes(item.imported_payment_method || "") ? item.imported_payment_method! : "bank_transfer",
   evidenceReference: item.imported_evidence_reference || "",
   financeNote: "",
@@ -260,7 +260,7 @@ export default function FinanceWorkspacePage() {
           return <article key={item.membership_id} className="case-row" style={{display:"grid",gap:12}}>
             <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
               <div><strong>{item.member_name || "Imported member"} · {item.membership_number}</strong><p className="muted">{item.email || "No email recorded"} · {item.product_name} ({item.product_code})</p><p className="muted">Imported {dateLabel(item.imported_at)} · Record status {item.membership_status.replaceAll("_"," ")}</p></div>
-              <Badge tone={item.invitation_claimed_at ? "warning" : "gold"}>{item.invitation_claimed_at ? "Previously claimed · review record" : item.invitation_expires_at ? "Invitation awaiting claim" : "No invitation recorded"}</Badge>
+              <Badge tone="warning">{item.invitation_claimed_at ? "Previously claimed · review record" : item.invitation_expires_at ? "Invitation awaiting claim" : "No invitation recorded"}</Badge>
             </div>
             {canVerify ? <form className="form-stack" onSubmit={event => void verifyLegacyPayment(event,item)}>
               <div className="grid grid-2">

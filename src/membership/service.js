@@ -437,7 +437,8 @@ export async function reviewApplication(applicationId,reviewerId,input,requestId
       if(missing.length)throw httpError(409,"Cannot approve this application until the required private evidence is attached: "+missing.join(", ").replaceAll("_"," ")+".","REQUIRED_EVIDENCE_MISSING");
     }
     const review=(await db.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,$3,$4,$5) returning *",[applicationId,reviewerId,decision,input.note||null,JSON.stringify(input.checklist||[])])).rows[0];
-    const verifiedPayment=(decision==="approved"?(await db.query(`select 1 from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id where ap.application_id=$1 and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id) limit 1`,[applicationId])).rowCount>0:false);
+    const feeBalance=decision==="approved"?(await db.query("select outstanding_balance from membership_fee_obligation_balance where application_id=$1",[applicationId])).rows[0]:null;
+    const verifiedPayment=decision==="approved"&&feeBalance!==undefined&&feeBalance!==null&&Number(feeBalance.outstanding_balance)===0;
     const next=applicationStatusAfterReview(decision,verifiedPayment);
     await db.query("update membership_application set status=$1,approved_at=case when $2 then coalesce(approved_at,now()) else approved_at end,updated_at=now() where id=$3",[next,decision==="approved",applicationId]);
     if(decision==="correction_required") await db.query("insert into membership_correction(application_id,requested_by,requested_fields,reviewer_note) values($1,$2,$3,$4)",[applicationId,reviewerId,JSON.stringify(input.requestedFields||[]),input.note||"Correction required."]);
@@ -585,15 +586,18 @@ export async function activateApplication(applicationId,actorId,requestId){
     }
     if(app.status!=="paid" || !app.approved_at) throw httpError(409,"Application must be approved and have a verified payment before activation.","ACTIVATION_NOT_READY");
     const fee=typeof app.fee_snapshot==="string"?JSON.parse(app.fee_snapshot):app.fee_snapshot;
+    const obligation=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[applicationId])).rows[0];
+    if(!fee||!Number.isFinite(Number(fee.amount))||!fee.currency||fee.durationDays===undefined||(fee.billingModel==="recurring"&&(!Number.isInteger(Number(fee.durationDays))||Number(fee.durationDays)<1||Number(fee.durationDays)>3650))||(fee.billingModel==="lifetime"&&fee.durationDays!==null)){
+      throw httpError(409,"The application fee snapshot is invalid. Membership has not been activated.","FEE_SNAPSHOT_INVALID");
+    }
+    if(!obligation||Number(obligation.amount_due)!==Number(fee.amount)||String(obligation.currency||"").trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase()||Number(obligation.outstanding_balance)>0||Number(obligation.verified_cash)+Number(obligation.approved_non_cash)<Number(fee.amount)){
+      throw httpError(409,"The saved fee obligation is not fully settled by Finance-verified receipts and approved non-cash coverage. Membership has not been activated.","PAYMENT_NOT_CONFIRMED");
+    }
     const pay=(await db.query(`select pt.* from payment_transaction pt
       join membership_application_payment ap on ap.payment_transaction_id=pt.id
       where ap.application_id=$1 and pt.status='succeeded'
         and not exists (select 1 from membership_payment_reversal mr where mr.payment_transaction_id=pt.id)
-      order by pt.created_at desc limit 1 for update of pt`,[applicationId])).rows[0];
-    if(!pay) throw httpError(409,"No unreversed successful payment is linked to this application.","PAYMENT_NOT_CONFIRMED");
-    if(!fee||!Number.isFinite(Number(fee.amount))||!fee.currency||fee.durationDays===undefined||(fee.billingModel==="recurring"&&(!Number.isInteger(Number(fee.durationDays))||Number(fee.durationDays)<1||Number(fee.durationDays)>3650))||(fee.billingModel==="lifetime"&&fee.durationDays!==null)||Number(pay.amount)!==Number(fee.amount)||String(pay.currency||"").trim().toUpperCase()!==String(fee.currency||"").trim().toUpperCase()){
-      throw httpError(409,"The payment no longer matches the application’s saved fee terms. Membership has not been activated.","PAYMENT_AMOUNT_MISMATCH");
-    }
+      order by pt.created_at desc limit 1 for update of pt`,[applicationId])).rows[0]||null;
     const previous=app.previous_membership_id ? (await db.query("select * from membership_record where id=$1 for update",[app.previous_membership_id])).rows[0] : null;
     const start=new Date(); start.setUTCHours(0,0,0,0);
     if(previous?.status==="active" && previous.end_date && new Date(previous.end_date)>=start) start.setTime(new Date(previous.end_date).getTime()+86400000);
@@ -617,9 +621,9 @@ export async function activateApplication(applicationId,actorId,requestId){
       values($1,$2,$3,'active',$4,$5,'online',$6) returning *`,[app.user_id,app.membership_product_id,number,start.toISOString().slice(0,10),end?.toISOString().slice(0,10)||null,applicationId])).rows[0];
     await db.query("update membership_application set status='activated',activated_at=now(),updated_at=now() where id=$1",[applicationId]);
     await memberReferrals.recordMembershipActivated(db,app.user_id,actorId);
-    await db.query("update payment_reconciliation set membership_id=$1,reconciled_at=coalesce(reconciled_at,now()) where payment_transaction_id=$2 and reconciliation_status='matched'",[membership.id,pay.id]);
-    await db.query("insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'activated',now(),$2,'membership_application',$3)",[membership.id,actorId,JSON.stringify({applicationId,paymentId:pay.id,productCode:app.product_code,durationDays:fee.durationDays,durationPolicy:fee.durationPolicy||"fixed_days_inclusive",feeRuleId:fee.feeRuleId||null,feeRuleVersion:fee.feeRuleVersion??null})]);
-    await audit(db,actorId,"membership.activated","membership_record",membership.id,requestId,{applicationId,paymentId:pay.id});
+    if(pay)await db.query("update payment_reconciliation set membership_id=$1,reconciled_at=coalesce(reconciled_at,now()) where payment_transaction_id=$2 and reconciliation_status='matched'",[membership.id,pay.id]);
+    await db.query("insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'activated',now(),$2,'membership_application',$3)",[membership.id,actorId,JSON.stringify({applicationId,paymentId:pay?.id||null,verifiedCash:obligation.verified_cash,approvedNonCash:obligation.approved_non_cash,productCode:app.product_code,durationDays:fee.durationDays,durationPolicy:fee.durationPolicy||"fixed_days_inclusive",feeRuleId:fee.feeRuleId||null,feeRuleVersion:fee.feeRuleVersion??null})]);
+    await audit(db,actorId,"membership.activated","membership_record",membership.id,requestId,{applicationId,paymentId:pay?.id||null,verifiedCash:obligation.verified_cash,approvedNonCash:obligation.approved_non_cash});
     await notify(db,app.user_id,"membership_activated","membership_record",membership.id,{membershipNumber:number,productCode:app.product_code});
     return membership;
   });

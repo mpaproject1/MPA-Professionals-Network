@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
-import { assertFinancePaymentQueueAccess, assertPaymentVerificationAccess } from "../platform/workspace-authorization.js";
+import { assertFinancePaymentQueueAccess, assertPaymentReversalAccess, assertPaymentVerificationAccess } from "../platform/workspace-authorization.js";
 
 function problem(statusCode, message, code = "BUSINESS_RULE") {
   return Object.assign(new Error(message), { statusCode, code });
@@ -136,5 +136,38 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
       [identity.sub, membershipId, requestId, JSON.stringify({ paymentTransactionId: payment.id, membershipNumber: membership.membership_number, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference })]
     );
     return { membershipId, paymentTransactionId: payment.id, verifiedAt: payment.verified_at, claimUnlocked: outstandingInvitation.rowCount > 0 };
+  });
+}
+
+export async function reverseLegacyMembershipPayment(identity, paymentId, input = {}, requestId) {
+  assertPaymentReversalAccess(identity);
+  const reason = String(input.reason || "").trim().slice(0, 1000);
+  const reversalType = input.reversalType === "reversal" ? "reversal" : "refund";
+  const evidenceReference = String(input.evidenceReference || "").trim().slice(0, 300) || null;
+  if (reason.length < 8) throw problem(400, "Enter a reason of at least eight characters for the historical payment reversal.", "REVERSAL_REASON_REQUIRED");
+
+  return withTransaction(async tx => {
+    const row = (await tx.query(`
+      select pt.id payment_id,pt.status payment_status,pr.membership_id,mr.membership_number,mr.id membership_id
+      from payment_transaction pt
+      join payment_reconciliation pr on pr.payment_transaction_id=pt.id
+      join membership_record mr on mr.id=pr.membership_id
+      where pt.id=$1 and pt.source='legacy_import' and mr.source='legacy_import'
+      for update of pt,pr,mr
+    `, [paymentId])).rows[0];
+    if (!row) throw problem(404, "Historical membership payment was not found.", "NOT_FOUND");
+    if (row.payment_status !== "succeeded") throw problem(409, "Only a Finance-verified historical payment can be reversed.", "PAYMENT_NOT_REVERSIBLE");
+
+    await tx.query("update payment_transaction set status='refunded',updated_at=now(),completed_at=coalesce(completed_at,now()),verification_note=$1 where id=$2", [reason, paymentId]);
+    await tx.query("update payment_reconciliation set reconciliation_status='disputed',reconciled_by=$1,reconciled_at=now(),note=concat_ws(' | ',note,$2::text) where payment_transaction_id=$3", [identity.sub, `Historical ${reversalType} recorded: ${reason}`, paymentId]);
+    await tx.query(
+      "insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'legacy_payment_reversed',now(),$2,'legacy_import',$3)",
+      [row.membership_id, identity.sub, JSON.stringify({ paymentId, reversalType, reason, evidenceReference })]
+    );
+    await tx.query(
+      "insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.legacy_payment_reversed','payment_transaction',$2,$3,'success',$4)",
+      [identity.sub, paymentId, requestId, JSON.stringify({ membershipId: row.membership_id, membershipNumber: row.membership_number, reversalType, reason, evidenceReference })]
+    );
+    return { paymentId, membershipId: row.membership_id, status: "refunded", reconciliationStatus: "disputed" };
   });
 }

@@ -34,7 +34,7 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(service, /listMentorshipLearningActivities/);
   assert.match(service, /createMentorshipLearningActivity/);
   assert.match(service, /submitMentorshipLearningActivity/);
-  assert.match(service, /reviewMentorshipLearningSubmission/);
+  assert.match(service, /reviewMentorshipLearningSubmission/);\n  assert.match(service, /listMyMentorshipLearningProgress/);\n  assert.match(service, /createInAppNotification\(db,m\.mentee_user_id/);\n  assert.match(service, /createInAppNotification\(db,activity\.mentor_user_id/);
   assert.match(service, /SUBMISSION_AWAITING_REVIEW/);
   assert.match(service, /STALE_SUBMISSION/);
   assert.match(service, /Only the assigned mentor can create learning activities/);

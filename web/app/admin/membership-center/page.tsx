@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, ArrowDownToLine, ArrowRight, BarChart3, CalendarDays, CreditCard, Download, MapPinned, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowRight, CalendarDays, CreditCard, Download, MapPinned, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { Badge, Card } from "../../../components/ui";
 import { OperationStatus } from "../../../components/operation-status";
 import { ApiError, api } from "../../../lib/api";
@@ -80,12 +80,11 @@ export default function MembershipCenterPage() {
   const [error, setError] = useState("");
   const [generatedAt, setGeneratedAt] = useState("");
 
-  const canReview = roles.some(role => ["system_admin", "admin", "reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review");
   const canFinance = roles.some(role => ["system_admin", "finance_officer"].includes(role)) || permissions.some(permission => ["finance.view", "finance.payment.verify", "finance.manage"].includes(permission));
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 
-  const load = useCallback(async (nextFilters: Filters = filters) => {
+  const load = useCallback(async (nextFilters: Filters) => {
     if (!token) return;
     setBusy(true);
     setError("");
@@ -125,13 +124,13 @@ export default function MembershipCenterPage() {
       setFinance(null);
       setAccess("allowed");
     } finally { setBusy(false); }
-  }, [token, filters]);
+  }, [token]);
 
   useEffect(() => {
     if (!hydrated) return;
     if (!token) { setAccess("signin"); return; }
     setAccess("loading");
-    void load();
+    void load(filters);
   }, [hydrated, token, load]);
 
   const appRows = applications?.rows || [];
@@ -185,11 +184,11 @@ export default function MembershipCenterPage() {
   ] as [string, string, boolean][];
 
   return <div className={styles.page}>
-    <AdminPageHeader eyebrow="MPA · Membership management" title="Membership Center" description="One place to review applications, understand the paid membership base and monitor renewal risk." actions={<button className="btn btn-ghost" type="button" onClick={() => void load()} disabled={busy}><RefreshCw size={16}/>{busy ? "Refreshing…" : "Refresh data"}</button>} />
+    <AdminPageHeader eyebrow="MPA · Membership management" title="Membership Center" description="One place to review applications, understand the paid membership base and monitor renewal risk." actions={<button className="btn btn-ghost" type="button" onClick={() => void load(filters)} disabled={busy}><RefreshCw size={16}/>{busy ? "Refreshing…" : "Refresh data"}</button>} />
     <nav className={styles.nav} aria-label="Membership management sections">
       {nav.map(([label, href, active]) => <a key={label} href={href} aria-current={active ? "page" : undefined} className={active ? styles.navActive : ""}>{label}</a>)}
     </nav>
-    {error && <Card><OperationStatus state="error" title="Membership data could not be fully verified" detail={error} onRetry={() => void load()} /></Card>}
+    {error && <Card><OperationStatus state="error" title="Membership data could not be fully verified" detail={error} action={<button className="btn btn-ghost" type="button" onClick={() => void load(filters)}>Retry</button>} /></Card>}
     <section className={styles.filterPanel} aria-label="Membership report filters">
       <div className={styles.filterTitle}><div><strong>Reporting period</strong><span>Application counts use application creation dates. Active and expired membership counts show the current recorded stock.</span></div><Badge tone="slate">Ethiopia · GMT+3 reporting convention</Badge></div>
       <div className={styles.filters}>
@@ -200,7 +199,7 @@ export default function MembershipCenterPage() {
       </div>
       <div className={styles.periodShortcuts}>
         <label>Year<select defaultValue={String(currentYear())} onChange={event => applyPeriod(event.target.value, "")}>{Array.from({length: 7}, (_, index) => currentYear() - index).map(year => <option key={year} value={year}>{year}</option>)}</select></label>
-        <label>Month<select defaultValue="" onChange={event => { const year = String(new Date(filters.from).getFullYear() || currentYear()); applyPeriod(year, event.target.value); }}><option value="">Full year</option>{Array.from({length: 12}, (_, index) => index + 1).map(month => <option key={month} value={String(month).padStart(2,"0")}>{new Date(2026, month - 1, 1).toLocaleString("en", {month:"long"})}</option>)}</select></label>
+        <label>Month<select defaultValue="" onChange={event => { const year = String(new Date(filters.from).getFullYear() || currentYear()); applyPeriod(year, event.target.value); }}><option value="">Full year</option>{Array.from({length: 12}, (_, index) => index + 1).map(month => <option key={month} value={String(month).padStart(2,"0")}>{new Date(2024, month - 1, 1).toLocaleString("en", {month:"long"})}</option>)}</select></label>
         <span className={styles.filterNote}>All charts and application KPIs refresh together. Current member stock is not reduced by the selected application period.</span>
       </div>
     </section>

@@ -126,8 +126,6 @@ export default function MembershipCenterPage() {
           setFinance(financeResult);
         } catch { setFinance(null); }
       } else setFinance(null);
-      setFinanceAvailable(false);
-      setGeneratedAt("");
       setAccess("allowed");
     } catch (cause) {
       setError(cause instanceof ApiError || cause instanceof Error ? cause.message : "Membership dashboard could not be loaded.");
@@ -135,6 +133,8 @@ export default function MembershipCenterPage() {
       setMembership(null);
       setMonthlyApplications(null);
       setFinance(null);
+      setFinanceAvailable(false);
+      setGeneratedAt("");
       setAccess("allowed");
     } finally { setBusy(false); }
   }, [token]);

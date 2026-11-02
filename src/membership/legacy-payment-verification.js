@@ -52,7 +52,7 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
   const evidenceReference = String(input.evidenceReference || "").trim().slice(0, 300);
   const financeNote = String(input.financeNote || "").trim().slice(0, 1000) || null;
 
-  if (!Number.isFinite(amount) || amount <= 0 || !/^\d{3,14}(\.\d{1,2})?$/.test(String(input.amount || "").trim())) {
+  if (!Number.isFinite(amount) || amount <= 0 || !/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/.test(String(input.amount || "").trim())) {
     throw problem(400, "Enter the amount confirmed against the historical payment evidence.", "INVALID_AMOUNT");
   }
   if (!/^[A-Z]{3}$/.test(currency)) throw problem(400, "Currency must be a three-letter ISO code.", "INVALID_CURRENCY");
@@ -95,7 +95,7 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
       [membership.user_id, membership.source_import_id]
     );
     await tx.query(
-      "insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'legacy_payment_verified',now(),$2,'finance_legacy_verification',$3)",
+      "insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'legacy_payment_verified',now(),$2,'legacy_import',$3)",
       [membershipId, identity.sub, JSON.stringify({ verificationId: verification.id, paymentReference, amount, currency, paymentDate, paymentMethod, evidenceReference })]
     );
     await tx.query(

@@ -43,6 +43,14 @@ type Organization = {
   required_evidence?: string[];
   missing_evidence?: string[];
 };
+type OrganizationAccess = {
+  id: string;
+  display_name: string;
+  legal_name: string;
+  verification_status?: string;
+  role_code: string;
+  membership_status: string;
+};
 type OrgReviewCase = {
   organization_id: string;
   legal_name: string;
@@ -84,6 +92,8 @@ export default function Organizations() {
   const token = useUiStore((s) => s.token);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizationAccess, setOrganizationAccess] = useState<OrganizationAccess[]>([]);
+  const [organizationLookupReady, setOrganizationLookupReady] = useState(false);
   const [reviewQueue, setReviewQueue] = useState<OrgReviewCase[]>([]);
   const [reviewDrafts, setReviewDrafts] = useState<
     Record<string, { decision: string; reason: string }>
@@ -110,30 +120,46 @@ export default function Organizations() {
   const load = useCallback(async () => {
     if (!token) {
       setOrganizations([]);
+      setOrganizationAccess([]);
+      setOrganizationLookupReady(false);
       setInquiries([]);
       setReviewQueue([]);
       return;
     }
     setLoading(true);
+    setOrganizationLookupReady(false);
     setError("");
     const results = await Promise.allSettled([
       api<Organization[]>("/api/v1/organizations", {}, token),
       api<Inquiry[]>("/api/v1/opportunity-inquiries?type=job", {}, token),
       api<{ roles?: string[] }>("/api/v1/me", {}, token),
+      api<OrganizationAccess[]>("/api/v1/me/organization-access", {}, token),
     ]);
     const organizationResult = results[0];
-    if (organizationResult.status === "fulfilled")
-      setOrganizations(
-        Array.isArray(organizationResult.value) ? organizationResult.value : [],
-      );
-    else {
+    let organizationsLoaded = false;
+    if (organizationResult.status === "fulfilled" && Array.isArray(organizationResult.value)) {
+      setOrganizations(organizationResult.value);
+      organizationsLoaded = true;
+    } else {
       const reason = organizationResult.reason;
+      setOrganizations([]);
       setError(
         reason instanceof ApiError
           ? reason.message
           : "We couldn't load your organizations.",
       );
     }
+    const accessResult = results[3];
+    let accessLoaded = false;
+    if (accessResult.status === "fulfilled" && Array.isArray(accessResult.value)) {
+      setOrganizationAccess(accessResult.value);
+      accessLoaded = true;
+    } else {
+      setOrganizationAccess([]);
+      const reason = accessResult.status === "rejected" ? accessResult.reason : null;
+      setError((current) => current || (reason instanceof ApiError ? reason.message : "We couldn't confirm your organization access."));
+    }
+    setOrganizationLookupReady(organizationsLoaded && accessLoaded);
     const inquiryResult = results[1];
     if (inquiryResult.status === "fulfilled")
       setInquiries(
@@ -523,6 +549,10 @@ export default function Organizations() {
 
           <OrganizationWorkspaceOverview
             organizations={organizations}
+            organizationAccess={organizationAccess}
+            authenticated={Boolean(token)}
+            organizationLookupReady={organizationLookupReady}
+            onRetry={() => void load()}
             onRegister={() => {
               if (!token) {
                 window.location.assign("/login?next=/organizations");

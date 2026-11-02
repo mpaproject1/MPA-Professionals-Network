@@ -129,9 +129,9 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  await assert.rejects(decideBalanceDisposition(applicantFinance,disposition.disposition.id,{decision:"approved",note:"Self approval attempt"},"fee-sponsor-self-approve-"+suffix),error=>error.code==="MAKER_CHECKER_REQUIRED");
  await decideBalanceDisposition(approverFinance,disposition.disposition.id,{decision:"approved",note:"Independent Finance approval"},"fee-sponsor-approve-"+suffix);
  const adjustment=(await db.query("select id,details from membership_fee_adjustment where obligation_id=(select id from membership_fee_obligation where application_id=$1) and status='approved' order by created_at desc limit 1",[app.id])).rows[0];
+ assert.ok(adjustment?.id,"approval must create an immutable approved adjustment");
  assert.equal(adjustment.details.evidenceFileId,evidence.id,"approved adjustment must retain the private evidence reference");
  assert.equal(adjustment.details.sponsorSource,"manual","manual sponsor body must be retained as a clearly labelled snapshot");
- assert.ok(adjustment?.id,"approval must create an immutable approved adjustment");
  await assert.rejects(db.query("update membership_fee_adjustment set status='reversed' where id=$1",[adjustment.id]),/approved membership fee adjustments are immutable/i);
  balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];
  assert.equal(Number(balance.verified_cash),500,"non-cash sponsorship must not be counted as cash");

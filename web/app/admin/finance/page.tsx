@@ -288,7 +288,7 @@ export default function FinanceWorkspacePage() {
                 <label>Evidence reference<input required minLength={4} maxLength={300} value={draft.evidenceReference} placeholder="Statement line, receipt or approved evidence reference" onChange={event=>setLegacyDrafts(current=>({...current,[item.membership_id]:{...draft,evidenceReference:event.target.value}}))}/></label>
               </div>
               <label>Finance verification note<textarea rows={2} maxLength={1000} value={draft.financeNote} onChange={event=>setLegacyDrafts(current=>({...current,[item.membership_id]:{...draft,financeNote:event.target.value}}))} placeholder="Record how the historical payment was independently checked."/></label>
-              <button type="submit" className="btn btn-primary" disabled={busy!==""}>{busy==="legacy-"+item.membership_id?"Verifying…":"Verify historical payment and unlock claim"}</button>
+              <button type="submit" className="btn btn-primary" disabled={busy!==""}>{busy==="legacy-"+item.membership_id?"Verifying…" :"Verify historical installment"}</button>
             </form> : <p className="muted">Read-only Finance queue. The separate finance.payment.verify permission is required to approve historical payment evidence.</p>}
           </article>;
         })}

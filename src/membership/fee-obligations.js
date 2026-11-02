@@ -35,6 +35,7 @@ async function ensureRecordObligation(db,membershipRecordId,input,actorId){
  return (await db.query("insert into membership_fee_obligation(membership_record_id,fee_snapshot,amount_due,currency,created_by) values($1,$2,$3,$4,$5) returning *",[membershipRecordId,JSON.stringify(snapshot),amount,code,actorId])).rows[0];
 }
 async function obligationFor(db,input,actorId){
+ if(Boolean(input.applicationId)===Boolean(input.membershipRecordId))throw problem(400,"Provide exactly one application ID or membership record ID.","MEMBERSHIP_REFERENCE_REQUIRED");
  if(input.applicationId)return ensureApplicationObligation(db,clean(input.applicationId,64),actorId);
  if(input.membershipRecordId)return ensureRecordObligation(db,clean(input.membershipRecordId,64),input,actorId);
  throw problem(400,"Provide an application ID or membership record ID.","MEMBERSHIP_REFERENCE_REQUIRED");
@@ -62,7 +63,8 @@ export async function listFeeObligations(identity,filters={}){
  const roles=identity?.roles||[],permissions=identity?.permissions||[];
  if(!roles.includes("finance_officer")&&!roles.includes("system_admin")&&!permissions.some(p=>["finance.view","finance.payment.record","finance.payment.verify","finance.manage"].includes(p)))throw problem(403,"Finance obligation access required.","FORBIDDEN");
  const status=clean(filters.status,20),q=clean(filters.q,100);
- const rows=(await getPool().query(`select b.*,o.created_at,o.due_date,
+ const db=getPool();
+ const rows=(await db.query(`select b.*,o.created_at,o.due_date,
   a.tracking_reference,a.status application_status,a.user_id,
   mr.membership_number,mr.status membership_status,
   coalesce(p.display_name,concat_ws(' ',p.first_name,p.last_name)) member_name,u.email,
@@ -77,7 +79,15 @@ export async function listFeeObligations(identity,filters={}){
   left join lateral (select json_agg(json_build_object('id',d.id,'type',d.disposition_type,'amount',d.amount,'currency',d.currency,'remark',d.remark,'requestedBy',d.requested_by) order by d.created_at) items from membership_fee_balance_disposition d where d.obligation_id=o.id and d.status='pending') pending_dispositions on true
   where ($1='' or o.status=$1) and ($2='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(mr.membership_number,'')||' '||coalesce(a.tracking_reference,'')) like lower('%'||$2||'%'))
   order by (b.outstanding_balance>0) desc,o.due_date nulls last,o.created_at desc limit 500`,[status,q])).rows;
- return {rows:rows.map(row=>({...row,pending_receipts:row.receipts||[],pending_dispositions:row.items||[]})),total:rows.length};
+ const legacyRecords=(await db.query(`select mr.id membership_record_id,mr.membership_number,mr.status membership_status,mp.product_code,mp.name product_name,
+  p.display_name member_name,u.email,mr.created_at
+  from membership_record mr join membership_product mp on mp.id=mr.membership_product_id
+  left join app_user u on u.id=mr.user_id left join person p on p.user_id=u.id
+  where mr.source='legacy_import' and mr.status<>'merged'
+  and not exists(select 1 from membership_fee_obligation o where o.membership_record_id=mr.id)
+  and ($1='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||mr.membership_number) like lower('%'||$1||'%'))
+  order by mr.created_at desc limit 200`,[q])).rows;
+ return {rows:rows.map(row=>({...row,pending_receipts:row.receipts||[],pending_dispositions:row.items||[]})),legacyRecords,total:rows.length};
 }
 export async function exportFeeObligations(identity,filters={},requestId){
  const result=await listFeeObligations(identity,filters);

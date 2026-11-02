@@ -27,6 +27,15 @@ type Organization = {
   missing_evidence?: string[];
 };
 
+type OrganizationAccess = {
+  id: string;
+  display_name: string;
+  legal_name: string;
+  verification_status?: string;
+  role_code: string;
+  membership_status: string;
+};
+
 type Folder = {
   key: string;
   title: string;
@@ -127,9 +136,17 @@ function statusFor(organization: Organization) {
 
 export function OrganizationWorkspaceOverview({
   organizations,
+  organizationAccess,
+  authenticated,
+  organizationLookupReady,
+  onRetry,
   onRegister,
 }: {
   organizations: Organization[];
+  organizationAccess: OrganizationAccess[];
+  authenticated: boolean;
+  organizationLookupReady: boolean;
+  onRetry: () => void;
   onRegister: () => void;
 }) {
   const verified = organizations.filter((item) => item.verification_status === "verified");
@@ -141,6 +158,44 @@ export function OrganizationWorkspaceOverview({
   const hasVerifiedOrganization = verified.length > 0;
   const [activeFolderKey, setActiveFolderKey] = useState("publishing");
   const activeFolder = folders.find((folder) => folder.key === activeFolderKey) || folders[0];
+
+  if (organizations.length === 0 && authenticated && !organizationLookupReady) {
+    return (
+      <section className={styles.gate} aria-labelledby="organization-access-check-title">
+        <div className={styles.gateIntro}>
+          <span className={styles.eyebrow}>MPA organization access</span>
+          <h2 id="organization-access-check-title">Confirming your organization access</h2>
+          <p>We need to confirm both your active organization assignments and any previous organization relationships before showing registration or workspace actions.</p>
+        </div>
+        <button className="btn btn-ghost" type="button" onClick={onRetry}>Retry access check</button>
+      </section>
+    );
+  }
+
+  if (organizations.length === 0 && authenticated && organizationAccess.length > 0) {
+    const hasActiveRelationship = organizationAccess.some((item) => item.membership_status === "active");
+    return (
+      <section className={styles.gate} aria-labelledby="organization-access-restricted-title">
+        <div className={styles.gateIntro}>
+          <span className={styles.eyebrow}>MPA organization access</span>
+          <h2 id="organization-access-restricted-title">{hasActiveRelationship ? "Your organization access needs attention" : "Organization access is not active"}</h2>
+          <p>{hasActiveRelationship ? "An active organization relationship was found, but the organization workspace details could not be loaded. Refresh before attempting another action." : "Your account has a previous organization relationship, but it is suspended or removed. This is not treated as an unregistered account, and a new registration is not offered."}</p>
+        </div>
+        <div className={styles.statusList}>
+          {organizationAccess.map((item) => (
+            <article className={styles.statusCard} key={item.id}>
+              <div className={styles.statusTop}>
+                <div><strong>{item.display_name || item.legal_name}</strong><span>{item.role_code.replaceAll("_", " ")}</span></div>
+                <span className={`${styles.statusPill} ${item.membership_status === "active" ? styles.pending : styles.attention}`}>{item.membership_status.replaceAll("_", " ")}</span>
+              </div>
+              <p>{item.membership_status === "suspended" ? "Ask an authorized organization owner or administrator to review your access." : item.membership_status === "removed" ? "Your organization assignment has been removed. Contact the organization if you believe this is incorrect." : "The relationship is active, but workspace access could not be confirmed."}</p>
+            </article>
+          ))}
+        </div>
+        <button className="btn btn-ghost" type="button" onClick={onRetry}>Refresh organization access</button>
+      </section>
+    );
+  }
 
   if (organizations.length === 0) {
     return (

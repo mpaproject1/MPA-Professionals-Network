@@ -507,6 +507,81 @@
   gap: .6rem;
 }
 
+.workflowPanel {
+  display: grid;
+  gap: .65rem;
+}
+
+.workflowTypeSelector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
+
+.workflowTypeSelector button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: .45rem .75rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workflowTypeSelector button:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.workflowTypeSelector .workflowTypeActive {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 15%, var(--surface));
+  color: var(--text);
+}
+
+.workflowAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  border: 1px solid var(--border);
+  border-radius: .8rem;
+  padding: .8rem;
+  background: var(--surface);
+}
+
+.workflowAction > div {
+  display: grid;
+  gap: .2rem;
+}
+
+.workflowAction strong {
+  color: var(--text);
+  font-size: .85rem;
+}
+
+.workflowAction p {
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.workflowAction a {
+  color: var(--primary);
+  font-size: .76rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.workflowAction a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .folderAction {
   display: flex;
   align-items: center;

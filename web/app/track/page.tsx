@@ -28,6 +28,7 @@ type Item = {
   recordId?: string;
   createdAt?: string | null;
   scheduledAt?: string | null;
+  dueAt?: string | null;
   description?: string;
   details?: Record<string, unknown>;
   history?: { status: string; at: string | null }[];
@@ -285,7 +286,7 @@ export default function Track() {
               </div>
               <div className="track-card-grid">
                 <div><span>Last updated</span><b>{dateLabel(item.updatedAt, true)}</b></div>
-                <div><span>What happens next</span><b>{item.nextAction || (item.responsibility === "member_action" ? "Your response is needed" : item.responsibility === "external_response" ? "Waiting for another participant" : item.responsibility === "mpa_action" ? "Waiting for MPA review" : "Continue your journey")}</b></div>\n                {item.scheduledAt ? <div><span>Scheduled for</span><b>{dateLabel(item.scheduledAt, true)}</b></div> : null}
+                <div><span>What happens next</span><b>{item.nextAction || (item.responsibility === "member_action" ? "Your response is needed" : item.responsibility === "external_response" ? "Waiting for another participant" : item.responsibility === "mpa_action" ? "Waiting for MPA review" : "Continue your journey")}</b></div>\n                {item.scheduledAt ? <div><span>Scheduled for</span><b>{dateLabel(item.scheduledAt, true)}</b></div> : null}\n                {item.dueAt ? <div><span>Due date</span><b>{dateLabel(item.dueAt, true)}</b></div> : null}
               </div>
               <div className="tracker-line">
                 <span className="timeline-dot" />

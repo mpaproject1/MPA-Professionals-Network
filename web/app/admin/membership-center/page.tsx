@@ -16,6 +16,7 @@ type Filters = { from: string; to: string; q: string; status: string };
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentYear = () => new Date().getFullYear();
+const initialFilters = (): Filters => ({ from: `${currentYear()}-01-01`, to: today(), q: "", status: "" });
 const number = (value: unknown) => Number(value || 0);
 const clean = (value: unknown) => String(value ?? "").toLowerCase().replaceAll("_", " ");
 const appPending = new Set(["submitted", "in_review", "correction_required"]);
@@ -70,7 +71,7 @@ export default function MembershipCenterPage() {
   const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "signin">("loading");
   const [roles, setRoles] = useState<string[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
-  const [filters, setFilters] = useState<Filters>({ from: `${currentYear()}-01-01`, to: today(), q: "", status: "" });
+  const [filters, setFilters] = useState<Filters>(initialFilters);
   const [applications, setApplications] = useState<ReportResult | null>(null);
   const [membership, setMembership] = useState<ReportResult | null>(null);
   const [monthlyApplications, setMonthlyApplications] = useState<ReportResult | null>(null);
@@ -139,7 +140,7 @@ export default function MembershipCenterPage() {
     if (!hydrated) return;
     if (!token) { setAccess("signin"); return; }
     setAccess("loading");
-    void load(filters);
+    void load(initialFilters());
   }, [hydrated, token, load]);
 
   const appRows = applications?.rows || [];

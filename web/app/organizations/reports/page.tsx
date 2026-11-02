@@ -70,9 +70,12 @@ export default function OrganizationReportsPage() {
       const rows = await api<Organization[]>("/api/v1/organizations", {}, token);
       const list = Array.isArray(rows) ? rows : [];
       setOrganizations(list);
-      setOrganizationId(current => current && list.some(org => org.id === current)
-        ? current
-        : (list.find(org => org.verification_status === "verified") || list[0])?.id || "");
+      const requestedId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("organizationId") || "" : "";
+      setOrganizationId(current => requestedId && list.some(org => org.id === requestedId)
+        ? requestedId
+        : current && list.some(org => org.id === current)
+          ? current
+          : (list.find(org => org.verification_status === "verified") || list[0])?.id || "");
     } catch (cause) {
       setOrganizations([]);
       setOrganizationId("");

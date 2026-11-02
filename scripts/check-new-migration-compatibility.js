@@ -944,6 +944,17 @@ try {
   const pushPreferenceDefault=await client.query("select column_default from information_schema.columns where table_schema='public' and table_name='notification_preference' and column_name='push_enabled'");
   if(pushPreferenceDefault.rows[0]?.column_default!=="false")throw new Error("Web Push must remain opt-in by default.");
 
+  const membershipTables=await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[]) order by table_name",[["membership_geography_version","membership_geography_unit","member_residence","membership_fee_obligation","membership_fee_obligation_payment","membership_fee_balance_disposition","membership_fee_adjustment","membership_fee_reminder"]]);
+  if(membershipTables.rowCount!==8)throw new Error("Membership geography and fee-obligation migrations did not create all eight required tables.");
+  const feeBalanceView=await client.query("select pg_get_viewdef('public.membership_fee_obligation_balance'::regclass,true) definition");
+  if(!/pt\.currency\s*=\s*o\.currency/i.test(feeBalanceView.rows[0]?.definition||""))throw new Error("Membership fee balance view must exclude cross-currency receipts.");
+  const membershipIndexes=await client.query("select count(*)::int count from pg_indexes where schemaname='public' and indexname=any($1::text[])",[["membership_fee_balance_disposition_idempotency_idx","membership_geography_country_iso3_uq","membership_geography_country_m49_uq"]]);
+  if(membershipIndexes.rows[0].count!==3)throw new Error("Membership payment/geography idempotency and country uniqueness indexes are incomplete.");
+  const zeroAmountConstraint=await client.query("select pg_get_constraintdef(oid) definition from pg_constraint where conrelid='public.membership_import_row'::regclass and conname='membership_import_row_paid_amount_nonnegative'");
+  if(zeroAmountConstraint.rowCount!==1||!/paid_amount\s*>=\s*0/i.test(zeroAmountConstraint.rows[0].definition))throw new Error("Member import must permit a zero declared amount without allowing negative amounts.");
+  const membershipPermissions=await client.query("select count(*)::int count from app_permission where permission_code=any($1::text[])",[["members.geography.manage","finance.payment.record","finance.payment.adjust","finance.payment.import"]]);
+  if(membershipPermissions.rows[0].count!==4)throw new Error("Membership geography and Finance fee permissions are incomplete.");
+
    await client.query("rollback");
   transactionOpen = false;
   const taxonomyConstraintRollback=await client.query(

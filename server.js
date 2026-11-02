@@ -3,6 +3,7 @@ import {randomUUID} from "node:crypto";
 import http from "node:http";
 import * as ethics from "./src/ethics/service.js";
 import * as membershipAdminBulk from "./src/membership/admin-bulk.js";
+import * as membershipGeography from "./src/membership/geography.js";
 import * as legacyMembershipPayments from "./src/membership/legacy-payment-verification.js";
 import * as membershipCard from "./src/membership/card.js";
 import { assertMembershipPaymentMethodAdmin } from "./src/membership/payment-method-policy.js";
@@ -820,6 +821,14 @@ const server=http.createServer(async (req,res)=>{
       assertMembershipReviewQueueAccess(identity);
       return ok(res,await membership.listApplicationsForReview(),requestId);
     }
+
+    if(req.method==="GET" && p==="api/v1/member-geography/reference") { const identity=await auth(req); return ok(res,await membershipGeography.listMemberGeography(identity),requestId); }
+    if(req.method==="GET" && p==="api/v1/me/residence") return ok(res,await membershipGeography.getMyResidence(identity.sub),requestId);
+    if(req.method==="PATCH" && p==="api/v1/me/residence") return ok(res,await membershipGeography.saveMyResidence(identity.sub,await body(req),requestId),requestId);
+    if(req.method==="GET" && p==="api/v1/admin/member-geography/import-template") { const identity=await auth(req); const file=membershipGeography.memberGeographyImportTemplate(identity); res.writeHead(200,{"content-type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":'attachment; filename="mpa-member-geography-template.xlsx"',"cache-control":"no-store, private, max-age=0","x-request-id":requestId}); return res.end(file); }
+    if(req.method==="POST" && p==="api/v1/admin/member-geography/import/preview") { const identity=await auth(req); return ok(res,await membershipGeography.previewMemberGeographyImport(identity,await body(req,12*1024*1024),requestId),requestId,201); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/member-geography/import/") && parts[6]==="apply") { const identity=await auth(req); return ok(res,await membershipGeography.applyMemberGeographyImport(identity,parts[5],await body(req),requestId),requestId); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/member-geography/versions/") && parts[6]==="publish") { const identity=await auth(req); return ok(res,await membershipGeography.publishMemberGeographyVersion(identity,parts[5],await body(req),requestId),requestId); }
 
     if(req.method==="GET" && p==="api/v1/professional-reference-data") return ok(res,await referencePortfolio.listPublicReferenceSets(),requestId);
     if(req.method==="GET" && p==="api/v1/me/cv") return ok(res,await talent.getMyCv(identity.sub),requestId);

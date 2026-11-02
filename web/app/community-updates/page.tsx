@@ -1,6 +1,6 @@
 "use client";
 import {useState} from "react";
-import {api,ApiError} from "../../lib/api";
+import {ApiError,api} from "../../lib/api";
 
 function decodeKey(value:string){const normalized=value.replace(/-/g,"+").replace(/_/g,"/");const raw=atob(normalized+"=".repeat((4-normalized.length%4)%4));return Uint8Array.from(raw,c=>c.charCodeAt(0));}
 export default function CommunityUpdatesOptIn(){

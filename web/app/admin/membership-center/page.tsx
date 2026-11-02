@@ -73,6 +73,7 @@ export default function MembershipCenterPage() {
   const [filters, setFilters] = useState<Filters>({ from: `${currentYear()}-01-01`, to: today(), q: "" });
   const [applications, setApplications] = useState<ReportResult | null>(null);
   const [membership, setMembership] = useState<ReportResult | null>(null);
+  const [monthlyApplications, setMonthlyApplications] = useState<ReportResult | null>(null);
   const [finance, setFinance] = useState<ReportResult | null>(null);
   const [financeAvailable, setFinanceAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -98,14 +99,16 @@ export default function MembershipCenterPage() {
       setPermissions(currentPermissions);
       if (!allowed) { setAccess("denied"); setApplications(null); setMembership(null); return; }
 
-      const [appResult, memberResult] = await Promise.all([
+      const [appResult, memberResult, monthlyResult] = await Promise.all([
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q }) }, token),
         // Current member stock is deliberately unbounded by the application-period filter.
         api<ReportResult>("/api/v1/admin/reports/membership-status/run", { method: "POST", body: JSON.stringify({}) }, token),
+        api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, groupBy: "month" }) }, token),
       ]);
-      if (!Array.isArray(appResult?.rows) || !Array.isArray(memberResult?.rows)) throw new Error("Membership reporting returned an incomplete response. No KPI values have been inferred.");
+      if (!Array.isArray(appResult?.rows) || !Array.isArray(memberResult?.rows) || !Array.isArray(monthlyResult?.rows)) throw new Error("Membership reporting returned an incomplete response. No KPI values have been inferred.");
       setApplications(appResult);
       setMembership(memberResult);
+      setMonthlyApplications(monthlyResult);
       setGeneratedAt(appResult.generatedAt || memberResult.generatedAt || "");
       const financeAllowed = currentRoles.some(role => ["system_admin", "finance_officer"].includes(role)) ||
         currentPermissions.some(permission => ["finance.view", "finance.payment.verify", "finance.manage"].includes(permission));
@@ -121,6 +124,7 @@ export default function MembershipCenterPage() {
       setError(cause instanceof ApiError || cause instanceof Error ? cause.message : "Membership dashboard could not be loaded.");
       setApplications(null);
       setMembership(null);
+      setMonthlyApplications(null);
       setFinance(null);
       setAccess("allowed");
     } finally { setBusy(false); }
@@ -214,7 +218,8 @@ export default function MembershipCenterPage() {
     </section>
 
     <section className={styles.chartGrid} aria-label="Membership analysis charts">
-      <Card><BarList title="Application pipeline" rows={statusChart} labelKey="Status" valueKey="Applications" empty={applications ? "No applications matched this period." : "Application report unavailable; retry after checking access."}/></Card>
+      <Card><BarList title="Applications by month" rows={monthlyApplications?.rows || []} labelKey="Month" valueKey="Applications" empty={monthlyApplications ? "No applications matched this period." : "Monthly trend report unavailable."}/>
+      <BarList title="Application pipeline" rows={statusChart} labelKey="Status" valueKey="Applications" empty={applications ? "No applications matched this period." : "Application report unavailable; retry after checking access."}/></Card>
       <Card><BarList title="Current membership by plan" rows={planChart} labelKey="Product" valueKey="Members" empty={membership ? "No membership records were returned." : "Membership report unavailable; retry after checking access."}/></Card>
       <Card><BarList title="Applications by membership plan" rows={applicationPlanChart} labelKey="Product" valueKey="Applications" empty="No applications matched this period."/></Card>
       <Card>

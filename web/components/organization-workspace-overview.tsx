@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -173,9 +173,24 @@ export function OrganizationWorkspaceOverview({
   const attention = organizations.filter((item) => ["correction_required", "rejected"].includes(item.verification_case_status || ""));
   const hasVerifiedOrganization = workspaceReady.length > 0;
   const [activeFolderKey, setActiveFolderKey] = useState("publishing");
-  const activeRoles = workspaceReady.map((item) => item.role_code || "");
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
+  useEffect(() => {
+    if (workspaceReady.length === 0) {
+      setSelectedOrganizationId("");
+      return;
+    }
+    setSelectedOrganizationId((current) => workspaceReady.some((item) => item.id === current) ? current : workspaceReady[0].id);
+  }, [workspaceReady]);
+  const selectedOrganization = workspaceReady.find((item) => item.id === selectedOrganizationId) || workspaceReady[0];
+  const activeRoles = selectedOrganization ? [selectedOrganization.role_code || ""] : [];
   const visibleFolders = folders.filter((folder) => !folder.allowedRoles || folder.allowedRoles.some((role) => activeRoles.includes(role)));
   const activeFolder = visibleFolders.find((folder) => folder.key === activeFolderKey) || visibleFolders[0];
+  const organizationHref = (href: string) => {
+    const [path, hash] = href.split("#");
+    if (!selectedOrganizationId || !["/recruitment", "/organizations/reports", "/organizations/team"].includes(path)) return href;
+    const query = new URLSearchParams({ organizationId: selectedOrganizationId }).toString();
+    return `${path}?${query}${hash ? `#${hash}` : ""}`;
+  };
 
   if (organizations.length === 0 && authenticated && !organizationLookupReady) {
     return (
@@ -247,7 +262,20 @@ export function OrganizationWorkspaceOverview({
           <h2 id="organization-overview-title">{hasVerifiedOrganization ? "Your organization at a glance" : "Your organization application"}</h2>
           <p>{hasVerifiedOrganization ? "Choose a folder to continue with the work your organization is authorized to do." : "Your registration and verification status are shown below. Operational folders unlock after approval."}</p>
         </div>
-        <Link className={styles.refreshLink} href="/organizations#your-organizations">View status details <span aria-hidden="true">↗</span></Link>
+        <div className={styles.dashboardActions}>
+          <label className={styles.organizationSwitcher}>
+            <span>Working with</span>
+            <select
+              aria-label="Choose active organization"
+              value={selectedOrganization?.id || ""}
+              disabled={workspaceReady.length < 2}
+              onChange={(event) => setSelectedOrganizationId(event.target.value)}
+            >
+              {workspaceReady.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}
+            </select>
+          </label>
+          <Link className={styles.refreshLink} href="/organizations#your-organizations">View status details <span aria-hidden="true">↗</span></Link>
+        </div>
       </header>
 
       <div className={styles.metrics} aria-label="Organization registration summary">
@@ -342,7 +370,7 @@ export function OrganizationWorkspaceOverview({
             </div>
             <div className={styles.folderActions}>
               {activeFolder.links.map((item, index) => (
-                <Link className={styles.folderAction} href={item.href} key={item.href + item.label}>
+                <Link className={styles.folderAction} href={organizationHref(item.href)} key={item.href + item.label}>
                   <span><strong>{item.label}</strong><small>{index === 0 ? "Open this workspace" : "Continue to this function"}</small></span>
                   <span aria-hidden="true">↗</span>
                 </Link>

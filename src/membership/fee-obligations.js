@@ -79,6 +79,14 @@ export async function listFeeObligations(identity,filters={}){
   order by (b.outstanding_balance>0) desc,o.due_date nulls last,o.created_at desc limit 500`,[status,q])).rows;
  return {rows:rows.map(row=>({...row,pending_receipts:row.receipts||[],pending_dispositions:row.items||[]})),total:rows.length};
 }
+export async function exportFeeObligations(identity,filters={},requestId){
+ const result=await listFeeObligations(identity,filters);
+ const columns=["member_name","email","membership_number","tracking_reference","product_name","currency","amount_due","verified_cash","approved_non_cash","outstanding_balance","due_date","status"];
+ const rows=result.rows.map(row=>Object.fromEntries(columns.map(key=>[key,row[key]??""])));
+ const buffer=createXlsx(rows,columns);
+ await getPool().query("insert into audit_log(actor_user_id,action,resource_type,request_id,outcome,metadata) values($1,'finance.membership_fee_obligations_exported','membership_fee_obligation',$2,'success',$3)",[identity.sub,requestId,JSON.stringify({rowCount:rows.length,filters:{status:filters.status||"",q:filters.q||""}})]);
+ return {buffer,rowCount:rows.length,filename:"mpa-membership-fee-obligations-"+new Date().toISOString().slice(0,10)+".xlsx",contentType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"};
+}
 export async function recordMembershipReceipt(identity,input={},requestId){
  financeRecord(identity);
  const amount=money(input.amount),code=currency(input.currency),methodCode=clean(input.paymentMethodCode,40).toLowerCase(),reference=clean(input.reference,180),receivedDate=clean(input.receivedDate,10),idem=clean(input.idempotencyKey,100),evidenceFileId=clean(input.evidenceFileId,64)||null;

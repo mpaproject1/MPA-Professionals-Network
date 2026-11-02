@@ -734,14 +734,16 @@ export default function Organizations() {
                   {(org.required_evidence||[]).length>0&&<p className="muted">Required evidence: {(org.required_evidence||[]).map(item=>item.replaceAll("_"," ")).join(", ")}. Uploaded evidence: {(org.verification_evidence||[]).map(item=>item.evidenceType.replaceAll("_"," ")).filter((item,index,all)=>all.indexOf(item)===index).join(", ")||"none recorded"}.</p>}
                   <div className="row" style={{flexWrap:"wrap",gap:8}}>
                     {org.verification_status==="verified" ? <>
-                      <a className="btn btn-primary" href="/recruitment">Manage jobs and hiring</a>
+                      {["owner","administrator","recruiter"].includes(org.role_code || "") ? <a className="btn btn-primary" href="/recruitment">Manage jobs and hiring</a> : null}
                       <a className="btn btn-ghost" href="/network">Find professional network</a>
-                      <a className="btn btn-ghost" href="/services">Publish services</a>
-                      <a className="btn btn-ghost" href="/mentorship">Mentorship offers</a>
-                    </> : <button className="btn btn-ghost" type="button" onClick={() => {setEvidenceOrg(org.id);document.getElementById("org-evidence")?.scrollIntoView({behavior:"smooth",block:"start"});}}>Complete trust checklist</button>}
-                    <button className="btn btn-ghost" type="button" onClick={() => void submitVerification(org)} disabled={org.verification_status==="verified"||org.verification_case_status==="submitted"||org.verification_case_status==="pending"}>
+                      {["owner","administrator","project_manager"].includes(org.role_code || "") ? <>
+                        <a className="btn btn-ghost" href="/services">Manage professional services</a>
+                        <a className="btn btn-ghost" href="/mentorship">Manage mentorship offers</a>
+                      </> : null}
+                    </> : ["owner","administrator"].includes(org.role_code || "") ? <button className="btn btn-ghost" type="button" onClick={() => {setEvidenceOrg(org.id);document.getElementById("org-evidence")?.scrollIntoView({behavior:"smooth",block:"start"});}}>Complete trust checklist</button> : <span className="muted">Verification actions are available to the organization owner or administrator.</span>}
+                    {["owner","administrator"].includes(org.role_code || "") ? <button className="btn btn-ghost" type="button" onClick={() => void submitVerification(org)} disabled={org.verification_status==="verified"||org.verification_case_status==="submitted"||org.verification_case_status==="pending"}>
                       Submit for verification
-                    </button>
+                    </button> : null}
                   </div>
                 </div>
               ))}
@@ -765,6 +767,8 @@ export default function Organizations() {
               <p className="muted">
                 Register an organization before attaching evidence.
               </p>
+            ) : !organizations.some((org) => ["owner", "administrator"].includes(org.role_code || "")) ? (
+              <p className="muted">Only an active organization owner or administrator can upload and submit private verification evidence.</p>
             ) : (
               <form
                 className="form-stack"
@@ -779,7 +783,7 @@ export default function Organizations() {
                     onChange={(e) => setEvidenceOrg(e.target.value)}
                   >
                     <option value="">Choose organization</option>
-                    {organizations.map((org) => (
+                    {organizations.filter((org) => ["owner", "administrator"].includes(org.role_code || "")).map((org) => (
                       <option key={org.id} value={org.id}>
                         {org.display_name}
                       </option>

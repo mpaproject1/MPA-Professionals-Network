@@ -32,6 +32,36 @@ type Payment = {
 type Me = { roles?: string[]; permissions?: string[] };
 type FinanceSummaryRow = { Currency: string; "Gross verified": string | number; "Refunds/reversals": string | number; "Net collected": string | number; "Failed amount": string | number; "Matched amount": string | number; "Unreconciled amount": string | number; "Outstanding amount": string | number; "Missing fee amount": number; "Disputed amount": string | number; "Written off amount": string | number; "Disputed payments": number; "Written off payments": number; "Approved payments": number; "Failed payments": number; "Refunded/reversed payments": number; "Outstanding applications": number };
 type FinanceSummary = { rows: FinanceSummaryRow[]; generatedAt: string };
+type LegacyMembershipPayment = {
+  membership_id: string;
+  membership_number: string;
+  membership_status: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  imported_at: string;
+  product_name: string;
+  product_code: string;
+  member_name?: string | null;
+  email?: string | null;
+  imported_payment_reference?: string | null;
+  imported_payment_amount?: string | null;
+  imported_payment_currency?: string | null;
+  imported_payment_date?: string | null;
+  imported_payment_method?: string | null;
+  imported_evidence_reference?: string | null;
+  invitation_expires_at?: string | null;
+  invitation_claimed_at?: string | null;
+};
+type LegacyPaymentDraft = { amount: string; currency: string; paymentReference: string; paymentDate: string; paymentMethod: string; evidenceReference: string; financeNote: string };
+const legacyDraft = (item: LegacyMembershipPayment): LegacyPaymentDraft => ({
+  amount: item.imported_payment_amount || "",
+  currency: (item.imported_payment_currency || "").toUpperCase(),
+  paymentReference: item.imported_payment_reference || "",
+  paymentDate: /^\\d{4}-\\d{2}-\\d{2}$/.test(item.imported_payment_date || "") ? item.imported_payment_date! : "",
+  paymentMethod: ["bank_transfer", "telebirr", "cash", "mobile_money", "other"].includes(item.imported_payment_method || "") ? item.imported_payment_method! : "bank_transfer",
+  evidenceReference: item.imported_evidence_reference || "",
+  financeNote: "",
+});
 
 const financeMoneyColumns = new Set(["Gross verified", "Refunds/reversals", "Net collected", "Failed amount", "Matched", "Unreconciled", "Disputed", "Written off", "Outstanding"]);
 
@@ -50,6 +80,9 @@ export default function FinanceWorkspacePage() {
   const hydrateToken = useUiStore(state => state.hydrateToken);
   const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "signin">("loading");
   const [rows, setRows] = useState<Payment[]>([]);
+  const [legacyPayments, setLegacyPayments] = useState<LegacyMembershipPayment[]>([]);
+  const [legacyDrafts, setLegacyDrafts] = useState<Record<string, LegacyPaymentDraft>>({});
+  const [legacyQueueError, setLegacyQueueError] = useState("");
   const [summaryRows, setSummaryRows] = useState<FinanceSummaryRow[]>([]);
   const [summaryError, setSummaryError] = useState("");
   const [summaryGeneratedAt, setSummaryGeneratedAt] = useState("");
@@ -72,11 +105,13 @@ export default function FinanceWorkspacePage() {
       const me = await api<Me>("/api/v1/me", {}, token);
       const roles = Array.isArray(me.roles) ? me.roles : [];
       const permissions = Array.isArray(me.permissions) ? me.permissions : [];
-      const financeRole = roles.some(role => ["finance_officer", "system_admin"].includes(role));
-      const readAccess = financeRole || permissions.some(permission => ["finance.view", "finance.payment.verify", "finance.payment.reverse", "finance.manage"].includes(permission));
+      const financeRole = roles.includes("finance_officer");
+      const platformAdmin = roles.includes("system_admin");
+      const readAccess = financeRole || platformAdmin || permissions.some(permission => ["finance.view", "finance.payment.verify", "finance.payment.reverse", "finance.manage"].includes(permission));
       if (!readAccess) {
         setAccess("denied");
         setRows([]);
+        setLegacyPayments([]);
         setSummaryRows([]);
         setSummaryError("");
         setSummaryGeneratedAt("");
@@ -87,6 +122,14 @@ export default function FinanceWorkspacePage() {
       setCanIssueVoucher(financeRole || permissions.some(permission => ["finance.voucher.issue", "finance.manage"].includes(permission)));
       const payments = await api<Payment[]>("/api/v1/finance/membership/payments", {}, token);
       setRows(Array.isArray(payments) ? payments : []);
+      setLegacyQueueError("");
+      try {
+        const legacyQueue = await api<{ rows: LegacyMembershipPayment[] }>("/api/v1/finance/membership/legacy-payment-verification", {}, token);
+        setLegacyPayments(Array.isArray(legacyQueue.rows) ? legacyQueue.rows : []);
+      } catch (legacyCause) {
+        setLegacyPayments([]);
+        setLegacyQueueError(legacyCause instanceof ApiError ? legacyCause.message : "Historical member payment verification queue could not be loaded.");
+      }
       try {
         const summary = await api<FinanceSummary>("/api/v1/admin/reports/finance-summary/run", { method: "POST", body: JSON.stringify({}) }, token);
         setSummaryRows(Array.isArray(summary.rows) ? summary.rows : []);
@@ -99,6 +142,7 @@ export default function FinanceWorkspacePage() {
       setAccess("allowed");
     } catch (cause) {
       setRows([]);
+      setLegacyPayments([]);
       setSummaryRows([]);
       setSummaryError("");
       setSummaryGeneratedAt("");
@@ -136,6 +180,27 @@ export default function FinanceWorkspacePage() {
       await load();
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : "Payment verification could not be recorded.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function verifyLegacyPayment(event: FormEvent, item: LegacyMembershipPayment) {
+    event.preventDefault();
+    if (!token || !canVerify || busy) return;
+    const draft = legacyDrafts[item.membership_id] || legacyDraft(item);
+    setBusy("legacy-" + item.membership_id);
+    setError("");
+    setNotice("");
+    try {
+      await api("/api/v1/finance/membership/legacy-payment-verification/" + item.membership_id + "/verify", {
+        method: "POST",
+        body: JSON.stringify(draft),
+      }, token);
+      setNotice("Historical payment verified by Finance. The imported member invitation can now be claimed; no membership review decision was changed.");
+      await load();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : "Historical membership payment verification could not be recorded.");
     } finally {
       setBusy("");
     }
@@ -184,6 +249,35 @@ export default function FinanceWorkspacePage() {
     <div className="row" style={{gap:8,flexWrap:"wrap"}}><a className="btn btn-primary" href="/admin/finance/receipts">Record manual payment & issue QR vouchers</a><a className="btn btn-ghost" href="/admin/reports?report=manual-finance-receipts">Manual finance receipts report</a></div>
     {error && <p className="form-error" role="alert">{error}</p>}
     {notice && <p className="form-success" role="status" aria-live="polite">{notice}</p>}
+    <Card>
+      <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+        <div><h2 className="h2">Historical member payment verification</h2><p className="muted">Legacy-import invitations remain locked until Finance verifies the historical dues payment and records the evidence reference. A system administrator role alone cannot approve this payment.</p></div>
+        <Badge tone={legacyPayments.length ? "warning" : "slate"}>{legacyPayments.length} awaiting Finance</Badge>
+      </div>
+      {legacyQueueError ? <OperationStatus state="error" title="Historical payment queue unavailable" detail={legacyQueueError} /> : legacyPayments.length === 0 ? <OperationStatus state="info" title="No imported membership payments awaiting verification" detail="No unverified legacy membership records were returned from the authoritative source." /> : <div className="grid" style={{gap:12}}>
+        {legacyPayments.map(item => {
+          const draft = legacyDrafts[item.membership_id] || legacyDraft(item);
+          return <article key={item.membership_id} className="case-row" style={{display:"grid",gap:12}}>
+            <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+              <div><strong>{item.member_name || "Imported member"} · {item.membership_number}</strong><p className="muted">{item.email || "No email recorded"} · {item.product_name} ({item.product_code})</p><p className="muted">Imported {dateLabel(item.imported_at)} · Record status {item.membership_status.replaceAll("_"," ")}</p></div>
+              <Badge tone={item.invitation_claimed_at ? "warning" : "gold"}>{item.invitation_claimed_at ? "Previously claimed · review record" : item.invitation_expires_at ? "Invitation awaiting claim" : "No invitation recorded"}</Badge>
+            </div>
+            {canVerify ? <form className="form-stack" onSubmit={event => void verifyLegacyPayment(event,item)}>
+              <div className="grid grid-2">
+                <label>Verified amount<input type="number" min="0.01" step="0.01" required value={draft.amount} onChange={event=>setLegacyDrafts(current=>({...current,[item.membership_id]:{...draft,amount:event.target.value}}))}/></label>
+                <label>Currency<input required maxLength={3} minLength={3} value={draft.currency} placeholder="ETB" onChange={event=>setLegacyDrafts(current=>({...current,[item.membership_id]:{...draft,currency:event.target.value.toUpperCase()}}))}/></label>
+                <label>Payment reference<input required minLength={4} maxLength={180} value={draft.paymentReference} onChange={event=>setLegacyDrafts(current=>({...current,[item.membership_id]:{...draft,paymentReference:event.target.value}}))}/></label>
+                <label>Payment date<input type="date" required value={draft.paymentDate} onChange={event=>setLegacyDrafts(current=>({...current,[item.membership_id]:{...draft,paymentDate:event.target.value}}))}/></label>
+                <label>Payment method<select value={draft.paymentMethod} onChange={event=>setLegacyDrafts(current=>({...current,[item.membership_id]:{...draft,paymentMethod:event.target.value}}))}><option value="bank_transfer">Bank transfer</option><option value="telebirr">Telebirr</option><option value="cash">Cash</option><option value="mobile_money">Other mobile money</option><option value="other">Other</option></select></label>
+                <label>Evidence reference<input required minLength={4} maxLength={300} value={draft.evidenceReference} placeholder="Statement line, receipt or approved evidence reference" onChange={event=>setLegacyDrafts(current=>({...current,[item.membership_id]:{...draft,evidenceReference:event.target.value}}))}/></label>
+              </div>
+              <label>Finance verification note<textarea rows={2} maxLength={1000} value={draft.financeNote} onChange={event=>setLegacyDrafts(current=>({...current,[item.membership_id]:{...draft,financeNote:event.target.value}}))} placeholder="Record how the historical payment was independently checked."/></label>
+              <button type="submit" className="btn btn-primary" disabled={busy!==""}>{busy==="legacy-"+item.membership_id?"Verifying…":"Verify historical payment and unlock claim"}</button>
+            </form> : <p className="muted">Read-only Finance queue. The separate finance.payment.verify permission is required to approve historical payment evidence.</p>}
+          </article>;
+        })}
+      </div>}
+    </Card>
     <Card>
       <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div><h2 className="h2">Finance summary</h2><p className="muted">Current membership-payment position by currency. Generated {dateLabel(summaryGeneratedAt)}. No amounts from different currencies are combined.</p></div>

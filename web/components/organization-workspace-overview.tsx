@@ -256,7 +256,7 @@ export function OrganizationWorkspaceOverview({
   }, [visibleFolders, activeFolderKey, onActiveFolderChange]);
   const organizationHref = (href: string) => {
     const [path, hash] = href.split("#");
-    if (!selectedOrganizationId || !["/recruitment", "/organizations/reports", "/organizations/team"].includes(path)) return href;
+    if (!selectedOrganizationId || !["/recruitment", "/services", "/mentorship", "/organizations/reports", "/organizations/team"].includes(path)) return href;
     const query = new URLSearchParams({ organizationId: selectedOrganizationId }).toString();
     return `${path}?${query}${hash ? `#${hash}` : ""}`;
   };

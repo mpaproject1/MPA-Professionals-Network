@@ -98,7 +98,7 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
     }
 
     const reusedReference = (await tx.query(
-      "select id from payment_transaction where source='legacy_import' and lower(coalesce(purpose_reference,''))=lower($1) and status='succeeded' for update",
+      "select id from payment_transaction where source='legacy_import' and lower(coalesce(purpose_reference,''))=lower($1) for update",
       [paymentReference]
     )).rows[0];
     if (reusedReference) throw problem(409, "This payment reference is already allocated to another imported payment.", "PAYMENT_REFERENCE_ALREADY_USED");

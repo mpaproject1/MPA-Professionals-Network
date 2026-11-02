@@ -42,16 +42,32 @@ function asDate(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
-function normalizedStatus(record) {
-  return String(first(record, ["status", "state", "application_status", "verification_status", "consent_status"]) || "unknown").toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
+function normalizedStatus(record, domain) {
+  if (domain === "mentorship_session" && record.coordination_status === "proposed") {
+    return record.proposed_by === record.viewer_user_id ? "awaiting_response" : "awaiting_member";
+  }
+  if (domain === "mentorship_activity") {
+    if (record.submission_status === "accepted") return "completed";
+    if (record.submission_status === "submitted") return record.viewer_user_id === record.mentor_user_id ? "awaiting_member" : "awaiting_response";
+    if (record.submission_status === "changes_requested") return record.viewer_user_id === record.mentee_user_id ? "awaiting_member" : "awaiting_response";
+    return record.viewer_user_id === record.mentee_user_id ? "awaiting_member" : "awaiting_response";
+  }
+  return String(first(record, ["status", "state", "application_status", "verification_status", "consent_status"]) || "unknown")
+    .toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
 }
 function responsibility(status, domain, record) {
+  if (domain === "job" && status === "interview") return "member_action";
+  if (domain === "job" && status === "offer") return record.offer_approval_status === "pending" ? "mpa_action" : "member_action";
+  if (domain === "job" && status === "accepted") return "external_response";
   if (domain === "mentorship_match") {
     if (["proposed", "matched"].includes(status)) return "member_action";
     if (status === "accepted") return "external_response";
   }
-  if (domain === "mentorship_request" && ["requested", "submitted", "matching", "matched"].includes(status)) return status === "matched" ? "member_action" : "mpa_action";
+  if (domain === "mentorship_request" && ["requested", "submitted", "matching", "matched"].includes(status)) {
+    return status === "matched" ? "member_action" : "mpa_action";
+  }
   if (domain === "organization_mentorship" && ["submitted", "pending", "requested"].includes(status)) return "external_response";
+  if (domain === "mentorship_session" && status === "scheduled" && record.coordination_status === "accepted") return "in_progress";
   if (MEMBER_ACTION.has(status)) return "member_action";
   if (EXTERNAL_WAIT.has(status)) return "external_response";
   if (CLOSED.has(status)) return "closed";
@@ -64,22 +80,49 @@ function responsibility(status, domain, record) {
 function safeId(value) {
   return value === null || value === undefined ? null : String(value);
 }
-function mapRecord(record, definition, index) {
+function mapRecord(record, definition) {
   if (!record || typeof record !== "object") return null;
   const [source, baseCategory, href, baseDomain] = definition;
   const domain = source === "applications" ? String(record.type || baseDomain) : baseDomain;
-  const category = source === "applications" ? ({ membership: "Membership", job: "Jobs", organization: "Organizations" }[domain] || baseCategory) : baseCategory;
+  const category = source === "applications"
+    ? ({ membership: "Membership", job: "Jobs", organization: "Organizations" }[domain] || baseCategory)
+    : baseCategory;
   const status = source === "recognitionAwards" ? "awarded" : normalizedStatus(record, domain);
   const id = safeId(first(record, ["id", "request_id", "case_id", "application_id", "claim_id", "attribution_id"]));
   if (!id) return null;
-  const title = domain === "mentorship_session" ? String(first(record, ["agenda"]) || "Mentorship session") : String(first(record, ["title", "service_title", "job_title", "program_title", "program_name", "project_title", "subject", "goals", "name"]) || category + " request");
+  const title = domain === "mentorship_session"
+    ? String(first(record, ["agenda"]) || "Mentorship session")
+    : String(first(record, ["title", "service_title", "job_title", "program_title", "program_name", "project_title", "subject", "goals", "name"]) || category + " request");
   const createdAt = asDate(first(record, ["submitted_at", "submittedAt", "created_at", "createdAt", "requested_at", "proposed_at"]));
   const scheduledAt = asDate(first(record, ["scheduled_start_at", "scheduledAt"]));
   const dueAt = asDate(first(record, ["due_at", "dueAt", "deadline_at"]));
   const updatedAt = asDate(first(record, ["last_activity_at", "lastActivityAt", "updated_at", "updatedAt", "reviewed_at", "responded_at", "submitted_at"])) || createdAt;
   const statusLabel = String(first(record, ["statusLabel", "status_label", "decision_label"]) || status.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase()));
-  const nextAction = responsibility(status);
+  const state = responsibility(status, domain, record);
   const trackingReference = first(record, ["tracking_reference", "trackingReference", "reference", "display_reference"]);
+  const historyRows = first(record, ["status_history", "events", "timeline", "history"]);
+  const history = Array.isArray(historyRows)
+    ? historyRows.map(event => ({
+      status: String(first(event, ["toStatus", "to_status", "status", "event_type", "eventType"]) || "Update"),
+      at: asDate(first(event, ["createdAt", "created_at", "occurred_at", "timestamp"])),
+    })).filter(event => event.at).slice(-20)
+    : [];
+  const defaultNextAction = {
+    member_action: "Your response is needed",
+    mpa_action: "Waiting for MPA review",
+    external_response: "Waiting for another participant",
+    in_progress: "Engagement in progress",
+    completed: "Completed",
+    closed: "Closed",
+    unknown: "Current status unavailable",
+  }[state];
+  const nextAction = domain === "mentorship_session" && state === "in_progress"
+    ? "Attend your confirmed session"
+    : domain === "mentorship_activity" && state === "member_action"
+      ? (record.submission_status === "changes_requested" ? "Improve and resubmit your work" : "Complete the assigned activity")
+      : domain === "mentorship_activity" && state === "external_response"
+        ? "Waiting for the other participant to review or submit work"
+        : defaultNextAction;
   return {
     id: domain + ":" + id,
     domain,
@@ -91,10 +134,12 @@ function mapRecord(record, definition, index) {
     description: String(first(record, ["summary", "description", "service_category", "category", "agenda", "instructions"]) || ""),
     status,
     statusLabel,
-    responsibility: nextAction,
-    nextAction: domain === "mentorship_session" && nextAction === "in_progress" ? "Attend your confirmed session" : domain === "mentorship_activity" && nextAction === "member_action" ? (record.submission_status === "changes_requested" ? "Improve and resubmit your work" : "Complete the assigned activity") : domain === "mentorship_activity" && nextAction === "external_response" ? "Waiting for the other participant to review or submit work" : ({ member_action: "Your response is needed", mpa_action: "Waiting for MPA review", external_response: "Waiting for another participant", in_progress: "Engagement in progress", completed: "Completed", closed: "Closed", unknown: "Current status unavailable" })[nextAction],
+    responsibility: state,
+    nextAction,
     createdAt,
     submittedAt: createdAt,
+    scheduledAt,
+    dueAt,
     updatedAt,
     trackingReference: trackingReference ? String(trackingReference) : null,
     href,
@@ -123,9 +168,13 @@ export function buildMemberProgress(sourceResults, { limit = 50, offset = 0, vie
       continue;
     }
     availableSources.push(key);
-    const sourceRows = key === "recognitionNominations" ? (result.value?.nominations || []) : key === "recognitionAwards" ? (result.value?.awards || []) : rowsOf(result.value);
-    for (const [index, record] of sourceRows.entries()) {
-      const item = mapRecord(record, definition, index);
+    const sourceRows = key === "recognitionNominations"
+      ? (result.value?.nominations || [])
+      : key === "recognitionAwards"
+        ? (result.value?.awards || [])
+        : rowsOf(result.value);
+    for (const record of sourceRows) {
+      const item = mapRecord(record, definition);
       if (item) items.push(item);
     }
   }
@@ -149,7 +198,14 @@ export function buildMemberProgress(sourceResults, { limit = 50, offset = 0, vie
     byCategory: Object.fromEntries([...new Set(SOURCE_DEFINITIONS.map(([, label]) => label))].map(label => [label, unique.filter(item => item.category === label).length])),
   };
   const page = filtered.slice(pageOffset, pageOffset + pageSize);
-  const summary = { total: counts.total, active: counts.inProgress + counts.waiting, nextSteps: counts.needsAttention, jobApplications: unique.filter(item => item.domain === "job").length, memberships: unique.filter(item => item.domain === "membership").length, organizations: unique.filter(item => item.domain === "organization").length };
+  const summary = {
+    total: counts.total,
+    active: counts.inProgress + counts.waiting,
+    nextSteps: counts.needsAttention,
+    jobApplications: unique.filter(item => item.domain === "job").length,
+    memberships: unique.filter(item => item.domain === "membership").length,
+    organizations: unique.filter(item => item.domain === "organization").length,
+  };
   return {
     items: page,
     counts,

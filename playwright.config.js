@@ -14,6 +14,8 @@ export default defineConfig({
   use: {
     baseURL: process.env.WEB_BASE_URL || "http://127.0.0.1:3001",
     headless: true,
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
     trace: "retain-on-failure"
   }
 });

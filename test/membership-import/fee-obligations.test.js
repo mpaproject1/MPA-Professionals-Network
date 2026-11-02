@@ -288,6 +288,9 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  await decideBalanceDisposition(approverFinance,fullSponsorship.disposition.id,{decision:"approved",note:"Full fee sponsorship independently verified."},"fee-zero-sponsor-approve-"+suffix);
  const archivedReminderEvent=(await db.query("select archived_at from notification_event where id=$1",[inAppReminder.member_outbox_id])).rows[0];
  assert.ok(archivedReminderEvent?.archived_at,"full settlement must archive the stale in-app balance reminder");
+ const settledReminder=(await db.query("select status,member_delivery_status from membership_fee_reminder where obligation_id=(select id from membership_fee_obligation where application_id=$1)",[zeroApp.id])).rows[0];
+ assert.equal(settledReminder.status,"cancelled");
+ assert.equal(settledReminder.member_delivery_status,"superseded");
  const zeroAdjustment=(await db.query("select details from membership_fee_adjustment where obligation_id=(select id from membership_fee_obligation where application_id=$1) and status='approved'",[zeroApp.id])).rows[0];
  assert.equal(zeroAdjustment.details.sponsorSource,"registered_organization");
  assert.equal(zeroAdjustment.details.sponsorOrganizationId,sponsorOrg.id);

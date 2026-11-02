@@ -192,7 +192,8 @@ export async function verifyMembershipReceipt(identity,paymentId,input={},reques
  });
 }
 export async function listSponsoringOrganizations(identity){
- financeAdjust(identity);
+ const roles=identity?.roles||[],permissions=identity?.permissions||[];
+ if(!roles.includes("finance_officer")&&!roles.includes("system_admin")&&!permissions.some(p=>["finance.view","finance.payment.adjust","finance.manage"].includes(p)))throw problem(403,"Finance organization lookup access required.","FORBIDDEN");
  const db=getPool();
  return (await db.query("select id,display_name from organization order by lower(display_name) limit 500")).rows;
 }

@@ -14,7 +14,8 @@
 
 ## UI contract
 
-- The progress panel reads `GET /api/v1/organizations` with the signed-in user's token. It does not accept organization IDs from the URL as authority and does not make client-side permission decisions.
+- The organization entry reads `GET /api/v1/organizations` with the signed-in user's token for active organization memberships and current verification state. It does not accept organization IDs from the URL as authority and does not make client-side permission decisions.
+- It also reads `GET /api/v1/me/organization-access`, a minimal account-scoped relationship index, to distinguish a genuinely unregistered account from a suspended or removed organization membership. This index contains no organization contact details, address, private evidence, reviewer notes or roster.
 - Each organization is shown separately with its display name, tracking reference when returned, verification status, case status, and a state-specific next action.
 - Loading, empty, and request-error states are distinct. A failed request is never shown as “no organizations,” “verified,” or zero activity.
 - Status labels derive from server-returned fields. Unknown states remain non-complete and direct the user to inspect the existing verification workflow.
@@ -26,8 +27,10 @@
 
 | Scenario | Expected UI behavior |
 |---|---|
-| Signed out | No private organization status is requested; existing sign-in guidance remains visible. |
-| Authenticated account with no organizations | Explicit “Register organization” next action; no approval or activity is implied. |
+| Signed out | No private organization status is requested; benefits and sign-in guidance remain visible. |
+| Authenticated account with no prior relationship | Explicit “Register organization” next action; no approval or activity is implied. |
+| Suspended or removed organization relationship | Explain that access is inactive; do not misclassify the account as unregistered or offer duplicate registration. |
+| Organization access lookup fails | Retry state; do not infer an empty account or offer registration until both access views resolve. |
 | Draft/unverified organization | Verification/evidence next action; publishing is not described as available. |
 | Submitted/pending case | “Awaiting review”; no claim of approval and no instruction to resubmit while pending. |
 | Correction required | Display recorded reviewer reason when present and link to the evidence checklist. |

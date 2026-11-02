@@ -77,3 +77,17 @@ test("an accepted mentorship proposal is not presented as an active relationship
   assert.equal(result.items.find(item => item.domain === "mentorship_request").responsibility, "mpa_action");
   assert.equal(result.counts.inProgress, 0);
 });
+
+test("mentorship session proposals distinguish who must respond and preserve confirmed dates", () => {
+  const result = buildMemberProgress({
+    mentorshipSessions: { status: "fulfilled", value: [
+      { id: "session-1", status: "scheduled", coordination_status: "proposed", proposed_by: "other-user", viewer_user_id: "member-1", scheduled_start_at: "2026-11-10T09:00:00Z" },
+      { id: "session-2", status: "scheduled", coordination_status: "proposed", proposed_by: "member-1", viewer_user_id: "member-1", scheduled_start_at: "2026-11-11T09:00:00Z" },
+      { id: "session-3", status: "scheduled", coordination_status: "accepted", scheduled_start_at: "2026-11-12T09:00:00Z" },
+    ] },
+  });
+  assert.equal(result.items.find(item => item.recordId === "session-1").responsibility, "member_action");
+  assert.equal(result.items.find(item => item.recordId === "session-2").responsibility, "external_response");
+  assert.equal(result.items.find(item => item.recordId === "session-3").responsibility, "in_progress");
+  assert.equal(result.items.find(item => item.recordId === "session-3").scheduledAt, "2026-11-12T09:00:00.000Z");
+});

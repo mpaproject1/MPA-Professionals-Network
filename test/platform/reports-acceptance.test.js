@@ -157,16 +157,20 @@ test("membership dashboard aggregates and monthly trend are available only throu
       assert.ok(Number.isFinite(Number(row.Activated)));
     }
 
-    const aging = await runReport(reviewer, "membership-application-aging", {}, requestIds[2]);
+    const aging = await runReport(reviewer, "membership-application-aging", { from: "2000-01-01", to: new Date().toISOString().slice(0, 10), status: "submitted", q: "no-such-application-" + randomUUID() }, requestIds[2]);
+    assert.equal(aging.filters.status, "submitted");
     assert.ok(Array.isArray(aging.rows));
+    assert.equal(aging.rows.length, 0, "queue ageing should respect the shared date, lifecycle and search filters");
     for (const row of aging.rows) {
       assert.ok(Number.isFinite(Number(row.Applications)));
       assert.ok(Number.isFinite(Number(row["Median age days"])));
       assert.ok(Number.isFinite(Number(row["Oldest age days"])));
     }
 
-    const renewals = await runReport(reviewer, "membership-renewal-pipeline", {}, requestIds[5]);
+    const renewals = await runReport(reviewer, "membership-renewal-pipeline", { q: "no-such-membership-" + randomUUID(), memberStatus: "active" }, requestIds[5]);
+    assert.equal(renewals.filters.memberStatus, "active");
     assert.ok(Array.isArray(renewals.rows));
+    assert.equal(renewals.rows.length, 0, "renewal search should not return unrelated membership records");
     for (const row of renewals.rows) {
       assert.ok(Number.isFinite(Number(row.Members)));
       assert.ok(["Overdue", "Due in 30 days", "Due in 31–60 days", "Due in 61–90 days"].includes(row["Renewal window"]));

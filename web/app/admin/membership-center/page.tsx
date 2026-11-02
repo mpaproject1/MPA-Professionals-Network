@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, ArrowDownToLine, ArrowRight, BarChart3, CalendarDays, CreditCard, Download, MapPinned, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowRight, BarChart3, CalendarDays, CreditCard, Download, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import { Badge, Card } from "../../../components/ui";
 import { OperationStatus } from "../../../components/operation-status";
 import { ApiError, api } from "../../../lib/api";
@@ -118,8 +118,8 @@ export default function MembershipCenterPage() {
         // Current member stock is deliberately unbounded by the application-period filter.
         api<ReportResult>("/api/v1/admin/reports/membership-status/run", { method: "POST", body: JSON.stringify({ q: nextFilters.q, status: nextFilters.memberStatus }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status, groupBy: "month" }) }, token),
-        api<ReportResult>("/api/v1/admin/reports/membership-application-aging/run", { method: "POST", body: JSON.stringify({}) }, token),
-        api<ReportResult>("/api/v1/admin/reports/membership-renewal-pipeline/run", { method: "POST", body: JSON.stringify({}) }, token),
+        api<ReportResult>("/api/v1/admin/reports/membership-application-aging/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, status: nextFilters.status, q: nextFilters.q }) }, token),
+        api<ReportResult>("/api/v1/admin/reports/membership-renewal-pipeline/run", { method: "POST", body: JSON.stringify({ q: nextFilters.q, memberStatus: nextFilters.memberStatus }) }, token),
       ]);
       if (!Array.isArray(appResult?.rows) || !Array.isArray(memberResult?.rows) || !Array.isArray(monthlyResult?.rows) || !Array.isArray(agingResult?.rows) || !Array.isArray(renewalResult?.rows)) throw new Error("Membership reporting returned an incomplete response. No KPI values have been inferred.");
       setApplications(appResult);
@@ -231,7 +231,7 @@ export default function MembershipCenterPage() {
     </nav>
     {error && <Card><OperationStatus state="error" title="Membership data could not be fully verified" detail={error} action={<button className="btn btn-ghost" type="button" onClick={() => void load(filters)}>Retry</button>} /></Card>}
     <section className={styles.filterPanel} aria-label="Membership report filters">
-      <div className={styles.filterTitle}><div><strong>Reporting period</strong><span>Application counts use application creation dates. Active and expired membership counts show the current recorded stock. Confirm the deployment reporting timezone before interpreting day-boundary comparisons.</span></div><Badge tone="slate">Calendar reporting filters</Badge></div>
+      <div className={styles.filterTitle}><div><strong>Reporting period</strong><span>The date range filters application submission/creation and queue-ageing reports. Current member stock remains a snapshot; the renewal pipeline remains a rolling 90-day expiry view. Search and the relevant lifecycle status are applied to each supported report.</span></div><Badge tone="slate">Calendar reporting filters</Badge></div>
       <div className={styles.filters}>
         <label>From<input type="date" value={filters.from} onChange={event => setFilters(current => ({ ...current, from: event.target.value }))}/></label>
         <label>To<input type="date" value={filters.to} onChange={event => setFilters(current => ({ ...current, to: event.target.value }))}/></label>
@@ -291,15 +291,10 @@ export default function MembershipCenterPage() {
           <a href="/admin/membership-cards"><span><strong>Membership cards</strong><small>Print cards for records already eligible under existing rules.</small></span><ArrowRight size={17}/></a>
         </div>
       </Card>
-      <Card>
-        <div className={styles.panelHeading}><div><h2>Geographic analysis readiness</h2><p>Location reporting must use verified member data.</p></div><MapPinned size={18}/></div>
-        <div className={styles.locationNotice}>
-          <strong>Structured location filters are not yet available in the current membership source.</strong>
-          <p>The current person and membership schema does not persist a governed region, zone, woreda and city hierarchy. This dashboard therefore does not fabricate geographic counts or pretend a text search is a location filter. Add validated location capture and reference-data mapping before enabling regional KPI comparisons.</p>
-        </div>
-        <div className={styles.panelFootnote}>Last report refresh: {generatedAt ? new Date(generatedAt).toLocaleString() : "Not confirmed"} · {busy ? "Refreshing" : "Source reports loaded"}</div>
-      </Card>
+      {canViewMemberRecords && <MemberGeographySummary/>}
     </section>
+
+    {canFinance && <MembershipFeeBalanceSummary/>}
 
     {financeAvailable && <Card>
       <div className={styles.panelHeading}><div><h2>Finance summary</h2><p>Visible only to users with separate Finance reporting authority. Amounts remain separated by currency.</p></div><a className="btn btn-ghost" href="/admin/finance">Open Finance</a></div>

@@ -992,7 +992,7 @@ For sponsorship, Finance must link an existing registered sponsoring organizatio
 
 **Branch:** `feat/workstream-3-progress-members-workspace`  
 **PR:** #18  
-**Latest implementation commit at this entry:** `044003d92fe006d163bba095ecfdab0781f3caef`  
+**Latest implementation commit at this entry:** `c5e79db774996cfbe8096e8d005c3bbe89c8ed45`  
 **Policy decision:** approved sponsorship, Honored Member exemption and volunteer valuation are final; Finance cannot reverse them.
 
 ### Source changes committed
@@ -1002,8 +1002,8 @@ For sponsorship, Finance must link an existing registered sponsoring organizatio
 - `server.js` exposes the Finance-authorized sponsoring-organization lookup endpoint.
 - `web/components/finance-membership-obligations.tsx` adds the registered-organization selector, manual sponsor fallback and private evidence upload flow using the existing private-file authorization/confirm lifecycle. The pending approval queue displays sponsor provenance and gives the separate Finance approver a protected way to inspect the evidence.
 - `src/platform/private-file-storage.js` extends Finance evidence authorization to membership fee dispositions and approved adjustments; it does not make the evidence public.
-- `db/migrations/20261103090000_membership_non_cash_settlement_immutability.sql` adds database triggers preventing updates/deletes of approved adjustments and dispositions and prevents an adjustment from being inserted or changed to `reversed`.
-- `test/membership-import/fee-obligations.test.js` uploads confirmed private evidence in its PostgreSQL lifecycle scenario, verifies that a different Finance approver can read it before deciding, asserts that the approved adjustment retains evidence and manual sponsor provenance, tests idempotent replay, exercises the database immutability guard, and adds a full ETB 1,200 sponsorship case that settles and activates a membership with zero cash.
+- `db/migrations/20261103090000_membership_non_cash_settlement_immutability.sql` adds database triggers preventing updates/deletes of approved adjustments and dispositions and prevents an adjustment from being inserted or changed to `reversed`. Approved disposition rows are also immutable after approval.
+- `test/membership-import/fee-obligations.test.js` uploads confirmed private evidence in its PostgreSQL lifecycle scenario, verifies that a different Finance approver can read it before deciding, asserts that the approved adjustment retains evidence and manual sponsor provenance, tests idempotent replay, exercises the database immutability guard, and adds a full ETB 1,200 sponsorship case that settles and activates a membership with zero cash. The zero-cash scenario registers a sponsoring organization and verifies that Finance can select and persist its organization ID; a separate scenario covers manual sponsor-name snapshots.
 
 ### Ledger semantics
 
@@ -1016,4 +1016,4 @@ For sponsorship, Finance must link an existing registered sponsoring organizatio
 
 ### Validation status
 
-The source and migration changes are committed. The latest PR Quality workflow lookup did not return a run for implementation SHA `044003d92fe006d163bba095ecfdab0781f3caef`; the most recent workflow-dispatch runs are for older SHAs. This is pending/unverified, not a pass. The migration, PostgreSQL integration test, TypeScript, Biome, production build and Playwright checks have not been executed against this latest implementation head. The available GitHub connection exposes run inspection and rerun actions but no workflow-dispatch action, so a fresh exact-head run still needs to be started from GitHub Actions before merge.
+The source and migration changes are committed. The latest PR Quality workflow lookup did not return a run for implementation SHA `c5e79db774996cfbe8096e8d005c3bbe89c8ed45`; the most recent workflow-dispatch runs are for older SHAs. This is pending/unverified, not a pass. The migration, PostgreSQL integration test, TypeScript, Biome, production build and Playwright checks have not been executed against this latest implementation head. The available GitHub connection exposes run inspection and rerun actions but no workflow-dispatch action, so a fresh exact-head run still needs to be started from GitHub Actions before merge.

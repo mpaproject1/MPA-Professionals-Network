@@ -973,14 +973,45 @@ Do not mark this workstream complete until all of the following are evidenced:
 - WP1 is improved but not fully complete: legacy workflows remain separate routes; no new in-center workflow tabs or geography filter controls have been introduced. The shared filters are propagated only to reports whose query semantics support them. The renewal report remains a current rolling expiry view.
 - WP2 still needs full route-by-route audit and additional test coverage for historical imported obligations, account claim/link after reversal, all relevant legacy reversal routes and repeated/idempotent reversal behavior.
 
-### Product-owner decision required before finalizing non-cash adjustment lifecycle
+### Product-owner decision — approved non-cash settlements are final
 
-The schema supports a `reversed` adjustment state, but the current application service has no authorized reversal action for an already-approved non-cash adjustment. Do not silently change an approved sponsorship, honored-member exemption or volunteer valuation. The next implementation step depends on the policy decision: either permit a separately authorized, audited, maker/checker compensating reversal, or make approved adjustments immutable and explicitly prohibit reversal. Record the decision and then enforce it in the service, API, migration constraints and tests.
+The product owner decided on 2026-11-03 that an approved sponsorship, Honored Member exemption or volunteer valuation **must not be reversed by Finance**. A member may settle an obligation with zero cash where approved non-cash coverage equals the fee, or with less cash than the product price where the remainder is covered by an approved non-cash disposition. Verified cash and approved non-cash coverage remain separate ledger values.
+
+For sponsorship, Finance must link an existing registered sponsoring organization when available, or preserve a manually entered sponsoring-body name when it is not registered. The record must retain a meaningful remark and confirmed private supporting evidence. The approved adjustment and its approval provenance are immutable.
 
 ### Next execution steps
 
-1. Obtain the product-owner decision above.
+1. Enforce and validate the approved immutable non-cash settlement policy recorded above.
 2. Run PR Quality against the latest branch head and fix failures without weakening checks; capture the exact workflow run ID and job/step diagnostics.
 3. Complete the remaining database-backed historical-import, claim/link, reversal and repeat-request scenarios.
 4. Finish the in-center navigation/section integration and add browser coverage for role visibility, filters, legacy route compatibility and summary loading/error states.
 5. Re-run all checks on the final SHA and update this log with actual results only.
+
+
+## 28. Approved non-cash settlement policy implementation — 2026-11-03
+
+**Branch:** `feat/workstream-3-progress-members-workspace`  
+**PR:** #18  
+**Policy decision:** approved sponsorship, Honored Member exemption and volunteer valuation are final; Finance cannot reverse them.
+
+### Source changes committed
+
+- `src/membership/fee-obligations.js` exposes a Finance-authorized list of registered sponsoring organizations. A sponsorship disposition may reference a registered organization ID or retain a manually entered sponsor name and an explicit source marker.
+- Non-cash disposition submission requires a confirmed private evidence file uploaded by the Finance user recording the settlement. The evidence ID is preserved in the disposition details and copied into the approved adjustment record. The remark remains required.
+- `server.js` exposes the Finance-authorized sponsoring-organization lookup endpoint.
+- `web/components/finance-membership-obligations.tsx` adds the registered-organization selector, manual sponsor fallback and private evidence upload flow using the existing private-file authorization/confirm lifecycle.
+- `db/migrations/20261103090000_membership_non_cash_settlement_immutability.sql` adds database triggers preventing updates/deletes of approved adjustments and dispositions and prevents an adjustment from being inserted or changed to `reversed`.
+- `test/membership-import/fee-obligations.test.js` uploads confirmed private evidence in its PostgreSQL lifecycle scenario, asserts that the approved adjustment retains evidence and manual sponsor provenance, and attempts a forbidden reversal to exercise the database guard.
+
+### Ledger semantics
+
+- The fee snapshot and product price remain unchanged.
+- Verified cash remains the only amount reported as cash received.
+- Approved non-cash coverage is recorded separately and reduces the outstanding balance.
+- A full approved non-cash settlement can bring the outstanding balance to zero without inventing a cash receipt.
+- A partial cash payment plus an approved non-cash settlement can settle the same obligation when their combined amounts cover the fee.
+- A later reversal of a real cash receipt may reopen the cash portion of the balance; it does not revoke approved non-cash coverage.
+
+### Validation status
+
+The source and migration changes are committed, but this entry does not claim that the migration, PostgreSQL integration test, TypeScript, Biome, production build or Playwright checks have passed. Confirm the latest PR Quality run against the final head SHA and inspect actual failing job logs before calling this work complete.

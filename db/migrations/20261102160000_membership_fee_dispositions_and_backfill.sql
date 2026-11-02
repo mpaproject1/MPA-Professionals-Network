@@ -28,7 +28,7 @@ insert into membership_fee_obligation(application_id,fee_snapshot,amount_due,cur
 select a.id,a.fee_snapshot,(a.fee_snapshot->>'amount')::numeric,upper(a.fee_snapshot->>'currency'),a.user_id
 from membership_application a
 where jsonb_typeof(a.fee_snapshot)='object'
-  and coalesce(a.fee_snapshot->>'amount','') ~ '^[0-9]+(\\.[0-9]{1,2})?$'
+  and coalesce(a.fee_snapshot->>'amount','') ~ '^[0-9]+([.][0-9]{1,2})?$'
   and upper(coalesce(a.fee_snapshot->>'currency','')) ~ '^[A-Z]{3}$'
 on conflict(application_id) do nothing;
 
@@ -56,7 +56,7 @@ declare amount_text text; currency_text text;
 begin
   amount_text:=new.fee_snapshot->>'amount';
   currency_text:=upper(new.fee_snapshot->>'currency');
-  if coalesce(amount_text,'') ~ '^[0-9]+(\\.[0-9]{1,2})?$' and coalesce(currency_text,'') ~ '^[A-Z]{3}$' then
+  if coalesce(amount_text,'') ~ '^[0-9]+([.][0-9]{1,2})?$' and coalesce(currency_text,'') ~ '^[A-Z]{3}$' then
     insert into membership_fee_obligation(application_id,fee_snapshot,amount_due,currency,created_by)
     values(new.id,new.fee_snapshot,amount_text::numeric,currency_text,new.user_id)
     on conflict(application_id) do nothing;

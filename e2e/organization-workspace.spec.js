@@ -176,6 +176,11 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
     await organizationSwitcher.selectOption("org-e2e-1");
     await expect(tabs.getByRole("tab")).toHaveCount(6);
+    await page.getByRole("button", { name: "Professional service" }).click();
+    await expect(page.getByRole("link", { name: /Continue/ })).toHaveAttribute("href", "/services?organizationId=org-e2e-1");
+    await page.getByRole("button", { name: "Mentorship" }).click();
+    await expect(page.getByRole("link", { name: /Continue/ })).toHaveAttribute("href", "/mentorship?organizationId=org-e2e-1");
+    await page.getByRole("button", { name: "Job" }).click();
     const publishing = tabs.getByRole("tab", { name: /Publishing/ });
     const reviewing = tabs.getByRole("tab", { name: /Reviewing/ });
     await publishing.focus();
@@ -190,6 +195,8 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(reports).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tabpanel").getByRole("link", { name: /Impact and outcomes/ })).toHaveAttribute("href", "/organizations/reports?organizationId=org-e2e-1");
     await tabs.getByRole("tab", { name: /Reviewing/ }).click();
+    await page.getByRole("button", { name: "Public inquiries" }).click();
+    await expect(page.getByRole("link", { name: /Open review/ })).toHaveAttribute("href", "/organizations#org-inquiries");
     await expect(page.getByRole("heading", { name: "Public job inquiries" })).toBeVisible();
     await tabs.getByRole("tab", { name: /Publishing/ }).click();
     await expect(page.getByRole("heading", { name: "Public job inquiries" })).toHaveCount(0);

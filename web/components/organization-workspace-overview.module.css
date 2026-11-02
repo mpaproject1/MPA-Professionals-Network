@@ -231,6 +231,13 @@
 .folder {
   --folder-accent: #97c024;
   position: relative;
+  display: grid;
+  gap: .45rem;
+  width: 100%;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
   min-width: 0;
   margin-top: .45rem;
   border: 1px solid color-mix(in srgb, var(--folder-accent) 34%, var(--border));
@@ -281,43 +288,96 @@
   font-weight: 700;
 }
 
-.folder h3 {
+.folderTitle {
   color: var(--text);
   font-size: 1rem;
   font-weight: 800;
-  margin: .7rem 0 .2rem;
+  margin-top: .2rem;
 }
 
-.folder > p {
+.folderDescription {
   color: var(--muted);
   font-size: .76rem;
   line-height: 1.45;
   min-height: 2.25rem;
-  margin: 0 0 .7rem;
 }
 
-.folder ul {
+.folderActive {
+  outline: 2px solid var(--folder-accent);
+  outline-offset: 2px;
+  transform: translateY(-3px);
+}
+
+.folder:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+}
+
+.folderPanel {
   display: grid;
-  gap: .38rem;
-  list-style: none;
-  margin: 0;
-  padding: .65rem 0 0;
-  border-top: 1px solid var(--border);
+  grid-template-columns: minmax(180px, .8fr) minmax(0, 1.4fr);
+  gap: 1rem;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: .9rem;
+  background: var(--bg);
+  padding: 1rem;
 }
 
-.folder li a {
+.folderPanelHeading h3 {
+  color: var(--text);
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin: .25rem 0;
+}
+
+.folderPanelHeading p {
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.folderActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .6rem;
+}
+
+.folderAction {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: .5rem;
+  gap: .75rem;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: .7rem;
+  padding: .7rem;
   color: var(--text);
-  font-size: .76rem;
-  line-height: 1.4;
+  background: var(--surface);
   text-decoration: none;
 }
 
-.folder li a span {
-  color: var(--folder-accent);
+.folderAction:hover {
+  border-color: var(--primary);
+}
+
+.folderAction > span:first-child {
+  display: grid;
+  gap: .15rem;
+}
+
+.folderAction strong {
+  font-size: .78rem;
+}
+
+.folderAction small {
+  color: var(--muted);
+  font-size: .68rem;
+}
+
+.folderAction > span:last-child {
+  color: var(--primary);
   font-weight: 800;
 }
 
@@ -330,15 +390,17 @@
 
 @media (max-width: 760px) {
   .folderShelf { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .folderPanel { grid-template-columns: 1fr; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 520px) {
   .benefits,
-  .folderShelf { grid-template-columns: minmax(0, 1fr); }
+  .folderShelf,
+  .folderActions { grid-template-columns: minmax(0, 1fr); }
   .dashboardHeader { display: grid; }
   .refreshLink { justify-self: start; }
-  .folder > p { min-height: 0; }
+  .folderDescription { min-height: 0; }
   .gateAction { align-items: stretch; }
   .gateAction :global(.btn) { width: 100%; justify-content: center; }
 }

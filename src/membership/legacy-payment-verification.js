@@ -12,7 +12,7 @@ const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Da
 const verifiedLegacyPayment = `not exists (
   select 1 from membership_fee_obligation o
   join membership_fee_obligation_balance b on b.obligation_id=o.id
-  where o.membership_record_id=mr.id and b.outstanding_balance=0
+  where (o.membership_record_id=mr.id or o.application_id=mr.application_id) and b.outstanding_balance=0
 )`;
 
 export async function listLegacyMembershipPaymentVerificationQueue(identity) {
@@ -88,6 +88,7 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
       obligation=(await tx.query("insert into membership_fee_obligation(membership_record_id,fee_snapshot,amount_due,currency,created_by) values($1,$2,$3,$4,$5) returning *",[membershipId,JSON.stringify(snapshot),feeAmount,currency,identity.sub])).rows[0];
     }
     if(obligation.currency!==currency)throw problem(409,"Receipt currency does not match the confirmed historical fee obligation.","PAYMENT_CURRENCY_MISMATCH");
+    if(feeAmount!==null&&feeAmount!==Number(obligation.amount_due))throw problem(409,"The entered original fee amount differs from the saved historical fee obligation.","FEE_SNAPSHOT_CONFLICT");
     await tx.query(`insert into membership_fee_obligation_payment(obligation_id,payment_transaction_id,linked_by)
       select $1,pr.payment_transaction_id,$2 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id
       where pr.membership_id=$3 and pr.reconciliation_status='matched' and pt.status='succeeded' and pt.currency=$4
@@ -96,7 +97,7 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
     let balance=(await tx.query("select * from membership_fee_obligation_balance where obligation_id=$1",[obligation.id])).rows[0];
 
     const existing=(await tx.query(`
-      select pt.id,pt.purpose_reference,pt.verified_at
+      select pt.id,pt.amount,pt.currency,pt.purpose_reference,pt.verified_at
       from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id
       where pr.membership_id=$1 and pr.reconciliation_status='matched' and pt.source='legacy_import'
         and pt.status='succeeded' and lower(coalesce(pt.purpose_reference,''))=lower($2)
@@ -104,6 +105,7 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
       order by pt.created_at desc limit 1 for update of pt
     `,[membershipId,paymentReference])).rows[0];
     if(existing){
+      if(Number(existing.amount)!==amount||existing.currency!==currency)throw problem(409,"This payment reference is already verified with a different amount or currency.","PAYMENT_REFERENCE_CONFLICT");
       balance=(await tx.query("select * from membership_fee_obligation_balance where obligation_id=$1",[obligation.id])).rows[0];
       if(Number(balance.outstanding_balance)===0)await tx.query("update member_invitation set expires_at=greatest(expires_at,now()+interval '7 days') where user_id=$1 and import_id=$2 and consumed_at is null",[membership.user_id,membership.source_import_id]);
       const invitation=(await tx.query("select id from member_invitation where user_id=$1 and import_id=$2 and consumed_at is null",[membership.user_id,membership.source_import_id])).rows[0];
@@ -180,6 +182,8 @@ export async function reverseLegacyMembershipPayment(identity, paymentId, input 
       "insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.legacy_payment_reversed','payment_transaction',$2,$3,'success',$4)",
       [identity.sub, paymentId, requestId, JSON.stringify({ membershipId: row.membership_id, membershipNumber: row.membership_number, reversalId: reversal.id, reversalType, reason, evidenceReference })]
     );
+    const member=(await tx.query("select user_id from membership_record where id=$1",[row.membership_id])).rows[0];
+    if(member?.user_id)await createInAppNotification(tx,member.user_id,"membership.payment_reversed","membership_record",row.membership_id,{category:"membership",message:"A historical membership payment was reversed. Your fee balance has been recalculated.",actionUrl:"/membership",eventVersion:reversal.id});
     return { paymentId, reversalId: reversal.id, membershipId: row.membership_id, status: "refunded", reconciliationStatus: "disputed" };
   });
 }

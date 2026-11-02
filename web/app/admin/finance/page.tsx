@@ -6,6 +6,7 @@ import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";
+import { FinanceMembershipObligations } from "../../../components/finance-membership-obligations";
 
 type Payment = {
   payment_id: string;

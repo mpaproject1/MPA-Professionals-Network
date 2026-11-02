@@ -69,7 +69,7 @@ export async function listFeeObligations(identity,filters={}){
  const status=clean(filters.status,20),q=clean(filters.q,100);
  const db=getPool();
  const limit=Math.min(Math.max(Number(filters.limit)||500,1),50000);
- const rows=(await db.query(`select b.*,o.created_at,o.due_date,case when o.due_date<current_date then current_date-o.due_date else 0 end days_past_due,reminders.last_status reminder_status,reminders.last_sent_at,disp.summary disposition_summary,
+ const rows=(await db.query(`select b.*,o.created_at,o.due_date,case when o.due_date<current_date then current_date-o.due_date else 0 end days_past_due,reminders.last_status reminder_status,reminders.last_member_delivery_status,reminders.last_member_delivery_note,reminders.last_sent_at,disp.summary disposition_summary,
   a.tracking_reference,a.status application_status,a.user_id,
   mr.membership_number,mr.status membership_status,
   coalesce(p.display_name,concat_ws(' ',p.first_name,p.last_name)) member_name,u.email,
@@ -82,7 +82,7 @@ export async function listFeeObligations(identity,filters={}){
   left join membership_product mp on mp.id=coalesce((select membership_product_id from membership_application where id=o.application_id),(select membership_product_id from membership_record where id=o.membership_record_id))
   left join lateral (select json_agg(json_build_object('id',pt.id,'amount',pt.amount,'currency',pt.currency,'reference',pt.purpose_reference,'createdAt',pt.created_at) order by pt.created_at) receipts from membership_fee_obligation_payment op join payment_transaction pt on pt.id=op.payment_transaction_id where op.obligation_id=o.id and pt.status='pending' and pt.source in ('finance_manual_record','finance_bulk_import')) pending on true
   left join lateral (select json_agg(json_build_object('id',d.id,'type',d.disposition_type,'amount',d.amount,'currency',d.currency,'remark',d.remark,'requestedBy',d.requested_by,'evidenceFileId',d.details->>'evidenceFileId','sponsorName',d.details->>'sponsorName','sponsorSource',d.details->>'sponsorSource','details',d.details) order by d.created_at) items from membership_fee_balance_disposition d where d.obligation_id=o.id and d.status='pending') pending_dispositions on true
-  left join lateral (select (array_agg(r.status order by r.created_at desc))[1] last_status,max(r.sent_at) last_sent_at from membership_fee_reminder r where r.obligation_id=o.id) reminders on true
+  left join lateral (select (array_agg(r.status order by r.created_at desc))[1] last_status,(array_agg(r.member_delivery_status order by r.created_at desc))[1] last_member_delivery_status,(array_agg(r.member_delivery_note order by r.created_at desc))[1] last_member_delivery_note,max(r.sent_at) last_sent_at from membership_fee_reminder r where r.obligation_id=o.id) reminders on true
   left join lateral (select string_agg(d.disposition_type||':'||d.status,', ' order by d.created_at desc) summary from membership_fee_balance_disposition d where d.obligation_id=o.id and d.status in ('active','pending','approved')) disp on true
   where ($1='' or o.status=$1) and ($2='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(mr.membership_number,'')||' '||coalesce(a.tracking_reference,'')) like lower('%'||$2||'%'))
   order by (b.outstanding_balance>0) desc,o.due_date nulls last,o.created_at desc limit $3`,[status,q,limit])).rows;
@@ -337,29 +337,36 @@ export async function applyMembershipPaymentImport(identity,batchId,input={},req
 export async function scheduleMembershipFeeReminders(batchSize=100){
  const limit=Math.min(Math.max(Number(batchSize)||100,1),500),db=getPool();
  return withTransaction(async tx=>{
+  // Due dates are civil dates in the MPA operating timezone, not the PostgreSQL host timezone.
   const obligations=(await tx.query(`select b.obligation_id,b.application_id,b.membership_record_id,b.outstanding_balance,b.currency,o.due_date,
-   coalesce(a.user_id,mr.user_id) user_id,(o.due_date-current_date) days_until_due
+   coalesce(a.user_id,mr.user_id) user_id,(o.due_date-(now() at time zone 'Africa/Addis_Ababa')::date) days_until_due
    from membership_fee_obligation_balance b join membership_fee_obligation o on o.id=b.obligation_id
    left join membership_application a on a.id=o.application_id
    left join membership_record mr on mr.id=o.membership_record_id
-   where b.outstanding_balance>0 and o.status='open' and o.due_date is not null and o.due_date<=current_date+3
-   and exists(select 1 from membership_fee_balance_disposition d where d.obligation_id=o.id and d.disposition_type='will_pay_later' and d.status='active' and d.due_date<=current_date+3)
+   where b.outstanding_balance>0 and o.status='open' and o.due_date is not null
+   and o.due_date<=(now() at time zone 'Africa/Addis_Ababa')::date+3
+   and exists(select 1 from membership_fee_balance_disposition d where d.obligation_id=o.id and d.disposition_type='will_pay_later' and d.status='active' and d.due_date<=(now() at time zone 'Africa/Addis_Ababa')::date+3)
    order by o.due_date limit $1 for update of o skip locked`,[limit])).rows;
-  let sent=0;
+  let queued=0,suppressed=0;
   for(const item of obligations){
    const key="membership-balance:"+item.obligation_id+":"+String(item.due_date)+":"+Number(item.outstanding_balance).toFixed(2);
+   await tx.query("update membership_fee_reminder set status='cancelled',member_delivery_note='Balance changed before delivery; a current reminder will be queued if still due.' where obligation_id=$1 and status in ('scheduled','queued') and due_balance<>$2",[item.obligation_id,item.outstanding_balance]);
    const reminder=(await tx.query("insert into membership_fee_reminder(obligation_id,reminder_key,due_balance,currency,scheduled_for,status) values($1,$2,$3,$4,now(),'queued') on conflict(reminder_key) do nothing returning id",[item.obligation_id,key,item.outstanding_balance,item.currency])).rows[0];
    if(!reminder)continue;
    const message="A membership balance of "+item.currency+" "+Number(item.outstanding_balance).toFixed(2)+" remains due"+(Number(item.days_until_due)>0?" in "+item.days_until_due+" day(s)":" (overdue)")+". Record or confirm your next payment to update the balance.";
-   const memberNotification=item.user_id?await createInAppNotification(tx,item.user_id,"membership.balance_due","membership_fee_obligation",item.obligation_id,{category:"membership",title:"Membership balance reminder",message,actionRequired:true,priority:"normal",actionUrl:"/membership",dedupeKey:key}):null;
+   const preference=(await tx.query("select coalesce(in_app_enabled,true) in_app_enabled,coalesce(in_app_categories,'{}'::jsonb) in_app_categories,coalesce(push_enabled,false) push_enabled from notification_preference where user_id=$1",[item.user_id])).rows[0]||{in_app_enabled:true,in_app_categories:{},push_enabled:false};
+   const optedOut=!preference.in_app_enabled&&preference.in_app_categories?.membership!==true&&!preference.push_enabled;
+   const memberNotification=item.user_id&&!optedOut?await createInAppNotification(tx,item.user_id,"membership.balance_due","membership_fee_obligation",item.obligation_id,{category:"membership",title:"Membership balance reminder",message,actionRequired:true,priority:"normal",actionUrl:"/membership",dedupeKey:key}):null;
+   const memberDeliveryStatus=optedOut||!item.user_id?"suppressed":"queued";
+   const memberDeliveryNote=optedOut?"Member disabled in-app and push notifications; no member reminder was queued.":!item.user_id?"No linked member account; only the Finance queue is notified.":"Member notification event queued in-app; push delivery is not represented as sent.";
    const staffNotifications=await notifyFinance(tx,"membership.balance_due_staff","membership_fee_obligation",item.obligation_id,{message:"Member balance "+item.currency+" "+Number(item.outstanding_balance).toFixed(2)+" is due. Review the Finance obligation.",actionUrl:"/admin/finance",dedupeKey:key});
-   await tx.query("update membership_fee_reminder set status='queued',member_outbox_id=$1,staff_outbox_id=$2 where id=$3",[memberNotification?.id||null,staffNotifications[0]||null,reminder.id]);sent++;
+   await tx.query("update membership_fee_reminder set status='queued',member_delivery_status=$1,member_delivery_note=$2,member_outbox_id=$3,staff_outbox_id=$4 where id=$5",[memberDeliveryStatus,memberDeliveryNote,memberNotification?.id||null,staffNotifications[0]||null,reminder.id]);
+   if(memberDeliveryStatus==="suppressed")suppressed++;else queued++;
   }
-  await tx.query("update membership_fee_reminder r set status='cancelled' from membership_fee_obligation_balance b where r.obligation_id=b.obligation_id and r.status in ('scheduled','queued') and b.outstanding_balance=0");
-  return {processed:obligations.length,sent};
+  await tx.query("update membership_fee_reminder r set status='cancelled',member_delivery_note='Balance fully settled before reminder delivery.' from membership_fee_obligation_balance b where r.obligation_id=b.obligation_id and r.status in ('scheduled','queued') and b.outstanding_balance=0");
+  return {processed:obligations.length,queued,suppressed};
  });
 }
-
 export async function reverseMembershipRecordReceipt(identity,paymentId,input={},requestId){
  assertPaymentReversalAccess(identity);
  const reason=clean(input.reason,1000),type=input.reversalType==="reversal"?"reversal":"refund",evidenceReference=clean(input.evidenceReference,300)||null;

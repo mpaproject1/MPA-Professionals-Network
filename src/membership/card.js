@@ -25,9 +25,9 @@ function tokenMatches(expected,supplied){
   return a.length===b.length&&timingSafeEqual(a,b);
 }
 export function getMembershipCardStatus(row, now=new Date()) {
-  if(row.source==="legacy_import" && !row.legacy_payment_verified) return "payment_verification_required";
   if(["revoked","cancelled","merged"].includes(row.status)) return "revoked";
   if(row.status==="suspended") return "suspended";
+  if(row.source==="legacy_import" && !row.legacy_payment_verified) return "payment_verification_required";
   const today=now.toISOString().slice(0,10);
   if(row.status!=="active"||String(row.start_date).slice(0,10)>today||(row.end_date&&String(row.end_date).slice(0,10)<today)) return "expired";
   return "active";

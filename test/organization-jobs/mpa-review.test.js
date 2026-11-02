@@ -40,3 +40,15 @@ test("vacancy publication is gated by an explicit MPA review decision",async()=>
  assert.match(service,/const CANDIDATE_ROLES=\["owner","administrator","recruiter"\]/);
  assert.match(service,/if\(org && \["owner","administrator","recruiter"\]\.includes\(org\.role_code\)\)/);
 });
+test("organization app distinguishes active assignments from inactive prior relationships without exposing private organization data", async () => {
+ const [service,server]=await Promise.all([
+  readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8"),
+  readFile(new URL("../../server.js",import.meta.url),"utf8")
+ ]);
+ const access=service.slice(service.indexOf("export async function listMyOrganizationAccess"),service.indexOf("export async function listMyJobAssignments"));
+ assert.match(access,/om\.status as membership_status/);
+ assert.match(access,/where om\.user_id=\$1/);
+ assert.match(access,/join organization o on o\.id=om\.organization_id/);
+ assert.doesNotMatch(access,/o\.email|o\.phone|o\.address_text|verification_evidence/);
+ assert.match(server,/p==="api\/v1\/me\/organization-access"\) return ok\(res,await organizationJobs\.listMyOrganizationAccess\(identity\.sub\)/);
+});

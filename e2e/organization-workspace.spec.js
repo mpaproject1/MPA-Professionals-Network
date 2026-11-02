@@ -80,6 +80,21 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("heading", { name: "Organization access is not active" })).toBeVisible();
     await expect(page.getByText("suspended", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Register your organization" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Register an organization" })).toHaveCount(0);
+    await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
+  });
+
+  test("organization access lookup failure does not expose registration or workspace actions", async ({ page }) => {
+    await mockOrganizationApi(page, []);
+    await page.route("**/api/v1/me/organization-access", (route) => route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "TEMPORARY_UNAVAILABLE", message: "Try again." } }),
+    }));
+    await page.goto("/organizations");
+    await expect(page.getByRole("heading", { name: "Confirming your organization access" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Register your organization" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Register an organization" })).toHaveCount(0);
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
   });
 

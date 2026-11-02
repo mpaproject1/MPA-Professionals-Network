@@ -293,6 +293,7 @@ function parsePaymentRows({xlsxBase64="",csv=""}={}){
   headers=(parsed.shift()||[]).map(value=>String(value).trim());records=parsed;
  }
  const missing=PAYMENT_IMPORT_COLUMNS.slice(0,7).filter(key=>!headers.includes(key));
+ if(!records.length)throw problem(400,"The payment import contains headings but no payment rows.","EMPTY_IMPORT");
  if(missing.length)throw problem(400,"The payment import is missing required columns: "+missing.join(", "),"MISSING_COLUMNS");
  return records.map((values,index)=>({rowNumber:index+2,raw:Object.fromEntries(PAYMENT_IMPORT_COLUMNS.map(key=>[key,clean(values[headers.indexOf(key)]??"",500)])),errors:[]}));
 }

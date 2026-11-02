@@ -788,3 +788,67 @@ The implementation status in Section 21 is historical and must not be read as co
 
 ### Next implementation checkpoint
 Trace exact payment application and membership-record schemas, all payment creation/verification/reversal routes, member profile persistence, import template download/preview/apply routes, reference dataset migration conventions and notification scheduler APIs. Then design additive migrations against those exact schemas before implementing the new workflows. Do not treat this documentation update as completion of the feature.
+
+
+## 25. Implementation progress — 2026-11-02 (PR #18)
+
+**Branch:** `feat/workstream-3-progress-members-workspace`  
+**Latest recorded implementation commit:** `c1848a014a9d349043b81a21cd9f47767da4edf2`
+
+### Implemented in this workstream (code committed; CI verification pending)
+
+1. **Payment and activation path reconciliation**
+   - Added an additive fee-obligation ledger for online applications and historical member records.
+   - Online application fee snapshots create obligations; existing application payments are linked into the ledger and future application payment links are captured by a database trigger.
+   - Membership review decision remains independent of how much cash was received. The application becomes payment-settled only when the obligation balance is zero.
+   - Paid activation now checks the full fee obligation, currency and fee snapshot. It accepts verified cash installments plus approved non-cash settlements, and rejects an outstanding balance.
+   - Legacy account claim/link eligibility now checks the complete fee balance, not the existence of any single verified historical payment. Historical imports do not create verified payment transactions.
+   - Reversal paths reopen fee obligations; legacy and direct historical reversals recalculate balances and suspend active imported memberships when the balance becomes due again.
+
+2. **Geography**
+   - Added versioned geography reference tables, parent/level constraints, member residence storage, profile read/write APIs and a profile editor.
+   - Profile capture distinguishes Ethiopia from Diaspora. Ethiopian hierarchy is Region/Federal City → Zone/Sub-city → District/Town; street address is optional. Diaspora uses a country/area and optional area of residence.
+   - Added versioned Excel reference import, validation, preview, apply-to-draft and separate publish action, with stable ISO/M49 codes, parent validation, metadata and audit events.
+   - Added a GitHub Actions workflow to generate a downloadable workbook from the current UN M49 country/area table and the initial 12 Ethiopian regional units plus Addis Ababa and Dire Dawa federal cities. The workflow is manual and weekly; the generated artifact must be uploaded and published by an authorized administrator.
+   - Added privacy-safe geographic aggregation and Membership Center summary.
+
+3. **Bulk member import**
+   - Expanded the Excel and CSV templates to include required full name, email, phone, gender, membership type/product, amount paid, status and registered date, while preserving existing membership-number, approval-reference and lifecycle validation.
+   - Added optional education, qualification, field of study, department, volunteer pledge and structured Ethiopia/Diaspora location columns.
+   - Structured residence data is validated against the published geography hierarchy and saved to the same member residence tables as profile edits.
+   - Declared amount paid remains historical/unverified import data; zero is allowed for an unpaid record. A spreadsheet status of Active or an amount-paid value cannot verify payment or bypass account-claim/activation guards.
+   - Existing matched members have missing phone/gender details filled without overwriting existing values.
+
+4. **Partial payments and non-cash balance disposition**
+   - Finance can record actual installment receipts independently from the saved fee amount; the server calculates verified cash, approved non-cash coverage and outstanding balance.
+   - Added controlled balance dispositions: Will pay later, Sponsored, Honored Member and Volunteer Activity Valuated. Non-cash settlements remain separate from cash and require a different Finance approver.
+   - Added idempotency for manual receipts and dispositions, currency integrity in the balance view, and reminder cancellation/recalculation when a balance is settled.
+   - Reversed receipts reopen the obligation and cannot leave an imported active member claimable with an unpaid balance.
+
+5. **Finance bulk payment intake**
+   - Added an Excel template and preview/apply batch flow. Imported rows create pending/unverified receipts only; Finance must verify or reject each payment individually.
+   - Row-level member/application matching, payment method/evidence checks, duplicate references, batch/row idempotency and audit events are implemented.
+   - Added Finance UI for manual receipts, pending receipt verification, balance dispositions, legacy fee setup and fee report export.
+
+6. **Reminders, reporting and Membership Center**
+   - Added a scheduled balance reminder worker for due/near-due balances. It queues member and Finance-team in-app notifications, respects notification preferences and uses a deduplicated reminder key. The status is recorded as queued, not falsely described as externally delivered.
+   - Added fee totals by currency, balance ageing, disposition summaries, reminder status fields and a permission-scoped XLSX export.
+   - Integrated fee-balance and member-geography summaries into Membership Center; Finance actions remain in the Finance workspace.
+
+7. **Automated test and migration coverage**
+   - Added authorization and workbook contract tests for Finance receipt, reversal, disposition and bulk intake, geography import and expanded member import templates.
+   - Added all new migrations to the migration compatibility rehearsal and added assertions for fee/geography tables, balance currency handling, idempotency indexes, permission registration and zero-amount import constraint.
+   - Existing PR Quality workflow already provisions a disposable PostgreSQL 16 service, runs migrations, full backend tests, Biome, TypeScript, production build and selected Playwright acceptance.
+
+### Remaining before this work can be certified complete
+
+- **CI has not yet been observed for the latest head.** The GitHub workflow-run lookup returned no run for the latest commit. The branch's PR Quality workflow must execute and pass; do not treat the absence of a run as a pass.
+- Run and fix all failures from the complete disposable-PostgreSQL migration/upgrade rehearsal, backend test suite, Biome, TypeScript, production build and Playwright suite. The added tests are not yet claimed as passing.
+- Execute the new GitHub Actions reference-workbook workflow, inspect the artifact, upload it through the geography admin workspace and publish the first reference version. Until this is done, member profile geography correctly reports that no published reference version is available.
+- The generated geography workbook includes UN M49 country/area entries and Ethiopian Regions/Federal Cities. It intentionally does **not** invent Zones, Sub-cities, Districts or Towns. An authoritative Ethiopian lower-level administrative dataset must be appended before those lower levels can be selected. Parent/level validation is in place.
+- Validate real XLSX round-trips for both import workbooks in CI and verify row-level preview, apply, duplicate replay and cleanup behavior against disposable PostgreSQL.
+- Verify the manual installment flow (e.g. ETB 500 against ETB 1,200), will-pay-later reminder cycle, each non-cash maker/checker decision, Finance bulk intake and one-by-one verification, reversal/reopening, account claim and paid activation in end-to-end tests.
+- Add and verify a separately authorized reversal workflow for an already-approved non-cash adjustment if operational policy requires a previously approved sponsorship, honor exemption or volunteer valuation to be revoked.
+- Confirm all role-based pages and exports against the existing role/permission fixtures. No live staging deployment is available, so deployment-level manual verification remains unavailable.
+
+**Completion rule:** this log records implementation, not a passing release. Mark the workstream complete only after the latest PR checks pass, the geography reference workbook is imported and published, and the listed payment/import/browser scenarios have recorded test evidence.

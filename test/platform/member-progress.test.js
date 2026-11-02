@@ -91,3 +91,19 @@ test("mentorship session proposals distinguish who must respond and preserve con
   assert.equal(result.items.find(item => item.recordId === "session-3").responsibility, "in_progress");
   assert.equal(result.items.find(item => item.recordId === "session-3").scheduledAt, "2026-11-12T09:00:00.000Z");
 });
+
+test("mentorship learning activities assign responsibility from submission and review state", () => {
+  const result = buildMemberProgress({
+    mentorshipLearningActivities: { status: "fulfilled", value: [
+      { id: "activity-1", title: "Leadership reflection", status: "published", viewer_user_id: "mentee", mentee_user_id: "mentee", mentor_user_id: "mentor", due_at: "2026-11-10", created_at: "2026-11-01" },
+      { id: "activity-2", title: "Strategy brief", status: "published", viewer_user_id: "mentee", mentee_user_id: "mentee", mentor_user_id: "mentor", submission_status: "changes_requested", due_at: "2026-11-11" },
+      { id: "activity-3", title: "Portfolio review", status: "published", viewer_user_id: "mentor", mentee_user_id: "mentee", mentor_user_id: "mentor", submission_status: "submitted" },
+      { id: "activity-4", title: "Career plan", status: "published", viewer_user_id: "mentee", mentee_user_id: "mentee", mentor_user_id: "mentor", submission_status: "accepted" },
+    ] },
+  });
+  assert.equal(result.items.find(item => item.recordId === "activity-1").responsibility, "member_action");
+  assert.equal(result.items.find(item => item.recordId === "activity-2").responsibility, "member_action");
+  assert.equal(result.items.find(item => item.recordId === "activity-3").responsibility, "member_action");
+  assert.equal(result.items.find(item => item.recordId === "activity-4").responsibility, "completed");
+  assert.equal(result.items.find(item => item.recordId === "activity-1").dueAt, "2026-11-10T00:00:00.000Z");
+});

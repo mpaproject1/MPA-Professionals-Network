@@ -94,6 +94,7 @@ export default function Organizations() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationAccess, setOrganizationAccess] = useState<OrganizationAccess[]>([]);
   const [organizationLookupReady, setOrganizationLookupReady] = useState(false);
+  const [activeOrganizationFolder, setActiveOrganizationFolder] = useState("publishing");
   const [reviewQueue, setReviewQueue] = useState<OrgReviewCase[]>([]);
   const [reviewDrafts, setReviewDrafts] = useState<
     Record<string, { decision: string; reason: string }>
@@ -551,6 +552,8 @@ export default function Organizations() {
             organizations={organizations}
             organizationAccess={organizationAccess}
             token={token}
+            activeFolderKey={activeOrganizationFolder}
+            onActiveFolderChange={setActiveOrganizationFolder}
             authenticated={Boolean(token)}
             organizationLookupReady={organizationLookupReady}
             onRetry={() => void load()}
@@ -580,7 +583,7 @@ export default function Organizations() {
       ) : (
         <>
           
-          {(organizations.length > 0 || (organizationLookupReady && organizationAccess.length === 0)) && (
+          {((organizations.length === 0 && organizationLookupReady && organizationAccess.length === 0) || (organizations.some((org) => org.verification_status === "verified") && activeOrganizationFolder === "organization")) && (
           <Card id="org-registration">
             <div className="row">
               <div>
@@ -680,6 +683,7 @@ export default function Organizations() {
           </Card>
           )}
 
+          {(organizations.length === 0 || !organizations.some((org) => org.verification_status === "verified") || activeOrganizationFolder === "organization") && (
           <Card id="your-organizations">
             <div className="row">
               <div>
@@ -752,6 +756,8 @@ export default function Organizations() {
               ))}
             </div>
           </Card>
+          )}
+          {((organizations.length === 0 && organizationLookupReady && organizationAccess.length === 0) || organizations.some((org) => ["owner", "administrator"].includes(org.role_code || "") && ["draft", "unverified", "correction_required", "rejected"].includes(org.verification_case_status || org.verification_status || "draft")) || (activeOrganizationFolder === "organization" && organizations.some((org) => org.verification_status === "verified"))) && (
           <Card id="org-evidence">
             <div className="row">
               <div>
@@ -854,7 +860,8 @@ export default function Organizations() {
             )}
             <Badge>Tabayyun · Verification / due diligence</Badge>
           </Card>
-          {reviewQueue.length > 0 && (
+          )}
+          {reviewQueue.length > 0 && (activeOrganizationFolder === "reviewing" || !organizations.some((org) => org.verification_status === "verified")) && (
             <Card>
               <div className="row">
                 <div>
@@ -961,6 +968,7 @@ export default function Organizations() {
               })}
             </Card>
           )}
+          {(activeOrganizationFolder === "reviewing" && organizations.some((org) => org.verification_status === "verified")) && (
           <Card id="org-inquiries">
             <div className="row">
               <div>
@@ -1086,6 +1094,7 @@ export default function Organizations() {
               </div>
             )}
           </Card>
+          )}
         </>
       )}
       {error && <FormFeedback kind="error" message={error} onRetry={()=>void load()} retryLabel="Reload workspace" />}

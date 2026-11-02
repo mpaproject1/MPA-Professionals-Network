@@ -75,7 +75,7 @@ async function validateImportedResidence(db,row){
  if(!["ethiopia","diaspora"].includes(type)){row.errors.push("residence_type must be Ethiopia or Diaspora.");return;}
  const version=(await db.query("select id from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0];
  if(!version){row.errors.push("Structured location cannot be imported until a geography reference version is published.");return;}
- const country=(await db.query("select id,country_iso3 from membership_geography_unit where version_id=$1 and unit_level='country' and country_iso3=$2 and active=true",[version.id,countryCode])).rows[0];
+ const country=(await db.query("select id,country_iso3 from membership_geography_unit where version_id=$1 and unit_level='country' and country_iso3=$2 and active=true and metadata->>'residenceSelectable' is distinct from 'false'",[version.id,countryCode])).rows[0];
  if(!country){row.errors.push("country_iso3 is not present in the current published geography version.");return;}
  if(type==="ethiopia"){
   if(countryCode!=="ETH"||!String(raw.region_or_federal_city||"").trim()){row.errors.push("Ethiopian location requires country ETH and a Region or Federal City code.");return;}

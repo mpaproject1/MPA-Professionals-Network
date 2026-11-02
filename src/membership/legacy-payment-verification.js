@@ -88,8 +88,12 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
       obligation=(await tx.query("insert into membership_fee_obligation(membership_record_id,fee_snapshot,amount_due,currency,created_by) values($1,$2,$3,$4,$5) returning *",[membershipId,JSON.stringify(snapshot),feeAmount,currency,identity.sub])).rows[0];
     }
     if(obligation.currency!==currency)throw problem(409,"Receipt currency does not match the confirmed historical fee obligation.","PAYMENT_CURRENCY_MISMATCH");
-    const balance=(await tx.query("select * from membership_fee_obligation_balance where obligation_id=$1",[obligation.id])).rows[0];
-    if(!balance||amount>Number(balance.outstanding_balance))throw problem(409,"The receipt exceeds the remaining historical membership balance. Refresh the Finance queue.","AMOUNT_EXCEEDS_BALANCE");
+    await tx.query(`insert into membership_fee_obligation_payment(obligation_id,payment_transaction_id,linked_by)
+      select $1,pr.payment_transaction_id,$2 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id
+      where pr.membership_id=$3 and pr.reconciliation_status='matched' and pt.status='succeeded' and pt.currency=$4
+        and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)
+      on conflict(payment_transaction_id) do nothing`,[obligation.id,identity.sub,membershipId,obligation.currency]);
+    let balance=(await tx.query("select * from membership_fee_obligation_balance where obligation_id=$1",[obligation.id])).rows[0];
 
     const existing=(await tx.query(`
       select pt.id,pt.purpose_reference,pt.verified_at
@@ -99,8 +103,14 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
         and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)
       order by pt.created_at desc limit 1 for update of pt
     `,[membershipId,paymentReference])).rows[0];
-    if(existing)return {membershipId,alreadyVerified:true,paymentTransactionId:existing.id,verifiedAt:existing.verified_at,outstandingBalance:balance.outstanding_balance,claimUnlocked:Number(balance.outstanding_balance)===0};
-    const reused=(await tx.query("select id from payment_transaction where source='legacy_import' and lower(coalesce(purpose_reference,''))=lower($1) for update",[paymentReference])).rows[0];
+    if(existing){
+      balance=(await tx.query("select * from membership_fee_obligation_balance where obligation_id=$1",[obligation.id])).rows[0];
+      if(Number(balance.outstanding_balance)===0)await tx.query("update member_invitation set expires_at=greatest(expires_at,now()+interval '7 days') where user_id=$1 and import_id=$2 and consumed_at is null",[membership.user_id,membership.source_import_id]);
+      const invitation=(await tx.query("select id from member_invitation where user_id=$1 and import_id=$2 and consumed_at is null",[membership.user_id,membership.source_import_id])).rows[0];
+      return {membershipId,alreadyVerified:true,paymentTransactionId:existing.id,verifiedAt:existing.verified_at,outstandingBalance:balance.outstanding_balance,claimUnlocked:Boolean(invitation)&&Number(balance.outstanding_balance)===0};
+    }
+    if(!balance||amount>Number(balance.outstanding_balance))throw problem(409,"The receipt exceeds the remaining historical membership balance. Refresh the Finance queue.","AMOUNT_EXCEEDS_BALANCE");
+    const reused=(await tx.query("select id from payment_transaction where lower(coalesce(purpose_reference,''))=lower($1) for update",[paymentReference])).rows[0];
     if(reused)throw problem(409,"This payment reference is already allocated to another imported payment.","PAYMENT_REFERENCE_ALREADY_USED");
 
     const channel=paymentMethod==="bank_transfer"?"bank_transfer":paymentMethod==="cash"?"cash":"other";

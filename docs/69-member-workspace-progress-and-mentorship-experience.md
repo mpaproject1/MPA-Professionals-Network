@@ -32,7 +32,7 @@ The endpoint composes existing authenticated domain services using independent s
 
 - Existing membership, organization and job application tracking.
 - Member service requests.
-- Mentorship requests, matches, active relationships and organization programme requests.
+- Mentorship requests, matches, active relationships, member-owned session proposals and organization programme requests.
 - Member verification cases and reference requests addressed to the member.
 - Community-impact claims owned by the member.
 - Talent/network inquiries.

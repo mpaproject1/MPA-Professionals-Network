@@ -54,7 +54,9 @@ function safeId(value) {
 }
 function mapRecord(record, definition, index) {
   if (!record || typeof record !== "object") return null;
-  const [source, category, href, domain] = definition;
+  const [source, baseCategory, href, baseDomain] = definition;
+  const domain = source === "applications" ? String(record.type || baseDomain) : baseDomain;
+  const category = source === "applications" ? ({ membership: "Membership", job: "Jobs", organization: "Organizations" }[domain] || baseCategory) : baseCategory;
   const status = normalizedStatus(record);
   const id = safeId(first(record, ["id", "request_id", "case_id", "application_id", "claim_id", "attribution_id"]));
   if (!id) return null;
@@ -129,9 +131,11 @@ export function buildMemberProgress(sourceResults, { limit = 50, offset = 0, vie
     byCategory: Object.fromEntries([...new Set(SOURCE_DEFINITIONS.map(([, label]) => label))].map(label => [label, unique.filter(item => item.category === label).length])),
   };
   const page = filtered.slice(pageOffset, pageOffset + pageSize);
+  const summary = { total: counts.total, active: counts.inProgress + counts.waiting, nextSteps: counts.needsAttention, jobApplications: unique.filter(item => item.domain === "job").length, memberships: unique.filter(item => item.domain === "membership").length, organizations: unique.filter(item => item.domain === "organization").length };
   return {
     items: page,
     counts,
+    summary,
     errors,
     availableSources,
     limit: pageSize,

@@ -60,7 +60,10 @@ function normalizedStatus(record, domain) {
 }
 function responsibility(status, domain, record) {
   if (domain === "job" && status === "interview") return "member_action";
-  if (domain === "job" && status === "offer") return (record.offer_approval_status || record.details?.offerApprovalStatus) === "pending" ? "mpa_action" : "member_action";
+  if (domain === "job" && status === "offer") {
+    const approval = record.offer_approval_status || record.details?.offerApprovalStatus;
+    return approval === "pending" ? "mpa_action" : approval === "rejected" ? "external_response" : "member_action";
+  }
   if (domain === "job" && status === "accepted") return "external_response";
   if (domain === "mentorship_match") {
     if (["proposed", "matched"].includes(status)) return "member_action";

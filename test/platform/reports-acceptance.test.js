@@ -150,7 +150,7 @@ test("membership dashboard aggregates and monthly trend are available only throu
     }, requestIds[1]);
     assert.ok(Array.isArray(monthly.rows));
     for (const row of monthly.rows) {
-      assert.match(String(row.Month), /^\\d{4}-\\d{2}$/);
+      assert.match(String(row.Month), /^\d{4}-\d{2}$/);
       assert.ok(Number.isFinite(Number(row.Applications)));
       assert.ok(Number.isFinite(Number(row.Submitted)));
       assert.ok(Number.isFinite(Number(row.Reviewed)));

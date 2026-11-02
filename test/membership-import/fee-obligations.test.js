@@ -228,7 +228,8 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.equal(Number(balance.outstanding_balance),0);
  const detailedReport=await runReport(approverFinance,"membership-fee-dispositions",{q:"Disposable test sponsor"},"fee-report-dispositions-"+suffix);
  assert.ok(detailedReport.rows.some(row=>row["Sponsor / reference"]==="Disposable test sponsor"&&Number(row.Amount)===700&&row.Status==="approved"),"Finance disposition report must expose the approved sponsor record and its remark");
- const balanceReport=await runReport(approverFinance,"membership-fee-balance-by-currency",{q:app.trackingReference},"fee-report-balance-"+suffix);
+ const appReference=(await db.query("select tracking_reference from membership_application where id=$1",[app.id])).rows[0].tracking_reference;
+ const balanceReport=await runReport(approverFinance,"membership-fee-balance-by-currency",{q:appReference},"fee-report-balance-"+suffix);
  assert.ok(balanceReport.rows.some(row=>row.Currency==="ETB"&&Number(row["Verified cash"])===500&&Number(row["Approved non-cash"])===700&&Number(row.Outstanding)===0),"currency totals must keep verified cash and non-cash coverage separate");
  const after=(await db.query("select fee_snapshot,amount_due,currency from membership_fee_obligation where application_id=$1",[app.id])).rows[0];
  assert.deepEqual(after.fee_snapshot,before.fee_snapshot,"settlement must not mutate the immutable application fee snapshot");

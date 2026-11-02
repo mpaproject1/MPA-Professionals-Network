@@ -255,6 +255,11 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  assert.equal(member.status,"suspended","reversal of a verified cash receipt must suspend active membership while a balance remains due");
  const appStatus=(await db.query("select status from membership_application where id=$1",[app.id])).rows[0].status;
  assert.equal(appStatus,"activated","reversal must not rewrite the historical activation event/status; membership access is suspended");
+ await scheduleMembershipFeeReminders(500);
+ const reopenedReminder=(await db.query("select status,due_balance,member_delivery_status from membership_fee_reminder where obligation_id=(select id from membership_fee_obligation where application_id=$1) order by created_at desc limit 1",[app.id])).rows[0];
+ assert.equal(reopenedReminder.status,"queued","cash reversal must reopen the reminder queue for the remaining balance");
+ assert.equal(Number(reopenedReminder.due_balance),500);
+ assert.equal(reopenedReminder.member_delivery_status,"suppressed","member reminder remains suppressed when the member opted out");
  const rejected=await recordBalanceDisposition(applicantFinance,{applicationId:app.id,dispositionType:"sponsored",amount:100,currency:"ETB",remark:"Rejected test sponsor proposal",details:{sponsorName:"Rejected test sponsor"},evidenceFileId:evidence.id,idempotencyKey:"fee_reject_"+suffix.slice(0,32)},"fee-rejected-record-"+suffix);
  await decideBalanceDisposition(approverFinance,rejected.disposition.id,{decision:"rejected",note:"Supporting approval was not provided."},"fee-rejected-decision-"+suffix);
  balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];

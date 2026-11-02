@@ -1,601 +1,436 @@
-# Network-Plus — Economic Opportunity & Business Growth Transformation Plan
+# Network-Plus — Economic Connections & Opportunity Exchange
 
 **Repository:** `mpaproject1/MPA-Professionals-Network`  
-**Target branch:** `feat/workstream-3-progress-members-workspace`  
-**PR:** #18 (keep draft; this document does not authorize merge or deployment)  
-**Planning baseline:** branch head `3e038dae220edb26b24256506339510ed85fa96b` (2026-11-02)  
-**Related contracts:** docs/53, docs/58, docs/59, docs/60, docs/62 (Network-Plus quality/release gate)  
-**Status:** Proposed product transformation and implementation plan; no feature implementation or production migration is authorized by this planning document.
-
-## 1. Executive direction
-
-Transform Network-Plus from a professional discovery and collaboration destination into MPA's **Economic Opportunity & Business Growth Platform**. Professional networking remains a core capability, but the product's primary promise expands: help members and eligible organizations start businesses, obtain expertise and resources, find customers and suppliers, access suitable finance, form partnerships, expand to new locations, and demonstrate measurable economic results.
-
-The platform must support the full journey:
-
-**Need or opportunity → guided assessment → verified business/person/programme → discover and match → request / application → due diligence → terms and decision → execution → evidence → independently credible outcome.**
-
-It is not enough to publish listings, count views, collect expressions of interest or mark milestones complete. Each pathway must identify the real-world result sought, the party responsible, the evidence needed, the next action, and whether the result is self-reported, counterparty-confirmed or independently verified.
-
-Network-Plus is not a bank, securities exchange, payment escrow provider, credit bureau, legal adviser or guarantor. It facilitates discovery, applications, due diligence, structured introductions, documented decisions and evidence-based reporting. Any regulated financing, investment solicitation, lending, franchise, payment, escrow or securities activity must be gated by jurisdiction-specific legal and compliance approval and an approved provider/partner model.
-
-## 2. Repository inspection — current architecture and gaps
-
-Inspection was performed against the specified branch at the planning baseline above. This is a source/document inspection, not a claim that all current endpoints or browser journeys have passed runtime validation.
-
-### 2.1 Existing foundations to preserve
-
-| Existing foundation | Current source / route | Reuse decision |
-|---|---|---|
-| Network-Plus access and eligibility | `src/platform/network-plus-access.js`, access guard | Keep server-side eligibility checks; entry eligibility never grants resource mutation rights |
-| Verified member discovery | `/network`, talent service | Reuse canonical people, membership, profile visibility and verified professional claims |
-| Organization discovery | `/network-plus/organizations` | Reuse canonical verified organizations and explicit opt-in visibility |
-| Business ownership and verification | `src/network-plus/business-discovery.js`, Increment 5 migration | Reuse individual, organization and joint ownership; separate business verification from member/organization verification |
-| Business and commercial listings | Increment 5 business-discovery service and schema | Extend the existing business/listing domain; do not create a second business identity or convert old service records automatically |
-| Typed collaboration requests | `src/network-plus/request-collaboration.js` | Reuse participant consent, idempotency, explicit acceptance, audit, notifications and collaboration workspaces |
-| Service delivery | Existing services/mentorship service foundation | Reuse only validated delivery primitives; retain distinct commercial and community-impact policies |
-| Organization resource permissions | `organization_membership` and scoped capabilities | Enforce exact organization and business resource scope |
-| Private files and evidence | Existing private-file service | Reuse private evidence storage, access checks and reviewer audit |
-| Serve-Community | `/serve-community` | Keep volunteering, community initiatives, impact commitments and community grants distinct from commercial business discovery |
-
-### 2.2 Gaps established by the inspected source
-
-1. The current `/network-plus` landing page presents member discovery, organization discovery and requests/collaboration. It does not yet communicate or guide a complete business-growth journey.
-2. Increment 5 documents business ownership, verification, business profiles, commercial listings, discovery APIs and moderation queues. Its implementation record explicitly says browser business management and reviewer screens are not included and the full exit gate is not passed.
-3. Increment 6 implements a private request lifecycle and accepted collaboration workspace. Its implementation record documents six request intents in the current service: `service_request`, `supplier_inquiry`, `referral`, `expertise_request`, `partnership_proposal`, and `collaboration_request`.
-4. The approved Increment 4 domain design lists a seventh `business_opportunity` intent, but the inspected Increment 6 implementation's `INTENTS` set does not include it. Reconcile this contract mismatch before relying on business-opportunity intake.
-5. The existing request workflow does not constitute a financing application, investor pipeline, grant award, disbursement, franchise process, branch expansion workflow or capital performance ledger.
-6. The inspected Network-Plus UI does not yet demonstrate a complete product catalog, quote/request-for-quotation journey, structured buyer inquiries, business discussion rooms or meeting booking workflow.
-7. The current collaboration milestone/event model is useful for execution but does not by itself verify funding received, equipment acquired, new branches opened, sales generated, jobs created or regional distribution achieved.
-8. Existing Network-Plus documentation states Increment 5/6 disposable PostgreSQL, API, browser, accessibility and complete CI exit gates remain pending. Do not describe the current feature as production-ready until those gates are evidenced.
-
-### 2.3 Architectural conclusion
-
-Extend the existing Network-Plus bounded context in additive, independently testable increments. Reuse canonical identity, organization, business ownership, verification, private-file, notification, audit, consent, idempotency and collaboration infrastructure. Add dedicated domains for business growth plans, capital programmes/applications, investor/partner matching, expansion projects, product commerce inquiries and measurable outcomes.
-
-Do not put financing, franchise, supplier, product inquiry and partnership semantics into one generic free-text request or one overloaded status field. Do not repurpose Jobs applications, mentorship requests, community initiatives, legacy service requests or donation records.
-
-## 3. Users and needs — end-to-end coverage
-
-The experience begins with the member's goal, not with a long application form. A member may select more than one goal and can save progress.
-
-| User / business situation | Need and supported pathway | Target tangible outcome |
-|---|---|---|
-| Has an idea but no registered business | Idea validation, problem/customer discovery, co-founder search, feasibility support, business-plan guidance, registration checklist and mentor matching | Validated concept, evidence of demand, launch plan and first customer/pilot |
-| Has skills but lacks capital | Skills-to-enterprise assessment, equipment/working-capital/seed-fund needs assessment, suitable grant or finance programme discovery, business partner/co-founder matching | Eligible funding application, partner match, equipment or working capital secured |
-| Has an existing small business and wants to scale | Business performance baseline, growth-readiness assessment, finance and market access, operations/management mentoring | Revenue/customer growth, capacity increase, new product/service, improved margins |
-| Needs a business partner or co-founder | Find complementary skills, capital, operating experience or market access; structured partner proposals, references and consent-based due diligence | Accepted partnership with documented responsibilities, contributions, governance and milestones |
-| Wants to open a new branch | Location feasibility, demand evidence, branch budget, lease/equipment/staffing needs, local operating partner and finance programme matching | Branch approved, financed, opened and trading |
-| Needs equipment or productive assets | Define equipment specification, supplier options, purchase/lease/asset-finance need, quotation comparison and delivery evidence | Equipment installed, operational capacity added and utilization measured |
-| Wants a franchise | Discover approved franchise opportunities, territory availability, franchisor due diligence, fees/royalties/obligations, franchisee readiness and finance | Signed/approved franchise arrangement and operating location |
-| Wants to offer a franchise | Franchise-readiness assessment, operating manual, unit economics, brand/IP, support model, territory design, legal review and franchisee discovery | Qualified franchise leads and opened/operating franchise units |
-| Wants to distribute or represent a product | Distributor/agent search, territory and channel fit, product capacity, minimum order quantities, exclusivity and commercial terms | Distribution agreement, active outlets/territories and sales |
-| Wants to finance a business | Publish a finance need with amount/range, instrument preference, use of funds, business readiness and milestones; discover eligible investors/programmes | Qualified funding interest, due diligence, accepted terms and verified capital received |
-| Wants to invest in a business | Investor profile, sectors, geography, ticket range, instrument and risk preference; discover consented eligible opportunities | Qualified introductions, documented decision and monitored investment outcomes |
-| Organization wants to provide seed funds/grants | Create a grant/seed-fund programme, define eligibility, geography, sectors, amounts, deadlines, scoring rubric, conflict rules and reporting requirements | Transparent eligible pipeline, awards, disbursement evidence and beneficiary outcomes |
-| Wants customers or new markets | Verified business/product catalog, customer segments, regional demand, buyer inquiries, quotations, meetings and distribution channels | Qualified leads, orders/contracts, repeat customers and new markets served |
-| Wants to source goods/services | Supplier catalog, specification and quantity request, quote comparison, supplier verification and procurement discussions | Qualified supplier, accepted quote, delivered order and verified fulfilment |
-| Wants to collaborate with a larger organization | Procurement/supplier registration, subcontracting, local partner, institutional buyer and consortium opportunities | Contract, subcontract, partnership or supplier onboarding |
-| Wants business mentorship | Mentor matching for finance, operations, marketing, export, governance, technology, franchise and sector-specific expertise | Completed advisory milestones and documented operational improvements |
-
-## 4. Product structure and member experience
-
-### 4.1 Network-Plus becomes a compact business-growth workspace
-
-Keep the app-like, minimal desktop/mobile design language already established in the branch. The landing page should make the member's next useful action obvious, with a visual shelf of compact workspaces rather than a marketing website or an enormous form.
-
-Proposed primary areas:
-
-1. **My Business Journey** — personal dashboard of goals, readiness, applications, requests, matches, decisions, tasks and outcomes.
-2. **Start & Validate** — idea validation, co-founder discovery, business model, customer research and launch checklist.
-3. **Grow My Business** — business profile, performance baseline, growth plan, funding needs, branch/equipment projects and execution.
-4. **Finance & Funding** — grant/seed-fund programmes, finance requests, investor/financier discovery, applications and due diligence.
-5. **Partners & Opportunities** — co-founders, business partners, joint ventures, franchise, agents, distributors, regional operators and institutional opportunities.
-6. **Products & Market** — verified product/service catalog, customer segments, buyers, supplier discovery, RFQs, quotations and meetings.
-7. **Business Support** — mentors, advisers, professional services, training, legal/accounting referrals and business clinics.
-8. **My Business Workspace** — owner/team workspace for business details, evidence, team permissions, catalog, requests, negotiations, projects and results.
-
-An organization sees the same capabilities only for the businesses and opportunities it is authorized to manage. An investor, funder or programme operator receives a separate role-scoped workspace; access is never inferred from a member role or from merely owning an organization.
-
-### 4.2 Goal-first onboarding
-
-Ask one short question first: **“What business result are you working towards?”** Offer goal cards such as start a business, find funding, scale, find a partner, open a branch, buy equipment, find customers, distribute a product, franchise, or invest/support businesses.
-
-Then reveal only the next relevant questions. Save drafts, explain why evidence is needed, show estimated completion time and allow the user to return later. A person with a skill but no business should not be forced to complete a business financial statement before the system can recommend a co-founder, mentor or start-up support pathway.
-
-### 4.3 One progress timeline
-
-Integrate Network-Plus actions into the existing member progress/track experience where appropriate. Show every business journey as a timeline: submitted → qualification → review → meeting → terms → decision → execution → evidence → outcome. Keep separate records and authorization boundaries underneath. The timeline is a unified view, not a unified database table.
-
-Every card should show: current state, who must act next, due date, outstanding evidence, last update and a direct action. No silent “pending” states.
-
-## 5. Business profile, readiness and performance
-
-### 5.1 Business profile and catalog identity
-
-Build on `network_plus_business`, explicit ownership and `network_plus_service_listing`. Extend listing types and structured attributes for physical products, wholesale/retail supply, professional services, subscriptions, distribution, franchise offers and business opportunities. A business may publish multiple catalog items.
-
-A product/service record should support:
-- approved business identity and verification scope;
-- product/service name, category, description, specifications and media;
-- variants, units, minimum order quantity, production/supply capacity and lead time;
-- price, currency, price validity, volume tiers, tax/shipping assumptions and quote-required state;
-- inventory/availability status where the owner can substantiate it;
-- target customer segments, B2B/B2C/institutional audience and use cases;
-- service/delivery areas, export/remote availability and distribution territory;
-- certifications, standards, origin and claims with evidence scope;
-- request-quote, ask-question, request-sample (where feasible), request-meeting and supplier inquiry actions;
-- visibility, moderation, expiry, audit and owner-controlled contact release.
-
-Do not represent unverified inventory, capacity, certification or sales as facts. Display “owner supplied” versus “reviewed/verified” data provenance.
-
-### 5.2 Business performance baseline
-
-Provide an optional, privacy-protected performance snapshot. Collect only data needed for a selected goal and allow ranges where exact values are commercially sensitive.
-
-Potential measures:
-- business age, sector, operating locations and business model;
-- monthly/annual revenue range and trend, gross margin range and cash-flow position;
-- customer count, repeat-customer share, active contracts/orders and pipeline;
-- production/service capacity, utilization, delivery lead time and stock-outs;
-- employees and full-time-equivalent jobs, with privacy-preserving aggregation;
-- current channels, target customer segments and geographic coverage;
-- assets/equipment, financing already secured and current obligations (only where necessary for the selected financing process);
-- business continuity, governance, ownership and key-person dependencies.
-
-Separate self-declared information from evidence-backed and independently reviewed metrics. Never expose confidential financial data in public discovery. Use explicit consent and field-level disclosure for each funder or partner.
-
-### 5.3 Expansion-readiness assessment
-
-Create a guided, explainable readiness assessment, not an opaque credit score. Evaluate:
-- validated demand and customer evidence;
-- business model and unit economics;
-- financial records and cash-flow forecast;
-- management/team capability;
-- operating capacity and quality controls;
-- legal/registration/licensing status relevant to the activity;
-- market access and distribution;
-- project cost, use of funds, contribution and contingency;
-- risk register and mitigation;
-- reporting and evidence readiness.
-
-Return a readiness profile with strengths, missing evidence, recommended support and next actions. It must not promise financing or imply creditworthiness. Any scoring rubric must be versioned, transparent, bias-tested and approved; keep the raw inputs private.
-
-### 5.4 Business plan and financial projection builder
-
-Offer templates and assisted workflows for:
-- problem, solution, value proposition and business model;
-- customer segments, market size assumptions and competitor analysis;
-- marketing, sales and distribution strategy;
-- operations, procurement, staffing and capacity;
-- launch/expansion budget and sources/uses of funds;
-- sales forecast, cost of goods/services, operating expenses, cash flow, break-even and scenario analysis;
-- risks, assumptions, milestones and implementation schedule.
-
-Every projection must label assumptions, period, currency, scenario and author. Store version history and export a reviewable PDF/XLSX. Generated forecasts are planning aids, not audited accounts, guarantees or investment advice. Allow an accountant/adviser to comment with explicit business-owner consent.
-
-## 6. Capital, funding and investment ecosystem
-
-### 6.1 Separate capital pathways
-
-Do not collapse all capital into a generic “investment” request. Support distinct pathways with separate eligibility, terms, decisions and outcome evidence:
-
-1. **Grant / seed grant** — non-repayable programme funding with eligibility, selection criteria, award conditions, milestones and reporting.
-2. **Interest-free or other debt finance** — principal, fees, repayment schedule, grace period, security/collateral where lawful, default and settlement terms. Instrument options and ethical constraints must be configurable; do not imply any instrument is automatically compliant with a user's beliefs or local law.
-3. **Equity / ownership investment** — proposed valuation, amount sought, equity/instrument, governance, dilution, shareholder approvals and required professional/legal review.
-4. **Revenue/profit-sharing or other structured finance** — clear formula, term, reporting basis, caps/limits and professional review; enabled only after legal approval.
-5. **Asset/equipment finance or leasing** — asset specification, supplier quote, deposit, term, ownership/maintenance and end-of-term obligations.
-6. **Working capital / purchase-order finance** — cash-flow need, order/contract evidence, supplier/customer and repayment/settlement source.
-7. **Founder/co-founder contribution** — skills, time, operating responsibility and agreed contribution; do not treat this as an investment security by default.
-8. **Franchise or branch finance** — project-level capital request tied to site, territory, fit-out, equipment, staffing and launch working capital.
-
-### 6.2 Business finance request
-
-A guided finance request should capture:
-- verified business and accountable owner;
-- goal: launch, equipment, inventory, working capital, branch, distribution, franchise or scale;
-- requested amount or range and currency;
-- instrument(s) considered and acceptable alternatives;
-- use-of-funds line items and supplier estimates;
-- owner contribution and other confirmed funding;
-- business performance baseline and projection version;
-- target market, customer evidence and operating capacity;
-- timeline, milestones, expected economic outcomes and risks;
-- documents/evidence and who may view each item;
-- preferred geography and funder/programme eligibility.
-
-The member chooses whether the opportunity is visible to a defined programme, selected funders or eligible Network-Plus partners. No public display of confidential financials or private documents.
-
-### 6.3 Grant and seed-fund programme operator
-
-An eligible organization/funder can create a programme with:
-- sponsor identity and authority verification;
-- programme objective, geography, sectors and beneficiary criteria;
-- grant/seed budget, per-award min/max, available budget and funding source attestation;
-- eligible and excluded business stages/types;
-- required application questions and evidence;
-- deadline, review stages, published scoring rubric and conflict-of-interest declarations;
-- selection panel, independent reviewer assignment and decision reasons;
-- award agreement/conditions, milestone schedule and disbursement evidence;
-- monitoring, reporting, corrective action, closeout and unused-fund reconciliation.
-
-Programme publication and award authority must be separate permissions. Reviewers must disclose conflicts and recuse themselves. The platform must not label a programme “funded” or “guaranteed” without verified sponsor and budget evidence.
-
-### 6.4 Investor and financier discovery
-
-Create structured investor/funder profiles with:
-- organization identity and authority verification;
-- investor/programme type and sectors;
-- geography, ticket range, stage and instrument preferences;
-- eligibility, exclusions, deadlines and typical diligence requirements;
-- publicly shareable investment thesis or programme criteria;
-- clear statement of whether the provider is a direct funder, intermediary, adviser or introducer.
-
-Matching should explain why an opportunity is relevant (sector, stage, geography, amount, instrument, readiness gaps). It must not rank by hidden credit score or promise funding. The platform should record introduction consent, NDA/confidentiality state where applicable, data-room access grants and expiry, meetings, diligence questions, decision, terms and close status.
-
-### 6.5 Due diligence, decisions and capital ledger
-
-A finance/investment case should progress through:
-`draft → submitted → eligibility_check → due_diligence → clarification → committee_decision → approved / declined / withdrawn`.
-
-Approved grants/financing then use a distinct execution lifecycle:
-`terms_issued → terms_accepted → conditions_pending → ready_to_disburse → partially_disbursed → fully_disbursed → monitoring → completed / cancelled / default_or_recovery`.
-
-Record approved amount, actual tranche amounts, dates, destination/use-of-funds categories, conditions, proof of transfer or provider confirmation, beneficiary acknowledgement and reconciliation. Do not store full card/bank credentials. Do not mark funds as received solely because an administrator clicked “paid”; require a source-of-truth settlement/provider reference and beneficiary confirmation or independent verification as defined by the programme. Repayment schedules and arrears are enabled only for approved debt products and must not be simulated as real payments.
-
-### 6.6 Investment and financial safety boundaries
-
-- No open, unmoderated public solicitation of securities or pooled investment.
-- No public “invest now” execution or matching that bypasses required eligibility, investor classification, legal disclosures or suitability rules.
-- No custody of investor funds, escrow, payment routing or guarantee by MPA unless a separately approved licensed-provider architecture and legal review authorizes it.
-- No public display of personal financial records, bank statements, tax files, identity documents, investor contact data or private business plans.
-- Risk statements, fees, conflicts, commissions, referral compensation and intermediary status must be disclosed.
-- Any paid intermediary/referral arrangement needs explicit terms, approval, audit and jurisdiction-specific legal review.
-- Provide reporting/complaint channels, fraud flags, suspicious-offer escalation, suspension and appeal.
-- Clearly distinguish “introduced”, “interested”, “approved”, “terms accepted”, “disbursed” and “capital independently confirmed”.
-
-## 7. Partnerships, franchises, branches and regional expansion
-
-### 7.1 Partner matching
-
-Support explicit partner needs:
-- co-founder with complementary skills;
-- operating/management partner;
-- local/regional branch operator;
-- capital partner;
-- technology/production partner;
-- sales/marketing partner;
-- supplier/manufacturer;
-- distributor/agent/reseller;
-- institutional or corporate partner;
-- joint venture / consortium.
-
-Capture desired contribution, decision rights, time commitment, territory, capital/asset contribution, risk allocation, governance and exit/termination expectations. Use private introductions and explicit acceptance. Preserve the existing Increment 6 collaboration workspace for agreed milestones and outcomes, but add typed partner-specific terms and due diligence.
-
-### 7.2 Branch expansion project
-
-A branch project should capture:
-- target city/region and candidate site(s);
-- demand/customer evidence and competitor/market assessment;
-- lease/land/permit/utility assumptions and required approvals;
-- fit-out, equipment, inventory, staffing and launch budget;
-- operating partner/branch manager and authority;
-- capital source, conditions and cash-flow forecast;
-- planned opening date, dependencies and risk register;
-- actual opening evidence and first-trading confirmation.
-
-Outcomes: site secured, approvals obtained, equipment installed, staff recruited, branch opened, first sale, 3/6/12-month operating status and contribution to business performance.
-
-### 7.3 Franchise lifecycle
-
-For franchisors:
-- evidence of an operating and replicable model;
-- brand/IP rights and franchise authority;
-- operating manual, training and support capacity;
-- unit economics and disclosure materials;
-- territories available, fees, royalties and ongoing obligations;
-- franchisee qualification and review.
-
-For franchisees:
-- target geography, budget, experience, operating role and readiness;
-- independent due diligence checklist;
-- fee, royalty, minimum capital, fit-out and working-capital requirements;
-- territory exclusivity and performance obligations;
-- legal review and contract evidence.
-
-Lifecycle: opportunity published → enquiry → qualification → disclosure/diligence → site/territory approval → terms negotiation → authorized agreement → setup → opening → ongoing performance. A listing is not a franchise grant and MPA does not certify commercial viability.
-
-### 7.4 Distribution and regional market access
-
-Support manufacturers, wholesalers and service providers to find:
-- importers/exporters where legally permitted;
-- regional distributors and wholesalers;
-- retailers, agents, resellers and institutional buyers;
-- logistics, warehousing and last-mile partners;
-- local representatives and branch operators.
-
-Capture territory, channel, product category, capacity, exclusivity, minimum sales, price/discount structure, service levels, stock/returns obligations, compliance and reporting. Outcomes include territories covered, active distributors, outlets onboarded, orders fulfilled, sales and repeat orders.
-
-## 8. Customer discovery, product catalog and business-to-business marketplace
-
-### 8.1 Verified catalog and discovery
-
-Search/filter by category, product, use case, customer segment, price/quote status, capacity, minimum order, delivery lead time, region/territory, verification scope and supplier type. Provide comparison and saved lists. Use clear trust labels: business verified, listing reviewed, product evidence reviewed, owner supplied, and last revalidated.
-
-### 8.2 Buyer interactions
-
-Each catalog item should support:
-- ask a product question;
-- request a quotation (RFQ);
-- request a sample/demo where offered;
-- request a business meeting;
-- discuss supply capacity and delivery;
-- save/follow a business or product;
-- submit a structured purchase/supplier inquiry.
-
-RFQ fields: item/specification, quantity/unit, quality/standard, delivery location/date, packaging, budget/range if optional, payment/credit expectations, required documents and response deadline. Suppliers can ask clarification, submit a versioned quotation, revise/withdraw quote, and record acceptance/decline. Quote acceptance is not proof of payment or delivery; use a separately authorized purchase/order and fulfilment workflow if/when implemented.
-
-### 8.3 Discussion and meeting rooms
-
-Provide a private, request-scoped discussion thread for the buyer and seller/authorized representatives. Support message history, attachments through private-file controls, clarification, quote versions, meeting proposals, timezone-aware meeting confirmation and calendar invitation integrations where available. Additional participants require invitation and consent. No public comments on private negotiation records. Provide report/block/abuse controls and retention rules.
-
-### 8.4 Lead and sales pipeline
-
-Business owners need a compact CRM-like pipeline:
-`new inquiry → qualified → meeting → quotation sent → negotiation → won / lost / not proceeding`.
-
-Track lead source, product, customer segment, territory, next action, owner, expected value/range, conversion date and loss reason. Provide aggregates to the business owner only. Never equate impressions, views or saves with sales.
-
-## 9. Business support, skills and knowledge exchange
-
-Connect the existing mentorship and professional-services capabilities to specific business goals:
-- business model validation and customer research;
-- bookkeeping, accounting and cash-flow discipline;
-- business plan and financial projection review;
-- marketing, sales, branding and digital commerce;
-- operations, procurement, quality and productivity;
-- technology adoption and cybersecurity;
-- legal, tax, licensing and governance referrals;
-- export readiness, standards and logistics;
-- franchise development and branch operations;
-- investor readiness and grant application support.
-
-The user requests an adviser/mentor for a defined outcome and receives a scoped plan, sessions, actions and completion feedback. Mentorship remains its own relationship and consent model; it is not reclassified as an investment or commercial contract. Pro-bono and community-benefit support must remain clearly distinguished from paid commercial services and approved Serve-Community programmes.
-
-## 10. Shared lifecycle, permissions and data architecture
-
-### 10.1 Proposed bounded domains and additive entities
-
-Names are conceptual; exact schema names and relationships must be settled by the migration design after reviewing all current migrations and constraints.
-
-| Domain | Proposed records / responsibility |
-|---|---|
-| Business growth | Business goal, growth plan, readiness assessment/version, performance snapshot/version, business plan/version, projection/scenario |
-| Market research | Customer segment, demand evidence, target market, territory/market assessment |
-| Capital programmes | Funder profile, funding programme, eligibility rule, application, application version, reviewer assignment, due-diligence checklist, decision, conflict declaration |
-| Capital execution | Award/finance agreement reference, conditions, disbursement tranche, proof/confirmation, use-of-funds report, repayment schedule/payment reference where applicable |
-| Investor matching | Investor mandate/profile, match explanation, introduction consent, data-room grant, meeting, diligence question and decision |
-| Partnering | Partner opportunity, partner profile/need, qualification, proposal, consented participant, terms version, agreement reference |
-| Expansion | Expansion project, branch/site, equipment requirement, asset quote, franchise opportunity/case, distribution territory/appointment |
-| Commerce | Product/catalog item, variant, stock/capacity snapshot, RFQ, quotation/version, inquiry thread, meeting, order/fulfilment reference if approved |
-| Outcomes | Outcome target, baseline, metric observation, evidence reference, verification event, attribution and follow-up review |
-| Governance | Audit event, consent, moderation/review decision, dispute, complaint, retention classification and policy version |
-
-Use canonical `app_user`, `person`, `organization`, `membership_record`, `organization_membership`, `network_plus_business`, `network_plus_business_ownership`, `network_plus_business_access`, private-file references and existing audit/notification infrastructure. Do not create a second person, member, organization or business table.
-
-### 10.2 Role and authority matrix
-
-Roles are capability-based and resource-scoped. A user may hold multiple roles, but receives only the explicit union of authorized capabilities.
-
-- Business owner/co-owner: manage their business, invite owners subject to consent rules, manage catalog, requests, business plans and own performance data.
-- Business delegate/manager: only explicitly assigned capabilities on a specific business, with expiry and revocation.
-- Organization owner/administrator: act for the exact verified organization and its authorized businesses.
-- Funder/programme owner: create/manage their own funding programme, criteria, budget attestation and awards within delegated authority.
-- Programme reviewer: review assigned applications, declare conflicts and submit recommendations; cannot self-approve awards or disburse.
-- Investment/finance provider: manage its verified profile, mandates and assigned cases; no access to unrelated cases.
-- Independent reviewer/moderator: decide verification, moderation, complaints or disputes; cannot review their own business or cases where conflicted.
-- MPA programme administrator: operational programme governance, not automatic power to approve a funder's disbursement.
-- Auditor/monitor: read-only, time-bound, case-scoped access with reason and audit.
-- Buyer/supplier/partner: access only their own inquiry, quote, meeting and accepted engagement records.
-
-Sensitive actions (ownership transfer, finance decision, award, disbursement, change to terms, conflict override, dispute decision) require separation of duties and append-only audit.
-
-### 10.3 Privacy, evidence and consent
-
-Consent purposes are separate: directory discovery, business financial disclosure, investor introduction, data-room access, referral, buyer contact release, meeting participation, outcome publication and third-party verification. Store purpose, data categories, audience, version, actor, time and revocation. Public profiles never expose private evidence or financial data. Use private files, short-lived scoped access, least privilege, access logs and retention schedules. Never place sensitive data in push/email notification payloads.
-
-### 10.4 Reliability and audit
-
-All mutations use existing high-entropy idempotency and request-fingerprint patterns. State changes occur transactionally with audit events and deduplicated notifications. Store terms and application versions as immutable snapshots at submission/acceptance. Corrections create new versions; they do not rewrite the history of what a funder, buyer or partner reviewed.
-
-## 11. Measurable outcomes and evidence model
-
-### 11.1 Outcome hierarchy
-
-**Activity** (profile, view, inquiry, application) → **qualified opportunity** (eligibility/need validated) → **commitment** (accepted quote, partner agreement, approved award) → **resource received** (capital/equipment/contract/market access confirmed) → **execution** (asset installed, branch opened, distributor active) → **economic result** (revenue, margin, productivity, jobs, customer and market growth).
-
-Only later stages count as tangible economic outcomes. Report each stage separately.
-
-### 11.2 Core KPI catalogue
-
-| Outcome area | Measures | Evidence level |
-|---|---|---|
-| Start-up creation | Ideas validated, businesses formally launched, first customer/order, time from intake to first transaction | Self-reported → counterparty confirmed → independently verified |
-| Finance access | Qualified applications, approval rate, approved value, amount actually disbursed, time to decision, use-of-funds completion | Programme decision + provider/beneficiary confirmation + source reference |
-| Business growth | Revenue trend/range, gross margin trend, repeat customers, order value, capacity utilization | Baseline and follow-up snapshots with provenance |
-| Employment | Jobs created/retained, FTE change, paid roles sustained at 3/6/12 months | Employer and worker/independent evidence under privacy controls |
-| Equipment/assets | Assets financed/acquired, installed, operational, utilization and downtime | Invoice/asset record, delivery/installation evidence and owner confirmation |
-| Branch expansion | Sites assessed, approved, opened, first trading date, branch survival at 6/12 months | Site/permit/lease evidence as appropriate, opening evidence and follow-up |
-| Franchise | Qualified leads, franchise agreements, units opened and operating at 6/12 months | Authorized agreement and unit operating confirmation |
-| Distribution/market | Territories reached, distributors appointed/active, outlets served, orders and repeat orders | Agreement, distributor confirmation and order/fulfilment evidence |
-| Product commerce | Qualified inquiries, RFQs, quotes, quote acceptance, orders, fulfilled orders and repeat buyers | Buyer/seller confirmation and permitted transaction references |
-| Partnerships | Partner matches, accepted proposals, active joint projects, deliverables and outcomes | Both-party confirmation and milestone/evidence records |
-| Business capability | Readiness improvement, plans completed, advisory actions adopted, reporting quality | Versioned assessment and documented action/evidence |
-| MPA programme performance | Cost per qualified application, award conversion, decision time, programme utilization, verified outcome rate | Audited programme operations and cohort reporting |
-
-### 11.3 Evidence and attribution rules
-
-Every metric stores:
-- metric code, definition and unit;
-- baseline, target, observed value and period;
-- currency and conversion basis where relevant;
-- source type and evidence reference;
-- reporter and verification actor;
-- evidence level: self-reported, counterparty-confirmed, provider-confirmed or independently verified;
-- timestamp, review status, correction/version history and attribution confidence.
-
-Do not add all programme funding to “member revenue”. Do not count a loan as revenue, an application as funding, an accepted quotation as a completed sale, a promised job as a created job, or an opened listing as a branch. Attribute outcomes to the relevant business/project and report contribution rather than claiming MPA caused every outcome. Aggregate reporting must protect small cohorts and suppress confidential details.
-
-### 11.4 Follow-up and impact measurement
-
-Capture a baseline before intervention where feasible; follow up at project completion and 3/6/12 months for relevant programmes. Track business survival, actual capital received, asset use, branch operation, sales/orders, jobs and repayment status only where the programme instrument requires it. Allow a business to decline public outcome publication while still providing required confidential programme reporting.
-
-## 12. Administration and governance workspaces
-
-Create a consolidated Network-Plus operations area with separate queues and permissions:
-- business identity verification and revalidation;
-- business/listing moderation;
-- programme/funder verification;
-- funding programme approval and publication;
-- application eligibility and reviewer assignment;
-- conflict-of-interest and committee decisions;
-- award conditions and disbursement reconciliation;
-- partner/franchise opportunity review;
-- product catalog/RFQ abuse and listing quality;
-- complaints, fraud reports, disputes, appeals and suspensions;
-- outcome evidence verification and programme monitoring;
-- retention, access audit and aggregate performance reporting.
-
-Use two-person approval for high-risk programme publication, award, disbursement reconciliation override, policy changes and public impact claims. Reviewers must be independent from applicants, business owners and funder beneficiaries. All override actions require a reason and audit trail.
-
-## 13. Phased delivery plan
-
-Each phase is additive, feature-flagged, independently testable and gated. Sequence phases to deliver useful value without building a large untestable monolith.
-
-### Phase 0 — Contract reconciliation and architecture audit
-- Reconcile docs/58 seven-intent contract with docs/60 and the actual six-intent service implementation.
-- Inspect all current Network-Plus migrations, API dispatchers, schemas, private file, notifications, permission catalogue, UI routes and test coverage at the live branch head before coding.
-- Inventory existing Increment 5/6 unvalidated work and finish their disposable PostgreSQL, API, browser, keyboard and accessibility gates.
-- Decide supported jurisdictions, regulated financial activities, programme authority, data retention and legal-review gates.
-- Produce data dictionary, state diagrams, role matrix and compatibility plan.
-
-**Exit:** no duplicate canonical entities; all existing routes and records have an owner/policy; open gaps and release blockers are explicit.
-
-### Phase 1 — Complete Business Workspace and Catalog
-- Deliver business owner onboarding, business dashboard, ownership/co-owner management and delegated team access.
-- Deliver business verification submission, reviewer UI, moderation UI, revalidation, suspension and appeal.
-- Deliver catalog creation/editing for products/services, media, availability, pricing, capacity and target markets.
-- Deliver business discovery/search/detail and owner publication controls.
-- Add product inquiry and RFQ foundation only after catalog permissions and request privacy are validated.
-
-**Exit:** an eligible member can create and verify a business, publish an approved catalog item, receive a scoped inquiry and manage it end-to-end on desktop and mobile.
-
-### Phase 2 — Business Growth Plans and Readiness
-- Deliver goal-first onboarding and business journey dashboard.
-- Add performance baseline, readiness assessment, business plan and projection versioning/export.
-- Add goal-specific action plan and adviser/mentor referrals.
-- Add evidence-backed targets and follow-up schedule.
-
-**Exit:** a business can create a growth plan with baseline, target, owner, tasks, budget, evidence and measurable follow-up.
-
-### Phase 3 — Market Access, Buyers and Suppliers
-- Complete catalog search, saved items, buyer segments and territory targeting.
-- Add structured RFQs, quote versions, buyer/seller discussion, meeting requests and lead pipeline.
-- Add supplier qualification and order/fulfilment reference workflow only with clear terms and payment boundaries.
-- Add product/distribution analytics based on qualified leads and confirmed transactions, not views.
-
-**Exit:** a buyer can discover, inquire, request and compare quotations; a seller can respond, meet, track lead progression and confirm outcomes with both-party evidence.
-
-### Phase 4 — Partner, Franchise, Branch and Distribution Growth
-- Add partner/co-founder/operating partner opportunities and structured matching.
-- Add branch expansion project, location readiness, budget, equipment and launch milestones.
-- Add franchisor/franchisee profiles, territory and due diligence workflow.
-- Add distributor/agent/representative search and appointment lifecycle.
-- Extend collaboration workspace for project-specific milestones and evidence.
-
-**Exit:** a business can complete a partner or expansion journey from discovery through authorized agreement to operational evidence.
-
-### Phase 5 — Grants, Seed Funding and Finance Applications
-- Add verified funder profiles and grant/seed-fund programme builder.
-- Add application forms, eligibility, evidence checklist, reviewer assignments, conflict declarations, scoring rubric and decision history.
-- Add award conditions, tranche schedule, disbursement reconciliation and beneficiary reporting.
-- Add application progress and transparent status communication.
-
-**Exit:** a funder can publish an approved programme, receive eligible applications, conduct independent review, make an auditable award and verify disbursement/outcomes without MPA taking custody of funds.
-
-### Phase 6 — Investor and Financier Matching
-- Add investor/finance-provider mandates and qualification.
-- Add finance requests, explained matching, consented introductions, scoped data rooms and meetings.
-- Add diligence questions, term versions, professional/legal review flags, decision and close status.
-- Enable instrument-specific workflows only after jurisdictional legal approval.
-
-**Exit:** a business and a qualified provider can complete a consented, auditable introduction and record an independently supported decision/transaction status without unapproved securities solicitation or custody.
-
-### Phase 7 — Economic Outcomes, Reporting and Continuous Improvement
-- Add baseline/target/actual metric ledger and evidence review.
-- Add 3/6/12-month follow-ups, programme dashboards and cohort reporting.
-- Add branch, equipment, finance, employment, market and franchise outcomes.
-- Add independent verification sampling, correction/appeal and attribution confidence.
-- Publish only approved, privacy-safe aggregate impact reports.
-
-**Exit:** MPA can report how many businesses progressed, what resources were actually received, what expansions became operational and what economic outcomes were evidenced.
-
-## 14. Cross-cutting acceptance and quality gates
-
-### Product and usability
-- Goal-first and progressive disclosure; no giant generic forms.
-- Compact app-like desktop workspace and mobile-native responsive layouts.
-- Keyboard-first navigation, semantic labels, visible focus, screen-reader announcements and WCAG AA contrast.
-- Clear next action, responsible party, due date and status on every active case.
-- Empty/loading/error/retry states; draft autosave and safe resume.
-- Localized currency, timezone, geography and future multilingual-ready labels.
-
-### Security and trust
-- Server-side authorization on every read and mutation; never rely on hidden links or client role claims.
-- Exact business/organization resource scope and current membership/assignment checks.
-- No self-approval, self-moderation or conflicted reviewer decisions.
-- Explicit consent for financial disclosure, introductions, meetings, evidence and outcome publication.
-- Private evidence storage, access expiry, audit and retention policy.
-- Rate limits, idempotency, replay conflict detection and transactional state changes.
-- Fraud/complaint/suspension/appeal pathways.
-- Legal and regulatory release gates for financing, investment, franchise, payments and consumer-facing commerce.
-
-### Technical validation
-- Migration compatibility against a disposable PostgreSQL database, including full ordered migration chain and rollback.
-- Backend unit and integration tests for every role, state transition, idempotency conflict, privacy boundary and negative authorization case.
-- API contract and schema tests.
-- Playwright end-to-end tests for full user journeys, desktop/mobile, browser refresh, interrupted drafts and accessibility.
-- Biome, TypeScript, production build and complete CI.
-- Staging walkthrough with distinct member, organization, business owner, funder, reviewer, buyer and supplier accounts.
-- No production migration, main-branch write, merge or deployment until separately authorized and all release gates pass.
-
-## 15. Key end-to-end acceptance scenarios
-
-1. Skilled member without capital: creates a skills-based business idea, finds a complementary co-founder, receives validation support, builds a plan, identifies an eligible seed programme and tracks the application.
-2. Existing business seeking equipment: submits a performance baseline and equipment specification, receives supplier quotations, identifies eligible asset finance, records approval/disbursement and confirms installation/utilization.
-3. Business opening a new branch: completes location/demand assessment, prepares project budget, matches a local operating partner, secures approved funding, tracks fit-out/staffing/opening and confirms first trading.
-4. Business seeking franchise: discovers a franchisor, checks territory, reviews disclosure/due diligence, records authorized terms, completes setup and reports operating results.
-5. Business seeking distributor: publishes verified products, selects target regions/customer segments, receives distributor inquiries, negotiates territory/terms and records active outlets/orders.
-6. Funder running a seed programme: verifies sponsor, publishes eligibility and rubric, assigns independent reviewers, records conflicts, selects applicants, documents award conditions, reconciles tranches and monitors outcomes.
-7. Investor exploring businesses: sets mandate and eligibility, sees only consented qualified opportunities, requests a meeting/data-room access, records diligence and decision; no unapproved public solicitation or payment custody.
-8. Buyer requesting a quote: discovers a product, submits quantity/specification/delivery RFQ, receives versioned quote, requests meeting, accepts or declines and both parties confirm fulfilment outcome.
-9. Jointly owned business: co-owners explicitly accept ownership, delegate listing/request tasks, revoke a delegate and retain historical actions without cross-business access.
-10. Reviewer conflict: an owner or conflicted reviewer cannot approve their own business/application; the system requires recusal and independent reassignment.
-11. Confidentiality: a funder sees only consented application evidence; a buyer cannot access another buyer's quote; public catalog never reveals private financials or identity documents.
-12. Outcome verification: a business reports a branch opened and jobs created; MPA records source/evidence, counterparty confirmation and independent verification separately, and only approved metrics enter aggregate reporting.
-
-## 16. Non-goals and explicit exclusions
-
-- Replacing the canonical membership, talent, organization, mentorship, Jobs or Serve-Community systems.
-- Automatically converting old service listings, volunteer commitments, donations or community grants into commercial business records.
-- Treating views, clicks, likes, saved listings or unqualified inquiries as economic success.
-- Promising funding, returns, creditworthiness, franchise success or business viability.
-- Holding, routing, guaranteeing or investing funds on behalf of users without a separately approved licensed-provider and legal architecture.
-- Publishing confidential business plans, financial statements, personal contacts or due-diligence evidence.
-- Using an opaque AI score as the sole basis for eligibility, funding or partner selection.
-
-## 17. Implementation governance and change control
-
-This document is a transformation plan only. It does not authorize feature coding, production migration, PR merge, deployment, policy activation, public financing solicitation or fund custody. Before implementation begins, the product owner should approve the scope and the legal/compliance boundary. Each phase should then have its own implementation record, additive migration review, acceptance scenarios and evidence-based exit report.
-
-**Recommended product north star:** businesses that become more capable, better connected to markets and resources, and demonstrably stronger — not merely more visible on a professional network.
+**Branch:** `feat/workstream-3-progress-members-workspace`  
+**PR:** #18  
+**Status:** Revised product requirements and architecture plan. Planning only; no feature implementation, migration, merge or deployment is authorized.
+
+## 1. Product mandate
+
+Network-Plus is an **economic connection platform**, not a business management system, transaction platform, online shop, CRM, investment execution platform or project-management tool.
+
+Its purpose is to help members, businesses, professionals, organizations, funders, buyers, suppliers, investors and potential partners discover one another and make meaningful contact around a clearly expressed need or offer. Negotiation, due diligence, contracting, payment, delivery, mentoring sessions, investment execution, franchise operations and other real-world work normally take place directly between the parties, outside Network-Plus.
+
+The system helps users:
+1. Explain a business need, opportunity, offer or support request in a structured, understandable way.
+2. Discover relevant people, businesses, organizations, products, services, programmes and opportunities.
+3. Express interest and initiate a purposeful connection.
+4. Obtain consent before personal/business contact details are disclosed.
+5. Let the parties decide whether to exchange contact details, request a quotation or arrange a meeting.
+6. Record only the connection disposition and the requester's concise outcome/remark.
+7. Keep a simple record of each request so its initiator can mark it **In progress**, **Completed** or **Cancelled**, with a short remark.
+
+**The system records the connection outcome, not the deal.** It must not require users to enter negotiations, contract terms, payment schedules, delivery milestones, investment tranches, operational KPIs or every step of a business relationship.
+
+North star: **more meaningful, consent-based connections that help members access skills, resources, finance, partners and markets.**
+
+## 2. Firm product boundaries
+
+### Network-Plus does
+- Publish and discover structured business needs, support requests, opportunities, business profiles, product/service catalogs and provider/programme profiles.
+- Match through category, geography, capability, sector, stage, amount/range, customer segment and other appropriate filters.
+- Provide a lightweight interest/request-to-connect workflow.
+- Support mutual consent for contact-detail exchange.
+- Support a request for a meeting, with a proposed/confirmed time and place or direct-contact handoff.
+- Let parties ask for a quotation or provide a quotation response as a connection artefact where useful; commercial negotiation itself happens outside the platform.
+- Keep an initiator's requests in a personal **My Requests** list (the user's demand cart / connection inbox).
+- Require a simple closure disposition and short remark for each initiated request.
+- Notify parties of new interest, consent decisions and status changes.
+- Provide aggregate counts of connection activity and self-reported connection outcomes, clearly labelled as self-reported.
+
+### Network-Plus does not
+- Sell products/services, host checkout, process orders, collect payments or act as escrow.
+- Operate a full marketplace, auction, procurement system or merchant inventory system.
+- Run negotiations, contract execution, invoicing, fulfilment, delivery or returns.
+- Administer loans, investments, grant disbursements, repayments, securities or fund custody.
+- Manage franchise operations, branch implementation, construction, staffing or equipment installation.
+- Replace email, phone, messaging, meetings, professional advisers or parties' own business systems.
+- Track detailed deal stages, every milestone, financial performance, sales, business operations or the lifecycle of an external agreement.
+- Claim an economic impact is independently verified merely because a user marks a request completed.
+
+Any regulated activity or payment functionality requires a separate product decision, legal review and architecture approval; it is outside this scope.
+
+## 3. Repository architecture — preserve and simplify
+
+Inspection of the specified branch identified foundations to reuse:
+- `src/platform/network-plus-access.js` and the Network-Plus access guard.
+- Existing member/talent and organization discovery.
+- `src/network-plus/business-discovery.js` and Increment 5 business identity, ownership, verification, business profile and listing model.
+- `src/network-plus/request-collaboration.js` and Increment 6 typed requests, consent, acceptance, notifications, audit and collaboration records.
+- Existing organization membership and scoped business capabilities.
+- Existing private-file, moderation, notification and audit infrastructure.
+- Existing mentorship, professional services and Serve-Community domains, retaining their distinct purposes.
+
+### Architecture corrections
+1. Reuse the business identity and listing domain. Do not create another business registry.
+2. Reuse the typed request foundation, but simplify the user-facing model to a **connection request** and a small, consistent set of disposition states.
+3. Reconcile the mismatch between the seven intents described in the Increment 4 design and the six intents implemented in the Increment 6 service. Add missing intents only where needed for the taxonomy below.
+4. Do not make the collaboration workspace mandatory for every connection. It may remain optional for users who explicitly want a shared work area.
+5. Do not introduce business performance ledgers, financial projection engines, investor pipelines, deal rooms, order fulfilment, disbursement ledgers or milestone tracking as part of this product.
+6. Complete existing Increment 5/6 validation and security gates before extending the feature. Source files/migrations do not prove that all journeys are implemented or production-ready.
+
+## 4. Need and opportunity taxonomy
+
+A person or organization can publish a **Need**, an **Offer**, or both. Start with a category and ask only relevant fields. Use structured fields to improve discovery, plus a clear free-text description.
+
+### A. Business start-up and development
+- Business idea validation / feasibility advice.
+- Co-founder or founding-team member.
+- Business partner / joint-venture partner.
+- Technical, operational or management expertise.
+- Business plan or financial projection assistance.
+- Registration, licensing, accounting, tax or legal referral.
+- Mentorship, coaching or professional advice.
+- Training, knowledge sharing or business clinics.
+- Incubation, acceleration or enterprise-support programme.
+- General start-up support.
+
+### B. Finance and resource support
+- Seed funding / grant support.
+- Business financing / working capital.
+- Equipment or machinery support.
+- Material, raw-material or inventory support.
+- Premises, workspace, land or facility support.
+- In-kind contribution or donated business resources.
+- Investor / financier seeking suitable businesses.
+- Organization offering a grant, seed fund or business-support programme.
+- Finance-readiness or funding-application assistance.
+
+### C. Growth and expansion
+- Scale existing production or service capacity.
+- Open a new branch / regional office / outlet.
+- Find a local operating partner or branch manager.
+- Acquire equipment, technology or productive assets.
+- Find a new supplier or manufacturer.
+- Expand to a new customer segment or geographic market.
+- Find a distributor, wholesaler, agent, reseller or representative.
+- Export / import / market-entry support.
+- Franchise opportunity sought.
+- Franchise partner / franchisee sought.
+- Franchise development expertise.
+- Business acquisition or succession interest, subject to legal review.
+
+### D. Products, services and market connections
+- Publish a business profile and product/service catalog for discovery.
+- Find potential buyers, customers or institutional clients.
+- Find suppliers, manufacturers or service providers.
+- Ask a product/service question.
+- Request a quotation (RFQ).
+- Offer to provide a quotation.
+- Request a meeting or product demonstration.
+- Find a distribution or sales channel.
+- Find a commercial or institutional partner.
+
+### E. Organization and community economic opportunities
+- Organization seeks a provider, supplier, consultant or local partner.
+- Organization offers a business-support programme or seed-fund opportunity.
+- Organization seeks eligible businesses for a programme.
+- Organization seeks trainers, mentors or technical experts.
+- Organization seeks distributors, regional representatives or implementation partners.
+
+Community volunteering and donations remain in Serve-Community unless the request is genuinely a commercial/business opportunity.
+
+## 5. Structured listing design
+
+Each Need or Offer contains only enough information to make discovery and first contact useful.
+
+Common fields:
+- title, short summary, category/type and detailed description;
+- what kind of response is sought;
+- publisher (person/business/organization);
+- location, preferred regions and remote/in-person preference;
+- sector, expertise, customer segment or target market as relevant;
+- visibility and eligibility;
+- response preference: contact exchange, ask a question, request a quote or request a meeting;
+- optional attachments/links with privacy controls;
+- status: draft, published, paused, closed, expired or removed;
+- created/updated date and optional expiry.
+
+Category-specific optional fields:
+- **Finance/resource need:** amount/range, currency, intended use, preferred support type and broad eligibility/context. No bank details or public sensitive financial records.
+- **Equipment/material:** type/specification, quantity, location and whether seeking purchase, lease, donation or supplier introduction.
+- **Partner/co-founder:** skills, experience, contribution sought, geography, time commitment and preferred involvement.
+- **Branch/expansion:** target region, type of support/partner sought, optional broad budget range and market context.
+- **Franchise/distribution:** territory, product/sector, role sought/offered and broad qualification criteria.
+- **Product/service catalog:** description, images, specifications, indicative price or quote-required, capacity/availability statement, target customer, service/delivery area and business contact preference.
+- **Mentorship:** subject, desired experience, format, language, location/remote preference and availability.
+
+Avoid collecting detailed business plans or sensitive financial evidence by default. If a user chooses to share a document with a specific interested party, require explicit scoped consent and secure access.
+
+A catalog is a **discovery profile**, not an online shop. It may describe products, indicative prices or price-on-request, specifications, capacity, minimum order, delivery areas and contact preferences. No checkout, cart of goods, order acceptance, inventory reservation or payment is provided.
+
+## 6. Lightweight connection workflow
+
+### 6.1 Initiating interest
+Every published need, offer, business profile or catalog item has a clear **I'm interested / Connect** action. The short contextual request asks:
+- What are you interested in?
+- What do you want to discuss or offer?
+- Optional short message/question.
+- Desired next step: ask a question; request/provide a quotation; exchange contact details; request a meeting; discuss a potential partnership/support opportunity.
+
+Additional fields appear only when relevant (e.g. quantity/specification for an RFQ or target region for distribution). Do not require a long application for an ordinary introduction.
+
+### 6.2 Consent-controlled contact exchange
+Contact details are private by default. An expression of interest does not automatically disclose either party's phone, email or other private details.
+
+1. A sends interest/request and selects the desired connection method.
+2. B receives a notification and can accept, decline, ask a question or propose a different next step.
+3. If contact exchange is selected, each party separately consents to release the specified contact fields.
+4. Only fields explicitly authorized by each party are revealed.
+5. If one party does not consent, details remain hidden. The parties may use a limited in-platform exchange or decline.
+6. Record that contact exchange was consented to and made available; do not monitor subsequent phone calls, email or messaging.
+
+The consent screen names the exact fields (e.g. business email, phone, public business address). Consent is purpose-specific, revocable for future access and audited. Public business contacts intentionally published by the owner remain visible according to listing settings.
+
+### 6.3 Question, quotation and meeting
+- **Question:** concise question and response to clarify interest; no full discussion platform required.
+- **Quotation:** buyer may request a quote and optionally provide specification, quantity and delivery location. Provider may respond with a quote summary or indicate they will contact the requester. Negotiation, quote acceptance, contract and order happen directly between parties. Record only that a quote was requested/offered and the connection disposition.
+- **Meeting:** a party requests a meeting; the other accepts, declines or proposes another time/place. Record agreed details only after both confirm. A physical place may be a public address or mutually agreed venue; online details may be exchanged by consent. The platform does not manage the meeting or its outcome.
+- **Direct handoff:** after consent, parties deal with one another outside the platform.
+
+No checkout, purchase order, contract signing, payment, escrow or delivery workflow.
+
+### 6.4 Decline and no response
+Recipient can decline with optional reason. Requester can withdraw. Expired/unanswered requests can be closed by requester; reminders should be sparing. No one is forced into contact or has private details exposed because another user expressed interest.
+
+## 7. My Requests — demand cart / connection register
+
+Implement the user's “demand cart” as **My Requests** (or **My Connections**), not as a shopping cart. It is the durable personal list of connection requests initiated by the user across Network-Plus categories.
+
+Every time a user sends a connect request, asks a question, requests a quote or meeting, or applies to contact an offer, a request record is automatically saved in My Requests. Saving a listing as a favourite does not create a request; favourites and submitted requests remain distinct.
+
+Each request card shows only:
+- need/offer and other party;
+- request type and date;
+- response/consent state;
+- contact/meeting/quote handoff state where relevant;
+- requester's outcome status;
+- last short remark and update date;
+- one action to review/update/close.
+
+### 7.1 Required disposition
+The requester must be able to mark every initiated request:
+- **In progress** — connection made or requester is still pursuing it; does not imply a contract or work inside Network-Plus.
+- **Completed** — requester considers the purpose of the connection achieved or concluded (e.g. useful advice received, contact exchanged, meeting held, quotation received, partner identified, finance/support connection made, supplier/customer connected). This does not assert a sale, investment, financing or contract was executed.
+- **Cancelled** — requester no longer wishes to pursue it, need changed, no suitable connection was made, other party declined, or request is no longer relevant.
+
+Require a short closing remark when marking Completed or Cancelled. Optional outcome category examples:
+- contact exchanged;
+- meeting arranged/held;
+- quotation received;
+- mentor/support connected;
+- partner identified;
+- funding/support contact made;
+- supplier/buyer connected;
+- no suitable match;
+- need withdrawn;
+- other.
+
+Example remarks:
+- “Contact exchanged; we will discuss directly.”
+- “Meeting arranged at Bole, Addis Ababa.”
+- “Received the quotation; follow-up is outside the platform.”
+- “Connected with a mentor; support arranged directly.”
+- “Found a suitable regional distributor.”
+- “No suitable partner found.”
+- “Need withdrawn; funding no longer required.”
+
+Do not require amounts, contract copies, payment proofs, revenue, detailed milestones or private negotiation information. Allow “prefer not to disclose details”.
+
+### 7.2 System enforcement without over-tracking
+- Every submitted request appears in My Requests and cannot disappear because a listing is later paused or removed.
+- Show open requests (awaiting response or in progress) prominently.
+- Prompt requester to review older unanswered/in-progress requests at a reasonable interval.
+- When requester closes a request, require status plus short remark; do not silently auto-complete.
+- Recipient decline/withdrawal is recorded as recipient-side response; initiator chooses own disposition (e.g. Cancelled, “recipient declined”).
+- A request may be reopened by initiator with a new remark; preserve previous closure event.
+- Do not make Completed dependent on recipient confirming a commercial deal. Other party may optionally confirm only that contact was made, not private deal details.
+- Distinguish platform-generated facts from user-reported outcomes.
+
+### 7.3 Example: product discovery to contact handoff
+1. Business X publishes a product listing with specifications, location, indicative price or “request quotation”, and contact preference.
+2. Member Y selects **I'm interested**.
+3. If Y has a question, Y sends it. If Y needs a quote, Y optionally supplies quantity/specification/location. If details are clear, Y requests contact or a meeting directly.
+4. X accepts, declines, asks a question, responds to the quote request or proposes a meeting.
+5. If contact details are to be shared, X and Y each consent to specific fields. The system releases only approved details.
+6. If they prefer a meeting, they agree a time/place; the system records mutually confirmed meeting information.
+7. X and Y conduct quotation discussion, negotiation, sale, contract, payment and delivery outside Network-Plus.
+8. Y's request remains in My Requests. Y later marks In progress, Completed or Cancelled with a short remark (e.g. “Quotation received; negotiating directly”).
+9. Platform records connection events and Y's self-reported disposition, not the transaction.
+
+## 8. Same connection pattern across all business needs
+
+| Need | What requester publishes | Interested party action | What Network-Plus records |
+|---|---|---|---|
+| Mentorship | Topic, experience sought, preferred format | Offers support / requests introduction | Interest, acceptance, contact consent, requester disposition |
+| Finance support | Type, amount/range, purpose, broad eligibility | Funder/financier expresses interest or requests contact | Introduction and consent; requester marks outcome |
+| Grant/seed support | Programme, eligibility, deadline, sponsor | Business expresses interest / asks to connect | Application/connection receipt and outcome remark; no disbursement tracking |
+| Material/equipment | Specification, quantity, location, support type | Supplier/donor offers help or asks for details | Connection, quote/contact handoff, requester disposition |
+| Co-founder | Skills, role, contribution and stage | Candidate expresses interest | Mutual interest/contact consent and outcome remark |
+| Business partner | Contribution, role, geography and purpose | Potential partner responds | Introduction/meeting handoff and outcome remark |
+| Investment | Business seeking investor or investor seeking opportunities | Expresses interest and requests consented introduction | Connection only, subject to legal boundaries; no execution ledger |
+| Financing | Finance need and broad parameters | Eligible provider asks to connect | Consent-based introduction; no loan/repayment system |
+| Scaling | Growth need and support sought | Adviser, partner or provider offers assistance | Contact/meeting handoff and requester disposition |
+| New branch | Target location and partner/resource sought | Regional operator, landlord, supplier or financier responds | Connection and optional meeting details |
+| Franchise | Franchisee/franchisor interest, territory and criteria | Interested party requests details/contact | Introduction and outcome remark; no franchise contract/operations |
+| Distribution | Product, target territory/channel and distributor sought | Distributor/agent expresses interest | Contact exchange/meeting and outcome remark |
+| Product/service | Catalog description and target customers | Buyer asks, requests quote or meeting | Inquiry/quote request and connection disposition; no sale processing |
+| Supplier | Supply need and basic specifications | Supplier responds or quotes | Quote/contact handoff and requester disposition |
+| Business plan support | Advice sought | Qualified adviser offers assistance | Introduction and outcome remark |
+
+For financing, investment, grants, franchise and other regulated/high-risk categories, listings and introductions must comply with applicable law and platform policy. Network-Plus does not endorse an offer, guarantee a return or certify a provider merely by allowing a listing. Apply appropriate identity/business verification, moderation, warnings and reporting.
+
+## 9. Outcome model — measure connections, not deals
+
+### Platform-observed events
+- need/offer published, paused or closed;
+- interest/request sent;
+- recipient accepted, declined or asked for clarification;
+- contact details consented to and released;
+- quotation requested or response indicated;
+- meeting proposed, accepted or declined;
+- requester changed status to In progress, Completed or Cancelled.
+
+### Requester-reported outcome
+At closure capture:
+- final status: Completed or Cancelled;
+- optional outcome category;
+- required short remark;
+- closure date.
+
+These are self-reported unless the other party separately confirms a limited fact. Do not call them independently verified economic impacts.
+
+### Useful aggregate measures
+- published needs/offers by category and region;
+- unique interested parties and response rate;
+- accepted connections and mutual contact-consent rate;
+- questions, quote requests and meeting requests;
+- requests marked In progress, Completed and Cancelled;
+- completion/cancellation rate by category;
+- common reasons for no connection;
+- median time to first response and requester closure;
+- repeat connections and cross-region introductions.
+
+Use privacy-safe aggregates and suppress small cohorts. Views, impressions and favourites are discovery signals, not connection outcomes. A “completed connection” is not a completed sale, financed business, opened branch or created job.
+
+## 10. Minimal data model and separate states
+
+Finalize exact table/column names only after reviewing current migrations and avoiding duplication. Reuse canonical user, organization, business, listing, request, consent, notification and audit records.
+
+Conceptual records:
+- **Need/Offer listing:** publisher, type/category, description, relevant structured fields, geography, visibility, expiry and publication state.
+- **Connection request:** listing reference (or direct member/business target), initiator, recipient, request type, short message, response state and timestamps.
+- **Contact consent:** parties, specific contact fields, purpose, consent state, time and revocation.
+- **Connection handoff:** optional quote-request summary, meeting proposal/confirmation or contact-release event; avoid storing private negotiation content.
+- **Request disposition:** initiator, status (In progress / Completed / Cancelled), optional outcome category, required closing remark and timestamp.
+- **Audit/notification events:** immutable platform-observed actions and deduplicated notifications.
+
+Keep lifecycles separate:
+
+**Listing:** Draft → Published ↔ Paused → Closed / Expired / Removed.
+
+**Connection request:** Sent → Accepted / Declined / Withdrawn / Expired. Clarification/counterproposal may occur without a deal workflow.
+
+**Contact consent:** Not requested → Awaiting each party's consent → Shared (only mutually authorized fields) / Declined / Revoked.
+
+**Requester disposition:** In progress → Completed / Cancelled. Reopen only through explicit user action, preserving history.
+
+Do not merge these lifecycles into one status field. Recipient can accept while initiator's request remains In progress. Contact can be shared while requester later cancels. Listing can close while historical requests remain accessible to their participants.
+
+## 11. Permissions, privacy and trust
+
+- Private requests visible only to participants and authorized scoped administrators.
+- Listing visibility and contact-detail visibility are separate.
+- Viewing a listing or sending interest never reveals a private phone/email.
+- Contact exchange requires explicit, field-specific consent from the information owner.
+- Organization/business representatives need current scoped authority to respond or disclose organizational contacts.
+- No public exposure of financial statements, identity documents, business plans or private attachments.
+- Verification labels state exactly what was reviewed; verified business does not mean every product, price, claim, finance offer or investment is verified.
+- Provide report/block, abuse handling, duplicate/spam prevention, rate limits and appeal.
+- High-risk offers need category-specific disclosures and review; no guarantee or implied endorsement.
+- Keep audit events for consent and administrative action, not surveillance of off-platform conversations.
+
+## 12. UX requirements
+
+- Main entry asks: **“What do you need, or what can you offer?”**
+- Make Need and Offer prominent; browsing does not require publishing.
+- Searchable, plain-language categories.
+- Progressive disclosure; only relevant fields appear.
+- Each listing has **I'm interested / Connect** and a concise explanation of next steps.
+- Clear consent language before sharing contact details.
+- Compact **My Requests** page with filters: All, Awaiting response, In progress, Completed, Cancelled.
+- Each card has one clear next action and no project-management clutter.
+- Ask for closure remark when requester marks Completed or Cancelled.
+- Draft, pause, edit and close listing controls.
+- Responsive, accessible desktop/mobile experience consistent with MPA app design.
+- Notifications reveal no sensitive content and deep-link to the request.
+
+## 13. Phased implementation
+
+### Phase 0 — Align current implementation
+- Inspect current branch code, migrations, API routes, UI, access controls and tests.
+- Reconcile Increment 4/5/6 contracts and six-versus-seven request-intent mismatch.
+- Confirm reusable request/collaboration functions and make collaboration workspace optional.
+- Produce compact schema/state/permission map and regression plan.
+
+**Exit:** one canonical business/listing model and one connection-request foundation, with no duplicate entities or contradictory intent contracts.
+
+### Phase 1 — Needs and Offers directory
+- Implement taxonomy with progressive, category-specific fields.
+- Reuse verified business/organization identity and moderation.
+- Deliver member/business/organization publishing, editing, pausing, closing and discovery.
+- Deliver product/service catalog as discovery-only profiles, not commerce listings.
+
+**Exit:** users can publish and discover needs/offers across supported categories.
+
+### Phase 2 — Connection request and consent handoff
+- Implement interest, question, quote request and meeting request actions.
+- Implement recipient accept/decline/clarify responses.
+- Implement field-specific bilateral contact consent and release.
+- Implement meeting-place/time confirmation as a simple handoff.
+- Implement notifications and request privacy.
+
+**Exit:** two parties can safely make contact or arrange a meeting without premature disclosure.
+
+### Phase 3 — My Requests and closure disposition
+- Automatically save every initiated connection request in My Requests.
+- Implement In progress, Completed and Cancelled with required short closing remark.
+- Implement review reminders, reopen history and recipient-side decline/withdrawal.
+- Label system-observed events separately from requester-reported outcomes.
+
+**Exit:** requesters can review and close every request without entering deal milestones or private transaction details.
+
+### Phase 4 — Outcomes and quality
+- Add privacy-safe aggregate connection reporting.
+- Add no-response/decline reasons, anti-spam, block/report, accessibility and usability.
+- Validate all categories with distinct member, business, organization, funder, supplier and buyer roles.
+- Complete migration, API, browser, security, keyboard, mobile and CI gates.
+
+**Exit:** Network-Plus demonstrates meaningful connections and honest self-reported dispositions without becoming a marketplace or transaction-management product.
+
+## 14. Acceptance scenarios
+
+1. Member seeks mentorship: publishes topic/format; mentor expresses interest; both consent to contact; member marks In progress then Completed: “Mentor connected; we will continue directly.”
+2. Skilled member lacks capital: publishes start-up support need; seed-support organization expresses interest; contact is shared with consent; member records connection outcome.
+3. Business needs equipment: lists specification/location; supplier responds with quote or requests contact; parties negotiate directly; requester closes with short remark.
+4. Business wants co-founder: describes skills/role; candidate expresses interest; they agree to meet; platform records confirmed meeting handoff and requester disposition only.
+5. Business wants a new branch: describes target region and partner/resource needs; regional operators or suppliers connect; owner records outcome without branch-construction milestones.
+6. Business seeks franchise: lists territory and support sought; interested party requests contact; due diligence and contract happen outside the platform.
+7. Distributor discovers product: asks question, requests quotation or meeting; owner consents to share contacts; parties discuss terms externally; requester records disposition.
+8. Buyer sees catalog item with no price: requests quotation; seller responds or contacts directly; no cart, order, payment or fulfilment record is created.
+9. Buyer already has specifications: requests contact/meeting directly without a mandatory quote workflow.
+10. User declines contact sharing: neither party's private details are disclosed; request may be declined/cancelled.
+11. Unanswered request remains in My Requests; requester receives a reminder and marks Cancelled with remark.
+12. Completed request is not represented as a verified sale, investment, loan, job or branch opening.
+13. Listing is removed after a request: participants retain authorized request history; public discovery is removed.
+14. Delegate loses business authority: they can no longer respond or disclose business contacts for that business.
+
+## 15. Change control
+
+This revised document **supersedes the earlier expansive business-growth plan's transaction, deal-execution and detailed economic-tracking requirements**. Preserve its broad taxonomy of needs and offers, but interpret each as a **connection use case**, not an end-to-end transaction workflow.
+
+The next implementation should focus on a small number of excellent, secure capabilities: publish a need/offer, discover a relevant party, express interest, consent to contact, arrange a meeting or quotation handoff, and record a concise requester disposition.
+
+Do not build a marketplace, CRM, investor execution system, business performance ledger or milestone tracker under Network-Plus. Keep any future proposal for such functionality separate and subject to explicit product approval.
+
+**Product north star:** Network-Plus turns a member's need or offer into a relevant, trusted, consent-based human connection — then gets out of the way so the parties can do business.

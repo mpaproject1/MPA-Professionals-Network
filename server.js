@@ -711,7 +711,7 @@ const server=http.createServer(async (req,res)=>{
         () => networkPlusRequests.listNetworkPlusRequests(identity.sub,{limit:100,offset:0}),
         () => serveCommunityInitiatives.listMyParticipations(identity.sub),
         () => serveCommunityInitiatives.listMyInitiatives(identity.sub),
-        () => memberReferrals.listMyReferrals(identity.sub),
+        () => memberReferrals.listMyReferralProgress(identity.sub),
         () => memberReferrals.listMyCandidateReferrals(identity.sub)
       ];
       calls.push(() => communityImpactRecognition.listMyRecognition(identity.sub));

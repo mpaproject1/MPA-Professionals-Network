@@ -187,7 +187,14 @@ export function buildMemberProgress(sourceResults, { limit = 50, offset = 0, vie
     if (view === "progress") return item.responsibility === "in_progress";
     if (view === "history") return ["completed", "closed"].includes(item.responsibility);
     return true;
-  }).sort((a, b) => {\n    const rank = priority(a) - priority(b);\n    if (rank) return rank;\n    const aDue = a.responsibility === "member_action" && a.dueAt ? Date.parse(a.dueAt) : Number.POSITIVE_INFINITY;\n    const bDue = b.responsibility === "member_action" && b.dueAt ? Date.parse(b.dueAt) : Number.POSITIVE_INFINITY;\n    if (aDue !== bDue) return aDue - bDue;\n    return (b.updatedAt || "").localeCompare(a.updatedAt || "");\n  });
+  }).sort((a, b) => {
+    const rank = priority(a) - priority(b);
+    if (rank) return rank;
+    const aDue = a.responsibility === "member_action" && a.dueAt ? Date.parse(a.dueAt) : Number.POSITIVE_INFINITY;
+    const bDue = b.responsibility === "member_action" && b.dueAt ? Date.parse(b.dueAt) : Number.POSITIVE_INFINITY;
+    if (aDue !== bDue) return aDue - bDue;
+    return (b.updatedAt || "").localeCompare(a.updatedAt || "");
+  });
   const pageSize = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 100);
   const pageOffset = Math.max(Number.parseInt(offset, 10) || 0, 0);
   const counts = {

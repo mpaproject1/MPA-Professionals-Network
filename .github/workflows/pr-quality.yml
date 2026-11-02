@@ -226,9 +226,7 @@ jobs:
             e2e/serve-community-separation.spec.js \
             e2e/workspace-app-ux.spec.js \
             --max-failures=0 \
-            --reporter=list,html,json \
-            --screenshot=only-on-failure \
-            --video=retain-on-failure 2>&1 | tee /tmp/mpa-playwright.log
+            --reporter=list,html,json 
 
       - name: Upload complete browser diagnostics (reports, traces, screenshots, videos and server logs)
         if: always()

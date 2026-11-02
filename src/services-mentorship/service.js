@@ -1319,7 +1319,7 @@ export async function listMyMentorshipLearningProgress(userId){
     from mentorship_learning_activity a join mentorship m on m.id=a.mentorship_id
     left join lateral (select id,version,status,submitted_at from mentorship_learning_submission where activity_id=a.id and submitted_by=m.mentee_user_id order by version desc limit 1) s on true
     left join lateral (select decision,feedback from mentorship_learning_review where submission_id=s.id order by created_at desc limit 1) review on true
-    where a.status='published' and (m.mentor_user_id=$1 or m.mentee_user_id=$1)
+    where a.status='published' and (m.status='active' or s.status='accepted') and (m.mentor_user_id=$1 or m.mentee_user_id=$1)
     order by a.due_at nulls last,a.created_at desc limit 200`,[userId])).rows;
 }
 

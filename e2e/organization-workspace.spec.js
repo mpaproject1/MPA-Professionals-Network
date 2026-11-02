@@ -31,6 +31,8 @@ async function mockOrganizationApi(page, organizations, organizationAccess = org
     else if (path === "/api/v1/me/organization-access") data = organizationAccess;
     else if (path === "/api/v1/me") data = { user_id: "e2e-org-user", roles: ["member"] };
     else if (path === "/api/v1/opportunity-inquiries") data = [];
+    else if (/^\/api\/v1\/organizations\/[^/]+\/jobs$/.test(path)) data = [];
+    else if (/^\/api\/v1\/organizations\/[^/]+\/users$/.test(path)) data = [];
     else if (path === "/api/v1/organizations/org-e2e-1") {
       data = { ...organization(), users: [] };
     } else if (path === "/api/v1/organizations/org-e2e-1/users") data = [];

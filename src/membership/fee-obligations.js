@@ -64,6 +64,7 @@ export async function listFeeObligations(identity,filters={}){
  if(!roles.includes("finance_officer")&&!roles.includes("system_admin")&&!permissions.some(p=>["finance.view","finance.payment.record","finance.payment.verify","finance.manage"].includes(p)))throw problem(403,"Finance obligation access required.","FORBIDDEN");
  const status=clean(filters.status,20),q=clean(filters.q,100);
  const db=getPool();
+ const limit=Math.min(Math.max(Number(filters.limit)||500,1),50000);
  const rows=(await db.query(`select b.*,o.created_at,o.due_date,
   a.tracking_reference,a.status application_status,a.user_id,
   mr.membership_number,mr.status membership_status,
@@ -78,7 +79,30 @@ export async function listFeeObligations(identity,filters={}){
   left join lateral (select json_agg(json_build_object('id',pt.id,'amount',pt.amount,'currency',pt.currency,'reference',pt.purpose_reference,'createdAt',pt.created_at) order by pt.created_at) receipts from membership_fee_obligation_payment op join payment_transaction pt on pt.id=op.payment_transaction_id where op.obligation_id=o.id and pt.status='pending' and pt.source in ('finance_manual_record','finance_bulk_import')) pending on true
   left join lateral (select json_agg(json_build_object('id',d.id,'type',d.disposition_type,'amount',d.amount,'currency',d.currency,'remark',d.remark,'requestedBy',d.requested_by) order by d.created_at) items from membership_fee_balance_disposition d where d.obligation_id=o.id and d.status='pending') pending_dispositions on true
   where ($1='' or o.status=$1) and ($2='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(mr.membership_number,'')||' '||coalesce(a.tracking_reference,'')) like lower('%'||$2||'%'))
+  order by (b.outstanding_balance>0) desc,o.due_date nulls last,o.created_at desc limit $3`,[status,q,limit])).rows;
+  a.tracking_reference,a.status application_status,a.user_id,
+  mr.membership_number,mr.status membership_status,
+  coalesce(p.display_name,concat_ws(' ',p.first_name,p.last_name)) member_name,u.email,
+  mp.product_code,mp.name product_name,pending.receipts,pending_dispositions.items
+  from membership_fee_obligation_balance b join membership_fee_obligation o on o.id=b.obligation_id
+  left join membership_application a on a.id=o.application_id
+  left join membership_record mr on mr.id=o.membership_record_id or (o.application_id is not null and mr.application_id=o.application_id)
+  left join app_user u on u.id=coalesce(a.user_id,mr.user_id)
+  left join person p on p.user_id=u.id
+  left join membership_product mp on mp.id=coalesce((select membership_product_id from membership_application where id=o.application_id),(select membership_product_id from membership_record where id=o.membership_record_id))
+  left join lateral (select json_agg(json_build_object('id',pt.id,'amount',pt.amount,'currency',pt.currency,'reference',pt.purpose_reference,'createdAt',pt.created_at) order by pt.created_at) receipts from membership_fee_obligation_payment op join payment_transaction pt on pt.id=op.payment_transaction_id where op.obligation_id=o.id and pt.status='pending' and pt.source in ('finance_manual_record','finance_bulk_import')) pending on true
+  left join lateral (select json_agg(json_build_object('id',d.id,'type',d.disposition_type,'amount',d.amount,'currency',d.currency,'remark',d.remark,'requestedBy',d.requested_by) order by d.created_at) items from membership_fee_balance_disposition d where d.obligation_id=o.id and d.status='pending') pending_dispositions on true
+  where ($1='' or o.status=$1) and ($2='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(mr.membership_number,'')||' '||coalesce(a.tracking_reference,'')) like lower('%'||$2||'%'))
   order by (b.outstanding_balance>0) desc,o.due_date nulls last,o.created_at desc limit 500`,[status,q])).rows;
+ const totalsByCurrency=(await db.query(`select b.currency,count(*)::int obligation_count,count(*) filter(where b.outstanding_balance>0)::int outstanding_count,
+  coalesce(sum(b.amount_due),0)::numeric(14,2) amount_due,coalesce(sum(b.verified_cash),0)::numeric(14,2) verified_cash,
+  coalesce(sum(b.approved_non_cash),0)::numeric(14,2) approved_non_cash,coalesce(sum(b.outstanding_balance),0)::numeric(14,2) outstanding_balance
+  from membership_fee_obligation_balance b join membership_fee_obligation o on o.id=b.obligation_id
+  left join membership_application a on a.id=o.application_id
+  left join membership_record mr on mr.id=o.membership_record_id or (o.application_id is not null and mr.application_id=o.application_id)
+  left join app_user u on u.id=coalesce(a.user_id,mr.user_id) left join person p on p.user_id=u.id
+  where ($1='' or o.status=$1) and ($2='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(mr.membership_number,'')||' '||coalesce(a.tracking_reference,'')) like lower('%'||$2||'%'))
+  group by b.currency order by b.currency`,[status,q])).rows;
  const legacyRecords=(await db.query(`select mr.id membership_record_id,mr.membership_number,mr.status membership_status,mp.product_code,mp.name product_name,
   p.display_name member_name,u.email,mr.created_at
   from membership_record mr join membership_product mp on mp.id=mr.membership_product_id
@@ -87,7 +111,7 @@ export async function listFeeObligations(identity,filters={}){
   and not exists(select 1 from membership_fee_obligation o where o.membership_record_id=mr.id or o.application_id=mr.application_id)
   and ($1='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||mr.membership_number) like lower('%'||$1||'%'))
   order by mr.created_at desc limit 200`,[q])).rows;
- return {rows:rows.map(row=>({...row,pending_receipts:row.receipts||[],pending_dispositions:row.items||[]})),legacyRecords,total:rows.length};
+ return {rows:rows.map(row=>({...row,pending_receipts:row.receipts||[],pending_dispositions:row.items||[]})),legacyRecords,totalsByCurrency,total:rows.length};
 }
 export async function exportFeeObligations(identity,filters={},requestId){
  const result=await listFeeObligations(identity,filters);

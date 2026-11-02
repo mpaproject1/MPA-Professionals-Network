@@ -221,7 +221,7 @@ export default function MembershipCenterPage() {
     </nav>
     {error && <Card><OperationStatus state="error" title="Membership data could not be fully verified" detail={error} action={<button className="btn btn-ghost" type="button" onClick={() => void load(filters)}>Retry</button>} /></Card>}
     <section className={styles.filterPanel} aria-label="Membership report filters">
-      <div className={styles.filterTitle}><div><strong>Reporting period</strong><span>Application counts use application creation dates. Active and expired membership counts show the current recorded stock.</span></div><Badge tone="slate">Ethiopia · GMT+3 reporting convention</Badge></div>
+      <div className={styles.filterTitle}><div><strong>Reporting period</strong><span>Application counts use application creation dates. Active and expired membership counts show the current recorded stock. Confirm the deployment reporting timezone before interpreting day-boundary comparisons.</span></div><Badge tone="slate">Calendar reporting filters</Badge></div>
       <div className={styles.filters}>
         <label>From<input type="date" value={filters.from} onChange={event => setFilters(current => ({ ...current, from: event.target.value }))}/></label>
         <label>To<input type="date" value={filters.to} onChange={event => setFilters(current => ({ ...current, to: event.target.value }))}/></label>

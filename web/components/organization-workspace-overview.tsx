@@ -36,12 +36,16 @@ type OrganizationAccess = {
   membership_status: string;
 };
 
+const WORKSPACE_ROLES = ["owner", "administrator", "recruiter", "project_manager", "read_only"];
+const VERIFICATION_MANAGER_ROLES = ["owner", "administrator"];
+
 type Folder = {
   key: string;
   title: string;
   description: string;
   icon: typeof BriefcaseBusiness;
   tone: string;
+  allowedRoles?: string[];
   links: { label: string; href: string }[];
 };
 
@@ -52,6 +56,7 @@ const folders: Folder[] = [
     description: "Create and manage professional opportunities.",
     icon: BriefcaseBusiness,
     tone: "publishing",
+    allowedRoles: ["owner", "administrator", "recruiter", "project_manager"],
     links: [
       { label: "Jobs and recruitment", href: "/recruitment" },
       { label: "Professional services", href: "/services" },
@@ -64,6 +69,7 @@ const folders: Folder[] = [
     description: "Work through applications and incoming requests.",
     icon: ClipboardCheck,
     tone: "reviewing",
+    allowedRoles: ["owner", "administrator", "recruiter"],
     links: [
       { label: "Candidate pipeline", href: "/recruitment#candidate-pipeline" },
       { label: "Public job inquiries", href: "/organizations#org-inquiries" },
@@ -97,6 +103,7 @@ const folders: Folder[] = [
     description: "Manage your team, access and organization details.",
     icon: Building2,
     tone: "organization",
+    allowedRoles: ["owner", "administrator"],
     links: [
       { label: "Team and permissions", href: "/organizations/team" },
       { label: "Organization profile", href: "/organizations#org-registration" },
@@ -119,6 +126,10 @@ const folders: Folder[] = [
 
 function statusFor(organization: Organization) {
   const state = organization.verification_case_status || organization.verification_status || "draft";
+  const canManageVerification = VERIFICATION_MANAGER_ROLES.includes(organization.role_code || "");
+  if (organization.verification_status === "verified" && !WORKSPACE_ROLES.includes(organization.role_code || "")) {
+    return { label: "Workspace access unavailable", detail: "Your organization relationship is active, but this role is not authorized for the current organization workspace. Ask the organization owner or administrator to review your assignment.", tone: "attention" };
+  }
   if (organization.verification_status === "verified") {
     return { label: "Verified", detail: "Organization verification has been approved.", tone: "verified" };
   }
@@ -126,12 +137,16 @@ function statusFor(organization: Organization) {
     return { label: "Under review", detail: "Your submission is awaiting an authorized MPA review. No further submission is needed while it is pending.", tone: "pending" };
   }
   if (state === "correction_required") {
-    return { label: "Changes requested", detail: "Review the feedback and provide the outstanding information or evidence.", tone: "attention" };
+    return canManageVerification
+      ? { label: "Changes requested", detail: "Review the feedback and provide the outstanding information or evidence.", tone: "attention" }
+      : { label: "Owner action needed", detail: "MPA has requested changes. Only the organization owner or an administrator can update verification evidence and resubmit.", tone: "attention" };
   }
   if (state === "rejected") {
     return { label: "Not approved", detail: "The application was not approved. Review the recorded decision before taking another step.", tone: "attention" };
   }
-  return { label: "Setup in progress", detail: "Complete the required evidence checklist and submit the organization for review.", tone: "draft" };
+  return canManageVerification
+    ? { label: "Setup in progress", detail: "Complete the required evidence checklist and submit the organization for review.", tone: "draft" }
+    : { label: "Owner action needed", detail: "Organization verification is managed by the owner or an administrator. Ask them to complete the evidence checklist and submit the case.", tone: "attention" };
 }
 
 export function OrganizationWorkspaceOverview({
@@ -150,14 +165,17 @@ export function OrganizationWorkspaceOverview({
   onRegister: () => void;
 }) {
   const verified = organizations.filter((item) => item.verification_status === "verified");
+  const workspaceReady = verified.filter((item) => WORKSPACE_ROLES.includes(item.role_code || ""));
   const awaiting = organizations.filter((item) => {
     const state = item.verification_case_status || item.verification_status;
     return state === "submitted" || state === "pending" || item.verification_status === "pending";
   });
   const attention = organizations.filter((item) => item.verification_case_status === "correction_required");
-  const hasVerifiedOrganization = verified.length > 0;
+  const hasVerifiedOrganization = workspaceReady.length > 0;
   const [activeFolderKey, setActiveFolderKey] = useState("publishing");
-  const activeFolder = folders.find((folder) => folder.key === activeFolderKey) || folders[0];
+  const activeRoles = workspaceReady.map((item) => item.role_code || "");
+  const visibleFolders = folders.filter((folder) => !folder.allowedRoles || folder.allowedRoles.some((role) => activeRoles.includes(role)));
+  const activeFolder = visibleFolders.find((folder) => folder.key === activeFolderKey) || visibleFolders[0];
 
   if (organizations.length === 0 && authenticated && !organizationLookupReady) {
     return (
@@ -252,7 +270,7 @@ export function OrganizationWorkspaceOverview({
                 <p>{status.detail}</p>
                 {organization.verification_decision_reason ? <p className={styles.reviewNote}><strong>Reviewer feedback:</strong> {organization.verification_decision_reason}</p> : null}
                 {(organization.missing_evidence || []).length > 0 && status.tone !== "pending" ? <p className={styles.reviewNote}><strong>Outstanding:</strong> {(organization.missing_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ")}</p> : null}
-                {status.tone !== "pending" && <Link className="btn btn-primary" href="/organizations#org-evidence">Continue verification</Link>}
+                {VERIFICATION_MANAGER_ROLES.includes(organization.role_code || "") && status.tone !== "pending" && status.tone !== "verified" ? <Link className="btn btn-primary" href="/organizations#org-evidence">Continue verification</Link> : null}
               </article>
             );
           })}
@@ -268,7 +286,7 @@ export function OrganizationWorkspaceOverview({
             </div>
           ) : null}
           <div className={styles.folderShelf} role="tablist" aria-label="Organization workspace folders">
-            {folders.map((folder) => {
+            {visibleFolders.map((folder, index) => {
               const Icon = folder.icon;
               const selected = activeFolder.key === folder.key;
               return (
@@ -280,7 +298,17 @@ export function OrganizationWorkspaceOverview({
                   id={`organization-folder-${folder.key}`}
                   aria-selected={selected}
                   aria-controls="organization-folder-panel"
+                  tabIndex={selected ? 0 : -1}
                   onClick={() => setActiveFolderKey(folder.key)}
+                  onKeyDown={(event) => {
+                    if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(event.key)) return;
+                    event.preventDefault();
+                    const direction = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
+                    const nextIndex = (index + direction + visibleFolders.length) % visibleFolders.length;
+                    const nextFolder = visibleFolders[nextIndex];
+                    setActiveFolderKey(nextFolder.key);
+                    document.getElementById(`organization-folder-${nextFolder.key}`)?.focus();
+                  }}
                 >
                   <span className={styles.folderTab} aria-hidden="true" />
                   <span className={styles.folderHeader}>

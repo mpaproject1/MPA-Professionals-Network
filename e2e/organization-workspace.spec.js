@@ -158,6 +158,18 @@ test.describe("MPA organization app entry and navigation", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 
+  test("recruitment opens with the organization selected from the dashboard context", async ({ page }) => {
+    await mockOrganizationApi(page, [organization(), organization({
+      id: "org-e2e-2",
+      legal_name: "Second MPA Institution",
+      display_name: "Second MPA Institution",
+      role_code: "read_only",
+      tracking_reference: "ORG-TEST-002",
+    })]);
+    await page.goto("/recruitment?organizationId=org-e2e-2");
+    await expect(page.getByRole("combobox", { name: "Organization workspace" })).toHaveValue("org-e2e-2");
+  });
+
   test("read-only organization members do not see publishing, reviewing or team-administration folders", async ({ page }) => {
     await mockOrganizationApi(page, [organization({ role_code: "read_only" })]);
     await page.goto("/organizations");

@@ -133,7 +133,7 @@ function statusFor(organization: Organization) {
   if (organization.verification_status === "verified") {
     return { label: "Verified", detail: "Organization verification has been approved.", tone: "verified" };
   }
-  if (state === "submitted" || state === "pending" || organization.verification_status === "pending") {
+  if (["submitted", "in_review", "pending"].includes(state) || organization.verification_status === "pending") {
     return { label: "Under review", detail: "Your submission is awaiting an authorized MPA review. No further submission is needed while it is pending.", tone: "pending" };
   }
   if (state === "correction_required") {
@@ -168,7 +168,7 @@ export function OrganizationWorkspaceOverview({
   const workspaceReady = verified.filter((item) => WORKSPACE_ROLES.includes(item.role_code || ""));
   const awaiting = organizations.filter((item) => {
     const state = item.verification_case_status || item.verification_status;
-    return state === "submitted" || state === "pending" || item.verification_status === "pending";
+    return ["submitted", "in_review", "pending"].includes(state || "") || item.verification_status === "pending";
   });
   const attention = organizations.filter((item) => ["correction_required", "rejected"].includes(item.verification_case_status || ""));
   const hasVerifiedOrganization = workspaceReady.length > 0;

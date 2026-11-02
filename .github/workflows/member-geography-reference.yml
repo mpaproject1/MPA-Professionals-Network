@@ -25,6 +25,8 @@ jobs:
         run: npm ci
       - name: Generate workbook from published reference sources
         run: node scripts/generate-member-geography-reference.js artifacts/member-geography-reference.xlsx
+      - name: Validate workbook codes, hierarchy and provenance
+        run: node scripts/validate-member-geography-reference.js artifacts/member-geography-reference.xlsx
       - name: Upload versioned reference workbook
         uses: actions/upload-artifact@v4
         with:

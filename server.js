@@ -815,7 +815,8 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/finance/receipts/") && parts[5]==="reverse") { const identity=await auth(req); return ok(res,await financeReceipts.reverseManualFinancePayment(identity,parts[4],(await body(req)).reason,requestId),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/finance/receipts/") && parts[5]==="voucher") { const identity=await auth(req); return ok(res,await financeReceipts.issueFinancePaymentVoucher(identity,parts[4],requestId),requestId,201); }
     if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/finance/membership/payments/") && parts[6]==="voucher") { const identity=await auth(req); return ok(res,await financeReceipts.issueVerifiedMembershipPaymentVoucher(identity,parts[5],requestId),requestId,201); }
-    if(req.method==="GET" && p==="api/v1/finance/membership/fee-obligations") { const identity=await auth(req); return ok(res,await membershipFeeObligations.listFeeObligations(identity,{status:query(req.url).get("status")||"",q:query(req.url).get("q")||""}),requestId); }
+        if(req.method==="GET" && p==="api/v1/finance/membership/fee-obligations/export.xlsx") { const identity=await auth(req),q=query(req.url),file=await membershipFeeObligations.exportFeeObligations(identity,{status:q.get("status")||"",q:q.get("q")||""},requestId); res.writeHead(200,{"content-type":file.contentType,"content-disposition":`attachment; filename="${file.filename}"`,"cache-control":"no-store, private, max-age=0","x-request-id":requestId}); return res.end(file.buffer); }
+if(req.method==="GET" && p==="api/v1/finance/membership/fee-obligations") { const identity=await auth(req); return ok(res,await membershipFeeObligations.listFeeObligations(identity,{status:query(req.url).get("status")||"",q:query(req.url).get("q")||""}),requestId); }
     if(req.method==="POST" && p==="api/v1/finance/membership/receipts") { const identity=await auth(req); return ok(res,await membershipFeeObligations.recordMembershipReceipt(identity,await body(req),requestId),requestId,201); }
     if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/finance/membership/receipts/") && parts[6]==="verify") { const identity=await auth(req); return ok(res,await membershipFeeObligations.verifyMembershipReceipt(identity,parts[5],await body(req),requestId),requestId); }
     if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/finance/membership/receipts/") && parts[6]==="reverse") { const identity=await auth(req); return ok(res,await membershipFeeObligations.reverseMembershipRecordReceipt(identity,parts[5],await body(req),requestId),requestId); }
@@ -833,6 +834,7 @@ const server=http.createServer(async (req,res)=>{
       return ok(res,await membership.listApplicationsForReview(),requestId);
     }
 
+    if(req.method==="GET" && p==="api/v1/admin/member-geography/summary") { const identity=await auth(req); return ok(res,await membershipGeography.getMemberGeographySummary(identity),requestId); }
     if(req.method==="GET" && p==="api/v1/member-geography/reference") { const identity=await auth(req); return ok(res,await membershipGeography.listMemberGeography(identity),requestId); }
     if(req.method==="GET" && p==="api/v1/me/residence") return ok(res,await membershipGeography.getMyResidence(identity.sub),requestId);
     if(req.method==="PATCH" && p==="api/v1/me/residence") return ok(res,await membershipGeography.saveMyResidence(identity.sub,await body(req),requestId),requestId);

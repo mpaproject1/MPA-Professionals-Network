@@ -66,7 +66,7 @@ export async function listFeeObligations(identity,filters={}){
   a.tracking_reference,a.status application_status,a.user_id,
   mr.membership_number,mr.status membership_status,
   coalesce(p.display_name,concat_ws(' ',p.first_name,p.last_name)) member_name,u.email,
-  mp.product_code,mp.name product_name
+  mp.product_code,mp.name product_name,pending.receipts,pending_dispositions.items
   from membership_fee_obligation_balance b join membership_fee_obligation o on o.id=b.obligation_id
   left join membership_application a on a.id=o.application_id
   left join membership_record mr on mr.id=o.membership_record_id or (o.application_id is not null and mr.application_id=o.application_id)

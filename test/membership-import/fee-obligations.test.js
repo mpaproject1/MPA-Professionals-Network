@@ -266,7 +266,8 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];
  assert.equal(Number(balance.outstanding_balance),500,"a rejected non-cash disposition must not reduce the outstanding balance");
  
- const zeroApplicant=await membership.register({email:"fee-zero-"+suffix+"@example.test",password:"ZeroCashSecurePassword!2026",firstName:"Zero",lastName:"Cash",phone:"08"+digits},"fee-zero-register-"+suffix);
+ const zeroSuffix=randomUUID(),zeroDigits=zeroSuffix.replace(/\D/g,"").slice(0,8).padEnd(8,"7");
+ const zeroApplicant=await membership.register({email:"fee-zero-"+suffix+"@example.test",password:"ZeroCashSecurePassword!2026",firstName:"Zero",lastName:"Cash",phone:"09"+zeroDigits},"fee-zero-register-"+suffix);
  const zeroApplicantId=zeroApplicant.user.id;
  const sponsorOrg=await organizationJobs.registerOrganization(zeroApplicantId,{legalName:"Fee Sponsor "+suffix,displayName:"Fee Sponsor "+suffix},"fee-sponsor-organization-"+suffix);
  await db.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='reviewer' on conflict do nothing",[zeroApplicantId]);

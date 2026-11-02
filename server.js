@@ -974,6 +974,20 @@ async function runMembershipExpiry(){
 }
 const membershipExpiryTimer=setInterval(()=>void runMembershipExpiry(),60*60*1000);
 membershipExpiryTimer.unref();
+let membershipFeeReminderRunning=false;
+async function runMembershipFeeReminders(){
+  if(membershipFeeReminderRunning)return;
+  membershipFeeReminderRunning=true;
+  try {
+    const result=await membershipFeeObligations.scheduleMembershipFeeReminders(process.env.MEMBERSHIP_FEE_REMINDER_BATCH_SIZE||100);
+    if(result.sent)logger.info("membership.fee_reminders.dispatched",{processed:result.processed,sent:result.sent});
+  } catch(error) {
+    logger.warn("membership.fee_reminders.failed",{error:error.message,code:error.code||"MEMBERSHIP_FEE_REMINDER_FAILED"});
+  } finally { membershipFeeReminderRunning=false; }
+}
+void runMembershipFeeReminders();
+const membershipFeeReminderTimer=setInterval(()=>void runMembershipFeeReminders(),60*60*1000);
+membershipFeeReminderTimer.unref();
 // Bounded, unref'd dispatcher. Row-level locking in the outbox service coordinates multiple instances.
 let emailWorkerRunning=false;
 const testLabExpiryTimer=setInterval(async()=>{ try{const result=await testLab.expireTestPortfolioAccounts();if(result.expired)logger.info("test_lab.accounts.expired",{expired:result.expired});}catch(error){logger.warn("test_lab.expiry.failed",{code:error.code||"TEST_LAB_EXPIRY_FAILED"});} },10*60*1000);

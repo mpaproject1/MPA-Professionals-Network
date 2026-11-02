@@ -56,3 +56,24 @@ test("member progress filters responsibility views and paginates without changin
   assert.equal(page.items.length, 1);
   assert.equal(page.hasMore, true);
 });
+
+test("member progress includes recognition nominations and awarded achievements", () => {
+  const result = buildMemberProgress({
+    recognitionNominations: { status: "fulfilled", value: { nominations: [{ id: "nom-1", status: "submitted", program_title: "Community service", created_at: "2026-10-01" }] } },
+    recognitionAwards: { status: "fulfilled", value: { awards: [{ id: "award-1", title: "Service recognition", awarded_at: "2026-10-02" }] } },
+  });
+  assert.equal(result.items.length, 2);
+  assert.equal(result.items.find(item => item.domain === "recognition_award").responsibility, "completed");
+  assert.equal(result.items.every(item => item.category === "Recognition"), true);
+});
+
+test("an accepted mentorship proposal is not presented as an active relationship", () => {
+  const result = buildMemberProgress({
+    mentorshipMatches: { status: "fulfilled", value: [{ id: "match-1", status: "accepted", mentee_consent_status: "pending", match_role: "mentor" }] },
+    mentorshipRequests: { status: "fulfilled", value: [{ id: "request-1", status: "matching" }] },
+    mentorships: { status: "fulfilled", value: [] },
+  });
+  assert.equal(result.items.find(item => item.domain === "mentorship_match").responsibility, "external_response");
+  assert.equal(result.items.find(item => item.domain === "mentorship_request").responsibility, "mpa_action");
+  assert.equal(result.counts.inProgress, 0);
+});

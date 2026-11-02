@@ -7,7 +7,7 @@ async function source(path) {
 }
 
 test("mentorship operational workflows require explicit sharing and preserve participant privacy", async () => {
-  const [migration, operations, service, server, page, email, reportPage, admin, adminEmail, interestPage] = await Promise.all([
+  const [migration, operations, service, server, page, email, reportPage, admin, adminEmail, interestPage, learningMigration, learningUi, progressModule] = await Promise.all([
     source("../../db/migrations/20261025100000_mentorship_operational_workflows.sql"),
     source("../../src/services-mentorship/operations.js"),
     source("../../src/services-mentorship/service.js"),
@@ -24,6 +24,28 @@ test("mentorship operational workflows require explicit sharing and preserve par
   assert.match(migration, /mentorship_match_interest/);
   assert.match(migration, /mentorship_circle_membership/);
   assert.match(migration, /mentorship_participant_report/);
+  assert.match(learningMigration, /create table if not exists mentorship_learning_activity/);
+  assert.match(learningMigration, /create table if not exists mentorship_learning_submission/);
+  assert.match(learningMigration, /create table if not exists mentorship_learning_review/);
+  assert.match(learningMigration, /unique\(activity_id, submitted_by, version\)/);
+  assert.match(service, /listMentorshipLearningActivities/);
+  assert.match(service, /createMentorshipLearningActivity/);
+  assert.match(service, /submitMentorshipLearningActivity/);
+  assert.match(service, /reviewMentorshipLearningSubmission/);
+  assert.match(service, /SUBMISSION_AWAITING_REVIEW/);
+  assert.match(service, /STALE_SUBMISSION/);
+  assert.match(service, /Only the assigned mentor can create learning activities/);
+  assert.match(service, /Only the assigned mentee can submit this activity/);
+  assert.match(server, /api\/v1\/mentorship-learning-submissions\//);
+  assert.match(server, /api\/v1\/mentorship-activities\//);
+  assert.match(page, /MentorshipLearningActivities/);
+  assert.match(learningUi, /Create a learning activity/);
+  assert.match(learningUi, /Submit new version/);
+  assert.match(learningUi, /Request improvement/);
+  assert.match(learningUi, /Accept work/);
+  assert.match(progressModule, /mentorshipLearningActivities/);
+  assert.match(progressModule, /mentorship_session/);
+
   assert.match(migration, /delivery_status IN \('unknown','queued','sent','delivered','failed','cancelled'\)/);
 
   const poolStart = operations.indexOf("export async function listMentorshipInterestPool");

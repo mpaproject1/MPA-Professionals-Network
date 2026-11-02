@@ -211,7 +211,7 @@ export default function MembershipCenterPage() {
     ...(canManageCards ? [["Membership cards", "/admin/membership-cards", false] as [string, string, boolean]] : []),
     ...(canViewMemberRecords ? [["Plans & settings", "/admin/membership", false] as [string, string, boolean]] : []),
     ...(canManagePaymentMethods ? [["Payment methods", "/admin/membership/payment-methods", false] as [string, string, boolean]] : []),
-    ...(canViewReports ? [["Reports", "/admin/reports?category=Membership", false] as [string, string, boolean]] : []),
+    ...(canViewReports ? [["Reports", "/admin/reports?report=membership-applications", false] as [string, string, boolean]] : []),
   ] as [string, string, boolean][];
 
   return <div className={styles.page}>

@@ -545,7 +545,7 @@ export default function Organizations() {
           continue through server-governed due diligence. Verified status is
           never assumed by the interface.
         </p>
-        <a className="btn btn-ghost mt-3 inline-flex" href="/organizations/team">Manage team & access</a>
+        {organizations.some((org) => ["owner", "administrator"].includes(org.role_code || "")) ? <a className="btn btn-ghost mt-3 inline-flex" href={`/organizations/team?organizationId=${organizations.find((org) => ["owner", "administrator"].includes(org.role_code || ""))?.id || ""}`}>Manage team & access</a> : null}
       </div>
 
           <OrganizationWorkspaceOverview

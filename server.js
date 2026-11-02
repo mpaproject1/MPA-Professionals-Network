@@ -992,7 +992,7 @@ async function runMembershipFeeReminders(){
   membershipFeeReminderRunning=true;
   try {
     const result=await membershipFeeObligations.scheduleMembershipFeeReminders(process.env.MEMBERSHIP_FEE_REMINDER_BATCH_SIZE||100);
-    if(result.sent)logger.info("membership.fee_reminders.dispatched",{processed:result.processed,sent:result.sent});
+    if(result.queued||result.suppressed)logger.info("membership.fee_reminders.queued",{processed:result.processed,memberQueued:result.queued||0,memberSuppressed:result.suppressed||0,delivery:"in-app queue; push delivery is tracked separately"});
   } catch(error) {
     logger.warn("membership.fee_reminders.failed",{error:error.message,code:error.code||"MEMBERSHIP_FEE_REMINDER_FAILED"});
   } finally { membershipFeeReminderRunning=false; }

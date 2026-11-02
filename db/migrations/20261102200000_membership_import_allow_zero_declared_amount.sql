@@ -8,7 +8,7 @@ begin
     from pg_constraint
     where conrelid='membership_import_row'::regclass
       and contype='c'
-      and pg_get_constraintdef(oid) ilike '%paid_amount%'
+      and pg_get_constraintdef(oid) ~* 'paid_amount.*> 0'
   loop
     execute format('alter table membership_import_row drop constraint %I',item.conname);
   end loop;

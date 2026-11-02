@@ -3,6 +3,7 @@ import {createHash,randomBytes} from "node:crypto";
 import {getPool,withTransaction} from "./db.js";
 import {safeInternalUrl} from "./notifications.js";
 import {deliverCommunityCampaignPush,enqueuePushDelivery,getWebPushPublicConfiguration,validPushEndpoint} from "./web-push.js";
+
 const TZ="Africa/Addis_Ababa";
 const ALLOWED_ROUTES=["/serve-community","/mentorship","/jobs","/members","/notifications"];
 const sha=value=>createHash("sha256").update(String(value)).digest("hex");

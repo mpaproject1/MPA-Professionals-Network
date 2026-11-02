@@ -165,6 +165,37 @@
   line-height: 1;
 }
 
+.activitySummary {
+  display: grid;
+  gap: .65rem;
+  border-top: 1px solid var(--border);
+  padding-top: .9rem;
+}
+
+.activityHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.activityHeading h3 {
+  color: var(--text);
+  font-size: .9rem;
+  font-weight: 800;
+  margin: 0 0 .15rem;
+}
+
+.activityHeading p,
+.activityHeading > span,
+.activityEmpty {
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
 .statusList {
   display: grid;
   gap: .7rem;

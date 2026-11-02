@@ -23,6 +23,7 @@ type Item = {
   submittedAt: string | null;
   nextAction: string;
   responsibility?: "member_action" | "mpa_action" | "external_response" | "in_progress" | "completed" | "closed" | "unknown";
+  responsibleParty?: string;
   href?: string;
   category?: string;
   recordId?: string;
@@ -289,6 +290,7 @@ export default function Track() {
               <div className="track-card-grid">
                 <div><span>Last updated</span><b>{dateLabel(item.updatedAt, true)}</b></div>
                 <div><span>What happens next</span><b>{item.nextAction || (item.responsibility === "member_action" ? "Your response is needed" : item.responsibility === "external_response" ? "Waiting for another participant" : item.responsibility === "mpa_action" ? "Waiting for MPA review" : "Continue your journey")}</b></div>
+                {item.responsibleParty ? <div><span>Currently with</span><b>{item.responsibleParty}</b></div> : null}
                 {item.scheduledAt ? <div><span>Scheduled for</span><b>{dateLabel(item.scheduledAt, true)}</b></div> : null}
                 {item.dueAt ? <div><span>Due date</span><b>{dateLabel(item.dueAt, true)}</b></div> : null}
               </div>

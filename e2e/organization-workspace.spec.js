@@ -153,6 +153,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("heading", { name: "Your organization at a glance" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recruitment activity" })).toBeVisible();
     await expect(page.getByText("Applications received")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Open task/ })).toHaveAttribute("href", "/recruitment?organizationId=org-e2e-1#candidate-pipeline");
     const organizationSwitcher = page.getByRole("combobox", { name: "Choose active organization" });
     await expect(organizationSwitcher).toBeEnabled();
     await expect(organizationSwitcher).toHaveValue("org-e2e-1");

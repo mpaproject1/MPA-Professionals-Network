@@ -23,17 +23,17 @@ function csvRows(csv){
  if(!rows.length)throw problem(400,"The CSV file is empty.","EMPTY_IMPORT");
  const headers=rows.shift().map(h=>h.trim().toLowerCase().replace(/[\s-]+/g,"_"));
  if(new Set(headers).size!==headers.length)throw problem(400,"The CSV has duplicate column headings.","DUPLICATE_COLUMNS");
- const modern=["phone","gender","registered_date"].every(h=>headers.includes(h))&&(headers.includes("amount_paid")||headers.includes("payment_amount"));
- const required=["email","full_name","membership_number","status","start_date","end_date","approved_membership","approval_reference"];
+ const required=["email","full_name","phone","gender","registered_date","amount_paid","membership_number","status","start_date","end_date","approved_membership","approval_reference"];
  const missing=required.filter(h=>!headers.includes(h));
  if(!headers.includes("product_code")&&!headers.includes("membership_type"))missing.push("membership_type or product_code");
+ if(missing.length)throw problem(400,`Missing required columns: ${missing.join(", ")}`,"MISSING_COLUMNS");
  if(modern){for(const h of ["phone","gender","registered_date"])if(!headers.includes(h))missing.push(h);if(!headers.includes("amount_paid")&&!headers.includes("payment_amount"))missing.push("amount_paid");}
  if(missing.length)throw problem(400,`Missing required columns: ${missing.join(", ")}`,"MISSING_COLUMNS");
  return rows.map((values,index)=>({rowNumber:index+2,raw:Object.fromEntries(headers.map((h,i)=>[h,String(values[i]??"").trim()]))}));
 }
 function parseDate(v){if(!v)return null;if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;const d=new Date(`${v}T00:00:00Z`);return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v?v:null;}
 function cleanRow(row){
- const x=row.raw,errors=[],modern=Object.hasOwn(x,"gender")||Object.hasOwn(x,"registered_date")||Object.hasOwn(x,"amount_paid");
+ const x=row.raw,errors=[],modern=true;
  const email=normalizeEmail(x.email),fullName=String(x.full_name||"").trim().replace(/\\s+/g," "),membershipNumber=String(x.membership_number||"").trim(),productCode=String(x.product_code||x.membership_type||"").trim().toUpperCase(),status=String(x.status||"").trim().toLowerCase();
  const phone=normalizePhone(x.phone),gender=String(x.gender||"").trim().toLowerCase(),registeredDate=parseDate(x.registered_date||x.start_date);
  const startDate=parseDate(x.start_date),endDate=parseDate(x.end_date),approved=String(x.approved_membership||"").trim().toLowerCase(),paidAmountText=String(x.amount_paid??x.payment_amount??"").trim(),paidAmount=paidAmountText?Number(paidAmountText):null,paidCurrency=String(x.payment_currency||"").trim().toUpperCase()||null,paymentReference=String(x.payment_reference||"").trim()||null;
@@ -56,6 +56,7 @@ function cleanRow(row){
  if(modern&&!paidAmountText)errors.push("amount_paid is required; enter 0 when no amount has been received.");
  if(paidAmountText&&(!Number.isFinite(paidAmount)||paidAmount<0||!/^(?:0|[1-9]\\d{0,11})(?:\\.\\d{1,2})?$/.test(paidAmountText)))errors.push("amount_paid must be zero or a positive amount with up to two decimal places.");
  if(paidCurrency&&!/^[A-Z]{3}$/.test(paidCurrency))errors.push("payment_currency must be a three-letter ISO currency code.");
+ if(paidAmount>0&&!paidCurrency)errors.push("payment_currency is required when amount_paid is greater than zero.");
  if(paymentReference&&paymentReference.length<4)errors.push("payment_reference must contain at least four characters.");
  if(paymentReference&&(!paidAmountText||!paidCurrency))errors.push("If a historical payment reference is supplied, include amount_paid and payment_currency.");
  return {...row,email,phone,gender,registeredDate,fullName,membershipNumber,productCode,status,startDate,endDate,paidAmount,paidCurrency,paymentReference,approved:approved==="yes",legacyMemberId:String(x.legacy_member_id||"").trim()||null,approvalReference:String(x.approval_reference||"").trim()||null,notes:String(x.notes||"").trim()||null,errors};
@@ -63,7 +64,7 @@ function cleanRow(row){
 function audit(db,actor,action,type,id,requestId,metadata={}){return db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,$3,$4,$5,'success',$6)",[actor,action,type,id,requestId,JSON.stringify(metadata)]);}
 export function memberImportTemplate(identity){
  assertImportAuthority(identity);
- return "legacy_member_id,email,phone,full_name,membership_number,product_code,status,start_date,end_date,approved_membership,approval_reference,notes,payment_reference,payment_amount,payment_currency,payment_date,payment_method,payment_evidence_reference\r\n";
+ return MEMBER_IMPORT_XLSX_COLUMNS.join(",")+"\\r\\n";
 }
 async function validateImportedResidence(db,row){
  const raw=row.raw,hasStructured=Boolean(String(raw.residence_type||"").trim()||String(raw.country_iso3||"").trim()||String(raw.region_or_federal_city||"").trim()||String(raw.zone_or_sub_city||"").trim()||String(raw.district_or_town||"").trim());

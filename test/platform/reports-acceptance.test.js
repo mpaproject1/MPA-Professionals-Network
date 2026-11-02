@@ -136,7 +136,7 @@ test("membership dashboard aggregates and monthly trend are available only throu
     t.skip("requires the disposable PostgreSQL database configured by PR Quality");
     return;
   }
-  const requestIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+  const requestIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()];
   const reviewer = { sub: null, roles: ["membership_reviewer"], permissions: [] };
   const permissionOnly = { sub: null, roles: [], permissions: ["membership.review"] };
   const financeOnly = { sub: null, roles: ["finance_officer"], permissions: [] };
@@ -174,6 +174,11 @@ test("membership dashboard aggregates and monthly trend are available only throu
       assert.ok(Number.isFinite(Number(row.Approved)));
       assert.ok(Number.isFinite(Number(row.Rejected)));
     }
+
+    await assert.rejects(
+      runReport({ sub: null, roles: [], permissions: ["reports.view"] }, "membership-reviewer-performance", {}, requestIds[4]),
+      error => error.code === "SENSITIVE_REPORT_FORBIDDEN"
+    );
 
     await assert.rejects(
       runReport(financeOnly, "membership-status", {}, randomUUID()),

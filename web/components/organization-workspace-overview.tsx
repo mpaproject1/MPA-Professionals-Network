@@ -273,7 +273,7 @@ export function OrganizationWorkspaceOverview({
                 <ol className={styles.verificationTimeline} aria-label="Organization verification progress">
                   <li className={styles.stageComplete}>Profile created</li>
                   <li className={evidenceSubmitted ? styles.stageComplete : styles.stageCurrent}>Evidence submitted</li>
-                  <li className={decisionRecorded ? styles.stageComplete : ""}>MPA decision</li>
+                  <li className={decisionRecorded ? styles.stageComplete : evidenceSubmitted ? styles.stageCurrent : ""}>MPA decision</li>
                 </ol>
                 <p>{status.detail}</p>
                 {organization.verification_decision_reason ? <p className={styles.reviewNote}><strong>Reviewer feedback:</strong> {organization.verification_decision_reason}</p> : null}

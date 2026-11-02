@@ -14,7 +14,7 @@ import {
   reverseMembershipRecordReceipt,
   verifyMembershipReceipt,
 } from "../../src/membership/fee-obligations.js";
-import { parseXlsxRows } from "../../src/platform/xlsx.js";
+import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import { getPool } from "../../src/platform/db.js";
@@ -75,6 +75,48 @@ test("Finance payment template contains only pending-intake fields and requires 
  const {headers,rows}=parseXlsxRows(workbook);
  assert.deepEqual(headers,["application_id","membership_number","amount","currency","received_date","payment_method_code","payment_reference","evidence_reference","evidence_file_id","payer_note"]);
  assert.equal(rows.length,0);
+});
+
+test("PostgreSQL Finance XLSX intake applies valid rows independently and preserves row failures",async t=>{
+ if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
+ const db=getPool(),suffix=randomUUID(),digits=suffix.replace(/\\D/g,"").slice(0,8).padEnd(8,"7");
+ const applicant=await membership.register({email:"fee-bulk-app-"+suffix+"@example.test",password:"BulkApplicantSecurePassword!2026",firstName:"Bulk",lastName:"Applicant",phone:"05"+digits},"fee-bulk-app-"+suffix);
+ const financeUser=await membership.register({email:"fee-bulk-finance-"+suffix+"@example.test",password:"BulkFinanceSecurePassword!2026",firstName:"Bulk",lastName:"Finance",phone:"04"+digits},"fee-bulk-finance-"+suffix);
+ const app=await membership.createApplication(applicant.user.id,{productCode:"BASIC",termsAcknowledged:true,idempotencyKey:"fee_bulk_app_"+suffix.slice(0,32)},"fee-bulk-create-app-"+suffix);
+ const identity={sub:financeUser.user.id,roles:["finance_officer"],permissions:[]},methodCode="bulk_"+suffix.slice(0,8);
+ await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'cash','Bulk XLSX test',true,'ETB','Disposable Finance intake method',false) on conflict(method_code) do update set enabled=true,currency='ETB',requires_evidence=false",[methodCode]);
+ const headers=parseXlsxRows(membershipPaymentImportTemplate(identity)).headers;
+ const reference="bulk-reference-"+suffix;
+ const rows=[
+  {application_id:app.id,membership_number:"",amount:"300",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:methodCode,payment_reference:reference,evidence_reference:"",evidence_file_id:"",payer_note:"Valid row"},
+  {application_id:app.id,membership_number:"",amount:"200",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:methodCode,payment_reference:reference,evidence_reference:"",evidence_file_id:"",payer_note:"Duplicate reference row"},
+ ];
+ const workbook=createXlsx(rows,headers);
+ const preview=await previewMembershipPaymentImport(identity,{filename:"bulk-fee-test.xlsx",xlsxBase64:workbook.toString("base64")},"fee-bulk-preview-"+suffix);
+ assert.equal(preview.rowCount,2);
+ assert.equal(preview.errorCount,1);
+ assert.equal(preview.canApply,false);
+ assert.equal(preview.rows[0].errors.length,0);
+ assert.ok(preview.rows[1].errors.some(error=>/duplicated in this workbook/i.test(error)));
+ await assert.rejects(applyMembershipPaymentImport(identity,preview.batchId,{reason:"Apply test batch without partial option"},"fee-bulk-denied-"+suffix),error=>error.code==="IMPORT_NOT_VALIDATED");
+ const applied=await applyMembershipPaymentImport(identity,preview.batchId,{reason:"Apply valid rows and retain row failures",applyValidRows:true},"fee-bulk-apply-"+suffix);
+ assert.equal(applied.createdCount,1);
+ assert.equal(applied.errorCount,1);
+ assert.equal(applied.partial,true);
+ assert.deepEqual(applied.createdRows,[2]);
+ assert.equal(applied.failedRows[0].rowNumber,3);
+ const pending=(await db.query("select pt.id,pt.status,pt.source from payment_transaction pt join membership_fee_obligation_payment op on op.payment_transaction_id=pt.id where op.obligation_id=(select id from membership_fee_obligation where application_id=$1)",[app.id])).rows;
+ assert.equal(pending.length,1);
+ assert.equal(pending[0].status,"pending");
+ assert.equal(pending[0].source,"finance_bulk_import");
+ assert.equal((await db.query("select 1 from payment_verification where payment_transaction_id=$1",[pending[0].id])).rowCount,0,"bulk import must not verify or auto-activate a receipt");
+ const replay=await applyMembershipPaymentImport(identity,preview.batchId,{reason:"Replay already applied batch",applyValidRows:true},"fee-bulk-replay-"+suffix);
+ assert.equal(replay.alreadyApplied,true);
+ assert.equal(replay.createdCount,1);
+ const duplicateUpload=await previewMembershipPaymentImport(identity,{filename:"duplicate-reupload.xlsx",xlsxBase64:createXlsx([rows[0]],headers).toString("base64")},"fee-bulk-duplicate-"+suffix);
+ assert.ok(duplicateUpload.rows[0].errors.some(error=>/already allocated/i.test(error)),"re-upload must detect the existing pending payment reference");
+ const audits=await db.query("select action from audit_log where request_id::text=any($1::text[])",[["fee-bulk-apply-"+suffix,"fee-bulk-replay-"+suffix]]);
+ assert.ok(audits.rows.some(row=>row.action==="finance.membership_bulk_receipt_created"));
 });
 
 test("ordinary members cannot access the Finance fee obligation queue",async()=>{

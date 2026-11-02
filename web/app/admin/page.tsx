@@ -122,7 +122,7 @@ export default function AdminPage() {
     if (hydrated && token && canSeeOperationalQueues) void loadOperationalQueues();
   }, [hydrated, token, canSeeOperationalQueues, loadOperationalQueues]);
   const totalUnreviewed = (operationalQueues?.rows || []).reduce((sum, row) => sum + Math.max(0, Number(row.Unreviewed) || 0), 0);
-  const operationalQueueLinks: Record<string, string> = { "Membership application": "/admin/membership", "Professional verification": "/verification", "Organization verification": "/organizations", "Marketplace demand": "/admin/marketplace" };
+  const operationalQueueLinks: Record<string, string> = { "Membership application": "/admin/membership-center", "Professional verification": "/verification", "Organization verification": "/organizations", "Marketplace demand": "/admin/marketplace" };
   const workspaces = [
     {title:"Organizations",desc:"Search organizations, inspect linked accounts and open verification review workflows.",href:"/admin/organizations",Icon:Building2,group:"Review & service",access:"org"},
     {title:"Vacancy review",desc:"Review submitted job vacancies and approve publication only after MPA governance checks.",href:"/admin/jobs/review",Icon:ClipboardList,group:"Review & service",access:"jobs"},

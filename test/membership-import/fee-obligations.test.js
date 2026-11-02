@@ -117,6 +117,13 @@ test("PostgreSQL Finance XLSX intake applies valid rows independently and preser
  assert.equal(pending[0].status,"pending");
  assert.equal(pending[0].source,"finance_bulk_import");
  assert.equal((await db.query("select 1 from payment_verification where payment_transaction_id=$1",[pending[0].id])).rowCount,0,"bulk import must not verify or auto-activate a receipt");
+ await assert.rejects(verifyMembershipReceipt(identity,pending[0].id,{decision:"approved",note:"Self-verification must be rejected"},"fee-bulk-self-verify-"+suffix),error=>error.code==="MAKER_CHECKER_REQUIRED");
+ const checker={sub:applicant.user.id,roles:["finance_officer"],permissions:[]};
+ await verifyMembershipReceipt(checker,pending[0].id,{decision:"approved",note:"Independent receipt verification"},"fee-bulk-independent-verify-"+suffix);
+ const verified=(await db.query("select status,verified_by from payment_transaction where id=$1",[pending[0].id])).rows[0];
+ assert.equal(verified.status,"succeeded");
+ assert.equal(verified.verified_by,checker.sub,"receipt verification must be performed by a different Finance user");
+ assert.equal((await db.query("select count(*)::int count from payment_verification where payment_transaction_id=$1",[pending[0].id])).rows[0].count,1);
  const replay=await applyMembershipPaymentImport(identity,preview.batchId,{reason:"Replay already applied batch",applyValidRows:true},"fee-bulk-replay-"+suffix);
  assert.equal(replay.alreadyApplied,true);
  assert.equal(replay.createdCount,1);

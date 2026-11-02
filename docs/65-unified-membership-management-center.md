@@ -654,7 +654,7 @@ Member profile capture and the reference-data database must use a governed hiera
 **Residence choice:** Ethiopia or Diaspora.
 
 **Ethiopia**
-1. Region or Federal City (the two federal cities are Addis Ababa and Dire Dawa).
+1. Region or Federal City (the two chartered cities are Addis Ababa and Dire Dawa).
 2. If a federal city is selected: Sub-city. If a region is selected: Zone.
 3. District/Woreda or Town, as appropriate to the selected parent.
 4. Specific street/address is optional free text.
@@ -1030,7 +1030,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 #### Implemented in source
 
 - `scripts/generate-member-geography-reference.js` now records separate M49 and Ethiopian administrative-structure source URLs, retrieval date, row counts, and explicit coverage limits in the manifest.
-- The Ethiopian top-level records are 12 regions and two federal cities. Their `ET-REG-*` / `ET-FED-*` identifiers are explicitly documented as MPA internal stable identifiers, not official Ethiopian government codes.
+- The Ethiopian top-level records are 12 regions and two chartered cities. Their `ET-REG-*` / `ET-FED-*` identifiers are explicitly documented as MPA internal stable identifiers, not official Ethiopian government codes.
 - `scripts/validate-member-geography-reference.js` validates the generated workbook before artifact upload: required columns, unique codes, ISO-alpha3 and M49 formats, parent relationships, row-level HTTPS provenance, the 12-region/two-city count, and exclusion of unsupported lower levels.
 - `.github/workflows/member-geography-reference.yml` now runs on manual dispatch, its weekly schedule, and relevant changes on this PR branch. It generates the XLSX and manifest, runs the structural validator, then uploads the artifact.
 - Geography preview now requires a primary HTTPS source URL and row-level HTTPS provenance. The preview metadata retains all source URLs; applying creates a draft version with the captured provenance. Publishing fails closed if any active row lacks source name, source version or an HTTPS source URL.
@@ -1039,7 +1039,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 
 #### Source boundary and operational proof still pending
 
-- The generator uses UN M49 for country/area codes and the Permanent Committee on Geographical Names (PCGN) reference cited by the UK Home Office Ethiopia CPIN for the 12 regions and two federal cities. The Ethiopian level-one codes are MPA-generated identifiers, not government codes. [UN M49](https://unstats.un.org/unsd/methodology/m49/overview/); [Ethiopia CPIN / PCGN reference](https://www.gov.uk/government/publications/ethiopia-country-policy-and-information-notes/country-policy-and-information-note-internal-relocation-ethiopia-september-2025-accessible).
+- The generator uses UN M49 for country/area codes and the Permanent Committee on Geographical Names (PCGN) reference cited by the UK Home Office Ethiopia CPIN for the 12 regions and two chartered cities. The Ethiopian level-one codes are MPA-generated identifiers, not government codes. [UN M49](https://unstats.un.org/unsd/methodology/m49/overview/); [Ethiopia CPIN / PCGN reference](https://www.gov.uk/government/publications/ethiopia-country-policy-and-information-notes/country-policy-and-information-note-internal-relocation-ethiopia-september-2025-accessible).
 - No authoritative, licensed and versioned Ethiopian Zone, Sub-city, District or Town dataset has been verified and imported. Those levels remain unavailable; no lower-level records have been invented.
 - The workbook workflow has been configured to run on relevant branch changes, but GitHub returned no run/artifact for the current implementation head. Therefore the generated workbook structure, codes and manifest have **not yet been inspected from an actual workflow artifact**. The database-backed preview/apply/publish integration test is committed but not executed here.
 

@@ -6,7 +6,7 @@ async function mockSignedInWorkspace(page) {
   });
   await page.route("**/api/v1/**", async route => {
     const url = new URL(route.request().url());
-    const path = url.pathname.replace(/\\/+$/, "");
+    const path = url.pathname.replace(/\/+$/, "");
     let data = {};
     if (path === "/api/v1/me") data = { user_id: "e2e-member", display_name: "Test Member", has_active_membership: true, completion_percent: 72, roles: ["member"] };
     else if (path.includes("application-tracking")) data = { summary: { total: 0, active: 0, nextSteps: 0, jobApplications: 0 }, items: [] };

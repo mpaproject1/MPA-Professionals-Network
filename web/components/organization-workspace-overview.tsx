@@ -170,7 +170,7 @@ export function OrganizationWorkspaceOverview({
     const state = item.verification_case_status || item.verification_status;
     return state === "submitted" || state === "pending" || item.verification_status === "pending";
   });
-  const attention = organizations.filter((item) => item.verification_case_status === "correction_required");
+  const attention = organizations.filter((item) => ["correction_required", "rejected"].includes(item.verification_case_status || ""));
   const hasVerifiedOrganization = workspaceReady.length > 0;
   const [activeFolderKey, setActiveFolderKey] = useState("publishing");
   const activeRoles = workspaceReady.map((item) => item.role_code || "");

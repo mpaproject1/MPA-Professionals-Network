@@ -129,7 +129,7 @@ function buildQuery(kind, identity, filters) {
   if (kind === "members") {
     dateColumn = "mr.created_at";
     select = `mr.id, u.account_reference, p.display_name full_name, u.status account_status, u.email, p.phone,
-      mr.membership_number, case when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end membership_status, mp.product_code, mp.name product_name, mr.start_date, mr.end_date,
+      mr.membership_number, case when mr.status in ('merged','cancelled','suspended') then mr.status when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end membership_status, mp.product_code, mp.name product_name, mr.start_date, mr.end_date,
       mr.source_import_id import_batch, mr.source import_source, mr.created_at record_created_at`;
     fromSql = `membership_record mr
       left join app_user u on u.id=mr.user_id
@@ -137,9 +137,9 @@ function buildQuery(kind, identity, filters) {
       left join membership_product mp on mp.id=mr.membership_product_id`;
     clauses.push(`($${args.length + 1}::date is null or mr.created_at >= $${args.length + 1}::date)`); args.push(filters.from || null);
     clauses.push(`($${args.length + 1}::date is null or mr.created_at < ($${args.length + 1}::date + interval '1 day'))`); args.push(filters.to || null);
-    clauses.push(`($${args.length + 1}='' or (case when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end)=${args.length + 1})`); args.push(filters.status);
+    clauses.push(`($${args.length + 1}='' or (case when mr.status in ('merged','cancelled','suspended') then mr.status when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end)=${args.length + 1})`); args.push(filters.status);
     clauses.push(`($${args.length + 1}='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(u.account_reference,'')||' '||coalesce(mr.membership_number,'')) like lower('%'||$${args.length + 1}||'%'))`); args.push(filters.q);
-    if (filters.membershipStatus) { clauses.push(`(case when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end)=${args.length + 1}`); args.push(filters.membershipStatus); }
+    if (filters.membershipStatus) { clauses.push(`(case when mr.status in ('merged','cancelled','suspended') then mr.status when mr.source='legacy_import' and not exists(select 1 from membership_legacy_payment_verification v where v.membership_id=mr.id) then 'payment_verification_required' else mr.status end)=${args.length + 1}`); args.push(filters.membershipStatus); }
     if (batchFilter) { clauses.push(`mr.source_import_id::text=$${args.length + 1}`); args.push(filters.importBatch); }
     if (orgFilter) { clauses.push(`exists(select 1 from organization_membership om where om.user_id=u.id and om.organization_id::text=$${args.length + 1} and om.status='active')`); args.push(filters.organizationId); }
   } else {

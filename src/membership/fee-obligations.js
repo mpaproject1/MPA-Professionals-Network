@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
 import { createInAppNotification } from "../platform/notifications.js";
 import { createXlsx, parseXlsxRows } from "../platform/xlsx.js";
-import { assertPaymentVerificationAccess } from "../platform/workspace-authorization.js";
+import { assertPaymentReversalAccess, assertPaymentVerificationAccess } from "../platform/workspace-authorization.js";
 import { assertMembershipPaymentMethodAvailable, buildMembershipPaymentMethodSnapshot } from "./payment-method-policy.js";
 
 function problem(statusCode,message,code="BUSINESS_RULE"){return Object.assign(new Error(message),{statusCode,code});}
@@ -73,9 +73,11 @@ export async function listFeeObligations(identity,filters={}){
   left join app_user u on u.id=coalesce(a.user_id,mr.user_id)
   left join person p on p.user_id=u.id
   left join membership_product mp on mp.id=coalesce((select membership_product_id from membership_application where id=o.application_id),(select membership_product_id from membership_record where id=o.membership_record_id))
+  left join lateral (select json_agg(json_build_object('id',pt.id,'amount',pt.amount,'currency',pt.currency,'reference',pt.purpose_reference,'createdAt',pt.created_at) order by pt.created_at) receipts from membership_fee_obligation_payment op join payment_transaction pt on pt.id=op.payment_transaction_id where op.obligation_id=o.id and pt.status='pending' and pt.source in ('finance_manual_record','finance_bulk_import')) pending on true
+  left join lateral (select json_agg(json_build_object('id',d.id,'type',d.disposition_type,'amount',d.amount,'currency',d.currency,'remark',d.remark,'requestedBy',d.requested_by) order by d.created_at) items from membership_fee_balance_disposition d where d.obligation_id=o.id and d.status='pending') pending_dispositions on true
   where ($1='' or o.status=$1) and ($2='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(mr.membership_number,'')||' '||coalesce(a.tracking_reference,'')) like lower('%'||$2||'%'))
   order by (b.outstanding_balance>0) desc,o.due_date nulls last,o.created_at desc limit 500`,[status,q])).rows;
- return {rows,total:rows.length};
+ return {rows:rows.map(row=>({...row,pending_receipts:row.receipts||[],pending_dispositions:row.items||[]})),total:rows.length};
 }
 export async function recordMembershipReceipt(identity,input={},requestId){
  financeRecord(identity);
@@ -291,5 +293,30 @@ export async function scheduleMembershipFeeReminders(batchSize=100){
   }
   await tx.query("update membership_fee_reminder r set status='cancelled' from membership_fee_obligation_balance b where r.obligation_id=b.obligation_id and r.status in ('scheduled','queued') and b.outstanding_balance=0");
   return {processed:obligations.length,sent};
+ });
+}
+
+export async function reverseMembershipRecordReceipt(identity,paymentId,input={},requestId){
+ assertPaymentReversalAccess(identity);
+ const reason=clean(input.reason,1000),type=input.reversalType==="reversal"?"reversal":"refund",evidenceReference=clean(input.evidenceReference,300)||null;
+ if(reason.length<8)throw problem(400,"Enter a reversal reason of at least eight characters.","REVERSAL_REASON_REQUIRED");
+ return withTransaction(async db=>{
+  const link=(await db.query("select obligation_id from membership_fee_obligation_payment where payment_transaction_id=$1 for update",[paymentId])).rows[0];
+  if(!link)throw problem(404,"Receipt is not linked to a fee obligation.","NOT_FOUND");
+  const obligation=(await db.query("select * from membership_fee_obligation where id=$1 for update",[link.obligation_id])).rows[0];
+  const payment=(await db.query("select * from payment_transaction where id=$1 for update",[paymentId])).rows[0];
+  if(!obligation||!payment)throw problem(404,"Receipt or fee obligation not found.","NOT_FOUND");
+  if(obligation.application_id)throw problem(409,"Application-linked receipts must use the existing membership payment reversal workflow.","USE_APPLICATION_REVERSAL");
+  if(!["finance_manual_record","finance_bulk_import"].includes(payment.source)||payment.status!=="succeeded")throw problem(409,"Only individually verified Finance-entered receipts can be reversed here.","PAYMENT_NOT_REVERSIBLE");
+  if((await db.query("select 1 from membership_payment_reversal where payment_transaction_id=$1",[paymentId])).rowCount)throw problem(409,"This receipt has already been reversed.","PAYMENT_ALREADY_REVERSED");
+  const reversal=(await db.query("insert into membership_payment_reversal(payment_transaction_id,application_id,membership_record_id,reversal_type,reason,evidence_reference,reversed_by,metadata) values($1,null,$2,$3,$4,$5,$6,$7) returning id",[paymentId,obligation.membership_record_id,type,reason,evidenceReference,identity.sub,JSON.stringify({source:payment.source,obligationId:obligation.id})])).rows[0];
+  await db.query("update payment_transaction set status='refunded',updated_at=now(),completed_at=coalesce(completed_at,now()),verification_note=$1 where id=$2",[reason,paymentId]);
+  await db.query("update payment_reconciliation set reconciliation_status='disputed',reconciled_by=$1,reconciled_at=now(),note=concat_ws(' | ',note,$2::text) where payment_transaction_id=$3",[identity.sub,"Finance "+type+" recorded: "+reason,paymentId]);
+  await db.query("update membership_fee_obligation set status='open',updated_at=now() where id=$1",[obligation.id]);
+  const balance=await balanceFor(db,obligation.id);
+  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'finance.membership_receipt_reversed','payment_transaction',$2,$3,'success',$4)",[identity.sub,paymentId,requestId,JSON.stringify({obligationId:obligation.id,reversalId:reversal.id,type,reason,evidenceReference,outstandingBalance:balance.outstanding_balance})]);
+  const user=(await db.query("select user_id from membership_record where id=$1",[obligation.membership_record_id])).rows[0];
+  if(user?.user_id)await createInAppNotification(db,user.user_id,"membership.payment_reversed","payment_transaction",paymentId,{category:"membership",message:"A Finance-verified membership receipt was reversed. Your outstanding balance has been recalculated.",actionUrl:"/membership",eventVersion:reversal.id});
+  return {paymentId,reversalId:reversal.id,balance};
  });
 }

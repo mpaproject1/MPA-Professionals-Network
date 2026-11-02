@@ -559,8 +559,32 @@
 
 @media (max-width: 520px) {
   .benefits,
-  .folderShelf,
   .folderActions { grid-template-columns: minmax(0, 1fr); }
+  .folderShelf {
+    position: sticky;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + .45rem);
+    z-index: 20;
+    display: flex;
+    gap: .45rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: .4rem;
+    border: 1px solid var(--border);
+    border-radius: .9rem;
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    box-shadow: 0 8px 24px rgba(7, 29, 51, .16);
+    scrollbar-width: thin;
+  }
+  .folderShelf .folder {
+    flex: 0 0 112px;
+    min-width: 112px;
+    gap: .3rem;
+    padding: .55rem;
+  }
+  .folderShelf .folderDescription { display: none; }
+  .folderShelf .folderTitle { font-size: .78rem; }
+  .folderShelf .folderHeader { gap: .3rem; }
+  .folderShelf .folderIcon { width: 1.8rem; height: 1.8rem; }
   .dashboardHeader { display: grid; }
   .dashboardActions { justify-items: stretch; }
   .organizationSwitcher { min-width: 0; }

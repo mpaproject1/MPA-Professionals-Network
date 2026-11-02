@@ -41,6 +41,16 @@ function unzip(buffer) {
 }
 
 function entryText(files, name) { const value = files.get(name); return value ? value.toString("utf8") : ""; }
+const EXCEL_DATE_HEADERS=new Set(["registered_date","registration_date","start_date","end_date","payment_date","received_date","due_date","effective_from","effective_to","date_of_birth","renewal_date","membership_start_date","membership_end_date"]);
+function normalizeExcelCell(header,value){
+ const text=String(value??"");
+ if(!EXCEL_DATE_HEADERS.has(String(header||"").trim().toLowerCase())||!/^\\d+(?:\\.\\d+)?$/.test(text))return text;
+ const serial=Number(text);
+ if(!Number.isFinite(serial)||serial<1||serial>100000)return text;
+ const date=new Date(Date.UTC(1899,11,30)+Math.floor(serial)*86400000);
+ return Number.isNaN(date.getTime())?text:date.toISOString().slice(0,10);
+}
+
 export function parseXlsxRows(input) {
   const files = unzip(input);
   const workbook = entryText(files, "xl/workbook.xml");
@@ -78,7 +88,7 @@ export function parseXlsxRows(input) {
   const headers = matrix[0].map(value => String(value).trim());
   if (!headers.some(Boolean)) throw new Error("The first worksheet must have a header row.");
   const rows = matrix.slice(1).filter(row => row.some(value => String(value ?? "").trim())).map(values =>
-    Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]).filter(([header]) => header))
+    Object.fromEntries(headers.map((header, index) => [header, normalizeExcelCell(header, values[index] ?? "")]).filter(([header]) => header))
   );
   return { headers, rows };
 }

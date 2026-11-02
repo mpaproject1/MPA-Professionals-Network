@@ -3,6 +3,7 @@ import {randomUUID} from "node:crypto";
 import http from "node:http";
 import * as ethics from "./src/ethics/service.js";
 import * as membershipAdminBulk from "./src/membership/admin-bulk.js";
+import * as legacyMembershipPayments from "./src/membership/legacy-payment-verification.js";
 import * as membershipCard from "./src/membership/card.js";
 import { assertMembershipPaymentMethodAdmin } from "./src/membership/payment-method-policy.js";
 import * as membership from "./src/membership/service.js";
@@ -812,6 +813,8 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/finance/receipts/") && parts[5]==="voucher") { const identity=await auth(req); return ok(res,await financeReceipts.issueFinancePaymentVoucher(identity,parts[4],requestId),requestId,201); }
     if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/finance/membership/payments/") && parts[6]==="voucher") { const identity=await auth(req); return ok(res,await financeReceipts.issueVerifiedMembershipPaymentVoucher(identity,parts[5],requestId),requestId,201); }
     if(req.method==="GET" && p==="api/v1/finance/membership/payments") { const identity=await auth(req); assertFinancePaymentQueueAccess(identity); return ok(res,await membership.listMembershipPaymentsForFinance(),requestId); }
+    if(req.method==="GET" && p==="api/v1/finance/membership/legacy-payment-verification") { const identity=await auth(req); return ok(res,await legacyMembershipPayments.listLegacyMembershipPaymentVerificationQueue(identity),requestId); }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/finance/membership/legacy-payment-verification/") && parts[6]==="verify") { const identity=await auth(req); return ok(res,await legacyMembershipPayments.verifyLegacyMembershipPayment(identity,parts[5],await body(req),requestId),requestId); }
     if(req.method==="GET" && p==="api/v1/review/membership/applications") {
       assertMembershipReviewQueueAccess(identity);
       return ok(res,await membership.listApplicationsForReview(),requestId);

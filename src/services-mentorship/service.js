@@ -1347,7 +1347,10 @@ export async function submitMentorshipLearningActivity(activityId,userId,input,r
     if(activity.mentorship_status!=="active"||activity.status!=="published")throw error(409,"This learning activity is not accepting submissions.","INVALID_STATE");
     const response=String(input.response||"").trim();
     if(response.length<10||response.length>10000)throw error(400,"Your practical work must contain 10 to 10,000 characters.","VALIDATION_ERROR");
-    const version=Number((await db.query("select coalesce(max(version),0)::int version from mentorship_learning_submission where activity_id=$1 and submitted_by=$2",[activityId,userId])).rows[0].version)+1;
+    const latest=(await db.query("select version,status from mentorship_learning_submission where activity_id=$1 and submitted_by=$2 order by version desc limit 1",[activityId,userId])).rows[0];
+    if(latest?.status==="accepted")throw error(409,"This activity has already been accepted and cannot be resubmitted.","INVALID_STATE");
+    if(latest?.status==="submitted")throw error(409,"Your latest version is awaiting mentor review. Wait for feedback before submitting another version.","SUBMISSION_AWAITING_REVIEW");
+    const version=Number(latest?.version||0)+1;
     const row=(await db.query("insert into mentorship_learning_submission(activity_id,submitted_by,version,response) values($1,$2,$3,$4) returning id,activity_id,version,response,status,submitted_at",[activityId,userId,version,response])).rows[0];
     await audit(db,userId,"mentorship.learning_submission_created","mentorship_learning_submission",row.id,requestId,{version});
     return row;
@@ -1360,6 +1363,9 @@ export async function reviewMentorshipLearningSubmission(submissionId,userId,inp
     if(!submission)throw error(404,"Learning submission not found.","NOT_FOUND");
     if(submission.mentor_user_id!==userId)throw error(403,"Only the assigned mentor can review this submission.","FORBIDDEN");
     if(submission.mentorship_status!=="active")throw error(409,"This mentorship is not active.","INVALID_STATE");
+    if(submission.status!=="submitted")throw error(409,"Only an unreviewed submission can be reviewed.","INVALID_STATE");
+    const latest=(await db.query("select id from mentorship_learning_submission where activity_id=$1 and submitted_by=$2 order by version desc limit 1",[submission.activity_id,submission.submitted_by])).rows[0];
+    if(latest?.id!==submissionId)throw error(409,"A newer submission exists. Review the latest version.","STALE_SUBMISSION");
     if(!["accepted","changes_requested"].includes(input.decision))throw error(400,"Choose accepted or changes requested.","VALIDATION_ERROR");
     const feedback=String(input.feedback||"").trim();
     if(feedback.length<5||feedback.length>3000)throw error(400,"Feedback must contain 5 to 3,000 characters.","VALIDATION_ERROR");

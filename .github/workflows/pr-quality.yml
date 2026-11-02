@@ -213,9 +213,9 @@ jobs:
           fi
 
           echo "=== Browser acceptance: run every selected spec and collect every failure ==="
-          # Do not use --max-failures: Playwright must continue through the complete
-          # selected suite. Preserve a machine-readable report, HTML report, failure
-          # screenshots, videos and traces for post-run diagnosis.
+          # A zero failure cap means unlimited: execute the entire selected suite.
+          # Preserve machine-readable/HTML reports, screenshots, videos and traces.
+          mkdir -p test-results playwright-report
           npx playwright test \
             e2e/support-bot-movement.spec.js \
             e2e/ui-guide-tour.spec.js \

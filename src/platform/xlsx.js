@@ -44,7 +44,7 @@ function entryText(files, name) { const value = files.get(name); return value ? 
 const EXCEL_DATE_HEADERS=new Set(["registered_date","registration_date","start_date","end_date","payment_date","received_date","due_date","effective_from","effective_to","date_of_birth","renewal_date","membership_start_date","membership_end_date"]);
 function normalizeExcelCell(header,value){
  const text=String(value??"");
- if(!EXCEL_DATE_HEADERS.has(String(header||"").trim().toLowerCase())||!/^\\d+(?:\\.\\d+)?$/.test(text))return text;
+ if(!EXCEL_DATE_HEADERS.has(String(header||"").trim().toLowerCase())||!/^\d+(?:\.\d+)?$/.test(text))return text;
  const serial=Number(text);
  if(!Number.isFinite(serial)||serial<1||serial>100000)return text;
  const date=new Date(Date.UTC(1899,11,30)+Math.floor(serial)*86400000);

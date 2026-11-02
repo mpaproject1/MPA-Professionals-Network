@@ -696,13 +696,14 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="PATCH" && parts.length===4 && p.startsWith("api/v1/opportunity-inquiries/")) { const identity=await auth(req); const b=await body(req); return ok(res,await publicOpportunity.decideInquiry(parts[3],identity.sub,b,requestId,req.headers["x-idempotency-key"]),requestId); }
     if(req.method==="GET" && p==="api/v1/me/progress") {
       const q=query(req.url);
-      const keys=["applications","serviceRequests","mentorshipRequests","mentorshipMatches","mentorships","organizationMentorshipRequests","verificationCases","referenceRequests","communityImpactClaims","talentInquiries","networkPlusRequests","initiativeParticipations","memberInitiatives","referrals","candidateReferrals","recognitionNominations","recognitionAwards"];
+      const keys=["applications","serviceRequests","mentorshipRequests","mentorshipMatches","mentorships","mentorshipSessions","organizationMentorshipRequests","verificationCases","referenceRequests","communityImpactClaims","talentInquiries","networkPlusRequests","initiativeParticipations","memberInitiatives","referrals","candidateReferrals","recognitionNominations","recognitionAwards"];
       const calls=[
         () => applicationTracking.getApplicationTracking(identity.sub,{limit:100,offset:0}),
         () => servicesMentorship.listMyServiceRequests(identity.sub),
         () => servicesMentorship.listMyMentorshipRequests(identity.sub),
         () => servicesMentorship.listMyMentorshipMatches(identity.sub),
         () => servicesMentorship.listMyMentorships(identity.sub),
+        () => servicesMentorship.listMyMentorshipSessions(identity.sub),
         () => organizationMentorshipOffers.listMyOrganizationMentorshipRequests(identity.sub),
         () => verification.listCases({viewerId:identity.sub,subjectUserId:identity.sub}),
         () => verification.listMyReferenceRequests(identity.sub),
@@ -716,9 +717,10 @@ const server=http.createServer(async (req,res)=>{
       ];
       calls.push(() => communityImpactRecognition.listMyRecognition(identity.sub));
       const settled=await Promise.allSettled(calls.map(call=>Promise.resolve().then(call)));
-      const sources=Object.fromEntries(keys.slice(0,15).map((key,index)=>[key,settled[index]]));
-      sources.recognitionNominations=settled[15];
-      sources.recognitionAwards=settled[15];
+      const sources=Object.fromEntries(keys.slice(0,16).map((key,index)=>[key,settled[index]]));
+      if(sources.mentorshipSessions.status==="fulfilled" && Array.isArray(sources.mentorshipSessions.value)) sources.mentorshipSessions.value=sources.mentorshipSessions.value.map(session=>({...session,viewer_user_id:identity.sub}));
+      sources.recognitionNominations=settled[16];
+      sources.recognitionAwards=settled[16];
       return ok(res,memberProgress.buildMemberProgress(sources,{limit:q.get("limit")||50,offset:q.get("offset")||0,view:q.get("view")||"all",category:q.get("category")||"all"}),requestId);
     }
     if(req.method==="GET" && p==="api/v1/me/application-tracking") { const q=query(req.url); return ok(res,await applicationTracking.getApplicationTracking(identity.sub,{limit:q.get("limit")||undefined,offset:q.get("offset")||undefined,reference:q.get("reference")||undefined}),requestId); }

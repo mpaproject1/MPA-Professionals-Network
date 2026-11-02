@@ -28,11 +28,14 @@ export async function listLegacyMembershipPaymentVerificationQueue(identity) {
       mr.legacy_payload->>'payment_date' imported_payment_date,
       mr.legacy_payload->>'payment_method' imported_payment_method,
       mr.legacy_payload->>'payment_evidence_reference' imported_evidence_reference,
+      o.amount_due confirmed_fee_amount,o.currency fee_currency,b.verified_cash,b.approved_non_cash,b.outstanding_balance,
       inv.expires_at invitation_expires_at, inv.consumed_at invitation_claimed_at
     from membership_record mr
     join membership_product mp on mp.id=mr.membership_product_id
     left join app_user u on u.id=mr.user_id
     left join person p on p.user_id=mr.user_id
+    left join membership_fee_obligation o on o.membership_record_id=mr.id or o.application_id=mr.application_id
+    left join membership_fee_obligation_balance b on b.obligation_id=o.id
     left join lateral (
       select expires_at,consumed_at from member_invitation
       where user_id=mr.user_id and import_id=mr.source_import_id
@@ -111,10 +114,12 @@ export async function verifyLegacyMembershipPayment(identity, membershipId, inpu
       returning id,verified_at
     `,[idempotencyKey,amount,currency,JSON.stringify(payload),channel,identity.sub,financeNote||evidenceReference,paymentReference])).rows[0];
     await tx.query("insert into membership_fee_obligation_payment(obligation_id,payment_transaction_id,linked_by) values($1,$2,$3) on conflict(payment_transaction_id) do nothing",[obligation.id,payment.id,identity.sub]);
+    if(membership.application_id&&obligation.application_id)await tx.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2) on conflict do nothing",[membership.application_id,payment.id]);
     await tx.query("insert into payment_verification(payment_transaction_id,verifier_user_id,decision,evidence_checked,note) values($1,$2,'approved',$3,$4)",[payment.id,identity.sub,JSON.stringify([{type:"historical_payment_reference",reference:paymentReference,evidenceReference,paymentDate,paymentMethod}]),financeNote||evidenceReference]);
     await tx.query("insert into payment_reconciliation(payment_transaction_id,membership_id,reconciliation_status,reconciled_by,reconciled_at,note) values($1,$2,'matched',$3,now(),$4)",[payment.id,membershipId,identity.sub,"Finance verified a historical membership installment for "+membership.membership_number]);
     const updatedBalance=(await tx.query("select * from membership_fee_obligation_balance where obligation_id=$1",[obligation.id])).rows[0];
     await tx.query("update membership_fee_obligation set status=case when $2::numeric=0 then 'settled' else 'open' end,updated_at=now() where id=$1",[obligation.id,updatedBalance.outstanding_balance]);
+    if(membership.application_id&&Number(updatedBalance.outstanding_balance)===0)await tx.query("update membership_application set status='paid',updated_at=now() where id=$1 and approved_at is not null and status in ('approved','payment_pending','paid')",[membership.application_id]);
     let outstandingInvitation={rowCount:0};
     if(Number(updatedBalance.outstanding_balance)===0){
       await tx.query("update member_invitation set expires_at=greatest(expires_at,now()+interval '7 days') where user_id=$1 and import_id=$2 and consumed_at is null",[membership.user_id,membership.source_import_id]);
@@ -154,6 +159,9 @@ export async function reverseLegacyMembershipPayment(identity, paymentId, input 
 
     await tx.query("update payment_transaction set status='refunded',updated_at=now(),completed_at=coalesce(completed_at,now()),verification_note=$1 where id=$2", [reason, paymentId]);
     await tx.query("update payment_reconciliation set reconciliation_status='disputed',reconciled_by=$1,reconciled_at=now(),note=concat_ws(' | ',note,$2::text) where payment_transaction_id=$3", [identity.sub, `Historical ${reversalType} recorded: ${reason}`, paymentId]);
+    await tx.query("update membership_fee_obligation set status='open',updated_at=now() where membership_record_id=$1",[row.membership_id]);
+    const balance=(await tx.query("select b.outstanding_balance from membership_fee_obligation o join membership_fee_obligation_balance b on b.obligation_id=o.id where o.membership_record_id=$1",[row.membership_id])).rows[0];
+    if(balance&&Number(balance.outstanding_balance)>0)await tx.query("update membership_record set status='suspended',updated_at=now() where id=$1 and status='active'",[row.membership_id]);
     await tx.query(
       "insert into membership_event(membership_id,event_type,effective_at,actor_user_id,source,details) values($1,'legacy_payment_reversed',now(),$2,'legacy_import',$3)",
       [row.membership_id, identity.sub, JSON.stringify({ paymentId, reversalId: reversal.id, reversalType, reason, evidenceReference })]

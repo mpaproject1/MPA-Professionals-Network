@@ -1,6 +1,7 @@
 import { createHash, randomBytes, } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
 import { makeXlsx } from "../platform/reports.js";
+import { createXlsx, parseXlsxRows } from "../platform/xlsx.js";
 import { hashPassword, normalizeEmail, normalizePhone } from "./identity.js";
 
 function problem(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e}
@@ -22,8 +23,12 @@ function csvRows(csv){
  if(!rows.length)throw problem(400,"The CSV file is empty.","EMPTY_IMPORT");
  const headers=rows.shift().map(h=>h.trim().toLowerCase().replace(/[\s-]+/g,"_"));
  if(new Set(headers).size!==headers.length)throw problem(400,"The CSV has duplicate column headings.","DUPLICATE_COLUMNS");
- const required=["email","full_name","membership_number","product_code","status","start_date","end_date","approved_membership","approval_reference"];
- const missing=required.filter(h=>!headers.includes(h));if(missing.length)throw problem(400,`Missing required columns: ${missing.join(", ")}`,"MISSING_COLUMNS");
+ const modern=["phone","gender","registered_date"].every(h=>headers.includes(h))&&(headers.includes("amount_paid")||headers.includes("payment_amount"));
+ const required=["email","full_name","membership_number","status","start_date","end_date","approved_membership","approval_reference"];
+ const missing=required.filter(h=>!headers.includes(h));
+ if(!headers.includes("product_code")&&!headers.includes("membership_type"))missing.push("membership_type or product_code");
+ if(modern){for(const h of ["phone","gender","registered_date"])if(!headers.includes(h))missing.push(h);if(!headers.includes("amount_paid")&&!headers.includes("payment_amount"))missing.push("amount_paid");}
+ if(missing.length)throw problem(400,`Missing required columns: ${missing.join(", ")}`,"MISSING_COLUMNS");
  return rows.map((values,index)=>({rowNumber:index+2,raw:Object.fromEntries(headers.map((h,i)=>[h,String(values[i]??"").trim()]))}));
 }
 function parseDate(v){if(!v)return null;if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;const d=new Date(`${v}T00:00:00Z`);return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v?v:null;}
@@ -55,9 +60,10 @@ export function memberImportTemplate(identity){
  assertImportAuthority(identity);
  return "legacy_member_id,email,phone,full_name,membership_number,product_code,status,start_date,end_date,approved_membership,approval_reference,notes,payment_reference,payment_amount,payment_currency,payment_date,payment_method,payment_evidence_reference\r\n";
 }
-export async function previewMemberImport(identity,{filename="mpa-members.csv",csv="",sourceSystem="MPA approved member register"}={},requestId){
+export async function previewMemberImport(identity,{filename="mpa-members.csv",csv="",xlsxBase64="",sourceSystem="MPA approved member register"}={},requestId){
  assertImportAuthority(identity);
- if(!String(csv).trim())throw problem(400,"Choose a CSV file to import.","EMPTY_IMPORT");
+ if(xlsxBase64){if(String(xlsxBase64).length>12*1024*1024)throw problem(413,"Member import XLSX must be 9 MiB or smaller.","IMPORT_TOO_LARGE");csv=xlsxAsCsv(xlsxBase64);}
+ if(!String(csv).trim())throw problem(400,"Choose a CSV or XLSX file to import.","EMPTY_IMPORT");
  if(Buffer.byteLength(csv)>5*1024*1024)throw problem(413,"Member import CSV must be 5 MiB or smaller.","IMPORT_TOO_LARGE");
  const rows=csvRows(csv).map(cleanRow),db=getPool();
  const productCodes=[...new Set(rows.map(r=>r.productCode).filter(Boolean))];
@@ -116,7 +122,7 @@ export async function applyMemberImport(identity,importId,{reason=""}={},request
     if(existing){userId=existing.id;await tx.query("update membership_import_row set match_status='conflict',matched_user_id=$2,match_reason='Account appeared after preview; re-review required',diagnostics=$3 where id=$1",[row.id,userId,JSON.stringify(["An account with this email was created after preview. Re-run the preview to avoid duplicates."])]);conflictCount++;continue;}
     const names=String(row.full_name).trim().split(/\s+/),firstName=names.shift(),lastName=names.pop(),middleName=names.join(" ")||null;
      const rawPassword=randomBytes(48).toString("base64url"),user=(await tx.query("insert into app_user(username,email,password_hash,status) values($1,$2,$3,'active') on conflict do nothing returning id,email",[row.email,row.email,hashPassword(rawPassword)])).rows[0];if(!user){conflictCount++;await tx.query("update membership_import_row set match_status='conflict',diagnostics=$2 where id=$1",[row.id,JSON.stringify(["An account conflict appeared during import. Re-run preview before retrying this row."])]);continue;}userId=user.id;createdAccounts++;accountCreatedForRow=true;
-    const person=(await tx.query("insert into person(user_id,first_name,middle_name,last_name,display_name,phone) values($1,$2,$3,$4,$5,$6) returning id",[userId,firstName,middleName,lastName,row.full_name,row.phone])).rows[0];
+    const person=(await tx.query("insert into person(user_id,first_name,middle_name,last_name,display_name,phone,sex) values($1,$2,$3,$4,$5,$6,$7) returning id",[userId,firstName,middleName,lastName,row.full_name,row.phone,row.raw_payload?.gender||null])).rows[0];
     await tx.query("insert into professional_profile(person_id,completion_percent) values($1,20)",[person.id]);
     await tx.query("insert into app_user_role(user_id,role_id) select $1,id from app_role where role_code='member' on conflict do nothing",[userId]);
     await tx.query("insert into notification_preference(user_id) values($1) on conflict do nothing",[userId]);

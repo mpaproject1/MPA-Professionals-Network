@@ -39,8 +39,8 @@ async function obligationFor(db,input,actorId){
  if(input.membershipRecordId)return ensureRecordObligation(db,clean(input.membershipRecordId,64),input,actorId);
  throw problem(400,"Provide an application ID or membership record ID.","MEMBERSHIP_REFERENCE_REQUIRED");
 }
-async function balanceFor(db,obligationId,lock=false){
- const result=await db.query("select * from membership_fee_obligation_balance where obligation_id=$1"+(lock?" for update of o":""),[obligationId]);
+async function balanceFor(db,obligationId){
+ const result=await db.query("select * from membership_fee_obligation_balance where obligation_id=$1",[obligationId]);
  if(!result.rows[0])throw problem(404,"Membership fee obligation not found.","OBLIGATION_NOT_FOUND");
  return result.rows[0];
 }
@@ -92,14 +92,14 @@ export async function recordMembershipReceipt(identity,input={},requestId){
   if(method.method_type==="chapa")throw problem(400,"Hosted checkout cannot be recorded as a manual Finance receipt.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
   if(method.requires_evidence&&!evidenceFileId)throw problem(400,"This payment method requires private receipt evidence.","PAYMENT_EVIDENCE_REQUIRED");
   if(evidenceFileId)await validateEvidence(db,identity.sub,evidenceFileId);
-  const reused=(await db.query("select id from payment_transaction where lower(coalesce(purpose_reference,''))=lower($1) and status<>'cancelled' limit 1 for update",[reference])).rows[0];
-  if(reused)throw problem(409,"This payment reference is already used by another payment record.","PAYMENT_REFERENCE_ALREADY_USED");
   const key="finance-membership:"+idem;
   const existing=(await db.query("select id,amount,currency,status,purpose_reference from payment_transaction where idempotency_key=$1 for update",[key])).rows[0];
   if(existing){
    if(Number(existing.amount)!==amount||existing.currency!==code||existing.purpose_reference!==reference)throw problem(409,"This idempotency key was used for a different receipt.","IDEMPOTENCY_CONFLICT");
    return {payment:existing,alreadyRecorded:true,obligationId:obligation.id};
   }
+  const reused=(await db.query("select id from payment_transaction where lower(coalesce(purpose_reference,''))=lower($1) and status<>'cancelled' limit 1 for update",[reference])).rows[0];
+  if(reused)throw problem(409,"This payment reference is already used by another payment record.","PAYMENT_REFERENCE_ALREADY_USED");
   const snapshot=buildMembershipPaymentMethodSnapshot(method),channel=method.method_type==="bank_transfer"?"bank_transfer":method.method_type==="cash"?"cash":"other";
   const payment=(await db.query(`insert into payment_transaction(provider,idempotency_key,purpose,amount,currency,status,request_payload,channel,submitted_by,purpose_reference,source,payment_method_code,payment_method_snapshot,evidence_file_id)
    values('manual',$1,'membership',$2,$3,'pending',$4::jsonb,$5,$6,$7,'finance_manual_record',$8,$9::jsonb,$10) returning id,status,amount,currency,purpose_reference,created_at`,

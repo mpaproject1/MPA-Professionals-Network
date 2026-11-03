@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { getPool, withTransaction } from "./db.js";
 import { classifyEmailDeliveryError, emailIdempotencyKey, emailRetryDelaySeconds } from "./email-retry-policy.js";
 import { renderBrandedEmail } from "./email-template.js";
-import { resendEmailVerification } from "./email-verification.js";
+import { retryVerificationDelivery } from "./email-verification.js";
 import { createInAppNotification } from "./notifications.js";
 import { captureTestDelivery } from "./test-lab.js";
 import { emailAudienceMatches, emailWorkflowEventKey, normalizeEmailAddress } from "./email-event-idempotency.js";
@@ -178,6 +178,8 @@ export async function cancelEmailDraft(actorId,id,requestId=null){
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.draft.cancelled','email_outbox_draft',$2,$3,'success',$4)",[actorId,id,requestId,{recipient:row.recipient}]);
  return row;
 }
+
+export async function sendEmailMessage(input){ return sendMessage(input); }
 
 async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,payload,idempotencyKey=null}){
  htmlBody=renderBrandedEmail({subject,htmlBody,textBody,preheader:subject});
@@ -357,13 +359,13 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
 export async function retryVerificationEmail(actorId,id,requestId){
  const db=getPool();await requireAdmin(db,actorId);
  if(!providerConfig().ready&&!(process.env.NODE_ENV!=="production"&&process.env.TEST_DELIVERY_MODE==="capture"))fail(503,"Configure the email provider or enable safe development capture before retrying verification messages.","EMAIL_DELIVERY_NOT_CONFIGURED");
- const row=(await db.query("select u.email from email_verification_token t join app_user u on u.id=t.user_id where t.id=$1 and t.delivery_status='failed' and t.consumed_at is null",[id])).rows[0];
- if(!row)fail(409,"Only unconsumed verification messages with a recorded delivery failure can be retried.","INVALID_STATE");
+ const row=(await db.query("select t.id,u.email from email_verification_token t join app_user u on u.id=t.user_id join email_verification_delivery d on d.verification_token_id=t.id where t.id=$1 and d.status='failed' and d.attempts<8 and t.consumed_at is null and t.expires_at>now()",[id])).rows[0];
+ if(!row)fail(409,"Only unconsumed, unexpired verification deliveries with retryable recorded failures can be retried.","INVALID_STATE");
  const hold=(await db.query("select reason from email_recipient_suppression where email_normalized=lower(trim($1)) and cleared_at is null limit 1",[row.email])).rows[0];
  if(hold)fail(409,"This verification recipient is on an outbound email hold. Resolve the address or consent issue before retrying.","RECIPIENT_HOLD_ACTIVE");
- const result=await resendEmailVerification(row.email,requestId);
- await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.verification.retry_requested','email_verification_token',$2,$3,'success',$4)",[actorId,id,requestId,{attemptRequested:Boolean(result.accepted)}]);
- return {requested:Boolean(result.accepted)};
+ const result=await retryVerificationDelivery(row.id);
+ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.verification.retry_requested','email_verification_token',$2,$3,$4,$5)",[actorId,id,requestId,result.requested?"success":"failure",{attemptRequested:Boolean(result.requested)}]);
+ return result;
 }
 export async function retryFailedEmail(actorId,id,requestId=null){
  const db=getPool();await requireAdmin(db,actorId);
@@ -438,7 +440,9 @@ export async function receiveDeliveryWebhook(input,providedSecret){
 // Server worker entry point: only queued platform messages are processed; no caller identity is accepted from HTTP.
 export async function dispatchPendingSystemEmail(){
  if(!providerConfig().ready)return {processed:0,results:[],skipped:"provider_not_configured"};
- return dispatchEmailOutbox(null,{limit:20,system:true});
+ const verification = await (await import("./email-verification.js")).dispatchPendingVerificationEmails({limit:20});
+ const workflow = await dispatchEmailOutbox(null,{limit:20,system:true});
+ return {processed:verification.processed+workflow.processed,verification,workflow};
 }
 
 export async function listEmailRecipientHolds(actorId,{limit=100}={}){

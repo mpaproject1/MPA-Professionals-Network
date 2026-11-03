@@ -13,7 +13,7 @@ const hash = value => createHash("sha256").update(String(value)).digest("hex");
 function fail(status,message,code="REQUEST_RULE"){ throw policyError(status,message,code); }
 function clean(value,max,label,min=1) { const s=String(value??"").trim(); if(s.length<min||s.length>max)fail(400,`${label} must be between ${min} and ${max} characters.`,"VALIDATION_ERROR"); return s; }
 function object(value,label) { if(value===undefined||value===null)return {}; if(typeof value!=="object"||Array.isArray(value))fail(400,`${label} must be an object.`,"VALIDATION_ERROR"); return value; }
-function assertNoContactFields(value) { if(Array.isArray(value)){for(const item of value)assertNoContactFields(item);return;} if(value&&typeof value==="object")for(const [key,child] of Object.entries(value)){ if(/email|phone|mobile|whatsapp|telegram|contact/i.test(key))fail(400,"Do not include private contact details in request content. Use the separate consent-controlled contact release workflow.","CONTACT_DETAILS_FORBIDDEN"); assertNoContactFields(child); } }
+function assertNoContactFields(value) { if(Array.isArray(value)){for(const item of value)assertNoContactFields(item);return;} if(typeof value==="string"&&(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value)||/(?:\+|(?:^|\D)0)[0-9 ()-]{7,}[0-9]/.test(value)))fail(400,"Do not include private contact details in request content. Use the separate consent-controlled contact release workflow.","CONTACT_DETAILS_FORBIDDEN"); if(value&&typeof value==="object")for(const [key,child] of Object.entries(value)){ if(/email|phone|mobile|whatsapp|telegram|contact/i.test(key))fail(400,"Do not include private contact details in request content. Use the separate consent-controlled contact release workflow.","CONTACT_DETAILS_FORBIDDEN"); assertNoContactFields(child); } }
 function safeTerms(intent,raw) {
   const t=object(raw,"Terms");
   if(intent==="partnership_proposal"||intent==="collaboration_request") {
@@ -101,7 +101,7 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
   const intent=input.intent;
   if(!INTENTS.has(intent))fail(400,"Choose a supported request intent.","INVALID_INTENT");
   const subject=clean(input.subject,180,"Subject",3), summary=clean(input.summary,500,"Summary",10);
-  const details=object(input.details,"Request details"); assertNoContactFields(details); const terms=safeTerms(intent,input.terms);
+  const details=object(input.details,"Request details"); const terms=safeTerms(intent,input.terms); assertNoContactFields({subject,summary,details,terms});
   if(input.recipientUserId===userId)fail(400,"You cannot send a request to yourself.","INVALID_RECIPIENT");
   if(!input.businessId&&!input.serviceListingId&&Boolean(input.recipientUserId)===Boolean(input.recipientOrganizationId))fail(400,"Choose exactly one recipient user or organization, or select a published business/service listing.","INVALID_RECIPIENT");
   const fingerprint=hash(JSON.stringify({intent,subject,summary,details,terms,recipientUserId:input.recipientUserId||null,recipientOrganizationId:input.recipientOrganizationId||null,businessId:input.businessId||null,serviceListingId:input.serviceListingId||null}));
@@ -466,7 +466,7 @@ export async function respondNetworkPlusMeeting(requestId,meetingId,userId,input
 }
 const CLARIFICATION_PROMPTS=new Set(["scope","budget","timeline","quantity","location","availability","eligibility","other"]);
 export async function askNetworkPlusClarification(requestId,userId,input,requestIdHeader){
-  const promptCode=input?.promptCode,question=clean(input?.question,1200,"Clarification question",3);
+  const promptCode=input?.promptCode,question=clean(input?.question,1200,"Clarification question",3); assertNoContactFields({question});
   if(!CLARIFICATION_PROMPTS.has(promptCode))fail(400,"Choose a structured clarification topic.","INVALID_CLARIFICATION_TOPIC");
   return withTransaction(async db=>{
     await assertEntry(db,userId);
@@ -486,7 +486,7 @@ export async function askNetworkPlusClarification(requestId,userId,input,request
   });
 }
 export async function answerNetworkPlusClarification(requestId,clarificationId,userId,input,requestIdHeader){
-  const answer=clean(input?.answer,2000,"Clarification response",3);
+  const answer=clean(input?.answer,2000,"Clarification response",3); assertNoContactFields({answer});
   return withTransaction(async db=>{
     await assertEntry(db,userId);
     const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];

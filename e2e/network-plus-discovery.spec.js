@@ -146,7 +146,7 @@ test.describe("Network-Plus discovery acceptance", () => {
     releaseAccess?.();
     await expect(nav.getByRole("link", { name: "Network-Plus", exact: true })).toBeVisible();
   });
-  test("Network-Plus opens as a compact workspace with three direct action folders", async ({ page }) => {
+  test("Network-Plus opens as a compact workspace with direct action folders", async ({ page }) => {
     await mockNetworkPlus(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/network-plus");
@@ -154,6 +154,7 @@ test.describe("Network-Plus discovery acceptance", () => {
     await expect(page.getByRole("link", { name: /Discover members/ })).toHaveAttribute("href", "/network");
     await expect(page.getByRole("link", { name: /Discover organizations/ })).toHaveAttribute("href", "/network-plus/organizations");
     await expect(page.getByRole("link", { name: /Requests & collaboration/ })).toHaveAttribute("href", "/network-plus/requests");
+    await expect(page.getByRole("link", { name: /Opportunity mall/ })).toHaveAttribute("href", "/network-plus/opportunities");
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByRole("link", { name: /Discover members/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

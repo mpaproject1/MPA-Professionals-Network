@@ -145,7 +145,20 @@ test("unmatched provider event is retained and reconciled after provider message
   assert.equal(pending.rows[0].processed_at, null);
   assert.equal(pending.rows[0].outbox_id, null);
   const outboxId = await makeOutbox({ providerMessageId: messageId, status: "sent" });
-  await dispatchEmailOutbox(null, { system: true, limit: 1 });
+  // The shared CI workflow defaults to Test Lab capture. This test must exercise
+  // the real event-reconciliation branch, not the capture-and-return branch.
+  const previousDeliveryMode = process.env.TEST_DELIVERY_MODE;
+  const previousTestLabEnabled = process.env.TEST_LAB_ENABLED;
+  delete process.env.TEST_DELIVERY_MODE;
+  process.env.TEST_LAB_ENABLED = "false";
+  try {
+    await dispatchEmailOutbox(null, { system: true, limit: 1 });
+  } finally {
+    if (previousDeliveryMode === undefined) delete process.env.TEST_DELIVERY_MODE;
+    else process.env.TEST_DELIVERY_MODE = previousDeliveryMode;
+    if (previousTestLabEnabled === undefined) delete process.env.TEST_LAB_ENABLED;
+    else process.env.TEST_LAB_ENABLED = previousTestLabEnabled;
+  }
   const reconciled = await db.query("select processed_at,outbox_id from email_delivery_event where provider_event_id=$1", [eventId]);
   const outbox = await db.query("select delivery_status from notification_outbox where id=$1", [outboxId]);
   assert.ok(reconciled.rows[0].processed_at);

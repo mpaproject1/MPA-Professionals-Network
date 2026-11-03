@@ -193,3 +193,8 @@ The follow-up audit found and fixed issues that the earlier addendum had missed:
 5. Confirm the backend integration tests cover recipient permission revocation, support privacy, legacy and `v1` ciphertext, tamper detection, notification preference/delivery and API-level DST ambiguity.
 6. Confirm the Playwright run includes `e2e/network-plus-requests.spec.js`, including DST gap/fold cases, and the existing workspace UX suite.
 7. Record run IDs, exact commit SHA, job conclusions and test counts in document 73. Only then implement Phase 3 from document 70, preserving the canonical request model and keeping collaboration optional.
+
+
+## 9. Browser regression follow-up — 2026-11-03
+
+The historical PR Quality run's two `/members` browser failures were traced from the Playwright artifact to a client-side TypeError in the Community Impact workspace panel. The UX test fixture returned an empty object for `/api/v1/me/community-impact/workspace`, while the component requires arrays for its categories, dimensions, claims, items, detected contributions and reminders. This caused the app error boundary to render before `#progress-title` appeared. The fixture now returns a complete empty-state response in commit `496914dd8a84dcab67f330514709ddf5134770d4`. This is a source correction only; it has not yet been rerun.

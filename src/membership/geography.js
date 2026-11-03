@@ -202,4 +202,4 @@ export async function getMemberGeographySummary(identity){
   db.query("select count(*)::int count from member_residence where geography_version_id is distinct from $1",[versionId])
  ]);
  return {publishedVersion,residenceTypes:residenceTypes.rows,countries:countries.rows,ethiopiaLevel1:level1.rows,ethiopiaLevel2:level2.rows,ethiopiaLevel3:level3.rows,residencesOutsidePublishedVersion:Number(stale.rows[0]?.count||0),generatedAt:new Date().toISOString()};
-}}
+}

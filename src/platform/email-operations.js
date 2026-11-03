@@ -137,7 +137,7 @@ export async function previewEmailTemplate(actorId,input={}){
  const textTemplate=String(template.text_template||input.textTemplate||"").slice(0,20000);
  const htmlTemplate=String(template.html_template||input.htmlTemplate||"").slice(0,30000);
  if(!subjectTemplate||(!textTemplate&&!htmlTemplate))fail(400,"A subject and message body are required for preview.","VALIDATION_ERROR");
- const sample={firstName:"Amina",status:"In review",nextAction:"Open your MPA workspace to review the next step.",registrationReference:"MPA-QA-26-000123",jobTitle:"Sample professional opportunity",organizationName:"Sample organization",lastUpdated:"3 November 2026",event:"Sample platform event",occurredAt:"3 November 2026",workflowType:"Membership",...(input.variables&&typeof input.variables==="object"&&!Array.isArray(input.variables)?input.variables:{})};
+ const sample={firstName:"Amina",verificationUrl:"https://example.invalid/verify-email?token=sample-only",status:"In review",nextAction:"Open your MPA workspace to review the next step.",registrationReference:"MPA-QA-26-000123",jobTitle:"Sample professional opportunity",organizationName:"Sample organization",lastUpdated:"3 November 2026",event:"Sample platform event",occurredAt:"3 November 2026",workflowType:"Membership",...(input.variables&&typeof input.variables==="object"&&!Array.isArray(input.variables)?input.variables:{})};
  const placeholders=[...new Set([subjectTemplate,textTemplate,htmlTemplate].join("\n").match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g)||[])].map(value=>value.replace(/[{}\s]/g,""));
  const missingVariables=placeholders.filter(key=>sample[key]===undefined||sample[key]===null||sample[key]==="");
  const subject=render(subjectTemplate,sample);

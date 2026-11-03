@@ -112,3 +112,9 @@ test("verification email and retry paths honor active recipient holds", async ()
   const operations = await read("../../src/platform/email-operations.js");
   assert.match(operations, /verification recipient is on an outbound email hold/);
 });
+
+test("transactional workflow email remains separate from optional email preference", async () => {
+  const source = await read("../../src/platform/email-operations.js");
+  assert.match(source, /optional=false/);
+  assert.match(source, /optional&&!user\.email_enabled/);
+});

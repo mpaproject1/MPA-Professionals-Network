@@ -59,7 +59,7 @@ test("PostgreSQL historical member XLSX import preserves approval and payment sa
  assert.equal(preview.rowCount,2);
  assert.equal(preview.newCount,1);
  assert.equal(preview.conflictCount,1);
- assert.ok(preview.rows[1].errors.some(error=>/configured product code/i.test(error)));
+ assert.ok(preview.rows[1].errors.some(error=>/Unknown or inactive membership product code/i.test(error)));
  assert.ok(preview.rows[1].errors.some(error=>/already approved/i.test(error)));
  assert.ok(preview.rows[1].errors.some(error=>/valid email address/i.test(error)),"malformed email values must fail the same CSV/XLSX row validator");
  const applied=await applyMemberImport(identity,preview.importId,{reason:"Import approved historical member register"},"member-import-apply-"+suffix);

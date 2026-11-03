@@ -96,6 +96,7 @@ export default function MembershipCenterPage() {
   const [membership, setMembership] = useState<ReportResult | null>(null);
   const [monthlyApplications, setMonthlyApplications] = useState<ReportResult | null>(null);
   const [cohortApplications, setCohortApplications] = useState<ReportResult | null>(null);
+  const [monthEndStock, setMonthEndStock] = useState<ReportResult | null>(null);
   const [applicationAging, setApplicationAging] = useState<ReportResult | null>(null);
   const [renewalPipeline, setRenewalPipeline] = useState<ReportResult | null>(null);
   const [reviewerPerformance, setReviewerPerformance] = useState<ReportResult | null>(null);
@@ -135,22 +136,24 @@ export default function MembershipCenterPage() {
         currentPermissions.some(permission => ["membership.review", "membership.activate", "members.view", "members.manage", "reports.view"].includes(permission));
       setRoles(currentRoles);
       setPermissions(currentPermissions);
-      if (!allowed) { setAccess("denied"); setApplications(null); setMembership(null); setMonthlyApplications(null); setCohortApplications(null); setApplicationAging(null); setRenewalPipeline(null); setReviewerPerformance(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
+      if (!allowed) { setAccess("denied"); setApplications(null); setMembership(null); setMonthlyApplications(null); setCohortApplications(null); setMonthEndStock(null); setApplicationAging(null); setRenewalPipeline(null); setReviewerPerformance(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
 
-      const [appResult, memberResult, monthlyResult, cohortResult, agingResult, renewalResult] = await Promise.all([
+      const [appResult, memberResult, monthlyResult, cohortResult, monthEndResult, agingResult, renewalResult] = await Promise.all([
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status }) }, token),
         // Current member stock is deliberately unbounded by the application-period filter.
         api<ReportResult>("/api/v1/admin/reports/membership-status/run", { method: "POST", body: JSON.stringify({ q: nextFilters.q, status: nextFilters.memberStatus }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status, groupBy: "month" }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-application-cohorts/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status }) }, token),
+        api<ReportResult>("/api/v1/admin/reports/membership-month-end-stock/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-application-aging/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, status: nextFilters.status, q: nextFilters.q }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-renewal-pipeline/run", { method: "POST", body: JSON.stringify({ q: nextFilters.q, memberStatus: nextFilters.memberStatus }) }, token),
       ]);
-      if (!Array.isArray(appResult?.rows) || !Array.isArray(memberResult?.rows) || !Array.isArray(monthlyResult?.rows) || !Array.isArray(cohortResult?.rows) || !Array.isArray(agingResult?.rows) || !Array.isArray(renewalResult?.rows)) throw new Error("Membership reporting returned an incomplete response. No KPI values have been inferred.");
+      if (!Array.isArray(appResult?.rows) || !Array.isArray(memberResult?.rows) || !Array.isArray(monthlyResult?.rows) || !Array.isArray(cohortResult?.rows) || !Array.isArray(monthEndResult?.rows) || !Array.isArray(agingResult?.rows) || !Array.isArray(renewalResult?.rows)) throw new Error("Membership reporting returned an incomplete response. No KPI values have been inferred.");
       setApplications(appResult);
       setMembership(memberResult);
       setMonthlyApplications(monthlyResult);
       setCohortApplications(cohortResult);
+      setMonthEndStock(monthEndResult);
       setApplicationAging(agingResult);
       setRenewalPipeline(renewalResult);
       setGeneratedAt(appResult.generatedAt || memberResult.generatedAt || "");
@@ -175,6 +178,7 @@ export default function MembershipCenterPage() {
       setMembership(null);
       setMonthlyApplications(null);
       setCohortApplications(null);
+      setMonthEndStock(null);
       setApplicationAging(null);
       setRenewalPipeline(null);
       setReviewerPerformance(null);
@@ -297,6 +301,7 @@ export default function MembershipCenterPage() {
       <BarList title="Renewal and expiry pipeline" rows={renewalPipeline?.rows || []} labelKey="Renewal window" valueKey="Members" empty={renewalPipeline ? "No verified-paid memberships are due in the next 90 days." : "Renewal pipeline unavailable."}/></Card>
       <Card><CohortConversionList rows={cohortApplications?.rows || []} days={30}/></Card>
       <Card><CohortConversionList rows={cohortApplications?.rows || []} days={90}/></Card>
+      <Card><BarList title="Month-end active membership stock" rows={monthEndStock?.rows || []} labelKey="Month" valueKey="Active members" empty={monthEndStock ? "No month-end snapshot is available in this period yet." : "Month-end stock report unavailable."}/></Card>
       <Card><BarList title="Current membership by plan" rows={planChart} labelKey="Product" valueKey="Members" empty={membership ? "No membership records were returned." : "Membership report unavailable; retry after checking access."}/></Card>
       <Card><BarList title="Applications by membership plan" rows={applicationPlanChart} labelKey="Product" valueKey="Applications" empty="No applications matched this period."/></Card>
       <Card>

@@ -77,6 +77,37 @@ alter table network_plus_service_listing
 update network_plus_service_listing set listing_kind='service_profile',wizard_step=6,draft_saved_at=coalesce(draft_saved_at,updated_at)
 where status='draft' and wizard_step=1;
 update network_plus_service_listing set wizard_step=8 where status<>'draft';
+alter table network_plus_service_listing
+  add column if not exists remote_available boolean not null default false,
+  add column if not exists service_radius_km integer,
+  add column if not exists availability_status text not null default 'accepting_requests',
+  add column if not exists lead_time_days integer,
+  add column if not exists active_work_limit integer,
+  add column if not exists timezone text,
+  add column if not exists next_available_at timestamptz,
+  add column if not exists target_audience text[] not null default '{}'::text[],
+  add column if not exists secondary_tags text[] not null default '{}'::text[],
+  add column if not exists pricing_details jsonb not null default '{}'::jsonb;
+alter table network_plus_service_listing
+  drop constraint if exists network_plus_service_listing_pricing_model_check,
+  add constraint network_plus_listing_pricing_model_check check (pricing_model in ('free','fixed','hourly','unit','range','quote','subscription','not_applicable')),
+  add constraint network_plus_listing_pricing_details_object check (jsonb_typeof(pricing_details)='object'),
+  add constraint network_plus_listing_availability_status_check check (availability_status in ('accepting_requests','limited','paused','unavailable')),
+  add constraint network_plus_listing_service_radius_check check (service_radius_km is null or service_radius_km between 1 and 1000),
+  add constraint network_plus_listing_lead_time_check check (lead_time_days is null or lead_time_days between 0 and 3650),
+  add constraint network_plus_listing_active_work_limit_check check (active_work_limit is null or active_work_limit between 1 and 100000),
+  add constraint network_plus_listing_audience_segments_check check (target_audience <@ array['individuals','smes','nonprofits','public_institutions','startups','all']::text[]);
+
+create table if not exists network_plus_service_listing_geography (
+  listing_id uuid not null references network_plus_service_listing(id) on delete cascade,
+  geography_version_id uuid not null references membership_geography_version(id) on delete restrict,
+  geography_unit_id uuid not null,
+  created_by uuid references app_user(id) on delete set null,
+  created_at timestamptz not null default now(),
+  primary key(listing_id,geography_unit_id),
+  foreign key(geography_version_id,geography_unit_id) references membership_geography_unit(version_id,id) on delete restrict
+);
+create index if not exists ix_network_plus_listing_geography_unit on network_plus_service_listing_geography(geography_unit_id,listing_id);
 create index if not exists ix_network_plus_listing_directory
   on network_plus_service_listing(listing_kind,service_category,subcategory_code,status,published_at desc);
 create index if not exists ix_network_plus_listing_drafts
@@ -89,3 +120,8 @@ comment on column network_plus_service_listing.structured_attributes is
   'Category-specific controlled fields used for discovery and reporting. Does not contain private contact details.';
 comment on column network_plus_service_listing.wizard_step is
   'Persistent guided-wizard position for a draft; draft listing row is the single durable draft record.';
+
+comment on table network_plus_service_listing_geography is 'Structured service-area references to the published, versioned membership geography hierarchy; never stores private residence addresses.';
+comment on column network_plus_service_listing.remote_available is 'Explicit remote availability; not inferred from location text.';
+comment on column network_plus_service_listing.target_audience is 'Controlled audience segments distinct from member/organization access visibility.';
+comment on column network_plus_service_listing.pricing_details is 'Structured range, unit, subscription, tax and fee disclosure details; no payment or checkout state.';

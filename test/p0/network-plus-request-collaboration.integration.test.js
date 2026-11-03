@@ -116,6 +116,12 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   await requests.transitionNetworkPlusRequest(opportunityRequest.id,recipient.user.id,{status:"accepted"},requestRef,randomUUID()+randomUUID());
   await assert.rejects(()=>requests.createNetworkPlusWorkspace(opportunityRequest.id,requester.user.id,requestRef),e=>e.code==="WORKSPACE_NOT_APPLICABLE");
   process.env.NETWORK_PLUS_CONTACT_ENCRYPTION_KEY ||= "phase2-test-contact-encryption-key-32-bytes-minimum";
+  const questionRequest=await requests.createNetworkPlusRequest(requester.user.id,{intent:"question",recipientUserId:recipient.user.id,subject:"Question about distribution",summary:"Can your business support regional distribution for a new product line?",details:{topic:"Regional distribution"},terms:{}},requestRef,randomUUID()+randomUUID());
+  await requests.submitNetworkPlusRequest(questionRequest.id,requester.user.id,requestRef,randomUUID()+randomUUID());
+  const questionResponse=await requests.answerNetworkPlusQuestion(questionRequest.id,recipient.user.id,{answer:"Yes. We support regional distribution through approved local partners and can discuss coverage after a connection is accepted."},requestRef);
+  assert.ok(questionResponse.recipient_response_at);
+  assert.equal((await requests.getNetworkPlusRequest(questionRequest.id,requester.user.id)).recipient_response,questionResponse.recipient_response);
+  await assert.rejects(()=>requests.answerNetworkPlusQuestion(questionRequest.id,recipient.user.id,{answer:"A second answer should not overwrite the first response."},requestRef),e=>e.code==="QUESTION_ALREADY_ANSWERED");
   const handoffRequest=await requests.createNetworkPlusRequest(requester.user.id,{intent:"meeting_request",recipientUserId:recipient.user.id,subject:"Introductory business meeting",summary:"Request a first meeting to discuss the opportunity and possible next steps.",details:{topic:"Professional introduction"},terms:{}},requestRef,randomUUID()+randomUUID());
   await requests.submitNetworkPlusRequest(handoffRequest.id,requester.user.id,requestRef,randomUUID()+randomUUID());
   const clarification=await requests.askNetworkPlusClarification(handoffRequest.id,recipient.user.id,{promptCode:"scope",question:"Which specific business area should the first conversation focus on?"},requestRef);

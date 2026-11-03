@@ -76,6 +76,7 @@ test("product profiles remain inquiry-only and respect intake availability",()=>
 
 test("authenticated API exposes taxonomy, directory, owned listings and persistent draft actions",()=>{
   for(const route of ["api/v1/network-plus/listing-taxonomy","api/v1/network-plus/listings","api/v1/network-plus/my/listings","/draft"])assert.ok(server.includes(route),"missing route "+route);
+  assert.match(server,/parts\[5\]==="listings" && parts\[6\]==="drafts"/,"listing draft creation must be scoped to the owning business");
  assert.match(server,/parts\[5\]==="listings" && parts\[6\]==="drafts"/,"business-owned listing draft creation must be routed under the canonical business listing resource");
   assert.match(server,/createOpportunityListingDraft/);
   assert.match(server,/saveOpportunityListingDraft/);

@@ -36,9 +36,9 @@ function providerConfig(){
  const provider=resendConfigured?"resend":webhookConfigured?"signed-webhook":"not-configured";
  return {provider,ready:Boolean((publicValid&&(resendConfigured||(webhookConfigured&&webhookValid)))||(environment!=="production"&&process.env.TEST_DELIVERY_MODE==="capture")),publicUrl,fromConfigured:Boolean(from),apiKeyConfigured:Boolean(apiKey),webhookConfigured,deliveryEventsConfigured:Boolean(clean(process.env.EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET)),inboundConfigured:Boolean(clean(process.env.EMAIL_INBOUND_WEBHOOK_SECRET)),testDeliveryMode:environment!=="production"&&process.env.TEST_DELIVERY_MODE==="capture"?"capture":"blocked",environment,sender:from?from:null};
 }
-export async function queueEmailNotification(db,userId,templateCode,variables={},resourceType="workflow",resourceId=null){
+export async function queueEmailNotification(db,userId,templateCode,variables={},resourceType="workflow",resourceId=null,{optional=false}={}){
  const user=(await db.query("select u.email,coalesce(np.email_enabled,true) email_enabled from app_user u left join notification_preference np on np.user_id=u.id where u.id=$1",[userId])).rows[0];
- if(!user?.email||!user.email_enabled)return false;
+ if(!user?.email||(optional&&!user.email_enabled))return false;
  const recipient=normalizeEmailAddress(user.email);
  const suppressed=(await db.query("select 1 from email_recipient_suppression where email_normalized=$1 and cleared_at is null limit 1",[recipient])).rowCount>0;
  if(suppressed)return false;

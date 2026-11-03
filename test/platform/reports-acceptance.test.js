@@ -48,7 +48,7 @@ test("administrative audit report applies date, outcome and search filters to kn
   const pdfRequestId = randomUUID();
   const xlsxRequestId = randomUUID();
   const csvRequestId = randomUUID();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date());
   const identity = { sub: null, roles: ["system_admin"], permissions: [] };
   try {
     await db.query(
@@ -147,9 +147,11 @@ test("membership dashboard aggregates and monthly trend are available only throu
     const status = await runReport(reviewer, "membership-status", {}, requestIds[0]);
     assert.ok(Array.isArray(status.rows));
     assert.equal(status.report.id, "membership-status");
+    const historicalStock = await runReport(reviewer, "membership-status", { from: "1900-01-01", to: "1900-01-02" }, randomUUID());
+    assert.deepEqual(historicalStock.rows, status.rows, "current member stock must not be truncated by an application-period filter");
 
     const monthly = await runReport(permissionOnly, "membership-applications", {
-      from: "2020-01-01", to: new Date().toISOString().slice(0, 10), groupBy: "month"
+      from: "2020-01-01", to: new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date()), groupBy: "month"
     }, requestIds[1]);
     assert.ok(Array.isArray(monthly.rows));
     for (const row of monthly.rows) {
@@ -160,7 +162,7 @@ test("membership dashboard aggregates and monthly trend are available only throu
       assert.ok(Number.isFinite(Number(row.Activated)));
     }
 
-    const aging = await runReport(reviewer, "membership-application-aging", { from: "2000-01-01", to: new Date().toISOString().slice(0, 10), status: "submitted", q: "no-such-application-" + randomUUID() }, requestIds[2]);
+    const aging = await runReport(reviewer, "membership-application-aging", { from: "2000-01-01", to: new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date()), status: "submitted", q: "no-such-application-" + randomUUID() }, requestIds[2]);
     assert.equal(aging.filters.status, "submitted");
     assert.ok(Array.isArray(aging.rows));
     assert.equal(aging.rows.length, 0, "queue ageing should respect the shared date, lifecycle and search filters");
@@ -180,7 +182,7 @@ test("membership dashboard aggregates and monthly trend are available only throu
     }
 
     const performance = await runReport(reviewer, "membership-reviewer-performance", {
-      from: "2020-01-01", to: new Date().toISOString().slice(0, 10)
+      from: "2020-01-01", to: new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date())
     }, requestIds[3]);
     assert.ok(Array.isArray(performance.rows));
     for (const row of performance.rows) {

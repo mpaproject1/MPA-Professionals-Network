@@ -138,9 +138,14 @@ export default function Organizations() {
     ]);
     const organizationResult = results[0];
     let organizationsLoaded = false;
-    if (organizationResult.status === "fulfilled" && Array.isArray(organizationResult.value)) {
-      setOrganizations(organizationResult.value);
-      organizationsLoaded = true;
+    if (organizationResult.status === "fulfilled") {
+      if (Array.isArray(organizationResult.value)) {
+        setOrganizations(organizationResult.value);
+        organizationsLoaded = true;
+      } else {
+        setOrganizations([]);
+        setError("The organization service returned an unexpected response.");
+      }
     } else {
       const reason = organizationResult.reason;
       setOrganizations([]);

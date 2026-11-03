@@ -258,6 +258,7 @@ test("Phase 3 requester disposition is separate from lifecycle status, requires 
  await requests.transitionNetworkPlusRequest(request.id,recipient.user.id,{status:"accepted"},`np-disposition-accept-${suffix}`,randomUUID()+randomUUID());
  const recipientWithdrawal=await requests.transitionNetworkPlusRequest(request.id,recipient.user.id,{status:"recipient_withdrawn",reason:"Recipient cannot continue this connection."},`np-disposition-recipient-withdraw-${suffix}`,randomUUID()+randomUUID());
  assert.equal(recipientWithdrawal.status,"recipient_withdrawn");
+ await assert.rejects(()=>requests.updateNetworkPlusContactConsent(request.id,recipient.user.id,{field:"email",decision:"accept",value:"recipient@example.test",peerUserId:requester.user.id},`np-disposition-contact-after-withdraw-${suffix}`),e=>e.code==="INVALID_REQUEST_STATUS");
  await assert.rejects(()=>requests.updateNetworkPlusRequestDisposition(request.id,recipient.user.id,{disposition:"cancelled",remark:"Recipient cannot set requester outcome."},`np-disposition-outsider-${suffix}`,randomUUID()+randomUUID()),e=>e.code==="NOT_FOUND");
  const db=getPool();
  await db.query("update network_plus_request set review_due_at=now()-interval '1 minute' where id=$1",[request.id]);

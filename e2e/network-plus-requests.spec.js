@@ -52,6 +52,16 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     expect(createPayload.terms.scope).toContain("WCAG AA");
     await expect(page.getByText(/Draft saved. It is not yet submitted/i)).toBeVisible();
     await expect(page).toHaveURL(/requestId=request-1/);
+    await expect(page.getByRole("button",{name:/Website accessibility review/})).toContainText("Draft");
+    await page.getByRole("button",{name:"Drafts"}).click();
+    await expect(page).toHaveURL(/requestFilter=drafts/);
+    await expect(page.getByRole("button",{name:"Drafts"})).toHaveAttribute("aria-pressed","true");
+    await page.goBack();
+    await expect(page).not.toHaveURL(/requestFilter=/);
+    await expect(page.getByRole("button",{name:"Drafts"})).toHaveAttribute("aria-pressed","false");
+    await page.goForward();
+    await expect(page).toHaveURL(/requestFilter=drafts/);
+    await page.getByRole("button",{name:"All"}).click();
     await expect(page.getByRole("heading",{name:"My Requests"})).toBeVisible();
     await expect(page.getByRole("button",{name:"Drafts"})).toBeVisible();
     await expect(page.getByRole("heading",{name:"Platform-observed activity"})).toBeVisible();

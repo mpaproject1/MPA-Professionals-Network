@@ -589,7 +589,7 @@ export default function Organizations() {
           <Card id="org-registration">
             <div className="row">
               <div>
-                <div className="h2">Organization registration</div>
+                <h2 className="h2">Organization registration</h2>
                 <p className="muted">
                   Legal identity, organization type and contact information.
                 </p>

@@ -83,7 +83,7 @@ test.describe("MPA application workspace UX", () => {
     await expect(mobile).toBeVisible();
     const mobileMore = mobile.getByRole("button", { name: "Open more signed-in destinations" });
     await mobileMore.click();
-    await expect(page.getByRole("link", { name: "Membership" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Membership", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 

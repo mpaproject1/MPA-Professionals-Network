@@ -144,8 +144,8 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
       const canReadFinanceEvidence=roles.some(role=>["finance_officer","system_admin","admin"].includes(role))||permissions.some(permission=>["finance.view","finance.payment.record","finance.payment.verify","finance.payment.adjust","finance.payment.reverse","finance.manage"].includes(permission));
       if(canReadFinanceEvidence){
         const financeEvidence=await db.query(`select 1 from finance_payment_record where evidence_file_id=$1
-          union all select 1 from membership_fee_balance_disposition where details->>'evidenceFileId'=$1
-          union all select 1 from membership_fee_adjustment where details->>'evidenceFileId'=$1
+          union all select 1 from membership_fee_balance_disposition where details->>'evidenceFileId'=$1::text
+          union all select 1 from membership_fee_adjustment where details->>'evidenceFileId'=$1::text
           limit 1`,[fileId]);
         allowed=financeEvidence.rowCount>0;
       }

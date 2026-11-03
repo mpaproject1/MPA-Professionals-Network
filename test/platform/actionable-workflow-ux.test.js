@@ -380,8 +380,9 @@ test("reference-data publication is reasoned and confirmed, with searchable pagi
 });
 
 test("organization workspace uses state-aware onboarding and exposes only supported organization workflows", async () => {
-  const [page, service, server, outcomes] = await Promise.all([
+  const [page, overview, service, server, outcomes] = await Promise.all([
     source("../../web/app/organizations/page.tsx"),
+    source("../../web/components/organization-workspace-overview.tsx"),
     source("../../src/organization-jobs/service.js"),
     source("../../server.js"),
     source("../../src/platform/stakeholder-outcomes.js"),
@@ -391,9 +392,9 @@ test("organization workspace uses state-aware onboarding and exposes only suppor
   assert.ok(page.includes("Step 3 — Upload evidence for Tabayyun review"));
   assert.ok(page.includes("setEvidenceOrg(created.id)"), "new registrations must carry their own organization into the evidence step");
   assert.ok(page.includes("verification_status === \"verified\""), "publishing links must depend on returned verification state");
-  assert.ok(page.includes("/recruitment"));
+  assert.ok(overview.includes("/recruitment"));
   assert.ok(overview.includes("/service-demand"));
-  assert.ok(page.includes("/mentorship"));
+  assert.ok(overview.includes("/mentorship"));
   assert.ok(overview.includes("Organization-scoped volunteer drives and skill dispatch are not implemented as a verified workflow yet"), "the workspace must explicitly disclose the unavailable volunteer workflow");
   assert.ok(overview.includes('href: "/organizations/reports"'), "the organization workspace must link to the real scoped outcome report");
   assert.ok(page.includes("does not persist a structured TIN, representative name/position, or verification-fee payment/receipt"));
@@ -409,9 +410,10 @@ test("organization workspace uses state-aware onboarding and exposes only suppor
 });
 
 test("organization impact report reads scoped outcomes and does not invent unsupported impact data", async () => {
-  const [page, hub, server, service] = await Promise.all([
+  const [page, hub, overview, server, service] = await Promise.all([
     source("../../web/app/organizations/reports/page.tsx"),
     source("../../web/app/organizations/page.tsx"),
+    source("../../web/components/organization-workspace-overview.tsx"),
     source("../../server.js"),
     source("../../src/platform/stakeholder-outcomes.js"),
   ]);

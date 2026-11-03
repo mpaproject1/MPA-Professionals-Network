@@ -163,6 +163,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
  if(process.env.TEST_DELIVERY_MODE==="capture"&&process.env.NODE_ENV!=="production"){
   const batch=Math.min(Math.max(Number(limit)||20,1),50);
   const rows=await withTransaction(async tx=>{
+   await tx.query("update notification_outbox set status='pending',locked_at=null,updated_at=now() where channel='email' and status='processing' and locked_at<now()-interval '5 minutes'");
    const selected=(await tx.query(`select o.id,o.recipient,o.template_code,o.payload,t.enabled,t.audience
     from notification_outbox o left join email_notification_template t on t.template_code=o.template_code
     where o.channel='email' and o.status in ('pending','failed') and ($1::uuid is null or o.id=$1::uuid)
@@ -181,9 +182,14 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
     await db.query("update notification_outbox set status='cancelled',delivery_status='suppressed',delivery_event_type='recipient_suppressed',delivery_event_at=now(),locked_at=null,updated_at=now() where id=$1",[row.id]);
     results.push({id:row.id,status:"suppressed"});continue;
    }
-   await captureTestDelivery({channel:"email",recipient:row.recipient,eventCode:row.template_code,payload:{outboxId:row.id,payload:row.payload}});
-   await db.query("update notification_outbox set status='sent',delivery_status='sent',sent_at=now(),provider_message_id='test-capture',last_error=null,locked_at=null,updated_at=now() where id=$1",[row.id]);
-   results.push({id:row.id,status:"captured"});
+   try{
+    await captureTestDelivery({channel:"email",recipient:row.recipient,eventCode:row.template_code,payload:{outboxId:row.id,payload:row.payload}});
+    await db.query("update notification_outbox set status='sent',delivery_status='sent',sent_at=now(),provider_message_id='test-capture',last_error=null,locked_at=null,updated_at=now() where id=$1",[row.id]);
+    results.push({id:row.id,status:"captured"});
+   }catch(error){
+    await db.query("update notification_outbox set status='failed',delivery_status='failed',last_error=$2,delivery_error_code='TEST_CAPTURE_FAILED',locked_at=null,updated_at=now() where id=$1",[row.id,clean(error?.message||"Test delivery capture failed",500)]);
+    results.push({id:row.id,status:"failed",error:"Test delivery capture failed"});
+   }
   }
   return {processed:results.length,results,mode:"capture"};
  }

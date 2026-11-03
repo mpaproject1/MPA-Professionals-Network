@@ -392,10 +392,10 @@ test("organization workspace uses state-aware onboarding and exposes only suppor
   assert.ok(page.includes("setEvidenceOrg(created.id)"), "new registrations must carry their own organization into the evidence step");
   assert.ok(page.includes("verification_status === \"verified\""), "publishing links must depend on returned verification state");
   assert.ok(page.includes("/recruitment"));
-  assert.ok(page.includes("/service-demand"));
+  assert.ok(overview.includes("/service-demand"));
   assert.ok(page.includes("/mentorship"));
-  assert.ok(page.includes("Organization-scoped volunteer drives and skill dispatch are not implemented as a verified workflow yet"), "the workspace must explicitly disclose the unavailable volunteer workflow");
-  assert.ok(page.includes('href="/organizations/reports"'), "the organization hub must link to the real scoped outcome report");
+  assert.ok(overview.includes("Organization-scoped volunteer drives and skill dispatch are not implemented as a verified workflow yet"), "the workspace must explicitly disclose the unavailable volunteer workflow");
+  assert.ok(overview.includes('href: "/organizations/reports"'), "the organization workspace must link to the real scoped outcome report");
   assert.ok(page.includes("does not persist a structured TIN, representative name/position, or verification-fee payment/receipt"));
   assert.doesNotMatch(page, /Zepko Enterprise Solutions|22 Total Applicants|120 Volunteer Hours Engaged|Download Q1 2026 Audit Report/);
   assert.ok(service.includes("input.legalName") && service.includes("input.displayName"));
@@ -423,7 +423,7 @@ test("organization impact report reads scoped outcomes and does not invent unsup
   assert.ok(page.includes("Requisition register"));
   assert.ok(page.includes("volunteer hours"));
   assert.ok(page.includes("not a signed server-generated audit artifact"));
-  assert.ok(hub.includes('href="/organizations/reports"'));
+  assert.ok(overview.includes('href: "/organizations/reports"'));
   assert.ok(server.includes('parts[4]==="outcomes"'));
   assert.ok(service.includes("organization_membership"));
   assert.ok(service.includes("count(distinct a.id)::int applications"), "multiple interviews must not inflate application totals");

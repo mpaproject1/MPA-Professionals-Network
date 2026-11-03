@@ -448,6 +448,13 @@ const server=http.createServer(async (req,res)=>{
       return ok(res,await organizationJobs.listNetworkPlusOrganizations(identity.sub,{q:q.get("q"),organizationType:q.get("organizationType"),location:q.get("location"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
     }
 
+    if(req.method==="GET" && p==="api/v1/network-plus/listing-taxonomy") return ok(res,await networkPlusBusiness.listNetworkPlusListingTaxonomy(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/network-plus/my/listings") return ok(res,await networkPlusBusiness.listMyOpportunityListings(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/network-plus/listings"){
+      await enforcePersistentRateLimit(req,"network-plus.listing.search",60,60000,identity.sub);
+      const q=query(req.url);
+      return ok(res,await networkPlusBusiness.listProfessionalServices(identity.sub,{q:q.get("q"),category:q.get("category"),subcategory:q.get("subcategory"),listingKind:q.get("listingKind"),location:q.get("location"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
+    }
     if(req.method==="GET" && p==="api/v1/network-plus/businesses"){
       await enforcePersistentRateLimit(req,"network-plus.business.search",60,60000,identity.sub);
       const q=query(req.url);
@@ -488,6 +495,13 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="moderation") return ok(res,await networkPlusBusiness.submitBusinessModeration(parts[4],identity.sub,requestId),requestId,201);
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="publication"){
       const b=await body(req);return ok(res,await networkPlusBusiness.changeBusinessPublicationStatus(parts[4],identity.sub,b.status,b.reason,requestId),requestId);
+    }
+    if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="listings" && parts[6]==="drafts"){
+      await enforcePersistentRateLimit(req,"network-plus.listing.draft.create",20,60000,identity.sub);
+      return ok(res,await networkPlusBusiness.createOpportunityListingDraft(parts[4],identity.sub,await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201);
+    }
+    if(req.method==="PATCH" && parts.length===6 && p.startsWith("api/v1/network-plus/services/") && parts[5]==="draft"){
+      return ok(res,await networkPlusBusiness.saveOpportunityListingDraft(parts[4],identity.sub,await body(req),requestId),requestId);
     }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/network-plus/businesses/") && parts[5]==="services"){
       await enforcePersistentRateLimit(req,"network-plus.service.create",10,60000,identity.sub);

@@ -180,7 +180,13 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && p==="api/v1/admin/passkeys/registration/verify") { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); return ok(res,await finishAdminPasskeyRegistration(identity,await body(req),requestId),requestId); }
     if(req.method==="GET" && p==="api/v1/admin/passkeys") { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); return ok(res,await listAdminPasskeys(identity.sub),requestId); }
     if(req.method==="DELETE" && parts.length===5 && p.startsWith("api/v1/admin/passkeys/")) { const identity=await auth(req); anyRole(identity,["system_admin","admin","platform_admin"]); return ok(res,await revokeAdminPasskey(identity.sub,parts[4],requestId),requestId); }
-    if(req.method==="POST" && p==="api/v1/email/delivery-webhook") return ok(res,await emailOperations.receiveDeliveryWebhook(await body(req),String(req.headers["x-email-delivery-webhook-secret"]||"")),requestId,202);
+    if(req.method==="POST" && p==="api/v1/email/delivery-webhook") {
+      const raw=await rawBody(req,1024*1024);
+      let payload;
+      try { payload=JSON.parse(raw.toString("utf8")); } catch { throw Object.assign(new Error("Request body must be valid JSON."),{statusCode:400,code:"INVALID_JSON"}); }
+      const signatureHeaders={"svix-id":req.headers["svix-id"],"svix-timestamp":req.headers["svix-timestamp"],"svix-signature":req.headers["svix-signature"],rawBody:raw};
+      return ok(res,await emailOperations.receiveDeliveryWebhook(payload,String(req.headers["x-email-delivery-webhook-secret"]||""),signatureHeaders),requestId,202);
+    }
     if(req.method==="POST" && p==="api/v1/email/inbound-webhook") {
       return ok(res,await emailOperations.receiveInboundEmail(await body(req),String(req.headers["x-email-webhook-secret"]||"")),requestId,201);
     }

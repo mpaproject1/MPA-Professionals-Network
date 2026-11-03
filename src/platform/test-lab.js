@@ -88,7 +88,7 @@ export async function createTestPortfolio(identity,input={},requestId=null){
     [user.id,portfolioId,{testPortfolioId:portfolioId,synthetic:true},category,`This is a synthetic test account for the ${fixture.persona} scenario. No real member information is used.`,`qa:${portfolioId}:${user.id}:welcome`]);
    await tx.query("insert into notification_outbox(channel,recipient,template_code,payload,status,subject,text_body,updated_at) values('email',$1,'test_lab.welcome',$2,'pending','Your MPA QA test account is ready',$3,now())",
     [email,{testPortfolioId:portfolioId,synthetic:true},`This is a test-only message for portfolio ${portfolioId}. No external email will be sent while delivery capture is enabled.`]);
-   accounts.push({email,displayName:fixture.name.join(" "),persona:fixture.persona,role:fixture.role,userId:user.id});
+   accounts.push({email,password,displayName:fixture.name.join(" "),persona:fixture.persona,role:fixture.role,userId:user.id});
   }
   // Clearly simulated transactions only: no provider API, webhook or bank integration is invoked.
   for(const [index,status,amount] of [[1,"succeeded",1200],[2,"pending",1200],[3,"failed",50000]]){
@@ -138,7 +138,9 @@ export async function createTestPortfolio(identity,input={},requestId=null){
  }
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'test_lab.portfolio.created','test_portfolio',$2,$3,'success',$4)",
   [identity.sub,portfolioId,requestId,{name,accountCount:accounts.length,expiryDays:days}]);
- return {id:portfolioId,name,expiresAt:(await db.query("select expires_at from test_portfolio where id=$1",[portfolioId])).rows[0].expires_at,accountCount:accounts.length,accounts:accounts.map(({userId,...safe})=>safe),message:"Export the temporary credentials workbook separately. No email or push was sent."};
+ const credentialRows=accounts.map(account=>({Email:account.email,Password:account.password,"Display name":account.displayName,Persona:account.persona,Role:account.role,"Sign-in URL":process.env.TEST_LAB_SIGN_IN_URL||"Set TEST_LAB_SIGN_IN_URL","Portfolio":name,"Expires":new Date((await db.query("select expires_at from test_portfolio where id=$1",[portfolioId])).rows[0].expires_at).toISOString(),"Instructions":"Development/test only. This is the one-time initial credential export. Do not reuse passwords. Delete workbook after testing."}));
+ const credentialsWorkbook=createXlsx(credentialRows,Object.keys(credentialRows[0]));
+ return {id:portfolioId,name,expiresAt:(await db.query("select expires_at from test_portfolio where id=$1",[portfolioId])).rows[0].expires_at,accountCount:accounts.length,accounts:accounts.map(({userId,password,...safe})=>safe),credentialsWorkbookBase64:credentialsWorkbook.toString("base64"),credentialsFilename:`mpa-test-accounts-${portfolioId.slice(0,8)}.xlsx`,message:"The one-time credentials workbook is included in this response. No email or push was sent."};
 }
 export async function exportTestPortfolioAccounts(identity,portfolioId){
  requireSystemAdmin(identity);const db=getPool();await assertSafeEnvironment(db);

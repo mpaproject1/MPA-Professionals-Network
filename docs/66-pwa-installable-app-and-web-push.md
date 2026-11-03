@@ -28,21 +28,23 @@ Web Push requires a VAPID key pair and a monitored subject:
 
 Supported push endpoints are restricted to HTTPS endpoints from the major browser push services. Subscription endpoints and encryption keys are stored server-side and must be treated as sensitive credentials.
 
-## Delivery worker and cPanel cron
+## Delivery worker and cPanel scheduling
 
-In-app notification creation inserts device delivery jobs into `notification_push_delivery` in the same database transaction. Delivery is performed separately by:
+In-app notification creation inserts device delivery jobs into `notification_push_delivery` in the same database transaction. The running API process already starts a bounded in-process dispatcher at startup and checks the outbox every 30 seconds. This is the normal delivery path when the Node application remains running.
+
+The same worker can be run manually or by an external scheduler:
 
 ```bash
 npm run notifications:dispatch-web-push
 ```
 
-Configure the cPanel cron job to run every minute using the Node 22 executable selected for the API application, for example:
+For a host that suspends the API process or requires an independently monitored scheduler, configure a cPanel cron job to run every minute using the Node 22 executable selected for the API application, for example:
 
 ```bash
 cd /home/ACCOUNT/REPOSITORY && /home/ACCOUNT/nodevenv/APP_ROOT/22/bin/node scripts/dispatch-web-push.js
 ```
 
-Replace the example account, repository and application paths with the actual hosting paths. The dispatcher claims jobs safely with `FOR UPDATE SKIP LOCKED`, retries transient failures with bounded backoff, expires invalid (404/410) subscriptions, and leaves a delivery audit trail in the outbox. It sends generic lock-screen copy only; private names, case details and member data stay inside the authenticated app. If VAPID is not configured, the worker reports a skipped run and does not attempt delivery.
+Replace the example account, repository and application paths with the actual hosting paths. Do not add a cron job merely because the script exists; first confirm whether the persistent API worker is running. Running both is safe at the database-claim level because the dispatcher uses `FOR UPDATE SKIP LOCKED`, but it adds unnecessary polling and log noise when the in-process worker is healthy. The dispatcher retries transient failures with bounded backoff, expires invalid (404/410) subscriptions, and leaves a delivery audit trail in the outbox. It sends generic lock-screen copy only; private names, case details and member data stay inside the authenticated app. If VAPID is not configured, the worker reports a skipped run and does not attempt delivery.
 
 ## Operational notes and limitations
 

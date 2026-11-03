@@ -15,12 +15,12 @@ import {
   reverseMembershipRecordReceipt,
   verifyMembershipReceipt,
 } from "../../src/membership/fee-obligations.js";
-import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
 import * as membership from "../../src/membership/service.js";
 import * as organizationJobs from "../../src/organization-jobs/service.js";
 import { getPool } from "../../src/platform/db.js";
-import { runReport } from "../../src/platform/reports.js";
 import { authorizePrivateUpload, receivePrivateUpload, confirmPrivateUpload, readAuthorizedPrivateFile } from "../../src/platform/private-file-storage.js";
+import { runReport } from "../../src/platform/reports.js";
+import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
 
 const admin={sub:"system-admin",roles:["system_admin"],permissions:[]};
 const member={sub:"member-user",roles:["member"],permissions:[]};

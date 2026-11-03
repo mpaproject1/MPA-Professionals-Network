@@ -92,7 +92,7 @@ test("public opt-in and push dispatcher enforce explicit consent, permission and
 
 test("service worker rejects non-allow-listed click-through routes",async()=>{
  const worker=await readFile(new URL("../../web/public/sw.js",import.meta.url),"utf8");
- assert.match(worker,/const allowed = \["\/notifications", "\/serve-community", "\/mentorship", "\/jobs"/);
+ assert.match(worker,/const allowed = \["\/notifications", "\/mobile", "\/serve-community", "\/mentorship", "\/learning", "\/jobs"/);
  assert.match(worker,/return "\/notifications";/);
  assert.match(worker,/client\.navigate\(target\)/);
 });

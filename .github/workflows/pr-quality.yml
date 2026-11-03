@@ -223,6 +223,7 @@ jobs:
             e2e/membership-card-print.spec.js \
             e2e/registration-human-verification.spec.js \
             e2e/network-plus-discovery.spec.js \
+            e2e/network-plus-requests.spec.js \
             e2e/serve-community-separation.spec.js \
             e2e/workspace-app-ux.spec.js \
             e2e/organization-workspace.spec.js \

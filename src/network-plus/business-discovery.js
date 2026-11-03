@@ -399,13 +399,13 @@ export async function updateProfessionalServiceListing(listingId,userId,input,re
     if(!row)fail(404,"Professional service listing not found.","NOT_FOUND");
     await assertBusinessOwner(db,row.business_id,userId);
     if(row.status==="archived")fail(409,"An archived listing cannot be edited.","LISTING_LOCKED");
-    const merged={title:row.title,summary:row.summary,description:row.description,serviceCategory:row.service_category,audience:row.audience,deliveryMode:row.delivery_mode,locationLabel:row.location_label,capacity:row.capacity,pricingModel:row.pricing_model,priceAmount:row.price_amount,currency:row.currency,availability:row.availability,credentials:row.credentials};
+    const merged={title:row.title,summary:row.summary,description:row.description,serviceCategory:row.service_category,audience:row.audience,deliveryMode:row.delivery_mode,locationLabel:row.location_label,capacity:row.capacity,pricingModel:row.pricing_model,priceAmount:row.price_amount,currency:row.currency,pricingDetails:row.pricing_details,availability:row.availability,credentials:row.credentials};
     const inputEntries=Object.entries(input||{}).filter(([key])=>LISTING_MODIFIABLE.has(key));
     if(!inputEntries.length)fail(400,"Provide at least one supported listing field.","VALIDATION_ERROR");
     for(const [key,value] of inputEntries)merged[key]=value;
     const normalized=normalizeListingInput(merged);
-    const updated=(await db.query(`update network_plus_service_listing set title=$1,summary=$2,description=$3,service_category=$4,audience=$5,delivery_mode=$6,location_label=$7,capacity=$8,pricing_model=$9,price_amount=$10,currency=$11,availability=$12,credentials=$13,
-      status=case when status='published' then 'paused' when status='suspended' then 'suspended' else 'draft' end,updated_at=now() where id=$14 returning *`,[normalized.title,normalized.summary,normalized.description,normalized.serviceCategory,normalized.audience,normalized.deliveryMode,normalized.locationLabel,normalized.capacity,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.availability,normalized.credentials,listingId])).rows[0];
+    const updated=(await db.query(`update network_plus_service_listing set title=$1,summary=$2,description=$3,service_category=$4,audience=$5,delivery_mode=$6,location_label=$7,capacity=$8,pricing_model=$9,price_amount=$10,currency=$11,pricing_details=$12,availability=$13,credentials=$14,
+      status=case when status='published' then 'paused' when status='suspended' then 'suspended' else 'draft' end,updated_at=now() where id=$15 returning *`,[normalized.title,normalized.summary,normalized.description,normalized.serviceCategory,normalized.audience,normalized.deliveryMode,normalized.locationLabel,normalized.capacity,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.pricingDetails,normalized.availability,normalized.credentials,listingId])).rows[0];
     await audit(db,userId,"network_plus.service_listing_updated","network_plus_service_listing",listingId,requestId,{fields:inputEntries.map(([key])=>key)});
     return updated;
   });

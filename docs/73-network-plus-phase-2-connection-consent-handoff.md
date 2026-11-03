@@ -81,7 +81,7 @@ Supported place types: business office, coffee/public place, online or other agr
 
 All lifecycle notifications use the existing in-app notification and Web Push delivery infrastructure. The new `network_plus` category is available in notification filters and user preferences. Notification actions deep-link to `/network-plus/requests`.
 
-Events include request submission/decision, clarification requested/answered, contact consent/release, and meeting proposal/counterproposal/confirmation/decline. Notification bodies contain no contact values. Request content, clarification, meeting details and contact-consent state are visible only to request participants; the existing case-scoped support access remains audited and does not grant contact-value release.
+Events include request submission/decision, clarification requested/answered, contact consent/release, and meeting proposal/counterproposal/confirmation/decline. Notification bodies contain no contact values. Request content remains participant-scoped. Clarification and meeting details are visible only to the requester and the accepted recipient representative; additional workspace invitees do not see these handoff details. Contact values are released only to the two participants who consented to that field. Existing case-scoped support access is audited and does not grant contact-value release.
 
 ## 7. API surface
 

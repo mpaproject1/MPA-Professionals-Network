@@ -521,7 +521,7 @@ export async function answerNetworkPlusQuestion(requestId,userId,input,requestId
     if(!["submitted","under_review"].includes(request.status))fail(409,"A question can be answered only while it is awaiting recipient review.","INVALID_REQUEST_STATUS");
     const actor=await participant(db,requestId,userId);
     if(actor.participant_role!=="recipient_representative")fail(403,"Only the recipient can answer this question.","RECIPIENT_ONLY");
-    if(request.business_id&&!await hasBusinessAuthority(db,request.business_id,userId,"business.respond_requests")&&!await hasBusinessAuthority(db,request.business_id,userId,"business.accept_terms"))fail(403,"Your business permission does not allow responding to requests.","BUSINESS_AUTHORITY_REQUIRED");
+    await assertRecipientRepresentative(db,request,userId);
     if(request.recipient_response_at)fail(409,"A recipient answer has already been recorded for this question.","QUESTION_ALREADY_ANSWERED");
     const updated=(await db.query("update network_plus_request set recipient_response=$1,recipient_response_by=$2,recipient_response_at=now(),version=version+1,updated_at=now() where id=$3 returning *",[answer,userId,requestId])).rows[0];
     await audit(db,requestId,userId,"request.question_answered",request.status,request.status,requestIdHeader,{responseLength:answer.length});

@@ -442,10 +442,10 @@ export function verifyResendWebhookSignature(rawBody, headers = {}, secret = "",
  });
 }
 
-export async function receiveDeliveryWebhook(input,providedSecret){
+export async function receiveDeliveryWebhook(input,providedSecret,signatureHeaders={}){
  const providerHint=clean(input.provider,80)||(input.data?.email_id?"resend":"configured-webhook");
- if(providerHint==="resend"||arguments[2]?.["svix-id"]){
-  const headers=arguments[2]||{};
+ if(providerHint==="resend"||signatureHeaders["svix-id"]){
+  const headers=signatureHeaders;
   if(!verifyResendWebhookSignature(headers.rawBody,headers,clean(process.env.RESEND_WEBHOOK_SECRET,500)))fail(401,"Resend webhook signature is missing, invalid, or outside the allowed timestamp window.","UNAUTHENTICATED");
  }else{
   const expected=clean(process.env.EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET,500);

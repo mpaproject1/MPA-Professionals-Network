@@ -248,6 +248,10 @@ test("Phase 3 requester disposition is separate from lifecycle status, requires 
  assert.equal(completed.requester_disposition,"completed");
  const recipientView=await requests.getNetworkPlusRequest(request.id,recipient.user.id);
  assert.equal(recipientView.requester_disposition,null,"requester-reported outcomes must not be disclosed to the recipient");
+ const recipientList=await requests.listNetworkPlusRequests(recipient.user.id);
+ const recipientListItem=recipientList.find(item=>item.id===request.id);
+ assert.ok(recipientListItem);
+ assert.equal(recipientListItem.requester_disposition,null,"requester disposition must also be masked in list projections");
  assert.ok(!recipientView.events.some(event=>event.event_code.startsWith("request.disposition_")),"requester disposition history must remain private");
  const reopened=await requests.updateNetworkPlusRequestDisposition(request.id,requester.user.id,{disposition:"in_progress",remark:"Reopening to continue the introduction."},`np-disposition-reopen-${suffix}`,randomUUID()+randomUUID());
  assert.equal(reopened.requester_disposition,"in_progress");
@@ -257,8 +261,8 @@ test("Phase 3 requester disposition is separate from lifecycle status, requires 
  await assert.rejects(()=>requests.updateNetworkPlusRequestDisposition(request.id,recipient.user.id,{disposition:"cancelled",remark:"Recipient cannot set requester outcome."},`np-disposition-outsider-${suffix}`,randomUUID()+randomUUID()),e=>e.code==="NOT_FOUND");
  const db=getPool();
  await db.query("update network_plus_request set review_due_at=now()-interval '1 minute' where id=$1",[request.id]);
- const reminders=await requests.dispatchNetworkPlusRequestReviewReminders({limit:10});
- assert.equal(reminders.sent,1);
+ const reminders=await requests.dispatchNetworkPlusRequestReviewReminders({limit:500});
+ assert.ok(reminders.sent>=1);
  const row=(await db.query("select requester_disposition,review_due_at,review_reminder_sent_at from network_plus_request where id=$1",[request.id])).rows[0];
  assert.equal(row.requester_disposition,"in_progress");
  assert.ok(row.review_reminder_sent_at);

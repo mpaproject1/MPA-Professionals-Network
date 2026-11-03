@@ -152,12 +152,14 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   const handoffDetail=await requests.getNetworkPlusRequest(handoffRequest.id,requester.user.id);
   assert.equal(handoffDetail.clarifications[0].status,"answered");
   assert.equal(handoffDetail.meetings[0].status,"confirmed");
+  assert.equal(handoffDetail.canHandoff,true);
   const handoffInvitee=await register("handoff-invitee-"+suffix);await setMembership(handoffInvitee.user.id);
   await requests.addNetworkPlusRequestParticipant(handoffRequest.id,requester.user.id,{userId:handoffInvitee.user.id},requestRef);
   await requests.respondNetworkPlusParticipant(handoffRequest.id,handoffInvitee.user.id,"accept",requestRef);
   const inviteeDetail=await requests.getNetworkPlusRequest(handoffRequest.id,handoffInvitee.user.id);
   assert.deepEqual(inviteeDetail.clarifications,[]);
   assert.deepEqual(inviteeDetail.meetings,[]);
+  assert.equal(inviteeDetail.canHandoff,false);
   assert.ok(!inviteeDetail.events.some(event=>/request\.(clarification|meeting|contact_consent)_/.test(event.event_code)));
   await assert.rejects(()=>requests.getNetworkPlusContactHandoff(handoffRequest.id,handoffInvitee.user.id),e=>e.code==="PARTICIPANT_FORBIDDEN");
 

@@ -36,23 +36,25 @@ function providerConfig(){
  const provider=resendConfigured?"resend":webhookConfigured?"signed-webhook":"not-configured";
  return {provider,ready:Boolean(publicValid&&(resendConfigured||(webhookConfigured&&webhookValid))),publicUrl,fromConfigured:Boolean(from),apiKeyConfigured:Boolean(apiKey),webhookConfigured, inboundConfigured:Boolean(clean(process.env.EMAIL_INBOUND_WEBHOOK_SECRET)),environment,sender:from?from:null};
 }
+export async function queueEmailNotification(db,userId,templateCode,variables={},resourceType="workflow",resourceId=null){
+ const user=(await db.query("select u.email,coalesce(np.email_enabled,true) email_enabled from app_user u left join notification_preference np on np.user_id=u.id where u.id=$1",[userId])).rows[0];
+ if(!user?.email||!user.email_enabled)return false;
+ const recipient=normalizeEmailAddress(user.email);
+ const suppressed=(await db.query("select 1 from email_recipient_suppression where email_normalized=$1 and cleared_at is null limit 1",[recipient])).rowCount>0;
+ if(suppressed)return false;
+ const eventCode=String(variables.notificationEventCode||variables.notification_event_code||templateCode);
+ const eventKey=emailWorkflowEventKey({userId,templateCode,resourceType,resourceId,eventCode,eventVersion:variables.eventVersion||variables.event_version||null});
+ const inserted=await db.query("insert into notification_outbox(channel,recipient,template_code,payload,status,delivery_status,email_event_key,updated_at) values('email',$1,$2,$3,'pending','queued',$4,now()) on conflict(email_event_key) where channel='email' and email_event_key is not null do nothing returning id",[user.email,templateCode,{...variables,variables},eventKey]);
+ return inserted.rowCount>0;
+}
 export async function queueWorkflowEmail(db,userId,templateCode,variables={},resourceType="workflow",resourceId=null){
- const user=(await db.query("select u.email,coalesce(np.email_enabled,true) email_enabled,p.first_name from app_user u left join notification_preference np on np.user_id=u.id left join person p on p.user_id=u.id where u.id=$1",[userId])).rows[0];
+ const user=(await db.query("select p.first_name from app_user u left join person p on p.user_id=u.id where u.id=$1",[userId])).rows[0];
  if(!user)return false;
  const vars={firstName:user.first_name||"",...variables};
  const eventCode=String(vars.notificationEventCode||vars.notification_event_code||templateCode);
  const inApp=await createInAppNotification(db,userId,eventCode,resourceType,resourceId,vars);
- let queued=Boolean(inApp);
- if(user.email&&user.email_enabled){
-  const recipient=normalizeEmailAddress(user.email);
-  const suppressed=(await db.query("select 1 from email_recipient_suppression where email_normalized=$1 and cleared_at is null limit 1",[recipient])).rowCount>0;
-  if(!suppressed){
-   const eventKey=emailWorkflowEventKey({userId,templateCode,resourceType,resourceId,eventCode,eventVersion:vars.eventVersion||vars.event_version||null});
-   const inserted=await db.query("insert into notification_outbox(channel,recipient,template_code,payload,status,delivery_status,email_event_key,updated_at) values('email',$1,$2,$3,'pending','queued',$4,now()) on conflict(email_event_key) where channel='email' and email_event_key is not null do nothing returning id",[user.email,templateCode,{...vars,variables:vars},eventKey]);
-   queued=queued||inserted.rowCount>0;
-  }
- }
- return queued;
+ const emailQueued=await queueEmailNotification(db,userId,templateCode,vars,resourceType,resourceId);
+ return Boolean(inApp||emailQueued);
 }
 export async function getEmailOperations(actorId){
  const db=getPool();await requireAdmin(db,actorId);

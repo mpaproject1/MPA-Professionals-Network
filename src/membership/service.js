@@ -708,7 +708,7 @@ export async function expireDueMemberships(batchSize=500){
  return withTransaction(async db=>{
   const result=await db.query(`with due as (
     select id,user_id,end_date from membership_record
-    where status='active' and end_date is not null and end_date<current_date
+    where status='active' and end_date is not null and end_date<(now() at time zone 'Africa/Addis_Ababa')::date
     order by end_date asc,id asc
     limit $1
     for update skip locked

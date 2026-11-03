@@ -271,7 +271,7 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const isPrimaryParticipant=participants.some(p=>p.user_id===userId&&["requester","recipient_representative"].includes(p.participant_role));
     const clarifications=isPrimaryParticipant?(await db.query("select id,asked_by,answered_by,prompt_code,question,answer,status,created_at,answered_at from network_plus_request_clarification where request_id=$1 order by created_at",[requestId])).rows:[];
     const meetings=isPrimaryParticipant?(await db.query("select * from network_plus_request_meeting where request_id=$1 order by created_at desc",[requestId])).rows:[];
-    const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 order by created_at",[requestId])).rows;
+    const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 and ($2::boolean or (event_code not like 'request.clarification_%' and event_code not like 'request.meeting_%' and event_code not like 'request.contact_consent_%')) order by created_at",[requestId,isPrimaryParticipant])).rows;
     const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;
     const isRecipientRepresentative=participants.some(p=>p.user_id===userId&&p.participant_role==="recipient_representative"&&p.consent_status!=="revoked");
     const canReview=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.respond_requests")||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));

@@ -152,14 +152,18 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   assert.equal(contact.fields[0].sharedWithYou,recipientEmail);
   const recipientContact=await requests.getNetworkPlusContactHandoff(handoffRequest.id,recipient.user.id);
   assert.equal(recipientContact.fields[0].sharedWithYou,requesterEmail);
+  const encryptedEmail=(await db.query("select requester_value_ciphertext,recipient_value_ciphertext from network_plus_request_contact_consent where request_id=$1 and recipient_user_id=$2 and field_code='email'",[handoffRequest.id,recipient.user.id])).rows[0];
+  assert.match(encryptedEmail.requester_value_ciphertext,/^v1\./);
+  assert.notEqual(encryptedEmail.requester_value_ciphertext,requesterEmail);
+  assert.match(encryptedEmail.recipient_value_ciphertext,/^v1\./);
+  assert.notEqual(encryptedEmail.recipient_value_ciphertext,recipientEmail);
   await requests.updateNetworkPlusContactConsent(handoffRequest.id,recipient.user.id,{field:"email",decision:"revoke"},requestRef);
   contact=await requests.getNetworkPlusContactHandoff(handoffRequest.id,requester.user.id,recipient.user.id);
   assert.equal(contact.fields[0].released,false);
   assert.equal(contact.fields[0].sharedWithYou,null);
-  const encryptedEmail=(await db.query("select requester_value_ciphertext,recipient_value_ciphertext from network_plus_request_contact_consent where request_id=$1 and recipient_user_id=$2 and field_code='email'",[handoffRequest.id,recipient.user.id])).rows[0];
-  assert.match(encryptedEmail.requester_value_ciphertext,/^v1\./);
-  assert.notEqual(encryptedEmail.requester_value_ciphertext,requesterEmail);
-  assert.notEqual(encryptedEmail.recipient_value_ciphertext,null);
+  const revokedEmail=(await db.query("select recipient_status,recipient_value_ciphertext from network_plus_request_contact_consent where request_id=$1 and recipient_user_id=$2 and field_code='email'",[handoffRequest.id,recipient.user.id])).rows[0];
+  assert.equal(revokedEmail.recipient_status,"revoked");
+  assert.equal(revokedEmail.recipient_value_ciphertext,null,"revocation must purge the revoked party's encrypted contact value");
   const legacyEncrypt=value=>{
     const key=createHash("sha256").update(process.env.NETWORK_PLUS_CONTACT_ENCRYPTION_KEY).digest(),iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",key,iv);
     const ciphertext=Buffer.concat([cipher.update(value,"utf8"),cipher.final()]);

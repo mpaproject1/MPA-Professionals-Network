@@ -118,3 +118,10 @@ test("transactional workflow email remains separate from optional email preferen
   assert.match(source, /optional=false/);
   assert.match(source, /optional&&!user\.email_enabled/);
 });
+
+test("provider callbacks arriving before outbox persistence are reconciled on later dispatch", async () => {
+  const source = await read("../../src/platform/email-operations.js");
+  assert.match(source, /reconcilePendingEmailDeliveryEvents/);
+  assert.match(source, /processed_at is null/);
+  assert.match(source, /email\.delivery_event\.reconciled/);
+});

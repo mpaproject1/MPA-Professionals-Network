@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-async function dismissPrivacyChoices(page) {\n  const rejectOptional = page.getByRole("button", { name: "Reject optional" });\n  if (await rejectOptional.isVisible().catch(() => false)) await rejectOptional.click();\n}
+async function dismissPrivacyChoices(page) {
+  const rejectOptional = page.getByRole("button", { name: "Reject optional" });
+  if (await rejectOptional.isVisible().catch(() => false)) await rejectOptional.click();
+}
 
 const organization = (overrides = {}) => ({
   id: "org-e2e-1",
@@ -58,6 +61,7 @@ test.describe("MPA organization app entry and navigation", () => {
       window.sessionStorage.removeItem("mpa-session-token");
     });
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: /Bring your organization into a trusted professional network/ })).toBeVisible();
     await page.getByRole("button", { name: "Register your organization" }).click();
     await expect(page).toHaveURL(/\/login\?next=\/organizations/);
@@ -66,6 +70,7 @@ test.describe("MPA organization app entry and navigation", () => {
   test("authenticated unregistered account sees benefits and a progressive registration action before operational tools", async ({ page }) => {
     await mockOrganizationApi(page, []);
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: /Bring your organization into a trusted professional network/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Register your organization" })).toBeVisible();
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
@@ -83,6 +88,7 @@ test.describe("MPA organization app entry and navigation", () => {
       verification_status: "verified",
     }]);
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: "Organization access is not active" })).toBeVisible();
     await expect(page.getByText("suspended", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Register your organization" })).toHaveCount(0);
@@ -99,6 +105,7 @@ test.describe("MPA organization app entry and navigation", () => {
       body: JSON.stringify({ error: { code: "TEMPORARY_UNAVAILABLE", message: "Try again." } }),
     }));
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: "Confirming your organization access" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Register your organization" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Register an organization" })).toHaveCount(0);
@@ -112,6 +119,7 @@ test.describe("MPA organization app entry and navigation", () => {
       verification_case_status: "submitted",
     })]);
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: "Your organization application" })).toBeVisible();
     await expect(page.getByText("Under review").first()).toBeVisible();
     await expect(page.getByText(/awaiting an authorized MPA review/)).toBeVisible();
@@ -124,6 +132,7 @@ test.describe("MPA organization app entry and navigation", () => {
       verification_case_status: "in_review",
     })]);
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.getByText("Under review").first()).toBeVisible();
     await expect(page.getByText(/awaiting an authorized MPA review/)).toBeVisible();
     await expect(page.getByRole("link", { name: "Continue verification" })).toHaveCount(0);
@@ -138,6 +147,7 @@ test.describe("MPA organization app entry and navigation", () => {
       missing_evidence: ["trade_license"],
     })]);
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.getByText("Changes requested").first()).toBeVisible();
     await expect(page.getByText(/Please attach the current trade license/).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Continue verification" })).toHaveAttribute("href", "/organizations#org-evidence");
@@ -162,6 +172,7 @@ test.describe("MPA organization app entry and navigation", () => {
     })]);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: "Your organization at a glance" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Your organizations" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recruitment activity" })).toBeVisible();
@@ -217,6 +228,7 @@ test.describe("MPA organization app entry and navigation", () => {
       tracking_reference: "ORG-TEST-002",
     })]);
     await page.goto("/recruitment?organizationId=org-e2e-2");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("combobox", { name: "Organization workspace" })).toHaveValue("org-e2e-2");
   });
 
@@ -228,6 +240,7 @@ test.describe("MPA organization app entry and navigation", () => {
       body: JSON.stringify({ error: { code: "FORBIDDEN", message: "Not permitted." } }),
     }));
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.getByText(/Live recruitment totals are not available/)).toBeVisible();
     await expect(page.getByText("Applications received", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Active pipeline", { exact: true })).toHaveCount(0);
@@ -236,6 +249,7 @@ test.describe("MPA organization app entry and navigation", () => {
   test("read-only organization members do not see publishing, reviewing or team-administration folders", async ({ page }) => {
     await mockOrganizationApi(page, [organization({ role_code: "read_only" })]);
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     const tabs = page.getByRole("tablist", { name: "Organization workspace folders" });
     await expect(tabs.getByRole("tab")).toHaveCount(3);
     await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
@@ -247,6 +261,7 @@ test.describe("MPA organization app entry and navigation", () => {
   test("recruiter role sees recruitment publishing and reviewing but not mentorship or team administration", async ({ page }) => {
     await mockOrganizationApi(page, [organization({ role_code: "recruiter" })]);
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("tab", { name: /Publishing/ })).toBeVisible();
     await expect(page.getByRole("tab", { name: /Reviewing/ })).toBeVisible();
     await expect(page.getByRole("tab", { name: /Organization/ })).toHaveCount(0);
@@ -258,6 +273,7 @@ test.describe("MPA organization app entry and navigation", () => {
   test("finance and event roles retain outcome reporting without publishing or team controls", async ({ page }) => {
     await mockOrganizationApi(page, [organization({ role_code: "finance" })]);
     await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
     const tabs = page.getByRole("tablist", { name: "Organization workspace folders" });
     await expect(tabs.getByRole("tab")).toHaveCount(3);
     await expect(tabs.getByRole("tab", { name: /Reports/ })).toBeVisible();
@@ -269,6 +285,7 @@ test.describe("MPA organization app entry and navigation", () => {
   test("legacy workspace URL redirects to the canonical organization entry", async ({ page }) => {
     await mockOrganizationApi(page, [organization()]);
     await page.goto("/organizations/workspace?source=legacy");
+    await dismissPrivacyChoices(page);
     await expect(page).toHaveURL(/\/organizations\?source=legacy$/);
     await expect(page.getByRole("heading", { name: "Your organization at a glance" })).toBeVisible();
   });
@@ -276,6 +293,7 @@ test.describe("MPA organization app entry and navigation", () => {
   test("team and permission administration remains available as a focused destination", async ({ page }) => {
     await mockOrganizationApi(page, [organization()]);
     await page.goto("/organizations/team");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: "Organization team & access" })).toBeVisible();
     await expect(page.getByText("Member administration")).toBeVisible();
   });

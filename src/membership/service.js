@@ -1,21 +1,21 @@
+import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence, requiresMembershipPaymentEvidence } from "./payment-policy.js";
+import { assertEmailDeliveryConfigured, createEmailVerification, deliverEmailVerification } from "../platform/email-verification.js";
+import { assertMembershipPaymentMethodAvailable, buildMembershipPaymentMethodSnapshot, buildPaymentMethodAuditMetadata, normalizeMembershipPaymentMethodInput } from "./payment-method-policy.js";
+import { assertProfessionalProfileCapability } from "../platform/identity-policy.js";
+import { consumeHumanChallenge } from "../platform/security-controls.js";
 import { createHash, randomUUID } from "node:crypto";
+import { createInAppNotification } from "../platform/notifications.js";
+import { displayReference } from "../platform/display-reference.js";
+import { getPool, withTransaction } from "../platform/db.js";
+import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
 import { hashSessionToken, newSessionToken, sessionTokenPayload, signToken } from "../platform/auth.js";
-import { toChapaMinorUnits } from "../platform/chapa-money.js";
 import { isValidChapaWebhookSignature } from "../platform/chapa-signature.js";
 import { loadConfig } from "../platform/config.js";
-import { getPool, withTransaction } from "../platform/db.js";
-import { displayReference } from "../platform/display-reference.js";
-import { assertEmailDeliveryConfigured, createEmailVerification, deliverEmailVerification } from "../platform/email-verification.js";
-import { assertProfessionalProfileCapability } from "../platform/identity-policy.js";
-import * as memberReferrals from "../platform/member-referrals.js";
 import { membershipEndDate } from "../platform/membership-duration.js";
-import { createInAppNotification } from "../platform/notifications.js";
-import { queueEmailNotification } from "../platform/email-operations.js";
-import { consumeHumanChallenge } from "../platform/security-controls.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
-import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
-import { assertMembershipPaymentMethodAvailable, buildMembershipPaymentMethodSnapshot, buildPaymentMethodAuditMetadata, normalizeMembershipPaymentMethodInput } from "./payment-method-policy.js";
-import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence, requiresMembershipPaymentEvidence } from "./payment-policy.js";
+import { queueEmailNotification } from "../platform/email-operations.js";
+import { toChapaMinorUnits } from "../platform/chapa-money.js";
+import * as memberReferrals from "../platform/member-referrals.js";
 
 export function generateMembershipNumber(date=new Date()) { return `MPA-${date.getUTCFullYear()}-${randomUUID().slice(0,8).toUpperCase()}`; }
 

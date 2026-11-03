@@ -168,6 +168,15 @@ const requiredColumns = [
   ["network_plus_request_meeting", "status", "text"],
   ["network_plus_request_meeting", "place_type", "text"],
   ["network_plus_request_meeting", "place_details", "text"],
+  ["network_plus_request_meeting", "counter_place_type", "text"],
+  ["network_plus_request_meeting", "counter_place_details", "text"],
+  ["network_plus_request_meeting", "counter_starts_at", "timestamptz"],
+  ["network_plus_request_meeting", "counter_timezone", "text"],
+  ["network_plus_request_meeting", "counter_duration_minutes", "int4"],
+  ["network_plus_request_meeting", "confirmed_place_type", "text"],
+  ["network_plus_request_meeting", "confirmed_place_details", "text"],
+  ["network_plus_request_meeting", "confirmed_starts_at", "timestamptz"],
+  ["network_plus_request_meeting", "confirmed_timezone", "text"],
   ["network_plus_request_meeting", "starts_at", "timestamptz"],
   ["network_plus_request_meeting", "timezone", "text"],
   ["network_plus_request_meeting", "duration_minutes", "int4"],
@@ -670,6 +679,17 @@ try {
     ["network_plus_business_access","business_id","network_plus_business","id"],
     ["network_plus_business_access","user_id","app_user","id"],
     ["network_plus_business_access","granted_by","app_user","id"],
+    ["network_plus_request","recipient_response_by","app_user","id"],
+    ["network_plus_request_contact_consent","request_id","network_plus_request","id"],
+    ["network_plus_request_contact_consent","recipient_user_id","app_user","id"],
+    ["network_plus_request_meeting","request_id","network_plus_request","id"],
+    ["network_plus_request_meeting","proposer_user_id","app_user","id"],
+    ["network_plus_request_meeting","responder_user_id","app_user","id"],
+    ["network_plus_request_meeting","confirmed_by","app_user","id"],
+    ["network_plus_request_meeting","responded_by","app_user","id"],
+    ["network_plus_request_clarification","request_id","network_plus_request","id"],
+    ["network_plus_request_clarification","asked_by","app_user","id"],
+    ["network_plus_request_clarification","answered_by","app_user","id"],
     ["network_plus_business_verification_case","business_id","network_plus_business","id"],
     ["network_plus_business_verification_case","submitted_by","app_user","id"],
     ["network_plus_business_verification_case","reviewer_user_id","app_user","id"],
@@ -884,6 +904,30 @@ try {
     if (!row || values.some(value=>!row.definition.includes(`'${value}'`))) {
       throw new Error(`Check constraint ${table}.${name} is missing or does not contain the expected allowed values.`);
     }
+  }
+  const phase2ConstraintRows=(await client.query(
+    "select cl.relname table_name,c.conname,lower(pg_get_constraintdef(c.oid)) definition from pg_constraint c join pg_class cl on cl.oid=c.conrelid join pg_namespace n on n.oid=cl.relnamespace where n.nspname='public' and cl.relname=any($1::text[]) and c.contype='c' order by cl.relname,c.conname",
+    [["network_plus_request","network_plus_request_contact_consent","network_plus_request_meeting","network_plus_request_clarification"]]
+  )).rows;
+  const requirePhase2Check=(table,fragments)=>{
+    const found=phase2ConstraintRows.some(row=>row.table_name===table&&fragments.every(fragment=>row.definition.includes(fragment.toLowerCase())));
+    if(!found)throw new Error(`Network-Plus Phase 2 check constraint on ${table} is missing required invariant fragments: ${fragments.join(", ")}.`);
+  };
+  requirePhase2Check("network_plus_request",["recipient_response is null","recipient_response_by is null","recipient_response_at is null","intent = 'question'","recipient_response is not null","recipient_response_by is not null","recipient_response_at is not null"]);
+  requirePhase2Check("network_plus_request_contact_consent",["field_code","business_location","whatsapp"]);
+  requirePhase2Check("network_plus_request_contact_consent",["requester_status = 'accepted'","requester_value_ciphertext is not null","requester_consented_at is not null"]);
+  requirePhase2Check("network_plus_request_contact_consent",["recipient_status = 'accepted'","recipient_value_ciphertext is not null","recipient_consented_at is not null"]);
+  requirePhase2Check("network_plus_request_meeting",["status = 'countered'","counter_place_type is not null","counter_starts_at is not null","counter_timezone is not null"]);
+  requirePhase2Check("network_plus_request_meeting",["status = 'confirmed'","confirmed_place_type is not null","confirmed_by is not null","confirmed_starts_at is not null"]);
+  requirePhase2Check("network_plus_request_clarification",["status = 'answered'","answer is not null","answered_by is not null","answered_at is not null"]);
+  const phase2Indexes=[
+    ["ix_network_plus_contact_consent_peer","network_plus_request_contact_consent",["recipient_user_id","request_id","field_code"]],
+    ["ix_network_plus_request_meeting_history","network_plus_request_meeting",["request_id","created_at"]],
+    ["ix_network_plus_request_clarification_open","network_plus_request_clarification",["request_id","status","created_at"]]
+  ];
+  for(const [name,table,columns] of phase2Indexes){
+    const index=(await client.query("select indexdef from pg_indexes where schemaname='public' and tablename=$1 and indexname=$2",[table,name])).rows[0];
+    if(!index||columns.some(column=>!index.indexdef.toLowerCase().includes(column)))throw new Error(`Network-Plus Phase 2 index ${name} is missing or has the wrong columns.`);
   }
 
   const serveRoles=await client.query("select role_code from app_role where role_code='serve_community_reviewer'");

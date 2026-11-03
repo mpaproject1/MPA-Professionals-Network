@@ -330,7 +330,15 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;
     const canReview=isRecipientRepresentative;
     const canAccept=isRecipientRepresentative&&await hasCurrentRecipientAuthority(db,row,userId,"business.accept_terms");
-    return { ...row, recipient_response:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response:null, recipient_response_by:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_by:null, recipient_response_at:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_at:null, participants, clarifications, meetings, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative, canReview, canAccept, canHandoff:isPrimaryParticipant };
+    return { ...row,
+      recipient_response:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response:null,
+      recipient_response_by:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_by:null,
+      recipient_response_at:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_at:null,
+      requester_disposition:row.requester_user_id===userId?row.requester_disposition:null,
+      requester_disposition_remark:row.requester_user_id===userId?row.requester_disposition_remark:null,
+      requester_disposition_updated_at:row.requester_user_id===userId?row.requester_disposition_updated_at:null,
+      review_due_at:row.requester_user_id===userId?row.review_due_at:null,
+      participants, clarifications, meetings, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative, canReview, canAccept, canHandoff:isPrimaryParticipant };
   });
 }
 export async function addNetworkPlusRequestParticipant(requestId,userId,input,requestIdHeader) {

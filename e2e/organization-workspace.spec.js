@@ -190,6 +190,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
     await organizationSwitcher.selectOption("org-e2e-1");
     await expect(tabs.getByRole("tab")).toHaveCount(6);
+    await tabs.getByRole("tab", { name: "Publishing" }).click();
     await page.getByRole("button", { name: "Professional service" }).click();
     await expect(page.getByRole("link", { name: /Continue/ })).toHaveAttribute("href", "/services?organizationId=org-e2e-1");
     await page.getByRole("button", { name: "Mentorship" }).click();

@@ -46,7 +46,7 @@ create index if not exists ix_network_plus_request_requester_disposition
 create index if not exists ix_network_plus_request_review_due
   on network_plus_request(review_due_at,id)
   where requester_disposition='in_progress' and review_due_at is not null
-    and status not in ('draft','completed','closed');
+    and status not in ('draft','closed');
 
 comment on column network_plus_request.requester_disposition is
   'Requester-reported connection outcome; independent from the platform-observed request lifecycle status.';

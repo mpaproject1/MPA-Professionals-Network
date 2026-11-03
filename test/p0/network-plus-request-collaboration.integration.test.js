@@ -60,7 +60,10 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
  const replay=await requests.transitionNetworkPlusRequest(draft.id,recipient.user.id,{status:"accepted"},requestRef,decisionKey);
  assert.equal(replay.status,"accepted");
  await assert.rejects(()=>requests.transitionNetworkPlusRequest(draft.id,recipient.user.id,{status:"declined"},requestRef,decisionKey),e=>e.code==="IDEMPOTENCY_CONFLICT");
+ await assert.rejects(()=>requests.getNetworkPlusWorkspace(draft.id,requester.user.id),e=>e.code==="NOT_FOUND");
+ const enabledWorkspace=await requests.createNetworkPlusWorkspace(draft.id,requester.user.id,requestRef);
  const requesterWorkspace=await requests.getNetworkPlusWorkspace(draft.id,requester.user.id);
+ assert.equal(enabledWorkspace.id,requesterWorkspace.workspace.id);
  const recipientWorkspace=await requests.getNetworkPlusWorkspace(draft.id,recipient.user.id);
  assert.equal(requesterWorkspace.workspace.id,recipientWorkspace.workspace.id);
  const milestone=await requests.addNetworkPlusWorkspaceMilestone(draft.id,requester.user.id,{title:"Complete accessibility audit"},randomUUID()+randomUUID());
@@ -102,7 +105,8 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   await assert.rejects(()=>requests.transitionNetworkPlusRequest(businessRequest.id,requestReviewer.user.id,{status:"accepted"},requestRef,randomUUID()+randomUUID()),e=>e.code==="RECIPIENT_AUTHORITY_REQUIRED");
   const businessAccepted=await requests.transitionNetworkPlusRequest(businessRequest.id,termsApprover.user.id,{status:"accepted"},requestRef,randomUUID()+randomUUID());
   assert.equal(businessAccepted.status,"accepted");
-  assert.ok((await requests.getNetworkPlusWorkspace(businessRequest.id,requester.user.id)).workspace.id);
+  await assert.rejects(()=>requests.getNetworkPlusWorkspace(businessRequest.id,requester.user.id),e=>e.code==="NOT_FOUND");
+  assert.ok((await requests.createNetworkPlusWorkspace(businessRequest.id,requester.user.id,requestRef)).id);
  await db.query("delete from app_user_role where user_id=$1 and role_id=$2",[reviewer.user.id,reviewerRole.id]);
   const support=await register("support-"+suffix),admin=await register("support-admin-"+suffix);
   const supportRole=(await db.query("select id from app_role where role_code=$1",["network_plus_support"])).rows[0];

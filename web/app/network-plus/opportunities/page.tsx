@@ -49,6 +49,14 @@ export default function NetworkPlusOpportunitiesPage(){
   finally{setLoading(false);}
  },[token,businessId]);
  useEffect(()=>{void load();},[load]);
+ const searchDirectory=useCallback(async()=>{
+  if(!token)return;
+  const params=new URLSearchParams();
+  if(q.trim())params.set("q",q.trim());if(kindFilter)params.set("listingKind",kindFilter);if(categoryFilter)params.set("category",categoryFilter);if(subcategoryFilter)params.set("subcategory",subcategoryFilter);if(locationFilter.trim())params.set("location",locationFilter.trim());params.set("limit","50");
+  try{const found=await api<ListingResult>("/api/v1/network-plus/listings?"+params.toString(),{},token);setResults(found?.items||[]);}
+  catch(e){setError(e instanceof ApiError?e.message:"Opportunity search could not be completed.");}
+ },[token,q,kindFilter,categoryFilter,subcategoryFilter,locationFilter]);
+ useEffect(()=>{if(!token)return;const timer=window.setTimeout(()=>void searchDirectory(),300);return()=>window.clearTimeout(timer);},[searchDirectory,token]);
 
  useEffect(()=>{
   if(!token||!draftId)return;

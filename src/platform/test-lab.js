@@ -1,12 +1,12 @@
-import { createXlsx } from "./xlsx.js";
-import { getPool, withTransaction } from "./db.js";
-import { hashPassword } from "../membership/identity.js";
-import { rm } from "node:fs/promises";
-import { seedTestLabDomainFixtures } from "./test-lab-domain-fixtures.js";
-import { TEST_LAB_PERSONAS, TEST_LAB_SCENARIOS } from "./test-lab-catalog.js";
-import * as membership from "../membership/service.js";
 import crypto from "node:crypto";
+import { rm } from "node:fs/promises";
 import path from "node:path";
+import { hashPassword } from "../membership/identity.js";
+import * as membership from "../membership/service.js";
+import { getPool, withTransaction } from "./db.js";
+import { TEST_LAB_PERSONAS, TEST_LAB_SCENARIOS } from "./test-lab-catalog.js";
+import { seedTestLabDomainFixtures } from "./test-lab-domain-fixtures.js";
+import { createXlsx } from "./xlsx.js";
 
 
 const ROLE_FIXTURES = TEST_LAB_PERSONAS.map(({persona,name,role})=>({persona,name,role}));

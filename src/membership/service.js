@@ -51,7 +51,7 @@ async function notify(db,userId,eventCode,resourceType,resourceId,payload={}){
   if(!exists)return;
   const details=membershipNotificationCopy(eventCode,payload);
   await createInAppNotification(db,userId,eventCode,resourceType,resourceId,details);
-  await queueEmailNotification(db,userId,eventCode,details,resourceType,resourceId);
+  await queueEmailNotification(db,userId,"professional.workflow_update",{...details,notificationEventCode:eventCode,status:details.status||eventCode},resourceType,resourceId);
 }
 async function roles(db,userId){
   const r=await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId]);

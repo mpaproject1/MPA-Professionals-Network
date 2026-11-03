@@ -149,6 +149,13 @@ test("membership dashboard aggregates and monthly trend are available only throu
     assert.equal(status.report.id, "membership-status");
     const historicalStock = await runReport(reviewer, "membership-status", { from: "1900-01-01", to: "1900-01-02" }, randomUUID());
     assert.deepEqual(historicalStock.rows, status.rows, "current member stock must not be truncated by an application-period filter");
+    const unknownGeography = await runReport(reviewer, "membership-status", { geographyUnitId: randomUUID() }, randomUUID());
+    assert.equal(unknownGeography.filters.geographyUnitId.length > 0, true);
+    assert.deepEqual(unknownGeography.rows, [], "an unknown published geography unit must not match unrelated members");
+    const unrecordedGeography = await runReport(reviewer, "membership-status", { geographyUnitId: "unrecorded", q: "no-such-member-" + randomUUID() }, randomUUID());
+    assert.equal(unrecordedGeography.filters.geographyUnitId, "unrecorded");
+    assert.deepEqual(unrecordedGeography.rows, [], "missing or stale geography is an explicit filter and must not broaden the result");
+
 
     const monthly = await runReport(permissionOnly, "membership-applications", {
       from: "2020-01-01", to: new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date()), groupBy: "month"

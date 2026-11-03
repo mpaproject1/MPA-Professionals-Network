@@ -250,6 +250,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
    }
    const sent=await sendMessage({recipient:row.recipient,subject,textBody,htmlBody,templateCode:row.template_code,payload:row.payload,idempotencyKey:row.id});
    await db.query("update notification_outbox set status='sent',delivery_status='sent',sent_at=now(),provider_message_id=$1,last_error=null,delivery_error_code=null,next_attempt_at=null,locked_at=null,updated_at=now() where id=$2",[sent.providerMessageId,row.id]);
+   await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.message.provider_accepted','notification_outbox',$1,'success',$2)",[row.id,{provider:providerConfig().provider,providerMessageId:sent.providerMessageId||null,attempt:Number(row.attempts||0)+1}]);
    const matchId=row.payload?.matchId||row.payload?.variables?.matchId;if(row.template_code==="mentor.mentorship_update"&&matchId){try{await db.query("update mentorship_match set mentor_notification_status='sent',mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$1",[matchId,"Provider accepted the send request; delivery is not confirmed."]);}catch(e){console.error("[email-outbox] could not update mentorship notification evidence",{outboxId:row.id});}}
    results.push({id:row.id,status:"sent"});
   }catch(e){
@@ -261,6 +262,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
    const delay=emailRetryDelaySeconds(attempt);
    try{
     await db.query("update notification_outbox set status=$1,delivery_status=case when $1='failed' then 'failed' else 'queued' end,last_error=$2,delivery_error_code=$3,next_attempt_at=$4,locked_at=null,updated_at=now() where id=$5",[failed?"failed":"pending",clean(e.message,500),code,failed?null:new Date(Date.now()+delay*1000),row.id]);
+    await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.message.delivery_attempt_failed','notification_outbox',$1,$2,$3)",[row.id,failed?"failure":"retry_scheduled",{code,attempt,retryable:classification.retryable&&!exhausted}]);
     const matchId=row.payload?.matchId||row.payload?.variables?.matchId;if(row.template_code==="mentor.mentorship_update"&&matchId){try{await db.query("update mentorship_match set mentor_notification_status=$2,mentor_notification_updated_at=now(),mentor_notification_detail=$3 where id=$1",[matchId,failed?"failed":"queued",failed?"Email delivery failed after retry policy was exhausted.":"Email send attempt failed and is queued for retry."]);}catch(persistMatchError){console.error("[email-outbox] could not update mentorship notification evidence",{outboxId:row.id});}}
     results.push({id:row.id,status:failed?"failed":"pending",error:clean(e.message,250),retryable:classification.retryable&&!exhausted});
    }catch(persistError){

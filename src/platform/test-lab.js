@@ -25,26 +25,6 @@ const ROLE_NAMES = {
 const fail=(status,message,code="BUSINESS_RULE")=>Object.assign(new Error(message),{statusCode:status,code});
 const clean=(v,max=120)=>String(v??"").trim().slice(0,max);
 function testLabEnabled(){return process.env.NODE_ENV!=="production"&&process.env.TEST_LAB_ENABLED==="true";}
-function credentialKey(){
- const value=String(process.env.TEST_LAB_CREDENTIAL_ENCRYPTION_KEY||"");
- let key;
- try{key=Buffer.from(value,"base64url");}catch{}
- if(!key||key.length!==32)key=Buffer.from(value,"utf8");
- if(key.length!==32)throw fail(503,"Set TEST_LAB_CREDENTIAL_ENCRYPTION_KEY to a dedicated 32-byte key before enabling test portfolios.","TEST_LAB_KEY_REQUIRED");
- return key;
-}
-function encryptSecret(value){
- const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv("aes-256-gcm",credentialKey(),iv);
- const encrypted=Buffer.concat([cipher.update(value,"utf8"),cipher.final()]);
- return ["v1",iv.toString("base64url"),cipher.getAuthTag().toString("base64url"),encrypted.toString("base64url")].join(".");
-}
-function decryptSecret(value){
- const [version,iv,tag,data]=String(value||"").split(".");
- if(version!=="v1"||!iv||!tag||!data)throw fail(500,"A stored test credential could not be decrypted.","TEST_CREDENTIAL_DECRYPT_FAILED");
- const decipher=crypto.createDecipheriv("aes-256-gcm",credentialKey(),Buffer.from(iv,"base64url"));
- decipher.setAuthTag(Buffer.from(tag,"base64url"));
- return Buffer.concat([decipher.update(Buffer.from(data,"base64url")),decipher.final()]).toString("utf8");
-}
 function randomPassword(){return crypto.randomBytes(24).toString("base64url")+"!7";}
 function usernameToken(){return crypto.randomBytes(5).toString("hex");}
 function requireSystemAdmin(identity){
@@ -53,17 +33,16 @@ function requireSystemAdmin(identity){
 async function assertSafeEnvironment(db){
  if(!testLabEnabled())throw fail(403,"Test Lab is disabled. Enable it explicitly in a non-production deployment.","TEST_LAB_DISABLED");
  if(process.env.NODE_ENV==="production")throw fail(403,"Test Lab operations are blocked in production.","TEST_LAB_PRODUCTION_BLOCKED");
- const expected=clean(process.env.TEST_LAB_DATABASE_NAME,120);
- if(!expected)throw fail(503,"Set TEST_LAB_DATABASE_NAME to the exact disposable database name.","TEST_LAB_DATABASE_NOT_ALLOWLISTED");
- const actual=(await db.query("select current_database() name")).rows[0]?.name;
- if(actual!==expected)throw fail(403,"The connected database does not match TEST_LAB_DATABASE_NAME. No test data was changed.","TEST_LAB_DATABASE_MISMATCH");
+ if(process.env.TEST_LAB_DISPOSABLE_DATABASE!=="true")throw fail(503,"Mark this non-production PostgreSQL database as disposable by setting TEST_LAB_DISPOSABLE_DATABASE=true before enabling Test Lab.","TEST_LAB_DATABASE_NOT_MARKED_DISPOSABLE");
+ const actual=(await db.query("select current_database() name, current_setting('server_version') server_version")).rows[0]?.name;
+ if(!actual)throw fail(503,"The configured database could not be identified. No test data was changed.","TEST_LAB_DATABASE_UNAVAILABLE");
  return actual;
 }
 function makePortfolioName(value){const name=clean(value,100);if(name.length<4)throw fail(400,"Portfolio name must contain at least four characters.","VALIDATION_ERROR");return name;}
 function makeEmail(prefix,role,index){return `qa.${prefix}.${role.replace(/_/g,"-")}.${index}@example.test`;}
 function randomId(){return crypto.randomUUID();}
 export function testLabConfiguration(){
- return {enabled:testLabEnabled(),environment:process.env.NODE_ENV||"development",databaseAllowlistConfigured:Boolean(process.env.TEST_LAB_DATABASE_NAME),credentialEncryptionConfigured:Boolean(process.env.TEST_LAB_CREDENTIAL_ENCRYPTION_KEY),deliveryMode:process.env.TEST_DELIVERY_MODE==="capture"?"capture":"blocked"};
+ return {enabled:testLabEnabled(),environment:process.env.NODE_ENV||"development",databaseSafetyConfigured:process.env.TEST_LAB_DISPOSABLE_DATABASE==="true",deliveryMode:process.env.TEST_DELIVERY_MODE==="capture"?"capture":"blocked"};
 }
 export async function listTestPortfolios(identity){
  requireSystemAdmin(identity);const db=getPool();await assertSafeEnvironment(db);
@@ -100,8 +79,8 @@ export async function createTestPortfolio(identity,input={},requestId=null){
    const role=(await tx.query("select id from app_role where role_code=$1",[fixture.role])).rows[0];
    if(!role)throw fail(409,`Required role ${fixture.role} is not installed. Apply the platform migrations before creating the portfolio.`,"TEST_ROLE_MISSING");
    await tx.query("insert into app_user_role(user_id,role_id,assigned_by) values($1,$2,$3)",[user.id,role.id,identity.sub]);
-   await tx.query("insert into test_portfolio_account(portfolio_id,user_id,email,display_name,persona,role_code,password_ciphertext) values($1,$2,$3,$4,$5,$6,$7)",
-    [portfolioId,user.id,email,fixture.name.join(" "),fixture.persona,fixture.role,encryptSecret(password)]);
+   await tx.query("insert into test_portfolio_account(portfolio_id,user_id,email,display_name,persona,role_code) values($1,$2,$3,$4,$5,$6)",
+    [portfolioId,user.id,email,fixture.name.join(" "),fixture.persona,fixture.role]);
    await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'app_user',$2),($1,'person',$3),($1,'professional_profile',$4)",
     [portfolioId,user.id,person.id,(await tx.query("select id from professional_profile where person_id=$1",[person.id])).rows[0].id]);
    const category=fixture.role==="member"?"membership":fixture.role.includes("reviewer")?"verification":"system";
@@ -165,11 +144,18 @@ export async function exportTestPortfolioAccounts(identity,portfolioId){
  requireSystemAdmin(identity);const db=getPool();await assertSafeEnvironment(db);
  const p=(await db.query("select id,name,branch_ref,commit_sha,expires_at,status from test_portfolio where id=$1",[portfolioId])).rows[0];
  if(!p||p.status!=="active")throw fail(404,"Active test portfolio not found.","NOT_FOUND");
- const rows=(await db.query("select email,display_name,persona,role_code,password_ciphertext from test_portfolio_account where portfolio_id=$1 order by role_code,email",[portfolioId])).rows;
+ const rows=(await db.query("select user_id,email,display_name,persona,role_code from test_portfolio_account where portfolio_id=$1 order by role_code,email",[portfolioId])).rows;
  if(!rows.length)throw fail(404,"This portfolio has no active test accounts.","NOT_FOUND");
- const workbookRows=rows.map(row=>({Email:row.email,Password:decryptSecret(row.password_ciphertext),"Display name":row.display_name,Persona:row.persona,Role:row.role_code,"Sign-in URL":process.env.TEST_LAB_SIGN_IN_URL||"Set TEST_LAB_SIGN_IN_URL","Portfolio":p.name,"Expires":new Date(p.expires_at).toISOString(),"Instructions":"Development/test only. Do not reuse this password. Delete workbook after testing."}));
+ const credentials=rows.map(row=>({email:row.email,password:randomPassword(),displayName:row.display_name,persona:row.persona,role:row.role_code}));
+ for(const account of credentials){
+  const source=rows.find(row=>row.email===account.email);
+  await db.query("update app_user set password_hash=$1,updated_at=now() where id=$2 and status='active'",[hashPassword(account.password),source.user_id]);
+ }
+ const userIds=rows.map(row=>row.user_id);
+ if(userIds.length)await db.query("update auth_session set revoked_at=coalesce(revoked_at,now()) where user_id=any($1::uuid[]) and revoked_at is null",[userIds]);
+ const workbookRows=credentials.map(row=>({Email:row.email,Password:row.password,"Display name":row.displayName,Persona:row.persona,Role:row.role,"Sign-in URL":process.env.TEST_LAB_SIGN_IN_URL||"Set TEST_LAB_SIGN_IN_URL","Portfolio":p.name,"Expires":new Date(p.expires_at).toISOString(),"Instructions":"Development/test only. Credentials were regenerated for this export. Do not reuse this password. Delete workbook after testing."}));
  const buffer=createXlsx(workbookRows,Object.keys(workbookRows[0]));
- await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,'test_lab.credentials.exported','test_portfolio',$2,'success',$3)",[identity.sub,portfolioId,{accountCount:rows.length,format:"xlsx"}]);
+ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,'test_lab.credentials.regenerated','test_portfolio',$2,'success',$3)",[identity.sub,portfolioId,{accountCount:rows.length,format:"xlsx"}]);
  return {buffer,filename:`mpa-test-accounts-${portfolioId.slice(0,8)}.xlsx`};
 }
 export async function previewTestPortfolioReset(identity,portfolioId){

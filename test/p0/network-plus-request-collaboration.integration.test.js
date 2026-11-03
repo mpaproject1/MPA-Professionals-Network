@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createCipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import test from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as requests from "../../src/network-plus/request-collaboration.js";
@@ -159,6 +159,17 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   assert.match(encryptedEmail.requester_value_ciphertext,/^v1\./);
   assert.notEqual(encryptedEmail.requester_value_ciphertext,requesterEmail);
   assert.notEqual(encryptedEmail.recipient_value_ciphertext,null);
+  const legacyEncrypt=value=>{
+    const key=createHash("sha256").update(process.env.NETWORK_PLUS_CONTACT_ENCRYPTION_KEY).digest(),iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",key,iv);
+    const ciphertext=Buffer.concat([cipher.update(value,"utf8"),cipher.final()]);
+    return [iv.toString("base64url"),cipher.getAuthTag().toString("base64url"),ciphertext.toString("base64url")].join(".");
+  };
+  const requesterWebsite="https://requester.example.test",recipientWebsite="https://recipient.example.test";
+  await requests.updateNetworkPlusContactConsent(handoffRequest.id,requester.user.id,{peerUserId:recipient.user.id,field:"website",decision:"accept",value:requesterWebsite},requestRef);
+  await requests.updateNetworkPlusContactConsent(handoffRequest.id,recipient.user.id,{field:"website",decision:"accept",value:recipientWebsite},requestRef);
+  await db.query("update network_plus_request_contact_consent set requester_value_ciphertext=$1,recipient_value_ciphertext=$2 where request_id=$3 and recipient_user_id=$4 and field_code='website'",[legacyEncrypt(requesterWebsite),legacyEncrypt(recipientWebsite),handoffRequest.id,recipient.user.id]);
+  const legacyHandoff=await requests.getNetworkPlusContactHandoff(handoffRequest.id,requester.user.id,recipient.user.id);
+  assert.equal(legacyHandoff.fields.find(field=>field.field==="website")?.sharedWithYou,recipientWebsite);
   await requests.updateNetworkPlusContactConsent(handoffRequest.id,requester.user.id,{peerUserId:recipient.user.id,field:"phone",decision:"accept",value:"+251911222333"},requestRef);
   await requests.updateNetworkPlusContactConsent(handoffRequest.id,recipient.user.id,{field:"phone",decision:"accept",value:"+251922333444"},requestRef);
   await db.query("update network_plus_request_contact_consent phone set requester_value_ciphertext=email.requester_value_ciphertext from network_plus_request_contact_consent email where phone.request_id=$1 and phone.recipient_user_id=$2 and phone.field_code='phone' and email.request_id=phone.request_id and email.recipient_user_id=phone.recipient_user_id and email.field_code='email'",[handoffRequest.id,recipient.user.id]);

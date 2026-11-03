@@ -306,6 +306,20 @@ try {
   const pushTableBaseline = await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[]) order by table_name",[pushTableNames]);
   const pushPreferenceDefaultBaseline=await client.query("select column_default from information_schema.columns where table_schema='public' and table_name='notification_preference' and column_name='push_enabled'");
 
+  const networkPlusPhase2TableNames=["network_plus_request_contact_consent","network_plus_request_meeting","network_plus_request_clarification"];
+  const networkPlusPhase2TableBaseline=await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[]) order by table_name",[networkPlusPhase2TableNames]);
+  const networkPlusPhase2ColumnBaseline=await client.query(
+    "select table_name,column_name,udt_name,is_nullable,column_default from information_schema.columns where table_schema='public' and (table_name=any($1::text[]) or (table_name='network_plus_request' and column_name=any($2::text[]))) order by table_name,column_name",
+    [networkPlusPhase2TableNames,["recipient_response","recipient_response_by","recipient_response_at"]]
+  );
+  const networkPlusPhase2ConstraintBaseline=await client.query(
+    "select conrelid::regclass::text relation,conname,pg_get_constraintdef(oid) definition,convalidated from pg_constraint where conrelid=any(array['public.network_plus_request'::regclass,'public.network_plus_request_contact_consent'::regclass,'public.network_plus_request_meeting'::regclass,'public.network_plus_request_clarification'::regclass]) order by relation,conname"
+  );
+  const networkPlusPhase2IndexBaseline=await client.query(
+    "select tablename,indexname,indexdef from pg_indexes where schemaname='public' and tablename=any($1::text[]) order by tablename,indexname",
+    [["network_plus_request","network_plus_request_contact_consent","network_plus_request_meeting","network_plus_request_clarification"]]
+  );
+
   await client.query("begin");
   transactionOpen = true;
   await client.query("set local lock_timeout = '5s'");
@@ -987,6 +1001,22 @@ try {
 
    await client.query("rollback");
   transactionOpen = false;
+  const networkPlusPhase2TablesAfterRollback=await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[]) order by table_name",[networkPlusPhase2TableNames]);
+  if(JSON.stringify(networkPlusPhase2TablesAfterRollback.rows)!==JSON.stringify(networkPlusPhase2TableBaseline.rows))throw new Error("Rollback rehearsal did not restore the Network-Plus Phase 2 table baseline exactly.");
+  const networkPlusPhase2ColumnsAfterRollback=await client.query(
+    "select table_name,column_name,udt_name,is_nullable,column_default from information_schema.columns where table_schema='public' and (table_name=any($1::text[]) or (table_name='network_plus_request' and column_name=any($2::text[]))) order by table_name,column_name",
+    [networkPlusPhase2TableNames,["recipient_response","recipient_response_by","recipient_response_at"]]
+  );
+  if(JSON.stringify(networkPlusPhase2ColumnsAfterRollback.rows)!==JSON.stringify(networkPlusPhase2ColumnBaseline.rows))throw new Error("Rollback rehearsal did not restore the Network-Plus Phase 2 column baseline exactly.");
+  const networkPlusPhase2ConstraintsAfterRollback=await client.query(
+    "select conrelid::regclass::text relation,conname,pg_get_constraintdef(oid) definition,convalidated from pg_constraint where conrelid=any(array['public.network_plus_request'::regclass,'public.network_plus_request_contact_consent'::regclass,'public.network_plus_request_meeting'::regclass,'public.network_plus_request_clarification'::regclass]) order by relation,conname"
+  );
+  if(JSON.stringify(networkPlusPhase2ConstraintsAfterRollback.rows)!==JSON.stringify(networkPlusPhase2ConstraintBaseline.rows))throw new Error("Rollback rehearsal did not restore the Network-Plus Phase 2 constraint baseline exactly.");
+  const networkPlusPhase2IndexesAfterRollback=await client.query(
+    "select tablename,indexname,indexdef from pg_indexes where schemaname='public' and tablename=any($1::text[]) order by tablename,indexname",
+    [["network_plus_request","network_plus_request_contact_consent","network_plus_request_meeting","network_plus_request_clarification"]]
+  );
+  if(JSON.stringify(networkPlusPhase2IndexesAfterRollback.rows)!==JSON.stringify(networkPlusPhase2IndexBaseline.rows))throw new Error("Rollback rehearsal did not restore the Network-Plus Phase 2 index baseline exactly.");
   const taxonomyConstraintRollback=await client.query(
     "select conrelid::regclass::text relation,conname,pg_get_constraintdef(oid) definition,convalidated from pg_constraint where conname=any($1::text[]) order by conrelid::regclass::text,conname",
     [taxonomyConstraintNames]

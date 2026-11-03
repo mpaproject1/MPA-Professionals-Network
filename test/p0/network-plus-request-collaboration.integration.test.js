@@ -232,8 +232,12 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
 test("Phase 3 requester disposition is separate from lifecycle status, requires closure remarks, preserves reopen history and sends due review reminders",async t=>{
  if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
  const suffix=randomUUID().replace(/-/g,"");
+ const reviewer=await register("disposition-reviewer-"+suffix);
+ const reviewerRole=(await getPool().query("select id from app_role where role_code='verification_reviewer'")).rows[0];
+ assert.ok(reviewerRole);
+ await getPool().query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing",[reviewer.user.id,reviewerRole.id]);
  const requester=await register("disposition-requester-"+suffix);await setMembership(requester.user.id);
- const recipient=await verifiedRecipient("disposition-recipient-"+suffix,(await register("disposition-reviewer-"+suffix)).user.id);
+ const recipient=await verifiedRecipient("disposition-recipient-"+suffix,reviewer.user.id);
  const request=await requests.createNetworkPlusRequest(requester.user.id,{
    intent:"interest",recipientUserId:recipient.user.id,subject:"Explore a supplier introduction",summary:"I would like to discuss a possible professional connection.",details:{},terms:{}
  },`np-disposition-${suffix}`,randomUUID()+randomUUID());
@@ -244,6 +248,9 @@ test("Phase 3 requester disposition is separate from lifecycle status, requires 
  assert.equal(completed.requester_disposition,"completed");
  const reopened=await requests.updateNetworkPlusRequestDisposition(request.id,requester.user.id,{disposition:"in_progress",remark:"Reopening to continue the introduction."},`np-disposition-reopen-${suffix}`,randomUUID()+randomUUID());
  assert.equal(reopened.requester_disposition,"in_progress");
+ await requests.transitionNetworkPlusRequest(request.id,recipient.user.id,{status:"accepted"},`np-disposition-accept-${suffix}`,randomUUID()+randomUUID());
+ const recipientWithdrawal=await requests.transitionNetworkPlusRequest(request.id,recipient.user.id,{status:"recipient_withdrawn",reason:"Recipient cannot continue this connection."},`np-disposition-recipient-withdraw-${suffix}`,randomUUID()+randomUUID());
+ assert.equal(recipientWithdrawal.status,"recipient_withdrawn");
  await assert.rejects(()=>requests.updateNetworkPlusRequestDisposition(request.id,recipient.user.id,{disposition:"cancelled",remark:"Recipient cannot set requester outcome."},`np-disposition-outsider-${suffix}`,randomUUID()+randomUUID()),e=>e.code==="NOT_FOUND");
  const db=getPool();
  await db.query("update network_plus_request set review_due_at=now()-interval '1 minute' where id=$1",[request.id]);

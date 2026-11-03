@@ -199,7 +199,7 @@ test("meeting local-time conversion rejects both DST gaps and repeated-hour ambi
 });
 
 test("Phase 2 response migration uses a valid PostgreSQL DO block and complete response invariant",()=>{
- assert.match(migration,/do \$phase2\$[\s\S]*?network_plus_request_recipient_response_complete_check[\s\S]*?end \$phase2\$;/);
+ assert.match(phase2Migration,/do \$phase2\$[\s\S]*?network_plus_request_recipient_response_complete_check[\s\S]*?end \$phase2\$;/);
  assert.doesNotMatch(migration,/do \$\s*\n/);
  assert.match(migration,/intent='question' and recipient_response is not null and recipient_response_by is not null and recipient_response_at is not null/);
 });
@@ -213,7 +213,7 @@ test("request detail hides private handoff data from former recipient representa
 test("Network-Plus Phase 3 adds requester-owned closure disposition, append-only history, recipient withdrawal and reminder scheduling",()=>{
  for(const column of ["requester_disposition","requester_disposition_remark","requester_disposition_updated_at","review_due_at","review_reminder_sent_at","recipient_withdrawn_at"])assert.match(phase3Migration,new RegExp("add column if not exists "+column));
  for(const value of ["in_progress","completed","cancelled","recipient_withdrawn"])assert.ok(phase3Migration.includes("'"+value+"'"));
- assert.match(phase3Migration,/requester_disposition_closure_remark_check/);
+ assert.match(phase3Migration,/network_plus_request_disposition_closure_remark_check/);
  assert.match(phase3Migration,/ix_network_plus_request_requester_disposition/);
  assert.match(phase3Migration,/ix_network_plus_request_review_due/);
  assert.match(service,/updateNetworkPlusRequestDisposition/);

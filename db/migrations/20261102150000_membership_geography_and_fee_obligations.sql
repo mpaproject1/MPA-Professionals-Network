@@ -58,7 +58,7 @@ begin
   elsif new.unit_level='zone' and parent_level='region' then null;
   elsif new.unit_level='sub_city' and parent_level='federal_city' then null;
   elsif new.unit_level='district' and parent_level in ('zone','sub_city') then null;
-  elsif new.unit_level='town' and parent_level in ('zone','sub_city') then null;
+  elsif new.unit_level='town' and parent_level in ('region','zone','federal_city','sub_city') then null;
   else
     raise exception 'Invalid geography hierarchy: % cannot be a child of %',new.unit_level,parent_level;
   end if;

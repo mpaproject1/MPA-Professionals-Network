@@ -255,6 +255,8 @@ test("Phase 3 requester disposition is separate from lifecycle status, requires 
  assert.ok(!recipientView.events.some(event=>event.event_code.startsWith("request.disposition_")),"requester disposition history must remain private");
  const reopened=await requests.updateNetworkPlusRequestDisposition(request.id,requester.user.id,{disposition:"in_progress",remark:"Reopening to continue the introduction."},`np-disposition-reopen-${suffix}`,randomUUID()+randomUUID());
  assert.equal(reopened.requester_disposition,"in_progress");
+ await assert.rejects(()=>requests.transitionNetworkPlusRequest(request.id,recipient.user.id,{status:"declined",reason:"  "},`np-disposition-decline-empty-${suffix}`,randomUUID()+randomUUID()),e=>e.code==="VALIDATION_ERROR");
+ await assert.rejects(()=>requests.transitionNetworkPlusRequest(request.id,recipient.user.id,{status:"declined",reason:"Please contact me at +251911234567 instead."},`np-disposition-decline-contact-${suffix}`,randomUUID()+randomUUID()),e=>e.code==="CONTACT_DETAILS_FORBIDDEN");
  await requests.transitionNetworkPlusRequest(request.id,recipient.user.id,{status:"accepted"},`np-disposition-accept-${suffix}`,randomUUID()+randomUUID());
  const db=getPool();
  await db.query("insert into network_plus_request_contact_consent(request_id,recipient_user_id,field_code,recipient_status,recipient_value_ciphertext,recipient_consented_at) values($1,$2,'email','accepted','synthetic-ciphertext',now())",[request.id,recipient.user.id]);

@@ -13,7 +13,8 @@ The email module is the platform's transactional communication path for account 
 3. The dispatcher claims rows with PostgreSQL row locks and `SKIP LOCKED`, applies recipient/template audience rules and checks active recipient holds.
 4. The configured Resend or signed-webhook provider receives a stable idempotency key.
 5. Provider callbacks are authenticated, event-ID deduplicated, stored in `email_delivery_event`, and correlated with the outbox. Events that arrive before the provider message ID is persisted remain pending and are reconciled on later dispatch.
-6. Provider acceptance and provider delivery are distinct states. A provider acceptance is not evidence that the recipient received or read the email.
+6. Account verification remains a dedicated token-bound delivery path rather than a generic workflow outbox item. Its token is hashed, single-use and expiring; provider idempotency and Test Lab capture apply, and delivery attempts are tracked on `email_verification_token`.
+7. Provider acceptance and provider delivery are distinct states. A provider acceptance is not evidence that the recipient received or read the email.
 
 ## Delivery states
 

@@ -8,6 +8,13 @@ alter table network_plus_request
     'interest','question','quote_request','meeting_request'
   ));
 
+alter table network_plus_request
+  add column if not exists recipient_response text check (recipient_response is null or length(trim(recipient_response)) between 3 and 2000),
+  add column if not exists recipient_response_by uuid references app_user(id) on delete restrict,
+  add column if not exists recipient_response_at timestamptz;
+comment on column network_plus_request.recipient_response is
+  'One private recipient answer for a question intent; not a chat thread.';
+
 create table if not exists network_plus_request_contact_consent (
   request_id uuid not null references network_plus_request(id) on delete restrict,
   recipient_user_id uuid not null references app_user(id) on delete restrict,

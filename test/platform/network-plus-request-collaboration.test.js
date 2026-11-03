@@ -94,7 +94,7 @@ test("browser journey distinguishes draft, submission, recipient acceptance and 
  assert.match(ui,/business_opportunity/);
  assert.match(ui,/Published business/);
  assert.match(ui,/Find a verified member recipient/);
- assert.match(ui,/Request clarification/);
+ assert.match(ui,/Ask for clarification/);
  assert.match(ui,/Withdraw request/);
  assert.match(e2e,/creates a draft without submitting/);
  assert.match(e2e,/recipient acceptance does not create a workspace/);

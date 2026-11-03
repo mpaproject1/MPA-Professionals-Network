@@ -99,6 +99,26 @@ export async function saveEmailTemplate(actorId,code,input,requestId){
   return {...row,version};
  });
 }
+export async function previewEmailTemplate(actorId,input={}){
+ const db=getPool();await requireAdmin(db,actorId);
+ let template=input;
+ if(input.templateCode){
+  template=(await db.query("select template_code,display_name,audience,subject_template,text_template,html_template,enabled from email_notification_template where template_code=$1",[clean(input.templateCode,100)])).rows[0];
+  if(!template)fail(404,"Email template not found.","NOT_FOUND");
+ }
+ const subjectTemplate=String(template.subject_template||input.subjectTemplate||"").slice(0,300);
+ const textTemplate=String(template.text_template||input.textTemplate||"").slice(0,20000);
+ const htmlTemplate=String(template.html_template||input.htmlTemplate||"").slice(0,30000);
+ if(!subjectTemplate||(!textTemplate&&!htmlTemplate))fail(400,"A subject and message body are required for preview.","VALIDATION_ERROR");
+ const sample={firstName:"Amina",status:"In review",nextAction:"Open your MPA workspace to review the next step.",registrationReference:"MPA-QA-26-000123",jobTitle:"Sample professional opportunity",organizationName:"Sample organization",lastUpdated:"3 November 2026",event:"Sample platform event",occurredAt:"3 November 2026",workflowType:"Membership",...(input.variables&&typeof input.variables==="object"&&!Array.isArray(input.variables)?input.variables:{})};
+ const placeholders=[...new Set([subjectTemplate,textTemplate,htmlTemplate].join("\n").match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g)||[])].map(value=>value.replace(/[{}\s]/g,""));
+ const missingVariables=placeholders.filter(key=>sample[key]===undefined||sample[key]===null||sample[key]==="");
+ const subject=render(subjectTemplate,sample);
+ const textBody=render(textTemplate,sample);
+ const htmlBody=renderBrandedEmail({subject,htmlBody:render(htmlTemplate,sample,{html:true}),textBody,preheader:subject});
+ return {subject,textBody,htmlBody,missingVariables,audience:template.audience||input.audience||"all",enabled:template.enabled!==false};
+}
+
 export async function saveEmailDraft(actorId,input){
  const db=getPool();await requireAdmin(db,actorId);
  const recipient=clean(input.recipient,320),subject=clean(input.subject,300),textBody=String(input.textBody||"").slice(0,20000),htmlBody=String(input.htmlBody||"").slice(0,30000);

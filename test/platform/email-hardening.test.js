@@ -58,7 +58,10 @@ test("recipient-hold management is exposed only through authenticated system-adm
 
 test("Test Lab capture applies the same recipient and template safeguards without external delivery", async () => {
   const source = await read("../../src/platform/email-operations.js");
-  const capture = source.slice(source.indexOf('if(process.env.TEST_DELIVERY_MODE==="capture"'), source.indexOf('if(!providerConfig().ready)'));
+  const dispatch = source.slice(source.indexOf("export async function dispatchEmailOutbox"));
+  const captureStart = dispatch.indexOf('if(process.env.TEST_DELIVERY_MODE==="capture"');
+  const captureEnd = dispatch.indexOf("if(!providerConfig().ready)", captureStart);
+  const capture = dispatch.slice(captureStart, captureEnd);
   assert.match(capture, /for update of o skip locked/i);
   assert.match(capture, /recipientMatchesAudience/);
   assert.match(capture, /email_recipient_suppression/);

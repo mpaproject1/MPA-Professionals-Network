@@ -393,6 +393,7 @@ export async function receiveDeliveryWebhook(input,providedSecret){
  const providerEventId=clean(input.eventId||input.event_id||input.id,300);
  const rawEventType=clean(input.eventType||input.type,80).toLowerCase();
  const eventType=rawEventType.startsWith("email.")?rawEventType.slice(6):rawEventType;
+ if(["opened","clicked","delivery_delayed","sent","scheduled"].includes(eventType))return {ignored:true,eventType};
  if(!providerMessageId)fail(400,"providerMessageId is required.","VALIDATION_ERROR");
  if(!providerEventId)fail(400,"A stable provider event ID is required for webhook idempotency.","PROVIDER_EVENT_ID_REQUIRED");
  if(!["delivered","bounced","complained","failed"].includes(eventType))fail(400,"Unsupported delivery event type.","VALIDATION_ERROR");

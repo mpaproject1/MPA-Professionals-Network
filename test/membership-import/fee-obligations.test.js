@@ -97,7 +97,7 @@ test("PostgreSQL Finance XLSX intake applies valid rows independently and preser
  const evidenceMethodCode="ev_"+suffix.slice(0,8);
  const staleMethodCode="st_"+suffix.slice(0,8);
  await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'cash','Stale method bulk test',true,'ETB','Will be disabled after preview',false) on conflict(method_code) do update set enabled=true,currency='ETB',requires_evidence=false",[staleMethodCode]);
- await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'bank_transfer','Evidence-required bulk test',true,'ETB','Evidence required',true) on conflict(method_code) do update set enabled=true,currency='ETB',requires_evidence=true",[evidenceMethodCode]);
+ await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence) values($1,'cash','Evidence-required bulk test',true,'ETB','Evidence required',true) on conflict(method_code) do update set enabled=true,currency='ETB',requires_evidence=true",[evidenceMethodCode]);
  const headers=parseXlsxRows(membershipPaymentImportTemplate(identity)).headers;
  const reference="bulk-reference-"+suffix;
  const rows=[
@@ -120,7 +120,7 @@ test("PostgreSQL Finance XLSX intake applies valid rows independently and preser
  assert.equal(preview.rows[0].errors.length,0);
  assert.ok(preview.rows[1].errors.some(error=>/duplicated in this workbook/i.test(error)));
  assert.ok(preview.rows[2].errors.some(error=>/no matching fee obligation/i.test(error)));
- assert.ok(preview.rows[3].errors.some(error=>/evidence/i.test(error)));
+ assert.ok(preview.rows[3].errors.some(error=>/requires evidence_file_id/i.test(error)));
  await assert.rejects(applyMembershipPaymentImport(identity,preview.batchId,{reason:"Apply test batch without partial option"},"fee-bulk-denied-"+suffix),error=>error.code==="IMPORT_NOT_VALIDATED");
  await db.query("update membership_payment_method set enabled=false where method_code=$1",[staleMethodCode]);
  const applied=await applyMembershipPaymentImport(identity,preview.batchId,{reason:"Apply valid rows and retain row failures",applyValidRows:true},"fee-bulk-apply-"+suffix);

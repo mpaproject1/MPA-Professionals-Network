@@ -36,7 +36,7 @@ const workspaces = [
     icon: Handshake,
     eyebrow: "Private workspace · Collaboration",
     title: "Requests & collaboration",
-    description: "Manage service, supplier, referral, expertise, partnership and collaboration requests. A shared workspace opens only after explicit acceptance.",
+    description: "Send interest, questions, quotation and meeting requests. Share contact details only by field-specific mutual consent; collaboration workspaces remain optional.",
     action: "Open my requests",
   },
 ];

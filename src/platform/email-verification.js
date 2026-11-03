@@ -91,6 +91,8 @@ export async function deliverEmailVerification(message) {
   if (!template || template.enabled !== true || template.audience !== "all") {
     const error = Object.assign(new Error("The security-critical verification template must exist, remain enabled and serve all recipients."), { code: "VERIFICATION_TEMPLATE_POLICY_VIOLATION", statusCode: 503 });
     await db.query("update email_verification_delivery set status='failed',last_error=$2,last_error_code=$3,locked_at=null,updated_at=now() where id=$1", [delivery.id, error.message, error.code]);
+    await db.query("update email_verification_token set delivery_attempted_at=now(),delivery_status='failed',delivery_error_code=$2 where id=$1 and consumed_at is null", [tokenRow.id, error.code]);
+    await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,'email.verification.template_policy_rejected','email_verification_token',$2,'failure',$3)", [tokenRow.user_id, tokenRow.id, { deliveryId: delivery.id, templateExists: Boolean(template), enabled: template?.enabled ?? null, audience: template?.audience ?? null }]);
     throw error;
   }
   const vars = { firstName: message.firstName || "", verificationUrl: message.verificationUrl, registrationReference: message.registrationReference || "" };

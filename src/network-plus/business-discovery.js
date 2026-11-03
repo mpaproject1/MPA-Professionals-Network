@@ -515,8 +515,6 @@ export async function listBusinesses(viewerId,filters={}) {
   const args=[],where=["b.publication_status='published'","b.verification_status='verified'","b.moderation_status='approved'","(b.verification_expires_at is null or b.verification_expires_at>now())", "not exists(select 1 from network_plus_business_ownership bo join organization o on o.id=bo.owner_organization_id where bo.business_id=b.id and bo.owner_type='organization' and bo.status='active' and bo.consent_status='accepted' and o.verification_status<>'verified')"];
   const q=String(filters.q||"").trim().slice(0,120);
   if(q){args.push(`%${q}%`);where.push(`(b.display_name ilike $${args.length} or coalesce(b.trading_name,'') ilike $${args.length} or b.description ilike $${args.length})`);}
-  const geographyUnitId=String(filters.geographyUnitId||"").trim();if(geographyUnitId){if(!/^[0-9a-f-]{36}$/i.test(geographyUnitId))fail(400,"Choose a valid service-area reference.","VALIDATION_ERROR");args.push(geographyUnitId);where.push(`exists(select 1 from network_plus_service_listing_geography lg where lg.listing_id=s.id and lg.geography_unit_id=${args.length})`);}
-  const geographyUnitId=String(filters.geographyUnitId||"").trim();if(geographyUnitId){if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(geographyUnitId))fail(400,"Choose a valid service-area reference.","VALIDATION_ERROR");args.push(geographyUnitId);where.push(`exists(select 1 from network_plus_service_listing_geography lg where lg.listing_id=s.id and lg.geography_unit_id=${args.length})`);}
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
   const base=` from network_plus_business b where ${where.join(" and ")}`;
   const total=Number((await db.query(`select count(*)::int count${base}`,args)).rows[0]?.count||0);
@@ -545,6 +543,7 @@ export async function listProfessionalServices(viewerId,filters={}) {
   const subcategory=String(filters.subcategory||"").trim().toLowerCase();if(subcategory){args.push(subcategory);where.push(`s.subcategory_code=$${args.length}`);}
   const listingKind=String(filters.listingKind||"").trim().toLowerCase();if(listingKind){if(!LISTING_KINDS.has(listingKind))fail(400,"Choose a supported listing type.","VALIDATION_ERROR");args.push(listingKind);where.push(`s.listing_kind=$${args.length}`);}
   const location=String(filters.location||"").trim().slice(0,120);if(location){args.push(`%${location}%`);where.push(`coalesce(s.location_label,'') ilike $${args.length}`);}
+  const geographyUnitId=String(filters.geographyUnitId||"").trim();if(geographyUnitId){if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(geographyUnitId))fail(400,"Choose a valid service-area reference.","VALIDATION_ERROR");args.push(geographyUnitId);where.push(`exists(select 1 from network_plus_service_listing_geography lg where lg.listing_id=s.id and lg.geography_unit_id=$${args.length})`);}
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
   args.push(visibleAudiences(access));where.push("s.audience=any($"+args.length+"::text[])");
   const base=` from network_plus_service_listing s join network_plus_business b on b.id=s.business_id where ${where.join(" and ")}`;

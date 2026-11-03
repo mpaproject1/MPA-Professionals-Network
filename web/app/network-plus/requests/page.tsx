@@ -4,7 +4,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react
 import { NetworkPlusAccessGuard } from "../../../components/network-plus-access-guard";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
-import { CalendarDays, CheckCircle2, Clock3, Handshake, MessageCircle, RefreshCw, Send, ShieldCheck, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, Handshake, Heart, MessageCircle, Quote, RefreshCw, Send, ShieldCheck, XCircle } from "lucide-react";
 
 type Intent = "service_request"|"supplier_inquiry"|"referral"|"expertise_request"|"partnership_proposal"|"collaboration_request"|"business_opportunity"|"interest"|"question"|"quote_request"|"meeting_request";
 type Participant = {user_id:string;participant_role:string;consent_status:string};
@@ -52,6 +52,7 @@ export default function NetworkPlusRequestsPage(){
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false);
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const [intent,setIntent]=useState<Intent>("service_request");
+ const [requestStep,setRequestStep]=useState(1);
  const [recipientUserId,setRecipientUserId]=useState(""),[recipientOrganizationId,setRecipientOrganizationId]=useState("");
  const [memberQuery,setMemberQuery]=useState(""),[memberChoices,setMemberChoices]=useState<MemberChoice[]>([]);
  const [organizationQuery,setOrganizationQuery]=useState(""),[organizationChoices,setOrganizationChoices]=useState<OrgChoice[]>([]);
@@ -95,6 +96,11 @@ export default function NetworkPlusRequestsPage(){
  useEffect(()=>{try{const params=new URLSearchParams(window.location.search),listingId=params.get("listingId"),requestedIntent=params.get("action") as Intent|null;if(requestedIntent&&intents.some(v=>v.value===requestedIntent))setIntent(requestedIntent);if(listingId){setServiceListingId(listingId);const listing=serviceChoices.find(v=>v.id===listingId);if(listing){setBusinessId(listing.business_id);setSubject((requestedIntent?label(requestedIntent):"Connection request")+" · "+listing.title);setSummary("I would like to connect regarding "+listing.title+". Please let me know the appropriate next step.");}}}catch{}},[serviceChoices]);
 
  const currentIntent=useMemo(()=>intents.find(v=>v.value===intent),[intent]);
+ const isLightweight=["interest","question","quote_request","meeting_request"].includes(intent);
+ const requestStepNames=["Choose action","Describe request","Choose recipient","Review and save"];
+ const selectedRecipientLabel=serviceListingId?(serviceChoices.find(v=>v.id===serviceListingId)?.business_name||businessChoices.find(v=>v.id===businessId)?.display_name||"Selected listing"):businessId?(businessChoices.find(v=>v.id===businessId)?.display_name||"Selected business"):recipientUserId?(memberChoices.find(v=>v.user_id===recipientUserId)?.display_name||"Selected member"):recipientOrganizationId?(organizationChoices.find(v=>v.id===recipientOrganizationId)?.display_name||"Selected organization"):"No recipient selected";
+ function continueRequestStep(){setError("");if(requestStep===2&&(subject.trim().length<3||summary.trim().length<10)){setError("Add a subject and a short request summary before continuing.");return;}if(requestStep===3&&!serviceListingId&&!businessId&&!recipientUserId&&!recipientOrganizationId){setError("Choose a published listing, business, verified member or verified organization.");return;}setRequestStep(step=>Math.min(4,step+1));}
+ function previousRequestStep(){setError("");setRequestStep(step=>Math.max(1,step-1));}
 
  async function searchMembers(){
   if(!token||memberQuery.trim().length<2){setError("Enter at least two characters to search verified members.");return;}
@@ -108,6 +114,7 @@ export default function NetworkPlusRequestsPage(){
  }
  async function createDraft(e:FormEvent){
   e.preventDefault();if(!token||saving)return;
+  if(isLightweight&&(subject.trim().length<3||summary.trim().length<10||(!serviceListingId&&!businessId&&!recipientUserId&&!recipientOrganizationId))){setError("Complete the request details and choose one recipient before saving.");return;}
   setSaving(true);setError("");setNotice("");
   try{
    let terms:Record<string,any>={};
@@ -214,16 +221,21 @@ export default function NetworkPlusRequestsPage(){
    <section className="card grid content-start gap-4">
     <div><h2 className="h2">Start a request</h2><p className="muted text-sm">The recipient must be an eligible member or a verified organization with active authorized representatives.</p></div>
     <form className="grid gap-3" onSubmit={createDraft}>
-     <label className="grid gap-1 text-sm font-medium">Request type<select className="input" value={intent} onChange={e=>setIntent(e.target.value as Intent)}>{intents.map(v=><option key={v.value} value={v.value}>{v.label}</option>)}</select><span className="muted text-xs">{currentIntent?.description}</span></label>
-     <fieldset className="grid gap-2 rounded-xl border p-3"><legend className="px-1 font-semibold">Choose a recipient</legend>
+     {isLightweight&&<div className="grid gap-2 rounded-xl border border-[var(--border)] p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-xs font-semibold uppercase tracking-wide muted">Step {requestStep} of 4</p><h3 className="font-semibold">{requestStepNames[requestStep-1]}</h3></div><span className="text-sm font-semibold tabular-nums">{requestStep*25}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface)]"><div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{width:(requestStep*25)+"%"}}/></div><div className="grid grid-cols-4 gap-1">{requestStepNames.map((name,index)=><span key={name} className={index+1===requestStep?"text-xs font-semibold":"text-xs muted"}>{index+1}. {name}</span>)}</div></div>}
+     {(!isLightweight||requestStep===1)&&<label className="grid gap-1 text-sm font-medium">Request type<select className="input" value={intent} onChange={e=>{setIntent(e.target.value as Intent);setRequestStep(1);}}>{intents.map(v=><option key={v.value} value={v.value}>{v.label}</option>)}</select><span className="muted text-xs">{currentIntent?.description}</span></label>}
+     {isLightweight&&requestStep===1&&<div className="flex items-start gap-3 rounded-xl bg-[var(--surface)] p-3">{intent==="interest"?<Heart className="mt-0.5 h-5 w-5 text-[var(--accent)]"/>:intent==="question"?<MessageCircle className="mt-0.5 h-5 w-5 text-[var(--accent)]"/>:intent==="quote_request"?<Quote className="mt-0.5 h-5 w-5 text-[var(--accent)]"/>:<CalendarDays className="mt-0.5 h-5 w-5 text-[var(--accent)]"/>}<div><strong>{currentIntent?.label}</strong><p className="muted text-sm">{currentIntent?.description}</p></div></div>}
+     {(!isLightweight||requestStep===3)&&<fieldset className="grid gap-2 rounded-xl border p-3"><legend className="px-1 font-semibold">Choose a recipient</legend>
       <p className="muted text-xs">For a business or service request, select a published business or listing. The server resolves its authorized owner/representatives from canonical ownership records; private owner IDs are not exposed.</p>
       <label className="grid gap-1 text-sm">Published business<select className="input" value={businessId} onChange={e=>{setBusinessId(e.target.value);setServiceListingId("");setRecipientUserId("");setRecipientOrganizationId("");}}><option value="">Select a business (optional)</option>{businessChoices.map(item=><option key={item.id} value={item.id}>{item.display_name}</option>)}</select></label>
       <label className="grid gap-1 text-sm">Published professional service<select className="input" value={serviceListingId} onChange={e=>{const item=serviceChoices.find(v=>v.id===e.target.value);setServiceListingId(e.target.value);if(item)setBusinessId(item.business_id);setRecipientUserId("");setRecipientOrganizationId("");}}><option value="">Select a service listing (optional)</option>{serviceChoices.map(item=><option key={item.id} value={item.id}>{item.title} · {item.business_name}</option>)}</select></label>
       <div className="grid gap-2 border-t pt-2"><label className="grid gap-1 text-sm">Find a verified member recipient<input className="input" value={memberQuery} onChange={e=>setMemberQuery(e.target.value)} placeholder="Search opted-in professionals"/></label><button type="button" className="btn btn-secondary w-fit" onClick={()=>void searchMembers()}>Search members</button><select aria-label="Member recipient" className="input" value={recipientUserId} onChange={e=>{setRecipientUserId(e.target.value);setRecipientOrganizationId("");setBusinessId("");setServiceListingId("");}}><option value="">No direct member recipient selected</option>{memberChoices.map(item=><option key={item.user_id} value={item.user_id}>{item.display_name}{item.professional_title?" · "+item.professional_title:""}</option>)}</select></div>
       <div className="grid gap-2 border-t pt-2"><label className="grid gap-1 text-sm">Find a verified organization recipient<input className="input" value={organizationQuery} onChange={e=>setOrganizationQuery(e.target.value)} placeholder="Search opted-in organizations"/></label><button type="button" className="btn btn-secondary w-fit" onClick={()=>void searchOrganizations()}>Search organizations</button><select aria-label="Organization recipient" className="input" value={recipientOrganizationId} onChange={e=>{setRecipientOrganizationId(e.target.value);setRecipientUserId("");setBusinessId("");setServiceListingId("");}}><option value="">No direct organization recipient selected</option>{organizationChoices.map(item=><option key={item.id} value={item.id}>{item.display_name}</option>)}</select></div>
-     </fieldset>
+     </fieldset>}
+     {(!isLightweight||requestStep===2)&&<>
      <label className="grid gap-1 text-sm">Subject<input required minLength={3} maxLength={180} className="input" value={subject} onChange={e=>setSubject(e.target.value)}/></label>
      <label className="grid gap-1 text-sm">Request summary<textarea required minLength={10} maxLength={500} className="input min-h-20" value={summary} onChange={e=>setSummary(e.target.value)}/></label>
+     </>}
+     {!isLightweight&&<>
      {intent==="service_request"&&<fieldset className="grid gap-3 rounded-xl border p-3"><legend className="px-1 font-semibold">Service engagement details</legend>
       <label className="grid gap-1 text-sm">Scope<textarea required className="input min-h-20" value={scope} onChange={e=>setScope(e.target.value)}/></label>
       <label className="grid gap-1 text-sm">Deliverables (one per line)<textarea required className="input min-h-20" value={deliverables} onChange={e=>setDeliverables(e.target.value)}/></label>
@@ -246,7 +258,10 @@ export default function NetworkPlusRequestsPage(){
       <label className="grid gap-1 text-sm">Timeline<input required className="input" value={timeline} onChange={e=>setTimeline(e.target.value)}/></label>
       <label className="grid gap-1 text-sm">Authorized representatives (one per line)<textarea required className="input" value={representatives} onChange={e=>setRepresentatives(e.target.value)}/></label>
      </fieldset>}
-     <button type="submit" className="btn btn-primary w-fit" disabled={saving}>{saving?"Saving…":"Save draft"}</button>
+     </>}
+     {isLightweight&&requestStep===4&&<div className="grid gap-2 rounded-xl border border-[var(--border)] p-3"><div className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-[var(--accent)]"/><h3 className="font-semibold">Review your connection request</h3></div><p className="muted text-xs">This saves a private draft. Nothing is sent until you submit it from the request details.</p><dl className="grid gap-2 text-sm"><div><dt className="muted text-xs">Action</dt><dd className="font-semibold">{currentIntent?.label}</dd></div><div><dt className="muted text-xs">Subject</dt><dd>{subject}</dd></div><div><dt className="muted text-xs">Summary</dt><dd>{summary}</dd></div><div><dt className="muted text-xs">Recipient</dt><dd>{selectedRecipientLabel}</dd></div></dl></div>}
+     {isLightweight&&<div className="flex items-center justify-between gap-2">{requestStep>1?<button type="button" className="btn btn-secondary" onClick={previousRequestStep}>Back</button>:<span/>}{requestStep<4&&<button type="button" className="btn btn-primary" onClick={continueRequestStep}>Continue</button>}</div>}
+     {(!isLightweight||requestStep===4)&&<button type="submit" className="btn btn-primary w-fit" disabled={saving}>{saving?"Saving…":"Save draft"}</button>}
     </form>
    </section>
    <section className="grid content-start gap-4">

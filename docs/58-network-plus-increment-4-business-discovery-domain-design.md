@@ -173,13 +173,15 @@ Every request records a type, requesting party, target business/listing/party, p
 
 | Request type | Purpose and minimum structured content | Successful progression |
 |---|---|---|
-| Service request | Specific offering, need, desired outcome, location/delivery fit, timing, optional budget | Clarify → scope/quote → both parties accept terms → delivery workflow |
-| Supplier request | Product/specification, quantity, quality/standard, delivery location/date, quote and procurement constraints | Supplier response → quote/terms → authorized purchase/engagement |
-| Referral | Person/business to be referred, referral purpose, receiving party, explicit referrer and subject consent | Consent check → referral sent → recipient accepts/declines → outcome recorded |
-| Expertise request | Problem/domain, expertise needed, expected contribution, duration and whether paid/pro-bono | Expert response → scope/terms → acceptance → contribution/outcome |
-| Partnership proposal | Parties, shared objective, contribution, governance, budget/funding (if any), timeline, decision owners and risks | Proposal → due diligence → negotiation → authorized approval → agreement or decline |
-| Collaboration | Shared deliverable, roles, responsibilities, milestones, resources, IP/confidentiality expectations and timeline | Scope → participant consent → collaboration plan → progress → outcome |
-| Business opportunity | Opportunity type, sponsor/provider, eligibility, value/compensation, deadline, selection process and terms | Review/interest → qualification → proposal/selection → acceptance or closure |
+| Service request (`service_request`) | Specific offering, need, desired outcome, location/delivery fit, timing, optional budget | Clarify → scope/quote → both parties accept terms → delivery workflow |
+| Supplier request (`supplier_inquiry`) | Product/specification, quantity, quality/standard, delivery location/date, quote and procurement constraints | Supplier response → quote/terms → authorized purchase/engagement |
+| Referral (`referral`) | Person/business to be referred, referral purpose, receiving party, explicit referrer and subject consent | Consent check → referral sent → recipient accepts/declines → outcome recorded |
+| Expertise request (`expertise_request`) | Problem/domain, expertise needed, expected contribution, duration and whether paid/pro-bono | Expert response → scope/terms → acceptance → contribution/outcome |
+| Partnership proposal (`partnership_proposal`) | Parties, shared objective, contribution, governance, budget/funding (if any), timeline, decision owners and risks | Proposal → due diligence → negotiation → authorized approval → agreement or decline |
+| Collaboration (`collaboration_request`) | Shared deliverable, roles, responsibilities, milestones, resources, IP/confidentiality expectations and timeline | Scope → participant consent → collaboration plan → progress → outcome |
+| Business opportunity (`business_opportunity`) | Opportunity type, sponsor/provider, eligibility, value/compensation, deadline, selection process and terms | Review/interest → qualification → proposal/selection → acceptance or closure |
+
+These seven codes are the canonical Network-Plus request-intent set; `business_opportunity` is an interest/connection request, not a second opportunity-application system. Collaboration workspaces are optional and may be enabled only after acceptance for eligible intents.
 
 Do not reuse job applications, mentorship requests, public opportunity intake or volunteer participation records as business requests. Referral consent must cover the person being referred; a user cannot disclose another person's contact details merely because they know them.
 

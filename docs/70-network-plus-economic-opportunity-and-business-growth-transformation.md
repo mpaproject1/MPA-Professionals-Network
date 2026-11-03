@@ -638,3 +638,10 @@ The next implementation should focus on a small number of excellent, secure capa
 Do not build a marketplace, CRM, investor execution system, business performance ledger or milestone tracker under Network-Plus. Keep any future proposal for such functionality separate and subject to explicit product approval.
 
 **Product north star:** Network-Plus turns a member's need or offer into a relevant, trusted, consent-based human connection — then gets out of the way so the parties can do business.
+
+
+## Phase 1 implementation record
+
+The Needs & Offers implementation now extends the canonical business/listing model with governed category/subcategory taxonomy, category-specific structured fields, versioned service-area references, remote availability, capacity/intake/lead-time disclosures, target-audience segments and structured pricing disclosures. The `/network-plus/opportunities` app workspace provides server-driven discovery, an eight-step guided wizard, server-persisted autosave/resume, owner edit/pause/close controls, private business evidence upload and independent business/listing review workspaces.
+
+Implementation details and the regression plan are recorded in [docs/72-network-plus-phase-1-needs-offers-implementation.md](72-network-plus-phase-1-needs-offers-implementation.md). This is a source-level implementation record, not a claim that CI, disposable PostgreSQL, full backend tests, Playwright or production deployment have passed.

@@ -7,6 +7,10 @@ const read = relative => readFile(new URL(relative, import.meta.url), "utf8");
 test("email hardening migration creates the logical-event unique key and provider event ledger", async () => {
   const sql = await read("../../db/migrations/20261103190000_email_delivery_hardening.sql");
   assert.match(sql, /uq_notification_outbox_email_event_key/);
+  assert.match(sql, /add column if not exists delivery_status/);
+  assert.match(sql, /add column if not exists delivered_at/);
+  assert.match(sql, /add column if not exists delivery_event_at/);
+  assert.match(sql, /add column if not exists delivery_event_type/);
   assert.match(sql, /create table if not exists email_delivery_event/i);
   assert.match(sql, /unique\(provider,provider_event_id\)/i);
   assert.match(sql, /create table if not exists email_recipient_suppression/i);

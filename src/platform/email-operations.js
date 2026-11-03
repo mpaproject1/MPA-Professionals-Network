@@ -412,18 +412,28 @@ export async function updateInbox(actorId,id,action,requestId=null){
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'email_inbox_message',$3,$4,'success',$5)",[actorId,"email.inbox."+action,id,requestId,{action}]);
  return row;
 }
-export async function receiveInboundEmail(input,providedSecret){
- const expected=clean(process.env.EMAIL_INBOUND_WEBHOOK_SECRET,500);
- if(!expected||!providedSecret||Buffer.byteLength(expected)!==Buffer.byteLength(providedSecret)||!timingSafeEqual(Buffer.from(expected),Buffer.from(providedSecret)))fail(401,"Inbound email webhook is not authorized.","UNAUTHENTICATED");
- const providerMessageId=clean(input.messageId||input.id,300),sender=clean(input.from||input.sender,320);
+export async function receiveInboundEmail(input,providedSecret,signatureHeaders={}) {
+ const payload=input.data&&typeof input.data==="object"?input.data:input;
+ const isResend=Boolean(signatureHeaders["svix-id"]||input.type==="email.received"||payload.email_id);
+ if(isResend){
+  if(!verifyResendWebhookSignature(signatureHeaders.rawBody,signatureHeaders,clean(process.env.RESEND_WEBHOOK_SECRET,500)))fail(401,"Resend inbound webhook signature is missing, invalid, or outside the allowed timestamp window.","UNAUTHENTICATED");
+ }else{
+  const expected=clean(process.env.EMAIL_INBOUND_WEBHOOK_SECRET,500);
+  if(!expected||!providedSecret||Buffer.byteLength(expected)!==Buffer.byteLength(providedSecret)||!timingSafeEqual(Buffer.from(expected),Buffer.from(providedSecret)))fail(401,"Inbound email webhook is not authorized.","UNAUTHENTICATED");
+ }
+ const providerMessageId=clean(input.messageId||input.id||payload.email_id||payload.id,300);
+ const sender=clean(input.from||input.sender||payload.from||payload.sender,320);
  if(!providerMessageId)fail(400,"A stable provider message ID is required for inbound email deduplication.","PROVIDER_MESSAGE_ID_REQUIRED");
- if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender))fail(400,"Inbound sender address is invalid.","VALIDATION_ERROR");
- const result=(await getPool().query("insert into email_inbox_message(provider_message_id,sender,recipients,subject,text_body,html_body,metadata) values($1,$2,$3,$4,$5,$6,$7) on conflict(provider_message_id) do nothing returning id,received_at",[providerMessageId,sender,Array.isArray(input.to)?input.to.map(v=>clean(v,320)).slice(0,20):[],clean(input.subject,500),String(input.text||"").slice(0,50000),String(input.html||"").slice(0,100000),{provider:"configured-inbound-webhook"}])).rows[0];
- if(!result)return {duplicate:true};
- await getPool().query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.inbound.received','email_inbox_message',$1,'success',$2)",[result.id,{providerMessageId}]);
- return result;
+ if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(sender))fail(400,"Inbound sender address is invalid.","VALIDATION_ERROR");
+ const rawRecipients=payload.to??input.to;
+ const recipients=Array.isArray(rawRecipients)?rawRecipients.map(v=>clean(v,320)).filter(Boolean).slice(0,20):rawRecipients?[clean(rawRecipients,320)]:[];
+ return withTransaction(async tx=>{
+  const result=(await tx.query("insert into email_inbox_message(provider_message_id,sender,recipients,subject,text_body,html_body,metadata) values($1,$2,$3,$4,$5,$6,$7) on conflict(provider_message_id) do nothing returning id,received_at",[providerMessageId,sender,recipients,clean(payload.subject||input.subject,500),String(payload.text||input.text||"").slice(0,50000),String(payload.html||input.html||"").slice(0,100000),{provider:isResend?"resend":"configured-inbound-webhook"}])).rows[0];
+  if(!result)return {duplicate:true};
+  await tx.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.inbound.received','email_inbox_message',$1,'success',$2)",[result.id,{providerMessageId,provider:isResend?"resend":"configured-inbound-webhook"}]);
+  return result;
+ });
 }
-
 export function verifyResendWebhookSignature(rawBody, headers = {}, secret = "", nowMs = Date.now()) {
  const id=String(headers["svix-id"]||"").trim(),timestamp=String(headers["svix-timestamp"]||"").trim(),signatures=String(headers["svix-signature"]||"");
  if(!id||!timestamp||!signatures||!String(secret).startsWith("whsec_"))return false;

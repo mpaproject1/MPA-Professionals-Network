@@ -115,6 +115,8 @@ jobs:
           test "$(psql "$DATABASE_URL" -X -A -t -v ON_ERROR_STOP=1 -c 'select current_database()')" = "mpa_test"
           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'select current_database(), current_user;'
       - name: Verify legacy-schema upgrade on a separate disposable PostgreSQL database
+        id: legacy_upgrade
+        continue-on-error: true
         env:
           UPGRADE_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/mpa_upgrade_test
         run: |
@@ -122,8 +124,13 @@ jobs:
           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'CREATE DATABASE mpa_upgrade_test'
           DATABASE_URL="$UPGRADE_DATABASE_URL" bash scripts/ci-migration-upgrade.sh
       - name: Apply repository migrations to disposable CI database
+        id: apply_migrations
+        continue-on-error: true
         run: npm run migrate
       - name: Verify migration compatibility and run every backend test file (collect all failures)
+        id: backend_validation
+        continue-on-error: true
+        if: always()
         shell: bash
         run: |
           set -uo pipefail
@@ -150,6 +157,22 @@ jobs:
           echo "Migration compatibility exit code: ${MIGRATION_STATUS}"
           echo "Backend test suite exit code:       ${TEST_STATUS}"
           if (( MIGRATION_STATUS != 0 || TEST_STATUS != 0 )); then
+            exit 1
+          fi
+
+      - name: Fail the job after all backend diagnostics have been collected
+        if: always()
+        env:
+          LEGACY_UPGRADE_OUTCOME: ${{ steps.legacy_upgrade.outcome }}
+          APPLY_MIGRATIONS_OUTCOME: ${{ steps.apply_migrations.outcome }}
+          BACKEND_VALIDATION_OUTCOME: ${{ steps.backend_validation.outcome }}
+        run: |
+          set -euo pipefail
+          echo "Legacy upgrade: $LEGACY_UPGRADE_OUTCOME"
+          echo "Apply migrations: $APPLY_MIGRATIONS_OUTCOME"
+          echo "Backend validation: $BACKEND_VALIDATION_OUTCOME"
+          if [[ "$LEGACY_UPGRADE_OUTCOME" != "success" || "$APPLY_MIGRATIONS_OUTCOME" != "success" || "$BACKEND_VALIDATION_OUTCOME" != "success" ]]; then
+            echo "One or more backend validation stages failed; see all stage logs above." >&2
             exit 1
           fi
 

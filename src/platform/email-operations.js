@@ -379,7 +379,7 @@ export async function receiveDeliveryWebhook(input,providedSecret){
  }
  const matchId=row.payload?.matchId||row.payload?.variables?.matchId;
  if(row.template_code==="mentor.mentorship_update"&&matchId){
-  await db.query("update mentorship_match set mentor_notification_status=$1,mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$3",[eventType==="delivered"?"delivered":"failed",eventType==="delivered"?"Trusted provider delivery event received.":"Trusted provider failure event: "+eventType,matchId]);
+  await db.query("update mentorship_match set mentor_notification_status=$1,mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$3",[row.delivery_status==="delivered"?"delivered":"failed",row.delivery_status==="delivered"?"Trusted provider delivery event received.":"Trusted provider failure or suppression event: "+row.delivery_status,matchId]);
  }
  await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.delivery_event.received','notification_outbox',$1,'success',$2)",[row.id,{provider,providerEventId,eventType}]);
  return {matched:true,deliveryStatus:row.delivery_status,deliveredAt:row.delivered_at||null,nextAction:row.delivery_status==="delivered"?"Provider reported delivery. This does not prove the recipient read the message.":"Provider reported a delivery failure; the recipient is suppressed for bounce/complaint events and must not be retried automatically."};

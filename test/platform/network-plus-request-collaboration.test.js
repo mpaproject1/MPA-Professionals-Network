@@ -179,3 +179,14 @@ test("Phase 2 recipient clarification and question answers revalidate current re
  assert.match(answer,/assertRecipientRepresentative\(db,request,userId\)/);
  assert.match(detail,/hasCurrentRecipientAuthority/);
 });
+
+test("Phase 2 migration compatibility covers consent, clarification and one-time response schema",()=>{
+ for(const column of ["recipient_response","recipient_response_by","recipient_response_at","requester_value_ciphertext","recipient_value_ciphertext","counter_starts_at","prompt_code","question","answer"])assert.ok(compatibility.includes(column));
+ assert.match(compatibility,/network_plus_request_contact_consent_pkey/);
+ assert.match(compatibility,/network_plus_request_recipient_response_complete_check/);
+});
+test("meeting local-time conversion rejects both DST gaps and repeated-hour ambiguity",()=>{
+ assert.match(ui,/That local time does not exist in the selected timezone/);
+ assert.match(ui,/That local time occurs twice in the selected timezone/);
+ assert.match(ui,/const candidates=\[\.\.\.offsets\]/);
+});

@@ -141,7 +141,11 @@ export async function recordMembershipReceipt(identity,input={},requestId){
   }
   const balance=await balanceFor(db,obligation.id);
   if(code!==obligation.currency)throw problem(400,"Receipt currency must match the fee obligation currency.","PAYMENT_CURRENCY_MISMATCH");
-  if(amount>Number(balance.outstanding_balance))throw problem(409,"The receipt exceeds the current outstanding balance. Refresh the obligation before recording.","AMOUNT_EXCEEDS_BALANCE");
+  // Pending Finance receipts reserve part of the balance until a separate
+  // verifier approves or rejects them. This prevents concurrent over-recording.
+  const pending=(await db.query("select coalesce(sum(pt.amount),0)::numeric(14,2) reserved_amount from membership_fee_obligation_payment op join payment_transaction pt on pt.id=op.payment_transaction_id where op.obligation_id=$1 and pt.status='pending'",[obligation.id])).rows[0];
+  const availableBalance=Math.max(0,Number(balance.outstanding_balance)-Number(pending?.reserved_amount||0));
+  if(amount>availableBalance)throw problem(409,"The receipt exceeds the unreserved outstanding balance. Review pending receipts before recording another payment.","AMOUNT_EXCEEDS_BALANCE");
   const method=await paymentMethod(db,methodCode,code);
   if(method.method_type==="chapa")throw problem(400,"Hosted checkout cannot be recorded as a manual Finance receipt.","PAYMENT_METHOD_REQUIRES_CHECKOUT");
   if(method.requires_evidence&&!evidenceFileId)throw problem(400,"This payment method requires private receipt evidence.","PAYMENT_EVIDENCE_REQUIRED");

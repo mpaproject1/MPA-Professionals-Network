@@ -28,16 +28,14 @@ function csvRows(csv){
  const missing=required.filter(h=>!headers.includes(h));
  if(!headers.includes("product_code")&&!headers.includes("membership_type"))missing.push("membership_type or product_code");
  if(missing.length)throw problem(400,`Missing required columns: ${missing.join(", ")}`,"MISSING_COLUMNS");
- if(modern){for(const h of ["phone","gender","registered_date"])if(!headers.includes(h))missing.push(h);if(!headers.includes("amount_paid")&&!headers.includes("payment_amount"))missing.push("amount_paid");}
- if(missing.length)throw problem(400,`Missing required columns: ${missing.join(", ")}`,"MISSING_COLUMNS");
  return rows.map((values,index)=>({rowNumber:index+2,raw:Object.fromEntries(headers.map((h,i)=>[h,String(values[i]??"").trim()]))}));
 }
 function parseDate(v){if(!v)return null;if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;const d=new Date(`${v}T00:00:00Z`);return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v?v:null;}
 function cleanRow(row){
- const x=row.raw,errors=[],modern=true;
- const email=normalizeEmail(x.email),fullName=String(x.full_name||"").trim().replace(/\\s+/g," "),membershipNumber=String(x.membership_number||"").trim(),productCode=String(x.product_code||x.membership_type||"").trim().toUpperCase(),status=String(x.status||"").trim().toLowerCase();
+ const x=row.raw,errors=[];
+ const email=normalizeEmail(x.email),fullName=String(x.full_name||"").trim().replace(/\s+/g," "),membershipNumber=String(x.membership_number||"").trim(),productCode=String(x.product_code||x.membership_type||"").trim().toUpperCase(),status=String(x.status||"").trim().toLowerCase();
  const phone=normalizePhone(x.phone),gender=String(x.gender||"").trim().toLowerCase(),registeredDate=parseDate(x.registered_date||x.start_date);
- const startDate=parseDate(x.start_date),endDate=parseDate(x.end_date),approved=String(x.approved_membership||"").trim().toLowerCase(),paidAmountText=String(x.amount_paid??x.payment_amount??"").trim(),paidAmount=paidAmountText?Number(paidAmountText):null,paidCurrency=String(x.payment_currency||"").trim().toUpperCase()||null,paymentReference=String(x.payment_reference||"").trim()||null;
+ if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))errors.push("Enter a valid email address.");
  if(!email||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))errors.push("Enter a valid email address.");
  if(!fullName||fullName.split(" ").length<2)errors.push("Enter first and last name in full_name.");
  if(!membershipNumber)errors.push("Membership number is required.");
@@ -51,11 +49,11 @@ function cleanRow(row){
  if(!String(x.approval_reference||"").trim())errors.push("Provide the MPA approval register, minute, resolution or other source reference for audit traceability.");
  if(status==="active"&&approved!=="yes")errors.push("Active membership requires explicit confirmation that MPA already approved the member.");
  if(status==="active"&&endDate&&endDate<new Date().toISOString().slice(0,10))errors.push("An expired end date cannot be imported as active.");
- if(modern&&!phone)errors.push("phone is required.");
- if(modern&&!["male","female"].includes(gender))errors.push("gender must be male or female.");
- if(modern&&!registeredDate)errors.push("registered_date must use YYYY-MM-DD.");
- if(modern&&!paidAmountText)errors.push("amount_paid is required; enter 0 when no amount has been received.");
- if(paidAmountText&&(!Number.isFinite(paidAmount)||paidAmount<0||!/^(?:0|[1-9]\\d{0,11})(?:\\.\\d{1,2})?$/.test(paidAmountText)))errors.push("amount_paid must be zero or a positive amount with up to two decimal places.");
+ if(!phone)errors.push("phone is required.");
+ if(!["male","female"].includes(gender))errors.push("gender must be male or female.");
+ if(!registeredDate)errors.push("registered_date must use YYYY-MM-DD.");
+ if(!paidAmountText)errors.push("amount_paid is required; enter 0 when no amount has been received.");
+ if(paidAmountText&&(!Number.isFinite(paidAmount)||paidAmount<0||!/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/.test(paidAmountText)))errors.push("amount_paid must be zero or a positive amount with up to two decimal places.");
  if(paidCurrency&&!/^[A-Z]{3}$/.test(paidCurrency))errors.push("payment_currency must be a three-letter ISO currency code.");
 
  if(paymentReference&&paymentReference.length<4)errors.push("payment_reference must contain at least four characters.");

@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-async function dismissPrivacyChoices(page) {\n  const rejectOptional = page.getByRole("button", { name: "Reject optional" });\n  if (await rejectOptional.isVisible().catch(() => false)) await rejectOptional.click();\n}
+async function dismissPrivacyChoices(page) {
+  const rejectOptional = page.getByRole("button", { name: "Reject optional" });
+  if (await rejectOptional.isVisible().catch(() => false)) await rejectOptional.click();
+}
 
 const draft = {
   id: "request-1", intent: "service_request", status: "draft",
@@ -38,6 +41,7 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:draft})}));
     await page.setViewportSize({width:390,height:844});
     await page.goto("/network-plus/requests");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading",{name:"Requests that become collaboration only by agreement."})).toBeVisible();
 await page.locator("details").filter({hasText:"Start a new connection request"}).locator("summary").click();
         await page.getByLabel("Request type").selectOption("service_request");
@@ -86,6 +90,7 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:current()})}));
     await page.setViewportSize({width:1280,height:900});
     await page.goto("/network-plus/requests");
+    await dismissPrivacyChoices(page);
     await page.getByRole("button",{name:/Website accessibility review/}).click();
     await expect(page.getByRole("button",{name:"Explicitly accept request"})).toBeVisible();
     await expect(page.getByText(/Awaiting the recipient’s explicit decision/i)).toBeVisible();
@@ -106,6 +111,7 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     });
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:draft})}));
     await page.goto("/network-plus/requests");
+    await dismissPrivacyChoices(page);
 await page.locator("details").filter({hasText:"Start a new connection request"}).locator("summary").click();
         await page.getByLabel("Request type").selectOption("partnership_proposal");
     await page.getByLabel("Published business").selectOption("business-1");
@@ -135,6 +141,7 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     });
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{...draft,intent:"quote_request"}})}));
     await page.goto("/network-plus/requests?action=quote_request&listingId=listing-1");
+    await dismissPrivacyChoices(page);
 await page.locator("details").filter({hasText:"Start a new connection request"}).locator("summary").click();
         await expect(page.getByLabel("Request type")).toHaveValue("quote_request");
     await page.getByRole("button",{name:"Continue"}).click();
@@ -159,6 +166,7 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:accepted})}));
     await page.route("**/api/v1/network-plus/requests/request-1/contact-handoff?*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{requestId:"request-1",fields:[]}})}));
     await page.goto("/network-plus/requests");
+    await dismissPrivacyChoices(page);
     await page.getByRole("button",{name:/Website accessibility review/}).click();
     await expect(page.getByText("Contact sharing · field-by-field consent")).toBeVisible();
     await expect(page.getByText("First meeting handoff")).toBeVisible();
@@ -174,6 +182,7 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     await page.route("**/api/v1/network-plus/requests/request-1/answer",async route=>{expect(route.request().method()).toBe("POST");await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:"request-1",recipient_response:answered.recipient_response,recipient_response_at:answered.recipient_response_at}})});});
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:answered})}));
     await page.goto("/network-plus/requests");
+    await dismissPrivacyChoices(page);
     await page.getByRole("button",{name:/Website accessibility review/}).click();
     await expect(page.getByText("Answer the question")).toBeVisible();
     await page.getByPlaceholder("Write a concise answer to the requester").fill("Yes, we can support regional distribution through approved local partners.");
@@ -192,6 +201,7 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:accepted})}));
     await page.route("**/api/v1/network-plus/requests/request-1/contact-handoff?*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{requestId:"request-1",fields:[]}})}));
     await page.goto("/network-plus/requests");
+    await dismissPrivacyChoices(page);
     await page.getByRole("button",{name:/Website accessibility review/}).click();
     await page.getByLabel("Timezone").fill("America/New_York");
     await page.getByLabel("Date and time").fill("2026-03-08T02:30");
@@ -219,6 +229,7 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     });
     await page.setViewportSize({width:390,height:844});
     await page.goto("/network-plus/requests");
+    await dismissPrivacyChoices(page);
     await page.getByRole("button",{name:/Website accessibility review/}).click();
     await page.getByLabel("Short remark").fill("Contact exchanged; we will continue directly.");
     await page.getByRole("button",{name:"Mark Completed"}).click();

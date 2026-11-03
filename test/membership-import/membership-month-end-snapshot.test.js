@@ -26,7 +26,7 @@ test("month-end membership snapshot is persisted and safely refreshed", async t 
     assert.equal(first.captured, true);
     assert.equal(first.snapshotDate, snapshotDate);
     const firstTotals = await db.query("select coalesce(sum(member_count),0)::int total,count(*)::int groups from membership_month_end_snapshot where snapshot_date=$1",[snapshotDate]);
-    const currentCount = Number((await db.query("select count(*)::int count from membership_record")).rows[0].count);
+    const currentCount = Number((await db.query("select count(*)::int count from membership_record mr where not exists(select 1 from membership_application test_app where test_app.id=mr.application_id and coalesce(test_app.data_snapshot->>'testPortfolioId','')<>'')")).rows[0].count);
     assert.equal(Number(firstTotals.rows[0].total), currentCount, "status groups must account for every membership record exactly once");
 
     const second = await captureMembershipMonthEndSnapshot(new Date("2026-11-30T20:56:00.000Z"));

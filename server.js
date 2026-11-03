@@ -987,6 +987,23 @@ async function runMembershipExpiry(){
 }
 const membershipExpiryTimer=setInterval(()=>void runMembershipExpiry(),60*60*1000);
 membershipExpiryTimer.unref();
+
+// Capture the month-end member stock during the final five minutes of the
+// Addis Ababa civil month. The snapshot table is idempotent by date/status/plan.
+let membershipMonthEndSnapshotRunning=false;
+async function runMembershipMonthEndSnapshot(){
+  if(membershipMonthEndSnapshotRunning)return;
+  membershipMonthEndSnapshotRunning=true;
+  try {
+    const result=await membership.captureMembershipMonthEndSnapshot();
+    if(result.captured)logger.info("membership.month_end_snapshot.captured",{snapshotDate:result.snapshotDate,groups:result.groups});
+  } catch(error) {
+    logger.warn("membership.month_end_snapshot.failed",{error:error.message,code:error.code||"MEMBERSHIP_MONTH_END_SNAPSHOT_FAILED"});
+  } finally { membershipMonthEndSnapshotRunning=false; }
+}
+void runMembershipMonthEndSnapshot();
+const membershipMonthEndSnapshotTimer=setInterval(()=>void runMembershipMonthEndSnapshot(),60*1000);
+membershipMonthEndSnapshotTimer.unref();
 let membershipFeeReminderRunning=false;
 async function runMembershipFeeReminders(){
   if(membershipFeeReminderRunning)return;

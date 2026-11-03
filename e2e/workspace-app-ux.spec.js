@@ -12,6 +12,11 @@ async function mockSignedInWorkspace(page) {
     else if (path.includes("application-tracking")) data = { summary: { total: 0, active: 0, nextSteps: 0, jobApplications: 0 }, items: [] };
     else if (path === "/api/v1/membership/applications/me") data = [];
     else if (path === "/api/v1/membership/history") data = { memberships: [{ status: "active" }] };
+    else if (path === "/api/v1/me/community-impact/workspace") data = {
+      score: 0, policyVersion: 1, progressPercent: 0, verifiedClaimCount: 0, totalClaimCount: 0,
+      dimensions: [], categoryBreakdown: [], items: [], claims: [], pendingClaims: [],
+      detectedContributions: [], reminders: [],
+    };
     else if (path.startsWith("/api/v1/notifications")) data = { items: [], counts: { unread: 0, action_required: 0 } };
     else if (path === "/api/v1/organizations") data = [];
     else if (path === "/api/v1/network-plus/access") data = { eligible: true, access: { member: true, organization: false } };

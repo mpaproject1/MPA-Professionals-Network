@@ -308,7 +308,7 @@ function normalizeStructuredAttributes(value) {
 }
 async function validateListingTaxonomy(db,category,subcategory,listingKind) {
   if(!LISTING_KINDS.has(listingKind))fail(400,"Choose a supported listing type.","VALIDATION_ERROR");
-  if(!category)return null;
+  if(!category){if(subcategory)fail(400,"Choose a primary category before selecting a subcategory.","INVALID_LISTING_SUBCATEGORY");return null;}
   const row=(await db.query("select code,listing_kinds from network_plus_listing_taxonomy where code=$1 and active=true",[category])).rows[0];
   if(!row||!row.listing_kinds.includes(listingKind))fail(400,"Choose an active category that supports this listing type.","INVALID_LISTING_CATEGORY");
   if(subcategory){const child=(await db.query("select code,listing_kinds from network_plus_listing_taxonomy where code=$1 and parent_code=$2 and active=true",[subcategory,category])).rows[0];if(!child||!child.listing_kinds.includes(listingKind))fail(400,"Choose a valid subcategory for the selected category and listing type.","INVALID_LISTING_SUBCATEGORY");}

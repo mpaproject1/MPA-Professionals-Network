@@ -22,7 +22,7 @@
     "web:build": "npm run build --workspace @mpa/web",
     "web:dev": "npm run dev --workspace @mpa/web",
     "test:e2e": "playwright test",
-    "check:migrations:rollback": "node scripts/check-new-migration-compatibility.js",
+    "check:migrations:rollback": "node scripts/check-new-migration-compatibility.js && node scripts/check-email-migration-compatibility.js",
     "network-plus:rotate-contact-key": "node scripts/rotate-network-plus-contact-key.js",
     "network-plus:dispatch-review-reminders": "node scripts/dispatch-network-plus-review-reminders.js"
   },

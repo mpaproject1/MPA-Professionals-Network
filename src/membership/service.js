@@ -666,6 +666,41 @@ export async function reverseMembershipPayment(paymentId,actorId,input,requestId
   });
 }
 
+export function membershipMonthEndSnapshotWindow(now=new Date()){
+ const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Addis_Ababa",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(now).reduce((result,part)=>{if(part.type!=="literal")result[part.type]=part.value;return result;},{});
+ const year=Number(parts.year),month=Number(parts.month),day=Number(parts.day),lastDay=new Date(Date.UTC(year,month,0)).getUTCDate();
+ const snapshotDate=parts.year+"-"+parts.month+"-"+parts.day;
+ return {snapshotDate,eligible:day===lastDay&&Number(parts.hour)===23&&Number(parts.minute)>=55};
+}
+
+export async function captureMembershipMonthEndSnapshot(now=new Date()){
+ const window=membershipMonthEndSnapshotWindow(now);
+ if(!window.eligible)return {captured:false,snapshotDate:window.snapshotDate,reason:"outside_month_end_capture_window"};
+ return withTransaction(async db=>{
+  await db.query("select pg_advisory_xact_lock(hashtext($1))",["membership-month-end:"+window.snapshotDate]);
+  const result=await db.query(`insert into membership_month_end_snapshot(snapshot_date,membership_status,product_code,member_count)
+   select $1::date,effective_status,coalesce(product_code,'UNSPECIFIED'),count(*)::int
+   from (
+    select mr.id,mp.product_code,case
+     when mr.status in ('merged','cancelled','suspended') then mr.status
+     when mr.source='legacy_import' and not exists(
+      select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id
+      where pr.membership_id=mr.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded'
+       and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)
+     ) then 'payment_verification_required'
+     when mr.status='active' and mr.start_date>$1::date then 'not_yet_active'
+     when mr.status='active' and mr.end_date is not null and mr.end_date<$1::date then 'expired'
+     else mr.status end effective_status
+    from membership_record mr left join membership_product mp on mp.id=mr.membership_product_id
+   ) current_membership
+   group by effective_status,coalesce(product_code,'UNSPECIFIED')
+   on conflict(snapshot_date,membership_status,product_code) do update
+    set member_count=excluded.member_count,captured_at=now()
+   returning membership_status,product_code,member_count`,[window.snapshotDate]);
+  return {captured:true,snapshotDate:window.snapshotDate,groups:result.rowCount};
+ });
+}
+
 export async function expireDueMemberships(batchSize=500){
  const size=Math.max(1,Math.min(5000,Number.parseInt(batchSize,10)||500));
  return withTransaction(async db=>{

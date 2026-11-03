@@ -100,6 +100,7 @@ test("PostgreSQL geography workbook preview, apply, publish, member selectors an
   }
   if(previousPublished)await db.query("update membership_geography_version set status='published',published_at=coalesce(published_at,now()) where id=$1",[previousPublished]);
   await db.query("delete from audit_log where actor_user_id=$1",[userId]);
+  await db.query("delete from app_user_role where user_id=$1",[userId]);
   await db.query("delete from app_user where id=$1",[userId]);
  }
 });

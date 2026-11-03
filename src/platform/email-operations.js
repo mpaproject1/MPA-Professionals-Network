@@ -424,9 +424,33 @@ export async function receiveInboundEmail(input,providedSecret){
  return result;
 }
 
+export function verifyResendWebhookSignature(rawBody, headers = {}, secret = "", nowMs = Date.now()) {
+ const id=String(headers["svix-id"]||"").trim(),timestamp=String(headers["svix-timestamp"]||"").trim(),signatures=String(headers["svix-signature"]||"");
+ if(!id||!timestamp||!signatures||!String(secret).startsWith("whsec_"))return false;
+ const seconds=Number(timestamp);
+ if(!Number.isInteger(seconds)||Math.abs(Math.floor(nowMs/1000)-seconds)>300)return false;
+ let key;
+ try{key=Buffer.from(String(secret).slice(6),"base64");}catch{return false;}
+ if(key.length<16)return false;
+ const raw=Buffer.isBuffer(rawBody)?rawBody:Buffer.from(String(rawBody||""));
+ const expected=createHmac("sha256",key).update(id+"."+timestamp+".").update(raw).digest("base64");
+ const candidates=signatures.split(" ").map(value=>value.trim()).filter(value=>value.startsWith("v1,")).map(value=>value.slice(3));
+ const expectedBuffer=Buffer.from(expected);
+ return candidates.some(value=>{
+  const candidate=Buffer.from(value);
+  return candidate.length===expectedBuffer.length&&timingSafeEqual(candidate,expectedBuffer);
+ });
+}
+
 export async function receiveDeliveryWebhook(input,providedSecret){
- const expected=clean(process.env.EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET,500);
- if(!expected||!providedSecret||Buffer.byteLength(expected)!==Buffer.byteLength(providedSecret)||!timingSafeEqual(Buffer.from(expected),Buffer.from(providedSecret)))fail(401,"Email delivery event webhook is not authorized.","UNAUTHENTICATED");
+ const providerHint=clean(input.provider,80)||(input.data?.email_id?"resend":"configured-webhook");
+ if(providerHint==="resend"||arguments[2]?.["svix-id"]){
+  const headers=arguments[2]||{};
+  if(!verifyResendWebhookSignature(headers.rawBody,headers,clean(process.env.RESEND_WEBHOOK_SECRET,500)))fail(401,"Resend webhook signature is missing, invalid, or outside the allowed timestamp window.","UNAUTHENTICATED");
+ }else{
+  const expected=clean(process.env.EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET,500);
+  if(!expected||!providedSecret||Buffer.byteLength(expected)!==Buffer.byteLength(providedSecret)||!timingSafeEqual(Buffer.from(expected),Buffer.from(providedSecret)))fail(401,"Email delivery event webhook is not authorized.","UNAUTHENTICATED");
+ }
  const providerMessageId=clean(input.providerMessageId||input.messageId||input.data?.email_id||input.data?.id,300);
  const providerEventId=clean(input.eventId||input.event_id||input.id,300);
  const rawEventType=clean(input.eventType||input.type,80).toLowerCase();
@@ -435,7 +459,7 @@ export async function receiveDeliveryWebhook(input,providedSecret){
  if(!providerMessageId)fail(400,"providerMessageId is required.","VALIDATION_ERROR");
  if(!providerEventId)fail(400,"A stable provider event ID is required for webhook idempotency.","PROVIDER_EVENT_ID_REQUIRED");
  if(!["delivered","bounced","complained","failed"].includes(eventType))fail(400,"Unsupported delivery event type.","VALIDATION_ERROR");
- const db=getPool(),provider=clean(input.provider,80)||(input.data?.email_id?"resend":"configured-webhook");
+ const db=getPool(),provider=providerHint;
  // The ledger insert, outbox transition, suppression, domain evidence and audit
  // record commit together. A transient DB error rolls the event insert back so
  // the provider can safely replay the same event ID.

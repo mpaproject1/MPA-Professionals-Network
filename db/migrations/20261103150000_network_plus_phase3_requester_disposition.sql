@@ -5,7 +5,14 @@ alter table network_plus_request
   add column if not exists requester_disposition_remark text,
   add column if not exists requester_disposition_updated_at timestamptz not null default now(),
   add column if not exists review_due_at timestamptz,
-  add column if not exists review_reminder_sent_at timestamptz;
+  add column if not exists review_reminder_sent_at timestamptz,
+  add column if not exists recipient_withdrawn_at timestamptz;
+
+alter table network_plus_request drop constraint if exists network_plus_request_status_check;
+alter table network_plus_request add constraint network_plus_request_status_check check (status in (
+  'draft','submitted','under_review','clarification_requested','accepted','declined','withdrawn',
+  'recipient_withdrawn','in_progress','completed','disputed','closed'
+));
 
 do $phase3$
 begin

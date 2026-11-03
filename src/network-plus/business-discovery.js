@@ -358,6 +358,16 @@ export async function createOpportunityListingDraft(businessId,userId,input,requ
     await audit(db,userId,"network_plus.listing_draft_created","network_plus_service_listing",row.id,requestId,{businessId,listingKind});return row;
   });
 }
+function parseOpportunityLocalDateTime(value,timeZone) {
+  if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))fail(400,"Next availability must use a local date and time.","VALIDATION_ERROR");
+  let formatter;try{formatter=new Intl.DateTimeFormat("en-CA",{timeZone:timeZone||"UTC",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"});}catch{fail(400,"Choose a valid IANA timezone.","INVALID_TIMEZONE");}
+  const [datePart,timePart]=value.split("T"),[year,month,day]=datePart.split("-").map(Number),[hour,minute]=timePart.split(":").map(Number),target=Date.UTC(year,month-1,day,hour,minute);
+  let guess=target;
+  for(let attempt=0;attempt<3;attempt++){const parts=Object.fromEntries(formatter.formatToParts(new Date(guess)).map(part=>[part.type,part.value]));const represented=Date.UTC(Number(parts.year),Number(parts.month)-1,Number(parts.day),Number(parts.hour),Number(parts.minute));guess+=target-represented;}
+  const check=Object.fromEntries(formatter.formatToParts(new Date(guess)).map(part=>[part.type,part.value]));
+  if(Number(check.year)!==year||Number(check.month)!==month||Number(check.day)!==day||Number(check.hour)!==hour||Number(check.minute)!==minute)fail(400,"The selected local time does not exist in this timezone.","INVALID_LOCAL_TIME");
+  return new Date(guess);
+}
 export async function saveOpportunityListingDraft(listingId,userId,input,requestId) {
   const data=input||{};
   return withTransaction(async db=>{
@@ -379,13 +389,14 @@ export async function saveOpportunityListingDraft(listingId,userId,input,request
     const leadTimeDays=data.leadTimeDays===undefined?row.lead_time_days:(data.leadTimeDays===""||data.leadTimeDays===null?null:Number(data.leadTimeDays));
     const activeWorkLimit=data.activeWorkLimit===undefined?row.active_work_limit:(data.activeWorkLimit===""||data.activeWorkLimit===null?null:Number(data.activeWorkLimit));
     const timezone=data.timezone===undefined?row.timezone:(data.timezone?String(data.timezone).trim().slice(0,64):null);
-    const nextAvailableAt=data.nextAvailableAt===undefined?row.next_available_at:(data.nextAvailableAt?new Date(data.nextAvailableAt):null);
+    const nextAvailableAt=data.nextAvailableAt===undefined?row.next_available_at:(data.nextAvailableAt?parseOpportunityLocalDateTime(data.nextAvailableAt,timezone):null);
     const targetAudience=data.targetAudience===undefined?(row.target_audience||[]):data.targetAudience;
     if(serviceRadiusKm!==null&&(!Number.isInteger(serviceRadiusKm)||serviceRadiusKm<1||serviceRadiusKm>1000))fail(400,"Service radius must be between 1 and 1000 kilometres.","VALIDATION_ERROR");
     if(!["accepting_requests","limited","paused","unavailable"].includes(availabilityStatus))fail(400,"Choose a supported intake status.","VALIDATION_ERROR");
     if(leadTimeDays!==null&&(!Number.isInteger(leadTimeDays)||leadTimeDays<0||leadTimeDays>3650))fail(400,"Lead time must be between 0 and 3650 days.","VALIDATION_ERROR");
     if(activeWorkLimit!==null&&(!Number.isInteger(activeWorkLimit)||activeWorkLimit<1||activeWorkLimit>100000))fail(400,"Active work limit must be a positive whole number.","VALIDATION_ERROR");
     if(timezone&&timezone.length>64)fail(400,"Timezone is too long.","VALIDATION_ERROR");
+    if(timezone){try{new Intl.DateTimeFormat("en-US",{timeZone:timezone});}catch{fail(400,"Choose a valid IANA timezone.","INVALID_TIMEZONE");}}
     if(nextAvailableAt&&Number.isNaN(nextAvailableAt.getTime()))fail(400,"Next availability must be a valid date and time.","VALIDATION_ERROR");
     const allowedAudience=new Set(["individuals","smes","nonprofits","public_institutions","startups","all"]);
     if(!Array.isArray(targetAudience)||targetAudience.some(value=>!allowedAudience.has(value)))fail(400,"Choose supported target-audience groups.","VALIDATION_ERROR");

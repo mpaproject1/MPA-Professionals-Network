@@ -49,7 +49,7 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     await page.getByLabel("Find a verified member recipient").fill("Recipient");
     await page.route("**/api/v1/talent?q=*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[{user_id:"recipient-1",display_name:"Recipient Professional",professional_title:"Architect"}]}})}));
     await page.getByRole("button",{name:"Search members"}).click();
-    await page.getByLabel("Member recipient").selectOption("recipient-1");
+    await page.getByLabel("Member recipient", { exact: true }).selectOption("recipient-1");
     await page.getByLabel("Subject").fill("Website accessibility review");
     await page.getByLabel("Request summary").fill("Request an accessibility review of our public website.");
     await page.getByLabel("Scope").fill("Review the public website against WCAG AA.");
@@ -177,11 +177,12 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
 
   test("recipient can send one private answer to a question request",async({page})=>{
     await mockSession(page);
-    const question={...draft,intent:"question",status:"submitted",isRequester:false,isRecipientRepresentative:true,canReview:true,canAccept:true,recipient_response:null,recipient_response_at:null};
-    const answered={...question,recipient_response:"Yes, we can support regional distribution through approved local partners.",recipient_response_at:"2026-11-03T06:00:00.000Z"};
+    const question={...draft,intent:"question",status:"submitted",isRequester:false,is_requester:false,isRecipientRepresentative:true,canReview:true,canAccept:true,recipient_response:null,recipient_response_by:null,recipient_response_at:null};
+    const answered={...question,recipient_response:"Yes, we can support regional distribution through approved local partners.",recipient_response_by:"recipient-1",recipient_response_at:"2026-11-03T06:00:00.000Z"};
+    let current=question;
     await page.route("**/api/v1/network-plus/requests",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[question]})}));
-    await page.route("**/api/v1/network-plus/requests/request-1/answer",async route=>{expect(route.request().method()).toBe("POST");await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:"request-1",recipient_response:answered.recipient_response,recipient_response_at:answered.recipient_response_at}})});});
-    await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:answered})}));
+    await page.route("**/api/v1/network-plus/requests/request-1/answer",async route=>{expect(route.request().method()).toBe("POST");current=answered;await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:"request-1",recipient_response:answered.recipient_response,recipient_response_by:answered.recipient_response_by,recipient_response_at:answered.recipient_response_at}})});});
+    await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:current})}));
     await page.goto("/network-plus/requests");
     await dismissPrivacyChoices(page);
     await page.getByRole("button",{name:/Website accessibility review/}).click();
@@ -235,7 +236,7 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     await page.getByLabel("Short remark").fill("Contact exchanged; we will continue directly.");
     await page.getByRole("button",{name:"Mark Completed"}).click();
     await expect(page.getByText("Completed",{exact:true}).last()).toBeVisible();
-    await expect(page.getByText(/Contact exchanged; we will continue directly/)).toBeVisible();
+    await expect(page.getByText(/Contact exchanged; we will continue directly/).last()).toBeVisible();
     await page.getByLabel("Short remark").fill("Reopening to continue the introduction.");
     await page.getByRole("button",{name:"Reopen as In progress"}).click();
     await expect(page.getByText(/Earlier closure history is preserved/)).toBeVisible();

@@ -5,7 +5,6 @@ import process from "node:process";
 const root = process.cwd();
 const sourceRoot = path.join(root, "src");
 const migrationRoot = path.join(root, "db", "migrations");
-const callNames = new Set(["queueWorkflowEmail", "queueEmailNotification"]);
 
 async function filesUnder(directory, suffix) {
   const found = [];
@@ -81,7 +80,8 @@ function resolveLiteral(expression, constants) {
   return null;
 }
 
-const sourceFiles = (await filesUnder(sourceRoot, ".js"))
+const sourceFiles = (await Promise.all([".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx"].map(suffix => filesUnder(sourceRoot, suffix))))
+  .flat()
   .filter(file => !file.endsWith(path.join("platform", "email-operations.js")));
 const migrationFiles = await filesUnder(migrationRoot, ".sql");
 const migrations = (await Promise.all(migrationFiles.map(file => readFile(file, "utf8")))).join("\n");

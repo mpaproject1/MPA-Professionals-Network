@@ -445,7 +445,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/network-plus/access") return ok(res,await resolveNetworkPlusAccess(getPool(),identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/network-plus/organizations"){
       const q=query(req.url);
-      return ok(res,await organizationJobs.listNetworkPlusOrganizations(identity.sub,{q:q.get("q"),organizationType:q.get("organizationType"),location:q.get("location"),geographyUnitId:q.get("geographyUnitId"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
+      return ok(res,await organizationJobs.listNetworkPlusOrganizations(identity.sub,{q:q.get("q"),organizationType:q.get("organizationType"),location:q.get("location"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
     }
 
     if(req.method==="GET" && p==="api/v1/network-plus/listing-taxonomy") return ok(res,await networkPlusBusiness.listNetworkPlusListingTaxonomy(identity.sub),requestId);

@@ -35,6 +35,7 @@ const migrationNames = [
   "20261029160000_account_references_and_governance.sql",
   "20261031110000_network_plus_business_discovery.sql",
   "20261031120000_network_plus_request_collaboration.sql",
+  "20261103120000_network_plus_phase0_contract_alignment.sql",
   "20261031130000_serve_community_initiatives.sql",
   "20261031140000_serve_community_offline_completed_projects.sql",
   "20261031150000_community_impact_detection.sql",
@@ -823,7 +824,7 @@ try {
   const noLegacyBackfill=await client.query("select count(*)::int count from serve_community_legacy_classification");
   if(noLegacyBackfill.rows[0].count!==0)throw new Error("Fresh migration unexpectedly created legacy classification rows.");
   const requestChecks = [
-    ["network_plus_request","network_plus_request_intent_check",["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request"]],
+    ["network_plus_request","network_plus_request_intent_check",["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request","business_opportunity"]],
     ["network_plus_request","network_plus_request_status_check",["draft","submitted","under_review","clarification_requested","accepted","declined","withdrawn","in_progress","completed","disputed","closed"]],
     ["network_plus_collaboration_workspace","network_plus_collaboration_workspace_status_check",["active","blocked","disputed","completed","closed"]],
     ["network_plus_collaboration_milestone","network_plus_collaboration_milestone_status_check",["not_started","in_progress","blocked","completed","cancelled"]]

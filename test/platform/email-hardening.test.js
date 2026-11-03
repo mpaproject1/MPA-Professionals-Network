@@ -19,6 +19,7 @@ test("email hardening migration creates the logical-event unique key and provide
   assert.match(coverage, /organization\.review_queue_item.*reviewer/s);
   assert.match(coverage, /organization\.review_update.*organization_representative/s);
   assert.match(coverage, /on conflict\(template_code\) do nothing/i);
+  assert.match(coverage, /insert into email_template_version/i);
 });
 
 test("workflow email enqueue is idempotent and checks recipient holds", async () => {

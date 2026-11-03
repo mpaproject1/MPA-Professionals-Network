@@ -1,11 +1,11 @@
-import { captureTestDelivery } from "./test-lab-delivery.js";
-import { classifyEmailDeliveryError, emailIdempotencyKey, emailRetryDelaySeconds } from "./email-retry-policy.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { createInAppNotification } from "./notifications.js";
-import { emailAudienceMatches, emailWorkflowEventKey, normalizeEmailAddress } from "./email-event-idempotency.js";
 import { getPool, withTransaction } from "./db.js";
+import { emailAudienceMatches, emailWorkflowEventKey, normalizeEmailAddress } from "./email-event-idempotency.js";
+import { classifyEmailDeliveryError, emailIdempotencyKey, emailRetryDelaySeconds } from "./email-retry-policy.js";
 import { renderBrandedEmail } from "./email-template.js";
 import { retryVerificationDelivery } from "./email-verification.js";
+import { createInAppNotification } from "./notifications.js";
+import { captureTestDelivery } from "./test-lab-delivery.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 async function requireAdmin(db,actorId){

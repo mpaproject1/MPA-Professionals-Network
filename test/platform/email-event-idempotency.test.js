@@ -27,15 +27,18 @@ test("recipient normalization is case-insensitive and trims whitespace", () => {
 });
 
 test("verification delivery is guarded by Test Lab capture before any provider call", async () => {
-  const source = await readFile(new URL("../../src/platform/email-verification.js", import.meta.url), "utf8");
-  const capture = source.indexOf("if (captureMode && environment !== \"production\")");
-  const resend = source.indexOf('fetch("https://api.resend.com/emails"');
-  const webhook = source.indexOf("fetch(endpoint");
-  assert.ok(capture >= 0);
-  assert.ok(resend > capture);
-  assert.ok(webhook > capture);
-  assert.match(source, /TEST_DELIVERY_CAPTURE_REQUIRED/);
-  assert.match(source, /Idempotency-Key/);
+  const verificationSource = await readFile(new URL("../../src/platform/email-verification.js", import.meta.url), "utf8");
+  const deliverySource = await readFile(new URL("../../src/platform/email-operations.js", import.meta.url), "utf8");
+  assert.match(verificationSource, /sendEmailMessage\(/);
+  const capture = deliverySource.indexOf('if(process.env.TEST_DELIVERY_MODE==="capture"&&process.env.NODE_ENV!=="production"){');
+  const resend = deliverySource.indexOf('fetch("https://api.resend.com/emails"');
+  const webhook = deliverySource.indexOf('fetch(endpoint');
+  assert.ok(capture >= 0, "shared email dispatcher must persist Test Lab capture before provider dispatch");
+  assert.ok(resend > capture, "Resend dispatch must occur only after the Test Lab capture branch");
+  assert.ok(webhook > capture, "webhook dispatch must occur only after the Test Lab capture branch");
+  assert.match(deliverySource, /TEST_DELIVERY_CAPTURE_REQUIRED/);
+  assert.match(deliverySource, /TEST_LAB_PRODUCTION_BLOCKED/);
+  assert.match(deliverySource, /Idempotency-Key/);
 });
 
 test("membership workflow mail uses the shared event-idempotent queue", async () => {

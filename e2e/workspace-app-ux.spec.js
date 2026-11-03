@@ -66,7 +66,7 @@ test.describe("MPA application workspace UX", () => {
     await more.press("Enter");
     await expect(more).toHaveAttribute("aria-expanded", "true");
     const morePanel = page.locator("#desktop-more-menu");
-    await expect(morePanel.getByRole("link", { name: "Membership" })).toBeVisible();
+    await expect(morePanel.getByRole("link", { name: "Membership", exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(more).toHaveAttribute("aria-expanded", "false");
 
@@ -118,7 +118,7 @@ test.describe("MPA application workspace UX", () => {
     await page.route("**/api/v1/**", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) }));
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/mentorship");
-    await expect(page.getByRole("heading", { name: "Guidance with purpose. Leadership with integrity." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "My Mentorship" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Seek Executive Mentorship" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Become an MPA Mentor" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

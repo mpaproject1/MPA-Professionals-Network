@@ -42,8 +42,8 @@ test("Test Lab membership applications are excluded from management funnel, coho
     const beforeFinanceSummary = await runReport(reviewer, "finance-summary", { from: "2020-01-01", to: today }, randomUUID());
 
     const application = (await db.query(
-      "insert into membership_application(user_id,application_type,membership_product_id,status,submitted_at,data_snapshot,fee_snapshot) values($1,'new',$2,'submitted',now(),$3,$4) returning id",
-      [userId, product.id, { synthetic: true, testPortfolioId: portfolioId, persona: "Test Lab reporting exclusion" }, { productCode: "BASIC", amount: Number(product.price), currency: product.currency }]
+      "insert into membership_application(user_id,application_type,membership_product_id,status,tracking_reference,submitted_at,data_snapshot,fee_snapshot) values($1,'new',$2,'submitted',$3,now(),$4,$5) returning id",
+      [userId, product.id, "TSTLAB-APP-" + suffix.replace(/-/g, "").slice(0, 12).toUpperCase(), { synthetic: true, testPortfolioId: portfolioId, persona: "Test Lab reporting exclusion" }, { productCode: "BASIC", amount: Number(product.price), currency: product.currency }]
     )).rows[0];
     applicationId = application.id;
     const membershipRecord = (await db.query(

@@ -44,8 +44,11 @@ Product profiles remain discovery-only. They allow `supplier_inquiry`, `referral
 
 The recipient can:
 - accept the request;
-- decline the request; or
+- decline the request;
+- answer a `question` intent once with a private response; or
 - ask one structured clarification at a time.
+
+The one-time question answer is stored on the canonical request record, visible only to the requester and recipient representatives, and does not create a message thread or automatically accept the request.
 
 Clarification topics are controlled: scope, budget, timeline, quantity, location, availability, eligibility or other. The requester answers the open clarification and the request returns to the recipient's submitted/review queue. Clarifications are attached to the canonical request and are not an open-ended chat thread.
 
@@ -92,6 +95,7 @@ All routes require authenticated Network-Plus access and participant-level autho
 | POST | `/api/v1/network-plus/requests` | Create an idempotent private draft |
 | POST | `/api/v1/network-plus/requests/:id/submit` | Submit to recipient |
 | POST | `/api/v1/network-plus/requests/:id/transitions` | Accept, decline, withdraw and eligible legacy lifecycle transitions |
+| POST | `/api/v1/network-plus/requests/:id/answer` | Recipient answers a question intent once |
 | POST | `/api/v1/network-plus/requests/:id/clarifications` | Recipient asks structured clarification |
 | POST | `/api/v1/network-plus/requests/:id/clarifications/:clarificationId/respond` | Requester answers |
 | POST | `/api/v1/network-plus/requests/:id/contact-consent` | Accept, decline or revoke one contact field |
@@ -117,7 +121,7 @@ The existing request detail endpoint returns participant-visible clarification a
 2. Verify all eleven supported intents and legacy request rows remain compatible.
 3. Create, submit and accept each lightweight intent; confirm no collaboration workspace is created or offered.
 4. Verify product-profile requests allow only discovery connection intents and reject service-order/commerce intents.
-5. Verify recipient accept/decline and structured clarification; reject duplicate open clarifications and requester/recipient role violations.
+5. Verify recipient accept/decline, one-time question answers and structured clarification; reject duplicate answers, duplicate open clarifications and requester/recipient role violations.
 6. Verify each contact field independently: requester consent alone does not reveal recipient data; recipient consent completes release; declined/revoked consent prevents release; outsiders and support staff cannot read values.
 7. Verify AES-GCM ciphertext is not plaintext, wrong/missing keys fail safely, and contact values never appear in list/detail/notification payloads.
 8. Verify meeting proposal, responder acceptance, one counterproposal, proposer confirmation, decline, duplicate active proposal and invalid date/time/timezone/duration rejection.

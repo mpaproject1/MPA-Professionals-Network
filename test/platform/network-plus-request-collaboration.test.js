@@ -170,3 +170,12 @@ test("migration compatibility and support-role governance include Increment 6",(
  assert.match(userAdmin,/network_plus_support/);
  assert.match(userAdmin,/PRIVILEGED_ROLES/);
 });
+
+test("Phase 2 recipient clarification and question answers revalidate current recipient authority",()=>{
+ const ask=service.slice(service.indexOf("export async function askNetworkPlusClarification"),service.indexOf("export async function answerNetworkPlusClarification"));
+ const answer=service.slice(service.indexOf("export async function answerNetworkPlusQuestion"),service.indexOf("export async function answerNetworkPlusClarification"));
+ const detail=service.slice(service.indexOf("export async function getNetworkPlusRequest"),service.indexOf("export async function addNetworkPlusRequestParticipant"));
+ assert.match(ask,/assertRecipientRepresentative\(db,request,userId\)/);
+ assert.match(answer,/assertRecipientRepresentative\(db,request,userId\)/);
+ assert.match(detail,/hasCurrentRecipientAuthority/);
+});

@@ -32,7 +32,7 @@ function lines(value:string){return value.split("\n").map(v=>v.trim()).filter(Bo
 function label(value:string){return value.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());}
 function meetingTime(value:string,timezone:string){try{return new Intl.DateTimeFormat(undefined,{dateStyle:"medium",timeStyle:"short",timeZone:timezone}).format(new Date(value));}catch{return new Date(value).toLocaleString();}}
 function meetingInstant(value:string,timezone:string){
- const match=/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})$/.exec(value);
+ const match=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
  if(!match)throw new Error("Choose a valid meeting date and time.");
  const target=match.slice(1).map(Number),base=Date.UTC(target[0],target[1]-1,target[2],target[3],target[4],0);
  let instant=base;

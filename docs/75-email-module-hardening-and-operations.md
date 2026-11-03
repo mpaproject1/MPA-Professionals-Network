@@ -83,7 +83,7 @@ Delivery callback JSON must include:
 }
 ```
 
-Supported event types: `delivered`, `bounced`, `complained`, `failed`. The callback is authenticated with the configured delivery-event secret. A stable provider event ID is required; replayed event IDs are ignored. Events with no matching outbox row are retained pending correlation and reconciled on a later dispatch.
+Supported event types: `delivered`, `bounced`, `complained`, `failed`. The callback is authenticated with the configured delivery-event secret. A stable provider event ID is required; replayed event IDs are ignored. The endpoint accepts canonical fields and can normalize Resend-style `data.email_id`, top-level `id`, and `email.delivered`/similar event names, but it does not validate Resend Svix signatures itself. For native Resend webhooks, use a trusted adapter that validates the Svix signature and forwards the canonical payload with the configured shared header; do not expose an unsigned native webhook directly to this endpoint. Events with no matching outbox row are retained pending correlation and reconciled on a later dispatch.
 
 Inbound callbacks require a stable provider message ID and the inbound webhook secret. Replayed provider message IDs do not create duplicate inbox rows.
 

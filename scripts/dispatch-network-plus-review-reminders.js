@@ -1,6 +1,6 @@
 import "../src/platform/load-env.js";
-import { closePool } from "../src/platform/db.js";
 import { dispatchNetworkPlusRequestReviewReminders } from "../src/network-plus/request-collaboration.js";
+import { closePool } from "../src/platform/db.js";
 
 try {
   const result = await dispatchNetworkPlusRequestReviewReminders({ limit: Number(process.env.NETWORK_PLUS_REVIEW_REMINDER_BATCH_SIZE || 100) });

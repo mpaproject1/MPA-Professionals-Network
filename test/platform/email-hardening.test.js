@@ -59,6 +59,7 @@ test("inbound email rejects missing provider IDs instead of creating random dupl
 test("system-managed templates cannot be edited and template revisions are retained", async () => {
   const source = await read("../../src/platform/email-operations.js");
   assert.match(source, /TEMPLATE_LOCKED/);
+  assert.match(source, /SECURITY_TEMPLATE_AUDIENCE_LOCKED/);
   assert.match(source, /insert into email_template_version/);
   assert.match(source, /version_number/);
 });

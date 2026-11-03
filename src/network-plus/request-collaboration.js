@@ -1,11 +1,12 @@
-import { createHash } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { withTransaction } from "../platform/db.js";
 import { policyError } from "../platform/identity-policy.js";
 import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
 import { createInAppNotification } from "../platform/notifications.js";
 
 
-const INTENTS = new Set(["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request","business_opportunity"]);
+const INTENTS = new Set(["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request","business_opportunity","interest","question","quote_request","meeting_request"]);
+const CONTACT_FIELDS = new Set(["email","phone","whatsapp","website","business_location"]);
 const WORKSPACE_ELIGIBLE_INTENTS = new Set(["service_request","supplier_inquiry","expertise_request","partnership_proposal","collaboration_request"]);
 const SUPPORT_ROLES = new Set(["network_plus_support","system_admin"]);
 const hash = value => createHash("sha256").update(String(value)).digest("hex");
@@ -267,12 +268,14 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const isParticipant=(await db.query("select 1 from network_plus_request_participant where request_id=$1 and user_id=$2 and consent_status<>'revoked' and (participant_role<>'additional_participant' or consent_status='accepted')",[requestId,userId])).rowCount>0;
     if(isParticipant) await assertEntry(db,userId); else { if(!await hasSupportRole(db,userId))fail(404,"Request not found.","NOT_FOUND"); await assertSupport(db,userId,requestId,supportReason,supportTicket); await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_read","network_plus_request",requestId,"success",{reason:supportReason,ticket:supportTicket}]); }
     const participants=(await db.query("select user_id,participant_role,consent_status,consented_at from network_plus_request_participant where request_id=$1 and consent_status<>'revoked'",[requestId])).rows;
+    const clarifications=(await db.query("select id,asked_by,answered_by,prompt_code,question,answer,status,created_at,answered_at from network_plus_request_clarification where request_id=$1 order by created_at",[requestId])).rows;
+    const meetings=(await db.query("select * from network_plus_request_meeting where request_id=$1 order by created_at desc",[requestId])).rows;
     const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 order by created_at",[requestId])).rows;
     const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;
     const isRecipientRepresentative=participants.some(p=>p.user_id===userId&&p.participant_role==="recipient_representative"&&p.consent_status!=="revoked");
     const canReview=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.respond_requests")||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));
     const canAccept=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));
-    return { ...row, participants, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative, canReview, canAccept };
+    return { ...row, participants, clarifications, meetings, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative, canReview, canAccept };
   });
 }
 export async function addNetworkPlusRequestParticipant(requestId,userId,input,requestIdHeader) {
@@ -313,6 +316,185 @@ async function workspaceAccess(db,workspaceId,userId) {
     where w.id=$1`,[workspaceId,userId])).rows[0];
   if(!ws)fail(404,"Collaboration workspace not found.","NOT_FOUND");
   return ws;
+}
+
+function contactEncryptionKey(){
+  const secret=process.env.NETWORK_PLUS_CONTACT_ENCRYPTION_KEY;
+  if(typeof secret!=="string"||secret.length<32)fail(503,"Secure contact sharing is not configured. Ask the platform administrator to configure NETWORK_PLUS_CONTACT_ENCRYPTION_KEY.","CONTACT_SHARING_NOT_CONFIGURED");
+  return createHash("sha256").update(secret).digest();
+}
+function encryptContactValue(value){
+  const iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",contactEncryptionKey(),iv);
+  const encrypted=Buffer.concat([cipher.update(value,"utf8"),cipher.final()]);
+  return [iv.toString("base64url"),cipher.getAuthTag().toString("base64url"),encrypted.toString("base64url")].join(".");
+}
+function decryptContactValue(value){
+  const [iv,tag,data]=String(value||"").split(".");
+  if(!iv||!tag||!data)fail(500,"Stored contact data is invalid.","CONTACT_DATA_INVALID");
+  const decipher=createDecipheriv("aes-256-gcm",contactEncryptionKey(),Buffer.from(iv,"base64url"));
+  decipher.setAuthTag(Buffer.from(tag,"base64url"));
+  return Buffer.concat([decipher.update(Buffer.from(data,"base64url")),decipher.final()]).toString("utf8");
+}
+function validateContactValue(field,value){
+  const v=clean(value,field==="business_location"?500:field==="website"?300:180,field.replaceAll("_"," "),2);
+  if(field==="email"&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))fail(400,"Enter a valid email address.","INVALID_CONTACT_VALUE");
+  if(["phone","whatsapp"].includes(field)&&! /^\+?[0-9 ()-]{7,30}$/.test(v))fail(400,"Enter a valid phone number including country code where possible.","INVALID_CONTACT_VALUE");
+  if(field==="website"){let url;try{url=new URL(v);}catch{fail(400,"Enter a valid HTTPS website URL.","INVALID_CONTACT_VALUE");}if(url.protocol!=="https:")fail(400,"Contact websites must use HTTPS.","INVALID_CONTACT_VALUE");}
+  return v;
+}
+async function connectionPair(db,requestId,userId,peerUserId){
+  const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
+  if(!request)fail(404,"Request not found.","NOT_FOUND");
+  if(!["accepted","in_progress","completed","closed"].includes(request.status))fail(409,"Contact and meeting handoffs are available only after recipient acceptance.","RECIPIENT_ACCEPTANCE_REQUIRED");
+  const actor=await participant(db,requestId,userId);
+  if(actor.consent_status!=="accepted")fail(403,"Accept the request invitation before sharing contact details.","PARTICIPANT_CONSENT_REQUIRED");
+  let side,peer;
+  if(userId===request.requester_user_id){
+    side="requester";peer=peerUserId||request.recipient_user_id;
+    if(!peer)fail(400,"Choose the recipient representative for this contact handoff.","RECIPIENT_REPRESENTATIVE_REQUIRED");
+  }else if(actor.participant_role==="recipient_representative"){
+    side="recipient";peer=request.requester_user_id;
+  }else fail(403,"Only the requester and an accepted recipient representative can arrange a connection handoff.","PARTICIPANT_FORBIDDEN");
+  const other=(await db.query("select participant_role,consent_status from network_plus_request_participant where request_id=$1 and user_id=$2",[requestId,peer])).rows[0];
+  if(!other||(side==="requester"&&other.participant_role!=="recipient_representative")||(side==="recipient"&&other.participant_role!=="requester")||other.consent_status!=="accepted")fail(403,"The selected connection partner has not accepted this request.","PARTICIPANT_CONSENT_REQUIRED");
+  if(side==="recipient"&&request.business_id&&!await hasBusinessAuthority(db,request.business_id,userId,"business.respond_requests")&&!await hasBusinessAuthority(db,request.business_id,userId,"business.accept_terms"))fail(403,"Your business permission does not allow contact release.","BUSINESS_AUTHORITY_REQUIRED");
+  return {request,side,peerUserId:peer};
+}
+async function contactHandoffFor(db,requestId,userId,peerUserId){
+  const {side}=await connectionPair(db,requestId,userId,peerUserId);
+  const recipientUserId=side==="requester"?peerUserId:userId;
+  const rows=(await db.query("select * from network_plus_request_contact_consent where request_id=$1 and recipient_user_id=$2 order by field_code",[requestId,recipientUserId])).rows;
+  return {requestId,fields:rows.map(row=>{
+    const released=row.requester_status==="accepted"&&row.recipient_status==="accepted";
+    const yourStatus=side==="requester"?row.requester_status:row.recipient_status;
+    const peerStatus=side==="requester"?row.recipient_status:row.requester_status;
+    const yourCipher=side==="requester"?row.requester_value_ciphertext:row.recipient_value_ciphertext;
+    const peerCipher=side==="requester"?row.recipient_value_ciphertext:row.requester_value_ciphertext;
+    return {field:row.field_code,yourStatus,peerStatus,released,yourValue:yourStatus==="accepted"&&yourCipher?decryptContactValue(yourCipher):null,sharedWithYou:released&&peerCipher?decryptContactValue(peerCipher):null};
+  })};
+}
+export async function updateNetworkPlusContactConsent(requestId,userId,input,requestIdHeader){
+  const field=input?.field,decision=input?.decision;
+  if(!CONTACT_FIELDS.has(field))fail(400,"Choose a supported contact field.","INVALID_CONTACT_FIELD");
+  if(!["accept","decline","revoke"].includes(decision))fail(400,"Choose accept, decline or revoke.","INVALID_CONSENT_DECISION");
+  return withTransaction(async db=>{
+    const pair=await connectionPair(db,requestId,userId,input?.peerUserId);
+    const value=decision==="accept"?validateContactValue(field,input?.value):null;
+    const encrypted=value?encryptContactValue(value):null;
+    const status=decision==="accept"?"accepted":decision==="decline"?"declined":"revoked";
+    const recipientUserId=pair.side==="requester"?pair.peerUserId:userId;
+    if(decision==="revoke"){
+      const exists=(await db.query("select 1 from network_plus_request_contact_consent where request_id=$1 and recipient_user_id=$2 and field_code=$3",[requestId,recipientUserId,field])).rowCount>0;
+      if(!exists)fail(404,"There is no contact consent to revoke.","CONTACT_CONSENT_NOT_FOUND");
+    }
+    if(pair.side==="requester"){
+      await db.query("insert into network_plus_request_contact_consent(request_id,recipient_user_id,field_code,requester_status,requester_value_ciphertext,requester_consented_at) values($1,$2,$3,$4,$5,case when $4='accepted' then now() end) on conflict(request_id,recipient_user_id,field_code) do update set requester_status=excluded.requester_status,requester_value_ciphertext=excluded.requester_value_ciphertext,requester_consented_at=case when excluded.requester_status='accepted' then now() else null end,updated_at=now()",[requestId,pair.peerUserId,field,status,encrypted]);
+    }else{
+      await db.query("insert into network_plus_request_contact_consent(request_id,recipient_user_id,field_code,recipient_status,recipient_value_ciphertext,recipient_consented_at) values($1,$2,$3,$4,$5,case when $4='accepted' then now() end) on conflict(request_id,recipient_user_id,field_code) do update set recipient_status=excluded.recipient_status,recipient_value_ciphertext=excluded.recipient_value_ciphertext,recipient_consented_at=case when excluded.recipient_status='accepted' then now() else null end,updated_at=now()",[requestId,pair.peerUserId,field,status,encrypted]);
+    }
+    await audit(db,requestId,userId,"request.contact_consent_"+status,null,null,requestIdHeader,{field,peerUserId:pair.peerUserId,side:pair.side});
+    const row=(await db.query("select requester_status,recipient_status from network_plus_request_contact_consent where request_id=$1 and recipient_user_id=$2 and field_code=$3",[requestId,recipientUserId,field])).rows[0];
+    const released=row.requester_status==="accepted"&&row.recipient_status==="accepted";
+    await notify(db,pair.peerUserId,released?"network_plus.request.contact_released":"network_plus.request.contact_consent",requestId,released?"Both parties consented to share a contact field. Open the private request to view the released details.":"The other participant updated a field-specific contact-sharing preference.");
+    return contactHandoffFor(db,requestId,userId,pair.peerUserId);
+  });
+}
+export async function getNetworkPlusContactHandoff(requestId,userId,peerUserId){
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    const pair=await connectionPair(db,requestId,userId,peerUserId);
+    return contactHandoffFor(db,requestId,userId,pair.peerUserId);
+  });
+}
+function validateMeeting(input){
+  const placeType=input?.placeType;
+  if(!["office","coffee","online","other"].includes(placeType))fail(400,"Choose a supported meeting place type.","INVALID_MEETING_PLACE");
+  const placeDetails=String(input?.placeDetails||"").trim();
+  if(placeDetails.length>500)fail(400,"Meeting place details must be 500 characters or fewer.","VALIDATION_ERROR");
+  const timezone=clean(input?.timezone,100,"Timezone",3);
+  try{new Intl.DateTimeFormat("en",{timeZone:timezone}).format(new Date());}catch{fail(400,"Choose a valid IANA timezone.","INVALID_TIMEZONE");}
+  const startsAt=new Date(input?.startsAt);
+  if(!Number.isFinite(startsAt.getTime())||startsAt.getTime()<Date.now()+15*60*1000||startsAt.getTime()>Date.now()+180*24*60*60*1000)fail(400,"Meeting time must be at least 15 minutes ahead and within 180 days.","INVALID_MEETING_TIME");
+  const durationMinutes=Number(input?.durationMinutes);
+  if(![15,30,45,60,90,120].includes(durationMinutes))fail(400,"Choose a supported meeting duration.","INVALID_MEETING_DURATION");
+  return {placeType,placeDetails,startsAt,timezone,durationMinutes};
+}
+export async function createNetworkPlusMeetingProposal(requestId,userId,input,requestIdHeader,idempotencyKey){
+  if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure idempotency key is required for a meeting proposal.","IDEMPOTENCY_KEY_REQUIRED");
+  const proposal=validateMeeting(input),fingerprint=hash(JSON.stringify({proposal,peerUserId:input?.peerUserId||null})),idHash=hash(idempotencyKey);
+  return withTransaction(async db=>{
+    const pair=await connectionPair(db,requestId,userId,input?.peerUserId);
+    if(!["accepted","in_progress"].includes(pair.request.status))fail(409,"A first meeting can be arranged only for an accepted or active request.","INVALID_REQUEST_STATUS");
+    await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",["network-plus-meeting:"+requestId]);
+    const replay=(await db.query("select * from network_plus_request_meeting where request_id=$1 and proposer_user_id=$2 and idempotency_hash=$3",[requestId,userId,idHash])).rows[0];
+    if(replay){if(replay.request_fingerprint!==fingerprint)fail(409,"This meeting key was already used for different details.","IDEMPOTENCY_CONFLICT");return replay;}
+    const active=(await db.query("select id from network_plus_request_meeting where request_id=$1 and status in ('proposed','countered')",[requestId])).rows[0];
+    if(active)fail(409,"A meeting proposal is already awaiting a response.","MEETING_RESPONSE_PENDING");
+    const created=(await db.query("insert into network_plus_request_meeting(request_id,proposer_user_id,responder_user_id,place_type,place_details,starts_at,timezone,duration_minutes,idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *",[requestId,userId,pair.peerUserId,proposal.placeType,proposal.placeDetails,proposal.startsAt,proposal.timezone,proposal.durationMinutes,idHash,fingerprint])).rows[0];
+    await audit(db,requestId,userId,"request.meeting_proposed",pair.request.status,pair.request.status,requestIdHeader,{meetingId:created.id,placeType:proposal.placeType,startsAt:proposal.startsAt,timezone:proposal.timezone,durationMinutes:proposal.durationMinutes});
+    await notify(db,pair.peerUserId,"network_plus.request.meeting_proposed",requestId,"A participant proposed a first meeting. Review the private request to accept, suggest another time or decline.");
+    return created;
+  });
+}
+export async function respondNetworkPlusMeeting(requestId,meetingId,userId,input,requestIdHeader){
+  const decision=input?.decision;
+  if(!["accept","counter","decline"].includes(decision))fail(400,"Choose accept, suggest another time or decline.","INVALID_MEETING_DECISION");
+  const counter=decision==="counter"?validateMeeting(input):null;
+  return withTransaction(async db=>{
+    const meeting=(await db.query("select * from network_plus_request_meeting where id=$1 and request_id=$2 for update",[meetingId,requestId])).rows[0];
+    if(!meeting)fail(404,"Meeting proposal not found.","NOT_FOUND");
+    const peerUserId=userId===meeting.proposer_user_id?meeting.responder_user_id:meeting.proposer_user_id;
+    const pair=await connectionPair(db,requestId,userId,peerUserId);
+    const isResponder=userId===meeting.responder_user_id,isProposer=userId===meeting.proposer_user_id;
+    if(meeting.status==="proposed"&&!isResponder)fail(403,"Only the invited participant can respond to this meeting proposal.","MEETING_RESPONDER_REQUIRED");
+    if(meeting.status==="countered"&&!isProposer)fail(403,"Only the original proposer can respond to the counterproposal.","MEETING_PROPOSER_REQUIRED");
+    if(!["proposed","countered"].includes(meeting.status))fail(409,"This meeting proposal has already been resolved.","MEETING_ALREADY_RESOLVED");
+    if(decision==="counter"){
+      if(meeting.status!=="proposed")fail(409,"Only one counterproposal is allowed for this meeting handoff.","MEETING_COUNTER_LIMIT");
+      await db.query("update network_plus_request_meeting set status='countered',counter_place_type=$1,counter_place_details=$2,counter_starts_at=$3,counter_timezone=$4,counter_duration_minutes=$5,responded_by=$6,responded_at=now(),updated_at=now() where id=$7",[counter.placeType,counter.placeDetails,counter.startsAt,counter.timezone,counter.durationMinutes,userId,meetingId]);
+    }else if(decision==="accept"){
+      const accepted=meeting.status==="countered"?{placeType:meeting.counter_place_type,placeDetails:meeting.counter_place_details,startsAt:meeting.counter_starts_at,timezone:meeting.counter_timezone,durationMinutes:meeting.counter_duration_minutes}:{placeType:meeting.place_type,placeDetails:meeting.place_details,startsAt:meeting.starts_at,timezone:meeting.timezone,durationMinutes:meeting.duration_minutes};
+      await db.query("update network_plus_request_meeting set status='confirmed',confirmed_place_type=$1,confirmed_place_details=$2,confirmed_starts_at=$3,confirmed_timezone=$4,confirmed_duration_minutes=$5,confirmed_by=$6,confirmed_at=now(),responded_by=$6,responded_at=now(),updated_at=now() where id=$7",[accepted.placeType,accepted.placeDetails,accepted.startsAt,accepted.timezone,accepted.durationMinutes,userId,meetingId]);
+    }else{
+      await db.query("update network_plus_request_meeting set status='declined',responded_by=$1,responded_at=now(),updated_at=now() where id=$2",[userId,meetingId]);
+    }
+    await audit(db,requestId,userId,"request.meeting_"+(decision==="counter"?"countered":decision==="accept"?"confirmed":"declined"),pair.request.status,pair.request.status,requestIdHeader,{meetingId,decision});
+    await notify(db,peerUserId,"network_plus.request.meeting_"+(decision==="counter"?"countered":decision==="accept"?"confirmed":"declined"),requestId,decision==="counter"?"A participant suggested another meeting time.":decision==="accept"?"The first meeting has been mutually confirmed.":"A meeting proposal was declined.");
+    return (await db.query("select * from network_plus_request_meeting where id=$1",[meetingId])).rows[0];
+  });
+}
+const CLARIFICATION_PROMPTS=new Set(["scope","budget","timeline","quantity","location","availability","eligibility","other"]);
+export async function askNetworkPlusClarification(requestId,userId,input,requestIdHeader){
+  const promptCode=input?.promptCode,question=clean(input?.question,1200,"Clarification question",3);
+  if(!CLARIFICATION_PROMPTS.has(promptCode))fail(400,"Choose a structured clarification topic.","INVALID_CLARIFICATION_TOPIC");
+  return withTransaction(async db=>{
+    const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
+    if(!request)fail(404,"Request not found.","NOT_FOUND");
+    if(!["submitted","under_review"].includes(request.status))fail(409,"Clarification can be requested only while a request is awaiting recipient review.","INVALID_REQUEST_STATUS");
+    const actor=await participant(db,requestId,userId);
+    if(actor.participant_role!=="recipient_representative"||actor.consent_status!=="accepted")fail(403,"Only an accepted recipient representative can request clarification.","RECIPIENT_ONLY");
+    if(request.business_id&&!await hasBusinessAuthority(db,request.business_id,userId,"business.respond_requests"))fail(403,"Your business permission does not allow responding to requests.","BUSINESS_AUTHORITY_REQUIRED");
+    const clarification=(await db.query("insert into network_plus_request_clarification(request_id,asked_by,prompt_code,question) values($1,$2,$3,$4) returning *",[requestId,userId,promptCode,question])).rows[0];
+    await db.query("update network_plus_request set status='clarification_requested',version=version+1,updated_at=now() where id=$1",[requestId]);
+    await audit(db,requestId,userId,"request.clarification_requested",request.status,"clarification_requested",requestIdHeader,{clarificationId:clarification.id,promptCode});
+    await notify(db,request.requester_user_id,"network_plus.request.clarification_requested",requestId,"The recipient asked for a clarification. Open the private request to respond.");
+    return clarification;
+  });
+}
+export async function answerNetworkPlusClarification(requestId,clarificationId,userId,input,requestIdHeader){
+  const answer=clean(input?.answer,2000,"Clarification response",3);
+  return withTransaction(async db=>{
+    const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
+    if(!request)fail(404,"Request not found.","NOT_FOUND");
+    if(request.requester_user_id!==userId||request.status!=="clarification_requested")fail(403,"Only the requester can answer an open clarification.","REQUESTER_ONLY");
+    const clarification=(await db.query("update network_plus_request_clarification set answer=$1,answered_by=$2,status='answered',answered_at=now(),updated_at=now() where id=$3 and request_id=$4 and status='open' returning *",[answer,userId,clarificationId,requestId])).rows[0];
+    if(!clarification)fail(404,"Open clarification not found.","CLARIFICATION_NOT_FOUND");
+    await db.query("update network_plus_request set status='submitted',version=version+1,updated_at=now() where id=$1",[requestId]);
+    await audit(db,requestId,userId,"request.clarification_answered","clarification_requested","submitted",requestIdHeader,{clarificationId});
+    const recipients=(await db.query("select user_id from network_plus_request_participant where request_id=$1 and participant_role='recipient_representative' and consent_status<>'revoked'",[requestId])).rows;
+    for(const recipient of recipients)await notify(db,recipient.user_id,"network_plus.request.clarification_answered",requestId,"The requester answered your clarification. Review the updated request.");
+    return clarification;
+  });
 }
 export async function createNetworkPlusWorkspace(requestId,userId,requestIdHeader) {
   return withTransaction(async db=>{

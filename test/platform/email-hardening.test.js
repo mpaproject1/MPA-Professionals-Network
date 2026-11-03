@@ -55,3 +55,22 @@ test("recipient-hold management is exposed only through authenticated system-adm
   assert.match(source, /api\/v1\/admin\/email\/recipient-holds/);
   assert.match(source, /anyRole\(identity,\["system_admin"\]\)/);
 });
+
+test("Test Lab capture applies the same recipient and template safeguards without external delivery", async () => {
+  const source = await read("../../src/platform/email-operations.js");
+  const capture = source.slice(source.indexOf('if(process.env.TEST_DELIVERY_MODE==="capture"'), source.indexOf('if(!providerConfig().ready)'));
+  assert.match(capture, /for update of o skip locked/i);
+  assert.match(capture, /recipientMatchesAudience/);
+  assert.match(capture, /email_recipient_suppression/);
+  assert.match(capture, /delivery_status='captured'/);
+  assert.doesNotMatch(capture, /fetch\(/);
+});
+
+test("the migration rollback check is included in the repository compatibility script", async () => {
+  const packageJson = JSON.parse(await read("../../package.json"));
+  assert.match(packageJson.scripts["check:migrations:rollback"], /check-email-migration-compatibility\.js/);
+  const checker = await read("../../scripts/check-email-migration-compatibility.js");
+  assert.match(checker, /MIGRATION_CHECK_EXPECTED_DATABASE/);
+  assert.match(checker, /MIGRATION_CHECK_ALLOW_ROLLBACK/);
+  assert.match(checker, /rollback/);
+});

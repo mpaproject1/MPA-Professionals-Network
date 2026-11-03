@@ -44,7 +44,7 @@ try{
   to_regclass('public.email_delivery_event') is not null has_events,
   to_regclass('public.email_recipient_suppression') is not null has_holds,
   to_regclass('public.email_template_version') is not null has_versions`)).rows[0];
- for(const key of ["has_event_key","has_events","has_holds","has_versions"])if(Boolean(restored[key])!==Boolean(before[key]))throw new Error("Email migration rollback did not restore the original disposable schema baseline: "+key);
+ for(const key of ["has_verification_capture","has_event_key","has_events","has_holds","has_versions"])if(Boolean(restored[key])!==Boolean(before[key]))throw new Error("Email migration rollback did not restore the original disposable schema baseline: "+key);
  const templateCoverageAfter=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count);
  if(templateCoverageAfter!==templateCoverageBefore)throw new Error("Email template coverage migration rollback did not restore the original template baseline.");
  process.stdout.write("Email hardening migration apply/rollback compatibility passed.\n");

@@ -91,6 +91,8 @@ export default function NetworkPlusRequestsPage(){
   catch(e){setError(e instanceof ApiError?e.message:"This request could not be opened.");}
  },[token]);
  useEffect(()=>{void load();},[load]);
+ useEffect(()=>{const syncRequestFromUrl=()=>{const id=new URLSearchParams(window.location.search).get("requestId");setSelectedId(id||"");};syncRequestFromUrl();window.addEventListener("popstate",syncRequestFromUrl);return()=>window.removeEventListener("popstate",syncRequestFromUrl);},[]);
+ useEffect(()=>{if(!selectedId)return;const url=new URL(window.location.href);if(url.searchParams.get("requestId")!==selectedId){url.searchParams.set("requestId",selectedId);window.history.pushState({},"",url);}},[selectedId]);
  useEffect(()=>{if(!token)return;Promise.all([api<{items:BusinessChoice[]}>("/api/v1/network-plus/businesses?limit=50",{},token),api<{items:ServiceChoice[]}>("/api/v1/network-plus/services?limit=50",{},token)]).then(([businesses,services])=>{setBusinessChoices(businesses.items||[]);setServiceChoices(services.items||[]);}).catch(()=>{});},[token]);
  useEffect(()=>{if(selectedId)void loadDetail(selectedId);else {setSelected(null);setWorkspaceData(null);}},[selectedId,loadDetail]);
  useEffect(()=>{if(selected?.workspace&&token)void api<any>("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/workspace",{},token).then(setWorkspaceData).catch(()=>setWorkspaceData(null));else setWorkspaceData(null);},[selected?.id,selected?.workspace?.id,token]);

@@ -3,7 +3,7 @@
 **Repository:** `mpaproject1/MPA-Professionals-Network`  
 **Branch:** `feat/workstream-3-progress-members-workspace`  
 **PR:** #18  
-**Status:** Revised product requirements and architecture plan. Planning only; no feature implementation, migration, merge or deployment is authorized.
+**Status:** Revised product requirements and architecture plan. Phase 0 contract-alignment changes are implemented on this branch; Phase 1 and later feature work remain separate. No production migration, merge or deployment is authorized.
 
 ## 1. Product mandate
 
@@ -574,6 +574,8 @@ The UI/UX is acceptable only when:
 - Produce compact schema/state/permission map and regression plan.
 
 **Exit:** one canonical business/listing model and one connection-request foundation, with no duplicate entities or contradictory intent contracts.
+
+**Phase 0 implementation record:** [docs/71-network-plus-phase-0-alignment-audit.md](71-network-plus-phase-0-alignment-audit.md) — schema/state/permission map and regression plan. The seven-intent correction and optional-workspace behavior are implemented; automated CI/database/browser gates must still pass before this PR is ready.
 
 ### Phase 1 — Needs and Offers directory
 - Implement taxonomy with progressive, category-specific fields and the professional opportunity-mall discovery experience.

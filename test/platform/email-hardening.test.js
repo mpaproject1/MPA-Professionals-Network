@@ -1,9 +1,9 @@
-import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import test from "node:test";
 import { decryptVerificationToken, encryptVerificationToken } from "../../src/platform/email-verification-crypto.js";
+import { readFile } from "node:fs/promises";
 import { verifyResendWebhookSignature } from "../../src/platform/email-operations.js";
+import assert from "node:assert/strict";
+import test from "node:test";
 
 const read = relative => readFile(new URL(relative, import.meta.url), "utf8");
 

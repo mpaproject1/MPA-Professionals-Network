@@ -125,7 +125,7 @@ test.describe("Network-Plus request and collaboration journey",()=>{
 
   test("accepted lightweight requests show consent and meeting handoff controls",async({page})=>{
     await mockSession(page);
-    const accepted={...draft,intent:"meeting_request",status:"accepted",isRequester:true,recipient_user_id:"recipient-1",participants:[
+    const accepted={...draft,intent:"meeting_request",status:"accepted",isRequester:true,canHandoff:true,recipient_user_id:"recipient-1",participants:[
       {user_id:"requester-1",participant_role:"requester",consent_status:"accepted"},
       {user_id:"recipient-1",participant_role:"recipient_representative",consent_status:"accepted"},
     ],meetings:[],clarifications:[]};

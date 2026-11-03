@@ -57,10 +57,12 @@ The authoritative feature contract remains in document 73. This handoff records 
    - Added integration assertions for one-time question response and a Playwright case for recipient answer.
    - Updated the listing-scoped quotation wizard Playwright flow to traverse all four steps.
 
-### Last directly inspected code commit
-`9a978d52c93fcaed7c29d0e0e5490ede28052cf7` — revalidate requester membership and recipient business/organization authority before contact and meeting handoffs.
+### Last directly inspected implementation snapshot
 
-A subsequent source-file snapshot was fetched from the target branch for the Phase 2 specification, main plan, migration, service, request UI, integration/source tests, Playwright test and package manifest. Do not assume the commit above is the branch HEAD: confirm the current branch head before making further edits.
+- `9a978d52c93fcaed7c29d0e0e5490ede28052cf7` remains the last code commit from the original handoff.
+- Source-level corrections and regression additions were subsequently committed to PR #18, with the Phase 2 audit recorded in document 73.
+- The documentation snapshot at the start of this addendum was `0bc7390d124448c7ef3ab5ee46e9b86898d6de02`; it records the source state through `b8b92cbda9b57680e3b2481314561a2c995cccf7`.
+- Always fetch PR #18 metadata again before editing; documentation commits may have advanced the branch since this snapshot.
 
 ## 3. Remaining work — Phase 2 is not yet closed
 
@@ -117,3 +119,41 @@ Keep PR #18 in draft until every mandatory gate above has actual recorded result
 ## 6. Next-chat instruction (copy/paste)
 
 Continue Network-Plus Phase 2 on the existing PR #18 branch `feat/workstream-3-progress-members-workspace` in `mpaproject1/MPA-Professionals-Network`. First inspect the current branch HEAD and all changes since commit `9a978d52c93fcaed7c29d0e0e5490ede28052cf7`. Read `docs/73-network-plus-phase-2-connection-consent-handoff.md` and this continuation record `docs/74-network-plus-phase2-progress-and-next-chat-handoff.md`. Do not assume Phase 2 is complete: finish the outstanding PostgreSQL migration/rollback, authorization/privacy, encryption, notification, timezone/DST, Playwright, backend, Biome, TypeScript, production-build and GitHub Actions validation gates. Fix all real failures without weakening checks, preserve the canonical request model, keep collaboration optional, do not introduce chat/commerce behavior, keep PR #18 draft, and record actual test/CI evidence in document 73 before proceeding to Phase 3.
+
+
+## 7. Continuation update — 2026-11-03
+
+### Current source work recorded
+
+The following Phase 2 corrections are now in the branch and documented in document 73:
+
+1. Fixed the migration compatibility script's missing comma, which was a JavaScript parse failure.
+2. Revalidated the current recipient representative before structured clarification and one-time question answers; organization representatives must still be active verified owners/administrators.
+3. Made request-detail `canReview` and `canAccept` flags reflect current recipient authority instead of stale participant rows.
+4. Added an all-or-none database invariant for `recipient_response`, `recipient_response_by` and `recipient_response_at`, restricted to question intents.
+5. Added Phase 2 columns and consent primary-key assertions to migration compatibility checks.
+6. Added exact before/after rollback snapshots for Phase 2 tables, columns, constraints and indexes.
+7. Bound AES-GCM contact ciphertext to request/recipient/field AAD and added authenticated versioned envelopes.
+8. Added a transactionally safe contact-key rotation utility, explicit package command and source regression test.
+9. Rejected nonexistent and repeated local meeting times around DST changes; added a browser regression scenario for both.
+10. Included the Network-Plus request journey in the selected PR Quality browser acceptance list.
+
+### Current verification boundary
+
+- Source changes and regression tests have been committed.
+- The migration compatibility runner has not been executed against disposable PostgreSQL.
+- Backend, Playwright, Biome, TypeScript and production-build checks have not been executed in this continuation.
+- No successful CI result or deployed encryption-key verification is claimed.
+- No Phase 3 implementation has started. The Phase 3 contract in document 70 is My Requests and closure disposition, and remains gated on Phase 2 exit evidence.
+
+### Next execution order
+
+1. Fetch current PR #18 metadata and branch HEAD; keep the PR draft.
+2. Inspect the final source diff and validate all changed JavaScript/SQL/TSX for consistency.
+3. Run the focused Network-Plus tests and source checks.
+4. Apply the full migration chain to a disposable PostgreSQL database; execute the Phase 2 migration replay/rollback compatibility harness and inspect the restored schema.
+5. Run backend integration coverage for current representative authority, support/additional-participant privacy, consent/revocation, encryption authentication, notifications and meeting lifecycle.
+6. Run focused and full Playwright coverage, including the DST gap/fold cases, mobile and keyboard navigation.
+7. Run Biome, TypeScript and production build. Fix actual failures without weakening checks.
+8. Inspect GitHub Actions for the exact final source head and record real results in document 73.
+9. Only after Phase 2 is verified complete, implement Phase 3 from document 70: compact My Requests shelf, requester disposition In progress / Completed / Cancelled, required short closure remark, review reminders, reopen history, decline/withdrawal, and explicit separation of observed events from requester-reported outcomes. Preserve the canonical request model; do not add CRM/deal/transaction tracking, chat or mandatory collaboration.

@@ -133,12 +133,16 @@ export async function createTestPortfolio(identity,input={},requestId=null){
     values($1,'new',$2,$3,case when $3='draft' then null else now() end,case when $3 in ('correction_required','payment_pending') then now() else null end,case when $3='payment_pending' then now() else null end,$4,$5) returning id`,
     [account.userId,basicProduct.id,status,{synthetic:true,testPortfolioId:portfolioId,persona:account.persona},{productCode:"BASIC",amount:Number(basicProduct.price),currency:basicProduct.currency}])).rows[0];
    applicationIds.push(application.id);
+   await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'membership_application',$2)",[portfolioId,application.id]);
    if(status==="correction_required"){
-    await tx.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,'correction_required','Synthetic QA correction request.',$3)",[application.id,reviewerAccount.userId,[{field:"professionalProfile",status:"incomplete"}]]);
-    await tx.query("insert into membership_correction(application_id,requested_by,status,requested_fields,reviewer_note) values($1,$2,'open',$3,'Please complete the synthetic profile fields for this QA case.')",[application.id,reviewerAccount.userId,["professionalProfile"]]);
+    const review=(await tx.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,'correction_required','Synthetic QA correction request.',$3) returning id",[application.id,reviewerAccount.userId,[{field:"professionalProfile",status:"incomplete"}]])).rows[0];
+    await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'membership_application_review',$2)",[portfolioId,review.id]);
+    const correction=(await tx.query("insert into membership_correction(application_id,requested_by,status,requested_fields,reviewer_note) values($1,$2,'open',$3,'Please complete the synthetic profile fields for this QA case.') returning id",[application.id,reviewerAccount.userId,["professionalProfile"]])).rows[0];
+    await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'membership_correction',$2)",[portfolioId,correction.id]);
    }
    if(status==="payment_pending"){
-    await tx.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,'approved','Synthetic QA approval; payment remains pending.',$3)",[application.id,reviewerAccount.userId,[{field:"application",status:"approved"}]]);
+    const review=(await tx.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,'approved','Synthetic QA approval; payment remains pending.',$3) returning id",[application.id,reviewerAccount.userId,[{field:"application",status:"approved"}]])).rows[0];
+    await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'membership_application_review',$2)",[portfolioId,review.id]);
     const payment=(await tx.query(`insert into payment_transaction(provider,provider_transaction_id,idempotency_key,purpose,amount,currency,status,request_payload,response_payload)
      values('test-simulator',$1,$2,'test_lab_simulation',$3,$4,'pending',$5,$6) returning id`,
      [`QA-${prefix}-MEMBERSHIP-PAYMENT`,`test-lab:${portfolioId}:membership-payment`,Number(basicProduct.price),basicProduct.currency,{testPortfolioId:portfolioId,applicationId:application.id,simulated:true},{captured:true,noExternalProvider:true}])).rows[0];

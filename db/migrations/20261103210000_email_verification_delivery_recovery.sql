@@ -37,3 +37,6 @@ alter table email_verification_delivery
   add column if not exists provider_delivery_status text
     check (provider_delivery_status is null or provider_delivery_status in ('delivered','bounced','complained','failed')),
   add column if not exists delivery_event_at timestamptz;
+
+-- Verification is a system-managed security message and cannot be restricted by audience.
+update email_notification_template set audience='all' where template_code='account.email_verification';

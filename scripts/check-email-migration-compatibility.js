@@ -39,8 +39,21 @@ try{
  await client.query(templateSql);
  await client.query(verificationSql);
  await client.query(workflowTemplateSql);
- const invalidWorkflowAudiences=await client.query("select template_code,audience from email_notification_template where template_code=any($1::text[]) and audience not in ('professional','employer','mentor','organization_representative')",[["professional.workflow_update","employer.candidate_update","employer.offer_approval_required","employer.interview_scheduled","employer.interview_response","mentor.mentorship_update","organization.membership_added","organization.membership_updated"]]);
- if(invalidWorkflowAudiences.rowCount)throw new Error("Existing workflow templates have invalid recipient audiences.");
+ const invalidWorkflowAudiences=await client.query(`with expected(template_code,audience) as (values
+  ('professional.workflow_update','professional'),
+  ('employer.candidate_update','employer'),
+  ('employer.offer_approval_required','employer'),
+  ('employer.interview_scheduled','employer'),
+  ('employer.interview_response','employer'),
+  ('mentor.mentorship_update','mentor'),
+  ('organization.membership_added','all'),
+  ('organization.membership_updated','all')
+ )
+ select e.template_code,t.audience actual_audience,e.audience expected_audience
+ from expected e
+ left join email_notification_template t using(template_code)
+ where t.template_code is null or t.audience is distinct from e.audience`);
+ if(invalidWorkflowAudiences.rowCount)throw new Error("Workflow email templates have missing or incorrect recipient audiences: "+JSON.stringify(invalidWorkflowAudiences.rows));
  const templateCoverage=(await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count;
  if(templateCoverage!==3)throw new Error("Organization email audience templates were not seeded.");
  const verificationAfter=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, exists(select 1 from information_schema.columns where table_schema='public' and table_name='email_delivery_event' and column_name='verification_delivery_id') event_link, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];

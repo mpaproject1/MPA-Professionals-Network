@@ -162,6 +162,15 @@ test("membership dashboard aggregates and monthly trend are available only throu
       assert.ok(Number.isFinite(Number(row.Activated)));
     }
 
+    const cohorts = await runReport(reviewer, "membership-application-cohorts", { from: "2020-01-01", to: new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date()) }, randomUUID());
+    assert.equal(cohorts.report.id, "membership-application-cohorts");
+    for (const row of cohorts.rows) {
+      assert.match(String(row["Cohort month"]), /^\\d{4}-\\d{2}$/);
+      for (const key of ["Applications", "Mature 30-day cohort", "Activated within 30 days", "Mature 90-day cohort", "Activated within 90 days"]) assert.ok(Number.isFinite(Number(row[key])), key);
+      assert.ok(Number(row["Activated within 30 days"]) <= Number(row["Mature 30-day cohort"]));
+      assert.ok(Number(row["Activated within 90 days"]) <= Number(row["Mature 90-day cohort"]));
+    }
+
     const aging = await runReport(reviewer, "membership-application-aging", { from: "2000-01-01", to: new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date()), status: "submitted", q: "no-such-application-" + randomUUID() }, requestIds[2]);
     assert.equal(aging.filters.status, "submitted");
     assert.ok(Array.isArray(aging.rows));

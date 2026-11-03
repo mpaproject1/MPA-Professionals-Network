@@ -71,6 +71,8 @@ test("Test Lab never stores recoverable credentials and gates every operation on
  assert.match(service,/TEST_LAB_DISPOSABLE_DATABASE==="true"/);
  assert.match(service,/hashPassword\(account\.password\)/);
  assert.match(service,/sessionsRevoked:true/);
+ assert.match(service,/credentialsWorkbookBase64/);
+ assert.match(service,/accounts\.map\(\(\{userId,password/);
  assert.match(admin,/Delete entire test portfolio/);
  assert.match(admin,/method:"POST"/);
 });

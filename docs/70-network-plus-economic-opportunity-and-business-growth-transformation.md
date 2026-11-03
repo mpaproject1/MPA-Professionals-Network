@@ -654,3 +654,19 @@ Phase 2 extends the canonical `network_plus_request` foundation with four lightw
 The implementation also closes Phase 1 integration gaps: product profiles now accept the four discovery-only connection intents without enabling commerce, listing detail cards expose contextual icon-led actions, paused/unavailable listings remain protected by the request service, and meeting location fields reject contact details or meeting links.
 
 See [docs/73-network-plus-phase-2-connection-consent-handoff.md](73-network-plus-phase-2-connection-consent-handoff.md) for schema, routes, privacy rules, encryption configuration and regression plan. Source-level implementation is recorded; disposable PostgreSQL migration execution, full test suites, CI and deployed encryption-key configuration remain to be verified.
+
+
+## Phase 3 implementation record — My Requests and closure disposition
+
+Phase 3 source implementation has started on PR #18 and reuses the canonical `network_plus_request` record.
+
+- The requester-owned My Requests shelf separates initiated requests from the incoming Requests received list. It supports All, Awaiting response, In progress, Completed and Cancelled filters, and compact cards show the other party, request intent/lifecycle status, last requester remark, update date and next review due date.
+- Every requester's disposition is stored separately from the platform-observed lifecycle status. The only requester dispositions are `in_progress`, `completed` and `cancelled`.
+- Completed and Cancelled require a 5–500 character remark. Reopening a closed disposition requires a new explanatory remark; each update/reopen is retained in the immutable canonical request event history.
+- Requester-reported disposition, remarks and reminder history are hidden from recipients and additional participants. They are visible only to the requester; the platform lifecycle status remains visible to the authorized request participants.
+- Recipient withdrawal after acceptance is represented as the distinct platform-observed `recipient_withdrawn` lifecycle status, requires a recipient-side reason, is audited/notified and closes any optional collaboration workspace. Recipient decline remains the existing `declined` status; requester withdrawal remains `withdrawn`.
+- A seven-day review due date is set when a request is submitted. The idempotent batch dispatcher sends a privacy-safe in-app reminder and advances the next review date by seven days, using row locks with `SKIP LOCKED` to avoid duplicate concurrent delivery. The command is `npm run network-plus:dispatch-review-reminders`.
+
+**Operational scheduling:** the repository command must be run daily by the hosting scheduler (for example, cPanel Cron Jobs) using the app's normal database environment. Suggested cadence is once daily; each due request is only reminded once per seven-day interval. This source change does not create a hosting cron entry, configure production secrets, deploy code or alter a production database.
+
+**Validation boundary:** migration, integration and Playwright regression cases have been authored, but they have not been executed in this continuation. Phase 2 CI was explicitly waived by the user for this continuation; that waiver is not a passing CI result. Keep PR #18 draft and do not claim release readiness until the complete current-head migration, backend, lint, type, build and browser gates are run.

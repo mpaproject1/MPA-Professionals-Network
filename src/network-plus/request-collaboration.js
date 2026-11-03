@@ -332,10 +332,12 @@ function encryptContactValue(value,context){
   return ["v1",iv.toString("base64url"),cipher.getAuthTag().toString("base64url"),encrypted.toString("base64url")].join(".");
 }
 function decryptContactValue(value,context){
-  const [version,iv,tag,data]=String(value||"").split(".");
-  if(version!=="v1"||!iv||!tag||!data)fail(500,"Stored contact data is invalid or uses an unsupported encryption version.","CONTACT_DATA_INVALID");
+  const parts=String(value||"").split(".");
+  const legacy=parts.length===3;
+  const [version,iv,tag,data]=legacy?["legacy",...parts]:parts;
+  if((!legacy&&version!=="v1")||!iv||!tag||!data)fail(500,"Stored contact data is invalid or uses an unsupported encryption version.","CONTACT_DATA_INVALID");
   const decipher=createDecipheriv("aes-256-gcm",contactEncryptionKey(),Buffer.from(iv,"base64url"));
-  decipher.setAAD(Buffer.from(context,"utf8"));
+  if(!legacy)decipher.setAAD(Buffer.from(context,"utf8"));
   decipher.setAuthTag(Buffer.from(tag,"base64url"));
   try{return Buffer.concat([decipher.update(Buffer.from(data,"base64url")),decipher.final()]).toString("utf8");}
   catch{fail(500,"Stored contact data could not be authenticated. Ask the platform administrator to verify the encryption key.","CONTACT_DATA_AUTHENTICATION_FAILED");}

@@ -58,6 +58,11 @@ export async function deliverEmailVerification(message) {
   const render = (source, html=false) => String(source || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_,key) => { const value=String(vars[key] ?? ""); return html ? value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;") : value; });
   const emailSubject = template ? render(template.subject_template) : "Verify your MPA Professionals Network email";
   const emailText = template ? render(template.text_template) : `Verify your email to activate your MPA Professionals Network account. This link expires in 24 hours. Registration reference: ${message.registrationReference}. Link: ${message.verificationUrl}`;
+  const hold=(await getPool().query("select reason from email_recipient_suppression where email_normalized=lower(trim($1)) and cleared_at is null limit 1",[message.email])).rows[0];
+  if(hold){
+    await getPool().query("update email_verification_token set delivery_attempted_at=now(),delivery_status='failed',delivery_error_code='RECIPIENT_SUPPRESSED' where token_hash=$1 and consumed_at is null",[sha256(message.token)]);
+    return {sent:false,suppressed:true};
+  }
   const emailHtml = renderVerificationEmail({
     subject: emailSubject,
     textBody: emailText,

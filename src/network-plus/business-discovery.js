@@ -672,7 +672,7 @@ export async function listBusinessModerationQueue(userId,filters={}) {
 export async function listProfessionalServiceModerationQueue(userId,filters={}) {
   const db=await assertReviewer(userId,LISTING_REVIEW_ROLES,"business.moderate","Independent business-listing moderation authority is required.");
   const {limit,offset}=queueBounds(filters);
-  const result=await db.query(`select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.description,s.service_category,
+  const result=await db.query(`select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.description,s.service_category category_code,s.subcategory_code,s.listing_kind,s.structured_attributes,
     s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.status,s.created_at
     from network_plus_service_listing s join network_plus_business b on b.id=s.business_id
     where s.status='pending_review' order by s.updated_at asc limit $1 offset $2`,[limit,offset]);

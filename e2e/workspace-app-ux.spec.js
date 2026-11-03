@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 async function dismissPrivacyChoices(page) {
   const rejectOptional = page.getByRole("button", { name: "Reject optional" });
+  await rejectOptional.waitFor({ state: "visible", timeout: 2000 }).catch(() => {});
   if (await rejectOptional.isVisible().catch(() => false)) await rejectOptional.click();
 }
 

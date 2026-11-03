@@ -34,7 +34,7 @@ function providerConfig(){
  let webhookValid=false;
  try{webhookValid=new URL(endpoint).protocol==="https:";}catch{}
  const provider=resendConfigured?"resend":webhookConfigured?"signed-webhook":"not-configured";
- return {provider,ready:Boolean(publicValid&&(resendConfigured||(webhookConfigured&&webhookValid))),publicUrl,fromConfigured:Boolean(from),apiKeyConfigured:Boolean(apiKey),webhookConfigured, inboundConfigured:Boolean(clean(process.env.EMAIL_INBOUND_WEBHOOK_SECRET)),environment,sender:from?from:null};
+ return {provider,ready:Boolean((publicValid&&(resendConfigured||(webhookConfigured&&webhookValid)))||(environment!=="production"&&process.env.TEST_DELIVERY_MODE==="capture")),publicUrl,fromConfigured:Boolean(from),apiKeyConfigured:Boolean(apiKey),webhookConfigured, inboundConfigured:Boolean(clean(process.env.EMAIL_INBOUND_WEBHOOK_SECRET)),environment,sender:from?from:null};
 }
 export async function queueEmailNotification(db,userId,templateCode,variables={},resourceType="workflow",resourceId=null){
  const user=(await db.query("select u.email,coalesce(np.email_enabled,true) email_enabled from app_user u left join notification_preference np on np.user_id=u.id where u.id=$1",[userId])).rows[0];
@@ -231,14 +231,14 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
 }
 export async function retryVerificationEmail(actorId,id,requestId){
  const db=getPool();await requireAdmin(db,actorId);
- if(!providerConfig().ready)fail(503,"Configure the email provider before retrying verification messages.","EMAIL_DELIVERY_NOT_CONFIGURED");
+ if(!providerConfig().ready&&!(process.env.NODE_ENV!=="production"&&process.env.TEST_DELIVERY_MODE==="capture"))fail(503,"Configure the email provider or enable safe development capture before retrying verification messages.","EMAIL_DELIVERY_NOT_CONFIGURED");
  const row=(await db.query("select u.email from email_verification_token t join app_user u on u.id=t.user_id where t.id=$1 and t.delivery_status='failed' and t.consumed_at is null",[id])).rows[0];
  if(!row)fail(409,"Only unconsumed verification messages with a recorded delivery failure can be retried.","INVALID_STATE");
  const result=await resendEmailVerification(row.email,requestId);
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.verification.retry_requested','email_verification_token',$2,$3,'success',$4)",[actorId,id,requestId,{attemptRequested:Boolean(result.accepted)}]);
  return {requested:Boolean(result.accepted)};
 }
-export async function retryFailedEmail(actorId,id){
+export async function retryFailedEmail(actorId,id,requestId=null){
  const db=getPool();await requireAdmin(db,actorId);
  if(!providerConfig().ready)fail(503,"Configure the email provider before retrying failed messages.","EMAIL_DELIVERY_NOT_CONFIGURED");
  const row=(await db.query("update notification_outbox set status='pending',delivery_status='queued',attempts=0,next_attempt_at=now(),last_error=null,delivery_error_code=null,delivery_event_type=null,delivery_event_at=null,updated_at=now() where id=$1 and channel='email' and (status='failed' or delivery_status in ('failed','bounced')) returning id,recipient")).rows[0];

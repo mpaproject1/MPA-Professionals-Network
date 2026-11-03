@@ -202,7 +202,7 @@ async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,pay
   const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${clean(process.env.RESEND_API_KEY)}`,...(stableIdempotencyKey?{"Idempotency-Key":stableIdempotencyKey}:{})},body:JSON.stringify({from:clean(process.env.EMAIL_FROM),to:[recipient],subject,text:textBody||"",html:htmlBody||undefined}),signal:AbortSignal.timeout(10000)});
   const result=await response.json().catch(()=>({}));
   if(!response.ok)throw Object.assign(new Error(`Resend rejected the message (HTTP ${response.status}).`),{code:`RESEND_HTTP_${response.status}`});
-  return {providerMessageId:result.id||null};
+  return {provider:"resend",providerMessageId:result.id||null};
  }
  const endpoint=clean(process.env.EMAIL_DELIVERY_WEBHOOK_URL),secret=clean(process.env.EMAIL_DELIVERY_WEBHOOK_SECRET);
  const body=JSON.stringify({to:recipient,subject,text:textBody||"",html:htmlBody||"",template:templateCode||"manual",idempotencyKey:stableIdempotencyKey||undefined,payload:payload||{}});
@@ -210,7 +210,7 @@ async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,pay
  const response=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${secret}`,"x-mpa-payload-signature":signature},body,signal:AbortSignal.timeout(10000)});
  if(!response.ok)throw Object.assign(new Error(`Email delivery webhook rejected the message (HTTP ${response.status}).`),{code:`DELIVERY_HTTP_${response.status}`});
  const result=await response.json().catch(()=>({}));
- return {providerMessageId:result.messageId||result.id||null};
+ return {provider:"signed-webhook",providerMessageId:result.messageId||result.id||null};
 }
 export async function queueEmailDraft(actorId,draftId,requestId){
  const db=getPool();await requireAdmin(db,actorId);

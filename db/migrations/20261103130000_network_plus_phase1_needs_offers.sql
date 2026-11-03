@@ -74,7 +74,7 @@ alter table network_plus_service_listing
   add constraint network_plus_listing_wizard_step_check check (wizard_step between 1 and 8),
   add constraint network_plus_listing_taxonomy_version_check check (taxonomy_version>0),
   add constraint network_plus_listing_category_fk foreign key(service_category) references network_plus_listing_taxonomy(code) on delete restrict;
-update network_plus_service_listing set listing_kind='service_profile',wizard_step=6,draft_saved_at=coalesce(draft_saved_at,updated_at)
+update network_plus_service_listing set listing_kind='service_profile',wizard_step=7,draft_saved_at=coalesce(draft_saved_at,updated_at)
 where status='draft' and wizard_step=1;
 update network_plus_service_listing set wizard_step=8 where status<>'draft';
 alter table network_plus_service_listing

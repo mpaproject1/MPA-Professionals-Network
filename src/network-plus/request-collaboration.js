@@ -208,7 +208,7 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
       accepted_at=case when $1='accepted' then now() else accepted_at end,declined_at=case when $1='declined' then now() else declined_at end,
       withdrawn_at=case when $1='withdrawn' then now() else withdrawn_at end,recipient_withdrawn_at=case when $1='recipient_withdrawn' then now() else recipient_withdrawn_at end,completed_at=case when $1='completed' then now() else completed_at end,
       disputed_at=case when $1='disputed' then now() else disputed_at end,closed_at=case when $1='closed' then now() else closed_at end,
-      review_due_at=case when $1='submitted' and requester_disposition='in_progress' then coalesce(review_due_at,now()+interval '7 days') when $1 in ('declined','withdrawn','recipient_withdrawn','completed','closed') then null else review_due_at end,
+      review_due_at=case when $1='closed' then null when $1<>'draft' and requester_disposition='in_progress' then now()+interval '7 days' else review_due_at end,
       version=version+1,updated_at=now() where id=$2 returning *`,[to,requestId])).rows[0];
     await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version},idempotencyHash,requestFingerprint);
     if(["disputed","completed","closed","recipient_withdrawn"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to==="recipient_withdrawn"?"closed":to; await db.query("update network_plus_collaboration_workspace set status=$1,completed_at=case when $1=$3 then coalesce(completed_at,now()) else completed_at end,closed_at=case when $1=$4 then coalesce(closed_at,now()) else closed_at end,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId,"completed","closed"]); }
@@ -245,6 +245,7 @@ export async function updateNetworkPlusRequestDisposition(requestId,userId,input
   const disposition=input?.disposition;
   if(!["in_progress","completed","cancelled"].includes(disposition))fail(400,"Choose In progress, Completed or Cancelled.","INVALID_DISPOSITION");
   const remark=String(input?.remark??"").trim();
+  assertNoContactFields({remark});
   if(disposition!=="in_progress"&&(remark.length<5||remark.length>500))fail(400,"A closing remark of 5–500 characters is required when completing or cancelling a request.","CLOSING_REMARK_REQUIRED");
   if(disposition==="in_progress"&&remark.length>500)fail(400,"The update remark must be 500 characters or fewer.","VALIDATION_ERROR");
   if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure idempotency key is required.","IDEMPOTENCY_KEY_REQUIRED");
@@ -274,7 +275,7 @@ export async function dispatchNetworkPlusRequestReviewReminders({limit=100}={}) 
   return withTransaction(async db=>{
     const due=(await db.query(`select id,requester_user_id from network_plus_request
       where requester_disposition='in_progress' and review_due_at<=now()
-        and status not in ('draft','completed','closed')
+        and status not in ('draft','closed')
       order by review_due_at for update skip locked limit $1`,[Math.min(500,Math.max(1,Number(limit)||100))])).rows;
     for(const row of due){
       await notify(db,row.requester_user_id,"network_plus.request.review_reminder",row.id,"A gentle reminder to review this connection request. Update its progress or close it with a short remark.");

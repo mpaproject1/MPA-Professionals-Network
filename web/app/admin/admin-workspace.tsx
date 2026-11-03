@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BookOpenCheck, Building2, ClipboardCheck, ClipboardList, CreditCard, FileBarChart, Fingerprint, Mail, MessageSquareText, Scale, ShieldCheck, Users } from "lucide-react";
+import { Activity, BookOpenCheck, Building2, ClipboardCheck, ClipboardList, CreditCard, FileBarChart, Fingerprint, Mail, MessageSquareText, Scale, ShieldCheck, Store, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -16,6 +16,8 @@ const destinations: Destination[] = [
   { href: "/admin/account-governance", label: "Account governance", description: "Account references, membership history and authorized organization relationships", icon: ShieldCheck },
   { href: "/admin/experience", label: "Help, guides and demos", description: "Contextual guides, training scenarios and support resources", icon: BookOpenCheck },
   { href: "/admin/organizations", label: "Organizations & accounts", description: "Organization register and account relationships", icon: Building2 },
+  { href: "/admin/network-plus/businesses", label: "Network-Plus businesses", description: "Review private business evidence and public business profiles", icon: Building2 },
+  { href: "/admin/network-plus/services", label: "Network-Plus listings", description: "Moderate Needs, Offers and discovery-only catalog profiles", icon: Store },
   { href: "/admin/members", label: "Members", description: "Imports and member records", icon: Users },
   { href: "/admin/members/catalog", label: "Member catalogue", description: "Search membership records and account links", icon: Users },
   { href: "/admin/membership", label: "Membership administration", description: "Plan versions, reviews and payments", icon: ShieldCheck },
@@ -91,6 +93,8 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
       if (item.href === "/admin/membership/payment-methods") return financeConfig;
       if (item.href === "/admin/reports") return reportIds.length > 0;
       if (item.href === "/admin/organizations") return roles?.some((role) => ["reviewer", "organization_admin"].includes(role)) === true;
+      if (item.href === "/admin/network-plus/businesses") return roles?.some((role) => ["business_verification_reviewer","business_moderator"].includes(role)) === true || permissions.some((permission) => ["business.verify","business.moderate"].includes(permission));
+      if (item.href === "/admin/network-plus/services") return roles?.includes("business_moderator") === true || permissions.includes("business.moderate");
       if (item.href === "/admin/marketplace") return membershipReviewer || supportStaff;
       if (item.href === "/admin/serve-community/offline-projects") return offlineProjectAccess;
       if (item.href === "/admin/community-impact/retention-policy") return roles?.includes("system_admin") === true || permissions.some((permission) => ["community_impact.retention.manage", "community_impact.retention.approve"].includes(permission));

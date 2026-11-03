@@ -256,11 +256,16 @@ test("Phase 3 requester disposition is separate from lifecycle status, requires 
  const reopened=await requests.updateNetworkPlusRequestDisposition(request.id,requester.user.id,{disposition:"in_progress",remark:"Reopening to continue the introduction."},`np-disposition-reopen-${suffix}`,randomUUID()+randomUUID());
  assert.equal(reopened.requester_disposition,"in_progress");
  await requests.transitionNetworkPlusRequest(request.id,recipient.user.id,{status:"accepted"},`np-disposition-accept-${suffix}`,randomUUID()+randomUUID());
+ const db=getPool();
+ await db.query("insert into network_plus_request_contact_consent(request_id,recipient_user_id,field_code,recipient_status,recipient_value_ciphertext,recipient_consented_at) values($1,$2,'email','accepted','synthetic-ciphertext',now())",[request.id,recipient.user.id]);
  const recipientWithdrawal=await requests.transitionNetworkPlusRequest(request.id,recipient.user.id,{status:"recipient_withdrawn",reason:"Recipient cannot continue this connection."},`np-disposition-recipient-withdraw-${suffix}`,randomUUID()+randomUUID());
  assert.equal(recipientWithdrawal.status,"recipient_withdrawn");
+ const revokedConsent=(await db.query("select recipient_status,recipient_value_ciphertext,recipient_consented_at from network_plus_request_contact_consent where request_id=$1 and recipient_user_id=$2 and field_code='email'",[request.id,recipient.user.id])).rows[0];
+ assert.equal(revokedConsent.recipient_status,"revoked");
+ assert.equal(revokedConsent.recipient_value_ciphertext,null);
+ assert.equal(revokedConsent.recipient_consented_at,null);
  await assert.rejects(()=>requests.updateNetworkPlusContactConsent(request.id,recipient.user.id,{field:"email",decision:"accept",value:"recipient@example.test",peerUserId:requester.user.id},`np-disposition-contact-after-withdraw-${suffix}`),e=>e.code==="RECIPIENT_ACCEPTANCE_REQUIRED");
  await assert.rejects(()=>requests.updateNetworkPlusRequestDisposition(request.id,recipient.user.id,{disposition:"cancelled",remark:"Recipient cannot set requester outcome."},`np-disposition-outsider-${suffix}`,randomUUID()+randomUUID()),e=>e.code==="NOT_FOUND");
- const db=getPool();
  await db.query("update network_plus_request set review_due_at=now()-interval '1 minute' where id=$1",[request.id]);
  const reminders=await requests.dispatchNetworkPlusRequestReviewReminders({limit:500});
  assert.ok(reminders.sent>=1);

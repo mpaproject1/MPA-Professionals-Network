@@ -18,6 +18,7 @@ try{
  if(identity.database_name!==expectedDatabase||identity.schema_name!=="public")throw new Error("Connected database/schema does not match the explicitly approved disposable target.");
  const templateCoverageBefore=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count);
  const before=(await client.query(`select
+  exists(select 1 from pg_constraint where conname='email_verification_token_delivery_status_check' and pg_get_constraintdef(oid) like '%captured%') has_verification_capture,
   exists(select 1 from information_schema.columns where table_schema='public' and table_name='notification_outbox' and column_name='email_event_key') has_event_key,
   to_regclass('public.email_delivery_event') is not null has_events,
   to_regclass('public.email_recipient_suppression') is not null has_holds,
@@ -30,13 +31,15 @@ try{
  const templateCoverage=(await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count;
  if(templateCoverage!==3)throw new Error("Organization email audience templates were not seeded.");
  const after=(await client.query(`select
+  exists(select 1 from pg_constraint where conname='email_verification_token_delivery_status_check' and pg_get_constraintdef(oid) like '%captured%') has_verification_capture,
   exists(select 1 from information_schema.columns where table_schema='public' and table_name='notification_outbox' and column_name='email_event_key') has_event_key,
   to_regclass('public.email_delivery_event') is not null has_events,
   to_regclass('public.email_recipient_suppression') is not null has_holds,
   to_regclass('public.email_template_version') is not null has_versions`)).rows[0];
- if(!after.has_event_key||!after.has_events||!after.has_holds||!after.has_versions)throw new Error("Email hardening migration did not create all expected schema objects.");
+ if(!after.has_verification_capture||!after.has_event_key||!after.has_events||!after.has_holds||!after.has_versions)throw new Error("Email hardening migration did not create all expected schema objects.");
  await client.query("rollback");open=false;
  const restored=(await client.query(`select
+  exists(select 1 from pg_constraint where conname='email_verification_token_delivery_status_check' and pg_get_constraintdef(oid) like '%captured%') has_verification_capture,
   exists(select 1 from information_schema.columns where table_schema='public' and table_name='notification_outbox' and column_name='email_event_key') has_event_key,
   to_regclass('public.email_delivery_event') is not null has_events,
   to_regclass('public.email_recipient_suppression') is not null has_holds,

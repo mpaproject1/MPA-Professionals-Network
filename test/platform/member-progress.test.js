@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { buildMemberProgress } from "../../src/platform/member-progress.js";
 
 test("member progress combines member-owned records across domains and prioritizes member actions", () => {

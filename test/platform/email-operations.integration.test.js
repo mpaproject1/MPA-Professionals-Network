@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test, { after, before } from "node:test";
 
-const databaseUrl = process.env.EMAIL_TEST_DATABASE_URL || "";
-const expectedDatabase = process.env.EMAIL_TEST_DATABASE_NAME || "";
+const databaseUrl = process.env.EMAIL_TEST_DATABASE_URL || process.env.DATABASE_URL || "";
+const expectedDatabase = process.env.EMAIL_TEST_DATABASE_NAME || process.env.MIGRATION_CHECK_EXPECTED_DATABASE || "";
 let databaseName = "";
 let enabled = false;
 try {

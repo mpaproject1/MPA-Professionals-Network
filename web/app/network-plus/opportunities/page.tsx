@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NetworkPlusAccessGuard } from "../../../components/network-plus-access-guard";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
@@ -7,7 +7,7 @@ import { useUiStore } from "../../../lib/store";
 type Taxon={code:string;parent_code:string|null;label:string;description:string;listing_kinds:string[];field_schema:{code:string;label:string;type:string;options?:string[];required?:boolean}[]};
 type Business={id:string;display_name:string;business_kind:string;verification_status:string;moderation_status:string;publication_status:string};
 type Organization={id:string;display_name?:string;name?:string};
-type Listing={id:string;business_id:string;business_name:string;title:string|null;summary:string|null;description?:string|null;category_code?:string|null;subcategory_code?:string|null;listing_kind:string;structured_attributes?:Record<string,any>;wizard_step:number;draft_saved_at?:string|null;status:string;moderation_reason?:string|null;location_label?:string|null;published_at?:string|null;pricing_model?:string;price_amount?:number|null;currency?:string|null};
+type Listing={id:string;business_id:string;business_name:string;title:string|null;summary:string|null;description?:string|null;category_code?:string|null;subcategory_code?:string|null;listing_kind:string;structured_attributes?:Record<string,any>;wizard_step:number;draft_saved_at?:string|null;status:string;moderation_reason?:string|null;location_label?:string|null;published_at?:string|null;pricing_model?:string;audience?:string;delivery_mode?:string;capacity?:number|null;price_amount?:number|null;currency?:string|null};
 type ListingResult={items:Listing[];total:number;hasMore:boolean};
 const kinds=[{code:"need",label:"I need",description:"Find a supplier, specialist, service or business partner."},{code:"offer",label:"I offer",description:"Share professional capacity, expertise or an opportunity."},{code:"product_profile",label:"Product profile",description:"Show products and supply capabilities for discovery only."},{code:"service_profile",label:"Service profile",description:"Present a professional service for discovery only."}];
 const label=(v:string)=>String(v||"").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
@@ -25,6 +25,7 @@ export default function NetworkPlusOpportunitiesPage(){
  const [businessName,setBusinessName]=useState(""),[businessDescription,setBusinessDescription]=useState(""),[ownerType,setOwnerType]=useState("member"),[organizationId,setOrganizationId]=useState(""),[businessWebsite,setBusinessWebsite]=useState(""),[businessLocation,setBusinessLocation]=useState("");
  const [evidenceBusinessId,setEvidenceBusinessId]=useState(""),[evidenceFileId,setEvidenceFileId]=useState(""),[evidenceType,setEvidenceType]=useState("business registration");
  const [saving,setSaving]=useState(false),[loading,setLoading]=useState(true),[saveState,setSaveState]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const saveQueue=useRef<Promise<void>>(Promise.resolve());
 
  const categories=useMemo(()=>taxonomy.filter(t=>!t.parent_code&&t.listing_kinds.includes(listingKind)),[taxonomy,listingKind]);
  const subcategories=useMemo(()=>taxonomy.filter(t=>t.parent_code===categoryCode&&t.listing_kinds.includes(listingKind)),[taxonomy,categoryCode,listingKind]);
@@ -53,8 +54,7 @@ export default function NetworkPlusOpportunitiesPage(){
   if(!token||!draftId)return;
   setSaveState("Saving…");
   const timer=window.setTimeout(async()=>{
-   try{await api<Listing>("/api/v1/network-plus/services/"+encodeURIComponent(draftId)+"/draft",{method:"PATCH",body:JSON.stringify(payload)},token);setSaveState("Saved");}
-   catch(e){setSaveState(e instanceof ApiError?e.message:"Save failed — check your connection.");}
+   saveQueue.current=saveQueue.current.then(async()=>{await api<Listing>("/api/v1/network-plus/services/"+encodeURIComponent(draftId)+"/draft",{method:"PATCH",body:JSON.stringify(payload)},token);setSaveState("Saved");}).catch(e=>{setSaveState(e instanceof ApiError?e.message:"Save failed — check your connection.");});
   },650);
   return()=>window.clearTimeout(timer);
  },[token,draftId,payload]);
@@ -67,7 +67,7 @@ export default function NetworkPlusOpportunitiesPage(){
   }catch(e){setError(e instanceof ApiError?e.message:"Could not start a listing draft.");}finally{setSaving(false);}
  };
  const resume=(row:Listing)=>{
-  setDraftId(row.id);setBusinessId(row.business_id);setListingKind(row.listing_kind);setCategoryCode(row.category_code||"");setSubcategoryCode(row.subcategory_code||"");setTitle(row.title||"");setSummary(row.summary||"");setDescription(row.description||"");setAttributes(row.structured_attributes||{});setStep(row.wizard_step||1);setLocationLabel(row.location_label||"");setPricingModel(row.pricing_model||"quote");setPriceAmount(row.price_amount?String(row.price_amount):"");setCurrency(row.currency||"ETB");setView("create");setSaveState("Saved");setNotice("Draft restored. Continue where you left off.");
+  setDraftId(row.id);setBusinessId(row.business_id);setListingKind(row.listing_kind);setCategoryCode(row.category_code||"");setSubcategoryCode(row.subcategory_code||"");setTitle(row.title||"");setSummary(row.summary||"");setDescription(row.description||"");setAttributes(row.structured_attributes||{});setStep(row.wizard_step||1);setLocationLabel(row.location_label||"");setAudience(row.audience||"both");setDeliveryMode(row.delivery_mode||"remote");setCapacity(row.capacity?String(row.capacity):"");setPricingModel(row.pricing_model||"quote");setPriceAmount(row.price_amount?String(row.price_amount):"");setCurrency(row.currency||"ETB");setView("create");setSaveState("Saved");setNotice("Draft restored. Continue where you left off.");
  };
  const submit=async()=>{
   if(!token||!draftId)return;setSaving(true);setError("");setNotice("");

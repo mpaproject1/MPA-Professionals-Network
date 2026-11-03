@@ -3,10 +3,11 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,alignmentMigration,phase2Migration,service,server,ui,e2e,compatibility,userAdmin,opportunities,notifications,notificationUi]=await Promise.all([
+const [migration,alignmentMigration,phase2Migration,phase3Migration,service,server,ui,e2e,compatibility,userAdmin,opportunities,notifications,notificationUi]=await Promise.all([
  read("../../db/migrations/20261031120000_network_plus_request_collaboration.sql"),
  read("../../db/migrations/20261103120000_network_plus_phase0_contract_alignment.sql"),
  read("../../db/migrations/20261103140000_network_plus_phase2_connection_handoff.sql"),
+ read("../../db/migrations/20261103150000_network_plus_phase3_requester_disposition.sql"),
  read("../../src/network-plus/request-collaboration.js"),
  read("../../server.js"),
  read("../../web/app/network-plus/requests/page.tsx"),
@@ -207,4 +208,30 @@ test("request detail hides private handoff data from former recipient representa
  assert.match(detail,/recipientRepresentativeParticipant[\s\S]*?hasCurrentRecipientAuthority/);
  assert.match(detail,/const isPrimaryParticipant=.*isRecipientRepresentative/);
  assert.match(detail,/and \$3::boolean and \(proposer_user_id=\$2 or responder_user_id=\$2\)/);
+});
+
+test("Network-Plus Phase 3 adds requester-owned closure disposition, append-only history, recipient withdrawal and reminder scheduling",()=>{
+ for(const column of ["requester_disposition","requester_disposition_remark","requester_disposition_updated_at","review_due_at","review_reminder_sent_at","recipient_withdrawn_at"])assert.match(phase3Migration,new RegExp("add column if not exists "+column));
+ for(const value of ["in_progress","completed","cancelled","recipient_withdrawn"])assert.ok(phase3Migration.includes("'"+value+"'"));
+ assert.match(phase3Migration,/requester_disposition_closure_remark_check/);
+ assert.match(phase3Migration,/ix_network_plus_request_requester_disposition/);
+ assert.match(phase3Migration,/ix_network_plus_request_review_due/);
+ assert.match(service,/updateNetworkPlusRequestDisposition/);
+ assert.match(service,/CLOSING_REMARK_REQUIRED/);
+ assert.match(service,/REOPEN_REMARK_REQUIRED/);
+ assert.match(service,/request\.disposition_reopened/);
+ assert.match(service,/dispatchNetworkPlusRequestReviewReminders/);
+ assert.match(service,/for update skip locked/);
+ assert.match(service,/request\.review_reminder_sent/);
+ assert.match(service,/recipient_withdrawn/);
+ assert.match(server,/networkPlusRequests\.updateNetworkPlusRequestDisposition/);
+ assert.match(server,/network-plus\.request\.disposition/);
+ assert.match(ui,/My Requests/);
+ assert.match(ui,/Awaiting response/);
+ assert.match(ui,/Mark Completed/);
+ assert.match(ui,/Cancel request outcome/);
+ assert.match(ui,/Reopen as In progress/);
+ assert.match(ui,/Your report about the connection—not a verified sale/);
+ assert.match(ui,/Withdraw recipient acceptance/);
+ assert.match(e2e,/requester records a closure remark, reopens the connection/);
 });

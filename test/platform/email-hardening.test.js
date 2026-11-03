@@ -8,6 +8,8 @@ test("email hardening migration creates the logical-event unique key and provide
   const sql = await read("../../db/migrations/20261103190000_email_delivery_hardening.sql");
   assert.match(sql, /uq_notification_outbox_email_event_key/);
   assert.match(sql, /add column if not exists delivery_status/);
+  assert.match(sql, /email_verification_token_delivery_status_check/);
+  assert.match(sql, /\('pending','sent','failed','captured'\)/);
   assert.match(sql, /add column if not exists delivered_at/);
   assert.match(sql, /add column if not exists delivery_event_at/);
   assert.match(sql, /add column if not exists delivery_event_type/);

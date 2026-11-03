@@ -221,6 +221,26 @@ async function recipientMatchesAudience(db,recipient,audience){
  return emailAudienceMatches(audience,{accountType:row.account_type,isAdmin:row.is_admin,isReviewer:row.is_reviewer,isMentor:row.is_mentor,isEmployer:row.is_employer});
 }
 
+async function reconcilePendingEmailDeliveryEvents(db){
+ const events=(await db.query("select id,provider,provider_event_id,provider_message_id,event_type from email_delivery_event where outbox_id is null and processed_at is null order by occurred_at limit 100")).rows;
+ let reconciled=0;
+ for(const event of events){
+  const result=await db.query("update notification_outbox set delivery_status=case when delivery_status='complained' then 'complained' when delivery_status='bounced' and $1<>'complained' then 'bounced' when delivery_status='delivered' and $1='failed' then 'delivered' else $1 end,delivered_at=case when $1='delivered' and delivery_status not in ('bounced','complained') then coalesce(delivered_at,now()) else delivered_at end,delivery_event_at=now(),delivery_event_type=case when delivery_status='complained' then delivery_event_type when delivery_status='bounced' and $1<>'complained' then delivery_event_type else $2 end,delivery_error_code=case when delivery_status='complained' then delivery_error_code when delivery_status='bounced' and $1<>'complained' then delivery_error_code when $1 in ('bounced','complained','failed') then $2 else null end,updated_at=now() where id=(select id from notification_outbox where channel='email' and provider_message_id=$3 order by sent_at desc nulls last,created_at desc limit 1) returning id,recipient,payload,template_code,delivery_status",[event.event_type,event.event_type,event.provider_message_id]);
+  const row=result.rows[0];
+  if(!row)continue;
+  await db.query("update email_delivery_event set outbox_id=$1,processed_at=now() where id=$2",[row.id,event.id]);
+  if(event.event_type==="bounced"||event.event_type==="complained"){
+   const reason=event.event_type==="complained"?"complaint":"hard_bounce";
+   await db.query("insert into email_recipient_suppression(email_normalized,reason,source,provider_message_id) values($1,$2,$3,$4) on conflict(email_normalized) do update set reason=case when email_recipient_suppression.reason='complaint' then email_recipient_suppression.reason else excluded.reason end,source=excluded.source,provider_message_id=excluded.provider_message_id,created_at=now(),cleared_at=null,cleared_by=null,clear_reason=null",[normalizeEmailAddress(row.recipient),reason,event.provider,event.provider_message_id]);
+  }
+  const matchId=row.payload?.matchId||row.payload?.variables?.matchId;
+  if(row.template_code==="mentor.mentorship_update"&&matchId)await db.query("update mentorship_match set mentor_notification_status=$1,mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$3",[row.delivery_status==="delivered"?"delivered":"failed","Reconciled provider delivery event: "+row.delivery_status,matchId]);
+  await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.delivery_event.reconciled','notification_outbox',$1,'success',$2)",[row.id,{provider:event.provider,providerEventId:event.provider_event_id,eventType:event.event_type}]);
+  reconciled++;
+ }
+ return reconciled;
+}
+
 export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=false}={}){
  const db=getPool();if(!system)await requireAdmin(db,actorId);
  if(process.env.TEST_LAB_ENABLED==="true"&&process.env.NODE_ENV==="production")fail(403,"Test Lab is forbidden in production; no email was sent.","TEST_LAB_PRODUCTION_BLOCKED");
@@ -260,6 +280,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
   return {processed:results.length,results,mode:"capture"};
  }
  if(!providerConfig().ready)fail(503,"Email provider is not configured. Set server-side email credentials first.","EMAIL_DELIVERY_NOT_CONFIGURED");
+ try{await reconcilePendingEmailDeliveryEvents(db);}catch(error){console.warn("[email-outbox] pending provider events remain for reconciliation",{code:error.code||"EMAIL_EVENT_RECONCILIATION_FAILED"});}
  const batch=Math.min(Math.max(Number(limit)||20,1),50);
  const claimed=await withTransaction(async tx=>{
   await tx.query("update notification_outbox set status='pending',delivery_status='queued',next_attempt_at=now(),locked_at=null,updated_at=now() where channel='email' and status='processing' and locked_at<now()-interval '5 minutes'");

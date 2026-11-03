@@ -848,7 +848,6 @@ try {
     "network_plus_request_contact_consent_pkey",
     "ux_network_plus_request_meeting_active",
     "ux_network_plus_request_meeting_idempotency",
-    "ix_network_plus_request_meeting_history",
     "ix_network_plus_request_clarification_open",
     "ux_serve_community_initiative_idempotency_hash","ux_serve_community_participation_idempotency_hash","ux_serve_community_participation_active","ux_serve_community_legacy_classification_initiative","uq_community_impact_claim_evidence_url","uq_community_impact_claim_active_assignment"
   ];
@@ -898,6 +897,20 @@ try {
       !contactConsentPeerIndex.rows[0].indexdef.includes("network_plus_request_contact_consent") ||
       !contactConsentPeerIndex.rows[0].indexdef.includes("recipient_user_id")) {
     throw new Error("The recipient-first contact-consent lookup index is missing or malformed.");
+  }
+  // Meeting history is intentionally a non-unique lookup index; uniqueness
+  // belongs only to the active-meeting partial index and idempotency key.
+  const meetingHistoryIndex = await client.query(
+    "select indexdef from pg_indexes where schemaname=$1 and indexname=$2",
+    ["public", "ix_network_plus_request_meeting_history"]
+  );
+  const meetingHistoryDefinition = meetingHistoryIndex.rows[0]?.indexdef || "";
+  if (!meetingHistoryDefinition ||
+      meetingHistoryDefinition.toUpperCase().includes("CREATE UNIQUE INDEX") ||
+      !meetingHistoryDefinition.includes("network_plus_request_meeting") ||
+      !meetingHistoryDefinition.includes("request_id") ||
+      !meetingHistoryDefinition.includes("created_at")) {
+    throw new Error("The meeting-history lookup index is missing, malformed, or unexpectedly unique.");
   }
   const supportGrantIndex=await client.query("select 1 from pg_indexes where schemaname=$1 and indexname=$2",["public","ix_network_plus_request_support_grant_active"]);
   if(!supportGrantIndex.rowCount) throw new Error("The active request-scoped support grant index is missing.");

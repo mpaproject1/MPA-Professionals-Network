@@ -88,6 +88,8 @@ alter table network_plus_service_listing
   add column if not exists target_audience text[] not null default '{}'::text[],
   add column if not exists secondary_tags text[] not null default '{}'::text[],
   add column if not exists pricing_details jsonb not null default '{}'::jsonb;
+update network_plus_service_listing set remote_available=true where delivery_mode='remote' and remote_available=false;
+
 alter table network_plus_service_listing
   drop constraint if exists network_plus_service_listing_pricing_model_check,
   add constraint network_plus_listing_pricing_model_check check (pricing_model in ('free','fixed','hourly','unit','range','quote','subscription','not_applicable')),

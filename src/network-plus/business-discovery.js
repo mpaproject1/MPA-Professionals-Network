@@ -460,18 +460,21 @@ export async function listProfessionalServices(viewerId,filters={}) {
   const q=String(filters.q||"").trim().slice(0,120);
   if(q){args.push(`%${q}%`);where.push(`(s.title ilike $${args.length} or s.summary ilike $${args.length} or s.description ilike $${args.length} or b.display_name ilike $${args.length})`);}
   const category=String(filters.category||"").trim().toLowerCase();
-  if(category){args.push(category);where.push(`s.service_category=$${args.length}`);}
+  if(category){args.push(category);where.push(`s.service_category=${args.length}`);}
+  const subcategory=String(filters.subcategory||"").trim().toLowerCase();if(subcategory){args.push(subcategory);where.push(`s.subcategory_code=${args.length}`);}
+  const listingKind=String(filters.listingKind||"").trim().toLowerCase();if(listingKind){if(!LISTING_KINDS.has(listingKind))fail(400,"Choose a supported listing type.","VALIDATION_ERROR");args.push(listingKind);where.push(`s.listing_kind=${args.length}`);}
+  const location=String(filters.location||"").trim().slice(0,120);if(location){args.push(`%${location}%`);where.push(`coalesce(s.location_label,'') ilike ${args.length}`);}
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
   args.push(visibleAudiences(access));where.push("s.audience=any($"+args.length+"::text[])");
   const base=` from network_plus_service_listing s join network_plus_business b on b.id=s.business_id where ${where.join(" and ")}`;
   const total=Number((await db.query(`select count(*)::int count${base}`,args)).rows[0]?.count||0);
-  const items=(await db.query(`select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.service_category,s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.published_at
+  const items=(await db.query(`select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.service_category category_code,s.subcategory_code,s.listing_kind,s.structured_attributes,s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.published_at
     ${base} order by s.published_at desc limit ${limit+1} offset ${offset}`,args)).rows;
   return {items:items.slice(0,limit),limit,offset,total,hasMore:offset+limit<total};
 }
 export async function getProfessionalService(listingId,viewerId) {
   const db=getPool();const access=await assertEntry(db,viewerId);
-  const row=(await db.query(`select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.description,s.service_category,s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.availability,s.credentials,s.published_at
+  const row=(await db.query(`select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.description,s.service_category category_code,s.subcategory_code,s.listing_kind,s.structured_attributes,s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.availability,s.credentials,s.published_at
     from network_plus_service_listing s join network_plus_business b on b.id=s.business_id
     where s.id=$1 and s.audience=any($2::text[]) and s.status='published' and b.publication_status='published' and b.verification_status='verified' and b.moderation_status='approved'
       and (b.verification_expires_at is null or b.verification_expires_at>now()) and not exists(select 1 from network_plus_business_ownership bo join organization o on o.id=bo.owner_organization_id where bo.business_id=b.id and bo.owner_type='organization' and bo.status='active' and bo.consent_status='accepted' and o.verification_status<>'verified')`,[listingId,visibleAudiences(access)])).rows[0];

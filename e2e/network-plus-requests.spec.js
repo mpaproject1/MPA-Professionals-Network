@@ -5,7 +5,7 @@ const draft = {
   subject: "Website accessibility review", summary: "Request an accessibility review of our public website.",
   requester_user_id: "requester-1", updated_at:"2026-11-03T09:00:00.000Z", isRequester: true, is_requester: true, requester_disposition:"in_progress", isRecipientRepresentative: false,
   participants: [{ user_id: "requester-1", participant_role: "requester", consent_status: "accepted" }],
-  events: [], workspace: null,
+  events: [{event_code:"request.submitted",to_status:"submitted",metadata:{}},{event_code:"request.disposition_updated",to_status:"draft",metadata:{previousDisposition:"in_progress",disposition:"completed",remark:"Connection made; continuing directly."}}], workspace: null,
 };
 const submitted = {
   ...draft, status: "submitted", isRequester: false, is_requester: false, isRecipientRepresentative: true, canReview: true, canAccept: true,
@@ -50,6 +50,9 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     await expect.poll(()=>createPayload?.intent).toBe("service_request");
     expect(createPayload.terms.scope).toContain("WCAG AA");
     await expect(page.getByText(/Draft saved. It is not yet submitted/i)).toBeVisible();
+    await expect(page).toHaveURL(/requestId=request-1/);
+    await expect(page.getByRole("heading",{name:"Platform-observed activity"})).toBeVisible();
+    await expect(page.getByRole("heading",{name:"Your reported connection outcomes"})).toBeVisible();
     await expect(page.getByText(/has not been sent to the recipient/i)).toBeVisible();
     await expect(page.getByRole("button",{name:"Submit request"})).toBeVisible();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);

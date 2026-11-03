@@ -47,7 +47,10 @@ export async function queueEmailNotification(db,userId,templateCode,variables={}
  }
  // Fail closed before creating an outbox record: enqueue and dispatch must agree
  // on the current persisted recipient identity and template governance.
- if(template?.enabled===false)return false;
+ if(template?.enabled===false||!template.audience){
+  await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.message.enqueue_template_policy_rejected','email_notification_template',$1,'failure',$2)",[templateCode,{userId,audience:template.audience||null,enabled:template.enabled}]);
+  return false;
+ }
  if(template&&!await recipientMatchesAudience(db,user.email,template.audience)){
   await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.message.enqueue_audience_rejected','email_notification_template',$1,'failure',$2)",[templateCode,{userId,audience:template.audience,resourceType,resourceId}]);
   return false;
@@ -340,7 +343,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
     results.push({id:row.id,status:"cancelled",reason:"audience_mismatch"});
     continue;
    }
-   if(template&&!template.enabled){await db.query("update notification_outbox set status='cancelled',delivery_status='cancelled',delivery_event_type='template_disabled',delivery_event_at=now(),last_error='Notification template disabled by administrator',locked_at=null,updated_at=now() where id=$1",[row.id]);const matchId=row.payload?.matchId||row.payload?.variables?.matchId;if(row.template_code==="mentor.mentorship_update"&&matchId){try{await db.query("update mentorship_match set mentor_notification_status='cancelled',mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$1",[matchId,"Email template disabled; provider delivery did not occur."]);}catch(e){console.error("[email-outbox] could not update mentorship notification evidence",{outboxId:row.id});}}results.push({id:row.id,status:"cancelled"});continue;}
+   if(template&&(!template.enabled||!template.audience)){await db.query("update notification_outbox set status='cancelled',delivery_status='cancelled',delivery_event_type='template_disabled',delivery_event_at=now(),last_error='Notification template disabled by administrator',locked_at=null,updated_at=now() where id=$1",[row.id]);const matchId=row.payload?.matchId||row.payload?.variables?.matchId;if(row.template_code==="mentor.mentorship_update"&&matchId){try{await db.query("update mentorship_match set mentor_notification_status='cancelled',mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$1",[matchId,"Email template disabled; provider delivery did not occur."]);}catch(e){console.error("[email-outbox] could not update mentorship notification evidence",{outboxId:row.id});}}results.push({id:row.id,status:"cancelled"});continue;}
    if(template?.enabled){const vars={...(row.payload||{}),...(row.payload?.variables||{})};subject=render(template.subject_template,vars);textBody=render(template.text_template,vars);htmlBody=render(template.html_template,vars,{html:true});}
    const humanEvent=String(row.template_code||"account update").replace(/[._-]+/g," ").replace(/\b\w/g,ch=>ch.toUpperCase());
    if(!subject)subject=`${humanEvent} · MPA Professionals Network`;

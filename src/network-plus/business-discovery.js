@@ -330,7 +330,7 @@ export async function createOpportunityListingDraft(businessId,userId,input,requ
     const existing=(await db.query("select * from network_plus_service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
     if(existing){if(existing.request_fingerprint!==payloadFingerprint)fail(409,"This draft key was already used for different details.","IDEMPOTENCY_CONFLICT");return {...existing,idempotent:true};}
     await validateListingTaxonomy(db,category,subcategory,listingKind);
-    const row=(await db.query("insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,listing_kind,subcategory_code,structured_attributes,wizard_step,draft_saved_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()) returning *",[businessId,userId,title,summary,description,category,listingKind,subcategory,attributes,step])).rows[0];
+    const row=(await db.query("insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,listing_kind,subcategory_code,structured_attributes,wizard_step,draft_saved_at,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12) returning *",[businessId,userId,title,summary,description,category,listingKind,subcategory,attributes,step,keyHash,payloadFingerprint])).rows[0];
     await audit(db,userId,"network_plus.listing_draft_created","network_plus_service_listing",row.id,requestId,{businessId,listingKind});return row;
   });
 }

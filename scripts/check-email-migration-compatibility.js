@@ -20,8 +20,7 @@ try{
  if(identity.database_name!==expectedDatabase||identity.schema_name!=="public")throw new Error("Connected database/schema does not match the explicitly approved disposable target.");
  const templateCoverageBefore=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count);
  const workflowCoverageBefore=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["professional.workflow_update","employer.candidate_update","employer.offer_approval_required","employer.interview_scheduled","employer.interview_response","mentor.mentorship_update","organization.membership_added","organization.membership_updated"]])).rows[0].count);
- const invalidWorkflowAudiences=await client.query("select template_code,audience from email_notification_template where template_code=any($1::text[]) and audience not in ('professional','employer','mentor','organization_representative')",[["professional.workflow_update","employer.candidate_update","employer.offer_approval_required","employer.interview_scheduled","employer.interview_response","mentor.mentorship_update","organization.membership_added","organization.membership_updated"]]);
- if(invalidWorkflowAudiences.rowCount)throw new Error("Existing workflow templates have invalid recipient audiences.");
+
  const verificationBefore=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
  const before=(await client.query(`select
   exists(select 1 from pg_constraint where conname='email_verification_token_delivery_status_check' and pg_get_constraintdef(oid) like '%captured%') has_verification_capture,
@@ -40,6 +39,8 @@ try{
  await client.query(templateSql);
  await client.query(verificationSql);
  await client.query(workflowTemplateSql);
+ const invalidWorkflowAudiences=await client.query("select template_code,audience from email_notification_template where template_code=any($1::text[]) and audience not in ('professional','employer','mentor','organization_representative')",[["professional.workflow_update","employer.candidate_update","employer.offer_approval_required","employer.interview_scheduled","employer.interview_response","mentor.mentorship_update","organization.membership_added","organization.membership_updated"]]);
+ if(invalidWorkflowAudiences.rowCount)throw new Error("Existing workflow templates have invalid recipient audiences.");
  const templateCoverage=(await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count;
  if(templateCoverage!==3)throw new Error("Organization email audience templates were not seeded.");
  const verificationAfter=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, exists(select 1 from information_schema.columns where table_schema='public' and table_name='email_delivery_event' and column_name='verification_delivery_id') event_link, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];

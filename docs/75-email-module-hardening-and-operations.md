@@ -120,3 +120,16 @@ The email-specific migration compatibility script runs inside a transaction agai
 - Confirm the live development deployment's environment variables and admin UI.
 
 No production migration, deployment or provider credential change is authorized by this implementation.
+
+
+## Verification recovery and native Resend callbacks (implementation update)
+
+Account verification remains outside the ordinary notification outbox. Its verification token hash remains the authority for single-use verification. A separate email_verification_delivery job stores the token using AES-256-GCM authenticated encryption, with a purpose-derived key from EMAIL_VERIFICATION_ENCRYPTION_KEY or the stable JWT_SECRET fallback. Keep that key stable across deployments; key rotation requires controlled re-encryption.
+
+The verification delivery worker claims due jobs with SKIP LOCKED, recovers claims older than five minutes, uses the shared email transport and provider idempotency key, and retries transient failures with bounded backoff (maximum eight attempts). Replacing or consuming a verification token expires its outstanding delivery job. Verification delivery acceptance, capture, suppression, failure and provider delivery events are audited without writing the raw token to audit metadata. The admin retry action retries the existing unexpired token job; it does not silently replace the token.
+
+Verification template governance is strict: the system-managed template remains enabled and its audience is all. Workflow enqueue and dispatch both fail closed for missing template records or invalid audience governance. Administrator-created admin.manual messages are the explicit exception because their subject and body are stored on the draft/outbox record.
+
+For native Resend webhooks, configure RESEND_WEBHOOK_SECRET (the Svix whsec_ signing secret). The endpoint validates svix-id, svix-timestamp and svix-signature against the exact raw request body and rejects timestamps outside the five-minute tolerance. Custom canonical webhook integrations continue to use EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET. Resend callbacks can be correlated with either ordinary outbox messages or verification delivery jobs; provider event, suppression and audit updates are committed transactionally.
+
+The verification recovery migration is 20261103210000_email_verification_delivery_recovery.sql. It creates the encrypted delivery-job ledger and links provider event records to verification deliveries. EMAIL_VERIFICATION_ENCRYPTION_KEY is optional when JWT_SECRET is configured, but whichever key is used must remain stable.

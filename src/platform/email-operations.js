@@ -233,18 +233,24 @@ async function reconcilePendingEmailDeliveryEvents(db){
  const events=(await db.query("select id,provider,provider_event_id,provider_message_id,event_type from email_delivery_event where outbox_id is null and processed_at is null order by occurred_at limit 100")).rows;
  let reconciled=0;
  for(const event of events){
-  const result=await db.query("update notification_outbox set delivery_status=case when delivery_status='complained' then 'complained' when delivery_status='bounced' and $1<>'complained' then 'bounced' when delivery_status='delivered' and $1='failed' then 'delivered' else $1 end,delivered_at=case when $1='delivered' and delivery_status not in ('bounced','complained') then coalesce(delivered_at,now()) else delivered_at end,delivery_event_at=now(),delivery_event_type=case when delivery_status='complained' then delivery_event_type when delivery_status='bounced' and $1<>'complained' then delivery_event_type else $2 end,delivery_error_code=case when delivery_status='complained' then delivery_error_code when delivery_status='bounced' and $1<>'complained' then delivery_error_code when $1 in ('bounced','complained','failed') then $2 else null end,updated_at=now() where id=(select id from notification_outbox where channel='email' and provider_message_id=$3 order by sent_at desc nulls last,created_at desc limit 1) returning id,recipient,payload,template_code,delivery_status",[event.event_type,event.event_type,event.provider_message_id]);
-  const row=result.rows[0];
-  if(!row)continue;
-  if(event.event_type==="bounced"||event.event_type==="complained"){
-   const reason=event.event_type==="complained"?"complaint":"hard_bounce";
-   await db.query("insert into email_recipient_suppression(email_normalized,reason,source,provider_message_id) values($1,$2,$3,$4) on conflict(email_normalized) do update set reason=case when email_recipient_suppression.reason='complaint' then email_recipient_suppression.reason else excluded.reason end,source=excluded.source,provider_message_id=excluded.provider_message_id,created_at=now(),cleared_at=null,cleared_by=null,clear_reason=null",[normalizeEmailAddress(row.recipient),reason,event.provider,event.provider_message_id]);
-  }
-  const matchId=row.payload?.matchId||row.payload?.variables?.matchId;
-  if(row.template_code==="mentor.mentorship_update"&&matchId)await db.query("update mentorship_match set mentor_notification_status=$1,mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$3",[row.delivery_status==="delivered"?"delivered":"failed","Reconciled provider delivery event: "+row.delivery_status,matchId]);
-  await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.delivery_event.reconciled','notification_outbox',$1,'success',$2)",[row.id,{provider:event.provider,providerEventId:event.provider_event_id,eventType:event.event_type}]);
-  await db.query("update email_delivery_event set outbox_id=$1,processed_at=now() where id=$2",[row.id,event.id]);
-  reconciled++;
+  const completed=await withTransaction(async tx=>{
+   // Lock the ledger row so concurrent dispatchers cannot reconcile it twice.
+   const locked=(await tx.query("select id from email_delivery_event where id=$1 and outbox_id is null and processed_at is null for update",[event.id])).rows[0];
+   if(!locked)return false;
+   const result=await tx.query("update notification_outbox set delivery_status=case when delivery_status='complained' then 'complained' when delivery_status='bounced' and $1<>'complained' then 'bounced' when delivery_status='delivered' and $1='failed' then 'delivered' else $1 end,delivered_at=case when $1='delivered' and delivery_status not in ('bounced','complained') then coalesce(delivered_at,now()) else delivered_at end,delivery_event_at=now(),delivery_event_type=case when delivery_status='complained' then delivery_event_type when delivery_status='bounced' and $1<>'complained' then delivery_event_type else $2 end,delivery_error_code=case when delivery_status='complained' then delivery_error_code when delivery_status='bounced' and $1<>'complained' then delivery_error_code when $1 in ('bounced','complained','failed') then $2 else null end,updated_at=now() where id=(select id from notification_outbox where channel='email' and provider_message_id=$3 order by sent_at desc nulls last,created_at desc limit 1) returning id,recipient,payload,template_code,delivery_status",[event.event_type,event.event_type,event.provider_message_id]);
+   const row=result.rows[0];
+   if(!row)return false;
+   if(event.event_type==="bounced"||event.event_type==="complained"){
+    const reason=event.event_type==="complained"?"complaint":"hard_bounce";
+    await tx.query("insert into email_recipient_suppression(email_normalized,reason,source,provider_message_id) values($1,$2,$3,$4) on conflict(email_normalized) do update set reason=case when email_recipient_suppression.reason='complaint' then email_recipient_suppression.reason else excluded.reason end,source=excluded.source,provider_message_id=excluded.provider_message_id,created_at=now(),cleared_at=null,cleared_by=null,clear_reason=null",[normalizeEmailAddress(row.recipient),reason,event.provider,event.provider_message_id]);
+   }
+   const matchId=row.payload?.matchId||row.payload?.variables?.matchId;
+   if(row.template_code==="mentor.mentorship_update"&&matchId)await tx.query("update mentorship_match set mentor_notification_status=$1,mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$3",[row.delivery_status==="delivered"?"delivered":"failed","Reconciled provider delivery event: "+row.delivery_status,matchId]);
+   await tx.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.delivery_event.reconciled','notification_outbox',$1,'success',$2)",[row.id,{provider:event.provider,providerEventId:event.provider_event_id,eventType:event.event_type}]);
+   await tx.query("update email_delivery_event set outbox_id=$1,processed_at=now() where id=$2",[row.id,event.id]);
+   return true;
+  });
+  if(completed)reconciled++;
  }
  return reconciled;
 }

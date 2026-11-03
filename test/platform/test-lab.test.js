@@ -4,16 +4,16 @@ import { testLabConfiguration } from "../../src/platform/test-lab.js";
 import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
 
 test("Test Lab reports capture mode only when explicitly configured",()=>{
- const before={nodeEnv:process.env.NODE_ENV,enabled:process.env.TEST_LAB_ENABLED,delivery:process.env.TEST_DELIVERY_MODE};
+ const before={nodeEnv:process.env.NODE_ENV,enabled:process.env.TEST_LAB_ENABLED,disposable:process.env.TEST_LAB_DISPOSABLE_DATABASE,delivery:process.env.TEST_DELIVERY_MODE};
  try{
-  process.env.NODE_ENV="development";process.env.TEST_LAB_ENABLED="true";process.env.TEST_DELIVERY_MODE="capture";
-  assert.deepEqual(testLabConfiguration(),{enabled:true,environment:"development",databaseAllowlistConfigured:Boolean(process.env.TEST_LAB_DATABASE_NAME),credentialEncryptionConfigured:Boolean(process.env.TEST_LAB_CREDENTIAL_ENCRYPTION_KEY),deliveryMode:"capture"});
+  process.env.NODE_ENV="development";process.env.TEST_LAB_ENABLED="true";process.env.TEST_LAB_DISPOSABLE_DATABASE="true";process.env.TEST_DELIVERY_MODE="capture";
+  assert.deepEqual(testLabConfiguration(),{enabled:true,environment:"development",databaseSafetyConfigured:true,deliveryMode:"capture"});
   process.env.TEST_DELIVERY_MODE="live";
   assert.equal(testLabConfiguration().deliveryMode,"blocked");
   process.env.NODE_ENV="production";
   assert.equal(testLabConfiguration().enabled,false);
  }finally{
-  for(const [key,value] of [["NODE_ENV",before.nodeEnv],["TEST_LAB_ENABLED",before.enabled],["TEST_DELIVERY_MODE",before.delivery]]){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+  for(const [key,value] of [["NODE_ENV",before.nodeEnv],["TEST_LAB_ENABLED",before.enabled],["TEST_LAB_DISPOSABLE_DATABASE",before.disposable],["TEST_DELIVERY_MODE",before.delivery]]){if(value===undefined)delete process.env[key];else process.env[key]=value;}
  }
 });
 

@@ -410,9 +410,8 @@ test("organization workspace uses state-aware onboarding and exposes only suppor
 });
 
 test("organization impact report reads scoped outcomes and does not invent unsupported impact data", async () => {
-  const [page, hub, overview, server, service] = await Promise.all([
+  const [page, overview, server, service] = await Promise.all([
     source("../../web/app/organizations/reports/page.tsx"),
-    source("../../web/app/organizations/page.tsx"),
     source("../../web/components/organization-workspace-overview.tsx"),
     source("../../server.js"),
     source("../../src/platform/stakeholder-outcomes.js"),

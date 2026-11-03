@@ -59,6 +59,7 @@ function normalizeListingInput(input) {
     serviceCategory:text(input.serviceCategory,100,"Service category",{min:2}).toLowerCase(),
     audience:input.audience||"members",
     deliveryMode:input.deliveryMode||"remote",
+    remoteAvailable:input.remoteAvailable===undefined?(input.deliveryMode||"remote")==="remote":input.remoteAvailable,
     locationLabel:text(input.locationLabel,160,"Location",{optional:true}),
     capacity:input.capacity===undefined||input.capacity===null||input.capacity===""?null:Number(input.capacity),
     pricingModel:input.pricingModel||"quote",
@@ -71,6 +72,7 @@ function normalizeListingInput(input) {
   if(!CATEGORIES.has(row.serviceCategory))fail(400,"Choose a supported service category.","VALIDATION_ERROR");
   if(!["members","organizations","both"].includes(row.audience))fail(400,"Unsupported listing audience.","VALIDATION_ERROR");
   if(!["remote","onsite","hybrid"].includes(row.deliveryMode))fail(400,"Unsupported delivery mode.","VALIDATION_ERROR");
+  if(typeof row.remoteAvailable!=="boolean")fail(400,"Remote availability must be explicitly selected.","VALIDATION_ERROR");
   if(!["free","fixed","hourly","unit","range","quote","subscription","not_applicable"].includes(row.pricingModel))fail(400,"Unsupported pricing model.","VALIDATION_ERROR");
   if(row.capacity!==null&&(!Number.isInteger(row.capacity)||row.capacity<1||row.capacity>100000))fail(400,"Capacity must be a positive whole number.","VALIDATION_ERROR");
   if(row.priceAmount!==null&&(!Number.isFinite(row.priceAmount)||row.priceAmount<0))fail(400,"Price must be a non-negative amount.","VALIDATION_ERROR");
@@ -424,8 +426,8 @@ export async function createProfessionalServiceListing(businessId,userId,input,r
       if(existing.request_fingerprint!==payloadFingerprint)fail(409,"This submission key was already used for different listing details.","IDEMPOTENCY_CONFLICT");
       return {...existing,idempotent:true};
     }
-    const row=(await db.query(`insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,audience,delivery_mode,location_label,capacity,pricing_model,price_amount,currency,pricing_details,availability,credentials,request_idempotency_hash,request_fingerprint)
-      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning *`,[businessId,userId,normalized.title,normalized.summary,normalized.description,normalized.serviceCategory,normalized.audience,normalized.deliveryMode,normalized.locationLabel,normalized.capacity,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.pricingDetails,normalized.availability,normalized.credentials,keyHash,payloadFingerprint])).rows[0];
+    const row=(await db.query(`insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,audience,delivery_mode,location_label,capacity,pricing_model,price_amount,currency,pricing_details,remote_available,availability,credentials,request_idempotency_hash,request_fingerprint)
+      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) returning *`,[businessId,userId,normalized.title,normalized.summary,normalized.description,normalized.serviceCategory,normalized.audience,normalized.deliveryMode,normalized.locationLabel,normalized.capacity,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.pricingDetails,normalized.remoteAvailable,normalized.availability,normalized.credentials,keyHash,payloadFingerprint])).rows[0];
     await audit(db,userId,"network_plus.service_listing_created","network_plus_service_listing",row.id,requestId,{businessId});
     return row;
   });

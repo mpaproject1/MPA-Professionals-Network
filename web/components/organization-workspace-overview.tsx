@@ -435,6 +435,7 @@ export function OrganizationWorkspaceOverview({
                   key={folder.key}
                   type="button"
                   role="tab"
+                  aria-label={folder.title}
                   id={`organization-folder-${folder.key}`}
                   aria-selected={selected}
                   aria-controls="organization-folder-panel"

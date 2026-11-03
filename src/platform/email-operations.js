@@ -324,6 +324,8 @@ export async function retryVerificationEmail(actorId,id,requestId){
  if(!providerConfig().ready&&!(process.env.NODE_ENV!=="production"&&process.env.TEST_DELIVERY_MODE==="capture"))fail(503,"Configure the email provider or enable safe development capture before retrying verification messages.","EMAIL_DELIVERY_NOT_CONFIGURED");
  const row=(await db.query("select u.email from email_verification_token t join app_user u on u.id=t.user_id where t.id=$1 and t.delivery_status='failed' and t.consumed_at is null",[id])).rows[0];
  if(!row)fail(409,"Only unconsumed verification messages with a recorded delivery failure can be retried.","INVALID_STATE");
+ const hold=(await db.query("select reason from email_recipient_suppression where email_normalized=lower(trim($1)) and cleared_at is null limit 1",[row.email])).rows[0];
+ if(hold)fail(409,"This verification recipient is on an outbound email hold. Resolve the address or consent issue before retrying.","RECIPIENT_HOLD_ACTIVE");
  const result=await resendEmailVerification(row.email,requestId);
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.verification.retry_requested','email_verification_token',$2,$3,'success',$4)",[actorId,id,requestId,{attemptRequested:Boolean(result.accepted)}]);
  return {requested:Boolean(result.accepted)};

@@ -158,6 +158,7 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   const inviteeDetail=await requests.getNetworkPlusRequest(handoffRequest.id,handoffInvitee.user.id);
   assert.deepEqual(inviteeDetail.clarifications,[]);
   assert.deepEqual(inviteeDetail.meetings,[]);
+  assert.ok(!inviteeDetail.events.some(event=>/request\.(clarification|meeting|contact_consent)_/.test(event.event_code)));
   await assert.rejects(()=>requests.getNetworkPlusContactHandoff(handoffRequest.id,handoffInvitee.user.id),e=>e.code==="PARTICIPANT_FORBIDDEN");
 
  await db.query("delete from app_user_role where user_id=$1 and role_id=$2",[reviewer.user.id,reviewerRole.id]);

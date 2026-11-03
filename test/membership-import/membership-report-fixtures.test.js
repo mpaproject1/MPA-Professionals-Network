@@ -87,6 +87,8 @@ test("Test Lab membership applications are excluded from management funnel, coho
 
   } finally {
     if (paymentId && applicationId) await db.query("delete from membership_application_payment where application_id=$1 and payment_transaction_id=$2", [applicationId,paymentId]);
+    if (paymentId) await db.query("delete from membership_fee_obligation_payment where payment_transaction_id=$1", [paymentId]);
+    if (applicationId) await db.query("delete from membership_fee_obligation where application_id=$1", [applicationId]);
     if (paymentId) await db.query("delete from payment_transaction where id=$1", [paymentId]);
     if (membershipRecordId) await db.query("delete from membership_record where id=$1", [membershipRecordId]);
     if (applicationId) await db.query("delete from membership_application where id=$1", [applicationId]);

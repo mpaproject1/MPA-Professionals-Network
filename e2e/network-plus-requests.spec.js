@@ -105,4 +105,39 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     expect(payload.terms.authorizedRepresentatives).toContain("Authorized project representative");
   });
 
+  test("opens a listing-scoped quotation request from an opportunity action",async({page})=>{
+    await mockSession(page);
+    await page.route("**/api/v1/network-plus/services?*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[{id:"listing-1",business_id:"business-1",business_name:"Verified Supply Co.",title:"Business equipment"}]}})}));
+    let payload=null;
+    await page.route("**/api/v1/network-plus/requests",async route=>{
+      if(route.request().method()==="POST"){payload=route.request().postDataJSON();await route.fulfill({status:201,contentType:"application/json",body:JSON.stringify({data:{...draft,intent:"quote_request",business_id:"business-1",service_listing_id:"listing-1"}})});}
+      else await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[]})});
+    });
+    await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{...draft,intent:"quote_request"}})}));
+    await page.goto("/network-plus/requests?action=quote_request&listingId=listing-1");
+    await expect(page.getByLabel("Request type")).toHaveValue("quote_request");
+    await expect(page.getByLabel("Subject")).toHaveValue("Request Quotation · Business equipment");
+    await page.getByRole("button",{name:"Save draft"}).click();
+    await expect.poll(()=>payload?.intent).toBe("quote_request");
+    expect(payload.serviceListingId).toBe("listing-1");
+    expect(payload.businessId).toBe("business-1");
+  });
+
+  test("accepted lightweight requests show consent and meeting handoff controls",async({page})=>{
+    await mockSession(page);
+    const accepted={...draft,intent:"meeting_request",status:"accepted",isRequester:true,recipient_user_id:"recipient-1",participants:[
+      {user_id:"requester-1",participant_role:"requester",consent_status:"accepted"},
+      {user_id:"recipient-1",participant_role:"recipient_representative",consent_status:"accepted"},
+    ],meetings:[],clarifications:[]};
+    await page.route("**/api/v1/network-plus/requests",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[accepted]})}));
+    await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:accepted})}));
+    await page.route("**/api/v1/network-plus/requests/request-1/contact-handoff?*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{requestId:"request-1",fields:[]}})}));
+    await page.goto("/network-plus/requests");
+    await page.getByRole("button",{name:/Website accessibility review/}).click();
+    await expect(page.getByText("Contact sharing · field-by-field consent")).toBeVisible();
+    await expect(page.getByText("First meeting handoff")).toBeVisible();
+    await expect(page.getByLabel("Contact field")).toBeVisible();
+    await expect(page.getByLabel("Date and time")).toBeVisible();
+  });
+
 });

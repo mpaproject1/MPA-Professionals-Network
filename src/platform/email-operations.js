@@ -87,6 +87,8 @@ export async function saveEmailTemplate(actorId,code,input,requestId){
  if(!/^[a-zA-Z0-9_.-]{2,100}$/.test(templateCode)||!subject||!textBody)fail(400,"Template code, subject and text body are required.","VALIDATION_ERROR");
  const audience=["all","professional","organization_representative","reviewer","administrator","employer","mentor"].includes(input.audience)?input.audience:"all";
  return withTransaction(async tx=>{
+  const existing=(await tx.query("select adjustable_by_admin from email_notification_template where template_code=$1 for update",[templateCode])).rows[0];
+  if(existing&&!existing.adjustable_by_admin)fail(403,"This system-managed email template cannot be edited by an administrator.","TEMPLATE_LOCKED");
   const row=(await tx.query(`insert into email_notification_template(template_code,display_name,audience,subject_template,text_template,html_template,enabled,updated_by,updated_at)
  values($1,$2,$3,$4,$5,$6,$7,$8,now()) on conflict(template_code) do update set display_name=excluded.display_name,audience=excluded.audience,subject_template=excluded.subject_template,text_template=excluded.text_template,html_template=excluded.html_template,enabled=excluded.enabled,updated_by=excluded.updated_by,updated_at=now()
  returning template_code,display_name,audience,subject_template,text_template,html_template,enabled,adjustable_by_admin,updated_at`,[templateCode,clean(input.displayName,150)||templateCode,audience,subject,textBody,html, input.enabled!==false,actorId])).rows[0];
@@ -139,6 +141,25 @@ export async function queueEmailDraft(actorId,draftId,requestId){
   return {queued:true,outboxId:queued.id};
  });
 }
+async function recipientMatchesAudience(db,recipient,audience){
+ if(!audience||audience==="all")return true;
+ const row=(await db.query(`select u.account_type,
+  exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('system_admin','admin','platform_admin')) is_admin,
+  exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','verification_reviewer','appeal_reviewer')) or
+   exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code in ('organizations.review','jobs.review','verification.review')) is_reviewer,
+  exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code='mentor') is_mentor,
+  exists(select 1 from organization_membership om where om.user_id=u.id and om.status='active' and om.role_code in ('owner','administrator','recruiter')) is_employer
+ from app_user u where lower(u.email)=lower($1) limit 1`,[recipient])).rows[0];
+ if(!row)return false;
+ if(audience==="professional")return row.account_type==="professional";
+ if(audience==="organization_representative")return row.account_type==="organization_representative";
+ if(audience==="employer")return row.account_type==="organization_representative"&&row.is_employer;
+ if(audience==="reviewer")return row.is_reviewer;
+ if(audience==="administrator")return row.is_admin;
+ if(audience==="mentor")return row.is_mentor;
+ return false;
+}
+
 export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=false}={}){
  const db=getPool();if(!system)await requireAdmin(db,actorId);
  if(process.env.TEST_LAB_ENABLED==="true"&&process.env.NODE_ENV==="production")fail(403,"Test Lab is forbidden in production; no email was sent.","TEST_LAB_PRODUCTION_BLOCKED");
@@ -165,7 +186,13 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
  for(const row of claimed){
   try{
    let subject=row.subject||"",textBody=row.text_body||row.payload?.text||"",htmlBody=row.html_body||row.payload?.html||"";
-   const template=(await db.query("select subject_template,text_template,html_template,enabled from email_notification_template where template_code=$1",[row.template_code])).rows[0];
+   const template=(await db.query("select subject_template,text_template,html_template,enabled,audience,adjustable_by_admin from email_notification_template where template_code=$1",[row.template_code])).rows[0];
+   if(template&&!await recipientMatchesAudience(db,row.recipient,template.audience)){
+    await db.query("update notification_outbox set status='cancelled',delivery_status='cancelled',delivery_event_type='audience_mismatch',delivery_event_at=now(),last_error='Recipient does not match the notification template audience',locked_at=null,updated_at=now() where id=$1",[row.id]);
+    await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.message.audience_rejected','notification_outbox',$1,'failure',$2)",[row.id,{templateCode:row.template_code,audience:template.audience}]);
+    results.push({id:row.id,status:"cancelled",reason:"audience_mismatch"});
+    continue;
+   }
    if(template&&!template.enabled){await db.query("update notification_outbox set status='cancelled',delivery_status='cancelled',delivery_event_type='template_disabled',delivery_event_at=now(),last_error='Notification template disabled by administrator',locked_at=null,updated_at=now() where id=$1",[row.id]);const matchId=row.payload?.matchId||row.payload?.variables?.matchId;if(row.template_code==="mentor.mentorship_update"&&matchId){try{await db.query("update mentorship_match set mentor_notification_status='cancelled',mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$1",[matchId,"Email template disabled; provider delivery did not occur."]);}catch(e){console.error("[email-outbox] could not update mentorship notification evidence",{outboxId:row.id});}}results.push({id:row.id,status:"cancelled"});continue;}
    if(template?.enabled){const vars={...(row.payload||{}),...(row.payload?.variables||{})};subject=render(template.subject_template,vars);textBody=render(template.text_template,vars);htmlBody=render(template.html_template,vars,{html:true});}
    const humanEvent=String(row.template_code||"account update").replace(/[._-]+/g," ").replace(/\b\w/g,ch=>ch.toUpperCase());

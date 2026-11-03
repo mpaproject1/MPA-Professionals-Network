@@ -149,6 +149,7 @@ export async function dispatchPendingVerificationEmails({ limit = 20, onlyTokenI
   const db = getPool();
   const batch = Math.min(Math.max(Number(limit) || 20, 1), 50);
   const jobs = await withTransaction(async tx => {
+    await tx.query("update email_verification_delivery set status='pending',locked_at=null,next_attempt_at=least(next_attempt_at,now()),updated_at=now() where status='processing' and locked_at<now()-interval '5 minutes'");
     const selected = (await tx.query(
       `select d.id,d.verification_token_id,d.encrypted_token,d.encryption_iv,d.encryption_tag,
               t.expires_at,t.consumed_at,u.email,u.registration_reference,p.first_name
@@ -156,7 +157,7 @@ export async function dispatchPendingVerificationEmails({ limit = 20, onlyTokenI
        join email_verification_token t on t.id=d.verification_token_id
        join app_user u on u.id=t.user_id
        left join person p on p.user_id=u.id
-       where d.status in ('pending','failed')
+       where d.status in ('pending','failed') and d.attempts<8
          and t.consumed_at is null and t.expires_at>now()
          and ($1::uuid is null or t.id=$1::uuid)
          and ($2::boolean or d.next_attempt_at<=now())

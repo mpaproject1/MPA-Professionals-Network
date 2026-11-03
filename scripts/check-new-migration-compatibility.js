@@ -38,6 +38,7 @@ const migrationNames = [
   "20261103120000_network_plus_phase0_contract_alignment.sql",
   "20261103130000_network_plus_phase1_needs_offers.sql",
   "20261103140000_network_plus_phase2_connection_handoff.sql",
+  "20261103150000_network_plus_phase3_requester_disposition.sql",
   "20261031130000_serve_community_initiatives.sql",
   "20261031140000_serve_community_offline_completed_projects.sql",
   "20261031150000_community_impact_detection.sql",
@@ -151,6 +152,12 @@ const requiredColumns = [
   ["network_plus_request", "recipient_response", "text"],
   ["network_plus_request", "recipient_response_by", "uuid"],
   ["network_plus_request", "recipient_response_at", "timestamptz"],
+  ["network_plus_request", "requester_disposition", "text"],
+  ["network_plus_request", "requester_disposition_remark", "text"],
+  ["network_plus_request", "requester_disposition_updated_at", "timestamptz"],
+  ["network_plus_request", "review_due_at", "timestamptz"],
+  ["network_plus_request", "review_reminder_sent_at", "timestamptz"],
+  ["network_plus_request", "recipient_withdrawn_at", "timestamptz"],
   ["network_plus_request_contact_consent", "request_id", "uuid"],
   ["network_plus_request_contact_consent", "recipient_user_id", "uuid"],
   ["network_plus_request_contact_consent", "field_code", "text"],
@@ -894,7 +901,10 @@ try {
     ["support_conversation_workflow","support_conversation_workflow_priority_check",["low","normal","high","urgent"]],
     ["support_conversation_workflow","support_conversation_workflow_waiting_on_check",["none","member","organization","provider","internal"]],
     ["mentorship_match","mentorship_match_mentee_consent_status_check",["pending","accepted","declined"]],
-    ["network_plus_request","network_plus_request_recipient_response_complete_check",["question"]]
+    ["network_plus_request","network_plus_request_recipient_response_complete_check",["question"]],
+    ["network_plus_request","network_plus_request_requester_disposition_check",["in_progress","completed","cancelled"]],
+    ["network_plus_request","network_plus_request_disposition_closure_remark_check",["completed","cancelled"]],
+    ["network_plus_request","network_plus_request_status_check",["recipient_withdrawn"]]
   ];
   for (const [table,name,values] of requiredChecks) {
     const row = (await client.query(
@@ -935,7 +945,9 @@ try {
   const phase2Indexes=[
     ["ix_network_plus_contact_consent_peer","network_plus_request_contact_consent",["recipient_user_id","request_id","field_code"]],
     ["ix_network_plus_request_meeting_history","network_plus_request_meeting",["request_id","created_at"]],
-    ["ix_network_plus_request_clarification_open","network_plus_request_clarification",["request_id","status","created_at"]]
+    ["ix_network_plus_request_clarification_open","network_plus_request_clarification",["request_id","status","created_at"]],
+    ["ix_network_plus_request_requester_disposition","network_plus_request",["requester_user_id","requester_disposition","updated_at"]],
+    ["ix_network_plus_request_review_due","network_plus_request",["review_due_at","id"]]
   ];
   for(const [name,table,columns] of phase2Indexes){
     const index=(await client.query("select indexdef from pg_indexes where schemaname='public' and tablename=$1 and indexname=$2",[table,name])).rows[0];

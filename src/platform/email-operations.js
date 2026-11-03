@@ -92,6 +92,7 @@ export async function saveEmailTemplate(actorId,code,input,requestId){
  const db=getPool();await requireAdmin(db,actorId);
  const templateCode=clean(code,100);
  if(templateCode==="account.email_verification"&&input.enabled===false)fail(400,"Email verification is security-critical and cannot be disabled.","SECURITY_TEMPLATE_REQUIRED");
+ if(templateCode==="account.email_verification"&&input.audience!==undefined&&input.audience!=="all")fail(400,"Email verification is security-critical and must remain available to all eligible account holders.","SECURITY_TEMPLATE_AUDIENCE_LOCKED");
  const subject=clean(input.subjectTemplate,300),textBody=String(input.textTemplate||"").slice(0,20000),html=String(input.htmlTemplate||"").slice(0,30000);
  if(!/^[a-zA-Z0-9_.-]{2,100}$/.test(templateCode)||!subject||!textBody)fail(400,"Template code, subject and text body are required.","VALIDATION_ERROR");
  const allowedAudiences=["all","professional","organization_representative","reviewer","administrator","employer","mentor"];

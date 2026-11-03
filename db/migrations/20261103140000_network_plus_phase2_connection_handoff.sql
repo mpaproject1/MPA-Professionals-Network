@@ -58,8 +58,8 @@ create table if not exists network_plus_request_meeting (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (responder_user_id<>proposer_user_id),
-  check ((status='countered' and counter_starts_at is not null and counter_timezone is not null and counter_duration_minutes is not null) or status<>'countered'),
-  check ((status='confirmed' and confirmed_at is not null and confirmed_by is not null and confirmed_starts_at is not null and confirmed_timezone is not null and confirmed_duration_minutes is not null) or status<>'confirmed')
+  check ((status='countered' and counter_place_type is not null and counter_starts_at is not null and counter_timezone is not null and counter_duration_minutes in (15,30,45,60,90,120)) or status<>'countered'),
+  check ((status='confirmed' and confirmed_place_type is not null and confirmed_at is not null and confirmed_by is not null and confirmed_starts_at is not null and confirmed_timezone is not null and confirmed_duration_minutes in (15,30,45,60,90,120)) or status<>'confirmed')
 );
 create unique index if not exists ux_network_plus_request_meeting_active
   on network_plus_request_meeting(request_id) where status in ('proposed','countered');

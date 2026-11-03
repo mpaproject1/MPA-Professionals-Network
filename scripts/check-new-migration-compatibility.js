@@ -914,12 +914,24 @@ try {
     if(!found)throw new Error(`Network-Plus Phase 2 check constraint on ${table} is missing required invariant fragments: ${fragments.join(", ")}.`);
   };
   requirePhase2Check("network_plus_request",["recipient_response is null","recipient_response_by is null","recipient_response_at is null","intent = 'question'","recipient_response is not null","recipient_response_by is not null","recipient_response_at is not null"]);
-  requirePhase2Check("network_plus_request_contact_consent",["field_code","business_location","whatsapp"]);
+  requirePhase2Check("network_plus_request_contact_consent",["field_code","'email'","'phone'","'whatsapp'","'website'","'business_location'"]);
+  requirePhase2Check("network_plus_request_contact_consent",["requester_status","'pending'","'accepted'","'declined'","'revoked'"]);
+  requirePhase2Check("network_plus_request_contact_consent",["recipient_status","'pending'","'accepted'","'declined'","'revoked'"]);
   requirePhase2Check("network_plus_request_contact_consent",["requester_status = 'accepted'","requester_value_ciphertext is not null","requester_consented_at is not null"]);
   requirePhase2Check("network_plus_request_contact_consent",["recipient_status = 'accepted'","recipient_value_ciphertext is not null","recipient_consented_at is not null"]);
-  requirePhase2Check("network_plus_request_meeting",["status = 'countered'","counter_place_type is not null","counter_starts_at is not null","counter_timezone is not null"]);
-  requirePhase2Check("network_plus_request_meeting",["status = 'confirmed'","confirmed_place_type is not null","confirmed_by is not null","confirmed_starts_at is not null"]);
+  requirePhase2Check("network_plus_request_meeting",["status","'proposed'","'countered'","'confirmed'","'declined'","'cancelled'"]);
+  requirePhase2Check("network_plus_request_meeting",["place_type","'office'","'coffee'","'online'","'other'"]);
+  requirePhase2Check("network_plus_request_meeting",["duration_minutes","15","30","45","60","90","120"]);
+  requirePhase2Check("network_plus_request_meeting",["responder_user_id <> proposer_user_id"]);
+  requirePhase2Check("network_plus_request_meeting",["status = 'countered'","counter_place_type is not null","counter_starts_at is not null","counter_timezone is not null","counter_duration_minutes is not null"]);
+  requirePhase2Check("network_plus_request_meeting",["status = 'confirmed'","confirmed_place_type is not null","confirmed_by is not null","confirmed_starts_at is not null","confirmed_timezone is not null","confirmed_duration_minutes is not null"]);
+  requirePhase2Check("network_plus_request_clarification",["prompt_code","'scope'","'budget'","'timeline'","'quantity'","'location'","'availability'","'eligibility'","'other'"]);
+  requirePhase2Check("network_plus_request_clarification",["status","'open'","'answered'","'closed'"]);
   requirePhase2Check("network_plus_request_clarification",["status = 'answered'","answer is not null","answered_by is not null","answered_at is not null"]);
+  const phase2ActiveMeetingIndex=(await client.query("select indexdef from pg_indexes where schemaname='public' and indexname='ux_network_plus_request_meeting_active'")).rows[0];
+  if(!phase2ActiveMeetingIndex||!phase2ActiveMeetingIndex.indexdef.toLowerCase().includes("where")||!phase2ActiveMeetingIndex.indexdef.includes("'proposed'")||!phase2ActiveMeetingIndex.indexdef.includes("'countered'"))throw new Error("The active meeting unique index must be partial and limited to proposed/countered meetings.");
+  const phase2MeetingIdempotencyIndex=(await client.query("select indexdef from pg_indexes where schemaname='public' and indexname='ux_network_plus_request_meeting_idempotency'")).rows[0];
+  if(!phase2MeetingIdempotencyIndex||!["request_id","proposer_user_id","idempotency_hash"].every(column=>phase2MeetingIdempotencyIndex.indexdef.includes(column)))throw new Error("The meeting idempotency index must be scoped to request, proposer and idempotency hash.");
   const phase2Indexes=[
     ["ix_network_plus_contact_consent_peer","network_plus_request_contact_consent",["recipient_user_id","request_id","field_code"]],
     ["ix_network_plus_request_meeting_history","network_plus_request_meeting",["request_id","created_at"]],

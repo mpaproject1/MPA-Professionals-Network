@@ -146,6 +146,9 @@ test("Phase 2 API and icon-led opportunity actions use the existing private requ
  for(const intent of ["interest","question","quote_request","meeting_request"])assert.ok(ui.includes('value:"'+intent+'"'));
  assert.match(ui,/Contact sharing · field-by-field consent/);
  assert.match(ui,/First meeting handoff/);
+ assert.match(ui,/Step \{requestStep\} of 4/);
+ assert.match(ui,/Review your connection request/);
+ assert.match(ui,/meetingInstant/);
  assert.match(ui,/Ask for clarification/);
  assert.match(opportunities,/I’m interested/);
  assert.match(opportunities,/Ask a question/);

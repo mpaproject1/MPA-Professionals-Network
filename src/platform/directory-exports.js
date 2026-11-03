@@ -158,7 +158,7 @@ function buildQuery(kind, identity, filters) {
     clauses.push(`($${args.length + 1}::date is null or u.created_at < ($${args.length + 1}::date + interval '1 day'))`); args.push(filters.to || null);
     clauses.push(`(${args.length + 1}::text='' or u.status=${args.length + 1}::text)`); args.push(filters.status);
     clauses.push(`($${args.length + 1}='' or lower(coalesce(p.display_name,'')||' '||coalesce(u.email,'')||' '||coalesce(u.account_reference,'')) like lower('%'||$${args.length + 1}||'%'))`); args.push(filters.q);
-    if (filters.membershipStatus) { clauses.push(`(${membershipState})=$${args.length + 1}`); args.push(filters.membershipStatus); }
+    if (filters.membershipStatus) { clauses.push(`(${membershipState})=${args.length + 1}::text`); args.push(filters.membershipStatus); }
     if (filters.membershipScope === "members") clauses.push("exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status<>'merged')");
     if (filters.membershipScope === "non_members") clauses.push("not exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status<>'merged')");
     if (batchFilter) { clauses.push(`exists(select 1 from membership_record mr where mr.user_id=u.id and mr.source_import_id::text=$${args.length + 1})`); args.push(filters.importBatch); }

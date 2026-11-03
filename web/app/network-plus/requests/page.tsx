@@ -44,6 +44,7 @@ export default function NetworkPlusRequestsPage(){
  const [scope,setScope]=useState(""),[deliverables,setDeliverables]=useState("");
  const [pricing,setPricing]=useState("Quotation requested"),[schedule,setSchedule]=useState("");
  const [purpose,setPurpose]=useState(""),[contributions,setContributions]=useState(""),[responsibilities,setResponsibilities]=useState(""),[outputs,setOutputs]=useState(""),[timeline,setTimeline]=useState(""),[representatives,setRepresentatives]=useState("");
+ const [opportunityType,setOpportunityType]=useState(""),[eligibility,setEligibility]=useState(""),[selectionProcess,setSelectionProcess]=useState(""),[opportunityDeadline,setOpportunityDeadline]=useState(""),[opportunityValue,setOpportunityValue]=useState("");
  const [updateTitle,setUpdateTitle]=useState(""),[updateBody,setUpdateBody]=useState(""),[updateType,setUpdateType]=useState("update");
  const [milestoneTitle,setMilestoneTitle]=useState(""),[milestoneDue,setMilestoneDue]=useState("");
  const [completionEvidence,setCompletionEvidence]=useState("");
@@ -83,6 +84,7 @@ export default function NetworkPlusRequestsPage(){
    let terms:Record<string,any>={};
    if(intent==="service_request")terms={scope,deliverables:lines(deliverables),pricing:{proposal:pricing},schedule:{requested:schedule||"To be agreed"}};
    if(intent==="partnership_proposal"||intent==="collaboration_request")terms={purpose,scope,contributions:lines(contributions),responsibilities:lines(responsibilities),outputs:lines(outputs),timeline:{proposed:timeline},authorizedRepresentatives:lines(representatives)};
+   if(intent==="business_opportunity")terms={opportunityType,eligibility,selectionProcess,deadline:opportunityDeadline||null,value:opportunityValue||null};
    const created=await api<RequestRow>("/api/v1/network-plus/requests",{method:"POST",headers:{"X-Idempotency-Key":key()},body:JSON.stringify({intent,recipientUserId:recipientUserId||undefined,recipientOrganizationId:recipientOrganizationId||undefined,businessId:businessId||undefined,serviceListingId:serviceListingId||undefined,subject,summary,details:{},terms})},token);
    setNotice("Draft saved. It is not yet submitted and creates no agreement or workspace.");
    setSelectedId(created.id);await load();
@@ -149,6 +151,13 @@ export default function NetworkPlusRequestsPage(){
       <label className="grid gap-1 text-sm">Deliverables (one per line)<textarea required className="input min-h-20" value={deliverables} onChange={e=>setDeliverables(e.target.value)}/></label>
       <label className="grid gap-1 text-sm">Pricing / quotation<input required className="input" value={pricing} onChange={e=>setPricing(e.target.value)}/></label>
       <label className="grid gap-1 text-sm">Schedule<textarea className="input" value={schedule} onChange={e=>setSchedule(e.target.value)} placeholder="Leave blank to agree schedule with recipient"/></label>
+     </fieldset>}
+     {intent==="business_opportunity"&&<fieldset className="grid gap-3 rounded-xl border p-3"><legend className="px-1 font-semibold">Opportunity details</legend>
+      <label className="grid gap-1 text-sm">Opportunity type<input required className="input" value={opportunityType} onChange={e=>setOpportunityType(e.target.value)} placeholder="Grant, seed support, accelerator, programme"/></label>
+      <label className="grid gap-1 text-sm">Eligibility<textarea required className="input min-h-20" value={eligibility} onChange={e=>setEligibility(e.target.value)}/></label>
+      <label className="grid gap-1 text-sm">Selection process<textarea required className="input min-h-20" value={selectionProcess} onChange={e=>setSelectionProcess(e.target.value)}/></label>
+      <label className="grid gap-1 text-sm">Deadline<input type="date" className="input" value={opportunityDeadline} onChange={e=>setOpportunityDeadline(e.target.value)}/></label>
+      <label className="grid gap-1 text-sm">Value / compensation (optional)<input className="input" value={opportunityValue} onChange={e=>setOpportunityValue(e.target.value)}/></label>
      </fieldset>}
      {(intent==="partnership_proposal"||intent==="collaboration_request")&&<fieldset className="grid gap-3 rounded-xl border p-3"><legend className="px-1 font-semibold">Partnership and collaboration terms</legend>
       <label className="grid gap-1 text-sm">Purpose<textarea required className="input" value={purpose} onChange={e=>setPurpose(e.target.value)}/></label>

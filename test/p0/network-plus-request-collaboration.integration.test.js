@@ -177,6 +177,11 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   const contactNotices=await db.query("select body,payload from notification_event where resource_type='network_plus_request' and resource_id=$1 and event_code like 'network_plus.request.contact_%'",[handoffRequest.id]);
   assert.ok(contactNotices.rows.length>0);
   assert.ok(contactNotices.rows.every(row=>!String(row.body||"").includes(requesterEmail)&&!JSON.stringify(row.payload||{}).includes(requesterEmail)&&!String(row.body||"").includes(recipientEmail)&&!JSON.stringify(row.payload||{}).includes(recipientEmail)));
+  const originalNow=Date.now;
+  Date.now=()=>Date.parse("2026-10-01T00:00:00.000Z");
+  try{
+    await assert.rejects(()=>requests.createNetworkPlusMeetingProposal(handoffRequest.id,requester.user.id,{peerUserId:recipient.user.id,placeType:"online",placeDetails:"An introductory online meeting.",startsAt:"2026-11-01T05:30:00.000Z",timezone:"America/New_York",durationMinutes:30},requestRef,randomUUID()+randomUUID()),e=>e.code==="AMBIGUOUS_LOCAL_MEETING_TIME");
+  }finally{Date.now=originalNow;}
   const meetingTime=new Date(Date.now()+48*60*60*1000).toISOString();
   const meeting=await requests.createNetworkPlusMeetingProposal(handoffRequest.id,requester.user.id,{peerUserId:recipient.user.id,placeType:"online",placeDetails:"Video call to be arranged outside the platform.",startsAt:meetingTime,timezone:"Africa/Addis_Ababa",durationMinutes:30},requestRef,randomUUID()+randomUUID());
   assert.equal(meeting.status,"proposed");

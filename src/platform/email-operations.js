@@ -5,7 +5,7 @@ import { renderBrandedEmail } from "./email-template.js";
 import { resendEmailVerification } from "./email-verification.js";
 import { createInAppNotification } from "./notifications.js";
 import { captureTestDelivery } from "./test-lab.js";
-import { emailWorkflowEventKey, normalizeEmailAddress } from "./email-event-idempotency.js";
+import { emailAudienceMatches, emailWorkflowEventKey, normalizeEmailAddress } from "./email-event-idempotency.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 async function requireAdmin(db,actorId){
@@ -151,13 +151,7 @@ async function recipientMatchesAudience(db,recipient,audience){
   exists(select 1 from organization_membership om where om.user_id=u.id and om.status='active' and om.role_code in ('owner','administrator','recruiter')) is_employer
  from app_user u where lower(u.email)=lower($1) limit 1`,[recipient])).rows[0];
  if(!row)return false;
- if(audience==="professional")return row.account_type==="professional";
- if(audience==="organization_representative")return row.account_type==="organization_representative";
- if(audience==="employer")return row.account_type==="organization_representative"&&row.is_employer;
- if(audience==="reviewer")return row.is_reviewer;
- if(audience==="administrator")return row.is_admin;
- if(audience==="mentor")return row.is_mentor;
- return false;
+ return emailAudienceMatches(audience,{accountType:row.account_type,isAdmin:row.is_admin,isReviewer:row.is_reviewer,isMentor:row.is_mentor,isEmployer:row.is_employer});
 }
 
 export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=false}={}){

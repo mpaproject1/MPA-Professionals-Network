@@ -1,9 +1,9 @@
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { loadConfig } from "./config.js";
 import { getPool, withTransaction } from "./db.js";
 import { renderVerificationEmail } from "./email-template.js";
-import { emailIdempotencyKey } from "./email-retry-policy.js";
-import { captureTestDelivery } from "./test-lab.js";
+import { classifyEmailDeliveryError, emailRetryDelaySeconds } from "./email-retry-policy.js";
+import { encryptVerificationToken, decryptVerificationToken } from "./email-verification-crypto.js";
 
 const sha256 = value => createHash("sha256").update(String(value)).digest("hex");
 const clean = value => String(value || "").trim();
@@ -43,109 +43,159 @@ export function assertEmailDeliveryConfigured() {
 export async function createEmailVerification(db, userId, email, registrationReference, firstName = "") {
   assertEmailDeliveryConfigured();
   const token = randomBytes(32).toString("base64url");
-  await db.query(
-    "insert into email_verification_token(user_id,token_hash,expires_at) values($1,$2,now()+interval '24 hours')",
+  const tokenRow = (await db.query(
+    "insert into email_verification_token(user_id,token_hash,expires_at) values($1,$2,now()+interval '24 hours') returning id",
     [userId, sha256(token)]
+  )).rows[0];
+  const encrypted = encryptVerificationToken(token);
+  await db.query(
+    "insert into email_verification_delivery(verification_token_id,encrypted_token,encryption_iv,encryption_tag) values($1,$2,$3,$4)",
+    [tokenRow.id, encrypted.encryptedToken, encrypted.encryptionIv, encrypted.encryptionTag]
   );
-  return { token, verificationUrl: emailUrl(token), registrationReference, email, firstName };
+  return { token, tokenId: tokenRow.id, verificationUrl: emailUrl(token), registrationReference, email, firstName };
 }
 
 export async function deliverEmailVerification(message) {
-  const config = loadConfig();
-  const templateResult = await getPool().query("select subject_template,text_template,html_template from email_notification_template where template_code='account.email_verification'").catch(()=>({rows:[]}));
-  const template = templateResult.rows[0];
-  const vars = {firstName: message.firstName || "", verificationUrl: message.verificationUrl, registrationReference: message.registrationReference || ""};
-  const render = (source, html=false) => String(source || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_,key) => { const value=String(vars[key] ?? ""); return html ? value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;") : value; });
-  const emailSubject = template ? render(template.subject_template) : "Verify your MPA Professionals Network email";
-  const emailText = template ? render(template.text_template) : `Verify your email to activate your MPA Professionals Network account. This link expires in 24 hours. Registration reference: ${message.registrationReference}. Link: ${message.verificationUrl}`;
-  const hold=(await getPool().query("select reason from email_recipient_suppression where email_normalized=lower(trim($1)) and cleared_at is null limit 1",[message.email])).rows[0];
-  if(hold){
-    await getPool().query("update email_verification_token set delivery_attempted_at=now(),delivery_status='failed',delivery_error_code='RECIPIENT_SUPPRESSED' where token_hash=$1 and consumed_at is null",[sha256(message.token)]);
-    return {sent:false,suppressed:true};
+  const db = getPool();
+  const tokenHash = sha256(message.token);
+  const tokenRow = (await db.query(
+    "select id,user_id,expires_at,consumed_at from email_verification_token where token_hash=$1 limit 1",
+    [tokenHash]
+  )).rows[0];
+  if (!tokenRow || tokenRow.consumed_at || new Date(tokenRow.expires_at).getTime() <= Date.now()) {
+    return { sent: false, expired: true };
   }
-  const emailHtml = renderVerificationEmail({
-    subject: emailSubject,
-    textBody: emailText,
+  const encrypted = encryptVerificationToken(message.token);
+  const delivery = (await db.query(
+    `insert into email_verification_delivery(verification_token_id,encrypted_token,encryption_iv,encryption_tag)
+     values($1,$2,$3,$4)
+     on conflict(verification_token_id) do update set updated_at=now()
+     returning id,status,attempts`,
+    [tokenRow.id, encrypted.encryptedToken, encrypted.encryptionIv, encrypted.encryptionTag]
+  )).rows[0];
+  const hold = (await db.query(
+    "select reason from email_recipient_suppression where email_normalized=lower(trim($1)) and cleared_at is null limit 1",
+    [message.email]
+  )).rows[0];
+  if (hold) {
+    await withTransaction(async tx => {
+      await tx.query("update email_verification_delivery set status='suppressed',last_error='Recipient is on an outbound email hold',last_error_code='RECIPIENT_SUPPRESSED',locked_at=null,updated_at=now() where id=$1", [delivery.id]);
+      await tx.query("update email_verification_token set delivery_attempted_at=now(),delivery_status='failed',delivery_error_code='RECIPIENT_SUPPRESSED' where id=$1 and consumed_at is null", [tokenRow.id]);
+      await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,'email.verification.delivery_suppressed','email_verification_token',$2,'suppressed',$3)", [tokenRow.user_id, tokenRow.id, { deliveryId: delivery.id, reason: hold.reason }]);
+    });
+    return { sent: false, suppressed: true };
+  }
+
+  const templateResult = await db.query("select subject_template,text_template,html_template,audience,enabled from email_notification_template where template_code='account.email_verification'");
+  const template = templateResult.rows[0];
+  if (template?.enabled === false || (template?.audience && template.audience !== "all")) {
+    const error = Object.assign(new Error("The security-critical verification template must remain enabled for all recipients."), { code: "VERIFICATION_TEMPLATE_POLICY_VIOLATION", statusCode: 503 });
+    await db.query("update email_verification_delivery set status='failed',last_error=$2,last_error_code=$3,locked_at=null,updated_at=now() where id=$1", [delivery.id, error.message, error.code]);
+    throw error;
+  }
+  const vars = { firstName: message.firstName || "", verificationUrl: message.verificationUrl, registrationReference: message.registrationReference || "" };
+  const render = (source, html=false) => String(source || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_,key) => {
+    const value=String(vars[key] ?? "");
+    return html ? value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;") : value;
+  });
+  const subject = template ? render(template.subject_template) : "Verify your MPA Professionals Network email";
+  const textBody = template ? render(template.text_template) : `Verify your email to activate your MPA Professionals Network account. This link expires in 24 hours. Registration reference: ${message.registrationReference}. Link: ${message.verificationUrl}`;
+  const htmlBody = renderVerificationEmail({
+    subject, textBody,
     htmlTemplate: template ? render(template.html_template, true) : "",
     verificationUrl: message.verificationUrl,
     registrationReference: message.registrationReference
   });
-  const environment = config.nodeEnv;
-  const captureMode = process.env.TEST_DELIVERY_MODE === "capture";
-  const testLabEnabled = process.env.TEST_LAB_ENABLED === "true";
-  if (environment === "production" && (captureMode || testLabEnabled)) {
-    throw Object.assign(new Error("Test delivery capture is forbidden in production; no external email was sent."), { statusCode: 403, code: "TEST_DELIVERY_PRODUCTION_BLOCKED" });
-  }
-  if (testLabEnabled && !captureMode) {
-    throw Object.assign(new Error("Test Lab requires TEST_DELIVERY_MODE=capture; no external email was sent."), { statusCode: 503, code: "TEST_DELIVERY_CAPTURE_REQUIRED" });
-  }
-  if (captureMode && environment !== "production") {
-    await captureTestDelivery({
-      channel: "email",
-      recipient: message.email,
-      eventCode: "account.email_verification",
-      payload: {
-        subject: emailSubject,
-        text: emailText,
-        html: emailHtml,
-        verificationUrl: message.verificationUrl,
-        registrationReference: message.registrationReference || null,
-        captured: true
-      }
-    });
-    await getPool().query("update email_verification_token set delivery_attempted_at=now(),delivery_status='captured',delivery_error_code=null where token_hash=$1 and consumed_at is null",[sha256(message.token)]);
-    return { sent: true, captured: true };
-  }
-  const resendKey = clean(process.env.RESEND_API_KEY);
-  const emailFrom = clean(process.env.EMAIL_FROM);
-  const endpoint = clean(process.env.EMAIL_DELIVERY_WEBHOOK_URL);
-  const secret = clean(process.env.EMAIL_DELIVERY_WEBHOOK_SECRET);
-  const idempotencyKey = emailIdempotencyKey("verification-" + sha256(message.token));
-  if (resendKey && emailFrom) {
-    let sent = false, errorCode = null;
-    try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${resendKey}`, "Idempotency-Key": idempotencyKey },
-        body: JSON.stringify({ from: emailFrom, to: [message.email], subject: emailSubject, text: emailText, html: emailHtml }),
-        signal: AbortSignal.timeout(8000)
-      });
-      sent = response.ok;
-      if (!sent) errorCode = `RESEND_HTTP_${response.status}`;
-    } catch { errorCode = "RESEND_UNREACHABLE"; }
-    await getPool().query("update email_verification_token set delivery_attempted_at=now(),delivery_status=$1,delivery_error_code=$2 where token_hash=$3 and consumed_at is null",[sent?"sent":"failed",errorCode,sha256(message.token)]);
-    return { sent };
-  }
-  if (!endpoint || !secret) {
-    if (config.nodeEnv === "production") throw Object.assign(new Error("Email verification delivery is not configured."), { statusCode: 503, code: "EMAIL_DELIVERY_NOT_CONFIGURED" });
+  const config = loadConfig();
+  if (config.nodeEnv !== "production" && !process.env.TEST_DELIVERY_MODE && !process.env.RESEND_API_KEY && !process.env.EMAIL_DELIVERY_WEBHOOK_URL) {
     return { sent: false, developmentVerificationUrl: message.verificationUrl };
   }
-  const payload = {
-    to: message.email,
-    template: "mpa-email-verification",
-    subject: emailSubject,
-    registrationReference: message.registrationReference,
-    verificationUrl: message.verificationUrl,
-    expiresInHours: 24,
-    idempotencyKey,
-    text: emailText,
-    html: emailHtml
-  };
-  const serialized = JSON.stringify(payload);
-  const signature = createHmac("sha256", secret).update(serialized).digest("hex");
-  let sent = false, errorCode = null;
+  const { sendEmailMessage } = await import("./email-operations.js");
   try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${secret}`, "x-mpa-payload-signature": signature },
-      body: serialized,
-      signal: AbortSignal.timeout(8000)
+    const sent = await sendEmailMessage({
+      recipient: message.email, subject, textBody, htmlBody,
+      templateCode: "account.email_verification",
+      payload: { registrationReference: message.registrationReference || null },
+      idempotencyKey: "verification-" + tokenHash
     });
-    sent = response.ok;
-    if (!sent) errorCode = `DELIVERY_HTTP_${response.status}`;
-  } catch { errorCode = "DELIVERY_UNREACHABLE"; }
-  await getPool().query("update email_verification_token set delivery_attempted_at=now(),delivery_status=$1,delivery_error_code=$2 where token_hash=$3 and consumed_at is null",[sent?"sent":"failed",errorCode,sha256(message.token)]);
-  return { sent };
+    const captured = sent.captured === true;
+    await withTransaction(async tx => {
+      await tx.query(
+        "update email_verification_delivery set status=$2,attempts=attempts+1,provider_message_id=$3,provider=$4,last_error=null,last_error_code=null,next_attempt_at=now(),locked_at=null,sent_at=case when $2='sent' then now() else sent_at end,captured_at=case when $2='captured' then now() else captured_at end,updated_at=now() where id=$1",
+        [delivery.id, captured ? "captured" : "sent", sent.providerMessageId || null, sent.provider || (captured ? "test-capture" : null)]
+      );
+      await tx.query("update email_verification_token set delivery_attempted_at=now(),delivery_status=$2,delivery_error_code=null where id=$1 and consumed_at is null", [tokenRow.id, captured ? "captured" : "sent"]);
+      await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,'email_verification_token',$3,'success',$4)", [tokenRow.user_id, captured ? "email.verification.delivery_captured" : "email.verification.provider_accepted", tokenRow.id, { deliveryId: delivery.id, providerMessageId: sent.providerMessageId || null, attempt: Number(delivery.attempts || 0) + 1 }]);
+    });
+    return { sent: true, captured, providerMessageId: sent.providerMessageId || null };
+  } catch (error) {
+    const classification = classifyEmailDeliveryError(error);
+    const attempt = Number(delivery.attempts || 0) + 1;
+    const exhausted = attempt >= 8 || !classification.retryable;
+    const delay = emailRetryDelaySeconds(attempt);
+    await withTransaction(async tx => {
+      await tx.query(
+        "update email_verification_delivery set status='failed',attempts=attempts+1,next_attempt_at=$2,locked_at=null,last_error=$3,last_error_code=$4,updated_at=now() where id=$1",
+        [delivery.id, exhausted ? new Date(Date.now() + 3650 * 86400000) : new Date(Date.now() + delay * 1000), String(error?.message || "Delivery failed").slice(0,500), classification.code]
+      );
+      await tx.query("update email_verification_token set delivery_attempted_at=now(),delivery_status='failed',delivery_error_code=$2 where id=$1 and consumed_at is null", [tokenRow.id, classification.code]);
+      await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,'email.verification.delivery_failed','email_verification_token',$2,$3,$4)", [tokenRow.user_id, tokenRow.id, exhausted ? "failure" : "retry_scheduled", { deliveryId: delivery.id, code: classification.code, attempt, retryable: !exhausted }]);
+    });
+    return { sent: false, retryScheduled: !exhausted, errorCode: classification.code };
+  }
+}
+
+export async function dispatchPendingVerificationEmails({ limit = 20, onlyTokenId = null, force = false } = {}) {
+  const db = getPool();
+  const batch = Math.min(Math.max(Number(limit) || 20, 1), 50);
+  const jobs = await withTransaction(async tx => {
+    const selected = (await tx.query(
+      `select d.id,d.verification_token_id,d.encrypted_token,d.encryption_iv,d.encryption_tag,
+              t.expires_at,t.consumed_at,u.email,u.registration_reference,p.first_name
+       from email_verification_delivery d
+       join email_verification_token t on t.id=d.verification_token_id
+       join app_user u on u.id=t.user_id
+       left join person p on p.user_id=u.id
+       where d.status in ('pending','failed')
+         and t.consumed_at is null and t.expires_at>now()
+         and ($1::uuid is null or t.id=$1::uuid)
+         and ($2::boolean or d.next_attempt_at<=now())
+       order by d.next_attempt_at,d.created_at
+       for update of d skip locked limit $3`,
+      [onlyTokenId, force, batch]
+    )).rows;
+    for (const job of selected) {
+      await tx.query("update email_verification_delivery set status='processing',locked_at=now(),updated_at=now() where id=$1", [job.id]);
+    }
+    return selected;
+  });
+  const results = [];
+  for (const job of jobs) {
+    try {
+      const token = decryptVerificationToken(job);
+      const result = await deliverEmailVerification({
+        token, tokenId: job.verification_token_id, email: job.email,
+        registrationReference: job.registration_reference || "MPA account",
+        firstName: job.first_name || "", verificationUrl: emailUrl(token)
+      });
+      results.push({ tokenId: job.verification_token_id, ...result });
+    } catch (error) {
+      await db.query("update email_verification_delivery set status='failed',locked_at=null,last_error=$2,last_error_code=$3,updated_at=now() where id=$1 and status='processing'", [job.id, String(error?.message || "Delivery failed").slice(0,500), String(error?.code || "DELIVERY_FAILED").slice(0,100)]);
+      results.push({ tokenId: job.verification_token_id, sent: false, errorCode: error?.code || "DELIVERY_FAILED" });
+    }
+  }
+  return { processed: results.length, results };
+}
+
+export async function retryVerificationDelivery(tokenId) {
+  const db = getPool();
+  const row = (await db.query(
+    "update email_verification_delivery d set status='pending',next_attempt_at=now(),locked_at=null,updated_at=now() from email_verification_token t where d.verification_token_id=t.id and t.id=$1 and t.consumed_at is null and t.expires_at>now() and d.status='failed' and d.attempts<8 returning d.id",
+    [tokenId]
+  )).rows[0];
+  if (!row) return { requested: false };
+  const result = await dispatchPendingVerificationEmails({ limit: 1, onlyTokenId: tokenId, force: true });
+  return { requested: true, ...result };
 }
 
 export async function verifyEmailToken(rawToken, requestId) {
@@ -179,7 +229,9 @@ export async function resendEmailVerification(emailInput, requestId) {
   const token = randomBytes(32).toString("base64url");
   await withTransaction(async tx => {
     await tx.query("update email_verification_token set consumed_at=now() where user_id=$1 and consumed_at is null", [user.id]);
-    await tx.query("insert into email_verification_token(user_id,token_hash,expires_at) values($1,$2,now()+interval '24 hours')", [user.id, sha256(token)]);
+    const tokenRow = (await tx.query("insert into email_verification_token(user_id,token_hash,expires_at) values($1,$2,now()+interval '24 hours') returning id", [user.id, sha256(token)])).rows[0];
+    const encrypted = encryptVerificationToken(token);
+    await tx.query("insert into email_verification_delivery(verification_token_id,encrypted_token,encryption_iv,encryption_tag) values($1,$2,$3,$4)", [tokenRow.id, encrypted.encryptedToken, encrypted.encryptionIv, encrypted.encryptionTag]);
     await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'account.email_verification_resent','account',$2,$3,'success',$4)", [user.id, user.id, requestId || null, { method: "email_link" }]);
   });
   const message = { token, verificationUrl: emailUrl(token), registrationReference: user.registration_reference || "MPA account", email: user.email };

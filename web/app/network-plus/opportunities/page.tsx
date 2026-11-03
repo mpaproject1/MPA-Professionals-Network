@@ -34,8 +34,10 @@ export default function NetworkPlusOpportunitiesPage(){
  const categories=useMemo(()=>taxonomy.filter(t=>!t.parent_code&&t.listing_kinds.includes(listingKind)),[taxonomy,listingKind]);
  const subcategories=useMemo(()=>taxonomy.filter(t=>t.parent_code===categoryCode&&t.listing_kinds.includes(listingKind)),[taxonomy,categoryCode,listingKind]);
  const selectedCategory=taxonomy.find(t=>t.code===categoryCode),selectedSubcategory=taxonomy.find(t=>t.code===subcategoryCode);
+ const geographyOptions=useMemo(()=>[...geography.countries.filter(u=>u.country_iso3!=="ETH"),...geography.regions,...geography.federalCities,...geography.children],[geography]);
+ const selectGeography=(ids:string[])=>{setGeographyUnitIds(ids);setLocationLabel(geographyOptions.filter(unit=>ids.includes(unit.id)).map(unit=>unit.label).join(", "));};
  const categoryFields=[...(selectedCategory?.field_schema||[]),...(selectedSubcategory?.field_schema||[])];
- const payload=useMemo(()=>({listingKind,categoryCode:categoryCode||null,subcategoryCode:subcategoryCode||null,title,summary,description,structuredAttributes:attributes,wizardStep:step,audience,deliveryMode,locationLabel,capacity,pricingModel,priceAmount,currency}),[listingKind,categoryCode,subcategoryCode,title,summary,description,attributes,step,audience,deliveryMode,locationLabel,capacity,pricingModel,priceAmount,currency]);
+ const payload=useMemo(()=>({listingKind,categoryCode:categoryCode||null,subcategoryCode:subcategoryCode||null,title,summary,description,structuredAttributes:attributes,wizardStep:step,audience,deliveryMode,locationLabel,capacity,pricingModel,priceAmount,currency,pricingDetails,geographyVersionId:geography.version?.id||null,geographyUnitIds,remoteAvailable,serviceRadiusKm,availabilityStatus,leadTimeDays,activeWorkLimit,timezone,nextAvailableAt,targetAudience}),[listingKind,categoryCode,subcategoryCode,title,summary,description,attributes,step,audience,deliveryMode,locationLabel,capacity,pricingModel,priceAmount,currency,pricingDetails,geography.version?.id,geographyUnitIds,remoteAvailable,serviceRadiusKm,availabilityStatus,leadTimeDays,activeWorkLimit,timezone,nextAvailableAt,targetAudience]);
 
  const load=useCallback(async()=>{
   if(!token){setLoading(false);return;}setLoading(true);setError("");

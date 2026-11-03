@@ -489,7 +489,7 @@ export async function submitProfessionalServiceListing(listingId,userId,requestI
     if(!row.remote_available&&!row.location_label&&!serviceAreas.rowCount)fail(400,"Select at least one structured service area or enable remote availability.","SERVICE_AREA_REQUIRED");
     if(row.service_radius_km&&!serviceAreas.rowCount)fail(400,"A service radius requires a structured service-area reference.","SERVICE_AREA_REQUIRED");
 
-    const updated=(await db.query("update network_plus_service_listing set status='pending_review',moderation_reason=null,submitted_by=$2,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
+    const updated=(await db.query("update network_plus_service_listing set status='pending_review',moderation_reason=null,submitted_by=$2,updated_at=now() where id=$1 returning *",[listingId,userId])).rows[0];
     await audit(db,userId,"network_plus.service_listing_submitted","network_plus_service_listing",listingId,requestId,{businessId:row.business_id,from:row.status,to:"pending_review"});
     const reviewers=(await db.query(`select distinct u.id from app_user u where u.status='active' and
       (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($1::text[]))

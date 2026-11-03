@@ -10,7 +10,7 @@ const BUSINESS_REVIEW_ROLES = ["business_verification_reviewer", "system_admin"]
 const LISTING_REVIEW_ROLES = ["business_moderator", "system_admin"];
 const CATEGORIES = new Set(["professional_services","consulting","technology","design","education","healthcare","legal","finance","construction","trade","manufacturing","other","products_supply","business_services","creative_media","facilities_operations","agriculture_food","transport_logistics","specialist_regulatory"]);\nconst LISTING_KINDS = new Set(["need","offer","product_profile","service_profile"]);
 const MODIFIABLE = new Set(["displayName","tradingName","description","website","locationLabel"]);
-const LISTING_MODIFIABLE = new Set(["title","summary","description","serviceCategory","audience","deliveryMode","locationLabel","capacity","pricingModel","priceAmount","currency","availability","credentials"]);
+const LISTING_MODIFIABLE = new Set(["title","summary","description","serviceCategory","audience","deliveryMode","locationLabel","capacity","pricingModel","priceAmount","currency","pricingDetails","availability","credentials"]);
 const hash = value => createHash("sha256").update(String(value)).digest("hex");
 const fingerprint = value => hash(JSON.stringify(value));
 function fail(status,message,code="BUSINESS_RULE"){ throw policyError(status,message,code); }
@@ -64,18 +64,17 @@ function normalizeListingInput(input) {
     pricingModel:input.pricingModel||"quote",
     priceAmount:input.priceAmount===undefined||input.priceAmount===null||input.priceAmount===""?null:Number(input.priceAmount),
     currency:input.currency?String(input.currency).trim().toUpperCase():null,
+    pricingDetails:normalizePricingDetails(input.pricingDetails),
     availability:input.availability&&typeof input.availability==="object"&&!Array.isArray(input.availability)?input.availability:{},
     credentials:Array.isArray(input.credentials)?input.credentials.map(value=>publicText(value,160,"Credential",{min:2})):[]
   };
   if(!CATEGORIES.has(row.serviceCategory))fail(400,"Choose a supported service category.","VALIDATION_ERROR");
   if(!["members","organizations","both"].includes(row.audience))fail(400,"Unsupported listing audience.","VALIDATION_ERROR");
   if(!["remote","onsite","hybrid"].includes(row.deliveryMode))fail(400,"Unsupported delivery mode.","VALIDATION_ERROR");
-  if(!["free","fixed","hourly","quote"].includes(row.pricingModel))fail(400,"Unsupported pricing model.","VALIDATION_ERROR");
+  if(!["free","fixed","hourly","unit","range","quote","subscription","not_applicable"].includes(row.pricingModel))fail(400,"Unsupported pricing model.","VALIDATION_ERROR");
   if(row.capacity!==null&&(!Number.isInteger(row.capacity)||row.capacity<1||row.capacity>100000))fail(400,"Capacity must be a positive whole number.","VALIDATION_ERROR");
   if(row.priceAmount!==null&&(!Number.isFinite(row.priceAmount)||row.priceAmount<0))fail(400,"Price must be a non-negative amount.","VALIDATION_ERROR");
-  if(row.pricingModel==="free"&&(row.priceAmount!==null&&row.priceAmount!==0))fail(400,"Free listings cannot have a non-zero price.","VALIDATION_ERROR");
-  if(["fixed","hourly"].includes(row.pricingModel)&&(!row.priceAmount||!row.currency||! /^[A-Z]{3}$/.test(row.currency)))fail(400,"Fixed and hourly pricing require a price and three-letter currency.","VALIDATION_ERROR");
-  if(row.pricingModel==="quote"&&(row.priceAmount!==null||row.currency!==null))fail(400,"Quotation listings must not include a fixed price or currency.","VALIDATION_ERROR");
+  validateListingPricing({pricing_model:row.pricingModel,price_amount:row.priceAmount,currency:row.currency,pricing_details:row.pricingDetails});
   if(row.credentials.length>30||row.credentials.some(x=>typeof x!=="string"||x.trim().length>160))fail(400,"Credentials must be a short list of up to 30 labels.","VALIDATION_ERROR");
   if(JSON.stringify(row.availability).length>8000)fail(400,"Availability details are too large.","VALIDATION_ERROR");
   return row;

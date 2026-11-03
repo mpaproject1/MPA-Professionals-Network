@@ -193,6 +193,8 @@ test("meeting local-time conversion rejects both DST gaps and repeated-hour ambi
  assert.match(ui,/That local time does not exist in the selected timezone/);
  assert.match(ui,/That local time occurs twice in the selected timezone/);
  assert.match(ui,/const candidates=\[\.\.\.offsets\]/);
+ assert.match(service,/function assertUnambiguousLocalMeetingTime/);
+ assert.match(service,/AMBIGUOUS_LOCAL_MEETING_TIME/);
 });
 
 test("Phase 2 response migration uses a valid PostgreSQL DO block and complete response invariant",()=>{

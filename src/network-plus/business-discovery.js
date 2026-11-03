@@ -8,7 +8,8 @@ const MEMBER_OWNER_ROLES = ["member", "professional"];
 const ORG_OWNER_ROLES = ["owner", "administrator"];
 const BUSINESS_REVIEW_ROLES = ["business_verification_reviewer", "system_admin"];
 const LISTING_REVIEW_ROLES = ["business_moderator", "system_admin"];
-const CATEGORIES = new Set(["professional_services","consulting","technology","design","education","healthcare","legal","finance","construction","trade","manufacturing","other","products_supply","business_services","creative_media","facilities_operations","agriculture_food","transport_logistics","specialist_regulatory"]);\nconst LISTING_KINDS = new Set(["need","offer","product_profile","service_profile"]);
+const CATEGORIES = new Set(["professional_services","consulting","technology","design","education","healthcare","legal","finance","construction","trade","manufacturing","other","products_supply","business_services","creative_media","facilities_operations","agriculture_food","transport_logistics","specialist_regulatory"]);
+const LISTING_KINDS = new Set(["need","offer","product_profile","service_profile"]);
 const MODIFIABLE = new Set(["displayName","tradingName","description","website","locationLabel"]);
 const LISTING_MODIFIABLE = new Set(["title","summary","description","serviceCategory","audience","deliveryMode","remoteAvailable","locationLabel","capacity","pricingModel","priceAmount","currency","pricingDetails","availability","credentials"]);
 const hash = value => createHash("sha256").update(String(value)).digest("hex");
@@ -301,7 +302,7 @@ function normalizeStructuredAttributes(value) {
   const visit=(node,key="")=>{
     if(/email|phone|mobile|whatsapp|telegram|contact|address/i.test(key))fail(400,"Private contact details cannot be included in public listing attributes.","PUBLIC_CONTACT_DETAILS_FORBIDDEN");
     if(typeof node==="string")publicText(node,1000,"Category detail",{min:0});
-    else if(Array.isArray(node))node.forEach(item=>visit(item,key));
+    else if(Array.isArray(node))node.forEach(item=>{visit(item,key);});
     else if(node&&typeof node==="object")for(const [childKey,child] of Object.entries(node))visit(child,childKey);
     else if(node!==null&&typeof node!=="number"&&typeof node!=="boolean")fail(400,"Category detail values must be text, numbers, booleans or lists.","VALIDATION_ERROR");
   };

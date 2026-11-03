@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import {randomUUID} from "node:crypto";
 import test from "node:test";
-import {classifyMatch, normalizeLegacyMember} from "../../src/membership-import/contract.js";
 import {applyMemberImport, claimMemberInvitation, exportMembers, memberImportTemplate, memberImportXlsxTemplate, previewMemberImport} from "../../src/membership/admin-bulk.js";
 import * as membership from "../../src/membership/service.js";
+import {classifyMatch, normalizeLegacyMember} from "../../src/membership-import/contract.js";
 import {getPool} from "../../src/platform/db.js";
 import {assertPaymentTransition, createManualPayment,verifyManualPayment} from "../../src/platform/payment-workflow.js";
 import {createXlsx, parseXlsxRows} from "../../src/platform/xlsx.js";

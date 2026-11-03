@@ -7,8 +7,10 @@ import { useUiStore } from "../../../lib/store";
 type Taxon={code:string;parent_code:string|null;label:string;description:string;listing_kinds:string[];field_schema:{code:string;label:string;type:string;options?:string[];required?:boolean}[]};
 type Business={id:string;display_name:string;business_kind:string;description?:string;website?:string|null;location_label?:string|null;verification_status:string;moderation_status:string;publication_status:string};
 type Organization={id:string;display_name?:string;name?:string};
-type Listing={id:string;business_id:string;business_name:string;title:string|null;summary:string|null;description?:string|null;category_code?:string|null;subcategory_code?:string|null;listing_kind:string;structured_attributes?:Record<string,any>;wizard_step:number;draft_saved_at?:string|null;status:string;moderation_reason?:string|null;location_label?:string|null;published_at?:string|null;pricing_model?:string;audience?:string;delivery_mode?:string;capacity?:number|null;price_amount?:number|null;currency?:string|null};
+type Listing={id:string;business_id:string;business_name:string;title:string|null;summary:string|null;description?:string|null;category_code?:string|null;subcategory_code?:string|null;listing_kind:string;structured_attributes?:Record<string,any>;wizard_step:number;draft_saved_at?:string|null;status:string;moderation_reason?:string|null;location_label?:string|null;published_at?:string|null;pricing_model?:string;pricing_details?:Record<string,any>;audience?:string;delivery_mode?:string;capacity?:number|null;remote_available?:boolean;service_radius_km?:number|null;availability_status?:string;lead_time_days?:number|null;active_work_limit?:number|null;timezone?:string|null;next_available_at?:string|null;target_audience?:string[];geography_areas?:{id:string;version_id:string;label:string;code:string;level:string}[];price_amount?:number|null;currency?:string|null};
 type ListingResult={items:Listing[];total:number;hasMore:boolean};
+type GeoUnit={id:string;unit_code:string;label:string;unit_level:string;country_iso3?:string|null;parent_id?:string|null};
+type GeoReference={version:{id:string;version_label:string}|null;countries:GeoUnit[];regions:GeoUnit[];federalCities:GeoUnit[];children:GeoUnit[]};
 const kinds=[{code:"need",label:"I need",description:"Find a supplier, specialist, service or business partner."},{code:"offer",label:"I offer",description:"Share professional capacity, expertise or an opportunity."},{code:"product_profile",label:"Product profile",description:"Show products and supply capabilities for discovery only."},{code:"service_profile",label:"Service profile",description:"Present a professional service for discovery only."}];
 const label=(v:string)=>String(v||"").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
 const newKey=()=>crypto.randomUUID()+crypto.randomUUID();
@@ -16,12 +18,13 @@ const newKey=()=>crypto.randomUUID()+crypto.randomUUID();
 export default function NetworkPlusOpportunitiesPage(){
  const token=useUiStore(s=>s.token);
  const [view,setView]=useState<"discover"|"mine"|"create"|"business">("discover");
- const [taxonomy,setTaxonomy]=useState<Taxon[]>([]),[businesses,setBusinesses]=useState<Business[]>([]),[organizations,setOrganizations]=useState<Organization[]>([]);
+ const [taxonomy,setTaxonomy]=useState<Taxon[]>([]),[businesses,setBusinesses]=useState<Business[]>([]),[organizations,setOrganizations]=useState<Organization[]>([]),[geography,setGeography]=useState<GeoReference>({version:null,countries:[],regions:[],federalCities:[],children:[]});
  const [mine,setMine]=useState<Listing[]>([]),[results,setResults]=useState<Listing[]>([]),[q,setQ]=useState(""),[kindFilter,setKindFilter]=useState(""),[categoryFilter,setCategoryFilter]=useState(""),[subcategoryFilter,setSubcategoryFilter]=useState(""),[locationFilter,setLocationFilter]=useState("");
  const [selected,setSelected]=useState<Listing|null>(null),[businessId,setBusinessId]=useState(""),[draftId,setDraftId]=useState("");
  const [step,setStep]=useState(1),[listingKind,setListingKind]=useState("offer"),[categoryCode,setCategoryCode]=useState(""),[subcategoryCode,setSubcategoryCode]=useState("");
  const [title,setTitle]=useState(""),[summary,setSummary]=useState(""),[description,setDescription]=useState(""),[attributes,setAttributes]=useState<Record<string,any>>({});
  const [audience,setAudience]=useState("both"),[deliveryMode,setDeliveryMode]=useState("remote"),[locationLabel,setLocationLabel]=useState(""),[capacity,setCapacity]=useState(""),[pricingModel,setPricingModel]=useState("quote"),[priceAmount,setPriceAmount]=useState(""),[currency,setCurrency]=useState("ETB");
+ const [geographyUnitIds,setGeographyUnitIds]=useState<string[]>([]),[remoteAvailable,setRemoteAvailable]=useState(true),[serviceRadiusKm,setServiceRadiusKm]=useState(""),[availabilityStatus,setAvailabilityStatus]=useState("accepting_requests"),[leadTimeDays,setLeadTimeDays]=useState(""),[activeWorkLimit,setActiveWorkLimit]=useState(""),[timezone,setTimezone]=useState("Africa/Addis_Ababa"),[nextAvailableAt,setNextAvailableAt]=useState(""),[targetAudience,setTargetAudience]=useState<string[]>(["all"]),[pricingDetails,setPricingDetails]=useState<Record<string,any>>({});
  const [businessName,setBusinessName]=useState(""),[businessDescription,setBusinessDescription]=useState(""),[ownerType,setOwnerType]=useState("member"),[organizationId,setOrganizationId]=useState(""),[businessWebsite,setBusinessWebsite]=useState(""),[businessLocation,setBusinessLocation]=useState("");
  const [evidenceBusinessId,setEvidenceBusinessId]=useState(""),[evidenceFileId,setEvidenceFileId]=useState(""),[evidenceType,setEvidenceType]=useState("business registration");
  const [editingBusinessId,setEditingBusinessId]=useState(""),[editBusinessName,setEditBusinessName]=useState(""),[editBusinessDescription,setEditBusinessDescription]=useState(""),[editBusinessWebsite,setEditBusinessWebsite]=useState(""),[editBusinessLocation,setEditBusinessLocation]=useState("");
@@ -37,13 +40,14 @@ export default function NetworkPlusOpportunitiesPage(){
  const load=useCallback(async()=>{
   if(!token){setLoading(false);return;}setLoading(true);setError("");
   try{
-   const [tax,biz,org,my,found]=await Promise.all([
+   const [tax,biz,org,my,geo]=await Promise.all([
     api<Taxon[]>("/api/v1/network-plus/listing-taxonomy",{},token),
     api<Business[]>("/api/v1/network-plus/my/businesses",{},token),
     api<Organization[]>("/api/v1/organizations",{},token),
-    api<Listing[]>("/api/v1/network-plus/my/listings",{},token)
+    api<Listing[]>("/api/v1/network-plus/my/listings",{},token),
+    api<GeoReference>("/api/v1/network-plus/geography-reference",{},token)
    ]);
-   setTaxonomy(tax||[]);setBusinesses(biz||[]);setOrganizations(org||[]);setMine(my||[]);
+   setTaxonomy(tax||[]);setBusinesses(biz||[]);setOrganizations(org||[]);setMine(my||[]);setGeography(geo||{version:null,countries:[],regions:[],federalCities:[],children:[]});
    if(!businessId&&biz?.length)setBusinessId(biz[0].id);
   }catch(e){setError(e instanceof ApiError?e.message:"Network-Plus directory could not be loaded.");}
   finally{setLoading(false);}

@@ -689,7 +689,7 @@ export default function Organizations() {
           <Card id="your-organizations">
             <div className="row">
               <div>
-                <div className="h2">Your organizations</div>
+                <h2 className="h2">Your organizations</h2>
                 <p className="muted">
                   Only organizations associated with your authenticated account
                   are shown.

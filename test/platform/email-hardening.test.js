@@ -96,3 +96,10 @@ test("template history is read-only and restores as a new audited version", asyn
   assert.match(routes, /parts\[6\]==="versions"/);
   assert.match(routes, /parts\[8\]==="restore"/);
 });
+
+test("complaint holds cannot be manually released and retry requires a cleared hold", async () => {
+  const source = await read("../../src/platform/email-operations.js");
+  assert.match(source, /COMPLAINT_HOLD_LOCKED/);
+  assert.match(source, /RECIPIENT_HOLD_ACTIVE/);
+  assert.match(source, /delivery_status in \('failed','bounced'\)/);
+});

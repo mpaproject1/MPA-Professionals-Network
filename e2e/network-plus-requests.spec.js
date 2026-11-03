@@ -236,7 +236,9 @@ await page.locator("details").filter({hasText:"Start a new connection request"})
     await page.getByLabel("Short remark").fill("Contact exchanged; we will continue directly.");
     await page.getByRole("button",{name:"Mark Completed"}).click();
     await expect(page.getByText("Completed",{exact:true}).last()).toBeVisible();
-    await expect(page.getByText(/Contact exchanged; we will continue directly/).last()).toBeVisible();
+    const closureRemark=page.getByText(/Contact exchanged; we will continue directly/);
+    await expect(closureRemark).toHaveCount(2);
+    await expect(closureRemark.last()).toBeVisible();
     await page.getByLabel("Short remark").fill("Reopening to continue the introduction.");
     await page.getByRole("button",{name:"Reopen as In progress"}).click();
     await expect(page.getByText(/Earlier closure history is preserved/)).toBeVisible();

@@ -432,6 +432,19 @@ export async function getNetworkPlusContactHandoff(requestId,userId,peerUserId){
     return contactHandoffFor(db,requestId,userId,pair.peerUserId);
   });
 }
+function assertUnambiguousLocalMeetingTime(startsAt,timezone){
+  const formatter=new Intl.DateTimeFormat("en-US",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+  const partsAt=instant=>Object.fromEntries(formatter.formatToParts(new Date(instant)).map(part=>[part.type,Number(part.value)]));
+  const localEpoch=parts=>Date.UTC(parts.year,parts.month-1,parts.day,parts.hour,parts.minute,parts.second);
+  const instant=Math.floor(startsAt.getTime()/1000)*1000,local=partsAt(instant),base=localEpoch(local);
+  const offsets=new Set([-36,-24,-12,0,12,24,36].map(hours=>{const sample=base+hours*60*60*1000;return localEpoch(partsAt(sample))-sample;}));
+  const candidates=[...offsets].map(offset=>base-offset).filter(candidate=>{
+    const parts=partsAt(candidate);
+    return parts.year===local.year&&parts.month===local.month&&parts.day===local.day&&parts.hour===local.hour&&parts.minute===local.minute&&parts.second===local.second;
+  });
+  if(!candidates.includes(instant))fail(400,"The meeting instant does not match its selected local timezone.","INVALID_LOCAL_MEETING_TIME");
+  if(candidates.length>1)fail(400,"That local time occurs twice in the selected timezone because clocks move backward. Choose a time outside the repeated hour.","AMBIGUOUS_LOCAL_MEETING_TIME");
+}
 function validateMeeting(input){
   const placeType=input?.placeType;
   if(!["office","coffee","online","other"].includes(placeType))fail(400,"Choose a supported meeting place type.","INVALID_MEETING_PLACE");
@@ -442,6 +455,7 @@ function validateMeeting(input){
   try{new Intl.DateTimeFormat("en",{timeZone:timezone}).format(new Date());}catch{fail(400,"Choose a valid IANA timezone.","INVALID_TIMEZONE");}
   const startsAt=new Date(input?.startsAt);
   if(!Number.isFinite(startsAt.getTime())||startsAt.getTime()<Date.now()+15*60*1000||startsAt.getTime()>Date.now()+180*24*60*60*1000)fail(400,"Meeting time must be at least 15 minutes ahead and within 180 days.","INVALID_MEETING_TIME");
+  assertUnambiguousLocalMeetingTime(startsAt,timezone);
   const durationMinutes=Number(input?.durationMinutes);
   if(![15,30,45,60,90,120].includes(durationMinutes))fail(400,"Choose a supported meeting duration.","INVALID_MEETING_DURATION");
   return {placeType,placeDetails,startsAt,timezone,durationMinutes};

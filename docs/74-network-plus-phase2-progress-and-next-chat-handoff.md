@@ -198,3 +198,31 @@ The follow-up audit found and fixed issues that the earlier addendum had missed:
 ## 9. Browser regression follow-up — 2026-11-03
 
 The historical PR Quality run's two `/members` browser failures were traced from the Playwright artifact to a client-side TypeError in the Community Impact workspace panel. The UX test fixture returned an empty object for `/api/v1/me/community-impact/workspace`, while the component requires arrays for its categories, dimensions, claims, items, detected contributions and reminders. This caused the app error boundary to render before `#progress-title` appeared. The fixture now returns a complete empty-state response in commit `496914dd8a84dcab67f330514709ddf5134770d4`. This is a source correction only; it has not yet been rerun.
+
+
+## 10. User-directed Phase 2 CI waiver and Phase 3 implementation — 2026-11-03
+
+The user explicitly said to skip the Phase 2 CI Action and continue Phase 3 end to end. The Phase 2 exit gate is therefore waived for sequencing in this continuation, **not passed**. Its runtime and CI evidence remains outstanding and is recorded as NOT VERIFIED in document 73.
+
+### Phase 3 source changes now committed on this branch
+
+- Added `20261103150000_network_plus_phase3_requester_disposition.sql` with requester disposition, remark, update timestamp, review due/reminder timestamps, recipient withdrawal timestamp, status/check constraints and requester/review indexes.
+- Added `updateNetworkPlusRequestDisposition` to the existing canonical request service. Only the requester can change the three dispositions. Completed/Cancelled require a 5–500 character remark; reopening a closed disposition requires a new explanatory remark. Disposition is independent of platform lifecycle status and events are retained in the existing immutable request event history.
+- Added distinct recipient-side `recipient_withdrawn` after acceptance. It requires an explanation, revalidates recipient authority, is audited/notified and closes an optional collaboration workspace. Existing recipient decline (`declined`) and requester withdrawal (`withdrawn`) remain distinct.
+- Extended request listing with requester/recipient identity labels and requester-only disposition projections. Recipient views and additional-participant views do not receive the requester's self-reported disposition, remark, review due date or disposition/reminder history.
+- Reworked the requests page into a compact My Requests shelf with All, Awaiting response, In progress, Completed and Cancelled filters; retained a separate Requests received section; cards include party, request type/lifecycle, remark and review date. Added requester closure/reopen controls and recipient withdrawal reason entry.
+- Added `dispatchNetworkPlusRequestReviewReminders`, using transactional row locks and seven-day cadence, plus `scripts/dispatch-network-plus-review-reminders.js` and `npm run network-plus:dispatch-review-reminders`.
+- Added Phase 3 static, PostgreSQL integration and Playwright regression cases, and extended the migration compatibility checker with Phase 3 schema/index assertions and rollback snapshot columns.
+- Updated documents 70 and 73 with the product/implementation boundary and the explicit Phase 2 waiver.
+
+### Important remaining work
+
+1. Review the final branch diff and verify the SQL constraint name against the actual migrated schema.
+2. Execute the full ordered migration chain and rollback compatibility rehearsal on disposable PostgreSQL; verify Phase 3 migration replay and exact schema baseline.
+3. Run the new requester disposition/recipient withdrawal/reminder integration test and full backend suite.
+4. Run the Network-Plus Playwright journey and full browser suite; fix any actual UX/type/runtime failures without weakening assertions.
+5. Run Biome, TypeScript and production build. Record exact evidence and counts.
+6. Configure the daily hosting scheduler for `npm run network-plus:dispatch-review-reminders` only after deployment operations explicitly authorize it. No production cron or deployment was changed in this work.
+7. Keep PR #18 open and draft. Phase 2 remains NOT VERIFIED; no merge/deployment is authorized.
+
+**Current branch target:** `feat/workstream-3-progress-members-workspace`, PR #18. Re-fetch the exact HEAD before further edits; the documentation commits themselves advance the branch.

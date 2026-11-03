@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { decryptVerificationToken, encryptVerificationToken } from "../../src/platform/email-verification-crypto.js";
+import { verifyResendWebhookSignature } from "../../src/platform/email-operations.js";
 
 const read = relative => readFile(new URL(relative, import.meta.url), "utf8");
 
@@ -179,4 +181,19 @@ test("verification delivery is durably encrypted, retried through shared transpo
   assert.match(operations, /retryVerificationDelivery/);
   assert.match(operations, /verification_delivery_id/);
   assert.match(operations, /email\.verification\.provider_delivery_event/);
+});
+
+test("Resend webhook signature validation binds raw bytes, timestamp and message ID", () => {
+  const raw = Buffer.from(JSON.stringify({ type: "email.delivered", data: { email_id: "provider-message-1" } }));
+  const signingKey = Buffer.from("test-resend-webhook-signing-key-32-bytes");
+  const secret = "whsec_" + signingKey.toString("base64");
+  const headers = { "svix-id": "evt_test_1", "svix-timestamp": String(Math.floor(Date.now() / 1000)) };
+  const signature = createHmac("sha256", signingKey)
+    .update(headers["svix-id"] + "." + headers["svix-timestamp"] + ".")
+    .update(raw).digest("base64");
+  headers["svix-signature"] = "v1," + signature;
+  assert.equal(verifyResendWebhookSignature(raw, headers, secret), true);
+  assert.equal(verifyResendWebhookSignature(Buffer.from(raw.toString() + " "), headers, secret), false);
+  assert.equal(verifyResendWebhookSignature(raw, { ...headers, "svix-timestamp": "1" }, secret), false);
+  assert.equal(verifyResendWebhookSignature(raw, headers, "wrong-secret"), false);
 });

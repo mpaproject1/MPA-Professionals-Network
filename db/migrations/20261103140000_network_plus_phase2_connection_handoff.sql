@@ -15,6 +15,23 @@ alter table network_plus_request
 comment on column network_plus_request.recipient_response is
   'One private recipient answer for a question intent; not a chat thread.';
 
+do $
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid='network_plus_request'::regclass
+       and conname='network_plus_request_recipient_response_complete_check'
+  ) then
+    alter table network_plus_request
+      add constraint network_plus_request_recipient_response_complete_check
+      check (
+        (recipient_response is null and recipient_response_by is null and recipient_response_at is null)
+        or
+        (intent='question' and recipient_response is not null and recipient_response_by is not null and recipient_response_at is not null)
+      );
+  end if;
+end $;
+
 create table if not exists network_plus_request_contact_consent (
   request_id uuid not null references network_plus_request(id) on delete restrict,
   recipient_user_id uuid not null references app_user(id) on delete restrict,

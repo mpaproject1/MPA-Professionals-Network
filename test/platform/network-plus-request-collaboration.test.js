@@ -117,6 +117,10 @@ test("Phase 2 adds lightweight connection intents, encrypted bilateral field con
  assert.match(phase2Migration,/ux_network_plus_request_meeting_active/);
  assert.match(service,/createCipheriv\("aes-256-gcm"/);
  assert.match(service,/NETWORK_PLUS_CONTACT_ENCRYPTION_KEY/);
+ assert.match(service,/cipher\.setAAD\(Buffer\.from\(context/);
+ assert.match(service,/decipher\.setAAD\(Buffer\.from\(context/);
+ assert.match(service,/\["v1",iv\.toString/);
+ assert.match(service,/CONTACT_DATA_AUTHENTICATION_FAILED/);
  assert.match(service,/requester_status==="accepted"&&row.recipient_status==="accepted"/);
  assert.match(service,/updateNetworkPlusContactConsent/);
  assert.match(service,/getNetworkPlusContactHandoff/);

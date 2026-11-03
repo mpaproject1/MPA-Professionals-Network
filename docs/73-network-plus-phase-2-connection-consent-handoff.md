@@ -66,7 +66,11 @@ Each row records:
 
 Consent is independently granted, declined or revoked by each side. A contact value is returned to the other participant only when both statuses for that field are `accepted`. Revocation clears that side's encrypted value and immediately prevents further release. No contact values are included in ordinary request list/detail payloads or support-access payloads.
 
-Contact values are encrypted at application level using AES-256-GCM. Configure `NETWORK_PLUS_CONTACT_ENCRYPTION_KEY` with a unique random secret of at least 32 characters in every environment before enabling contact sharing. Keep the secret stable and securely backed up: changing or losing it makes previously stored encrypted values unreadable. Never commit a real key to the repository.
+Contact values are encrypted at application level using AES-256-GCM with a random 96-bit IV, authenticated encryption tag, versioned `v1` envelope and additional authenticated data bound to the request ID, recipient user ID and contact field. Ciphertext copied to another request, recipient or field will fail authentication.
+
+Configure `NETWORK_PLUS_CONTACT_ENCRYPTION_KEY` with a unique random secret of at least 32 characters in every environment before enabling contact sharing. Generate a high-entropy value (for example, `openssl rand -base64 48`), store it only in the environment's secret manager, and keep a separately access-controlled encrypted backup. Never commit a real key, place it in database rows, or include it in logs.
+
+**Rotation procedure:** use a maintenance window and disable contact-sharing writes while rotating. Back up the database and old key first. Set `DATABASE_URL`, `NETWORK_PLUS_CONTACT_ENCRYPTION_OLD_KEY`, `NETWORK_PLUS_CONTACT_ENCRYPTION_NEW_KEY`, and `NETWORK_PLUS_CONTACT_KEY_ROTATION_CONFIRM=YES`, then run `npm run network-plus:rotate-contact-key`. For a production-like database, the separate `NETWORK_PLUS_CONTACT_KEY_ROTATION_ALLOW_PRODUCTION=YES` confirmation is also required. The utility locks the consent table, decrypts and re-encrypts each non-null field with the same record-bound AAD, verifies the new ciphertext before commit, and rolls back the complete transaction on any failure. After a successful rotation, set `NETWORK_PLUS_CONTACT_ENCRYPTION_KEY` to the new secret before re-enabling contact sharing. Retain the old key and database backup until post-rotation verification and recovery checks are complete; then retire the old key according to the organization's secret-retention policy. Do not rotate by merely replacing the runtime key.
 
 ## 5. Meeting handoff
 
@@ -135,3 +139,25 @@ The existing request detail endpoint returns participant-visible clarification a
 The Phase 2 schema, service methods, authenticated API routes, opportunity actions, request workspace controls, notification category and regression coverage are source changes on PR #18.
 
 This document does **not** claim that the migration has executed against disposable PostgreSQL, that backend/Playwright suites or CI have passed, or that the encryption key has been configured in a deployed environment. Keep PR #18 draft until those gates are verified.
+
+
+## 11. Implementation audit addendum — 2026-11-03
+
+**Source snapshot audited:** PR #18 head `b8b92cbda9b57680e3b2481314561a2c995cccf7` (before this documentation update). The PR remains open and draft.
+
+Source-level corrections now present:
+
+- Fixed the missing comma in the migration compatibility runner's required migration list.
+- Unified current recipient-authority revalidation for clarification, question answers, contact handoff, meeting handoff and request-detail action permissions, including organization representatives.
+- Added a database check requiring the one-time question response, actor and timestamp to be recorded together, and only for the `question` intent.
+- Extended the migration compatibility preflight to inspect Phase 2 request-response, consent, meeting and clarification columns and the consent primary-key index.
+- Extended the rollback rehearsal to snapshot and compare the exact Phase 2 table, column, constraint and index state after rollback.
+- Bound AES-GCM ciphertext to its request, recipient and field context; introduced an authenticated `v1` ciphertext envelope and safe authentication-failure handling.
+- Added a transactional contact-key rotation utility and the `network-plus:rotate-contact-key` package command, with explicit confirmation, table locking, new-key verification and rollback.
+- Made local meeting-time conversion reject both DST gaps and repeated-hour ambiguity. The selected policy is to ask the user to choose a different local time rather than silently select one of two possible instants.
+- Added a browser regression scenario for both DST cases and included `e2e/network-plus-requests.spec.js` in the PR Quality browser acceptance list.
+- Added source regression assertions for recipient authority, schema/rollback coverage, context-bound encryption and key rotation.
+
+**Evidence boundary:** These are inspected source changes and newly authored regression tests. The tests have not yet been executed in this continuation. No disposable PostgreSQL migration/rollback run, backend suite, Playwright run, Biome check, TypeScript check, production build or successful GitHub Actions result is claimed here. The rotation utility has not been run against any database. The encryption key has not been verified in a deployed environment.
+
+**Phase 2 exit status: NOT CLOSED.** Runtime verification remains mandatory. Keep PR #18 draft. Do not begin Phase 3 until the Phase 2 migration, authorization/privacy, encryption, notification, DST, backend, browser, lint, typecheck and production-build gates have actual recorded results.

@@ -116,7 +116,7 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{...draft,intent:"quote_request"}})}));
     await page.goto("/network-plus/requests?action=quote_request&listingId=listing-1");
     await expect(page.getByLabel("Request type")).toHaveValue("quote_request");
-    await expect(page.getByLabel("Subject")).toHaveValue("Request Quotation · Business equipment");
+    await expect(page.getByLabel("Subject")).toHaveValue("Quote Request · Business equipment");
     await page.getByRole("button",{name:"Save draft"}).click();
     await expect.poll(()=>payload?.intent).toBe("quote_request");
     expect(payload.serviceListingId).toBe("listing-1");

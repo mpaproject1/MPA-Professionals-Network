@@ -29,7 +29,7 @@ function safeTerms(intent,raw) {
     t.eligibility=clean(t.eligibility,2000,"Eligibility",5);
     t.selectionProcess=clean(t.selectionProcess,2000,"Selection process",5);
     if(t.deadline!==undefined&&t.deadline!==null&&t.deadline!=="") {
-      if(typeof t.deadline!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(t.deadline)||Number.isNaN(Date.parse(t.deadline)))fail(400,"Opportunity deadline must be a valid calendar date.","VALIDATION_ERROR");
+      if(typeof t.deadline!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(t.deadline)||Number.isNaN(Date.parse(t.deadline)))fail(400,"Opportunity deadline must be a valid calendar date.","VALIDATION_ERROR");
     }
     if(t.value!==undefined&&t.value!==null&&String(t.value).length>300)fail(400,"Opportunity value/compensation must be 300 characters or fewer.","VALIDATION_ERROR");
   }

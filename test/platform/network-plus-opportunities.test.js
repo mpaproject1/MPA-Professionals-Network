@@ -3,13 +3,16 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
-const [migration,service,requests,server,ui,landing,compatibility] = await Promise.all([
+const [migration,service,requests,server,ui,landing,listingAdmin,businessAdmin,adminNav,compatibility] = await Promise.all([
   read("../../db/migrations/20261103130000_network_plus_phase1_needs_offers.sql"),
   read("../../src/network-plus/business-discovery.js"),
   read("../../src/network-plus/request-collaboration.js"),
   read("../../server.js"),
   read("../../web/app/network-plus/opportunities/page.tsx"),
   read("../../web/app/network-plus/page.tsx"),
+  read("../../web/app/admin/network-plus/services/page.tsx"),
+  read("../../web/app/admin/network-plus/businesses/page.tsx"),
+  read("../../web/app/admin/admin-workspace.tsx"),
   read("../../scripts/check-new-migration-compatibility.js"),
 ]);
 
@@ -95,6 +98,19 @@ test("opportunity mall and wizard preserve the no-commerce boundary and draft re
   assert.match(ui,/no checkout or transactions here/i);
   assert.match(ui,/does not process orders, payments or delivery/i);
   assert.doesNotMatch(ui,/\/checkout|\/orders|\/payments/);
+});
+
+test("independent business and listing moderation queues reuse the existing review services",()=>{
+  assert.match(listingAdmin,/moderation-queue/);
+  assert.match(listingAdmin,/structured_attributes/);
+  assert.match(listingAdmin,/Approve and publish/);
+  assert.match(businessAdmin,/verification-queue/);
+  assert.match(businessAdmin,/moderation-queue/);
+  assert.match(businessAdmin,/View private evidence/);
+  assert.match(adminNav,/admin\/network-plus\/businesses/);
+  assert.match(adminNav,/admin\/network-plus\/services/);
+  assert.match(adminNav,/business_verification_reviewer/);
+  assert.match(adminNav,/business_moderator/);
 });
 
 test("Phase 1 migration participates in disposable migration compatibility validation",()=>{

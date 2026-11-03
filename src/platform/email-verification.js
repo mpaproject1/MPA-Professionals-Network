@@ -2,6 +2,8 @@ import { createHash, createHmac, randomBytes } from "node:crypto";
 import { loadConfig } from "./config.js";
 import { getPool, withTransaction } from "./db.js";
 import { renderVerificationEmail } from "./email-template.js";
+import { emailIdempotencyKey } from "./email-retry-policy.js";
+import { captureTestDelivery } from "./test-lab.js";
 
 const sha256 = value => createHash("sha256").update(String(value)).digest("hex");
 const clean = value => String(value || "").trim();
@@ -63,16 +65,43 @@ export async function deliverEmailVerification(message) {
     verificationUrl: message.verificationUrl,
     registrationReference: message.registrationReference
   });
+  const environment = config.nodeEnv;
+  const captureMode = process.env.TEST_DELIVERY_MODE === "capture";
+  const testLabEnabled = process.env.TEST_LAB_ENABLED === "true";
+  if (environment === "production" && (captureMode || testLabEnabled)) {
+    throw Object.assign(new Error("Test delivery capture is forbidden in production; no external email was sent."), { statusCode: 403, code: "TEST_DELIVERY_PRODUCTION_BLOCKED" });
+  }
+  if (testLabEnabled && !captureMode) {
+    throw Object.assign(new Error("Test Lab requires TEST_DELIVERY_MODE=capture; no external email was sent."), { statusCode: 503, code: "TEST_DELIVERY_CAPTURE_REQUIRED" });
+  }
+  if (captureMode && environment !== "production") {
+    await captureTestDelivery({
+      channel: "email",
+      recipient: message.email,
+      eventCode: "account.email_verification",
+      payload: {
+        subject: emailSubject,
+        text: emailText,
+        html: emailHtml,
+        verificationUrl: message.verificationUrl,
+        registrationReference: message.registrationReference || null,
+        captured: true
+      }
+    });
+    await getPool().query("update email_verification_token set delivery_attempted_at=now(),delivery_status='sent',delivery_error_code=null where token_hash=$1 and consumed_at is null",[sha256(message.token)]);
+    return { sent: true, captured: true };
+  }
   const resendKey = clean(process.env.RESEND_API_KEY);
   const emailFrom = clean(process.env.EMAIL_FROM);
   const endpoint = clean(process.env.EMAIL_DELIVERY_WEBHOOK_URL);
   const secret = clean(process.env.EMAIL_DELIVERY_WEBHOOK_SECRET);
+  const idempotencyKey = emailIdempotencyKey("verification-" + sha256(message.token));
   if (resendKey && emailFrom) {
     let sent = false, errorCode = null;
     try {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${resendKey}` },
+        headers: { "content-type": "application/json", authorization: `Bearer ${resendKey}`, "Idempotency-Key": idempotencyKey },
         body: JSON.stringify({ from: emailFrom, to: [message.email], subject: emailSubject, text: emailText, html: emailHtml }),
         signal: AbortSignal.timeout(8000)
       });
@@ -93,6 +122,7 @@ export async function deliverEmailVerification(message) {
     registrationReference: message.registrationReference,
     verificationUrl: message.verificationUrl,
     expiresInHours: 24,
+    idempotencyKey,
     text: emailText,
     html: emailHtml
   };

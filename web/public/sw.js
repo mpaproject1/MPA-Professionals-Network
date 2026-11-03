@@ -46,7 +46,7 @@ function safeNotificationPath(value) {
   let decoded;
   try { decoded = decodeURIComponent(path); } catch { return "/notifications"; }
   if (decoded.includes("\\") || decoded.startsWith("//") || decoded.split("/").includes("..") || /[\x00-\x1f\x7f]/.test(decoded)) return "/notifications";
-  const allowed = ["/notifications", "/serve-community", "/mentorship", "/jobs", "/members", "/track", "/membership", "/verification", "/organizations", "/services", "/dashboard", "/profile", "/community-impact/recognition"];
+  const allowed = ["/notifications", "/mobile", "/serve-community", "/mentorship", "/learning", "/jobs", "/recruitment", "/members", "/track", "/membership", "/verification", "/organizations", "/services", "/dashboard", "/profile", "/account", "/workspaces", "/network-plus", "/community-impact/recognition"];
   if (!allowed.some((route) => decoded === route || decoded.startsWith(route + "/"))) return "/notifications";
   for (let index = 0; index < value.length; index += 1) {
     const code = value.charCodeAt(index);

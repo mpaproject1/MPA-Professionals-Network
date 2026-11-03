@@ -117,7 +117,7 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
       if(!listing)fail(404,"Published verified service listing not found.","SERVICE_NOT_FOUND");
       if((listing.audience==="members"&&!entry.access.member)||(listing.audience==="organizations"&&!entry.access.organization))fail(403,"This service listing is not available to your Network-Plus audience.","SERVICE_AUDIENCE_FORBIDDEN");
       if(["paused","unavailable"].includes(listing.availability_status))fail(409,"This listing is not currently accepting new connection requests.","LISTING_NOT_ACCEPTING_REQUESTS");
-      if(listing.listing_kind==="product_profile"&&!["supplier_inquiry","referral"].includes(intent))fail(400,"Product profiles support discovery inquiries and referrals only; they cannot be used to create service orders or other engagements.","PRODUCT_PROFILE_DISCOVERY_ONLY");
+      if(listing.listing_kind==="product_profile"&&!["supplier_inquiry","referral","interest","question","quote_request","meeting_request"].includes(intent))fail(400,"Product profiles support discovery inquiries, questions, quotation requests and meeting handoffs only; they cannot be used to create service orders or other engagements.","PRODUCT_PROFILE_DISCOVERY_ONLY");
       if(input.businessId&&input.businessId!==listing.business_id)fail(400,"Service listing does not belong to the selected business.","BUSINESS_LISTING_MISMATCH");
       input.businessId=listing.business_id;
     }

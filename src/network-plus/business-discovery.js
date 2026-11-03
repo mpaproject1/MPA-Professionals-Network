@@ -387,8 +387,8 @@ export async function createProfessionalServiceListing(businessId,userId,input,r
       if(existing.request_fingerprint!==payloadFingerprint)fail(409,"This submission key was already used for different listing details.","IDEMPOTENCY_CONFLICT");
       return {...existing,idempotent:true};
     }
-    const row=(await db.query(`insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,audience,delivery_mode,location_label,capacity,pricing_model,price_amount,currency,availability,credentials,request_idempotency_hash,request_fingerprint)
-      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning *`,[businessId,userId,normalized.title,normalized.summary,normalized.description,normalized.serviceCategory,normalized.audience,normalized.deliveryMode,normalized.locationLabel,normalized.capacity,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.availability,normalized.credentials,keyHash,payloadFingerprint])).rows[0];
+    const row=(await db.query(`insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,audience,delivery_mode,location_label,capacity,pricing_model,price_amount,currency,pricing_details,availability,credentials,request_idempotency_hash,request_fingerprint)
+      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning *`,[businessId,userId,normalized.title,normalized.summary,normalized.description,normalized.serviceCategory,normalized.audience,normalized.deliveryMode,normalized.locationLabel,normalized.capacity,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.pricingDetails,normalized.availability,normalized.credentials,keyHash,payloadFingerprint])).rows[0];
     await audit(db,userId,"network_plus.service_listing_created","network_plus_service_listing",row.id,requestId,{businessId});
     return row;
   });

@@ -72,7 +72,7 @@ test("PostgreSQL historical member XLSX import preserves approval and payment sa
  assert.equal(member.source,"legacy_import");
  const paymentRows=await db.query("select pt.id,pt.status from payment_transaction pt join payment_reconciliation pr on pr.payment_transaction_id=pt.id where pr.membership_id=$1",[member.id]);
  assert.equal(paymentRows.rowCount,0,"historical amount_paid and payment references must never create verified payment transactions");
- const event=(await db.query("select details from membership_event where membership_id=$1 and event_type='legacy_member_imported' order by created_at desc limit 1",[member.id])).rows[0];
+ const event=(await db.query("select details from membership_event where membership_id=$1 and event_type='legacy_member_imported' order by effective_at desc limit 1",[member.id])).rows[0];
  assert.equal(event.details.paymentImported,false);
  assert.equal(event.details.approvalConfirmed,true);
  const exported=await exportMembers(identity,{q:membershipNumber,format:"csv"},"member-import-export-"+suffix);

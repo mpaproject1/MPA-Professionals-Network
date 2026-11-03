@@ -147,7 +147,7 @@ export default function NetworkPlusRequestsPage(){
   setSaving(true);setError("");setNotice("");
   try{
    await api("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/disposition",{method:"POST",headers:{"X-Idempotency-Key":key()},body:JSON.stringify({disposition,remark})},token);
-   setClosureRemark("");setNotice(disposition==="in_progress"&&selected.requester_disposition!=="in_progress"?"Request reopened. Earlier closure history is preserved.":"Your connection outcome was saved separately from the platform request status.");
+   setClosureRemark("");setNotice(disposition==="in_progress"&&selected.requester_disposition!=="in_progress"?"Outcome reopened as In progress. The platform request status is unchanged; earlier closure history is preserved.":"Your connection outcome was saved separately from the platform request status.");
    const refreshed=await api<RequestRow>("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id),{},token);setSelected(refreshed);await load();
   }catch(e){setError(e instanceof ApiError?e.message:"The disposition could not be saved. Refresh before retrying.");}
   finally{setSaving(false);}

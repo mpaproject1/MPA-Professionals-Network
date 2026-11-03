@@ -8,7 +8,7 @@ const MEMBER_OWNER_ROLES = ["member", "professional"];
 const ORG_OWNER_ROLES = ["owner", "administrator"];
 const BUSINESS_REVIEW_ROLES = ["business_verification_reviewer", "system_admin"];
 const LISTING_REVIEW_ROLES = ["business_moderator", "system_admin"];
-const CATEGORIES = new Set(["professional_services","consulting","technology","design","education","healthcare","legal","finance","construction","trade","manufacturing","other"]);
+const CATEGORIES = new Set(["professional_services","consulting","technology","design","education","healthcare","legal","finance","construction","trade","manufacturing","other","products_supply","business_services","creative_media","facilities_operations","agriculture_food","transport_logistics","specialist_regulatory"]);\nconst LISTING_KINDS = new Set(["need","offer","product_profile","service_profile"]);
 const MODIFIABLE = new Set(["displayName","tradingName","description","website","locationLabel"]);
 const LISTING_MODIFIABLE = new Set(["title","summary","description","serviceCategory","audience","deliveryMode","locationLabel","capacity","pricingModel","priceAmount","currency","availability","credentials"]);
 const hash = value => createHash("sha256").update(String(value)).digest("hex");
@@ -291,6 +291,70 @@ export async function reviewBusinessVerification(businessId,userId,input,request
     await notifyOwners(db,businessId,"network_plus.business_verification_decided",{message:"A decision was recorded for the business verification case.",nextAction:status==="verified"?"Continue to listing moderation and publication.":"Review the decision reason and provide any requested clarification.",actionUrl:"/network-plus/businesses/"+businessId,status,eventVersion:updated.updated_at});
     return updated;
   });
+}
+
+function normalizeStructuredAttributes(value) {
+  const attributes=value===undefined||value===null?{}:value;
+  if(typeof attributes!=="object"||Array.isArray(attributes))fail(400,"Category details must be a structured object.","VALIDATION_ERROR");
+  if(JSON.stringify(attributes).length>8000)fail(400,"Category details are too large.","PAYLOAD_TOO_LARGE");
+  const visit=(node,key="")=>{
+    if(/email|phone|mobile|whatsapp|telegram|contact|address_text/i.test(key))fail(400,"Private contact details cannot be included in public listing attributes.","PUBLIC_CONTACT_DETAILS_FORBIDDEN");
+    if(typeof node==="string")publicText(node,1000,"Category detail",{min:0});
+    else if(Array.isArray(node))node.forEach(item=>visit(item,key));
+    else if(node&&typeof node==="object")for(const [childKey,child] of Object.entries(node))visit(child,childKey);
+    else if(node!==null&&typeof node!=="number"&&typeof node!=="boolean")fail(400,"Category detail values must be text, numbers, booleans or lists.","VALIDATION_ERROR");
+  };
+  visit(attributes); return attributes;
+}
+async function validateListingTaxonomy(db,category,subcategory,listingKind) {
+  if(!LISTING_KINDS.has(listingKind))fail(400,"Choose a supported listing type.","VALIDATION_ERROR");
+  if(!category)return null;
+  const row=(await db.query("select code,listing_kinds from network_plus_listing_taxonomy where code=$1 and active=true",[category])).rows[0];
+  if(!row||!row.listing_kinds.includes(listingKind))fail(400,"Choose an active category that supports this listing type.","INVALID_LISTING_CATEGORY");
+  if(subcategory){const child=(await db.query("select code,listing_kinds from network_plus_listing_taxonomy where code=$1 and parent_code=$2 and active=true",[subcategory,category])).rows[0];if(!child||!child.listing_kinds.includes(listingKind))fail(400,"Choose a valid subcategory for the selected category and listing type.","INVALID_LISTING_SUBCATEGORY");}
+  return row;
+}
+export async function listNetworkPlusListingTaxonomy(viewerId) {
+  const db=getPool();await assertEntry(db,viewerId);
+  return (await db.query("select code,parent_code,label,description,listing_kinds,field_schema,sort_order,taxonomy_version from network_plus_listing_taxonomy where active=true order by coalesce(parent_code,''),sort_order,label")).rows;
+}
+export async function createOpportunityListingDraft(businessId,userId,input,requestId,idempotencyKey) {
+  if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure idempotency key is required.","IDEMPOTENCY_KEY_REQUIRED");
+  const data=input||{},listingKind=data.listingKind||"offer",category=data.categoryCode||data.serviceCategory||null,subcategory=data.subcategoryCode||null;
+  const title=data.title?publicText(data.title,160,"Title",{min:3}):null,summary=data.summary?publicText(data.summary,500,"Summary",{min:20}):null,description=data.description?publicText(data.description,8000,"Description",{min:40}):null;
+  const attributes=normalizeStructuredAttributes(data.structuredAttributes),step=Number(data.wizardStep||1);
+  if(!Number.isInteger(step)||step<1||step>8)fail(400,"Wizard step must be between 1 and 8.","VALIDATION_ERROR");
+  const keyHash=hash(idempotencyKey),payloadFingerprint=fingerprint({businessId,userId,listingKind,category,subcategory,title,summary,description,attributes,step});
+  return withTransaction(async db=>{
+    await assertBusinessOwner(db,businessId,userId);
+    const existing=(await db.query("select * from network_plus_service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
+    if(existing){if(existing.request_fingerprint!==payloadFingerprint)fail(409,"This draft key was already used for different details.","IDEMPOTENCY_CONFLICT");return {...existing,idempotent:true};}
+    await validateListingTaxonomy(db,category,subcategory,listingKind);
+    const row=(await db.query("insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,listing_kind,subcategory_code,structured_attributes,wizard_step,draft_saved_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()) returning *",[businessId,userId,title,summary,description,category,listingKind,subcategory,attributes,step])).rows[0];
+    await audit(db,userId,"network_plus.listing_draft_created","network_plus_service_listing",row.id,requestId,{businessId,listingKind});return row;
+  });
+}
+export async function saveOpportunityListingDraft(listingId,userId,input,requestId) {
+  const data=input||{};
+  return withTransaction(async db=>{
+    const row=(await db.query("select * from network_plus_service_listing where id=$1 for update",[listingId])).rows[0];
+    if(!row)fail(404,"Opportunity draft not found.","NOT_FOUND");await assertBusinessOwner(db,row.business_id,userId);
+    if(row.status!=="draft"&&row.status!=="changes_requested")fail(409,"Only an unpublished draft can be autosaved. Published listings must be paused and edited through review.","DRAFT_LOCKED");
+    const kind=data.listingKind||row.listing_kind||"service_profile",category=data.categoryCode===undefined?row.service_category:data.categoryCode,subcategory=data.subcategoryCode===undefined?row.subcategory_code:data.subcategoryCode;await validateListingTaxonomy(db,category,subcategory,kind);
+    const title=data.title===undefined?row.title:(data.title?publicText(data.title,160,"Title",{min:3}):null),summary=data.summary===undefined?row.summary:(data.summary?publicText(data.summary,500,"Summary",{min:20}):null),description=data.description===undefined?row.description:(data.description?publicText(data.description,8000,"Description",{min:40}):null),attributes=data.structuredAttributes===undefined?row.structured_attributes:normalizeStructuredAttributes(data.structuredAttributes),step=data.wizardStep===undefined?row.wizard_step:Number(data.wizardStep);
+    if(!Number.isInteger(step)||step<1||step>8)fail(400,"Wizard step must be between 1 and 8.","VALIDATION_ERROR");
+    const audience=data.audience===undefined?row.audience:data.audience,delivery=data.deliveryMode===undefined?row.delivery_mode:data.deliveryMode,location=data.locationLabel===undefined?row.location_label:(data.locationLabel?optionalPublicText(data.locationLabel,160,"Location"):null),capacity=data.capacity===undefined?row.capacity:(data.capacity===""||data.capacity===null?null:Number(data.capacity)),pricing=data.pricingModel===undefined?row.pricing_model:data.pricingModel,price=data.priceAmount===undefined?row.price_amount:(data.priceAmount===""||data.priceAmount===null?null:Number(data.priceAmount)),currency=data.currency===undefined?row.currency:(data.currency?String(data.currency).trim().toUpperCase():null);
+    if(!["members","organizations","both"].includes(audience)||!["remote","onsite","hybrid"].includes(delivery)||!["free","fixed","hourly","quote"].includes(pricing))fail(400,"Choose supported audience, delivery and pricing options.","VALIDATION_ERROR");
+    if(capacity!==null&&(!Number.isInteger(capacity)||capacity<1||capacity>100000))fail(400,"Capacity must be a positive whole number.","VALIDATION_ERROR");
+    if(price!==null&&(!Number.isFinite(price)||price<0))fail(400,"Price must be non-negative.","VALIDATION_ERROR");
+    if(["fixed","hourly"].includes(pricing)&&(!price||!currency||! /^[A-Z]{3}$/.test(currency)))fail(400,"Fixed and hourly pricing require an amount and ISO currency.","VALIDATION_ERROR");
+    const updated=(await db.query("update network_plus_service_listing set title=$1,summary=$2,description=$3,service_category=$4,listing_kind=$5,subcategory_code=$6,structured_attributes=$7,wizard_step=$8,audience=$9,delivery_mode=$10,location_label=$11,capacity=$12,pricing_model=$13,price_amount=$14,currency=$15,draft_saved_at=now(),updated_at=now() where id=$16 returning *",[title,summary,description,category,kind,subcategory,attributes,step,audience,delivery,location,capacity,pricing,price,currency,listingId])).rows[0];
+    await audit(db,userId,"network_plus.listing_draft_autosaved","network_plus_service_listing",listingId,requestId,{wizardStep:step,listingKind:kind});return updated;
+  });
+}
+export async function listMyOpportunityListings(userId) {
+  const db=getPool();await assertEntry(db,userId);const businesses=await listMyBusinesses(userId),ids=businesses.map(b=>b.id);if(!ids.length)return [];
+  return (await db.query("select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.description,s.service_category category_code,s.subcategory_code,s.listing_kind,s.structured_attributes,s.wizard_step,s.draft_saved_at,s.status,s.moderation_reason,s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.created_at,s.updated_at,s.published_at from network_plus_service_listing s join network_plus_business b on b.id=s.business_id where s.business_id=any($1::uuid[]) order by case when s.status='draft' then 0 else 1 end,s.updated_at desc",[ids])).rows;
 }
 export async function createProfessionalServiceListing(businessId,userId,input,requestId,idempotencyKey) {
   if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure idempotency key is required.","IDEMPOTENCY_KEY_REQUIRED");

@@ -405,6 +405,8 @@ export async function saveOpportunityListingDraft(listingId,userId,input,request
       if(!Array.isArray(data.geographyUnitIds)||data.geographyUnitIds.length>30)fail(400,"Choose up to 30 structured service areas.","VALIDATION_ERROR");
       areaIds=[...new Set(data.geographyUnitIds.map(value=>String(value)))];
       areaVersion=data.geographyVersionId||null;
+      const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if(areaIds.some(value=>!uuidPattern.test(value))||(areaVersion&&!uuidPattern.test(areaVersion)))fail(400,"Choose valid published geography references.","GEOGRAPHY_UNIT_INVALID");
       if(areaIds.length){
         if(!areaVersion)fail(400,"Choose a published geography reference version.","GEOGRAPHY_VERSION_REQUIRED");
         const version=(await db.query("select id from membership_geography_version where id=$1 and status='published'",[areaVersion])).rows[0];

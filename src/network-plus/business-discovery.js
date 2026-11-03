@@ -391,8 +391,11 @@ export async function saveOpportunityListingDraft(listingId,userId,input,request
     const timezone=data.timezone===undefined?row.timezone:(data.timezone?String(data.timezone).trim().slice(0,64):null);
     const nextAvailableAt=data.nextAvailableAt===undefined?row.next_available_at:(data.nextAvailableAt?parseOpportunityLocalDateTime(data.nextAvailableAt,timezone):null);
     const targetAudience=data.targetAudience===undefined?(row.target_audience||[]):data.targetAudience;
-    const secondaryTags=data.secondaryTags===undefined?(row.secondary_tags||[]):data.secondaryTags;
-    if(!Array.isArray(secondaryTags)||secondaryTags.length>10||secondaryTags.some(value=>typeof value!=="string"))fail(400,"Choose up to ten controlled secondary tags.","INVALID_SECONDARY_TAGS");
+    if(!Array.isArray(targetAudience))fail(400,"Choose supported target-audience groups.","INVALID_TARGET_AUDIENCE");
+    const rawSecondaryTags=data.secondaryTags===undefined?(row.secondary_tags||[]):data.secondaryTags;
+    if(!Array.isArray(rawSecondaryTags)||rawSecondaryTags.some(value=>typeof value!=="string"))fail(400,"Choose up to ten controlled secondary tags.","INVALID_SECONDARY_TAGS");
+    const secondaryTags=[...new Set(rawSecondaryTags)];
+    if(secondaryTags.length>10)fail(400,"Choose up to ten controlled secondary tags.","INVALID_SECONDARY_TAGS");
     if(secondaryTags.length){const valid=(await db.query("select code from network_plus_listing_taxonomy where active=true and code=any($1::text[])",[secondaryTags])).rows;if(valid.length!==new Set(secondaryTags).size)fail(400,"One or more secondary tags are no longer available.","INVALID_SECONDARY_TAGS");}
     if(serviceRadiusKm!==null&&(!Number.isInteger(serviceRadiusKm)||serviceRadiusKm<1||serviceRadiusKm>1000))fail(400,"Service radius must be between 1 and 1000 kilometres.","VALIDATION_ERROR");
     if(!["accepting_requests","limited","paused","unavailable"].includes(availabilityStatus))fail(400,"Choose a supported intake status.","VALIDATION_ERROR");

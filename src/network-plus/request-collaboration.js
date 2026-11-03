@@ -411,6 +411,7 @@ function validateMeeting(input){
   if(!["office","coffee","online","other"].includes(placeType))fail(400,"Choose a supported meeting place type.","INVALID_MEETING_PLACE");
   const placeDetails=String(input?.placeDetails||"").trim();
   if(placeDetails.length>500)fail(400,"Meeting place details must be 500 characters or fewer.","VALIDATION_ERROR");
+  if(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(placeDetails)||/\+?[0-9][0-9 ()-]{6,}[0-9]/.test(placeDetails)||/https?:\/\//i.test(placeDetails))fail(400,"Do not put contact details or meeting links in the meeting location. Share those separately only through consent.","CONTACT_DETAILS_FORBIDDEN");
   const timezone=clean(input?.timezone,100,"Timezone",3);
   try{new Intl.DateTimeFormat("en",{timeZone:timezone}).format(new Date());}catch{fail(400,"Choose a valid IANA timezone.","INVALID_TIMEZONE");}
   const startsAt=new Date(input?.startsAt);
@@ -475,6 +476,8 @@ export async function askNetworkPlusClarification(requestId,userId,input,request
     const actor=await participant(db,requestId,userId);
     if(actor.participant_role!=="recipient_representative")fail(403,"Only the recipient representative can request clarification.","RECIPIENT_ONLY");
     if(request.business_id&&!await hasBusinessAuthority(db,request.business_id,userId,"business.respond_requests"))fail(403,"Your business permission does not allow responding to requests.","BUSINESS_AUTHORITY_REQUIRED");
+    const openClarification=(await db.query("select id from network_plus_request_clarification where request_id=$1 and status='open' limit 1",[requestId])).rows[0];
+    if(openClarification)fail(409,"A clarification is already awaiting the requester response.","CLARIFICATION_ALREADY_OPEN");
     const clarification=(await db.query("insert into network_plus_request_clarification(request_id,asked_by,prompt_code,question) values($1,$2,$3,$4) returning *",[requestId,userId,promptCode,question])).rows[0];
     await db.query("update network_plus_request set status='clarification_requested',version=version+1,updated_at=now() where id=$1",[requestId]);
     await audit(db,requestId,userId,"request.clarification_requested",request.status,"clarification_requested",requestIdHeader,{clarificationId:clarification.id,promptCode});

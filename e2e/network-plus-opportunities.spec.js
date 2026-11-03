@@ -18,7 +18,7 @@ async function mockOpportunityMall(page,{drafts=[],items=[listing]}={}){
  await page.route("**/api/v1/network-plus/geography-reference",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{version:null,countries:[],regions:[],federalCities:[],children:[]}})}));
  await page.route("**/api/v1/network-plus/my/businesses",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[business]})}));
  await page.route("**/api/v1/network-plus/my/listings",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:drafts})}));
- await page.route("**/api/v1/network-plus/listings",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items,limit:20,offset:0,total:items.length,hasMore:false}})}));
+ await page.route("**/api/v1/network-plus/listings*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items,limit:20,offset:0,total:items.length,hasMore:false}})}));
 }
 
 test("professional opportunity mall searches verified Needs, Offers and discovery-only profiles",async({page})=>{

@@ -658,13 +658,15 @@ See [docs/73-network-plus-phase-2-connection-consent-handoff.md](73-network-plus
 
 ## Phase 3 implementation record — My Requests and closure disposition
 
-Phase 3 source implementation has started on PR #18 and reuses the canonical `network_plus_request` record.
+Phase 3 source implementation is complete on PR #18 at the source level and reuses the canonical `network_plus_request` record. The final audit also closed the recipient-decline reason, request-history labeling and selected-request context gaps.
 
 - The requester-owned My Requests shelf separates initiated requests from the incoming Requests received list. It supports All, Awaiting response, In progress, Completed and Cancelled filters, and compact cards show the other party, request intent/lifecycle status, last requester remark, update date and next review due date.
 - Every requester's disposition is stored separately from the platform-observed lifecycle status. The only requester dispositions are `in_progress`, `completed` and `cancelled`.
 - Completed and Cancelled require a 5–500 character remark. Reopening a closed disposition requires a new explanatory remark; each update/reopen is retained in the immutable canonical request event history.
 - Requester-reported disposition, remarks and reminder history are hidden from recipients and additional participants. They are visible only to the requester; the platform lifecycle status remains visible to the authorized request participants.
 - Recipient withdrawal after acceptance is represented as the distinct platform-observed `recipient_withdrawn` lifecycle status, requires a recipient-side reason, is audited/notified, revokes the recipient's previously granted contact-field consent and encrypted values, blocks new contact release, and closes any optional collaboration workspace. Consent status remains readable so the other party can manage its own revocation. Recipient decline remains the existing `declined` status; requester withdrawal remains `withdrawn`.
+- Recipient decline and withdrawal reasons are now both required to be 5–500 characters and reject private contact details. The recipient UI collects a decline reason instead of submitting a generic hard-coded explanation.
+- Request history visibly separates **Platform-observed activity** from **Your reported connection outcomes**, and the selected request ID is preserved in the URL/browser history alongside existing listing/action context.
 - A seven-day review due date is set when a request is submitted. The idempotent batch dispatcher sends a privacy-safe in-app reminder and advances the next review date by seven days, using row locks with `SKIP LOCKED` to avoid duplicate concurrent delivery. The command is `npm run network-plus:dispatch-review-reminders`.
 
 **Operational scheduling:** the repository command must be run daily by the hosting scheduler (for example, cPanel Cron Jobs) using the app's normal database environment. Suggested cadence is once daily; each due request is only reminded once per seven-day interval. This source change does not create a hosting cron entry, configure production secrets, deploy code or alter a production database.

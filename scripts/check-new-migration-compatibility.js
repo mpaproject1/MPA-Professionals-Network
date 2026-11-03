@@ -68,7 +68,7 @@ const migrationNames = [
   "20261101280000_community_impact_governed_taxonomies.sql",
   "20261101290000_community_impact_taxonomy_code_constraints.sql",
   "20261102090000_community_impact_claim_candidate_one_to_one.sql",
-  "20261102100000_community_impact_claim_candidate_many_to_one.sql"
+  "20261102100000_community_impact_claim_candidate_many_to_one.sql",
   "20261102150000_membership_geography_and_fee_obligations.sql",
   "20261102160000_membership_fee_dispositions_and_backfill.sql",
   "20261102170000_membership_fee_disposition_idempotency.sql",

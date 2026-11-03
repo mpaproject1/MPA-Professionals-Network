@@ -14,19 +14,20 @@ export function PushNotificationSettings({token}:{token:string}){
  const [permission,setPermission]=useState<NotificationPermission|"unsupported">("default");
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const supported=typeof window!=="undefined"&&window.isSecureContext&&"serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window;
- const refreshDeviceState=async()=>{
+ const refreshDeviceState=async(isCurrent:()=>boolean=()=>true)=>{
   if(typeof window!=="undefined"&&"Notification" in window)setPermission(Notification.permission);else setPermission("unsupported");
   const [serverStatus,registration]=await Promise.all([
    api<PushStatus>("/api/v1/notifications/push/status",{},token),
    "serviceWorker" in navigator?navigator.serviceWorker.getRegistration("/"):Promise.resolve(undefined)
   ]);
   const subscription=await registration?.pushManager.getSubscription();
+  if(!isCurrent())return;
   setStatus(serverStatus);
   setDeviceEnabled(Boolean(subscription));
  };
  useEffect(()=>{
   let cancelled=false;
-  const refresh=()=>{void refreshDeviceState().catch(e=>{if(!cancelled)setError(e instanceof ApiError?e.message:"Push notification status could not be loaded.")})};
+  const refresh=()=>{void refreshDeviceState(()=>!cancelled).catch(e=>{if(!cancelled)setError(e instanceof ApiError?e.message:"Push notification status could not be loaded.")})};
   refresh();
   const onVisibility=()=>{if(document.visibilityState==="visible")refresh()};
   window.addEventListener("pageshow",refresh);

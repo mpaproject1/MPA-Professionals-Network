@@ -45,6 +45,7 @@ test("taxonomy-driven drafts are owner-authorized, structured, private and resum
   assert.match(service,/membership_geography_version/);
   assert.match(service,/network_plus_service_listing_geography/);
   assert.match(service,/validateListingPricing/);
+  assert.match(service,/parseOpportunityLocalDateTime/);
   assert.match(service,/SERVICE_AREA_REQUIRED/);
   assert.match(service,/status=case when status in \('published','paused','rejected'\) then 'draft' else status end/);
 });

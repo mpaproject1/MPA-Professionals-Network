@@ -36,7 +36,6 @@ function cleanRow(row){
  const email=normalizeEmail(x.email),fullName=String(x.full_name||"").trim().replace(/\s+/g," "),membershipNumber=String(x.membership_number||"").trim(),productCode=String(x.product_code||x.membership_type||"").trim().toUpperCase(),status=String(x.status||"").trim().toLowerCase();
  const phone=normalizePhone(x.phone),gender=String(x.gender||"").trim().toLowerCase(),registeredDate=parseDate(x.registered_date||x.start_date);
  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))errors.push("Enter a valid email address.");
- if(!email||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))errors.push("Enter a valid email address.");
  if(!fullName||fullName.split(" ").length<2)errors.push("Enter first and last name in full_name.");
  if(!membershipNumber)errors.push("Membership number is required.");
  if(!/^[A-Z0-9_-]{2,32}$/.test(productCode))errors.push("Membership type must resolve to a configured product code.");

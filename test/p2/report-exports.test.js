@@ -173,6 +173,7 @@ test("finance reports reconcile verified, failed, refunded, disputed and outstan
   if(paymentIds.length)await db.query("delete from payment_reconciliation where payment_transaction_id=any($1::uuid[])",[paymentIds]);
   if(reversalIds.length)await db.query("delete from membership_payment_reversal where id=any($1::uuid[])",[reversalIds]);
   if(applicationIds.length)await db.query("delete from membership_application_payment where application_id=any($1::uuid[])",[applicationIds]);
+  if(paymentIds.length)await db.query("delete from membership_fee_obligation_payment where payment_transaction_id=any($1::uuid[])",[paymentIds]);
   if(paymentIds.length)await db.query("delete from payment_transaction where id=any($1::uuid[])",[paymentIds]);
   if(applicationIds.length)await db.query("delete from membership_application where id=any($1::uuid[])",[applicationIds]);
  }

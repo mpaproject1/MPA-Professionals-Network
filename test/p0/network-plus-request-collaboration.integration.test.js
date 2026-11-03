@@ -96,6 +96,14 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   const business=(await db.query("insert into network_plus_business(business_kind,display_name,description,verification_status,moderation_status,publication_status,verified_at,verified_by,created_by) values('individual',$1,$2,'verified','approved','published',now(),$3,$3) returning id",["Verified Test Business "+suffix.slice(0,6),"A synthetic verified business used only by the disposable request lifecycle integration test.",businessOwner.user.id])).rows[0];
   await db.query("insert into network_plus_business_ownership(business_id,owner_type,owner_user_id,owner_role,consent_status,status,consented_at,created_by) values($1,'member',$2,'primary_owner','accepted','active',now(),$2)",[business.id,businessOwner.user.id]);
   await db.query("insert into network_plus_business_access(business_id,user_id,capability_code,granted_by) values($1,$2,'business.respond_requests',$3),($1,$4,'business.accept_terms',$3)",[business.id,requestReviewer.user.id,businessOwner.user.id,termsApprover.user.id]);
+  const businessQuestion=await requests.createNetworkPlusRequest(requester.user.id,{intent:"question",businessId:business.id,subject:"Business representative authority check",summary:"Can your business support this regional service?",details:{topic:"Service capability"},terms:{}},requestRef,randomUUID()+randomUUID());
+  await requests.submitNetworkPlusRequest(businessQuestion.id,requester.user.id,requestRef,randomUUID()+randomUUID());
+  await requests.answerNetworkPlusQuestion(businessQuestion.id,requestReviewer.user.id,{answer:"The authorized representative confirms the service capability."},requestRef);
+  await db.query("delete from network_plus_business_access where business_id=$1 and user_id=$2 and capability_code='business.respond_requests'",[business.id,requestReviewer.user.id]);
+  await assert.rejects(()=>requests.answerNetworkPlusQuestion(businessQuestion.id,requestReviewer.user.id,{answer:"A former representative must not answer."},requestRef),e=>e.code==="RECIPIENT_AUTHORITY_REQUIRED");
+  const formerRepresentativeDetail=await requests.getNetworkPlusRequest(businessQuestion.id,requestReviewer.user.id);
+  assert.equal(formerRepresentativeDetail.isRecipientRepresentative,false);
+  assert.equal(formerRepresentativeDetail.recipient_response,null);
   const businessRequest=await requests.createNetworkPlusRequest(requester.user.id,{intent:"partnership_proposal",businessId:business.id,subject:"Verified business partnership",summary:"Propose a defined partnership with measurable community outputs.",details:{},terms:{purpose:"Deliver a community technology pilot.",scope:"Design and deliver a three-month pilot.",contributions:["Technical expertise"],responsibilities:["Coordinate implementation"],outputs:["Pilot and outcomes report"],timeline:{proposed:"Three months"},authorizedRepresentatives:["Business owner representative","Requester representative"]}},requestRef,randomUUID()+randomUUID());
   assert.equal(businessRequest.recipient_user_id,businessOwner.user.id);
   const businessParticipants=await db.query("select user_id from network_plus_request_participant where request_id=$1",[businessRequest.id]);
@@ -121,6 +129,8 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   const questionResponse=await requests.answerNetworkPlusQuestion(questionRequest.id,recipient.user.id,{answer:"Yes. We support regional distribution through approved local partners and can discuss coverage after a connection is accepted."},requestRef);
   assert.ok(questionResponse.recipient_response_at);
   assert.equal((await requests.getNetworkPlusRequest(questionRequest.id,requester.user.id)).recipient_response,questionResponse.recipient_response);
+  assert.equal((await requests.getNetworkPlusRequest(questionRequest.id,recipient.user.id)).recipient_response,questionResponse.recipient_response);
+  await assert.rejects(()=>requests.getNetworkPlusRequest(questionRequest.id,outsider.user.id),e=>e.code==="NOT_FOUND");
   await assert.rejects(()=>requests.answerNetworkPlusQuestion(questionRequest.id,recipient.user.id,{answer:"A second answer should not overwrite the first response."},requestRef),e=>e.code==="QUESTION_ALREADY_ANSWERED");
   const handoffRequest=await requests.createNetworkPlusRequest(requester.user.id,{intent:"meeting_request",recipientUserId:recipient.user.id,subject:"Introductory business meeting",summary:"Request a first meeting to discuss the opportunity and possible next steps.",details:{topic:"Professional introduction"},terms:{}},requestRef,randomUUID()+randomUUID());
   await requests.submitNetworkPlusRequest(handoffRequest.id,requester.user.id,requestRef,randomUUID()+randomUUID());
@@ -181,6 +191,10 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   const supportGrant=await requests.grantNetworkPlusSupportAccess(draft.id,admin.user.id,{supportUserId:support.user.id,supportCaseReference:supportTicket,reason:supportReason,expiresAt:new Date(Date.now()+3600000).toISOString()},requestRef);
   const supportDetail=await requests.getNetworkPlusRequest(draft.id,support.user.id,{supportReason,supportTicket});
   assert.equal(supportDetail.id,draft.id);
+  const questionSupportGrant=await requests.grantNetworkPlusSupportAccess(questionRequest.id,admin.user.id,{supportUserId:support.user.id,supportCaseReference:supportTicket+"-Q",reason:supportReason,expiresAt:new Date(Date.now()+3600000).toISOString()},requestRef);
+  const questionSupportDetail=await requests.getNetworkPlusRequest(questionRequest.id,support.user.id,{supportReason,supportTicket:supportTicket+"-Q"});
+  assert.equal(questionSupportDetail.recipient_response,null);
+  await requests.revokeNetworkPlusSupportAccess(questionRequest.id,questionSupportGrant.id,admin.user.id,{reason:"The question response privacy review is complete."},requestRef);
   await requests.revokeNetworkPlusSupportAccess(draft.id,supportGrant.id,admin.user.id,requestRef);
   await assert.rejects(()=>requests.getNetworkPlusRequest(draft.id,support.user.id,{supportReason,supportTicket}),e=>e.code==="SUPPORT_GRANT_REQUIRED");
 

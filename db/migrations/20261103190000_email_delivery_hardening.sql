@@ -9,6 +9,8 @@ create unique index if not exists uq_notification_outbox_email_event_key
   on notification_outbox(email_event_key) where channel='email' and email_event_key is not null;
 create index if not exists ix_notification_outbox_email_delivery_status
   on notification_outbox(delivery_status,delivery_event_at desc) where channel='email';
+create index if not exists ix_notification_outbox_email_provider_message_id
+  on notification_outbox(provider_message_id) where channel='email' and provider_message_id is not null;
 
 create table if not exists email_delivery_event (
   id uuid primary key default gen_random_uuid(),

@@ -9,20 +9,21 @@
 
 Increment 6 adds a private request-and-collaboration lifecycle to Network-Plus. It does not replace or migrate the existing Serve-Community `service_request`, mentorship requests, Jobs applications, talent inquiries or legacy service agreements. These remain separate domains with their existing permissions and history.
 
-A request is an expression of intent. **Draft and submitted requests are not agreements.** Only the intended recipient (or a currently authorized representative of the addressed organization) can record acceptance. The accepted decision and its terms are retained in the request history. A collaboration workspace is created in the same database transaction as acceptance, only for engagement-capable intents.
+A request is an expression of intent. **Draft and submitted requests are not agreements.** Only the intended recipient (or a currently authorized representative of the addressed organization) can record acceptance. The accepted decision and its terms are retained in the request history. A collaboration workspace is never created merely because a request is accepted. Acceptance records the connection decision only; an accepted primary participant may explicitly enable an optional shared workspace for eligible engagement intents.
 
 ## 2. Typed intents
 
-| Intent | Meaning | Workspace after explicit acceptance |
+| Intent | Meaning | Workspace |
 |---|---|---|
-| `service_request` | Request a defined professional service from a business/provider | Yes |
-| `supplier_inquiry` | Ask a supplier about capacity, supply or availability | Yes |
-| `referral` | Ask for or offer a professional introduction | No by default; an introduction is not automatically a project |
-| `expertise_request` | Request specialist advice, review or expertise | Yes |
-| `partnership_proposal` | Propose a structured partnership | Yes |
-| `collaboration_request` | Propose a defined collaboration | Yes |
+| `service_request` | Request a defined professional service from a business/provider | Optional after acceptance |
+| `supplier_inquiry` | Ask a supplier about capacity, supply or availability | Optional after acceptance |
+| `referral` | Ask for or offer a professional introduction | Not supported; keep the introduction lightweight |
+| `expertise_request` | Request specialist advice, review or expertise | Optional after acceptance |
+| `partnership_proposal` | Propose a structured partnership | Optional after acceptance |
+| `collaboration_request` | Propose a defined collaboration | Optional after acceptance |
+| `business_opportunity` | Express interest in a sponsored programme, grant or other business-support opportunity | Not supported by default; qualification and selection remain outside a project workspace |
 
-The service stores these values in a constrained `intent` column. It does not infer an intent from free-text descriptions.
+The service stores these seven values in a constrained `intent` column. `business_opportunity` is the seventh type missing from the original Increment 6 implementation and is included by the forward-only Phase 0 compatibility migration. The service does not infer an intent from free-text descriptions.
 
 ### Required terms
 
@@ -51,7 +52,7 @@ The service stores these values in a constrained `intent` column. It does not in
 
 Invalid transitions are rejected server-side. The browser never decides whether a transition is allowed. A recipient organization decision is rechecked against its current active owner/administrator membership at decision time. Direct member recipients must be verified, directory-visible and retain active membership. Direct organization recipients must be verified and opted into Network-Plus. Business listing recipients must still be published, verified and moderated at decision time.
 
-**Workspace rule:** the service inserts a workspace only while processing the explicit `accepted` transition. A database trigger independently rejects workspace inserts unless the referenced request has an accepted timestamp and is in an accepted/active/disputed/completed state. Referral acceptance does not create a project workspace by default.
+**Workspace rule:** the service inserts a workspace only through the explicit post-acceptance opt-in operation. A database trigger independently rejects workspace inserts unless the referenced request has an accepted timestamp and is in an accepted/active/disputed/completed state. Referral and business-opportunity requests remain lightweight and do not support a project workspace.
 
 ## 4. Role and visibility matrix
 
@@ -98,6 +99,7 @@ All routes are authenticated by the existing API dispatcher; domain functions re
 | GET | `/api/v1/network-plus/requests/:id` | Participant detail/history; support reads require reason and ticket query values |
 | POST | `/api/v1/network-plus/requests/:id/submit` | Submit draft; requires idempotency key |
 | POST | `/api/v1/network-plus/requests/:id/transitions` | Request state transition; requires idempotency key |
+| POST | `/api/v1/network-plus/requests/:id/workspace` | Explicitly enable an optional workspace for an accepted eligible request |
 | POST | `/api/v1/network-plus/requests/:id/participants` | Invite an eligible additional participant after acceptance |
 | POST | `/api/v1/network-plus/requests/:id/participants/respond` | Invited participant accepts/declines |
 | GET | `/api/v1/network-plus/requests/:id/workspace` | Accepted-participant workspace read |
@@ -125,6 +127,7 @@ The guarded route `/network-plus/requests` provides:
 2. A separate submit action with a clear “not an agreement” message.
 3. Recipient review, clarification, explicit acceptance or decline.
 4. Requester resubmission or withdrawal.
+5. An accepted participant may optionally enable a shared collaboration workspace; acceptance alone does not create one.
 5. Accepted workspace with milestone creation/status updates and progress/blocker/decision/outcome entries.
 6. Completion evidence capture and dispute/close actions.
 
@@ -133,7 +136,7 @@ The Playwright suite `e2e/network-plus-requests.spec.js` covers the draft-not-su
 ## 9. Validation and exit gate
 
 Added:
-- `test/platform/network-plus-request-collaboration.test.js` — source-contract assertions for schema, routes, lifecycle, privacy, support policy, browser and migration wiring.
+- `test/platform/network-plus-request-collaboration.test.js` — source-contract assertions for schema, routes, lifecycle, privacy, support policy, browser and migration wiring, including the seven-intent contract and optional-workspace boundary.
 - `test/p0/network-plus-request-collaboration.integration.test.js` — disposable PostgreSQL integration journey covering member verification, draft/submission, pre-acceptance workspace denial, recipient acceptance, idempotent decision replay/conflict, participant-only workspace reads, milestones, updates and notification events. It skips when `DATABASE_URL` is not configured.
 - `e2e/network-plus-requests.spec.js` — browser journey tests.
 - `scripts/check-new-migration-compatibility.js` — includes the Increment 6 migration, columns, unique indexes, status checks, workspace acceptance trigger and support role.

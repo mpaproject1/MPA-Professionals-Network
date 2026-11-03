@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import * as membership from "../../src/membership/service.js";
+import { captureMembershipMonthEndSnapshot } from "../../src/membership/service.js";
 import { getPool } from "../../src/platform/db.js";
 import { runReport } from "../../src/platform/reports.js";
 
@@ -25,18 +26,28 @@ test("Test Lab membership applications are excluded from management funnel, coho
   assert.ok(product, "the BASIC membership product must exist in the disposable test database");
   const portfolioId = randomUUID();
   let applicationId = null;
+  let membershipRecordId = null;
+  const snapshotDate = "2026-12-31";
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date());
   const reviewer = { sub: userId, roles: ["system_admin"], permissions: [] };
   try {
     const beforeApplications = await runReport(reviewer, "membership-applications", { from: "2020-01-01", to: today, status: "submitted" }, randomUUID());
     const beforeCohorts = await runReport(reviewer, "membership-application-cohorts", { from: "2020-01-01", to: today, status: "submitted" }, randomUUID());
     const beforeAging = await runReport(reviewer, "membership-application-aging", { from: "2020-01-01", to: today, status: "submitted" }, randomUUID());
+    const beforeMemberStock = await runReport(reviewer, "membership-status", {}, randomUUID());
+    const beforeDirectory = await runReport(reviewer, "member-directory", {}, randomUUID());
 
     const application = (await db.query(
       "insert into membership_application(user_id,application_type,membership_product_id,status,submitted_at,data_snapshot,fee_snapshot) values($1,'new',$2,'submitted',now(),$3,$4) returning id",
       [userId, product.id, { synthetic: true, testPortfolioId: portfolioId, persona: "Test Lab reporting exclusion" }, { productCode: "BASIC", amount: Number(product.price), currency: product.currency }]
     )).rows[0];
     applicationId = application.id;
+    const membershipRecord = (await db.query(
+      "insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,end_date,source,application_id) values($1,$2,$3,'active',$4,$5,'online',$6) returning id",
+      [userId, product.id, "TSTLAB-" + suffix.replace(/-/g, "").slice(0, 12).toUpperCase(), today, "2027-12-31", application.id]
+    )).rows[0];
+    membershipRecordId = membershipRecord.id;
+
 
     const afterApplications = await runReport(reviewer, "membership-applications", { from: "2020-01-01", to: today, status: "submitted" }, randomUUID());
     const afterCohorts = await runReport(reviewer, "membership-application-cohorts", { from: "2020-01-01", to: today, status: "submitted" }, randomUUID());
@@ -45,8 +56,21 @@ test("Test Lab membership applications are excluded from management funnel, coho
     assert.deepEqual(afterApplications.rows, beforeApplications.rows, "synthetic Test Lab applications must not affect application KPIs");
     assert.deepEqual(afterCohorts.rows, beforeCohorts.rows, "synthetic Test Lab applications must not affect cohort denominators or conversion");
     assert.deepEqual(afterAging.rows, beforeAging.rows, "synthetic Test Lab applications must not affect reviewer queue ageing");
+    const afterMemberStock = await runReport(reviewer, "membership-status", {}, randomUUID());
+    const afterDirectory = await runReport(reviewer, "member-directory", {}, randomUUID());
+    assert.deepEqual(afterMemberStock.rows, beforeMemberStock.rows, "membership records linked to Test Lab applications must not affect member stock");
+    assert.deepEqual(afterDirectory.rows, beforeDirectory.rows, "membership records linked to Test Lab applications must not leak into production-like member exports");
+
+    const snapshot = await captureMembershipMonthEndSnapshot(new Date("2026-12-31T20:55:00.000Z"));
+    assert.equal(snapshot.captured, true);
+    const snapshotTotals = await db.query("select coalesce(sum(member_count),0)::int total from membership_month_end_snapshot where snapshot_date=$1",[snapshotDate]);
+    const expectedRealStock = Number((await db.query("select count(*)::int count from membership_record mr where not exists(select 1 from membership_application test_app where test_app.id=mr.application_id and coalesce(test_app.data_snapshot->>'testPortfolioId','')<>'')")).rows[0].count);
+    assert.equal(Number(snapshotTotals.rows[0].total), expectedRealStock, "month-end snapshots must exclude Test Lab membership records");
+
   } finally {
+    if (membershipRecordId) await db.query("delete from membership_record where id=$1", [membershipRecordId]);
     if (applicationId) await db.query("delete from membership_application where id=$1", [applicationId]);
+    await db.query("delete from membership_month_end_snapshot where snapshot_date=$1",[snapshotDate]);
     await db.query("delete from audit_log where actor_user_id=$1", [userId]);
   }
 });

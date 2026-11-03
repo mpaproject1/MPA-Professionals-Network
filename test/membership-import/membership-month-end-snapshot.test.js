@@ -33,7 +33,7 @@ test("month-end membership snapshot is persisted and safely refreshed", async t 
     assert.equal(second.captured, true);
     const secondTotals = await db.query("select coalesce(sum(member_count),0)::int total,count(*)::int groups from membership_month_end_snapshot where snapshot_date=$1",[snapshotDate]);
     assert.equal(Number(secondTotals.rows[0].total), currentCount, "recapture must replace the prior snapshot rather than duplicate counts");
-    assert.ok(Number(secondTotals.rows[0].groups) <= Number(firstTotals.rows[0].groups) || Number(secondTotals.rows[0].groups) >= Number(firstTotals.rows[0].groups));
+    assert.equal(Number(secondTotals.rows[0].groups), Number(firstTotals.rows[0].groups), "recapture must replace each status/plan group without duplicating groups");
   } finally {
     await db.query("delete from membership_month_end_snapshot where snapshot_date=$1",[snapshotDate]);
   }

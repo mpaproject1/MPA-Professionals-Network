@@ -70,7 +70,7 @@ Contact values are encrypted at application level using AES-256-GCM with a rando
 
 Configure `NETWORK_PLUS_CONTACT_ENCRYPTION_KEY` with a unique random secret of at least 32 characters in every environment before enabling contact sharing. Generate a high-entropy value (for example, `openssl rand -base64 48`), store it only in the environment's secret manager, and keep a separately access-controlled encrypted backup. Never commit a real key, place it in database rows, or include it in logs.
 
-**Rotation procedure:** use a maintenance window and disable contact-sharing writes while rotating. Back up the database and old key first. Set `DATABASE_URL`, `NETWORK_PLUS_CONTACT_ENCRYPTION_OLD_KEY`, `NETWORK_PLUS_CONTACT_ENCRYPTION_NEW_KEY`, and `NETWORK_PLUS_CONTACT_KEY_ROTATION_CONFIRM=YES`, then run `npm run network-plus:rotate-contact-key`. For a production-like database, the separate `NETWORK_PLUS_CONTACT_KEY_ROTATION_ALLOW_PRODUCTION=YES` confirmation is also required. The utility locks the consent table, decrypts and re-encrypts each non-null field with the same record-bound AAD, verifies the new ciphertext before commit, and rolls back the complete transaction on any failure. After a successful rotation, set `NETWORK_PLUS_CONTACT_ENCRYPTION_KEY` to the new secret before re-enabling contact sharing. Retain the old key and database backup until post-rotation verification and recovery checks are complete; then retire the old key according to the organization's secret-retention policy. Do not rotate by merely replacing the runtime key.
+**Rotation procedure:** use a maintenance window and disable contact-sharing writes while rotating. Back up the database and old key first. Set `DATABASE_URL`, `NETWORK_PLUS_CONTACT_ENCRYPTION_OLD_KEY`, `NETWORK_PLUS_CONTACT_ENCRYPTION_NEW_KEY`, and `NETWORK_PLUS_CONTACT_KEY_ROTATION_CONFIRM=YES`, then run `npm run network-plus:rotate-contact-key`. For a production-like database, the separate `NETWORK_PLUS_CONTACT_KEY_ROTATION_ALLOW_PRODUCTION=YES` confirmation is also required. The utility locks the consent table, reads both the earlier three-part AES-GCM envelope (legacy, without AAD) and the current versioned `v1` envelope, and re-encrypts every non-null value into the record-bound `v1` format. It verifies each new ciphertext before commit and rolls back the complete transaction on any failure. The application temporarily supports read-only decryption of legacy envelopes so previously stored contact values remain accessible during the planned rotation; all new writes use only the authenticated `v1` format. After a successful rotation, set `NETWORK_PLUS_CONTACT_ENCRYPTION_KEY` to the new secret before re-enabling contact sharing. Retain the old key and database backup until post-rotation verification and recovery checks are complete; then retire the old key according to the organization's secret-retention policy. Do not rotate by merely replacing the runtime key.
 
 ## 5. Meeting handoff
 
@@ -161,3 +161,34 @@ Source-level corrections now present:
 **Evidence boundary:** These are inspected source changes and newly authored regression tests. The tests have not yet been executed in this continuation. No disposable PostgreSQL migration/rollback run, backend suite, Playwright run, Biome check, TypeScript check, production build or successful GitHub Actions result is claimed here. The rotation utility has not been run against any database. The encryption key has not been verified in a deployed environment.
 
 **Phase 2 exit status: NOT CLOSED.** Runtime verification remains mandatory. Keep PR #18 draft. Do not begin Phase 3 until the Phase 2 migration, authorization/privacy, encryption, notification, DST, backend, browser, lint, typecheck and production-build gates have actual recorded results.
+
+
+## 12. Follow-up source audit — 2026-11-03
+
+**Source snapshot:** `c2c6af71ef39d18f3804876cc6c4f4141b65948c` (the branch head before this documentation update).
+
+Additional defects found and corrected after the initial audit:
+
+- The question-answer path still contained the older business-only permission check; it now calls the shared current-recipient-authority check. Business permissions, verified organization owner/administrator status and active individual membership are rechecked at answer time.
+- Request-detail privacy previously trusted a stale recipient participant row. Former recipient representatives could continue to see the one-time answer and private handoff history after their authority was revoked. The detail projection now requires current recipient authority; clarification and meeting history is restricted to the requester and current recipient representative, and meeting rows are not returned to additional participants or support readers.
+- The new response-integrity migration block was malformed as a single-dollar delimiter. It now uses a valid named PostgreSQL dollar-quote delimiter (`$phase2$`) and enforces the all-or-none response/actor/timestamp invariant for question intents.
+- The migration compatibility checker now inventories Phase 2 columns and foreign-key targets, verifies contact-consent/meeting/clarification checks and indexes, and snapshots/restores the exact Phase 2 table, column, constraint and index baseline during its rollback-only rehearsal.
+- Contact decryption and the rotation utility now support the earlier three-part AES-GCM envelope as a read/rotation-only legacy format. Rotation rewrites it to the record-bound `v1` AAD envelope; new writes remain `v1` only. The integration test exercises legacy reads, ciphertext-at-rest, cross-field ciphertext substitution failure, and notification payloads without contact values.
+- Recipient-answer integration coverage now includes revoked business response authority and confirms that support readers do not receive the private response.
+- Meeting-time ambiguity is now rejected in both the browser conversion and the API validation boundary. The backend derives the selected local wall time and rejects repeated-hour instants in IANA timezones, preventing direct API callers from bypassing the browser check.
+- The request integration test includes a fall-back DST repeated-hour API case. Browser acceptance includes both a nonexistent spring-forward time and an ambiguous fall-back time.
+
+### Actual validation evidence available (historical, not current-head evidence)
+
+GitHub Actions run [`41405549658`](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41405549658) checked out commit `491c554ae1e589d8358f54f2d1789e96f646b97e` on 2026-11-02, before the Phase 2 corrections listed above:
+
+- Biome: passed.
+- TypeScript: passed.
+- Next.js production build: passed.
+- Disposable PostgreSQL migration compatibility rehearsal: passed for the migration set present at that older commit; it did not include the new Phase 2 migration.
+- Backend suite: 519 passed, 0 failed, 3 skipped (522 total).
+- Browser acceptance: 40 passed, 2 failed, 2 skipped. Both failures were in `e2e/workspace-app-ux.spec.js` because `#progress-title` did not appear on `/members`; these are unrelated to Network-Plus but remain full-workflow failures to diagnose.
+
+**Current-head evidence:** the latest inspected PR #18 head at this audit is `c2c6af71ef39d18f3804876cc6c4f4141b65948c`. No GitHub Actions run or commit status is associated with that current head. The earlier run is historical baseline evidence only and must not be represented as validation of the new migration, encryption compatibility, authority/privacy fixes or DST tests. The current source changes have not yet been executed against disposable PostgreSQL or in the backend/browser suites. The contact-key rotation utility has not been run. No deployed encryption key has been inspected.
+
+**Phase 2 exit status: NOT CLOSED.** Do not start Phase 3 until a run against the current source head proves the Phase 2 migration forward path and rollback, current authorization/privacy, legacy and `v1` encryption behavior, notifications, DST handling, backend suite, Playwright suite, Biome, TypeScript and production build. The current draft PR remains open; no merge or deployment is authorized.

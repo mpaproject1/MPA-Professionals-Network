@@ -431,6 +431,8 @@ export async function createNetworkPlusMeetingProposal(requestId,userId,input,re
     if(replay){if(replay.request_fingerprint!==fingerprint)fail(409,"This meeting key was already used for different details.","IDEMPOTENCY_CONFLICT");return replay;}
     const active=(await db.query("select id from network_plus_request_meeting where request_id=$1 and status in ('proposed','countered')",[requestId])).rows[0];
     if(active)fail(409,"A meeting proposal is already awaiting a response.","MEETING_RESPONSE_PENDING");
+    const confirmed=(await db.query("select id from network_plus_request_meeting where request_id=$1 and status='confirmed' limit 1",[requestId])).rows[0];
+    if(confirmed)fail(409,"A first meeting has already been confirmed for this connection.","MEETING_ALREADY_CONFIRMED");
     const created=(await db.query("insert into network_plus_request_meeting(request_id,proposer_user_id,responder_user_id,place_type,place_details,starts_at,timezone,duration_minutes,idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *",[requestId,userId,pair.peerUserId,proposal.placeType,proposal.placeDetails,proposal.startsAt,proposal.timezone,proposal.durationMinutes,idHash,fingerprint])).rows[0];
     await audit(db,requestId,userId,"request.meeting_proposed",pair.request.status,pair.request.status,requestIdHeader,{meetingId:created.id,placeType:proposal.placeType,startsAt:proposal.startsAt,timezone:proposal.timezone,durationMinutes:proposal.durationMinutes});
     await notify(db,pair.peerUserId,"network_plus.request.meeting_proposed",requestId,"A participant proposed a first meeting. Review the private request to accept, suggest another time or decline.");

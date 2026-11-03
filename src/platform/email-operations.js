@@ -210,9 +210,9 @@ async function recipientMatchesAudience(db,recipient,audience){
  if(!audience||audience==="all")return true;
  const row=(await db.query(`select u.account_type,
   exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('system_admin','admin','platform_admin')) is_admin,
-  exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','verification_reviewer','appeal_reviewer','system_admin')) or
-   exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code in ('organizations.review','jobs.review','verification.review')) is_reviewer,
-  exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code='mentor') or exists(select 1 from mentorship_match mm where mm.mentor_user_id=u.id) or exists(select 1 from mentorship m where m.mentor_user_id=u.id) is_mentor,
+  (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','verification_reviewer','appeal_reviewer','system_admin')) or
+   exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code in ('organizations.review','jobs.review','verification.review'))) is_reviewer,
+  (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code='mentor') or exists(select 1 from mentorship_match mm where mm.mentor_user_id=u.id) or exists(select 1 from mentorship m where m.mentor_user_id=u.id)) is_mentor,
   exists(select 1 from organization_membership om where om.user_id=u.id and om.status='active' and om.role_code in ('owner','administrator','recruiter')) is_employer
  from app_user u where lower(u.email)=lower($1) limit 1`,[recipient])).rows[0];
  if(!row)return false;

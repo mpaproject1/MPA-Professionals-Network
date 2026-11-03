@@ -108,7 +108,7 @@ The existing request detail endpoint returns participant-visible clarification a
 ## 8. User experience
 
 - Opportunity detail cards provide icon-led “I’m interested”, “Ask a question”, “Request quotation” (product/service profiles) and “Request meeting” actions.
-- Each action opens the existing request workspace with the listing and business context preselected.
+- Each action opens a four-step guided request wizard: choose action, describe the request, choose the recipient, review and save a private draft. Listing and business context are preselected.
 - The recipient sees accept, decline and structured clarification actions.
 - The contact panel shows per-field consent state, not the other party's contact value before mutual approval.
 - The meeting panel shows a proposal, counterproposal and confirmed handoff.

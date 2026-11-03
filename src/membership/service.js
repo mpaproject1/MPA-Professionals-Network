@@ -10,6 +10,7 @@ import { assertProfessionalProfileCapability } from "../platform/identity-policy
 import * as memberReferrals from "../platform/member-referrals.js";
 import { membershipEndDate } from "../platform/membership-duration.js";
 import { createInAppNotification } from "../platform/notifications.js";
+import { queueEmailNotification } from "../platform/email-operations.js";
 import { consumeHumanChallenge } from "../platform/security-controls.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
 import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
@@ -46,11 +47,11 @@ function membershipNotificationCopy(eventCode,payload={}){
  return {...defaults,...payload};
 }
 async function notify(db,userId,eventCode,resourceType,resourceId,payload={}){
-  const user=(await db.query("select u.email,coalesce(np.email_enabled,true) email_enabled from app_user u left join notification_preference np on np.user_id=u.id where u.id=$1",[userId])).rows[0];
-  if(!user)return;
+  const exists=(await db.query("select 1 from app_user where id=$1",[userId])).rowCount>0;
+  if(!exists)return;
   const details=membershipNotificationCopy(eventCode,payload);
   await createInAppNotification(db,userId,eventCode,resourceType,resourceId,details);
-  if(user.email&&user.email_enabled)await db.query("insert into notification_outbox(channel,recipient,template_code,payload) values('email',$1,$2,$3)",[user.email,eventCode,details]);
+  await queueEmailNotification(db,userId,eventCode,details,resourceType,resourceId);
 }
 async function roles(db,userId){
   const r=await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId]);

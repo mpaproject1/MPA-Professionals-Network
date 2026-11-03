@@ -454,7 +454,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/network-plus/listings"){
       await enforcePersistentRateLimit(req,"network-plus.listing.search",60,60000,identity.sub);
       const q=query(req.url);
-      return ok(res,await networkPlusBusiness.listProfessionalServices(identity.sub,{q:q.get("q"),category:q.get("category"),subcategory:q.get("subcategory"),listingKind:q.get("listingKind"),location:q.get("location"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
+      return ok(res,await networkPlusBusiness.listProfessionalServices(identity.sub,{q:q.get("q"),category:q.get("category"),subcategory:q.get("subcategory"),listingKind:q.get("listingKind"),location:q.get("location"),geographyUnitId:q.get("geographyUnitId"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
     }
     if(req.method==="GET" && p==="api/v1/network-plus/businesses"){
       await enforcePersistentRateLimit(req,"network-plus.business.search",60,60000,identity.sub);

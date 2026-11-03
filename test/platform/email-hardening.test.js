@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { decryptVerificationToken, encryptVerificationToken } from "../../src/platform/email-verification-crypto.js";
 
 const read = relative => readFile(new URL(relative, import.meta.url), "utf8");
 
@@ -134,4 +135,48 @@ test("provider webhook accepts Resend payload field names and acknowledges non-d
   assert.match(source, /input\.id,300/);
   assert.match(source, /rawEventType\.startsWith\("email\."/);
   assert.match(source, /delivery_delayed/);
+});
+
+test("verification delivery encryption round-trips tokens and rejects tampering", () => {
+  const prior = process.env.EMAIL_VERIFICATION_ENCRYPTION_KEY;
+  process.env.EMAIL_VERIFICATION_ENCRYPTION_KEY = "test-only-verification-encryption-key-32-bytes";
+  try {
+    const token = "opaque-single-use-verification-token-value";
+    const encrypted = encryptVerificationToken(token);
+    assert.notEqual(encrypted.encryptedToken, Buffer.from(token).toString("base64url"));
+    assert.equal(decryptVerificationToken({
+      encrypted_token: encrypted.encryptedToken,
+      encryption_iv: encrypted.encryptionIv,
+      encryption_tag: encrypted.encryptionTag
+    }), token);
+    assert.throws(() => decryptVerificationToken({
+      encrypted_token: encrypted.encryptedToken.slice(0, -2) + "AA",
+      encryption_iv: encrypted.encryptionIv,
+      encryption_tag: encrypted.encryptionTag
+    }));
+  } finally {
+    if (prior === undefined) delete process.env.EMAIL_VERIFICATION_ENCRYPTION_KEY;
+    else process.env.EMAIL_VERIFICATION_ENCRYPTION_KEY = prior;
+  }
+});
+
+test("verification delivery is durably encrypted, retried through shared transport and provider-event correlated", async () => {
+  const migration = await read("../../db/migrations/20261103210000_email_verification_delivery_recovery.sql");
+  assert.match(migration, /create table if not exists email_verification_delivery/i);
+  assert.match(migration, /encrypted_token/);
+  assert.match(migration, /verification_delivery_id/);
+  const verification = await read("../../src/platform/email-verification.js");
+  assert.match(verification, /insert into email_verification_delivery/);
+  assert.match(verification, /dispatchPendingVerificationEmails/);
+  assert.match(verification, /for update of d skip locked/i);
+  assert.match(verification, /decryptVerificationToken/);
+  assert.match(verification, /email\.verification\.delivery_failed/);
+  assert.match(verification, /email\.verification\.provider_accepted/);
+  assert.match(verification, /sendEmailMessage/);
+  assert.match(verification, /attempts<8/);
+  const operations = await read("../../src/platform/email-operations.js");
+  assert.match(operations, /export async function sendEmailMessage/);
+  assert.match(operations, /retryVerificationDelivery/);
+  assert.match(operations, /verification_delivery_id/);
+  assert.match(operations, /email\.verification\.provider_delivery_event/);
 });

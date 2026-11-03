@@ -14,6 +14,8 @@ test("Network-Plus contact key rotation is explicit, transactional and context a
   assert.match(rotation,/lock table network_plus_request_contact_consent in access exclusive mode/);
   assert.match(rotation,/cipher\.setAAD\(Buffer\.from\(context/);
   assert.match(rotation,/decipher\.setAAD\(Buffer\.from\(context/);
+  assert.match(rotation,/const legacy = parts\.length === 3/);
+  assert.match(rotation,/if \(!legacy\) decipher\.setAAD/);
   assert.match(rotation,/await client\.query\("rollback"\)/);
   assert.match(rotation,/NETWORK_PLUS_CONTACT_KEY_ROTATION_ALLOW_PRODUCTION/);
   assert.match(rotation,/No plaintext values were logged/);

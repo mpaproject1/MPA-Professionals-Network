@@ -3,11 +3,12 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,alignmentMigration,phase2Migration,phase3Migration,service,server,ui,e2e,compatibility,userAdmin,opportunities,notifications,notificationUi]=await Promise.all([
+const [migration,alignmentMigration,phase2Migration,phase3Migration,contractMigration,service,server,ui,e2e,compatibility,userAdmin,opportunities,notifications,notificationUi]=await Promise.all([
  read("../../db/migrations/20261031120000_network_plus_request_collaboration.sql"),
  read("../../db/migrations/20261103120000_network_plus_phase0_contract_alignment.sql"),
  read("../../db/migrations/20261103140000_network_plus_phase2_connection_handoff.sql"),
  read("../../db/migrations/20261103150000_network_plus_phase3_requester_disposition.sql"),
+ read("../../db/migrations/20261103160000_finance_and_network_plus_notification_contracts.sql"),
  read("../../src/network-plus/request-collaboration.js"),
  read("../../server.js"),
  read("../../web/app/network-plus/requests/page.tsx"),
@@ -35,6 +36,15 @@ test("Increment 6 schema adds typed requests, explicit participants, immutable e
  assert.match(migration,/trg_network_plus_collaboration_event_immutable/);
  assert.match(migration,/explicitly accepted request/);
  assert.doesNotMatch(migration,/delete from|drop table|truncate table|alter table service_request\b/i);
+});
+
+test("Finance and Network-Plus notification values extend existing database checks without removing legacy values",()=>{
+ assert.match(contractMigration,/payment_transaction_source_check/);
+ assert.match(contractMigration,/pg_get_expr/);
+ assert.match(contractMigration,/finance_manual_record/);
+ assert.match(contractMigration,/finance_bulk_import/);
+ assert.match(contractMigration,/notification_event_category_valid/);
+ assert.match(contractMigration,/network_plus/);
 });
 
 test("request lifecycle requires explicit recipient authority and never creates a workspace on submission",()=>{

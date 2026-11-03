@@ -20,7 +20,7 @@ test("Phase 1 extends the canonical listing model and adds governed taxonomy, no
   assert.match(migration,/foreign key\(service_category\) references network_plus_listing_taxonomy/);
   assert.match(migration,/listing_kind in \('need','offer','product_profile','service_profile'\)/);
   for(const category of ["professional_services","consulting","technology","design","education","healthcare","legal","finance","construction","products_supply","business_services","creative_media","facilities_operations","agriculture_food","transport_logistics","specialist_regulatory","trade","manufacturing","other"])assert.ok(migration.includes("'"+category+"'"),"taxonomy must include "+category);
-  assert.match(migration,/network_plus_service_listing_drafts/);
+  assert.match(migration,/ix_network_plus_listing_drafts/);
 });
 
 test("taxonomy-driven drafts are owner-authorized, structured, private and resumable",()=>{

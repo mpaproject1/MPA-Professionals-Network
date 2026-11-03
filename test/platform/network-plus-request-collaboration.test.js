@@ -48,6 +48,7 @@ test("request lifecycle requires explicit recipient authority and never creates 
  assert.match(service,/if\(to==="accepted"\)/);
  assert.match(service,/createNetworkPlusWorkspace/);
  assert.match(service,/WORKSPACE_ELIGIBLE_INTENTS/);
+ assert.match(service,/product_profile"&&!\["supplier_inquiry","referral","interest","question","quote_request","meeting_request"\]/);
  assert.doesNotMatch(service,/if\(to==="accepted"\)[\s\S]{0,900}insert into network_plus_collaboration_workspace/);
  assert.match(service,/request\.\$\{to\}/);
  assert.match(service,/IDEMPOTENCY_CONFLICT/);
@@ -123,6 +124,7 @@ test("Network-Plus notifications have a dedicated preference category and deep-l
  assert.match(notifications,/network_plus\.request\./);
  assert.match(notifications,/type==="network_plus_request"\)return "network_plus"/);
  assert.match(notifications,/network_plus:"\/network-plus\/requests"/);
+ assert.match(notifications,/NOTIFICATION_CATEGORIES=new Set\([^\n]*"network_plus"/);
  assert.match(notificationUi,/value:"network_plus",label:"Network-Plus"/);
 });
 test("Phase 2 API and icon-led opportunity actions use the existing private request foundation",()=>{

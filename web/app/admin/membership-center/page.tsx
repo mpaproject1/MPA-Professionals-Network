@@ -142,7 +142,7 @@ export default function MembershipCenterPage() {
       try {
         const reference = await api<GeographyReference>("/api/v1/member-geography/reference", {}, token);
         const units = [...(reference.countries || []), ...(reference.regions || []), ...(reference.federalCities || []), ...(reference.children || [])];
-        const byId = new Map(units.map(unit => [unit.id, unit]));
+        const byId = new Map<string, GeographyUnit>(units.map(unit => [unit.id, unit] as const));
         setGeographyOptions(units.map(unit => {
           const parent = unit.parent_id ? byId.get(unit.parent_id) : undefined;
           const level = unit.unit_level.replaceAll("_", " ");

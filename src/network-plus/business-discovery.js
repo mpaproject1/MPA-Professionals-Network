@@ -462,6 +462,11 @@ export async function submitProfessionalServiceListing(listingId,userId,requestI
     const categoryFields=[...(taxonomy.field_schema||[])];
     if(row.subcategory_code){const child=(await db.query("select field_schema from network_plus_listing_taxonomy where code=$1 and parent_code=$2 and active=true",[row.subcategory_code,row.service_category])).rows[0];if(!child)fail(400,"The selected subcategory is no longer valid.","INVALID_LISTING_SUBCATEGORY");categoryFields.push(...(child.field_schema||[]));}
     for(const field of categoryFields){const value=row.structured_attributes?.[field.code];if(field.required&&(value===undefined||value===null||value===""||(Array.isArray(value)&&!value.length)))fail(400,"Complete the required category-specific field: "+field.label+".","LISTING_CATEGORY_FIELD_REQUIRED");}
+    validateListingPricing(row);
+    const serviceAreas=await db.query("select 1 from network_plus_service_listing_geography where listing_id=$1 limit 1",[listingId]);
+    if(row.delivery_mode==="remote"&&!row.remote_available)fail(400,"Confirm remote availability for a remote listing.","REMOTE_AVAILABILITY_REQUIRED");
+    if(!row.remote_available&&!row.location_label&&!serviceAreas.rowCount)fail(400,"Select at least one structured service area or enable remote availability.","SERVICE_AREA_REQUIRED");
+    if(row.service_radius_km&&!serviceAreas.rowCount)fail(400,"A service radius requires a structured service-area reference.","SERVICE_AREA_REQUIRED");
 
     const updated=(await db.query("update network_plus_service_listing set status='pending_review',moderation_reason=null,submitted_by=$2,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
     await audit(db,userId,"network_plus.service_listing_submitted","network_plus_service_listing",listingId,requestId,{businessId:row.business_id,from:row.status,to:"pending_review"});

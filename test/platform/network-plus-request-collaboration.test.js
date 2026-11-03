@@ -201,7 +201,7 @@ test("meeting local-time conversion rejects both DST gaps and repeated-hour ambi
 test("Phase 2 response migration uses a valid PostgreSQL DO block and complete response invariant",()=>{
  assert.match(phase2Migration,/do \$phase2\$[\s\S]*?network_plus_request_recipient_response_complete_check[\s\S]*?end \$phase2\$;/);
  assert.doesNotMatch(migration,/do \$\s*\n/);
- assert.match(migration,/intent='question' and recipient_response is not null and recipient_response_by is not null and recipient_response_at is not null/);
+ assert.match(phase2Migration,/intent='question' and recipient_response is not null and recipient_response_by is not null and recipient_response_at is not null/);
 });
 test("request detail hides private handoff data from former recipient representatives",()=>{
  const detail=service.slice(service.indexOf("export async function getNetworkPlusRequest"),service.indexOf("export async function addNetworkPlusRequestParticipant"));
@@ -231,7 +231,7 @@ test("Network-Plus Phase 3 adds requester-owned closure disposition, append-only
  assert.match(ui,/My Requests/);
  assert.match(ui,/Awaiting response/);
  assert.match(ui,/Mark Completed/);
- assert.match(ui,/Cancel request outcome/);
+ assert.match(ui,/Mark Cancelled/);
  assert.match(ui,/Reopen as In progress/);
  assert.match(ui,/Your report about the connection—not a verified sale/);
  assert.match(ui,/Withdraw recipient acceptance/);

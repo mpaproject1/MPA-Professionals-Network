@@ -18,6 +18,9 @@ test("Phase 1 extends the canonical listing model and adds governed taxonomy, no
   for(const column of ["subcategory_code","structured_attributes","taxonomy_version","wizard_step","draft_saved_at"])assert.match(migration,new RegExp("add column if not exists "+column));
   assert.doesNotMatch(migration,/create table if not exists network_plus_(opportunity|need|offer|product|catalog|listing)\b/i);
   assert.match(migration,/foreign key\(service_category\) references network_plus_listing_taxonomy/);
+  assert.match(migration,/create table if not exists network_plus_service_listing_geography/);
+  assert.match(migration,/references membership_geography_unit\(version_id,id\)/);
+  assert.match(migration,/pricing_model in/);
   assert.match(migration,/listing_kind in \('need','offer','product_profile','service_profile'\)/);
   for(const category of ["professional_services","consulting","technology","design","education","healthcare","legal","finance","construction","products_supply","business_services","creative_media","facilities_operations","agriculture_food","transport_logistics","specialist_regulatory","trade","manufacturing","other"])assert.ok(migration.includes("'"+category+"'"),"taxonomy must include "+category);
   assert.match(migration,/ix_network_plus_listing_drafts/);
@@ -35,6 +38,10 @@ test("taxonomy-driven drafts are owner-authorized, structured, private and resum
   assert.match(service,/wizard_step/);
   assert.match(service,/PUBLIC_CONTACT_DETAILS_FORBIDDEN/);
   assert.match(service,/LISTING_CATEGORY_FIELD_REQUIRED/);
+  assert.match(service,/membership_geography_version/);
+  assert.match(service,/network_plus_service_listing_geography/);
+  assert.match(service,/validateListingPricing/);
+  assert.match(service,/SERVICE_AREA_REQUIRED/);
   assert.match(service,/status=case when status in \('published','paused'\) then 'draft' else status end/);
 });
 
@@ -59,6 +66,8 @@ test("authenticated API exposes taxonomy, directory, owned listings and persiste
   assert.match(server,/saveOpportunityListingDraft/);
   assert.match(server,/listNetworkPlusListingTaxonomy/);
   assert.match(server,/listMyOpportunityListings/);
+  assert.match(server,/geography-reference/);
+  assert.match(server,/geographyUnitId/);
   assert.match(server,/listingKind:"service_profile"/);
 });
 

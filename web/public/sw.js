@@ -23,7 +23,7 @@ self.addEventListener("install", (event) => {
         await Promise.all(PRECACHE_URLS.map(async (url) => {
           try {
             const response = await fetch(url, { cache: "reload" });
-            if (response.ok && response.type === "basic") await cache.put(url, response);
+            if (response.ok && response.type === "basic" && !/private|no-store/i.test(response.headers.get("cache-control") || "")) await cache.put(url, response);
           } catch { /* offline-first install remains best-effort */ }
         }));
       })

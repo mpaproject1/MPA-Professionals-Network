@@ -81,3 +81,14 @@ test("the migration rollback check is included in the repository compatibility s
   assert.match(checker, /MIGRATION_CHECK_ALLOW_ROLLBACK/);
   assert.match(checker, /rollback/);
 });
+
+test("template history is read-only and restores as a new audited version", async () => {
+  const source = await read("../../src/platform/email-operations.js");
+  assert.match(source, /listEmailTemplateVersions/);
+  assert.match(source, /restoreEmailTemplateVersion/);
+  assert.match(source, /email\.template\.version_restored/);
+  assert.match(source, /restoredVersion:number,newVersion:nextVersion/);
+  const routes = await read("../../server.js");
+  assert.match(routes, /parts\[6\]==="versions"/);
+  assert.match(routes, /parts\[8\]==="restore"/);
+});

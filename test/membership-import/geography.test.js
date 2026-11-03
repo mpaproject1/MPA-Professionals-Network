@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import test from "node:test";
 import { randomUUID } from "node:crypto";
+import test from "node:test";
 import {
   memberGeographyImportTemplate,
   previewMemberGeographyImport,
@@ -11,9 +11,9 @@ import {
   getMyResidence,
   getMemberGeographySummary,
 } from "../../src/membership/geography.js";
-import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
-import { getPool } from "../../src/platform/db.js";
 import * as membership from "../../src/membership/service.js";
+import { getPool } from "../../src/platform/db.js";
+import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
 
 const admin={sub:"system-admin",roles:["system_admin"],permissions:[]};
 const member={sub:"member-user",roles:["member"],permissions:[]};

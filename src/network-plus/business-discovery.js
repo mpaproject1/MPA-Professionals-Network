@@ -364,12 +364,49 @@ export async function saveOpportunityListingDraft(listingId,userId,input,request
     const kind=data.listingKind||row.listing_kind||"service_profile",category=data.categoryCode===undefined?row.service_category:data.categoryCode,subcategory=data.subcategoryCode===undefined?row.subcategory_code:data.subcategoryCode;await validateListingTaxonomy(db,category,subcategory,kind);
     const title=data.title===undefined?row.title:(data.title?publicText(data.title,160,"Title",{min:3}):null),summary=data.summary===undefined?row.summary:(data.summary?publicText(data.summary,500,"Summary",{min:20}):null),description=data.description===undefined?row.description:(data.description?publicText(data.description,8000,"Description",{min:40}):null),attributes=data.structuredAttributes===undefined?row.structured_attributes:normalizeStructuredAttributes(data.structuredAttributes),step=data.wizardStep===undefined?row.wizard_step:Number(data.wizardStep);
     if(!Number.isInteger(step)||step<1||step>8)fail(400,"Wizard step must be between 1 and 8.","VALIDATION_ERROR");
-    const audience=data.audience===undefined?row.audience:data.audience,delivery=data.deliveryMode===undefined?row.delivery_mode:data.deliveryMode,location=data.locationLabel===undefined?row.location_label:(data.locationLabel?optionalPublicText(data.locationLabel,160,"Location"):null),capacity=data.capacity===undefined?row.capacity:(data.capacity===""||data.capacity===null?null:Number(data.capacity)),pricing=data.pricingModel===undefined?row.pricing_model:data.pricingModel,price=data.priceAmount===undefined?row.price_amount:(data.priceAmount===""||data.priceAmount===null?null:Number(data.priceAmount)),currency=data.currency===undefined?row.currency:(data.currency?String(data.currency).trim().toUpperCase():null);
-    if(!["members","organizations","both"].includes(audience)||!["remote","onsite","hybrid"].includes(delivery)||!["free","fixed","hourly","quote"].includes(pricing))fail(400,"Choose supported audience, delivery and pricing options.","VALIDATION_ERROR");
+    const audience=data.audience===undefined?row.audience:data.audience,delivery=data.deliveryMode===undefined?row.delivery_mode:data.deliveryMode,capacity=data.capacity===undefined?row.capacity:(data.capacity===""||data.capacity===null?null:Number(data.capacity)),pricing=data.pricingModel===undefined?row.pricing_model:data.pricingModel,price=data.priceAmount===undefined?row.price_amount:(data.priceAmount===""||data.priceAmount===null?null:Number(data.priceAmount)),currency=data.currency===undefined?row.currency:(data.currency?String(data.currency).trim().toUpperCase():null),pricingDetails=data.pricingDetails===undefined?(row.pricing_details||{}):normalizePricingDetails(data.pricingDetails);
+    if(!["members","organizations","both"].includes(audience)||!["remote","onsite","hybrid"].includes(delivery)||!["free","fixed","hourly","unit","range","quote","subscription","not_applicable"].includes(pricing))fail(400,"Choose supported audience, delivery and pricing options.","VALIDATION_ERROR");
     if(capacity!==null&&(!Number.isInteger(capacity)||capacity<1||capacity>100000))fail(400,"Capacity must be a positive whole number.","VALIDATION_ERROR");
     if(price!==null&&(!Number.isFinite(price)||price<0))fail(400,"Price must be non-negative.","VALIDATION_ERROR");
-    if(["fixed","hourly"].includes(pricing)&&(!price||!currency||! /^[A-Z]{3}$/.test(currency)))fail(400,"Fixed and hourly pricing require an amount and ISO currency.","VALIDATION_ERROR");
-    const updated=(await db.query("update network_plus_service_listing set title=$1,summary=$2,description=$3,service_category=$4,listing_kind=$5,subcategory_code=$6,structured_attributes=$7,wizard_step=$8,audience=$9,delivery_mode=$10,location_label=$11,capacity=$12,pricing_model=$13,price_amount=$14,currency=$15,status=case when status in ('published','paused') then 'draft' else status end,draft_saved_at=now(),updated_at=now() where id=$16 returning *",[title,summary,description,category,kind,subcategory,attributes,step,audience,delivery,location,capacity,pricing,price,currency,listingId])).rows[0];
+    if(currency&&!/^[A-Z]{3}$/.test(currency))fail(400,"Currency must use a three-letter ISO code.","VALIDATION_ERROR");
+    const remoteAvailable=data.remoteAvailable===undefined?Boolean(row.remote_available):data.remoteAvailable;
+    if(typeof remoteAvailable!=="boolean")fail(400,"Remote availability must be explicitly selected.","VALIDATION_ERROR");
+    const serviceRadiusKm=data.serviceRadiusKm===undefined?row.service_radius_km:(data.serviceRadiusKm===""||data.serviceRadiusKm===null?null:Number(data.serviceRadiusKm));
+    const availabilityStatus=data.availabilityStatus===undefined?(row.availability_status||"accepting_requests"):data.availabilityStatus;
+    const leadTimeDays=data.leadTimeDays===undefined?row.lead_time_days:(data.leadTimeDays===""||data.leadTimeDays===null?null:Number(data.leadTimeDays));
+    const activeWorkLimit=data.activeWorkLimit===undefined?row.active_work_limit:(data.activeWorkLimit===""||data.activeWorkLimit===null?null:Number(data.activeWorkLimit));
+    const timezone=data.timezone===undefined?row.timezone:(data.timezone?String(data.timezone).trim().slice(0,64):null);
+    const nextAvailableAt=data.nextAvailableAt===undefined?row.next_available_at:(data.nextAvailableAt?new Date(data.nextAvailableAt):null);
+    const targetAudience=data.targetAudience===undefined?(row.target_audience||[]):data.targetAudience;
+    if(serviceRadiusKm!==null&&(!Number.isInteger(serviceRadiusKm)||serviceRadiusKm<1||serviceRadiusKm>1000))fail(400,"Service radius must be between 1 and 1000 kilometres.","VALIDATION_ERROR");
+    if(!["accepting_requests","limited","paused","unavailable"].includes(availabilityStatus))fail(400,"Choose a supported intake status.","VALIDATION_ERROR");
+    if(leadTimeDays!==null&&(!Number.isInteger(leadTimeDays)||leadTimeDays<0||leadTimeDays>3650))fail(400,"Lead time must be between 0 and 3650 days.","VALIDATION_ERROR");
+    if(activeWorkLimit!==null&&(!Number.isInteger(activeWorkLimit)||activeWorkLimit<1||activeWorkLimit>100000))fail(400,"Active work limit must be a positive whole number.","VALIDATION_ERROR");
+    if(timezone&&timezone.length>64)fail(400,"Timezone is too long.","VALIDATION_ERROR");
+    if(nextAvailableAt&&Number.isNaN(nextAvailableAt.getTime()))fail(400,"Next availability must be a valid date and time.","VALIDATION_ERROR");
+    const allowedAudience=new Set(["individuals","smes","nonprofits","public_institutions","startups","all"]);
+    if(!Array.isArray(targetAudience)||targetAudience.some(value=>!allowedAudience.has(value)))fail(400,"Choose supported target-audience groups.","VALIDATION_ERROR");
+    let areaIds=null,areaVersion=null,areaRows=[];
+    if(data.geographyUnitIds!==undefined){
+      if(!Array.isArray(data.geographyUnitIds)||data.geographyUnitIds.length>30)fail(400,"Choose up to 30 structured service areas.","VALIDATION_ERROR");
+      areaIds=[...new Set(data.geographyUnitIds.map(value=>String(value)))];
+      areaVersion=data.geographyVersionId||null;
+      if(areaIds.length){
+        if(!areaVersion)fail(400,"Choose a published geography reference version.","GEOGRAPHY_VERSION_REQUIRED");
+        const version=(await db.query("select id from membership_geography_version where id=$1 and status='published'",[areaVersion])).rows[0];
+        if(!version)fail(409,"The selected service-area reference version is not published.","GEOGRAPHY_VERSION_INVALID");
+        areaRows=(await db.query("select id,label,unit_level from membership_geography_unit where version_id=$1 and id=any($2::uuid[]) and active=true",[areaVersion,areaIds])).rows;
+        if(areaRows.length!==areaIds.length)fail(400,"One or more selected service areas are not active in this geography version.","GEOGRAPHY_UNIT_INVALID");
+      }
+    }
+    const location=data.locationLabel===undefined?row.location_label:(data.locationLabel?optionalPublicText(data.locationLabel,160,"Location"):null);
+    const resolvedLocation=areaIds&&areaIds.length?areaRows.map(unit=>unit.label).join(", ").slice(0,160):location;
+    const updated=(await db.query("update network_plus_service_listing set title=$1,summary=$2,description=$3,service_category=$4,listing_kind=$5,subcategory_code=$6,structured_attributes=$7,wizard_step=$8,audience=$9,delivery_mode=$10,location_label=$11,capacity=$12,pricing_model=$13,price_amount=$14,currency=$15,pricing_details=$16,remote_available=$17,service_radius_km=$18,availability_status=$19,lead_time_days=$20,active_work_limit=$21,timezone=$22,next_available_at=$23,target_audience=$24,status=case when status in ('published','paused') then 'draft' else status end,draft_saved_at=now(),updated_at=now() where id=$25 returning *",[title,summary,description,category,kind,subcategory,attributes,step,audience,delivery,resolvedLocation,capacity,pricing,price,currency,pricingDetails,remoteAvailable,serviceRadiusKm,availabilityStatus,leadTimeDays,activeWorkLimit,timezone,nextAvailableAt,targetAudience,listingId])).rows[0];
+    if(areaIds!==null){
+      await db.query("delete from network_plus_service_listing_geography where listing_id=$1",[listingId]);
+      for(const geographyUnitId of areaIds)await db.query("insert into network_plus_service_listing_geography(listing_id,geography_version_id,geography_unit_id,created_by) values($1,$2,$3,$4)",[listingId,areaVersion,geographyUnitId,userId]);
+    }
+    if(["published","paused"].includes(row.status))await audit(db,userId,"network_plus.listing_edit_started","network_plus_service_listing",listingId,requestId,{from:row.status,to:"draft"});
     await audit(db,userId,"network_plus.listing_draft_autosaved","network_plus_service_listing",listingId,requestId,{wizardStep:step,listingKind:kind});return updated;
   });
 }

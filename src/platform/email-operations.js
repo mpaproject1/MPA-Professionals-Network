@@ -99,6 +99,30 @@ export async function saveEmailTemplate(actorId,code,input,requestId){
   return {...row,version};
  });
 }
+export async function listEmailTemplateVersions(actorId,code){
+ const db=getPool();await requireAdmin(db,actorId);
+ const templateCode=clean(code,100);
+ return (await db.query("select id,template_code,version_number,display_name,audience,subject_template,text_template,html_template,enabled,changed_by,change_request_id,created_at from email_template_version where template_code=$1 order by version_number desc limit 50",[templateCode])).rows;
+}
+export async function restoreEmailTemplateVersion(actorId,code,versionNumber,requestId=null){
+ const db=getPool();await requireAdmin(db,actorId);
+ const templateCode=clean(code,100),number=Number(versionNumber);
+ if(!Number.isInteger(number)||number<1)fail(400,"A valid template version is required.","VALIDATION_ERROR");
+ return withTransaction(async tx=>{
+  const current=(await tx.query("select adjustable_by_admin from email_notification_template where template_code=$1 for update",[templateCode])).rows[0];
+  if(!current)fail(404,"Email template not found.","NOT_FOUND");
+  if(!current.adjustable_by_admin)fail(403,"This system-managed email template cannot be restored by an administrator.","TEMPLATE_LOCKED");
+  const version=(await tx.query("select * from email_template_version where template_code=$1 and version_number=$2",[templateCode,number])).rows[0];
+  if(!version)fail(404,"Email template version not found.","NOT_FOUND");
+  if(templateCode==="account.email_verification"&&!version.enabled)fail(400,"Email verification is security-critical and cannot be disabled.","SECURITY_TEMPLATE_REQUIRED");
+  const row=(await tx.query("update email_notification_template set display_name=$2,audience=$3,subject_template=$4,text_template=$5,html_template=$6,enabled=$7,updated_by=$8,updated_at=now() where template_code=$1 returning template_code,display_name,audience,subject_template,text_template,html_template,enabled,adjustable_by_admin,updated_at",[templateCode,version.display_name,version.audience,version.subject_template,version.text_template,version.html_template,version.enabled,actorId])).rows[0];
+  const nextVersion=Number((await tx.query("select coalesce(max(version_number),0)+1 version from email_template_version where template_code=$1",[templateCode])).rows[0].version);
+  await tx.query("insert into email_template_version(template_code,version_number,display_name,audience,subject_template,text_template,html_template,enabled,changed_by,change_request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",[row.template_code,nextVersion,row.display_name,row.audience,row.subject_template,row.text_template,row.html_template,row.enabled,actorId,requestId||null]);
+  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.template.version_restored','email_notification_template',$2,$3,'success',$4)",[actorId,templateCode,requestId,{restoredVersion:number,newVersion:nextVersion}]);
+  return {...row,restoredVersion:number,version:nextVersion};
+ });
+}
+
 export async function previewEmailTemplate(actorId,input={}){
  const db=getPool();await requireAdmin(db,actorId);
  let template=input;

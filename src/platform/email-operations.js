@@ -430,7 +430,7 @@ export async function receiveInboundEmail(input,providedSecret,signatureHeaders=
  const senderMatch=senderRaw.match(/<([^<>]+)>/);
  const sender=normalizeEmailAddress(senderMatch?.[1]||senderRaw);
  if(!providerMessageId)fail(400,"A stable provider message ID is required for inbound email deduplication.","PROVIDER_MESSAGE_ID_REQUIRED");
- if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(sender))fail(400,"Inbound sender address is invalid.","VALIDATION_ERROR");
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender))fail(400,"Inbound sender address is invalid.","VALIDATION_ERROR");
  const rawRecipients=payload.to??input.to;
  const recipients=Array.isArray(rawRecipients)?rawRecipients.map(v=>clean(v,320)).filter(Boolean).slice(0,20):rawRecipients?[clean(rawRecipients,320)]:[];
  return withTransaction(async tx=>{

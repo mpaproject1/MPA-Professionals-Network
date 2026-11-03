@@ -14,7 +14,7 @@ const [migration,alignmentMigration,service,server,ui,e2e,compatibility,userAdmi
  read("../../src/platform/user-admin.js")
 ]);
 
-test("Increment 6 schema adds typed requests, explicit participants, immutable events and accepted-only workspaces",()=>{
+test("Increment 6 schema adds typed requests, explicit participants, immutable events and optional accepted-only workspaces",()=>{
  for(const table of ["network_plus_request","network_plus_request_participant","network_plus_request_event","network_plus_collaboration_workspace","network_plus_collaboration_milestone","network_plus_collaboration_event"])assert.match(migration,new RegExp("create table if not exists "+table,"i"));
  for(const intent of ["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request"])assert.ok(migration.includes("'"+intent+"'"));
  assert.match(alignmentMigration,/business_opportunity/);

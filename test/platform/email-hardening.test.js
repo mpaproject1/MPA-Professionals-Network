@@ -15,6 +15,10 @@ test("email hardening migration creates the logical-event unique key and provide
   assert.match(sql, /unique\(provider,provider_event_id\)/i);
   assert.match(sql, /create table if not exists email_recipient_suppression/i);
   assert.match(sql, /create table if not exists email_template_version/i);
+  const coverage = await read("../../db/migrations/20261103200000_email_workflow_template_coverage.sql");
+  assert.match(coverage, /organization\.review_queue_item.*reviewer/s);
+  assert.match(coverage, /organization\.review_update.*organization_representative/s);
+  assert.match(coverage, /on conflict\(template_code\) do nothing/i);
 });
 
 test("workflow email enqueue is idempotent and checks recipient holds", async () => {

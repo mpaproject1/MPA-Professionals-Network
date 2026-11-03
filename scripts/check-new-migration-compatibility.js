@@ -39,6 +39,7 @@ const migrationNames = [
   "20261103130000_network_plus_phase1_needs_offers.sql",
   "20261103140000_network_plus_phase2_connection_handoff.sql",
   "20261103150000_network_plus_phase3_requester_disposition.sql",
+  "20261103160000_finance_and_network_plus_notification_contracts.sql",
   "20261031130000_serve_community_initiatives.sql",
   "20261031140000_serve_community_offline_completed_projects.sql",
   "20261031150000_community_impact_detection.sql",
@@ -368,6 +369,24 @@ try {
   // Remove the later activation guard only inside this transaction so the historical detection migration
   // is replayed in its original order; the governance migration below reinstalls the guard before assertions.
   await client.query("drop trigger if exists trg_community_impact_detection_policy_activation_guard on community_impact_detection_active_policy");
+  // The Phase 1 migration is replayed against a database where it has already run.
+  // Remove only the constraints it owns inside this rollback-only rehearsal so the
+  // original migration can recreate and validate them in sequence.
+  await client.query(`
+    alter table network_plus_service_listing
+      drop constraint if exists network_plus_listing_kind_check,
+      drop constraint if exists network_plus_listing_attributes_object,
+      drop constraint if exists network_plus_listing_wizard_step_check,
+      drop constraint if exists network_plus_listing_taxonomy_version_check,
+      drop constraint if exists network_plus_listing_category_fk,
+      drop constraint if exists network_plus_listing_pricing_model_check,
+      drop constraint if exists network_plus_listing_pricing_details_object,
+      drop constraint if exists network_plus_listing_availability_status_check,
+      drop constraint if exists network_plus_listing_service_radius_check,
+      drop constraint if exists network_plus_listing_lead_time_check,
+      drop constraint if exists network_plus_listing_active_work_limit_check,
+      drop constraint if exists network_plus_listing_audience_segments_check
+  `);
   for (const migration of migrations) {
     await client.query(migration.sql);
     console.log(`PASS: ${migration.filename} applied inside rollback-only transaction`);

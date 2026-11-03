@@ -12,7 +12,7 @@ try {
   enabled = Boolean(databaseUrl && expectedDatabase && databaseName === expectedDatabase && /test|disposable|ci/i.test(databaseName));
 } catch {}
 const skipReason = "Set EMAIL_TEST_DATABASE_URL and EMAIL_TEST_DATABASE_NAME to the same explicitly disposable database name containing test, disposable or ci.";
-let db, closePool, receiveDeliveryWebhook, receiveInboundEmail, dispatchEmailOutbox;
+let db, getPoolRef, closePool, receiveDeliveryWebhook, receiveInboundEmail, dispatchEmailOutbox;
 let prefix;
 const outboxIds = [];
 const eventIds = [];
@@ -36,7 +36,7 @@ before(async () => {
   db = getPoolRef();
   ({ receiveDeliveryWebhook, receiveInboundEmail, dispatchEmailOutbox } = await import("../../src/platform/email-operations.js"));
   const required = ["notification_outbox", "email_delivery_event", "email_recipient_suppression", "email_inbox_message", "email_notification_template", "test_delivery_capture"];
-  const missing = (await db.query("select unnest($1::text[]) name except select table_name from information_schema.tables where table_schema='public'", [required])).rows.map(row => row.name);
+  const missing = (await db.query("select name from unnest($1::text[]) as required(name) where not exists(select 1 from information_schema.tables t where t.table_schema='public' and t.table_name=required.name)", [required])).rows.map(row => row.name);
   assert.deepEqual(missing, [], "Apply the repository migrations to the disposable integration database before running email integration tests.");
   originalFetch = globalThis.fetch;
 });

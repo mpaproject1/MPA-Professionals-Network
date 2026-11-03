@@ -226,7 +226,10 @@ export async function listNetworkPlusRequests(userId,{status,intent,disposition,
     let support=false;
     if(supportReason||supportTicket){if(!supportRequestId)fail(400,"Support access must be scoped to one request record.","SUPPORT_SCOPE_REQUIRED");await assertSupport(db,userId,supportRequestId,supportReason,supportTicket);support=true;} else await assertEntry(db,userId);
     const rows=(await db.query(`select r.id,r.intent,r.status,r.subject,r.summary,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id,r.business_id,r.service_listing_id,r.version,r.created_at,r.updated_at,
-        r.requester_disposition,r.requester_disposition_remark,r.requester_disposition_updated_at,r.review_due_at,
+        case when r.requester_user_id=$1 then r.requester_disposition end as requester_disposition,
+        case when r.requester_user_id=$1 then r.requester_disposition_remark end as requester_disposition_remark,
+        case when r.requester_user_id=$1 then r.requester_disposition_updated_at end as requester_disposition_updated_at,
+        case when r.requester_user_id=$1 then r.review_due_at end as review_due_at,
         (r.requester_user_id=$1) as is_requester
       from network_plus_request r where (${support} or exists(select 1 from network_plus_request_participant p where p.request_id=r.id and p.user_id=$1 and p.consent_status<>'revoked' and (p.participant_role<>'additional_participant' or p.consent_status='accepted')))
       and ($2::text is null or r.status=$2) and ($3::text is null or r.intent=$3) and ($4::uuid is null or r.id=$4::uuid)
@@ -323,7 +326,7 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const isPrimaryParticipant=participants.some(p=>p.user_id===userId&&p.participant_role==="requester")||isRecipientRepresentative;
     const clarifications=(await db.query("select id,asked_by,answered_by,prompt_code,question,answer,status,created_at,answered_at from network_plus_request_clarification where request_id=$1 and ($2::boolean or asked_by=$3) order by created_at",[requestId,isPrimaryParticipant,userId])).rows;
     const meetings=(await db.query("select * from network_plus_request_meeting where request_id=$1 and $3::boolean and (proposer_user_id=$2 or responder_user_id=$2) order by created_at desc",[requestId,userId,isPrimaryParticipant])).rows;
-    const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 and ($2::boolean or (actor_user_id=$3 and event_code not like 'request.meeting_%' and event_code not like 'request.contact_consent_%')) order by created_at",[requestId,isPrimaryParticipant,userId])).rows;
+    const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 and ($2::boolean or (actor_user_id=$3 and event_code not like 'request.meeting_%' and event_code not like 'request.contact_consent_%')) and (event_code not like 'request.disposition_%' and event_code<>'request.review_reminder_sent' or $4::boolean) order by created_at",[requestId,isPrimaryParticipant,userId,row.requester_user_id===userId])).rows;
     const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;
     const canReview=isRecipientRepresentative;
     const canAccept=isRecipientRepresentative&&await hasCurrentRecipientAuthority(db,row,userId,"business.accept_terms");

@@ -37,6 +37,17 @@ test("Needs and Offers persist guided drafts, validate taxonomy, moderate listin
 
  const base={listingKind:"offer",categoryCode:"technology",subcategoryCode:"software_development",title:"Verified data engineering capacity",summary:"Experienced team available for structured data engineering work.",description:"A synthetic offer describing data pipeline design, implementation and support for organizations seeking reliable analytics foundations.",wizardStep:4,audience:"both",deliveryMode:"hybrid",locationLabel:"Addis Ababa",structuredAttributes:{},pricingModel:"quote"};
  await businessDiscovery.saveOpportunityListingDraft(draft.id,owner.user.id,base,"np-autosave-"+suffix);
+ const geographyVersion=(await db.query("select id from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0];
+ let geographyUnitId=null;
+ if(geographyVersion){
+  const geographyUnit=(await db.query("select id,label from membership_geography_unit where version_id=$1 and active=true and unit_level in ('region','federal_city') order by label limit 1",[geographyVersion.id])).rows[0];
+  if(geographyUnit){
+   geographyUnitId=geographyUnit.id;
+   await businessDiscovery.saveOpportunityListingDraft(draft.id,owner.user.id,{deliveryMode:"onsite",remoteAvailable:false,locationLabel:"",geographyVersionId:geographyVersion.id,geographyUnitIds:[geographyUnit.id],serviceRadiusKm:25},"np-geography-"+suffix);
+   const area=(await db.query("select u.label,lg.geography_version_id from network_plus_service_listing_geography lg join membership_geography_unit u on u.id=lg.geography_unit_id and u.version_id=lg.geography_version_id where lg.listing_id=$1",[draft.id])).rows[0];
+   assert.equal(area.label,geographyUnit.label);assert.equal(area.geography_version_id,geographyVersion.id);
+  }
+ }
  const persisted=(await db.query("select wizard_step,title,subcategory_code,structured_attributes,draft_saved_at,status from network_plus_service_listing where id=$1",[draft.id])).rows[0];
  assert.equal(persisted.wizard_step,4);assert.equal(persisted.title,base.title);assert.equal(persisted.subcategory_code,"software_development");assert.ok(persisted.draft_saved_at);assert.equal(persisted.status,"draft");
  await assert.rejects(()=>businessDiscovery.submitProfessionalServiceListing(draft.id,owner.user.id,"np-incomplete-"+suffix),e=>e.code==="LISTING_CATEGORY_FIELD_REQUIRED");
@@ -46,7 +57,7 @@ test("Needs and Offers persist guided drafts, validate taxonomy, moderate listin
  assert.equal(submitted.status,"pending_review");
  const published=await businessDiscovery.moderateProfessionalServiceListing(draft.id,reviewer.user.id,{status:"published",reason:"Taxonomy and business evidence reviewed."},"np-moderate-"+suffix);
  assert.equal(published.status,"published");
- const found=await businessDiscovery.listProfessionalServices(owner.user.id,{q:"data engineering",category:"technology",subcategory:"software_development",listingKind:"offer",location:"Addis Ababa"});
+ const found=await businessDiscovery.listProfessionalServices(owner.user.id,{q:"data engineering",category:"technology",subcategory:"software_development",listingKind:"offer",geographyUnitId:geographyUnitId||undefined,location:geographyUnitId?undefined:"Addis Ababa"});
  assert.ok(found.items.some(row=>row.id===draft.id));
  const detail=await businessDiscovery.getProfessionalService(draft.id,owner.user.id);
  assert.equal(detail.listing_kind,"offer");assert.equal(detail.structured_attributes.platform[0],"web");

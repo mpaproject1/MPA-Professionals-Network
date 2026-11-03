@@ -1,4 +1,4 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { getPool, withTransaction } from "./db.js";
 import { classifyEmailDeliveryError, emailIdempotencyKey, emailRetryDelaySeconds } from "./email-retry-policy.js";
 import { renderBrandedEmail } from "./email-template.js";
@@ -162,9 +162,30 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
  if(process.env.TEST_LAB_ENABLED==="true"&&process.env.TEST_DELIVERY_MODE!=="capture"&&process.env.NODE_ENV!=="production")fail(503,"Test Lab is enabled but outbound delivery is not safely configured. Set TEST_DELIVERY_MODE=capture; no email was sent.","TEST_DELIVERY_CAPTURE_REQUIRED");
  if(process.env.TEST_DELIVERY_MODE==="capture"&&process.env.NODE_ENV!=="production"){
   const batch=Math.min(Math.max(Number(limit)||20,1),50);
-  const rows=(await db.query("select id,recipient,template_code,payload from notification_outbox where channel='email' and status in ('pending','failed') and ($1::uuid is null or id=$1::uuid) order by created_at limit $2",[onlyId,batch])).rows;
-  for(const row of rows){await captureTestDelivery({channel:"email",recipient:row.recipient,eventCode:row.template_code,payload:{outboxId:row.id,payload:row.payload}});await db.query("update notification_outbox set status='sent',delivery_status='sent',sent_at=now(),provider_message_id='test-capture',last_error=null,locked_at=null,updated_at=now() where id=$1",[row.id]);}
-  return {processed:rows.length,results:rows.map(row=>({id:row.id,status:"captured"})),mode:"capture"};
+  const rows=await withTransaction(async tx=>{
+   const selected=(await tx.query(`select o.id,o.recipient,o.template_code,o.payload,t.enabled,t.audience
+    from notification_outbox o left join email_notification_template t on t.template_code=o.template_code
+    where o.channel='email' and o.status in ('pending','failed') and ($1::uuid is null or o.id=$1::uuid)
+    order by o.created_at for update of o skip locked limit $2`,[onlyId,batch])).rows;
+   for(const row of selected)await tx.query("update notification_outbox set status='processing',attempts=attempts+1,locked_at=now(),updated_at=now() where id=$1",[row.id]);
+   return selected;
+  });
+  const results=[];
+  for(const row of rows){
+   if(row.enabled===false||(row.audience&&!await recipientMatchesAudience(db,row.recipient,row.audience))){
+    await db.query("update notification_outbox set status='cancelled',delivery_status='cancelled',delivery_event_type=$2,delivery_event_at=now(),locked_at=null,updated_at=now() where id=$1",[row.id,row.enabled===false?"template_disabled":"audience_mismatch"]);
+    results.push({id:row.id,status:"cancelled"});continue;
+   }
+   const hold=(await db.query("select 1 from email_recipient_suppression where email_normalized=$1 and cleared_at is null limit 1",[normalizeEmailAddress(row.recipient)])).rowCount>0;
+   if(hold){
+    await db.query("update notification_outbox set status='cancelled',delivery_status='suppressed',delivery_event_type='recipient_suppressed',delivery_event_at=now(),locked_at=null,updated_at=now() where id=$1",[row.id]);
+    results.push({id:row.id,status:"suppressed"});continue;
+   }
+   await captureTestDelivery({channel:"email",recipient:row.recipient,eventCode:row.template_code,payload:{outboxId:row.id,payload:row.payload}});
+   await db.query("update notification_outbox set status='sent',delivery_status='sent',sent_at=now(),provider_message_id='test-capture',last_error=null,locked_at=null,updated_at=now() where id=$1",[row.id]);
+   results.push({id:row.id,status:"captured"});
+  }
+  return {processed:results.length,results,mode:"capture"};
  }
  if(!providerConfig().ready)fail(503,"Email provider is not configured. Set server-side email credentials first.","EMAIL_DELIVERY_NOT_CONFIGURED");
  const batch=Math.min(Math.max(Number(limit)||20,1),50);

@@ -33,6 +33,8 @@ test("workflow email enqueue is idempotent and checks recipient holds", async ()
   assert.match(source, /on conflict\(email_event_key\).*do nothing/i);
   assert.match(source, /email_recipient_suppression/);
   assert.match(source, /recipientMatchesAudience/);
+  assert.match(source, /email\.message\.enqueue_template_missing/);
+  assert.match(source, /template_code!==\"admin.manual\"/);
 });
 
 test("delivery events require provider event IDs and persist an immutable event ledger", async () => {
@@ -196,4 +198,28 @@ test("Resend webhook signature validation binds raw bytes, timestamp and message
   assert.equal(verifyResendWebhookSignature(Buffer.from(raw.toString() + " "), headers, secret), false);
   assert.equal(verifyResendWebhookSignature(raw, { ...headers, "svix-timestamp": "1" }, secret), false);
   assert.equal(verifyResendWebhookSignature(raw, headers, "wrong-secret"), false);
+});
+
+test("all audited workflow producers have explicit template audience migrations", async () => {
+  const sql = await read("../../db/migrations/20261103220000_email_workflow_template_complete.sql");
+  for (const code of [
+    "professional.workflow_update", "employer.candidate_update",
+    "employer.offer_approval_required", "employer.interview_scheduled",
+    "employer.interview_response", "mentor.mentorship_update",
+    "organization.membership_added", "organization.membership_updated"
+  ]) assert.ok(sql.includes(code), "missing template seed: " + code);
+  assert.match(sql, /set audience=e\.audience/);
+  const checker = await read("../../scripts/check-email-migration-compatibility.js");
+  assert.match(checker, /20261103220000_email_workflow_template_complete\.sql/);
+  assert.match(checker, /invalidWorkflowAudiences/);
+});
+
+test("retry classification distinguishes transient provider failures from permanent failures", async () => {
+  const { classifyEmailDeliveryError, emailRetryDelaySeconds } = await import("../../src/platform/email-retry-policy.js");
+  assert.equal(classifyEmailDeliveryError({ code: "RESEND_HTTP_429" }).retryable, true);
+  assert.equal(classifyEmailDeliveryError({ code: "RESEND_HTTP_503" }).retryable, true);
+  assert.equal(classifyEmailDeliveryError({ code: "RESEND_HTTP_400" }).retryable, false);
+  assert.equal(classifyEmailDeliveryError({ code: "VERIFICATION_TEMPLATE_POLICY_VIOLATION" }).retryable, false);
+  assert.ok(emailRetryDelaySeconds(4) > emailRetryDelaySeconds(2));
+  assert.ok(emailRetryDelaySeconds(100) <= 3600);
 });

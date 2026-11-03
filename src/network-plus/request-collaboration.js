@@ -199,8 +199,8 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
     if(!canTransition(row.intent,row.status,to,role))fail(403,"This role cannot make the requested transition from the current status.","TRANSITION_FORBIDDEN");
     if(to==="accepted"&&role!=="recipient")fail(403,"Only an authorized recipient representative may explicitly accept this request.","RECIPIENT_ACCEPTANCE_REQUIRED");
     if(to==="clarification_requested"&&!input.reason)fail(400,"A clarification reason is required.","REASON_REQUIRED");
-    if(to==="declined"&&!input.reason)fail(400,"A decline reason is required.","REASON_REQUIRED");
-    if(to==="recipient_withdrawn"&&(!input.reason||String(input.reason).trim().length<5))fail(400,"Explain why the recipient is withdrawing from this connection.","REASON_REQUIRED");
+    if(to==="declined"){input.reason=clean(input.reason,500,"Decline reason",5);assertNoContactFields({reason:input.reason});}
+    if(to==="recipient_withdrawn"){input.reason=clean(input.reason,500,"Withdrawal reason",5);assertNoContactFields({reason:input.reason});}
     if(to==="disputed"&&!input.reason)fail(400,"A dispute reason is required.","REASON_REQUIRED");
     if(to==="completed"&&(!Array.isArray(input.completionEvidence)||!input.completionEvidence.length||input.completionEvidence.some(value=>typeof value!=="string"||value.trim().length<5)))fail(400,"Provide completion evidence or a documented not-applicable reason.","COMPLETION_EVIDENCE_REQUIRED");
     if(to==="in_progress"&&row.status!=="accepted")fail(409,"Only an accepted engagement can start.","ACCEPTANCE_REQUIRED");

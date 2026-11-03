@@ -34,7 +34,6 @@ function meetingTime(value:string,timezone:string){try{return new Intl.DateTimeF
 
 export default function NetworkPlusRequestsPage(){
  const token=useUiStore(s=>s.token);
- useEffect(()=>{const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;if(zone)setMeetingTimezone(zone);},[]);
  const [items,setItems]=useState<RequestRow[]>([]);
  const [selectedId,setSelectedId]=useState("");
  const [selected,setSelected]=useState<RequestRow|null>(null);
@@ -58,6 +57,7 @@ export default function NetworkPlusRequestsPage(){
  const [contactPeerId,setContactPeerId]=useState(""),[contactField,setContactField]=useState("email"),[contactValue,setContactValue]=useState(""),[contactHandoff,setContactHandoff]=useState<any>({fields:[]});
  const [meetingPlace,setMeetingPlace]=useState("online"),[meetingPlaceDetails,setMeetingPlaceDetails]=useState(""),[meetingDateTime,setMeetingDateTime]=useState(""),[meetingDuration,setMeetingDuration]=useState("30"),[meetingTimezone,setMeetingTimezone]=useState("Africa/Addis_Ababa");
  const [clarificationTopic,setClarificationTopic]=useState("scope"),[clarificationQuestion,setClarificationQuestion]=useState(""),[clarificationAnswer,setClarificationAnswer]=useState("");
+ useEffect(()=>{const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;if(zone)setMeetingTimezone(zone);},[]);
 
 
  const load=useCallback(async()=>{

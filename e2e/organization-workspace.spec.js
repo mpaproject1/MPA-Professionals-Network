@@ -255,7 +255,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(tabs.getByRole("tab")).toHaveCount(3);
     await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /Reviewing/ })).toHaveCount(0);
-    await expect(tabs.getByRole("tab", { name: /^Organization\\b/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /^Organization\b/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /Exploring/ })).toBeVisible();
   });
 
@@ -265,7 +265,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await dismissPrivacyChoices(page);
     await expect(page.getByRole("tab", { name: /Publishing/ })).toBeVisible();
     await expect(page.getByRole("tab", { name: /Reviewing/ })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /^Organization\\b/ })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: /^Organization\b/ })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Job" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Professional service" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Mentorship" })).toHaveCount(0);
@@ -280,7 +280,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(tabs.getByRole("tab", { name: /Reports/ })).toBeVisible();
     await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /Reviewing/ })).toHaveCount(0);
-    await expect(tabs.getByRole("tab", { name: /^Organization\\b/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /^Organization\b/ })).toHaveCount(0);
   });
 
   test("legacy workspace URL redirects to the canonical organization entry", async ({ page }) => {

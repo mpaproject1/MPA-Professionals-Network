@@ -1081,3 +1081,16 @@ The source and migration changes are committed. The latest PR Quality workflow l
 - The available GitHub connection supports run inspection and reruns but does not expose a workflow-dispatch action. The branch pushes made through this connection have not produced a new Actions run. Start PR Quality and the geography-reference workflow from GitHub Actions if automatic runs remain suppressed.
 - Do not enable Zone/Sub-city/District/Town selectors until an authoritative source dataset, source license, release date, stable codes and parent mappings are independently verified and imported.
 - Do not merge or deploy on the basis of these implementation commits alone. Complete the exact-head migration, backend, Biome, TypeScript, build and browser gates; inspect the geography workbook artifact; verify actual device push delivery; and resolve the supervisor role scope before declaring WP3/WP4 complete.
+
+
+## 30. Pre-CI source hardening — membership center increment (2026-11-03)
+
+- Fixed the member-import CSV parser's out-of-scope `modern` reference, which caused CSV preview to fail before row validation.
+- Corrected member-import name whitespace, email and decimal amount regular expressions so normal whitespace, case-insensitive email addresses and decimal amounts are validated as intended.
+- Extended the existing PostgreSQL CSV/XLSX parity scenario with a whitespace-heavy full name and uppercase/padded email fixture, asserting successful CSV preview normalization and validation.
+- Changed Membership Center's default reporting date and year to the `Africa/Addis_Ababa` civil calendar. Report export requests now carry the member-status filter consistently.
+- Corrected membership-status reporting to represent current stock rather than filtering current stock by the application reporting period. Current effective-status and renewal window calculations now use the Addis Ababa civil date.
+- Membership application and review date-range filters now interpret inclusive civil dates in the Addis Ababa timezone rather than the database session timezone.
+- Membership fee balance and member geography summary components are already rendered in the current Membership Center implementation for Finance-authorized and member-record-authorized staff respectively; no duplicate widgets were added.
+- Current stock and the rolling 90-day renewal pipeline remain snapshot/rolling-window reports; application and ageing reports use selected inclusive civil-date filters.
+- Remaining before CI: complete route-by-route claim/link/activation/reversal audit; operational workflow integration beyond existing authorized deep links; full cohort and month-end historical stock analytics; disposable PostgreSQL, TypeScript, Biome, build, Playwright and migration compatibility validation. These are not represented as complete by this source-hardening commit.

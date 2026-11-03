@@ -64,7 +64,7 @@ test("saved drafts resume at the persisted wizard step with category-specific an
  await page.route("**/api/v1/network-plus/services/np-resume-1/draft",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:draft})}));
  await page.goto("/network-plus/opportunities");await page.getByRole("button",{name:"My listings"}).click();
  await page.getByRole("button",{name:"Resume draft"}).click();
- await expect(page.getByText("Step 4 of 7")).toBeVisible();
+ await expect(page.getByText("Step 4 of 8")).toBeVisible();
  await expect(page.getByLabel("More specific category")).toHaveValue("software_development");
  await expect(page.getByLabel("Technology area")).toHaveValue(["data"]);await expect(page.getByLabel("Platform")).toHaveValue(["web"]);
 });

@@ -467,7 +467,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/network-plus/services"){
       await enforcePersistentRateLimit(req,"network-plus.service.search",60,60000,identity.sub);
       const q=query(req.url);
-      return ok(res,await networkPlusBusiness.listProfessionalServices(identity.sub,{q:q.get("q"),category:q.get("category"),limit:q.get("limit"),offset:q.get("offset")}),requestId);
+      return ok(res,await networkPlusBusiness.listProfessionalServices(identity.sub,{q:q.get("q"),category:q.get("category"),listingKind:"service_profile",limit:q.get("limit"),offset:q.get("offset")}),requestId);
     }
     if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/network-plus/services/")) return ok(res,await networkPlusBusiness.getProfessionalService(parts[4],identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/network-plus/my/businesses") return ok(res,await networkPlusBusiness.listMyBusinesses(identity.sub),requestId);

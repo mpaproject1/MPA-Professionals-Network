@@ -31,6 +31,17 @@ function key(){return crypto.randomUUID()+crypto.randomUUID();}
 function lines(value:string){return value.split("\n").map(v=>v.trim()).filter(Boolean);}
 function label(value:string){return value.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());}
 function meetingTime(value:string,timezone:string){try{return new Intl.DateTimeFormat(undefined,{dateStyle:"medium",timeStyle:"short",timeZone:timezone}).format(new Date(value));}catch{return new Date(value).toLocaleString();}}
+function meetingInstant(value:string,timezone:string){
+ const match=/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})$/.exec(value);
+ if(!match)throw new Error("Choose a valid meeting date and time.");
+ const target=match.slice(1).map(Number),base=Date.UTC(target[0],target[1]-1,target[2],target[3],target[4],0);
+ let instant=base;
+ const format=new Intl.DateTimeFormat("en-US",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+ for(let i=0;i<3;i++){const parts=Object.fromEntries(format.formatToParts(new Date(instant)).map(part=>[part.type,Number(part.value)]));const zoned=Date.UTC(parts.year,parts.month-1,parts.day,parts.hour,parts.minute,parts.second);const delta=zoned-base;if(delta===0)break;instant-=delta;}
+ const verify=Object.fromEntries(format.formatToParts(new Date(instant)).map(part=>[part.type,Number(part.value)]));
+ if(verify.year!==target[0]||verify.month!==target[1]||verify.day!==target[2]||verify.hour!==target[3]||verify.minute!==target[4])throw new Error("That local time does not exist in the selected timezone. Choose another time.");
+ return new Date(instant).toISOString();
+}
 
 export default function NetworkPlusRequestsPage(){
  const token=useUiStore(s=>s.token);
@@ -126,14 +137,14 @@ export default function NetworkPlusRequestsPage(){
  async function proposeMeeting(e:FormEvent){
   e.preventDefault();if(!token||!selected||!meetingDateTime)return;
   setSaving(true);setError("");setNotice("");
-  try{const startsAt=new Date(meetingDateTime);if(!Number.isFinite(startsAt.getTime()))throw new Error("Choose a valid meeting date and time.");await api("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/meetings",{method:"POST",headers:{"X-Idempotency-Key":key()},body:JSON.stringify({peerUserId:handoffPeerId||undefined,placeType:meetingPlace,placeDetails:meetingPlaceDetails,startsAt:startsAt.toISOString(),timezone:meetingTimezone,durationMinutes:Number(meetingDuration)})},token);setNotice("Meeting proposal sent privately. It is not confirmed until the other participant accepts.");setMeetingDateTime("");await loadDetail(selected.id);}
+  try{const startsAt=meetingInstant(meetingDateTime,meetingTimezone);await api("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/meetings",{method:"POST",headers:{"X-Idempotency-Key":key()},body:JSON.stringify({peerUserId:handoffPeerId||undefined,placeType:meetingPlace,placeDetails:meetingPlaceDetails,startsAt,timezone:meetingTimezone,durationMinutes:Number(meetingDuration)})},token);setNotice("Meeting proposal sent privately. It is not confirmed until the other participant accepts.");setMeetingDateTime("");await loadDetail(selected.id);}
   catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Meeting proposal could not be sent.");}
   finally{setSaving(false);}
  }
  async function meetingResponse(meetingId:string,decision:"accept"|"counter"|"decline"){
   if(!token||!selected)return;
   setSaving(true);setError("");setNotice("");
-  try{const body:any={decision};if(decision==="counter"){const startsAt=new Date(meetingDateTime);if(!meetingDateTime||!Number.isFinite(startsAt.getTime()))throw new Error("Choose a valid alternative meeting time.");Object.assign(body,{placeType:meetingPlace,placeDetails:meetingPlaceDetails,startsAt:startsAt.toISOString(),timezone:meetingTimezone,durationMinutes:Number(meetingDuration)});}await api("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/meetings/"+encodeURIComponent(meetingId)+"/respond",{method:"POST",body:JSON.stringify(body)},token);setNotice(decision==="accept"?"The meeting handoff is confirmed.":decision==="counter"?"Your alternative time was sent.":"The meeting proposal was declined.");await loadDetail(selected.id);}
+  try{const body:any={decision};if(decision==="counter"){if(!meetingDateTime)throw new Error("Choose a valid alternative meeting time.");const startsAt=meetingInstant(meetingDateTime,meetingTimezone);Object.assign(body,{placeType:meetingPlace,placeDetails:meetingPlaceDetails,startsAt,timezone:meetingTimezone,durationMinutes:Number(meetingDuration)});}await api("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/meetings/"+encodeURIComponent(meetingId)+"/respond",{method:"POST",body:JSON.stringify(body)},token);setNotice(decision==="accept"?"The meeting handoff is confirmed.":decision==="counter"?"Your alternative time was sent.":"The meeting proposal was declined.");await loadDetail(selected.id);}
   catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Meeting response failed.");}
   finally{setSaving(false);}
  }

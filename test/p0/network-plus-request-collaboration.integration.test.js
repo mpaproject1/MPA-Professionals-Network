@@ -44,6 +44,7 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
  const recipient=await verifiedRecipient("recipient-"+suffix,reviewer.user.id);
  const outsider=await register("outsider-"+suffix);await setMembership(outsider.user.id);
  const idempotencyKey=randomUUID()+randomUUID(),requestRef=`np-request-${randomUUID()}`;
+ await assert.rejects(()=>requests.createNetworkPlusRequest(requester.user.id,{intent:"interest",recipientUserId:recipient.user.id,subject:"Contact leak attempt",summary:"Please call +251911234567 to discuss this opportunity.",details:{},terms:{}},requestRef,randomUUID()+randomUUID()),e=>e.code==="CONTACT_DETAILS_FORBIDDEN");
  const draft=await requests.createNetworkPlusRequest(requester.user.id,{
    intent:"service_request",recipientUserId:recipient.user.id,subject:"Accessibility review",summary:"Please review our public website accessibility.",
    details:{context:"Public website"},terms:{scope:"Review public pages against WCAG AA.",deliverables:["Prioritized audit report"],pricing:{proposal:"Quotation requested"},schedule:{requested:"To be agreed"}}
@@ -147,6 +148,7 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   const confirmed=await requests.respondNetworkPlusMeeting(handoffRequest.id,meeting.id,requester.user.id,{decision:"accept"},requestRef);
   assert.equal(confirmed.status,"confirmed");
   assert.equal(confirmed.confirmed_place_type,"coffee");
+  await assert.rejects(()=>requests.createNetworkPlusMeetingProposal(handoffRequest.id,requester.user.id,{peerUserId:recipient.user.id,placeType:"online",startsAt:new Date(Date.now()+96*60*60*1000).toISOString(),timezone:"Africa/Addis_Ababa",durationMinutes:30},requestRef,randomUUID()+randomUUID()),e=>e.code==="MEETING_ALREADY_CONFIRMED");
   const handoffDetail=await requests.getNetworkPlusRequest(handoffRequest.id,requester.user.id);
   assert.equal(handoffDetail.clarifications[0].status,"answered");
   assert.equal(handoffDetail.meetings[0].status,"confirmed");

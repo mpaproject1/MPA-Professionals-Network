@@ -88,8 +88,8 @@ export async function deliverEmailVerification(message) {
 
   const templateResult = await db.query("select subject_template,text_template,html_template,audience,enabled from email_notification_template where template_code='account.email_verification'");
   const template = templateResult.rows[0];
-  if (template?.enabled === false || (template?.audience && template.audience !== "all")) {
-    const error = Object.assign(new Error("The security-critical verification template must remain enabled for all recipients."), { code: "VERIFICATION_TEMPLATE_POLICY_VIOLATION", statusCode: 503 });
+  if (!template || template.enabled !== true || template.audience !== "all") {
+    const error = Object.assign(new Error("The security-critical verification template must exist, remain enabled and serve all recipients."), { code: "VERIFICATION_TEMPLATE_POLICY_VIOLATION", statusCode: 503 });
     await db.query("update email_verification_delivery set status='failed',last_error=$2,last_error_code=$3,locked_at=null,updated_at=now() where id=$1", [delivery.id, error.message, error.code]);
     throw error;
   }

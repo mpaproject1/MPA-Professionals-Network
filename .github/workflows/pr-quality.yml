@@ -42,8 +42,32 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install locked dependencies
         run: npm ci
-      - name: Lint application and test sources
-        run: npx --yes @biomejs/biome@2.2.4 check --max-diagnostics=5000 --formatter-enabled=false web/app web/components web/lib web/server.js web/next.config.js web/tailwind.config.ts src test e2e scripts server.js
+      - name: Lint application and test sources (collect all diagnostics)
+        id: lint_validation
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p ci-diagnostics
+          npx --yes @biomejs/biome@2.2.4 check --max-diagnostics=5000 --formatter-enabled=false web/app web/components web/lib web/server.js web/next.config.js web/tailwind.config.ts src test e2e scripts server.js 2>&1 | tee ci-diagnostics/biome.log
+          status=${PIPESTATUS[0]}
+          echo "Biome exit code: $status"
+          exit "$status"
+      - name: Upload complete Biome diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: biome-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci-diagnostics/biome.log
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Fail lint job after collecting diagnostics
+        if: always()
+        env:
+          LINT_OUTCOME: ${{ steps.lint_validation.outcome }}
+        run: |
+          echo "Biome validation: $LINT_OUTCOME"
+          test "$LINT_OUTCOME" = success
 
   typecheck:
     name: TypeScript type check
@@ -60,8 +84,32 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install locked dependencies
         run: npm ci
-      - name: Type-check web application
-        run: npx --no-install tsc --noEmit --pretty false -p web/tsconfig.json
+      - name: Type-check web application (collect all diagnostics)
+        id: typecheck_validation
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p ci-diagnostics
+          npx --no-install tsc --noEmit --pretty false -p web/tsconfig.json 2>&1 | tee ci-diagnostics/typescript.log
+          status=${PIPESTATUS[0]}
+          echo "TypeScript exit code: $status"
+          exit "$status"
+      - name: Upload complete TypeScript diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci-diagnostics/typescript.log
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Fail type-check job after collecting diagnostics
+        if: always()
+        env:
+          TYPECHECK_OUTCOME: ${{ steps.typecheck_validation.outcome }}
+        run: |
+          echo "TypeScript validation: $TYPECHECK_OUTCOME"
+          test "$TYPECHECK_OUTCOME" = success
 
   backend-tests:
     name: Backend tests (disposable PostgreSQL)

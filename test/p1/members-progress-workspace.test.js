@@ -9,7 +9,7 @@ test("members workspace is a server-state-driven progress journey, not a card ca
   assert.match(page, /api<Me>\("\/api\/v1\/me"/);
   assert.match(page, /api<Application\[]>\("\/api\/v1\/membership\/applications\/me"/);
   assert.match(page, /api<MembershipHistory>\("\/api\/v1\/membership\/history"/);
-  assert.match(page, /api<Tracking>\("\/api\/v1\/me\/application-tracking/);
+  assert.match(page, /api<Tracking>\("\/api\/v1\/me\/progress\?limit=5/);
   assert.match(page, /Continue where you left off/);
   assert.match(page, /Membership progress/);
   assert.match(page, /aria-label="Membership progress steps"/);

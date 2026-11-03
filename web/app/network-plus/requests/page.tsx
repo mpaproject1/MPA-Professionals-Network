@@ -34,6 +34,7 @@ function meetingTime(value:string,timezone:string){try{return new Intl.DateTimeF
 
 export default function NetworkPlusRequestsPage(){
  const token=useUiStore(s=>s.token);
+ useEffect(()=>{const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;if(zone)setMeetingTimezone(zone);},[]);
  const [items,setItems]=useState<RequestRow[]>([]);
  const [selectedId,setSelectedId]=useState("");
  const [selected,setSelected]=useState<RequestRow|null>(null);

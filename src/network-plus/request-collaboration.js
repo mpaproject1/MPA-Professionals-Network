@@ -468,11 +468,12 @@ export async function askNetworkPlusClarification(requestId,userId,input,request
   const promptCode=input?.promptCode,question=clean(input?.question,1200,"Clarification question",3);
   if(!CLARIFICATION_PROMPTS.has(promptCode))fail(400,"Choose a structured clarification topic.","INVALID_CLARIFICATION_TOPIC");
   return withTransaction(async db=>{
+    await assertEntry(db,userId);
     const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
     if(!request)fail(404,"Request not found.","NOT_FOUND");
     if(!["submitted","under_review"].includes(request.status))fail(409,"Clarification can be requested only while a request is awaiting recipient review.","INVALID_REQUEST_STATUS");
     const actor=await participant(db,requestId,userId);
-    if(actor.participant_role!=="recipient_representative"||actor.consent_status!=="accepted")fail(403,"Only an accepted recipient representative can request clarification.","RECIPIENT_ONLY");
+    if(actor.participant_role!=="recipient_representative")fail(403,"Only the recipient representative can request clarification.","RECIPIENT_ONLY");
     if(request.business_id&&!await hasBusinessAuthority(db,request.business_id,userId,"business.respond_requests"))fail(403,"Your business permission does not allow responding to requests.","BUSINESS_AUTHORITY_REQUIRED");
     const clarification=(await db.query("insert into network_plus_request_clarification(request_id,asked_by,prompt_code,question) values($1,$2,$3,$4) returning *",[requestId,userId,promptCode,question])).rows[0];
     await db.query("update network_plus_request set status='clarification_requested',version=version+1,updated_at=now() where id=$1",[requestId]);
@@ -484,6 +485,7 @@ export async function askNetworkPlusClarification(requestId,userId,input,request
 export async function answerNetworkPlusClarification(requestId,clarificationId,userId,input,requestIdHeader){
   const answer=clean(input?.answer,2000,"Clarification response",3);
   return withTransaction(async db=>{
+    await assertEntry(db,userId);
     const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
     if(!request)fail(404,"Request not found.","NOT_FOUND");
     if(request.requester_user_id!==userId||request.status!=="clarification_requested")fail(403,"Only the requester can answer an open clarification.","REQUESTER_ONLY");

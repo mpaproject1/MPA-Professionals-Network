@@ -157,3 +157,39 @@ The following Phase 2 corrections are now in the branch and documented in docume
 7. Run Biome, TypeScript and production build. Fix actual failures without weakening checks.
 8. Inspect GitHub Actions for the exact final source head and record real results in document 73.
 9. Only after Phase 2 is verified complete, implement Phase 3 from document 70: compact My Requests shelf, requester disposition In progress / Completed / Cancelled, required short closure remark, review reminders, reopen history, decline/withdrawal, and explicit separation of observed events from requester-reported outcomes. Preserve the canonical request model; do not add CRM/deal/transaction tracking, chat or mandatory collaboration.
+
+
+## 8. Continuation update — 2026-11-03 (follow-up source audit)
+
+### Additional Phase 2 corrections committed
+
+The follow-up audit found and fixed issues that the earlier addendum had missed:
+
+1. The one-time question-answer handler still used the old business-only permission check. It now revalidates the current recipient authority through the shared helper.
+2. Request-detail privacy previously trusted a participant row even after the recipient representative lost authority. The detail projection now hides the response, clarifications and meeting history from former representatives; meeting history is not exposed to additional participants or scoped support readers.
+3. The Phase 2 migration's response-integrity block used a malformed single-dollar PostgreSQL delimiter. It now uses the valid named `$phase2$` delimiter.
+4. The migration compatibility checker now validates the Phase 2 foreign keys, columns, check constraints and indexes, in addition to exact schema restoration after rollback.
+5. Legacy three-part AES-GCM contact envelopes remain readable only for migration compatibility. The transactional rotation utility can convert both legacy and `v1` envelopes into the authenticated record-bound `v1` format. New writes are `v1` only.
+6. Integration coverage now includes revoked business response permission, former-representative privacy, scoped support response privacy, legacy ciphertext reads, ciphertext-at-rest, cross-field substitution failure and contact-value-free notification payloads.
+7. Server-side meeting validation now rejects repeated local times during DST fall-back, in addition to the browser's spring-forward gap and fall-back ambiguity checks.
+
+### Actual Actions evidence and limitation
+
+- Historical run [41405549658](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41405549658) checked commit `491c554ae1e589d8358f54f2d1789e96f646b97e`, before these Phase 2 changes. It reported Biome, TypeScript, production build and its then-current PostgreSQL compatibility check passing; backend tests 519 passed / 0 failed / 3 skipped; browser tests 40 passed / 2 failed / 2 skipped.
+- The two browser failures were the member workspace `#progress-title` hydration expectation in `e2e/workspace-app-ux.spec.js`, not Network-Plus request tests.
+- The current branch head before this document update was `c2c6af71ef39d18f3804876cc6c4f4141b65948c`; no Actions run or commit status was returned for that head. The historical run is not evidence that the new Phase 2 changes pass.
+- The connected GitHub controls available in this session allow branch/file updates and Actions inspection, but do not expose a workflow-dispatch operation. A fresh Actions run must be started from the repository Actions UI after this source batch is ready.
+
+### Current gate
+
+**Phase 2 remains open. Phase 3 has not started.** Do not begin Phase 3 until the current source head has actual passing PostgreSQL migration/rollback, backend integration, Playwright, Biome, TypeScript and production-build evidence. Keep PR #18 open and draft.
+
+### Next actions
+
+1. Fetch the latest PR #18 head and verify this source batch is present.
+2. Start **Actions → PR Quality → Run workflow** on `feat/workstream-3-progress-members-workspace`. Do not select an older commit.
+3. Fix all actual failures without skipping tests, relaxing assertions, changing timeouts to mask races, or weakening lint/type/build checks. In particular, diagnose the historical member workspace hydration failures if they reproduce.
+4. Confirm the current-head PostgreSQL compatibility job applied the complete migration chain and rolled back the Phase 2 migration while restoring the exact baseline.
+5. Confirm the backend integration tests cover recipient permission revocation, support privacy, legacy and `v1` ciphertext, tamper detection, notification preference/delivery and API-level DST ambiguity.
+6. Confirm the Playwright run includes `e2e/network-plus-requests.spec.js`, including DST gap/fold cases, and the existing workspace UX suite.
+7. Record run IDs, exact commit SHA, job conclusions and test counts in document 73. Only then implement Phase 3 from document 70, preserving the canonical request model and keeping collaboration optional.

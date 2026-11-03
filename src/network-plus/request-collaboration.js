@@ -211,6 +211,11 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
       review_due_at=case when $1='closed' then null when $1<>'draft' and requester_disposition='in_progress' then now()+interval '7 days' else review_due_at end,
       version=version+1,updated_at=now() where id=$2 returning *`,[to,requestId])).rows[0];
     await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version},idempotencyHash,requestFingerprint);
+    if(to==="recipient_withdrawn"){
+      const consentRows=(await db.query("select field_code from network_plus_request_contact_consent where request_id=$1 and recipient_status in ('accepted','pending')",[requestId])).rows;
+      await db.query("update network_plus_request_contact_consent set recipient_status='revoked',recipient_value_ciphertext=null,recipient_consented_at=null,updated_at=now() where request_id=$1 and recipient_status in ('accepted','pending')",[requestId]);
+      for(const consent of consentRows)await audit(db,requestId,userId,"request.contact_consent_revoked_by_withdrawal",row.status,row.status,requestIdHeader,{field:consent.field_code,side:"recipient"});
+    }
     if(["disputed","completed","closed","recipient_withdrawn"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to==="recipient_withdrawn"?"closed":to; await db.query("update network_plus_collaboration_workspace set status=$1,completed_at=case when $1=$3 then coalesce(completed_at,now()) else completed_at end,closed_at=case when $1=$4 then coalesce(closed_at,now()) else closed_at end,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId,"completed","closed"]); }
     if(to==="accepted") {
       await db.query("update network_plus_request_participant set consent_status='accepted',consented_at=now() where request_id=$1 and user_id=$2 and participant_role='recipient_representative'",[requestId,userId]);

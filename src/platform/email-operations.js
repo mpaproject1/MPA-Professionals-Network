@@ -5,6 +5,7 @@ import { renderBrandedEmail } from "./email-template.js";
 import { resendEmailVerification } from "./email-verification.js";
 import { createInAppNotification } from "./notifications.js";
 import { captureTestDelivery } from "./test-lab.js";
+import { emailWorkflowEventKey, normalizeEmailAddress } from "./email-event-idempotency.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}
 async function requireAdmin(db,actorId){
@@ -43,8 +44,13 @@ export async function queueWorkflowEmail(db,userId,templateCode,variables={},res
  const inApp=await createInAppNotification(db,userId,eventCode,resourceType,resourceId,vars);
  let queued=Boolean(inApp);
  if(user.email&&user.email_enabled){
-  await db.query("insert into notification_outbox(channel,recipient,template_code,payload,status,delivery_status,updated_at) values('email',$1,$2,$3,'pending','queued',now())",[user.email,templateCode,{...vars,variables:vars}]);
-  queued=true;
+  const recipient=normalizeEmailAddress(user.email);
+  const suppressed=(await db.query("select 1 from email_recipient_suppression where email_normalized=$1 and cleared_at is null limit 1",[recipient])).rowCount>0;
+  if(!suppressed){
+   const eventKey=emailWorkflowEventKey({userId,templateCode,resourceType,resourceId,eventCode,eventVersion:vars.eventVersion||vars.event_version||null});
+   const inserted=await db.query("insert into notification_outbox(channel,recipient,template_code,payload,status,delivery_status,email_event_key,updated_at) values('email',$1,$2,$3,'pending','queued',$4,now()) on conflict(email_event_key) where channel='email' and email_event_key is not null do nothing returning id",[user.email,templateCode,{...vars,variables:vars},eventKey]);
+   queued=queued||inserted.rowCount>0;
+  }
  }
  return queued;
 }
@@ -62,9 +68,10 @@ export async function listEmailOutbox(actorId,{folder="outbox",limit=100}={}){
  if(folder==="drafts")return (await db.query("select id,recipient,subject,text_body,html_body,status,created_at,updated_at from email_outbox_draft where status='draft' order by updated_at desc limit $1",[n])).rows;
  if(folder==="inbox")return (await db.query("select id,provider_message_id,sender,recipients,subject,text_body,received_at,read_at,archived_at from email_inbox_message where archived_at is null order by received_at desc limit $1",[n])).rows;
  if(folder==="verification-failed")return (await db.query("select t.id,u.email recipient,'Email verification delivery failed' subject,coalesce(t.delivery_error_code,'Delivery failed') last_error,t.delivery_attempted_at created_at,'failed' status from email_verification_token t join app_user u on u.id=t.user_id where t.delivery_status='failed' and t.consumed_at is null order by t.delivery_attempted_at desc nulls last limit $1",[n])).rows;
- const status=folder==="sent"?"sent":folder==="failed"?"failed":folder==="queued"?"pending":null;
+ const status=folder==="sent"?"sent":folder==="queued"?"pending":null;
+ const deliveryFilter=folder==="failed"?"delivery_status in ('failed','bounced','complained')":folder==="sent"?"delivery_status in ('sent','delivered')":null;
  return (await db.query(`select id,recipient,template_code,coalesce(subject,'') subject,coalesce(text_body,payload->>'text','') text_body,status,delivery_status,delivered_at,delivery_event_at,delivery_event_type,attempts,next_attempt_at,provider_message_id,last_error,delivery_error_code,created_at,updated_at,sent_at
- from notification_outbox where channel='email' and ($1::text is null or status=$1) order by created_at desc limit $2`,[status,n])).rows;
+ from notification_outbox where channel='email' and ($1::text is null or status=$1) and ($2::text is null or ${deliveryFilter||"true"}) order by created_at desc limit $3`,[status,deliveryFilter,n])).rows;
 }
 export async function listEmailTemplates(actorId){
  const db=getPool();await requireAdmin(db,actorId);
@@ -81,8 +88,10 @@ export async function saveEmailTemplate(actorId,code,input,requestId){
   const row=(await tx.query(`insert into email_notification_template(template_code,display_name,audience,subject_template,text_template,html_template,enabled,updated_by,updated_at)
  values($1,$2,$3,$4,$5,$6,$7,$8,now()) on conflict(template_code) do update set display_name=excluded.display_name,audience=excluded.audience,subject_template=excluded.subject_template,text_template=excluded.text_template,html_template=excluded.html_template,enabled=excluded.enabled,updated_by=excluded.updated_by,updated_at=now()
  returning template_code,display_name,audience,subject_template,text_template,html_template,enabled,adjustable_by_admin,updated_at`,[templateCode,clean(input.displayName,150)||templateCode,audience,subject,textBody,html, input.enabled!==false,actorId])).rows[0];
-  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.template.updated','email_notification_template',$2,$3,'success',$4)",[actorId,templateCode,requestId,{audience,enabled:input.enabled!==false}]);
-  return row;
+  const version=Number((await tx.query("select coalesce(max(version_number),0)+1 version from email_template_version where template_code=$1",[templateCode])).rows[0].version);
+  await tx.query("insert into email_template_version(template_code,version_number,display_name,audience,subject_template,text_template,html_template,enabled,changed_by,change_request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",[row.template_code,version,row.display_name,row.audience,row.subject_template,row.text_template,row.html_template,row.enabled,actorId,requestId||null]);
+  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.template.updated','email_notification_template',$2,$3,'success',$4)",[actorId,templateCode,requestId,{audience,enabled:input.enabled!==false,version}]);
+  return {...row,version};
  });
 }
 export async function saveEmailDraft(actorId,input){
@@ -162,6 +171,12 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
    if(!textBody)textBody=`There is a new update to your MPA Professionals Network account.\n\n${row.payload?.status?`Status: ${row.payload.status}\n`:""}${row.payload?.nextAction?`Next action: ${row.payload.nextAction}\n`:""}${row.payload?.registrationReference?`Reference: ${row.payload.registrationReference}\n`:""}Sign in to the platform to review the latest details. If you need help, contact platform support.`;
    if(!htmlBody)htmlBody=`<p>There is a new update to your MPA Professionals Network account.</p>${row.payload?.status?`<p>Status: ${String(row.payload.status).replace(/[&<>]/g,"")} </p>`:""}${row.payload?.nextAction?`<p>Next action: ${String(row.payload.nextAction).replace(/[&<>]/g,"")}</p>`:""}${row.payload?.registrationReference?`<p>Reference: <strong>${String(row.payload.registrationReference).replace(/[&<>]/g,"")}</strong></p>`:""}<p>Sign in to the platform to review the latest details.</p>`;
    if(!subject)subject="Notification from MPA Professionals Network";
+   const suppression=(await db.query("select reason from email_recipient_suppression where email_normalized=$1 and cleared_at is null limit 1",[normalizeEmailAddress(row.recipient)])).rows[0];
+   if(suppression){
+    await db.query("update notification_outbox set status='cancelled',delivery_status='suppressed',delivery_event_type='recipient_suppressed',delivery_event_at=now(),last_error='Recipient is suppressed from outbound email',locked_at=null,updated_at=now() where id=$1",[row.id]);
+    results.push({id:row.id,status:"suppressed"});
+    continue;
+   }
    const sent=await sendMessage({recipient:row.recipient,subject,textBody,htmlBody,templateCode:row.template_code,payload:row.payload,idempotencyKey:row.id});
    await db.query("update notification_outbox set status='sent',delivery_status='sent',sent_at=now(),provider_message_id=$1,last_error=null,delivery_error_code=null,next_attempt_at=null,locked_at=null,updated_at=now() where id=$2",[sent.providerMessageId,row.id]);
    const matchId=row.payload?.matchId||row.payload?.variables?.matchId;if(row.template_code==="mentor.mentorship_update"&&matchId){try{await db.query("update mentorship_match set mentor_notification_status='sent',mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$1",[matchId,"Provider accepted the send request; delivery is not confirmed."]);}catch(e){console.error("[email-outbox] could not update mentorship notification evidence",{outboxId:row.id});}}
@@ -197,41 +212,60 @@ export async function retryVerificationEmail(actorId,id,requestId){
 export async function retryFailedEmail(actorId,id){
  const db=getPool();await requireAdmin(db,actorId);
  if(!providerConfig().ready)fail(503,"Configure the email provider before retrying failed messages.","EMAIL_DELIVERY_NOT_CONFIGURED");
- const row=(await db.query("update notification_outbox set status='pending',attempts=0,next_attempt_at=now(),last_error=null,delivery_error_code=null,updated_at=now() where id=$1 and channel='email' and status='failed' returning id",[id])).rows[0];
- if(!row)fail(409,"Only failed email messages can be retried.","INVALID_STATE");
+ const row=(await db.query("update notification_outbox set status='pending',delivery_status='queued',attempts=0,next_attempt_at=now(),last_error=null,delivery_error_code=null,delivery_event_type=null,delivery_event_at=null,updated_at=now() where id=$1 and channel='email' and (status='failed' or delivery_status in ('failed','bounced')) returning id,recipient")).rows[0];
+ if(!row)fail(409,"Only failed or bounced email messages can be retried. Complaints remain suppressed and cannot be retried.","INVALID_STATE");
+ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.message.retry_requested','notification_outbox',$2,$3,'success',$4)",[actorId,id,requestId||null,{recipient:normalizeEmailAddress(row.recipient)}]);
  return dispatchEmailOutbox(actorId,{limit:1,onlyId:id});
 }
-export async function updateInbox(actorId,id,action){
+export async function updateInbox(actorId,id,action,requestId=null){
  const db=getPool();await requireAdmin(db,actorId);
- if(action==="read")return (await db.query("update email_inbox_message set read_at=coalesce(read_at,now()) where id=$1 and archived_at is null returning id,read_at",[id])).rows[0]||fail(404,"Message not found.","NOT_FOUND");
- if(action==="unread")return (await db.query("update email_inbox_message set read_at=null where id=$1 and archived_at is null returning id,read_at",[id])).rows[0]||fail(404,"Message not found.","NOT_FOUND");
- if(action==="archive")return (await db.query("update email_inbox_message set archived_at=now() where id=$1 and archived_at is null returning id,archived_at",[id])).rows[0]||fail(404,"Message not found.","NOT_FOUND");
- fail(400,"Unsupported inbox action.","VALIDATION_ERROR");
+ let row;
+ if(action==="read")row=(await db.query("update email_inbox_message set read_at=coalesce(read_at,now()) where id=$1 and archived_at is null returning id,read_at",[id])).rows[0];
+ else if(action==="unread")row=(await db.query("update email_inbox_message set read_at=null where id=$1 and archived_at is null returning id,read_at",[id])).rows[0];
+ else if(action==="archive")row=(await db.query("update email_inbox_message set archived_at=now() where id=$1 and archived_at is null returning id,archived_at",[id])).rows[0];
+ else fail(400,"Unsupported inbox action.","VALIDATION_ERROR");
+ if(!row)fail(404,"Message not found.","NOT_FOUND");
+ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'email_inbox_message',$3,$4,'success',$5)",[actorId,"email.inbox."+action,id,requestId,{action}]);
+ return row;
 }
 export async function receiveInboundEmail(input,providedSecret){
  const expected=clean(process.env.EMAIL_INBOUND_WEBHOOK_SECRET,500);
  if(!expected||!providedSecret||Buffer.byteLength(expected)!==Buffer.byteLength(providedSecret)||!timingSafeEqual(Buffer.from(expected),Buffer.from(providedSecret)))fail(401,"Inbound email webhook is not authorized.","UNAUTHENTICATED");
- const providerMessageId=clean(input.messageId||input.id,300)||randomUUID(),sender=clean(input.from||input.sender,320);
+ const providerMessageId=clean(input.messageId||input.id,300),sender=clean(input.from||input.sender,320);
+ if(!providerMessageId)fail(400,"A stable provider message ID is required for inbound email deduplication.","PROVIDER_MESSAGE_ID_REQUIRED");
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender))fail(400,"Inbound sender address is invalid.","VALIDATION_ERROR");
- return (await getPool().query("insert into email_inbox_message(provider_message_id,sender,recipients,subject,text_body,html_body,metadata) values($1,$2,$3,$4,$5,$6,$7) on conflict(provider_message_id) do nothing returning id,received_at",[providerMessageId,sender,Array.isArray(input.to)?input.to.map(v=>clean(v,320)).slice(0,20):[],clean(input.subject,500),String(input.text||"").slice(0,50000),String(input.html||"").slice(0,100000),{provider:"configured-inbound-webhook"}])).rows[0]||{duplicate:true};
+ const result=(await getPool().query("insert into email_inbox_message(provider_message_id,sender,recipients,subject,text_body,html_body,metadata) values($1,$2,$3,$4,$5,$6,$7) on conflict(provider_message_id) do nothing returning id,received_at",[providerMessageId,sender,Array.isArray(input.to)?input.to.map(v=>clean(v,320)).slice(0,20):[],clean(input.subject,500),String(input.text||"").slice(0,50000),String(input.html||"").slice(0,100000),{provider:"configured-inbound-webhook"}])).rows[0];
+ if(!result)return {duplicate:true};
+ await getPool().query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.inbound.received','email_inbox_message',$1,'success',$2)",[result.id,{providerMessageId}]);
+ return result;
 }
 
 export async function receiveDeliveryWebhook(input,providedSecret){
  const expected=clean(process.env.EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET,500);
  if(!expected||!providedSecret||Buffer.byteLength(expected)!==Buffer.byteLength(providedSecret)||!timingSafeEqual(Buffer.from(expected),Buffer.from(providedSecret)))fail(401,"Email delivery event webhook is not authorized.","UNAUTHENTICATED");
  const providerMessageId=clean(input.providerMessageId||input.messageId,300);
+ const providerEventId=clean(input.eventId||input.event_id,300);
  const eventType=clean(input.eventType||input.type,80).toLowerCase();
  if(!providerMessageId)fail(400,"providerMessageId is required.","VALIDATION_ERROR");
+ if(!providerEventId)fail(400,"A stable provider event ID is required for webhook idempotency.","PROVIDER_EVENT_ID_REQUIRED");
  if(!["delivered","bounced","complained","failed"].includes(eventType))fail(400,"Unsupported delivery event type.","VALIDATION_ERROR");
- const deliveryStatus=eventType==="delivered"?"delivered":"failed";
- const result=await getPool().query("update notification_outbox set delivery_status=$1,delivered_at=case when $1='delivered' then now() else delivered_at end,delivery_event_at=now(),delivery_event_type=$2,delivery_error_code=case when $1='failed' then $2 else null end,updated_at=now() where provider_message_id=$3 returning id,payload,template_code,delivery_status,delivered_at",[deliveryStatus,eventType,providerMessageId]);
+ const db=getPool(),provider=clean(input.provider,80)||"configured-webhook";
+ const recorded=(await db.query("insert into email_delivery_event(provider,provider_event_id,provider_message_id,event_type,payload,processed_at) values($1,$2,$3,$4,$5,now()) on conflict(provider,provider_event_id) do nothing returning id",[provider,providerEventId,providerMessageId,eventType,{provider}])).rows[0];
+ if(!recorded)return {matched:true,duplicate:true,providerEventId};
+ const result=await db.query("update notification_outbox set delivery_status=$1,delivered_at=case when $1='delivered' then coalesce(delivered_at,now()) else delivered_at end,delivery_event_at=now(),delivery_event_type=$2,delivery_error_code=case when $1 in ('bounced','complained','failed') then $2 else null end,updated_at=now() where provider_message_id=$3 returning id,recipient,payload,template_code,delivery_status,delivered_at",[eventType,eventType,providerMessageId]);
  const row=result.rows[0];
- if(!row)return {matched:false,providerMessageId,nextAction:"No outbox row matched this provider message ID; no delivery status was changed."};
+ if(!row){await db.query("update email_delivery_event set processed_at=null where id=$1",[recorded.id]);return {matched:false,providerMessageId,nextAction:"No outbox row matched this provider message ID; the event is retained for reconciliation."};}
+ await db.query("update email_delivery_event set outbox_id=$1 where id=$2",[row.id,recorded.id]);
+ if(eventType==="bounced"||eventType==="complained"){
+  const reason=eventType==="complained"?"complaint":"hard_bounce";
+  await db.query("insert into email_recipient_suppression(email_normalized,reason,source,provider_message_id) values($1,$2,$3,$4) on conflict(email_normalized) do update set reason=excluded.reason,source=excluded.source,provider_message_id=excluded.provider_message_id,created_at=now(),cleared_at=null,cleared_by=null,clear_reason=null",[normalizeEmailAddress(row.recipient),reason,provider,providerMessageId]);
+ }
  const matchId=row.payload?.matchId||row.payload?.variables?.matchId;
  if(row.template_code==="mentor.mentorship_update"&&matchId){
-  await getPool().query("update mentorship_match set mentor_notification_status=$1,mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$3",[deliveryStatus,eventType==="delivered"?"Trusted provider delivery event received.":"Trusted provider failure event: "+eventType,matchId]);
+  await db.query("update mentorship_match set mentor_notification_status=$1,mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$3",[eventType==="delivered"?"delivered":"failed",eventType==="delivered"?"Trusted provider delivery event received.":"Trusted provider failure event: "+eventType,matchId]);
  }
- return {matched:true,deliveryStatus,deliveredAt:row.delivered_at||null,nextAction:deliveryStatus==="delivered"?"Provider reported delivery. This does not prove the recipient read the message.":"Provider reported a delivery failure; check the outbox and use an authorized retry workflow."};
+ await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.delivery_event.received','notification_outbox',$1,'success',$2)",[row.id,{provider,providerEventId,eventType}]);
+ return {matched:true,deliveryStatus:eventType,deliveredAt:row.delivered_at||null,nextAction:eventType==="delivered"?"Provider reported delivery. This does not prove the recipient read the message.":"Provider reported a delivery failure; the recipient is suppressed for bounce/complaint events and must not be retried automatically."};
 }
 
 // Server worker entry point: only queued platform messages are processed; no caller identity is accepted from HTTP.

@@ -27,6 +27,8 @@ test("email operations APIs reject unauthenticated access",async()=>{
    const response=await api.get(path);
    expect(response.status(),path).toBe(401);
   }
+  const preview=await api.post("/api/v1/admin/email/preview",{data:{subjectTemplate:"Preview",textTemplate:"Hello {{firstName}}",htmlTemplate:"<p>Hello {{firstName}}</p>"}});
+  expect(preview.status()).toBe(401);
  }finally{await api.dispose();}
 });
 

@@ -35,12 +35,14 @@ function meetingInstant(value:string,timezone:string){
  const match=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
  if(!match)throw new Error("Choose a valid meeting date and time.");
  const target=match.slice(1).map(Number),base=Date.UTC(target[0],target[1]-1,target[2],target[3],target[4],0);
- let instant=base;
  const format=new Intl.DateTimeFormat("en-US",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
- for(let i=0;i<3;i++){const parts=Object.fromEntries(format.formatToParts(new Date(instant)).map(part=>[part.type,Number(part.value)]));const zoned=Date.UTC(parts.year,parts.month-1,parts.day,parts.hour,parts.minute,parts.second);const delta=zoned-base;if(delta===0)break;instant-=delta;}
- const verify=Object.fromEntries(format.formatToParts(new Date(instant)).map(part=>[part.type,Number(part.value)]));
- if(verify.year!==target[0]||verify.month!==target[1]||verify.day!==target[2]||verify.hour!==target[3]||verify.minute!==target[4])throw new Error("That local time does not exist in the selected timezone. Choose another time.");
- return new Date(instant).toISOString();
+ const partsAt=(instant:number)=>Object.fromEntries(format.formatToParts(new Date(instant)).map(part=>[part.type,Number(part.value)]));
+ const localEpoch=(parts:Record<string,number>)=>Date.UTC(parts.year,parts.month-1,parts.day,parts.hour,parts.minute,parts.second);
+ const offsets=new Set([-36,-24,-12,0,12,24,36].map(hours=>{const sample=base+hours*60*60*1000;return localEpoch(partsAt(sample))-sample;}));
+ const candidates=[...offsets].map(offset=>base-offset).filter(instant=>{const parts=partsAt(instant);return parts.year===target[0]&&parts.month===target[1]&&parts.day===target[2]&&parts.hour===target[3]&&parts.minute===target[4];});
+ if(candidates.length===0)throw new Error("That local time does not exist in the selected timezone because of a clock change. Choose another time.");
+ if(candidates.length>1)throw new Error("That local time occurs twice in the selected timezone because clocks move backward. Choose a time outside the repeated hour.");
+ return new Date(candidates[0]).toISOString();
 }
 
 export default function NetworkPlusRequestsPage(){

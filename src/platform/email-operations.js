@@ -4,7 +4,7 @@ import { classifyEmailDeliveryError, emailIdempotencyKey, emailRetryDelaySeconds
 import { renderBrandedEmail } from "./email-template.js";
 import { retryVerificationDelivery } from "./email-verification.js";
 import { createInAppNotification } from "./notifications.js";
-import { captureTestDelivery } from "./test-lab.js";
+import { captureTestDelivery } from "./test-lab-delivery.js";
 import { emailAudienceMatches, emailWorkflowEventKey, normalizeEmailAddress } from "./email-event-idempotency.js";
 
 function fail(status,message,code="BUSINESS_RULE"){throw Object.assign(new Error(message),{statusCode:status,code});}

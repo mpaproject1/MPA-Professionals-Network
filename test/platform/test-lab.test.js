@@ -124,3 +124,19 @@ test("Test Lab API exposes the scenario workbook and portfolio operations monito
  assert.match(admin,/Captured delivery events/);
  assert.match(admin,/Simulate success/);
 });
+
+
+test("delivery capture is isolated from Test Lab membership service imports",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const lab=await readFile(new URL("../../src/platform/test-lab.js",import.meta.url),"utf8");
+ const capture=await readFile(new URL("../../src/platform/test-lab-delivery.js",import.meta.url),"utf8");
+ const email=await readFile(new URL("../../src/platform/email-operations.js",import.meta.url),"utf8");
+ const push=await readFile(new URL("../../src/platform/web-push.js",import.meta.url),"utf8");
+ assert.match(lab,/import \* as membership from "\.\.\/membership\/service\.js"/);
+ assert.doesNotMatch(lab,/from "\.\/email-operations\.js"/);
+ assert.match(capture,/export async function captureTestDelivery/);
+ assert.match(email,/from "\.\/test-lab-delivery\.js"/);
+ assert.match(push,/from "\.\/test-lab-delivery\.js"/);
+ assert.doesNotMatch(email,/from "\.\/test-lab\.js"/);
+ assert.doesNotMatch(push,/from "\.\/test-lab\.js"/);
+});

@@ -1,5 +1,6 @@
 import {createCipheriv,createECDH,createHash,createPrivateKey,createSign,hkdfSync,randomBytes} from "node:crypto";
 import {getPool,withTransaction} from "./db.js";
+import { captureTestDelivery } from "./test-lab-delivery.js";
 
 const b64url=value=>Buffer.from(value).toString("base64url");
 const fromB64url=value=>Buffer.from(String(value||""),"base64url");

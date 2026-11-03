@@ -262,14 +262,6 @@ export async function resetTestPortfolio(identity,portfolioId,input={},requestId
  for(const key of files){try{await rm(safeStoragePath(key),{force:true});removedFiles++;}catch{failedFiles++;}}
  return {...result,removedFiles,failedFiles,status:failedFiles?"reset_with_file_cleanup_warning":"reset"};
 }
-export async function captureTestDelivery({channel,recipient=null,eventCode,payload={},portfolioId=null}){
- if(process.env.TEST_DELIVERY_MODE!=="capture"||process.env.NODE_ENV==="production")return false;
- const db=getPool();
- let owner=portfolioId;
- if(!owner&&recipient)owner=(await db.query("select portfolio_id from test_portfolio_account where lower(email)=lower($1) limit 1",[String(recipient)])).rows[0]?.portfolio_id||null;
- await db.query("insert into test_delivery_capture(portfolio_id,channel,recipient,event_code,payload) values($1,$2,$3,$4,$5)",[owner,channel,recipient,eventCode,payload]);
- return true;
-}
 
 export async function expireTestPortfolioAccounts(){
  if(!testLabEnabled())return {expired:0,skipped:true};

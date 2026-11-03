@@ -399,7 +399,9 @@ export async function submitProfessionalServiceListing(listingId,userId,requestI
     if(!row.title||!row.summary||!row.description||!row.service_category)fail(400,"Complete the title, summary, description and category before submitting this listing.","LISTING_INCOMPLETE");
     const taxonomy=(await db.query("select field_schema,listing_kinds from network_plus_listing_taxonomy where code=$1 and active=true",[row.service_category])).rows[0];
     if(!taxonomy||!taxonomy.listing_kinds.includes(row.listing_kind||"service_profile"))fail(400,"The selected listing category is no longer valid for this listing type.","INVALID_LISTING_CATEGORY");
-    for(const field of taxonomy.field_schema||[]){const value=row.structured_attributes?.[field.code];if(field.required&&(value===undefined||value===null||value===""||(Array.isArray(value)&&!value.length)))fail(400,"Complete the required category-specific field: "+field.label+".","LISTING_CATEGORY_FIELD_REQUIRED");}
+    const categoryFields=[...(taxonomy.field_schema||[])];
+    if(row.subcategory_code){const child=(await db.query("select field_schema from network_plus_listing_taxonomy where code=$1 and parent_code=$2 and active=true",[row.subcategory_code,row.service_category])).rows[0];if(!child)fail(400,"The selected subcategory is no longer valid.","INVALID_LISTING_SUBCATEGORY");categoryFields.push(...(child.field_schema||[]));}
+    for(const field of categoryFields){const value=row.structured_attributes?.[field.code];if(field.required&&(value===undefined||value===null||value===""||(Array.isArray(value)&&!value.length)))fail(400,"Complete the required category-specific field: "+field.label+".","LISTING_CATEGORY_FIELD_REQUIRED");}
 
     const updated=(await db.query("update network_plus_service_listing set status='pending_review',moderation_reason=null,submitted_by=$2,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
     await audit(db,userId,"network_plus.service_listing_submitted","network_plus_service_listing",listingId,requestId,{businessId:row.business_id,from:row.status,to:"pending_review"});

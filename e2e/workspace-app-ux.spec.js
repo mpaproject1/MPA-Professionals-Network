@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-async function dismissPrivacyChoices(page) {\n  const rejectOptional = page.getByRole("button", { name: "Reject optional" });\n  if (await rejectOptional.isVisible().catch(() => false)) await rejectOptional.click();\n}
+async function dismissPrivacyChoices(page) {
+  const rejectOptional = page.getByRole("button", { name: "Reject optional" });
+  if (await rejectOptional.isVisible().catch(() => false)) await rejectOptional.click();
+}
 
 async function mockSignedInWorkspace(page) {
   await page.addInitScript(() => {
@@ -41,6 +44,7 @@ test.describe("MPA application workspace UX", () => {
     await mockSignedInWorkspace(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/members");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: /Welcome back, Test Member/ })).toBeVisible();
     // The welcome heading renders before the account-backed workspace data. Wait for
     // the progress section as the explicit signal that the workspace has hydrated.
@@ -59,6 +63,7 @@ test.describe("MPA application workspace UX", () => {
     await mockSignedInWorkspace(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/members");
+    await dismissPrivacyChoices(page);
     const desktop = page.getByRole("navigation", { name: "Main navigation" });
     await expect(desktop.getByRole("link", { name: "Job Portal" })).toBeVisible();
     await expect(desktop.getByRole("link", { name: "Mentorship" })).toBeVisible();
@@ -85,6 +90,7 @@ test.describe("MPA application workspace UX", () => {
     await mockSignedInWorkspace(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/jobs");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: "Find your next professional opportunity." })).toBeVisible();
     await expect(page.getByRole("group", { name: "Find opportunities" })).toBeVisible();
     const refine = page.getByText(/Refine results/);
@@ -100,6 +106,7 @@ test.describe("MPA application workspace UX", () => {
   test("light and dark themes remain readable and reduced-motion preferences are respected", async ({ page }) => {
     await mockSignedInWorkspace(page);
     await page.goto("/members");
+    await dismissPrivacyChoices(page);
     // Theme and motion checks target the rendered member cards, not the loading shell.
     await expect(page.locator("#progress-title")).toBeVisible();
     const themeToggle = page.getByRole("button", { name: "Toggle theme" });
@@ -120,6 +127,7 @@ test.describe("MPA application workspace UX", () => {
     await page.route("**/api/v1/**", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: [] }) }));
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/mentorship");
+    await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: "My Mentorship" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Seek Executive Mentorship" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Become an MPA Mentor" })).toBeVisible();

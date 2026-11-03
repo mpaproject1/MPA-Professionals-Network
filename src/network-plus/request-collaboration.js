@@ -24,6 +24,15 @@ function safeTerms(intent,raw) {
     }
     t.timeline=object(t.timeline,"Timeline");
   }
+  if(intent==="business_opportunity") {
+    t.opportunityType=clean(t.opportunityType,100,"Opportunity type",2);
+    t.eligibility=clean(t.eligibility,2000,"Eligibility",5);
+    t.selectionProcess=clean(t.selectionProcess,2000,"Selection process",5);
+    if(t.deadline!==undefined&&t.deadline!==null&&t.deadline!=="") {
+      if(typeof t.deadline!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(t.deadline)||Number.isNaN(Date.parse(t.deadline)))fail(400,"Opportunity deadline must be a valid calendar date.","VALIDATION_ERROR");
+    }
+    if(t.value!==undefined&&t.value!==null&&String(t.value).length>300)fail(400,"Opportunity value/compensation must be 300 characters or fewer.","VALIDATION_ERROR");
+  }
   if(intent==="service_request") {
     t.scope=clean(t.scope,5000,"Scope",3);
     if(!Array.isArray(t.deliverables)||t.deliverables.length<1||t.deliverables.length>50)fail(400,"Service requests require 1–50 deliverables.","TERMS_INCOMPLETE");

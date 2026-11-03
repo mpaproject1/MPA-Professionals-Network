@@ -9,9 +9,18 @@
 - Mobile navigation prioritizes four destinations and places remaining destinations in a dedicated More panel. Safe-area spacing keeps the fixed navigation clear of device home indicators.
 - The app continues to use the same account, backend, authorization and workflow routes on desktop and mobile; it does not create a second identity or data store.
 
-## Offline and privacy boundaries
+## Offline front-end navigation and privacy boundaries
 
-The service worker caches only the public landing shell, public brand assets and fingerprinted Next.js static assets. It does not cache API responses, authentication, notification inboxes, member profiles, financial records, forms, approvals or other private workflow data. Offline account actions are not queued or replayed. The offline screen asks the user to reconnect.
+The PWA now supports a limited, useful offline front end rather than stopping at a generic reconnect message:
+
+- The service worker precaches the public entry routes `/`, `/mobile`, `/about`, `/jobs` and `/serve-community`, together with the manifest, public brand assets and fingerprinted Next.js static assets.
+- Successful online visits to those same public routes are cached for subsequent offline navigation. Query-string variants are not cached.
+- If a public route is not yet cached, or the user opens an unsupported route while offline, the service worker returns a lightweight offline navigation hub with ordinary browser links to the public routes. The user can navigate the cached public front end without relying on an online API.
+- The cache version is bumped when this policy changes so old caches are discarded and the new public route set is precached on worker installation.
+- The offline hub clearly distinguishes available front-end navigation from live functionality. Sign-in, notification delivery and inbox data, profiles, membership records, application state, approvals, forms, uploads, and all mutations still require a live connection. No private API response, authenticated workspace HTML or user-specific data is cached or queued.
+- Private route prefixes are explicitly bypassed by the service worker; do not add authenticated routes to `OFFLINE_PUBLIC_ROUTES`.
+
+This is intentionally an offline-readable public front end, not an offline transaction system. A public route is available offline after the worker has installed and its HTML has been successfully precached or visited while online. A first-ever visit to an uncached route still requires connectivity.
 
 ## Web Push configuration
 
@@ -68,3 +77,11 @@ The follow-up source audit on PR #18 checked the manifest, app shell, service wo
 - The existing regression suite `test/platform/pwa-install-push.test.js` now checks the added deep-link destinations, bounded notification copy, install dismissal state and single registration ownership in addition to the existing manifest, migration, encryption and VAPID checks.
 
 **Validation boundary:** these are source changes and authored regression assertions. The test suite, production build, disposable PostgreSQL migration rehearsal and real-device push delivery have not been run in this continuation. Keep the PR draft; do not treat this audit as release approval. The cPanel cron entry and VAPID secrets remain deployment-specific and must be configured by the operator.
+
+## 2026-11-03 offline navigation and preference visibility update
+
+- Expanded offline navigation from only `/` and `/mobile` to an explicit public route set: `/`, `/mobile`, `/about`, `/jobs` and `/serve-community`.
+- Added network-first HTML caching for those exact public paths and a lightweight offline navigation hub for uncached routes. Private account/workspace prefixes remain excluded; API responses and mutations are never cached.
+- Moved the notification preference controls and device push settings to the top of the signed-in Action Center, above notification counts and the inbox. They are no longer hidden inside a collapsed disclosure.
+- Added a first-position Notification preferences shortcut on the installed app's `/mobile` home, deep-linking directly to the visible preference section.
+- Added regression assertions for offline route allowlisting, private-route exclusions, cached public HTML, the offline hub and notification preference placement. Runtime validation remains outstanding; do not claim offline browser acceptance until tested with DevTools offline mode and on installed Android/iOS devices.

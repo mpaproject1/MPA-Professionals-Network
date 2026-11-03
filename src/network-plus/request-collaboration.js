@@ -49,6 +49,7 @@ function safeTerms(intent,raw) {
 async function assertEntry(db,userId) {
   const access=await resolveNetworkPlusAccess(db,userId);
   if(!access.eligible)fail(403,"Network-Plus access is required.","NETWORK_PLUS_FORBIDDEN");
+  return access;
 }
 async function participant(db,requestId,userId) {
   const row=(await db.query("select p.*,r.status request_status,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id from network_plus_request_participant p join network_plus_request r on r.id=p.request_id where p.request_id=$1 and p.user_id=$2 and p.consent_status<>'revoked' and (p.participant_role<>'additional_participant' or p.consent_status='accepted')",[requestId,userId])).rows[0];
@@ -339,7 +340,7 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const canReview=isRecipientRepresentative;
     const canAccept=isRecipientRepresentative&&await hasCurrentRecipientAuthority(db,row,userId,"business.accept_terms");
     return { ...row,
-      recipient_response:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response:null,
+      recipient_response:isRecipientRepresentative||row.requester_user_id===userId||row.recipient_user_id===userId?row.recipient_response:null,
       recipient_response_by:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_by:null,
       recipient_response_at:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_at:null,
       requester_disposition:row.requester_user_id===userId?row.requester_disposition:null,

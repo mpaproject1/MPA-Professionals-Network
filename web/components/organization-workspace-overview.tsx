@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -12,6 +10,8 @@ import {
   Network,
   UsersRound,
 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import styles from "./organization-workspace-overview.module.css";
 

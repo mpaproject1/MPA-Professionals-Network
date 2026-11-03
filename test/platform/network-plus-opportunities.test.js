@@ -95,7 +95,9 @@ test("opportunity mall and wizard preserve the no-commerce boundary and draft re
   assert.match(ui,/Pause/);
   assert.match(ui,/Close/);
   assert.match(ui,/Create business profile/);
-  assert.match(ui,/Attach evidence & submit/);
+  assert.match(ui,/api\/v1\/files\/uploads/);
+  assert.match(ui,/checksumSha256/);
+  assert.match(ui,/Upload evidence & submit/);
   assert.match(ui,/no checkout or transactions here/i);
   assert.match(ui,/does not process orders, payments or delivery/i);
   assert.doesNotMatch(ui,/\/checkout|\/orders|\/payments/);
@@ -108,6 +110,7 @@ test("independent business and listing moderation queues reuse the existing revi
   assert.match(businessAdmin,/verification-queue/);
   assert.match(businessAdmin,/moderation-queue/);
   assert.match(businessAdmin,/View private evidence/);
+  assert.match(businessAdmin,/Download private evidence/);
   assert.match(adminNav,/admin\/network-plus\/businesses/);
   assert.match(adminNav,/admin\/network-plus\/services/);
   assert.match(adminNav,/business_verification_reviewer/);

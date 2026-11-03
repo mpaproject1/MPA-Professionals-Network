@@ -3,15 +3,17 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,alignmentMigration,service,server,ui,e2e,compatibility,userAdmin]=await Promise.all([
+const [migration,alignmentMigration,phase2Migration,service,server,ui,e2e,compatibility,userAdmin,opportunities]=await Promise.all([
  read("../../db/migrations/20261031120000_network_plus_request_collaboration.sql"),
  read("../../db/migrations/20261103120000_network_plus_phase0_contract_alignment.sql"),
+ read("../../db/migrations/20261103140000_network_plus_phase2_connection_handoff.sql"),
  read("../../src/network-plus/request-collaboration.js"),
  read("../../server.js"),
  read("../../web/app/network-plus/requests/page.tsx"),
  read("../../e2e/network-plus-requests.spec.js"),
  read("../../scripts/check-new-migration-compatibility.js"),
- read("../../src/platform/user-admin.js")
+ read("../../src/platform/user-admin.js"),
+ read("../../web/app/network-plus/opportunities/page.tsx")
 ]);
 
 test("Increment 6 schema adds typed requests, explicit participants, immutable events and optional accepted-only workspaces",()=>{
@@ -97,9 +99,48 @@ test("browser journey distinguishes draft, submission, recipient acceptance and 
  assert.match(e2e,/document\.documentElement\.scrollWidth<=window\.innerWidth/);
 });
 
+
+test("Phase 2 adds lightweight connection intents, encrypted bilateral field consent, structured clarifications and one-time meeting handoff",()=>{
+ for(const intent of ["interest","question","quote_request","meeting_request"])assert.ok(phase2Migration.includes("'"+intent+"'"));
+ for(const table of ["network_plus_request_contact_consent","network_plus_request_meeting","network_plus_request_clarification"])assert.match(phase2Migration,new RegExp("create table if not exists "+table,"i"));
+ assert.match(phase2Migration,/requester_value_ciphertext/);
+ assert.match(phase2Migration,/recipient_value_ciphertext/);
+ assert.match(phase2Migration,/ux_network_plus_request_meeting_active/);
+ assert.match(service,/createCipheriv\("aes-256-gcm"/);
+ assert.match(service,/NETWORK_PLUS_CONTACT_ENCRYPTION_KEY/);
+ assert.match(service,/requester_status==="accepted"&&row.recipient_status==="accepted"/);
+ assert.match(service,/updateNetworkPlusContactConsent/);
+ assert.match(service,/getNetworkPlusContactHandoff/);
+ assert.match(service,/askNetworkPlusClarification/);
+ assert.match(service,/answerNetworkPlusClarification/);
+ assert.match(service,/createNetworkPlusMeetingProposal/);
+ assert.match(service,/respondNetworkPlusMeeting/);
+ assert.match(service,/WORKSPACE_ELIGIBLE_INTENTS/);
+});
+test("Phase 2 API and icon-led opportunity actions use the existing private request foundation",()=>{
+ for(const route of ["contact-consent","contact-handoff","meetings","clarifications"])assert.ok(server.includes(route));
+ assert.match(server,/updateNetworkPlusContactConsent/);
+ assert.match(server,/getNetworkPlusContactHandoff/);
+ assert.match(server,/createNetworkPlusMeetingProposal/);
+ assert.match(server,/respondNetworkPlusMeeting/);
+ assert.match(server,/askNetworkPlusClarification/);
+ assert.match(server,/answerNetworkPlusClarification/);
+ for(const intent of ["interest","question","quote_request","meeting_request"])assert.ok(ui.includes('value:"'+intent+'"'));
+ assert.match(ui,/Contact sharing · field-by-field consent/);
+ assert.match(ui,/First meeting handoff/);
+ assert.match(ui,/Ask for clarification/);
+ assert.match(opportunities,/I’m interested/);
+ assert.match(opportunities,/Ask a question/);
+ assert.match(opportunities,/Request quotation/);
+ assert.match(opportunities,/Request meeting/);
+ assert.match(opportunities,/lucide-react/);
+});
+
 test("migration compatibility and support-role governance include Increment 6",()=>{
  assert.match(compatibility,/20261031120000_network_plus_request_collaboration\.sql/);
  assert.match(compatibility,/20261103120000_network_plus_phase0_contract_alignment\.sql/);
+ assert.match(compatibility,/20261103140000_network_plus_phase2_connection_handoff\.sql/);
+ assert.match(compatibility,/ux_network_plus_request_meeting_active/);
  assert.match(compatibility,/business_opportunity/);
  assert.match(compatibility,/network_plus_request_event_idempotency/);
  assert.match(compatibility,/trg_network_plus_workspace_requires_acceptance/);

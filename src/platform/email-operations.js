@@ -329,8 +329,12 @@ export async function retryVerificationEmail(actorId,id,requestId){
 export async function retryFailedEmail(actorId,id,requestId=null){
  const db=getPool();await requireAdmin(db,actorId);
  if(!providerConfig().ready)fail(503,"Configure the email provider before retrying failed messages.","EMAIL_DELIVERY_NOT_CONFIGURED");
- const row=(await db.query("update notification_outbox set status='pending',delivery_status='queued',attempts=0,next_attempt_at=now(),last_error=null,delivery_error_code=null,delivery_event_type=null,delivery_event_at=null,updated_at=now() where id=$1 and channel='email' and (status='failed' or delivery_status in ('failed','bounced')) returning id,recipient")).rows[0];
- if(!row)fail(409,"Only failed or bounced email messages can be retried. Complaints remain suppressed and cannot be retried.","INVALID_STATE");
+ const current=(await db.query("select recipient from notification_outbox where id=$1 and channel='email' and (status='failed' or delivery_status in ('failed','bounced'))",[id])).rows[0];
+ if(!current)fail(409,"Only failed or bounced email messages can be retried. Complaints remain suppressed and cannot be retried.","INVALID_STATE");
+ const hold=(await db.query("select reason from email_recipient_suppression where email_normalized=$1 and cleared_at is null limit 1",[normalizeEmailAddress(current.recipient)])).rows[0];
+ if(hold)fail(409,"This recipient is still on an outbound email hold. Review and release an eligible hard-bounce hold before retrying.","RECIPIENT_HOLD_ACTIVE");
+ const row=(await db.query("update notification_outbox set status='pending',delivery_status='queued',attempts=0,next_attempt_at=now(),last_error=null,delivery_error_code=null,delivery_event_type=null,delivery_event_at=null,updated_at=now() where id=$1 and channel='email' and (status='failed' or delivery_status in ('failed','bounced')) returning id,recipient",[id])).rows[0];
+ if(!row)fail(409,"Email retry state changed during review. Refresh and try again.","CONCURRENT_UPDATE");
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.message.retry_requested','notification_outbox',$2,$3,'success',$4)",[actorId,id,requestId||null,{recipient:normalizeEmailAddress(row.recipient)}]);
  return dispatchEmailOutbox(actorId,{limit:1,onlyId:id});
 }

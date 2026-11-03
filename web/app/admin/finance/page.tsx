@@ -1,12 +1,12 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { FinanceMembershipObligations } from "../../../components/finance-membership-obligations";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";
-import { FinanceMembershipObligations } from "../../../components/finance-membership-obligations";
 
 type Payment = {
   payment_id: string;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { emailWorkflowEventKey, normalizeEmailAddress } from "../../src/platform/email-event-idempotency.js";
+import { emailAudienceMatches, emailWorkflowEventKey, normalizeEmailAddress } from "../../src/platform/email-event-idempotency.js";
 
 test("the same logical workflow transition has a stable idempotency key", () => {
   const input = { userId: "user-1", templateCode: "professional.workflow_update", resourceType: "job_application", resourceId: "application-1", eventCode: "job.application_submitted" };
@@ -42,4 +42,17 @@ test("membership workflow mail uses the shared event-idempotent queue", async ()
   const source = await readFile(new URL("../../src/membership/service.js", import.meta.url), "utf8");
   assert.match(source, /queueEmailNotification/);
   assert.doesNotMatch(source, /insert into notification_outbox\(channel,recipient,template_code,payload\)/i);
+});
+
+test("template audience policy rejects mismatched account types and roles", () => {
+  assert.equal(emailAudienceMatches("all", {}), true);
+  assert.equal(emailAudienceMatches("professional", { accountType: "professional" }), true);
+  assert.equal(emailAudienceMatches("professional", { accountType: "organization_representative" }), false);
+  assert.equal(emailAudienceMatches("organization_representative", { accountType: "organization_representative" }), true);
+  assert.equal(emailAudienceMatches("employer", { accountType: "organization_representative", isEmployer: false }), false);
+  assert.equal(emailAudienceMatches("employer", { accountType: "organization_representative", isEmployer: true }), true);
+  assert.equal(emailAudienceMatches("reviewer", { isReviewer: true }), true);
+  assert.equal(emailAudienceMatches("administrator", { isAdmin: false }), false);
+  assert.equal(emailAudienceMatches("mentor", { isMentor: true }), true);
+  assert.equal(emailAudienceMatches("unknown", {}), false);
 });

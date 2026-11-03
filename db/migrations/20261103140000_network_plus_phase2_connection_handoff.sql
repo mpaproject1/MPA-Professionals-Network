@@ -15,7 +15,7 @@ alter table network_plus_request
 comment on column network_plus_request.recipient_response is
   'One private recipient answer for a question intent; not a chat thread.';
 
-do $
+do $phase2$
 begin
   if not exists (
     select 1 from pg_constraint
@@ -30,7 +30,7 @@ begin
         (intent='question' and recipient_response is not null and recipient_response_by is not null and recipient_response_at is not null)
       );
   end if;
-end $;
+end $phase2$;
 
 create table if not exists network_plus_request_contact_consent (
   request_id uuid not null references network_plus_request(id) on delete restrict,

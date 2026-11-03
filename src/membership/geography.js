@@ -116,7 +116,7 @@ export async function saveMyResidence(userId,input={},requestId){
    admin_level_1_id=excluded.admin_level_1_id,admin_level_2_id=excluded.admin_level_2_id,admin_level_3_id=excluded.admin_level_3_id,
    diaspora_area=excluded.diaspora_area,street_address=excluded.street_address,locality_note=excluded.locality_note,updated_at=now()`,
   [userId,type,version.id,country.id,a1?.id||null,a2?.id||null,a3?.id||null,area,street,locality]);
-  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'member.residence_updated','member_residence',$1::text,$2,'success',$3)",[userId,requestId,JSON.stringify({residenceType:type,countryCode,hasStreetAddress:Boolean(street)})]);
+  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'member.residence_updated','member_residence',$1::uuid::text,$2,'success',$3)",[userId,requestId,JSON.stringify({residenceType:type,countryCode,hasStreetAddress:Boolean(street)})]);
  });
  return getMyResidence(userId);
 }

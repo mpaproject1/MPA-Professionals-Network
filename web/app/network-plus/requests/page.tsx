@@ -4,15 +4,16 @@ import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react
 import { NetworkPlusAccessGuard } from "../../../components/network-plus-access-guard";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
+import { CalendarDays, CheckCircle2, Clock3, Handshake, Heart, Mail, MessageCircle, Phone, Quote, ShieldCheck, Video, XCircle } from "lucide-react";
 
-type Intent = "service_request"|"supplier_inquiry"|"referral"|"expertise_request"|"partnership_proposal"|"collaboration_request"|"business_opportunity";
+type Intent = "service_request"|"supplier_inquiry"|"referral"|"expertise_request"|"partnership_proposal"|"collaboration_request"|"business_opportunity"|"interest"|"question"|"quote_request"|"meeting_request";
 type Participant = {user_id:string;participant_role:string;consent_status:string};
 type MemberChoice = {user_id:string;display_name:string;professional_title?:string};
 type OrgChoice = {id:string;display_name:string};
 type BusinessChoice = {id:string;display_name:string;business_kind:string};
 type ServiceChoice = {id:string;business_id:string;business_name:string;title:string};
 type Workspace = {id:string;purpose:string;scope:string;status:string};
-type RequestRow = {isRequester?:boolean;isRecipientRepresentative?:boolean;canReview?:boolean;canAccept?:boolean;id:string;intent:Intent;status:string;subject:string;summary:string;requester_user_id:string;recipient_user_id?:string|null;recipient_organization_id?:string|null;participants?:Participant[];terms?:Record<string,any>;workspace?:Workspace|null;events?:any[]};
+type RequestRow = {isRequester?:boolean;isRecipientRepresentative?:boolean;canReview?:boolean;canAccept?:boolean;id:string;intent:Intent;status:string;subject:string;summary:string;requester_user_id:string;recipient_user_id?:string|null;recipient_organization_id?:string|null;participants?:Participant[];terms?:Record<string,any>;workspace?:Workspace|null;events?:any[];clarifications?:any[];meetings?:any[]};
 const intents: {value:Intent;label:string;description:string}[] = [
  {value:"service_request",label:"Service request",description:"Ask a business to deliver a defined professional service."},
  {value:"supplier_inquiry",label:"Supplier inquiry",description:"Ask about supplying goods, materials or professional capacity."},
@@ -20,7 +21,11 @@ const intents: {value:Intent;label:string;description:string}[] = [
  {value:"expertise_request",label:"Expertise request",description:"Seek specialist advice, review or expertise."},
  {value:"partnership_proposal",label:"Partnership proposal",description:"Propose a structured partnership with shared contributions and outputs."},
  {value:"collaboration_request",label:"Collaboration request",description:"Propose a scoped collaboration with named responsibilities."},
-  {value:"business_opportunity",label:"Business opportunity",description:"Express interest in a sponsored programme, grant or other business-support opportunity."}
+  {value:"business_opportunity",label:"Business opportunity",description:"Express interest in a sponsored programme, grant or other business-support opportunity."},
+ {value:"interest",label:"I’m interested",description:"A simple signal to start a professional connection."},
+ {value:"question",label:"Ask a question",description:"Ask one focused question before deciding on next steps."},
+ {value:"quote_request",label:"Request quotation",description:"Ask for a quotation or pricing discussion; no payment is collected."},
+ {value:"meeting_request",label:"Request meeting",description:"Ask to arrange a first conversation after the recipient accepts."}
 ];
 function key(){return crypto.randomUUID()+crypto.randomUUID();}
 function lines(value:string){return value.split("\n").map(v=>v.trim()).filter(Boolean);}
@@ -48,6 +53,10 @@ export default function NetworkPlusRequestsPage(){
  const [updateTitle,setUpdateTitle]=useState(""),[updateBody,setUpdateBody]=useState(""),[updateType,setUpdateType]=useState("update");
  const [milestoneTitle,setMilestoneTitle]=useState(""),[milestoneDue,setMilestoneDue]=useState("");
  const [completionEvidence,setCompletionEvidence]=useState("");
+ const [contactPeerId,setContactPeerId]=useState(""),[contactField,setContactField]=useState("email"),[contactValue,setContactValue]=useState(""),[contactHandoff,setContactHandoff]=useState<any>({fields:[]});
+ const [meetingPlace,setMeetingPlace]=useState("online"),[meetingPlaceDetails,setMeetingPlaceDetails]=useState(""),[meetingDateTime,setMeetingDateTime]=useState(""),[meetingDuration,setMeetingDuration]=useState("30"),[meetingTimezone,setMeetingTimezone]=useState("Africa/Addis_Ababa");
+ const [clarificationTopic,setClarificationTopic]=useState("scope"),[clarificationQuestion,setClarificationQuestion]=useState(""),[clarificationAnswer,setClarificationAnswer]=useState("");
+
 
  const load=useCallback(async()=>{
   if(!token){setLoading(false);return;}
@@ -65,6 +74,12 @@ export default function NetworkPlusRequestsPage(){
  useEffect(()=>{if(!token)return;Promise.all([api<{items:BusinessChoice[]}>("/api/v1/network-plus/businesses?limit=50",{},token),api<{items:ServiceChoice[]}>("/api/v1/network-plus/services?limit=50",{},token)]).then(([businesses,services])=>{setBusinessChoices(businesses.items||[]);setServiceChoices(services.items||[]);}).catch(()=>{});},[token]);
  useEffect(()=>{if(selectedId)void loadDetail(selectedId);else {setSelected(null);setWorkspaceData(null);}},[selectedId,loadDetail]);
  useEffect(()=>{if(selected?.workspace&&token)void api<any>("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/workspace",{},token).then(setWorkspaceData).catch(()=>setWorkspaceData(null));else setWorkspaceData(null);},[selected?.id,selected?.workspace?.id,token]);
+ const acceptedRecipient=selected?.participants?.find(p=>p.participant_role==="recipient_representative"&&p.consent_status==="accepted");
+ const handoffPeerId=selected?.isRequester?(contactPeerId||selected?.recipient_user_id||acceptedRecipient?.user_id||""):(selected?.requester_user_id||"");
+ useEffect(()=>{if(!token||!selected||!["accepted","in_progress","completed","closed"].includes(selected.status)||!handoffPeerId){setContactHandoff({fields:[]});return;}api<any>("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/contact-handoff?peerUserId="+encodeURIComponent(handoffPeerId),{},token).then(setContactHandoff).catch(()=>setContactHandoff({fields:[]}));},[selected?.id,selected?.status,handoffPeerId,token]);
+ useEffect(()=>{if(selected?.isRequester&&acceptedRecipient&&!contactPeerId)setContactPeerId(acceptedRecipient.user_id);if(!selected?.isRequester&&selected?.requester_user_id)setContactPeerId(selected.requester_user_id);},[selected?.id,selected?.isRequester,selected?.requester_user_id,acceptedRecipient?.user_id]);
+ useEffect(()=>{try{const params=new URLSearchParams(window.location.search),listingId=params.get("listingId"),requestedIntent=params.get("action") as Intent|null;if(requestedIntent&&intents.some(v=>v.value===requestedIntent))setIntent(requestedIntent);if(listingId){setServiceListingId(listingId);const listing=serviceChoices.find(v=>v.id===listingId);if(listing){setBusinessId(listing.business_id);setSubject((requestedIntent?label(requestedIntent):"Connection request")+" · "+listing.title);setSummary("I would like to connect regarding "+listing.title+". Please let me know the appropriate next step.");}}}catch{}},[serviceChoices]);
+
  const currentIntent=useMemo(()=>intents.find(v=>v.value===intent),[intent]);
 
  async function searchMembers(){
@@ -96,6 +111,42 @@ export default function NetworkPlusRequestsPage(){
   setSaving(true);setError("");setNotice("");
   try{await api("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+path,{method:"POST",headers:{"X-Idempotency-Key":key()},body:body?JSON.stringify(body):undefined},token);setNotice("Request updated. The status and audit history have been refreshed.");const refreshed=await api<RequestRow>("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id),{},token);setSelected(refreshed);if(refreshed.workspace){const ws=await api<any>("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/workspace",{},token);setWorkspaceData(ws);}await load();}
   catch(e){setError(e instanceof ApiError?e.message:"The action could not be confirmed. Refresh before retrying.");}
+  finally{setSaving(false);}
+ }
+
+ async function saveContactConsent(decision:"accept"|"decline"|"revoke"){
+  if(!token||!selected||!handoffPeerId)return;
+  setSaving(true);setError("");setNotice("");
+  try{const result=await api<any>("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/contact-consent",{method:"POST",body:JSON.stringify({field:contactField,decision,value:decision==="accept"?contactValue:undefined,peerUserId:handoffPeerId})},token);setContactHandoff(result);setContactValue("");setNotice(decision==="accept"?"Your consent was saved. The selected contact field is released only after the other participant also consents.":"Your contact-sharing preference was updated.");}
+  catch(e){setError(e instanceof ApiError?e.message:"Contact consent could not be updated.");}
+  finally{setSaving(false);}
+ }
+ async function proposeMeeting(e:FormEvent){
+  e.preventDefault();if(!token||!selected||!meetingDateTime)return;
+  setSaving(true);setError("");setNotice("");
+  try{const startsAt=new Date(meetingDateTime);if(!Number.isFinite(startsAt.getTime()))throw new Error("Choose a valid meeting date and time.");await api("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/meetings",{method:"POST",headers:{"X-Idempotency-Key":key()},body:JSON.stringify({peerUserId:handoffPeerId||undefined,placeType:meetingPlace,placeDetails:meetingPlaceDetails,startsAt:startsAt.toISOString(),timezone:meetingTimezone,durationMinutes:Number(meetingDuration)})},token);setNotice("Meeting proposal sent privately. It is not confirmed until the other participant accepts.");setMeetingDateTime("");await loadDetail(selected.id);}
+  catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Meeting proposal could not be sent.");}
+  finally{setSaving(false);}
+ }
+ async function meetingResponse(meetingId:string,decision:"accept"|"counter"|"decline"){
+  if(!token||!selected)return;
+  setSaving(true);setError("");setNotice("");
+  try{const body:any={decision};if(decision==="counter"){const startsAt=new Date(meetingDateTime);if(!meetingDateTime||!Number.isFinite(startsAt.getTime()))throw new Error("Choose a valid alternative meeting time.");Object.assign(body,{placeType:meetingPlace,placeDetails:meetingPlaceDetails,startsAt:startsAt.toISOString(),timezone:meetingTimezone,durationMinutes:Number(meetingDuration)});}await api("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/meetings/"+encodeURIComponent(meetingId)+"/respond",{method:"POST",body:JSON.stringify(body)},token);setNotice(decision==="accept"?"The meeting handoff is confirmed.":decision==="counter"?"Your alternative time was sent.":"The meeting proposal was declined.");await loadDetail(selected.id);}
+  catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Meeting response failed.");}
+  finally{setSaving(false);}
+ }
+ async function askClarification(e:FormEvent){
+  e.preventDefault();if(!token||!selected)return;
+  setSaving(true);setError("");setNotice("");
+  try{await api("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/clarifications",{method:"POST",body:JSON.stringify({promptCode:clarificationTopic,question:clarificationQuestion})},token);setClarificationQuestion("");setNotice("Clarification sent privately to the requester.");await loadDetail(selected.id);await load();}
+  catch(e){setError(e instanceof ApiError?e.message:"Clarification could not be sent.");}
+  finally{setSaving(false);}
+ }
+ async function answerClarification(e:FormEvent,clarificationId:string){
+  e.preventDefault();if(!token||!selected)return;
+  setSaving(true);setError("");setNotice("");
+  try{await api("/api/v1/network-plus/requests/"+encodeURIComponent(selected.id)+"/clarifications/"+encodeURIComponent(clarificationId)+"/respond",{method:"POST",body:JSON.stringify({answer:clarificationAnswer})},token);setClarificationAnswer("");setNotice("Your clarification was sent. The request returned to the recipient’s review queue.");await loadDetail(selected.id);await load();}
+  catch(e){setError(e instanceof ApiError?e.message:"Clarification response could not be sent.");}
   finally{setSaving(false);}
  }
  async function enableWorkspace(){

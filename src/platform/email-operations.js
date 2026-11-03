@@ -34,7 +34,7 @@ function providerConfig(){
  let webhookValid=false;
  try{webhookValid=new URL(endpoint).protocol==="https:";}catch{}
  const provider=resendConfigured?"resend":webhookConfigured?"signed-webhook":"not-configured";
- return {provider,ready:Boolean((publicValid&&(resendConfigured||(webhookConfigured&&webhookValid)))||(environment!=="production"&&process.env.TEST_DELIVERY_MODE==="capture")),publicUrl,fromConfigured:Boolean(from),apiKeyConfigured:Boolean(apiKey),webhookConfigured,deliveryEventsConfigured:Boolean(clean(process.env.EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET)),inboundConfigured:Boolean(clean(process.env.EMAIL_INBOUND_WEBHOOK_SECRET)),testDeliveryMode:environment!=="production"&&process.env.TEST_DELIVERY_MODE==="capture"?"capture":"blocked",environment,sender:from?from:null};
+ return {provider,ready:Boolean((publicValid&&(resendConfigured||(webhookConfigured&&webhookValid)))||(environment!=="production"&&process.env.TEST_DELIVERY_MODE==="capture")),publicUrl,fromConfigured:Boolean(from),apiKeyConfigured:Boolean(apiKey),webhookConfigured,deliveryEventsConfigured:Boolean(clean(process.env.RESEND_WEBHOOK_SECRET)||clean(process.env.EMAIL_DELIVERY_EVENT_WEBHOOK_SECRET)),inboundConfigured:Boolean(clean(process.env.EMAIL_INBOUND_WEBHOOK_SECRET)),testDeliveryMode:environment!=="production"&&process.env.TEST_DELIVERY_MODE==="capture"?"capture":"blocked",environment,sender:from?from:null};
 }
 export async function queueEmailNotification(db,userId,templateCode,variables={},resourceType="workflow",resourceId=null,{optional=false}={}){
  const user=(await db.query("select u.email,coalesce(np.email_enabled,true) email_enabled from app_user u left join notification_preference np on np.user_id=u.id where u.id=$1",[userId])).rows[0];

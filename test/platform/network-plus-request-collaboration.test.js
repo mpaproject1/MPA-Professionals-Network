@@ -99,6 +99,7 @@ test("browser journey distinguishes draft, submission, recipient acceptance and 
  assert.match(ui,/Published business/);
  assert.match(ui,/Find a verified member recipient/);
  assert.match(ui,/Ask for clarification/);
+ assert.match(ui,/Answer the question/);
  assert.match(ui,/Withdraw request/);
  assert.match(e2e,/creates a draft without submitting/);
  assert.match(e2e,/recipient acceptance does not create a workspace/);
@@ -112,6 +113,7 @@ test("Phase 2 adds lightweight connection intents, encrypted bilateral field con
  for(const table of ["network_plus_request_contact_consent","network_plus_request_meeting","network_plus_request_clarification"])assert.match(phase2Migration,new RegExp("create table if not exists "+table,"i"));
  assert.match(phase2Migration,/requester_value_ciphertext/);
  assert.match(phase2Migration,/recipient_value_ciphertext/);
+ assert.match(phase2Migration,/recipient_response text/);
  assert.match(phase2Migration,/ux_network_plus_request_meeting_active/);
  assert.match(service,/createCipheriv\("aes-256-gcm"/);
  assert.match(service,/NETWORK_PLUS_CONTACT_ENCRYPTION_KEY/);
@@ -120,6 +122,7 @@ test("Phase 2 adds lightweight connection intents, encrypted bilateral field con
  assert.match(service,/getNetworkPlusContactHandoff/);
  assert.match(service,/askNetworkPlusClarification/);
  assert.match(service,/answerNetworkPlusClarification/);
+ assert.match(service,/answerNetworkPlusQuestion/);
  assert.match(service,/createNetworkPlusMeetingProposal/);
  assert.match(service,/respondNetworkPlusMeeting/);
  assert.match(service,/WORKSPACE_ELIGIBLE_INTENTS/);
@@ -139,6 +142,7 @@ test("Phase 2 API and icon-led opportunity actions use the existing private requ
  assert.match(server,/respondNetworkPlusMeeting/);
  assert.match(server,/askNetworkPlusClarification/);
  assert.match(server,/answerNetworkPlusClarification/);
+ assert.match(server,/answerNetworkPlusQuestion/);
  for(const intent of ["interest","question","quote_request","meeting_request"])assert.ok(ui.includes('value:"'+intent+'"'));
  assert.match(ui,/Contact sharing · field-by-field consent/);
  assert.match(ui,/First meeting handoff/);

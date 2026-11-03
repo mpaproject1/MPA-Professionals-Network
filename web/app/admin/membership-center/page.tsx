@@ -17,6 +17,7 @@ type Me = { roles?: string[]; permissions?: string[] };
 type Filters = { from: string; to: string; q: string; status: string; memberStatus: string; geographyUnitId?: string };
 type GeographyUnit = { id: string; label: string; unit_level: string; parent_id?: string | null };
 type GeographyReference = { countries?: GeographyUnit[]; regions?: GeographyUnit[]; federalCities?: GeographyUnit[]; children?: GeographyUnit[] };
+type SavedView = { id: string; report_id: string; name: string; filters: Partial<Filters> };
 
 const addisDateParts = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()).reduce<Record<string, string>>((parts, part) => { if (part.type !== "literal") parts[part.type] = part.value; return parts; }, {});
 const today = () => { const parts = addisDateParts(); return parts.year + "-" + parts.month + "-" + parts.day; };
@@ -93,6 +94,10 @@ export default function MembershipCenterPage() {
   const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "signin">("loading");
   const [roles, setRoles] = useState<string[]>([]);
   const [geographyOptions, setGeographyOptions] = useState<Array<{id:string;label:string}>>([]);
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [selectedSavedView, setSelectedSavedView] = useState("");
+  const [savedViewName, setSavedViewName] = useState("");
+  const [savingView, setSavingView] = useState(false);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [applications, setApplications] = useState<ReportResult | null>(null);
@@ -139,6 +144,7 @@ export default function MembershipCenterPage() {
         currentPermissions.some(permission => ["membership.review", "membership.activate", "members.view", "members.manage", "reports.view"].includes(permission));
       setRoles(currentRoles);
       setPermissions(currentPermissions);
+      try { const views = await api<SavedView[]>("/api/v1/me/report-saved-views", {}, token); setSavedViews(views.filter(view => view.report_id === "membership-applications")); } catch { setSavedViews([]); }
       try {
         const reference = await api<GeographyReference>("/api/v1/member-geography/reference", {}, token);
         const units = [...(reference.countries || []), ...(reference.regions || []), ...(reference.federalCities || []), ...(reference.children || [])];
@@ -201,6 +207,19 @@ export default function MembershipCenterPage() {
       setAccess("allowed");
     } finally { setBusy(false); }
   }, [token]);
+
+  const saveCurrentView = async () => {
+    if (!token || !savedViewName.trim()) return;
+    setSavingView(true);
+    setError("");
+    try {
+      const created = await api<SavedView>("/api/v1/me/report-saved-views", { method: "POST", body: JSON.stringify({ reportId: "membership-applications", name: savedViewName.trim(), filters }) }, token);
+      setSavedViews(current => [created, ...current.filter(view => view.id !== created.id)]);
+      setSelectedSavedView(created.id);
+      setSavedViewName("");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "The saved filter could not be created."); }
+    finally { setSavingView(false); }
+  };
 
   useEffect(() => {
     if (!hydrated) return;
@@ -288,7 +307,10 @@ export default function MembershipCenterPage() {
       <div className={styles.periodShortcuts}>
         <label>Year<select defaultValue={String(currentYear())} onChange={event => applyPeriod(event.target.value, "")}>{Array.from({length: 7}, (_, index) => currentYear() - index).map(year => <option key={year} value={year}>{year}</option>)}</select></label>
         <label>Month<select defaultValue="" onChange={event => { const year = String(new Date(filters.from).getFullYear() || currentYear()); applyPeriod(year, event.target.value); }}><option value="">Full year</option>{Array.from({length: 12}, (_, index) => index + 1).map(month => <option key={month} value={String(month).padStart(2,"0")}>{new Date(2024, month - 1, 1).toLocaleString("en", {month:"long"})}</option>)}</select></label>
-        <span className={styles.filterNote}>All charts and application KPIs refresh together. Current member stock is not reduced by the selected application period.</span>
+        <label>Saved filters<select value={selectedSavedView} onChange={event => { setSelectedSavedView(event.target.value); const view = savedViews.find(item => item.id === event.target.value); if (view) setFilters(current => ({ ...current, ...view.filters, geographyUnitId: String(view.filters.geographyUnitId || "") })); }}><option value="">Choose a saved filter</option>{savedViews.map(view => <option key={view.id} value={view.id}>{view.name}</option>)}</select></label>
+        <label>Save current filters<input value={savedViewName} maxLength={100} onChange={event => setSavedViewName(event.target.value)} placeholder="Name this view"/></label>
+        <button className="btn btn-ghost" type="button" disabled={savingView || !savedViewName.trim()} onClick={() => void saveCurrentView()}>{savingView ? "Saving…" : "Save filter"}</button>
+        <span className={styles.filterNote}>Apply the filters to refresh reports. Saved views are private to your account.</span>
       </div>
     </section>
 

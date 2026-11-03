@@ -5,7 +5,8 @@ import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
 import { createInAppNotification } from "../platform/notifications.js";
 
 
-const INTENTS = new Set(["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request"]);
+const INTENTS = new Set(["service_request","supplier_inquiry","referral","expertise_request","partnership_proposal","collaboration_request","business_opportunity"]);
+const WORKSPACE_ELIGIBLE_INTENTS = new Set(["service_request","supplier_inquiry","expertise_request","partnership_proposal","collaboration_request"]);
 const SUPPORT_ROLES = new Set(["network_plus_support","system_admin"]);
 const hash = value => createHash("sha256").update(String(value)).digest("hex");
 function fail(status,message,code="REQUEST_RULE"){ throw policyError(status,message,code); }
@@ -198,15 +199,7 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
     if(["disputed","completed","closed"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to; await db.query("update network_plus_collaboration_workspace set status=$1,completed_at=case when $1=$3 then coalesce(completed_at,now()) else completed_at end,closed_at=case when $1=$4 then coalesce(closed_at,now()) else closed_at end,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId,"completed","closed"]); }
     if(to==="accepted") {
       await db.query("update network_plus_request_participant set consent_status='accepted',consented_at=now() where request_id=$1 and user_id=$2 and participant_role='recipient_representative'",[requestId,userId]);
-      if(!["service_request","supplier_inquiry","expertise_request","partnership_proposal","collaboration_request"].includes(row.intent)) {
-        // Accepted referral/expertise requests are recorded as accepted without a project workspace.
-      } else {
-        const t=row.terms||{};
-        const purpose=t.purpose||row.summary, scope=t.scope||row.summary;
-        const ws=(await db.query(`insert into network_plus_collaboration_workspace(request_id,purpose,scope,timeline,created_by,accepted_at)
-          values($1,$2,$3,$4,$5,now()) on conflict(request_id) do nothing returning id`,[requestId,purpose,scope,t.timeline||{},userId])).rows[0];
-        if(ws) await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body) values($1,$2,'update','Engagement accepted','The recipient explicitly accepted this request. The collaboration workspace is now active.')",[ws.id,userId]);
-      }
+      // Acceptance records a connection decision only. Shared workspaces are explicit opt-in.
     }
     const other=(await db.query("select user_id from network_plus_request_participant where request_id=$1 and user_id<>$2 and consent_status<>'revoked'",[requestId,userId])).rows;
     for(const x of other) await notify(db,x.user_id,`network_plus.request.${to}`,requestId,`Your Network-Plus request is now ${to.replaceAll("_"," ")}.`);
@@ -310,6 +303,30 @@ async function workspaceAccess(db,workspaceId,userId) {
   if(!ws)fail(404,"Collaboration workspace not found.","NOT_FOUND");
   return ws;
 }
+export async function createNetworkPlusWorkspace(requestId,userId,requestIdHeader) {
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
+    if(!request)fail(404,"Request not found.","NOT_FOUND");
+    if(!["accepted","in_progress","disputed"].includes(request.status)||!request.accepted_at)fail(409,"A collaboration workspace can be enabled only for an accepted, active request.","ACCEPTANCE_REQUIRED");
+    if(!WORKSPACE_ELIGIBLE_INTENTS.has(request.intent))fail(409,"This request is intended to remain a lightweight connection and does not support a collaboration workspace.","WORKSPACE_NOT_APPLICABLE");
+    const actor=await participant(db,requestId,userId);
+    if(!["requester","recipient_representative"].includes(actor.participant_role)||actor.consent_status!=="accepted")fail(403,"Only an accepted primary participant may enable the shared workspace.","PARTICIPANT_CONSENT_REQUIRED");
+    const terms=request.terms||{};
+    const purpose=clean(terms.purpose||request.subject,2000,"Workspace purpose",3);
+    const scope=clean(terms.scope||request.summary,5000,"Workspace scope",3);
+    const created=(await db.query(`insert into network_plus_collaboration_workspace(request_id,purpose,scope,timeline,created_by,accepted_at)
+      values($1,$2,$3,$4,$5,$6) on conflict(request_id) do nothing returning *`,[requestId,purpose,scope,terms.timeline||{},userId,request.accepted_at])).rows[0];
+    const workspace=created||(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0];
+    if(created){
+      await db.query("insert into network_plus_collaboration_event(workspace_id,actor_user_id,event_type,title,body) values($1,$2,'update','Optional collaboration workspace enabled','An accepted participant explicitly enabled a shared workspace.')",[workspace.id,userId]);
+      await audit(db,requestId,userId,"request.workspace_enabled",request.status,request.status,requestIdHeader,{workspaceId:workspace.id});
+      const others=(await db.query("select user_id from network_plus_request_participant where request_id=$1 and user_id<>$2 and consent_status='accepted'",[requestId,userId])).rows;
+      for(const other of others)await notify(db,other.user_id,"network_plus.request.workspace_enabled",requestId,"An optional collaboration workspace was enabled for your accepted request.");
+    }
+    return workspace;
+  });
+}
 export async function getNetworkPlusWorkspace(requestId,userId) {
   return withTransaction(async db=>{
     await assertEntry(db,userId);
@@ -388,4 +405,4 @@ export async function addNetworkPlusWorkspaceEvent(requestId,userId,input,reques
     return row;
   });
 }
-export const requestLifecycle = Object.freeze({intents:[...INTENTS],statuses:["draft","submitted","under_review","clarification_requested","accepted","declined","withdrawn","in_progress","completed","disputed","closed"]});
+export const requestLifecycle = Object.freeze({intents:[...INTENTS],workspaceEligibleIntents:[...WORKSPACE_ELIGIBLE_INTENTS],statuses:["draft","submitted","under_review","clarification_requested","accepted","declined","withdrawn","in_progress","completed","disputed","closed"]});

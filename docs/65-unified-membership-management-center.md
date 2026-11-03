@@ -1121,3 +1121,11 @@ The source and migration changes are committed. The latest PR Quality workflow l
 - The membership status/event history does not provide a complete point-in-time record for all status changes: activation is recorded in `membership_event`, while expiry and post-activation payment reversal also update `membership_record` status without a corresponding complete status-history stream. Cumulative activation counts therefore cannot safely reconstruct month-end active stock.
 - Added an additive `membership_month_end_snapshot` table and an idempotent server worker. It captures status/plan counts during the final five minutes of the Addis Ababa civil month, uses Finance payment eligibility when classifying imported members, and refreshes the month snapshot under an advisory lock. A report and dashboard chart read these snapshots; missing months are not interpolated or inferred.
 - Snapshots start after this migration and are not backfilled because historical status transitions cannot be reliably reconstructed. The month-end capture worker and PostgreSQL migration still require disposable-database execution and an operational observation of the first scheduled capture.
+
+
+### Geography filter implementation addendum
+
+- Added a Membership Center member-residence selector populated from the current published geography reference API. It includes countries, Ethiopian regions, federal cities and any published child units, labelled with their hierarchy level and parent.
+- Added an explicit `Not recorded / outdated reference` option. The stock report distinguishes current published-reference residences from missing or stale residence versions; it does not infer location from IP, phone, nationality or free text.
+- The selected unit matches the stored country or one of the administrative hierarchy IDs. Street/address fields are never used in aggregate filters. Unknown unit IDs return no matching members rather than widening the query.
+- The geography filter currently scopes current member stock only. Application cohorts and month-end historical snapshots do not claim a residence dimension; historical geography must be versioned into those analytics before such filters can be applied consistently.

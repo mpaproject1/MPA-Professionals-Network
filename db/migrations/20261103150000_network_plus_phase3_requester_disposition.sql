@@ -28,6 +28,10 @@ begin
     alter table network_plus_request add constraint network_plus_request_disposition_closure_remark_check
       check (requester_disposition not in ('completed','cancelled') or length(trim(coalesce(requester_disposition_remark,''))) between 5 and 500);
   end if;
+  if not exists (select 1 from pg_constraint where conrelid='network_plus_request'::regclass and conname='network_plus_request_recipient_withdrawn_accepted_check') then
+    alter table network_plus_request add constraint network_plus_request_recipient_withdrawn_accepted_check
+      check (status<>'recipient_withdrawn' or (accepted_at is not null and recipient_withdrawn_at is not null));
+  end if;
 end $phase3$;
 
 -- Existing submitted requests receive a first review date; drafts are not reminded before submission.

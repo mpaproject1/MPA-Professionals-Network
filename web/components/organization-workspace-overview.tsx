@@ -446,7 +446,7 @@ export function OrganizationWorkspaceOverview({
                     const direction = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
                     const nextIndex = (index + direction + visibleFolders.length) % visibleFolders.length;
                     const nextFolder = visibleFolders[nextIndex];
-                    setActiveFolderKey(nextFolder.key);
+                    onActiveFolderChange(nextFolder.key);
                     document.getElementById(`organization-folder-${nextFolder.key}`)?.focus();
                   }}
                 >

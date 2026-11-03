@@ -49,6 +49,7 @@ test("request lifecycle requires explicit recipient authority and never creates 
  assert.match(service,/createNetworkPlusWorkspace/);
  assert.match(service,/WORKSPACE_ELIGIBLE_INTENTS/);
  assert.match(service,/product_profile"&&!\["supplier_inquiry","referral","interest","question","quote_request","meeting_request"\]/);
+ assert.match(service,/product_profile"&&!\["supplier_inquiry","referral","interest","question","quote_request","meeting_request"\]/);
  assert.doesNotMatch(service,/if\(to==="accepted"\)[\s\S]{0,900}insert into network_plus_collaboration_workspace/);
  assert.match(service,/request\.\$\{to\}/);
  assert.match(service,/IDEMPOTENCY_CONFLICT/);

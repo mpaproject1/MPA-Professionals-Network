@@ -14,7 +14,7 @@ async function mockSignedInWorkspace(page) {
     const path = url.pathname.replace(/\/+$/, "");
     let data = {};
     if (path === "/api/v1/me") data = { user_id: "e2e-member", display_name: "Test Member", has_active_membership: true, completion_percent: 72, roles: ["member"] };
-    else if (path.includes("application-tracking")) data = { summary: { total: 0, active: 0, nextSteps: 0, jobApplications: 0 }, items: [] };
+    else if (path === "/api/v1/me/progress") data = { summary: { total: 0, active: 0, nextSteps: 0, jobApplications: 0 }, items: [] };
     else if (path === "/api/v1/membership/applications/me") data = [];
     else if (path === "/api/v1/membership/history") data = { memberships: [{ status: "active" }] };
     else if (path === "/api/v1/me/community-impact/workspace") data = {

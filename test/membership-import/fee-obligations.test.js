@@ -247,7 +247,9 @@ test("PostgreSQL fee obligation lifecycle preserves partial cash, maker-checker 
  const activated=await membership.activateApplication(app.id,reviewer,"fee-lifecycle-activate-"+suffix);
  assert.equal(activated.status,"active");
 
- await membership.reverseMembershipPayment(receipt.payment.id,financeId,{reason:"Test reversal reopens the remaining fee obligation."},"fee-lifecycle-reverse-"+suffix);
+ const firstReversal=await membership.reverseMembershipPayment(receipt.payment.id,financeId,{reason:"Test reversal reopens the remaining fee obligation."},"fee-lifecycle-reverse-"+suffix);
+ const repeatedReversal=await membership.reverseMembershipPayment(receipt.payment.id,financeId,{reason:"Repeated reversal must be idempotent."},"fee-lifecycle-reverse-repeat-"+suffix);
+ assert.equal(repeatedReversal.id,firstReversal.id,"repeated payment reversal must return the original reversal record without creating another");
  balance=(await db.query("select * from membership_fee_obligation_balance where application_id=$1",[app.id])).rows[0];
  assert.equal(Number(balance.verified_cash),0);
  assert.equal(Number(balance.approved_non_cash),700);

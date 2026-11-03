@@ -233,6 +233,7 @@ export default function NetworkPlusRequestsPage(){
  const visibleMyRequests=myRequests.filter(item=>{
   const disposition=item.requester_disposition||"in_progress";
   if(dispositionFilter==="awaiting")return ["submitted","under_review","clarification_requested"].includes(item.status);
+  if(dispositionFilter==="in_progress")return item.status!=="draft"&&disposition==="in_progress";
   return dispositionFilter==="all"||disposition===dispositionFilter;
  });
  const receivedRequests=items.filter(item=>item.is_requester===false);

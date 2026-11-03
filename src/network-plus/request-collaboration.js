@@ -276,7 +276,7 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const isRecipientRepresentative=participants.some(p=>p.user_id===userId&&p.participant_role==="recipient_representative"&&p.consent_status!=="revoked");
     const canReview=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.respond_requests")||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));
     const canAccept=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));
-    return { ...row, participants, clarifications, meetings, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative, canReview, canAccept };
+    return { ...row, participants, clarifications, meetings, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative, canReview, canAccept, canHandoff:isPrimaryParticipant };
   });
 }
 export async function addNetworkPlusRequestParticipant(requestId,userId,input,requestIdHeader) {

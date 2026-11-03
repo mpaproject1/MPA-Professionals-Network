@@ -152,7 +152,7 @@ export async function dispatchPendingVerificationEmails({ limit = 20, onlyTokenI
     await tx.query("update email_verification_delivery d set status='expired',locked_at=null,updated_at=now() from email_verification_token t where t.id=d.verification_token_id and (t.consumed_at is not null or t.expires_at<=now()) and d.status in ('pending','processing','failed')");
     await tx.query("update email_verification_delivery set status='pending',locked_at=null,next_attempt_at=least(next_attempt_at,now()),updated_at=now() where status='processing' and locked_at<now()-interval '5 minutes'");
     const selected = (await tx.query(
-      `select d.id,d.verification_token_id,d.encrypted_token,d.encryption_iv,d.encryption_tag,
+      `select d.id,d.verification_token_id,d.encrypted_token,d.encryption_iv,d.encryption_tag,d.attempts,
               t.expires_at,t.consumed_at,u.email,u.registration_reference,p.first_name
        from email_verification_delivery d
        join email_verification_token t on t.id=d.verification_token_id
@@ -182,8 +182,14 @@ export async function dispatchPendingVerificationEmails({ limit = 20, onlyTokenI
       });
       results.push({ tokenId: job.verification_token_id, ...result });
     } catch (error) {
-      await db.query("update email_verification_delivery set status='failed',locked_at=null,last_error=$2,last_error_code=$3,updated_at=now() where id=$1 and status='processing'", [job.id, String(error?.message || "Delivery failed").slice(0,500), String(error?.code || "DELIVERY_FAILED").slice(0,100)]);
-      results.push({ tokenId: job.verification_token_id, sent: false, errorCode: error?.code || "DELIVERY_FAILED" });
+      const classification=classifyEmailDeliveryError(error),attempt=Number(job.attempts||0)+1;
+      const exhausted=!classification.retryable||attempt>=8;
+      await withTransaction(async tx=>{
+        await tx.query("update email_verification_delivery set status='failed',attempts=$2,next_attempt_at=$3,locked_at=null,last_error=$4,last_error_code=$5,updated_at=now() where id=$1 and status='processing'",[job.id,attempt,exhausted?new Date(Date.now()+3650*86400000):new Date(Date.now()+emailRetryDelaySeconds(attempt)*1000),String(error?.message||"Delivery failed").slice(0,500),classification.code]);
+        await tx.query("update email_verification_token set delivery_attempted_at=now(),delivery_status='failed',delivery_error_code=$2 where id=$1 and consumed_at is null",[job.verification_token_id,classification.code]);
+        await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) select user_id,'email.verification.delivery_failed','email_verification_token',$1,$2,$3 from email_verification_token where id=$1",[job.verification_token_id,exhausted?"failure":"retry_scheduled",{deliveryId:job.id,code:classification.code,attempt,retryable:!exhausted}]);
+      });
+      results.push({ tokenId: job.verification_token_id, sent: false, errorCode: classification.code, retryScheduled: !exhausted });
     }
   }
   return { processed: results.length, results };

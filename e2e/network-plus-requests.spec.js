@@ -182,3 +182,30 @@ test.describe("Network-Plus request and collaboration journey",()=>{
   });
 
 });
+
+
+  test("requester records a closure remark, reopens the connection and sees preserved disposition history",async({page})=>{
+    await mockSession(page);
+    let current={...draft,status:"submitted",isRequester:true,is_requester:true,requester_disposition:"in_progress",requester_disposition_remark:null,events:[]};
+    const response=()=>({data:current});
+    await page.route("**/api/v1/network-plus/requests",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[current]})}));
+    await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(response())}));
+    await page.route("**/api/v1/network-plus/requests/request-1/disposition",async route=>{
+      const payload=route.request().postDataJSON();
+      const previous=current.requester_disposition;
+      current={...current,requester_disposition:payload.disposition,requester_disposition_remark:payload.remark,events:[...current.events,{event_code:previous!=="in_progress"&&payload.disposition==="in_progress"?"request.disposition_reopened":"request.disposition_updated",metadata:{previousDisposition:previous,disposition:payload.disposition}}]};
+      await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(response())});
+    });
+    await page.setViewportSize({width:390,height:844});
+    await page.goto("/network-plus/requests");
+    await page.getByRole("button",{name:/Website accessibility review/}).click();
+    await page.getByLabel("Short remark").fill("Contact exchanged; we will continue directly.");
+    await page.getByRole("button",{name:"Mark Completed"}).click();
+    await expect(page.getByText("Completed",{exact:true}).last()).toBeVisible();
+    await expect(page.getByText(/Contact exchanged; we will continue directly/)).toBeVisible();
+    await page.getByLabel("Short remark").fill("Reopening to continue the introduction.");
+    await page.getByRole("button",{name:"Reopen as In progress"}).click();
+    await expect(page.getByText(/Earlier closure history is preserved/)).toBeVisible();
+    expect(current.events.some(event=>event.event_code==="request.disposition_reopened")).toBe(true);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  });

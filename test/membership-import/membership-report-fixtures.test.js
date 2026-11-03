@@ -27,6 +27,8 @@ test("Test Lab membership applications are excluded from management funnel, coho
   const portfolioId = randomUUID();
   let applicationId = null;
   let membershipRecordId = null;
+  let paymentId = null;
+  let paymentLinkId = null;
   const snapshotDate = "2026-12-31";
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date());
   const reviewer = { sub: userId, roles: ["system_admin"], permissions: [] };
@@ -36,6 +38,9 @@ test("Test Lab membership applications are excluded from management funnel, coho
     const beforeAging = await runReport(reviewer, "membership-application-aging", { from: "2020-01-01", to: today, status: "submitted" }, randomUUID());
     const beforeMemberStock = await runReport(reviewer, "membership-status", {}, randomUUID());
     const beforeDirectory = await runReport(reviewer, "member-directory", {}, randomUUID());
+    const beforeCollections = await runReport(reviewer, "membership-collections", { from: "2020-01-01", to: today }, randomUUID());
+    const beforeApprovedPayments = await runReport(reviewer, "approved-payments", { from: "2020-01-01", to: today }, randomUUID());
+    const beforeFinanceSummary = await runReport(reviewer, "finance-summary", { from: "2020-01-01", to: today }, randomUUID());
 
     const application = (await db.query(
       "insert into membership_application(user_id,application_type,membership_product_id,status,submitted_at,data_snapshot,fee_snapshot) values($1,'new',$2,'submitted',now(),$3,$4) returning id",
@@ -47,6 +52,14 @@ test("Test Lab membership applications are excluded from management funnel, coho
       [userId, product.id, "TSTLAB-" + suffix.replace(/-/g, "").slice(0, 12).toUpperCase(), today, "2027-12-31", application.id]
     )).rows[0];
     membershipRecordId = membershipRecord.id;
+    const payment = (await db.query(
+      "insert into payment_transaction(provider,provider_transaction_id,idempotency_key,purpose,amount,currency,status,request_payload,response_payload) values('test-simulator',$1,$2,'test_lab_simulation',$3,$4,'succeeded',$5,$6) returning id",
+      ["QA-" + suffix, "test-lab:" + portfolioId + ":verified-simulation", 1200, "ETB", { testPortfolioId: portfolioId, applicationId: application.id, simulated: true }, { captured: true, noExternalProvider: true }]
+    )).rows[0];
+    paymentId = payment.id;
+    const paymentLink = (await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2) returning id",[application.id,payment.id])).rows[0];
+    paymentLinkId = paymentLink.id;
+
 
 
     const afterApplications = await runReport(reviewer, "membership-applications", { from: "2020-01-01", to: today, status: "submitted" }, randomUUID());
@@ -60,6 +73,13 @@ test("Test Lab membership applications are excluded from management funnel, coho
     const afterDirectory = await runReport(reviewer, "member-directory", {}, randomUUID());
     assert.deepEqual(afterMemberStock.rows, beforeMemberStock.rows, "membership records linked to Test Lab applications must not affect member stock");
     assert.deepEqual(afterDirectory.rows, beforeDirectory.rows, "membership records linked to Test Lab applications must not leak into production-like member exports");
+    const afterCollections = await runReport(reviewer, "membership-collections", { from: "2020-01-01", to: today }, randomUUID());
+    const afterApprovedPayments = await runReport(reviewer, "approved-payments", { from: "2020-01-01", to: today }, randomUUID());
+    const afterFinanceSummary = await runReport(reviewer, "finance-summary", { from: "2020-01-01", to: today }, randomUUID());
+    assert.deepEqual(afterCollections.rows, beforeCollections.rows, "simulated Test Lab payments must not inflate retained collections");
+    assert.deepEqual(afterApprovedPayments.rows, beforeApprovedPayments.rows, "simulated Test Lab payments must not appear as approved payments");
+    assert.deepEqual(afterFinanceSummary.rows, beforeFinanceSummary.rows, "simulated Test Lab payments must not affect Finance management summaries");
+
 
     const snapshot = await captureMembershipMonthEndSnapshot(new Date("2026-12-31T20:55:00.000Z"));
     assert.equal(snapshot.captured, true);
@@ -68,6 +88,8 @@ test("Test Lab membership applications are excluded from management funnel, coho
     assert.equal(Number(snapshotTotals.rows[0].total), expectedRealStock, "month-end snapshots must exclude Test Lab membership records");
 
   } finally {
+    if (paymentLinkId) await db.query("delete from membership_application_payment where id=$1", [paymentLinkId]);
+    if (paymentId) await db.query("delete from payment_transaction where id=$1", [paymentId]);
     if (membershipRecordId) await db.query("delete from membership_record where id=$1", [membershipRecordId]);
     if (applicationId) await db.query("delete from membership_application where id=$1", [applicationId]);
     await db.query("delete from membership_month_end_snapshot where snapshot_date=$1",[snapshotDate]);

@@ -160,4 +160,25 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     await expect(page.getByText("Recipient answer")).toBeVisible();
   });
 
+
+  test("rejects nonexistent and ambiguous local meeting times across DST transitions",async({page})=>{
+    await mockSession(page);
+    const accepted={...draft,intent:"meeting_request",status:"accepted",isRequester:true,canHandoff:true,recipient_user_id:"recipient-1",participants:[
+      {user_id:"requester-1",participant_role:"requester",consent_status:"accepted"},
+      {user_id:"recipient-1",participant_role:"recipient_representative",consent_status:"accepted"},
+    ],meetings:[],clarifications:[]};
+    await page.route("**/api/v1/network-plus/requests",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[accepted]})}));
+    await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:accepted})}));
+    await page.route("**/api/v1/network-plus/requests/request-1/contact-handoff?*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{requestId:"request-1",fields:[]}})}));
+    await page.goto("/network-plus/requests");
+    await page.getByRole("button",{name:/Website accessibility review/}).click();
+    await page.getByLabel("Timezone").fill("America/New_York");
+    await page.getByLabel("Date and time").fill("2026-03-08T02:30");
+    await page.getByRole("button",{name:/Propose meeting/}).click();
+    await expect(page.getByText(/local time does not exist in the selected timezone/i)).toBeVisible();
+    await page.getByLabel("Date and time").fill("2026-11-01T01:30");
+    await page.getByRole("button",{name:/Propose meeting/}).click();
+    await expect(page.getByText(/local time occurs twice in the selected timezone/i)).toBeVisible();
+  });
+
 });

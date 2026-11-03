@@ -1,5 +1,9 @@
 -- Email delivery hardening: event-level idempotency, provider event ledger,
 -- recipient suppression, and immutable template version history.
+alter table notification_outbox add column if not exists delivery_status text not null default 'queued';
+alter table notification_outbox add column if not exists delivered_at timestamptz;
+alter table notification_outbox add column if not exists delivery_event_at timestamptz;
+alter table notification_outbox add column if not exists delivery_event_type text;
 alter table notification_outbox add column if not exists email_event_key text;
 create unique index if not exists uq_notification_outbox_email_event_key
   on notification_outbox(email_event_key) where channel='email' and email_event_key is not null;

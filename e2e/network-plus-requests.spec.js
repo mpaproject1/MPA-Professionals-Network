@@ -140,4 +140,19 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     await expect(page.getByLabel("Date and time")).toBeVisible();
   });
 
+  test("recipient can send one private answer to a question request",async({page})=>{
+    await mockSession(page);
+    const question={...draft,intent:"question",status:"submitted",isRequester:false,isRecipientRepresentative:true,canReview:true,canAccept:true,recipient_response:null,recipient_response_at:null};
+    const answered={...question,recipient_response:"Yes, we can support regional distribution through approved local partners.",recipient_response_at:"2026-11-03T06:00:00.000Z"};
+    await page.route("**/api/v1/network-plus/requests",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[question]})}));
+    await page.route("**/api/v1/network-plus/requests/request-1/answer",async route=>{expect(route.request().method()).toBe("POST");await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:"request-1",recipient_response:answered.recipient_response,recipient_response_at:answered.recipient_response_at}})});});
+    await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:answered})}));
+    await page.goto("/network-plus/requests");
+    await page.getByRole("button",{name:/Website accessibility review/}).click();
+    await expect(page.getByText("Answer the question")).toBeVisible();
+    await page.getByPlaceholder("Write a concise answer to the requester").fill("Yes, we can support regional distribution through approved local partners.");
+    await page.getByRole("button",{name:"Send answer"}).click();
+    await expect(page.getByText("Recipient answer")).toBeVisible();
+  });
+
 });

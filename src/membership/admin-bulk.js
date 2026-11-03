@@ -35,6 +35,7 @@ function cleanRow(row){
  const x=row.raw,errors=[];
  const email=normalizeEmail(x.email),fullName=String(x.full_name||"").trim().replace(/\s+/g," "),membershipNumber=String(x.membership_number||"").trim(),productCode=String(x.product_code||x.membership_type||"").trim().toUpperCase(),status=String(x.status||"").trim().toLowerCase();
  const phone=normalizePhone(x.phone),gender=String(x.gender||"").trim().toLowerCase(),registeredDate=parseDate(x.registered_date||x.start_date);
+ const startDate=parseDate(x.start_date),endDate=parseDate(x.end_date),approved=String(x.approved_membership||"").trim().toLowerCase(),paidAmountText=String(x.amount_paid??x.payment_amount??"").trim(),paidAmount=paidAmountText?Number(paidAmountText):null,paidCurrency=String(x.payment_currency||"").trim().toUpperCase()||null,paymentReference=String(x.payment_reference||"").trim()||null;
  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))errors.push("Enter a valid email address.");
  if(!fullName||fullName.split(" ").length<2)errors.push("Enter first and last name in full_name.");
  if(!membershipNumber)errors.push("Membership number is required.");

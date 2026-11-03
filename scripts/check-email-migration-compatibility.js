@@ -18,7 +18,7 @@ try{
  const identity=(await client.query("select current_database() database_name,current_schema() schema_name")).rows[0];
  if(identity.database_name!==expectedDatabase||identity.schema_name!=="public")throw new Error("Connected database/schema does not match the explicitly approved disposable target.");
  const templateCoverageBefore=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count);
- const verificationBefore=(await client.query("select to_regclass('public.email_verification_delivery') is not null exists, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
+ const verificationBefore=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
  const before=(await client.query(`select
   exists(select 1 from pg_constraint where conname='email_verification_token_delivery_status_check' and pg_get_constraintdef(oid) like '%captured%') has_verification_capture,
   exists(select 1 from information_schema.columns where table_schema='public' and table_name='notification_outbox' and column_name='delivery_status') has_delivery_status,
@@ -38,7 +38,7 @@ try{
  const templateCoverage=(await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count;
  if(templateCoverage!==3)throw new Error("Organization email audience templates were not seeded.");
  const verificationAfter=(await client.query("select to_regclass('public.email_verification_delivery') is not null exists, exists(select 1 from information_schema.columns where table_schema='public' and table_name='email_delivery_event' and column_name='verification_delivery_id') event_link, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
- if(!verificationAfter.exists||!verificationAfter.event_link||verificationAfter.audience!=="all")throw new Error("Verification recovery migration did not create the encrypted job ledger, provider event link and universal verification audience.");
+ if(!verificationAfter.has_delivery_table||!verificationAfter.event_link||verificationAfter.audience!=="all")throw new Error("Verification recovery migration did not create the encrypted job ledger, provider event link and universal verification audience.");
  const after=(await client.query(`select
   exists(select 1 from pg_constraint where conname='email_verification_token_delivery_status_check' and pg_get_constraintdef(oid) like '%captured%') has_verification_capture,
   exists(select 1 from information_schema.columns where table_schema='public' and table_name='notification_outbox' and column_name='delivery_status') has_delivery_status,
@@ -63,7 +63,7 @@ try{
   to_regclass('public.email_template_version') is not null has_versions`)).rows[0];
  for(const key of ["has_verification_capture","has_event_key","has_delivery_status","has_delivered_at","has_delivery_event_at","has_delivery_event_type","has_events","has_holds","has_versions"])if(Boolean(restored[key])!==Boolean(before[key]))throw new Error("Email migration rollback did not restore the original disposable schema baseline: "+key);
  const verificationRestored=(await client.query("select to_regclass('public.email_verification_delivery') is not null exists, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
- if(Boolean(verificationRestored.exists)!==Boolean(verificationBefore.exists)||verificationRestored.audience!==verificationBefore.audience)throw new Error("Verification recovery migration rollback did not restore the disposable schema/template baseline.");
+ if(Boolean(verificationRestored.has_delivery_table)!==Boolean(verificationBefore.has_delivery_table)||verificationRestored.audience!==verificationBefore.audience)throw new Error("Verification recovery migration rollback did not restore the disposable schema/template baseline.");
  const templateCoverageAfter=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count);
  if(templateCoverageAfter!==templateCoverageBefore)throw new Error("Email template coverage migration rollback did not restore the original template baseline.");
  process.stdout.write("Email hardening migration apply/rollback compatibility passed.\n");

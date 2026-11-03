@@ -1,8 +1,17 @@
-import { ArrowRight, BriefcaseBusiness, Building2, Handshake, Network, ShieldCheck } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, Building2, Handshake, Network, ShieldCheck, Store } from "lucide-react";
 import Link from "next/link";
 import { NetworkPlusAccessGuard } from "../../components/network-plus-access-guard";
 
 const workspaces = [
+  {
+    href: "/network-plus/opportunities",
+    className: "np-folder np-folder--opportunities",
+    icon: Store,
+    eyebrow: "Needs · Offers · Product & service profiles",
+    title: "Opportunity mall",
+    description: "Discover professional needs, offers, suppliers, products and services. Publish structured listings from verified business identities.",
+    action: "Explore opportunities",
+  },
   {
     href: "/network",
     className: "np-folder np-folder--members",

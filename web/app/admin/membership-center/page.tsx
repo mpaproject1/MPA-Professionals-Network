@@ -16,8 +16,9 @@ type ReportResult = { report?: { title?: string; definition?: string }; generate
 type Me = { roles?: string[]; permissions?: string[] };
 type Filters = { from: string; to: string; q: string; status: string; memberStatus: string };
 
-const today = () => new Date().toISOString().slice(0, 10);
-const currentYear = () => new Date().getFullYear();
+const addisDateParts = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()).reduce<Record<string, string>>((parts, part) => { if (part.type !== "literal") parts[part.type] = part.value; return parts; }, {});
+const today = () => { const parts = addisDateParts(); return parts.year + "-" + parts.month + "-" + parts.day; };
+const currentYear = () => Number(addisDateParts().year);
 const initialFilters = (): Filters => ({ from: `${currentYear()}-01-01`, to: today(), q: "", status: "", memberStatus: "" });
 const number = (value: unknown) => Number(value || 0);
 const clean = (value: unknown) => String(value ?? "").toLowerCase().replaceAll("_", " ");
@@ -48,7 +49,7 @@ function Kpi({ label, value, detail, icon: Icon, tone = "navy" }: { label: strin
 }
 
 async function downloadReport(token: string, id: string, filters: Filters, format: "csv" | "xlsx") {
-  const params = new URLSearchParams({ format, from: filters.from, to: filters.to, q: filters.q, status: filters.status });
+  const params = new URLSearchParams({ format, from: filters.from, to: filters.to, q: filters.q, status: filters.status, memberStatus: filters.memberStatus });
   const response = await fetch(`/api/v1/admin/reports/${id}/export?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
   if (!response.ok) {
     let message = "The membership report export failed.";

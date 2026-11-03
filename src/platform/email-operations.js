@@ -60,9 +60,10 @@ export async function getEmailOperations(actorId){
  const db=getPool();await requireAdmin(db,actorId);
  const cfg=providerConfig();
  const counts=(await db.query("select status,count(*)::int count from notification_outbox where channel='email' group by status")).rows;
+ const deliveryCounts=(await db.query("select delivery_status status,count(*)::int count from notification_outbox where channel='email' group by delivery_status")).rows;
  const drafts=(await db.query("select count(*)::int count from email_outbox_draft where status='draft'")).rows[0]?.count||0;
  const unread=(await db.query("select count(*)::int count from email_inbox_message where read_at is null and archived_at is null")).rows[0]?.count||0;
- return {connection:{...cfg,environment:process.env.NODE_ENV||"development",sender:cfg.fromConfigured?clean(process.env.EMAIL_FROM,320):null},counts:Object.fromEntries(counts.map(x=>[x.status,x.count])),drafts:Number(drafts),unread:Number(unread)};
+ return {connection:{...cfg,environment:process.env.NODE_ENV||"development",sender:cfg.fromConfigured?clean(process.env.EMAIL_FROM,320):null},counts:Object.fromEntries(counts.map(x=>[x.status,x.count])),deliveryCounts:Object.fromEntries(deliveryCounts.map(x=>[x.status,x.count])),drafts:Number(drafts),unread:Number(unread)};
 }
 export async function listEmailOutbox(actorId,{folder="outbox",limit=100}={}){
  const db=getPool();await requireAdmin(db,actorId);

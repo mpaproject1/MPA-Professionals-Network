@@ -3,9 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
-const [migration,service,server,ui,landing,compatibility] = await Promise.all([
+const [migration,service,requests,server,ui,landing,compatibility] = await Promise.all([
   read("../../db/migrations/20261103130000_network_plus_phase1_needs_offers.sql"),
   read("../../src/network-plus/business-discovery.js"),
+  read("../../src/network-plus/request-collaboration.js"),
   read("../../server.js"),
   read("../../web/app/network-plus/opportunities/page.tsx"),
   read("../../web/app/network-plus/page.tsx"),
@@ -58,6 +59,12 @@ test("discovery filters use parameterized SQL and require verified, approved, pu
   assert.match(query,/location_label/);
   assert.match(query,/s\.audience=any/);
   assert.match(service,/listing_kind category_code/);
+});
+
+test("product profiles remain inquiry-only and respect intake availability",()=>{
+  assert.match(requests,/PRODUCT_PROFILE_DISCOVERY_ONLY/);
+  assert.match(requests,/LISTING_NOT_ACCEPTING_REQUESTS/);
+  assert.match(requests,/supplier_inquiry/);
 });
 
 test("authenticated API exposes taxonomy, directory, owned listings and persistent draft actions",()=>{

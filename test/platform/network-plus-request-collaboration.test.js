@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [migration,alignmentMigration,phase2Migration,service,server,ui,e2e,compatibility,userAdmin,opportunities]=await Promise.all([
+const [migration,alignmentMigration,phase2Migration,service,server,ui,e2e,compatibility,userAdmin,opportunities,notifications,notificationUi]=await Promise.all([
  read("../../db/migrations/20261031120000_network_plus_request_collaboration.sql"),
  read("../../db/migrations/20261103120000_network_plus_phase0_contract_alignment.sql"),
  read("../../db/migrations/20261103140000_network_plus_phase2_connection_handoff.sql"),
@@ -13,7 +13,9 @@ const [migration,alignmentMigration,phase2Migration,service,server,ui,e2e,compat
  read("../../e2e/network-plus-requests.spec.js"),
  read("../../scripts/check-new-migration-compatibility.js"),
  read("../../src/platform/user-admin.js"),
- read("../../web/app/network-plus/opportunities/page.tsx")
+ read("../../web/app/network-plus/opportunities/page.tsx"),
+ read("../../src/platform/notifications.js"),
+ read("../../web/app/notifications/page.tsx")
 ]);
 
 test("Increment 6 schema adds typed requests, explicit participants, immutable events and optional accepted-only workspaces",()=>{
@@ -116,6 +118,12 @@ test("Phase 2 adds lightweight connection intents, encrypted bilateral field con
  assert.match(service,/createNetworkPlusMeetingProposal/);
  assert.match(service,/respondNetworkPlusMeeting/);
  assert.match(service,/WORKSPACE_ELIGIBLE_INTENTS/);
+});
+test("Network-Plus notifications have a dedicated preference category and deep-link to private requests",()=>{
+ assert.match(notifications,/network_plus\.request\./);
+ assert.match(notifications,/type==="network_plus_request"\)return "network_plus"/);
+ assert.match(notifications,/network_plus:"\/network-plus\/requests"/);
+ assert.match(notificationUi,/value:"network_plus",label:"Network-Plus"/);
 });
 test("Phase 2 API and icon-led opportunity actions use the existing private request foundation",()=>{
  for(const route of ["contact-consent","contact-handoff","meetings","clarifications"])assert.ok(server.includes(route));

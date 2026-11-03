@@ -85,6 +85,7 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.ok(worker.includes('const OFFLINE_PUBLIC_ROUTES = ["/", "/mobile", "/about", "/jobs", "/serve-community"]'));
  assert.ok(worker.includes("function offlineNavigationHtml()"));
  assert.ok(worker.includes("await cache.put(url.pathname, response.clone())"));
+ assert.ok(worker.includes('!/private|no-store/i.test(response.headers.get("cache-control") || "")'));
  assert.ok(worker.includes('"/members", "/mentorship", "/learning", "/network-plus", "/track"'));
  assert.ok(notificationsPage.indexOf('id="notification-preferences"')<notificationsPage.indexOf('aria-label="Notification summary"'));
  assert.ok(notificationsPage.includes("<PushNotificationSettings token={token}/>"));

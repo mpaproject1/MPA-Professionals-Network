@@ -239,6 +239,17 @@ async function reconcilePendingEmailDeliveryEvents(db){
    // Lock the ledger row so concurrent dispatchers cannot reconcile it twice.
    const locked=(await tx.query("select id from email_delivery_event where id=$1 and outbox_id is null and processed_at is null for update",[event.id])).rows[0];
    if(!locked)return false;
+   const verification=(await tx.query("update email_verification_delivery set provider_delivery_status=case when provider_delivery_status='complained' then 'complained' when provider_delivery_status='bounced' and $1<>'complained' then 'bounced' else $1 end,delivery_event_at=now(),updated_at=now() where provider_message_id=$2 returning id,verification_token_id",[event.event_type,event.provider_message_id])).rows[0];
+   if(verification){
+    const recipient=(await tx.query("select u.email,t.user_id from email_verification_token t join app_user u on u.id=t.user_id where t.id=$1",[verification.verification_token_id])).rows[0];
+    if(recipient&&(event.event_type==="bounced"||event.event_type==="complained")){
+     const reason=event.event_type==="complained"?"complaint":"hard_bounce";
+     await tx.query("insert into email_recipient_suppression(email_normalized,reason,source,provider_message_id) values($1,$2,$3,$4) on conflict(email_normalized) do update set reason=case when email_recipient_suppression.reason='complaint' then email_recipient_suppression.reason else excluded.reason end,source=excluded.source,provider_message_id=excluded.provider_message_id,created_at=now(),cleared_at=null,cleared_by=null,clear_reason=null",[normalizeEmailAddress(recipient.email),reason,event.provider,event.provider_message_id]);
+    }
+    await tx.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.verification.provider_delivery_event','email_verification_token',$1,'success',$2)",[verification.verification_token_id,{provider:event.provider,providerEventId:event.provider_event_id,eventType:event.event_type}]);
+    await tx.query("update email_delivery_event set verification_delivery_id=$1,processed_at=now() where id=$2",[verification.id,event.id]);
+    return true;
+   }
    const result=await tx.query("update notification_outbox set delivery_status=case when delivery_status='complained' then 'complained' when delivery_status='bounced' and $1<>'complained' then 'bounced' when delivery_status='delivered' and $1='failed' then 'delivered' else $1 end,delivered_at=case when $1='delivered' and delivery_status not in ('bounced','complained') then coalesce(delivered_at,now()) else delivered_at end,delivery_event_at=now(),delivery_event_type=case when delivery_status='complained' then delivery_event_type when delivery_status='bounced' and $1<>'complained' then delivery_event_type else $2 end,delivery_error_code=case when delivery_status='complained' then delivery_error_code when delivery_status='bounced' and $1<>'complained' then delivery_error_code when $1 in ('bounced','complained','failed') then $2 else null end,updated_at=now() where id=(select id from notification_outbox where channel='email' and provider_message_id=$3 order by sent_at desc nulls last,created_at desc limit 1) returning id,recipient,payload,template_code,delivery_status",[event.event_type,event.event_type,event.provider_message_id]);
    const row=result.rows[0];
    if(!row)return false;
@@ -422,7 +433,18 @@ export async function receiveDeliveryWebhook(input,providedSecret){
   if(!recorded)return {matched:true,duplicate:true,providerEventId};
   const result=await tx.query("update notification_outbox set delivery_status=case when delivery_status='complained' then 'complained' when delivery_status='bounced' and $1<>'complained' then 'bounced' when delivery_status='delivered' and $1='failed' then 'delivered' else $1 end,delivered_at=case when $1='delivered' and delivery_status not in ('bounced','complained') then coalesce(delivered_at,now()) else delivered_at end,delivery_event_at=now(),delivery_event_type=case when delivery_status='complained' then delivery_event_type when delivery_status='bounced' and $1<>'complained' then delivery_event_type else $2 end,delivery_error_code=case when delivery_status='complained' then delivery_error_code when delivery_status='bounced' and $1<>'complained' then delivery_error_code when $1 in ('bounced','complained','failed') then $2 else null end,updated_at=now() where id=(select id from notification_outbox where channel='email' and provider_message_id=$3 order by sent_at desc nulls last,created_at desc limit 1) returning id,recipient,payload,template_code,delivery_status,delivered_at",[eventType,eventType,providerMessageId]);
   const row=result.rows[0];
-  if(!row)return {matched:false,providerMessageId,nextAction:"No outbox row matched this provider message ID; the event is retained for reconciliation."};
+  if(!row){
+   const verification=(await tx.query("update email_verification_delivery set provider_delivery_status=case when provider_delivery_status='complained' then 'complained' when provider_delivery_status='bounced' and $1<>'complained' then 'bounced' else $1 end,delivery_event_at=now(),updated_at=now() where provider_message_id=$2 returning id,verification_token_id",[eventType,providerMessageId])).rows[0];
+   if(!verification)return {matched:false,providerMessageId,nextAction:"No outbox or verification delivery matched this provider message ID; the event is retained for reconciliation."};
+   const recipient=(await tx.query("select u.email,t.user_id from email_verification_token t join app_user u on u.id=t.user_id where t.id=$1",[verification.verification_token_id])).rows[0];
+   if(recipient&&(eventType==="bounced"||eventType==="complained")){
+    const reason=eventType==="complained"?"complaint":"hard_bounce";
+    await tx.query("insert into email_recipient_suppression(email_normalized,reason,source,provider_message_id) values($1,$2,$3,$4) on conflict(email_normalized) do update set reason=case when email_recipient_suppression.reason='complaint' then email_recipient_suppression.reason else excluded.reason end,source=excluded.source,provider_message_id=excluded.provider_message_id,created_at=now(),cleared_at=null,cleared_by=null,clear_reason=null",[normalizeEmailAddress(recipient.email),reason,provider,providerMessageId]);
+   }
+   await tx.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.verification.provider_delivery_event','email_verification_token',$1,'success',$2)",[verification.verification_token_id,{provider,providerEventId,eventType}]);
+   await tx.query("update email_delivery_event set verification_delivery_id=$1,processed_at=now() where id=$2",[verification.id,recorded.id]);
+   return {matched:true,verificationDelivery:true,deliveryStatus:eventType};
+  }
   if(eventType==="bounced"||eventType==="complained"){
    const reason=eventType==="complained"?"complaint":"hard_bounce";
    await tx.query("insert into email_recipient_suppression(email_normalized,reason,source,provider_message_id) values($1,$2,$3,$4) on conflict(email_normalized) do update set reason=case when email_recipient_suppression.reason='complaint' then email_recipient_suppression.reason else excluded.reason end,source=excluded.source,provider_message_id=excluded.provider_message_id,created_at=now(),cleared_at=null,cleared_by=null,clear_reason=null",[normalizeEmailAddress(row.recipient),reason,provider,providerMessageId]);

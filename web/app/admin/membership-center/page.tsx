@@ -78,6 +78,7 @@ export default function MembershipCenterPage() {
   const [applications, setApplications] = useState<ReportResult | null>(null);
   const [membership, setMembership] = useState<ReportResult | null>(null);
   const [monthlyApplications, setMonthlyApplications] = useState<ReportResult | null>(null);
+  const [cohortApplications, setCohortApplications] = useState<ReportResult | null>(null);
   const [applicationAging, setApplicationAging] = useState<ReportResult | null>(null);
   const [renewalPipeline, setRenewalPipeline] = useState<ReportResult | null>(null);
   const [reviewerPerformance, setReviewerPerformance] = useState<ReportResult | null>(null);
@@ -117,20 +118,22 @@ export default function MembershipCenterPage() {
         currentPermissions.some(permission => ["membership.review", "membership.activate", "members.view", "members.manage", "reports.view"].includes(permission));
       setRoles(currentRoles);
       setPermissions(currentPermissions);
-      if (!allowed) { setAccess("denied"); setApplications(null); setMembership(null); setMonthlyApplications(null); setApplicationAging(null); setRenewalPipeline(null); setReviewerPerformance(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
+      if (!allowed) { setAccess("denied"); setApplications(null); setMembership(null); setMonthlyApplications(null); setCohortApplications(null); setApplicationAging(null); setRenewalPipeline(null); setReviewerPerformance(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
 
-      const [appResult, memberResult, monthlyResult, agingResult, renewalResult] = await Promise.all([
+      const [appResult, memberResult, monthlyResult, cohortResult, agingResult, renewalResult] = await Promise.all([
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status }) }, token),
         // Current member stock is deliberately unbounded by the application-period filter.
         api<ReportResult>("/api/v1/admin/reports/membership-status/run", { method: "POST", body: JSON.stringify({ q: nextFilters.q, status: nextFilters.memberStatus }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status, groupBy: "month" }) }, token),
+        api<ReportResult>("/api/v1/admin/reports/membership-application-cohorts/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-application-aging/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, status: nextFilters.status, q: nextFilters.q }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-renewal-pipeline/run", { method: "POST", body: JSON.stringify({ q: nextFilters.q, memberStatus: nextFilters.memberStatus }) }, token),
       ]);
-      if (!Array.isArray(appResult?.rows) || !Array.isArray(memberResult?.rows) || !Array.isArray(monthlyResult?.rows) || !Array.isArray(agingResult?.rows) || !Array.isArray(renewalResult?.rows)) throw new Error("Membership reporting returned an incomplete response. No KPI values have been inferred.");
+      if (!Array.isArray(appResult?.rows) || !Array.isArray(memberResult?.rows) || !Array.isArray(monthlyResult?.rows) || !Array.isArray(cohortResult?.rows) || !Array.isArray(agingResult?.rows) || !Array.isArray(renewalResult?.rows)) throw new Error("Membership reporting returned an incomplete response. No KPI values have been inferred.");
       setApplications(appResult);
       setMembership(memberResult);
       setMonthlyApplications(monthlyResult);
+      setCohortApplications(cohortResult);
       setApplicationAging(agingResult);
       setRenewalPipeline(renewalResult);
       setGeneratedAt(appResult.generatedAt || memberResult.generatedAt || "");
@@ -154,6 +157,7 @@ export default function MembershipCenterPage() {
       setApplications(null);
       setMembership(null);
       setMonthlyApplications(null);
+      setCohortApplications(null);
       setApplicationAging(null);
       setRenewalPipeline(null);
       setReviewerPerformance(null);
@@ -237,7 +241,7 @@ export default function MembershipCenterPage() {
     </nav>
     {error && <Card><OperationStatus state="error" title="Membership data could not be fully verified" detail={error} action={<button className="btn btn-ghost" type="button" onClick={() => void load(filters)}>Retry</button>} /></Card>}
     <section className={styles.filterPanel} aria-label="Membership report filters">
-      <div className={styles.filterTitle}><div><strong>Reporting period</strong><span>The date range filters application submission/creation and queue-ageing reports. Current member stock remains a snapshot; the renewal pipeline remains a rolling 90-day expiry view. Search and the relevant lifecycle status are applied to each supported report.</span></div><Badge tone="slate">Calendar reporting filters</Badge></div>
+      <div className={styles.filterTitle}><div><strong>Reporting period</strong><span>The date range filters application cohorts and queue-ageing reports using Addis Ababa civil dates. Current member stock is a snapshot; renewal is a rolling 90-day expiry view. Cohort conversion counts only cohorts mature enough for each 30/90-day observation window.</span></div><Badge tone="slate">Calendar reporting filters</Badge></div>
       <div className={styles.filters}>
         <label>From<input type="date" value={filters.from} onChange={event => setFilters(current => ({ ...current, from: event.target.value }))}/></label>
         <label>To<input type="date" value={filters.to} onChange={event => setFilters(current => ({ ...current, to: event.target.value }))}/></label>

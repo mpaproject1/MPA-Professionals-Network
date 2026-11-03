@@ -142,20 +142,24 @@ export async function createTestPortfolio(identity,input={},requestId=null){
 }
 export async function exportTestPortfolioAccounts(identity,portfolioId){
  requireSystemAdmin(identity);const db=getPool();await assertSafeEnvironment(db);
- const p=(await db.query("select id,name,branch_ref,commit_sha,expires_at,status from test_portfolio where id=$1",[portfolioId])).rows[0];
- if(!p||p.status!=="active")throw fail(404,"Active test portfolio not found.","NOT_FOUND");
- const rows=(await db.query("select user_id,email,display_name,persona,role_code from test_portfolio_account where portfolio_id=$1 order by role_code,email",[portfolioId])).rows;
- if(!rows.length)throw fail(404,"This portfolio has no active test accounts.","NOT_FOUND");
- const credentials=rows.map(row=>({email:row.email,password:randomPassword(),displayName:row.display_name,persona:row.persona,role:row.role_code}));
- for(const account of credentials){
-  const source=rows.find(row=>row.email===account.email);
-  await db.query("update app_user set password_hash=$1,updated_at=now() where id=$2 and status='active'",[hashPassword(account.password),source.user_id]);
- }
- const userIds=rows.map(row=>row.user_id);
- if(userIds.length)await db.query("update auth_session set revoked_at=coalesce(revoked_at,now()) where user_id=any($1::uuid[]) and revoked_at is null",[userIds]);
- const workbookRows=credentials.map(row=>({Email:row.email,Password:row.password,"Display name":row.displayName,Persona:row.persona,Role:row.role,"Sign-in URL":process.env.TEST_LAB_SIGN_IN_URL||"Set TEST_LAB_SIGN_IN_URL","Portfolio":p.name,"Expires":new Date(p.expires_at).toISOString(),"Instructions":"Development/test only. Credentials were regenerated for this export. Do not reuse this password. Delete workbook after testing."}));
+ const credentials=await withTransaction(async tx=>{
+  const p=(await tx.query("select id,name,expires_at,status from test_portfolio where id=$1 for update",[portfolioId])).rows[0];
+  if(!p||p.status!=="active")throw fail(404,"Active test portfolio not found.","NOT_FOUND");
+  const rows=(await tx.query("select a.user_id,a.email,a.display_name,a.persona,a.role_code,u.status account_status from test_portfolio_account a join app_user u on u.id=a.user_id where a.portfolio_id=$1 order by a.role_code,a.email for update of u",[portfolioId])).rows;
+  if(!rows.length)throw fail(404,"This portfolio has no test accounts.","NOT_FOUND");
+  if(rows.some(row=>row.account_status!=="active"))throw fail(409,"One or more test accounts are expired or disabled. Create a fresh portfolio instead of reactivating expired credentials.","TEST_ACCOUNTS_INACTIVE");
+  const generated=rows.map(row=>({...row,password:randomPassword()}));
+  for(const account of generated){
+   const updated=await tx.query("update app_user set password_hash=$1,updated_at=now() where id=$2 and status='active'",[hashPassword(account.password),account.user_id]);
+   if(updated.rowCount!==1)throw fail(409,"A test account changed state while credentials were being regenerated. No workbook was issued.","TEST_ACCOUNT_CHANGED");
+  }
+  const userIds=rows.map(row=>row.user_id);
+  await tx.query("update auth_session set revoked_at=coalesce(revoked_at,now()) where user_id=any($1::uuid[]) and revoked_at is null",[userIds]);
+  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,'test_lab.credentials.regenerated','test_portfolio',$2,'success',$3)",[identity.sub,portfolioId,{accountCount:rows.length,format:"xlsx",sessionsRevoked:true}]);
+  return generated.map(row=>({email:row.email,password:row.password,displayName:row.display_name,persona:row.persona,role:row.role_code,expiresAt:p.expires_at,portfolioName:p.name}));
+ });
+ const workbookRows=credentials.map(row=>({Email:row.email,Password:row.password,"Display name":row.displayName,Persona:row.persona,Role:row.role,"Sign-in URL":process.env.TEST_LAB_SIGN_IN_URL||"Set TEST_LAB_SIGN_IN_URL","Portfolio":row.portfolioName,"Expires":new Date(row.expiresAt).toISOString(),"Instructions":"Development/test only. Credentials were regenerated for this export. All previous passwords and sessions are invalid. Do not reuse this password. Delete workbook after testing."}));
  const buffer=createXlsx(workbookRows,Object.keys(workbookRows[0]));
- await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,'test_lab.credentials.regenerated','test_portfolio',$2,'success',$3)",[identity.sub,portfolioId,{accountCount:rows.length,format:"xlsx"}]);
  return {buffer,filename:`mpa-test-accounts-${portfolioId.slice(0,8)}.xlsx`};
 }
 export async function previewTestPortfolioReset(identity,portfolioId){

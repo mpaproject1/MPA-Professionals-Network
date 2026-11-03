@@ -23,12 +23,18 @@ test("registration mode switch presents organization representative and legal-en
 test("email operations APIs reject unauthenticated access",async()=>{
  const api=await playwrightRequest.newContext({baseURL:API_BASE});
  try{
-  for(const path of ["/api/v1/admin/email/operations","/api/v1/admin/email/messages?folder=failed","/api/v1/admin/email/templates","/api/v1/admin/email/recipient-holds"]){
+  for(const path of ["/api/v1/admin/email/operations","/api/v1/admin/email/messages?folder=failed","/api/v1/admin/email/templates","/api/v1/admin/email/recipient-holds","/api/v1/admin/email/templates/account.email_verification/versions"]){
    const response=await api.get(path);
    expect(response.status(),path).toBe(401);
   }
   const preview=await api.post("/api/v1/admin/email/preview",{data:{subjectTemplate:"Preview",textTemplate:"Hello {{firstName}}",htmlTemplate:"<p>Hello {{firstName}}</p>"}});
   expect(preview.status()).toBe(401);
+  const restore=await api.post("/api/v1/admin/email/templates/account.email_verification/versions/1/restore");
+  expect(restore.status()).toBe(401);
+  const updateDraft=await api.put("/api/v1/admin/email/drafts/00000000-0000-0000-0000-000000000001",{data:{recipient:"qa@example.org",subject:"QA",textBody:"Test"}});
+  expect(updateDraft.status()).toBe(401);
+  const cancelDraft=await api.post("/api/v1/admin/email/drafts/00000000-0000-0000-0000-000000000001/cancel");
+  expect(cancelDraft.status()).toBe(401);
  }finally{await api.dispose();}
 });
 

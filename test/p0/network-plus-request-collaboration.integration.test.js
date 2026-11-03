@@ -155,6 +155,17 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   contact=await requests.getNetworkPlusContactHandoff(handoffRequest.id,requester.user.id,recipient.user.id);
   assert.equal(contact.fields[0].released,false);
   assert.equal(contact.fields[0].sharedWithYou,null);
+  const encryptedEmail=(await db.query("select requester_value_ciphertext,recipient_value_ciphertext from network_plus_request_contact_consent where request_id=$1 and recipient_user_id=$2 and field_code='email'",[handoffRequest.id,recipient.user.id])).rows[0];
+  assert.match(encryptedEmail.requester_value_ciphertext,/^v1\./);
+  assert.notEqual(encryptedEmail.requester_value_ciphertext,requesterEmail);
+  assert.notEqual(encryptedEmail.recipient_value_ciphertext,null);
+  await requests.updateNetworkPlusContactConsent(handoffRequest.id,requester.user.id,{peerUserId:recipient.user.id,field:"phone",decision:"accept",value:"+251911222333"},requestRef);
+  await requests.updateNetworkPlusContactConsent(handoffRequest.id,recipient.user.id,{field:"phone",decision:"accept",value:"+251922333444"},requestRef);
+  await db.query("update network_plus_request_contact_consent phone set requester_value_ciphertext=email.requester_value_ciphertext from network_plus_request_contact_consent email where phone.request_id=$1 and phone.recipient_user_id=$2 and phone.field_code='phone' and email.request_id=phone.request_id and email.recipient_user_id=phone.recipient_user_id and email.field_code='email'",[handoffRequest.id,recipient.user.id]);
+  await assert.rejects(()=>requests.getNetworkPlusContactHandoff(handoffRequest.id,requester.user.id,recipient.user.id),e=>e.code==="CONTACT_DATA_AUTHENTICATION_FAILED");
+  const contactNotices=await db.query("select body,payload from notification_event where resource_type='network_plus_request' and resource_id=$1 and event_code like 'network_plus.request.contact_%'",[handoffRequest.id]);
+  assert.ok(contactNotices.rows.length>0);
+  assert.ok(contactNotices.rows.every(row=>!String(row.body||"").includes(requesterEmail)&&!JSON.stringify(row.payload||{}).includes(requesterEmail)&&!String(row.body||"").includes(recipientEmail)&&!JSON.stringify(row.payload||{}).includes(recipientEmail)));
   const meetingTime=new Date(Date.now()+48*60*60*1000).toISOString();
   const meeting=await requests.createNetworkPlusMeetingProposal(handoffRequest.id,requester.user.id,{peerUserId:recipient.user.id,placeType:"online",placeDetails:"Video call to be arranged outside the platform.",startsAt:meetingTime,timezone:"Africa/Addis_Ababa",durationMinutes:30},requestRef,randomUUID()+randomUUID());
   assert.equal(meeting.status,"proposed");

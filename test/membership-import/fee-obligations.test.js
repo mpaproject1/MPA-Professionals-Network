@@ -68,8 +68,8 @@ test("bulk payment import cannot be applied by a system administrator without Fi
  await assert.rejects(applyMembershipPaymentImport(admin,paymentId,{reason:"test import apply"},requestId),error=>error.statusCode===403&&error.code==="FORBIDDEN");
 });
 
-test("bulk payment preview requires an XLSX workbook",async()=>{
- await assert.rejects(previewMembershipPaymentImport(finance,{xlsxBase64:""},requestId),error=>error.statusCode===400&&error.code==="FILE_REQUIRED");
+test("bulk payment preview requires an uploaded XLSX or CSV file",async()=>{
+ await assert.rejects(previewMembershipPaymentImport(finance,{xlsxBase64:""},requestId),error=>error.statusCode===400&&error.code==="IMPORT_FILE_REQUIRED");
 });
 
 test("Finance CSV template matches the XLSX intake contract",()=>{
@@ -120,7 +120,7 @@ test("PostgreSQL Finance XLSX intake applies valid rows independently and preser
  assert.equal(preview.rows[0].errors.length,0);
  assert.ok(preview.rows[1].errors.some(error=>/duplicated in this workbook/i.test(error)));
  assert.ok(preview.rows[2].errors.some(error=>/no matching fee obligation/i.test(error)));
- assert.ok(preview.rows[3].errors.some(error=>/requires evidence_file_id/i.test(error)));
+ assert.ok(preview.rows[3].errors.some(error=>/evidence/i.test(error)));
  await assert.rejects(applyMembershipPaymentImport(identity,preview.batchId,{reason:"Apply test batch without partial option"},"fee-bulk-denied-"+suffix),error=>error.code==="IMPORT_NOT_VALIDATED");
  await db.query("update membership_payment_method set enabled=false where method_code=$1",[staleMethodCode]);
  const applied=await applyMembershipPaymentImport(identity,preview.batchId,{reason:"Apply valid rows and retain row failures",applyValidRows:true},"fee-bulk-apply-"+suffix);

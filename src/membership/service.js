@@ -693,6 +693,7 @@ export async function captureMembershipMonthEndSnapshot(now=new Date()){
      when mr.status='active' and mr.end_date is not null and mr.end_date<$1::date then 'expired'
      else mr.status end effective_status
     from membership_record mr left join membership_product mp on mp.id=mr.membership_product_id
+    where not exists(select 1 from membership_application test_app where test_app.id=mr.application_id and coalesce(test_app.data_snapshot->>'testPortfolioId','')<>'')
    ) current_membership
    group by effective_status,coalesce(product_code,'UNSPECIFIED')
    on conflict(snapshot_date,membership_status,product_code) do update

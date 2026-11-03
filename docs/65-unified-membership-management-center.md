@@ -1129,3 +1129,31 @@ The source and migration changes are committed. The latest PR Quality workflow l
 - Added an explicit `Not recorded / outdated reference` option. The stock report distinguishes current published-reference residences from missing or stale residence versions; it does not infer location from IP, phone, nationality or free text.
 - The selected unit matches the stored country or one of the administrative hierarchy IDs. Street/address fields are never used in aggregate filters. Unknown unit IDs return no matching members rather than widening the query.
 - The geography filter currently scopes current member stock only. Application cohorts and month-end historical snapshots do not claim a residence dimension; historical geography must be versioned into those analytics before such filters can be applied consistently.
+
+## 31. Additional pre-CI completion — reporting, geography, saved views and fixture isolation (2026-11-03)
+
+- Added the Membership Center's 30/90-day cohort conversion views with mature cohort denominators. These are explicitly separate from application/event-period throughput.
+- Added a forward-only month-end membership stock snapshot. The current status/event history is incomplete for reliable historical reconstruction because expiry and payment-reversal status changes do not consistently produce a complete status-history stream. The additive snapshot table is captured during the final five minutes of each Addis Ababa civil month under an advisory lock; repeat capture replaces the same month's groups. The dashboard reports only actual snapshots and does not interpolate missing months or backfill unsupported history.
+- Added a published-reference residence filter for current member stock. It supports country, region, federal city and any available child units, parent-aware labels, and a distinct not-recorded/outdated-reference filter. It matches normalized hierarchy IDs only and never uses street address, IP, telephone prefix or free text. Application cohort and month-end snapshot reports do not currently claim historical residence filtering.
+- Added personal saved membership report filters using the existing saved-view API. Saved filters retain date range, application stage, member status and selected residence unit. Report export requests now preserve the same member-status and residence filter parameters as the dashboard.
+- Standardized report date-time boundaries and export metadata on Africa/Addis_Ababa. CSV, XLSX and PDF outputs identify the reporting timezone; date-only payment dates remain date values.
+- Excluded Test Lab synthetic membership applications from application funnel, cohort, ageing, reviewer performance, outstanding payment, support queue, member stock, member directory, renewal, fee-obligation, disposition and month-end snapshot reporting. Test-simulator transactions are excluded from payment/Finance aggregates; synthetic manual donation receipts are excluded through the Test Lab record registry.
+- Registered Test Lab membership applications, their review/correction child rows and synthetic finance donation receipts in the portfolio-scoped cleanup ledger so reset can delete them child-first. Added integration coverage to assert Test Lab applications and payment simulations do not change production-like membership or Finance report totals.
+- Added explicit authorization-helper tests for the system-admin / Finance / membership-reviewer permission boundary, and an idempotent payment-reversal retry assertion.
+- Updated the member-expiry worker to use the Addis Ababa civil date, matching the dashboard, renewal pipeline and month-end capture calendar.
+
+### Remaining before CI / acceptance
+
+1. Run all new and existing backend tests against disposable PostgreSQL, including the new additive snapshot migration, Test Lab reset registry changes, report filtering and export tests.
+2. Run migration rehearsal from a clean schema and every supported prior migration state; verify the month-end snapshot worker against the migrated schema.
+3. Run Biome, TypeScript, production build and the full Playwright suite on the exact PR #18 head. Complete desktop/mobile, keyboard, touch, accessibility and dark/light browser acceptance.
+4. Verify report totals against source records and Finance totals, verify export row-limit metadata and role masking, and inspect real generated CSV/XLSX files.
+5. Observe the first scheduled month-end snapshot in a running development instance; snapshots are forward-only and no historic month-end values are fabricated.
+
+### Governance / data dependencies still not hard-coded
+
+- Membership renewal grace period and overdue-to-expired policy; approval-to-payment deadline and auto-close policy.
+- First-review, final-decision and Finance-verification SLA targets. Existing reviewer metrics remain descriptive workload/turnaround measures; no target or staff ranking has been invented.
+- Supervisor role and permissions. The current role catalogue has no supervisor role; no role or assignment has been silently added.
+- Verified Ethiopian Zone, Sub-city, District/Woreda and Town reference dataset. Current published levels remain the supported filter choices; missing lower-level records are not fabricated.
+- Ethiopian-calendar display convention, rejected/withdrawn application and export retention rules, historic membership reconstruction before the snapshot migration, and acquisition-cost data for cost-per-acquisition reporting.

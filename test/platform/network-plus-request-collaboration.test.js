@@ -176,7 +176,7 @@ test("migration compatibility and support-role governance include Increment 6",(
 });
 
 test("Phase 2 recipient clarification and question answers revalidate current recipient authority",()=>{
- const ask=service.slice(service.indexOf("export async function askNetworkPlusClarification"),service.indexOf("export async function answerNetworkPlusClarification"));
+ const ask=service.slice(service.indexOf("export async function askNetworkPlusClarification"),service.indexOf("export async function answerNetworkPlusQuestion"));
  const answer=service.slice(service.indexOf("export async function answerNetworkPlusQuestion"),service.indexOf("export async function answerNetworkPlusClarification"));
  const detail=service.slice(service.indexOf("export async function getNetworkPlusRequest"),service.indexOf("export async function addNetworkPlusRequestParticipant"));
  assert.match(ask,/assertRecipientRepresentative\(db,request,userId\)/);
@@ -193,4 +193,10 @@ test("meeting local-time conversion rejects both DST gaps and repeated-hour ambi
  assert.match(ui,/That local time does not exist in the selected timezone/);
  assert.match(ui,/That local time occurs twice in the selected timezone/);
  assert.match(ui,/const candidates=\[\.\.\.offsets\]/);
+});
+
+test("Phase 2 response migration uses a valid PostgreSQL DO block and complete response invariant",()=>{
+ assert.match(migration,/do \$\$[\s\S]*?network_plus_request_recipient_response_complete_check[\s\S]*?end \$\$;/);
+ assert.doesNotMatch(migration,/do \$\s*\n/);
+ assert.match(migration,/intent='question' and recipient_response is not null and recipient_response_by is not null and recipient_response_at is not null/);
 });

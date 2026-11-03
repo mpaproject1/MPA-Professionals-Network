@@ -231,7 +231,7 @@ test("Member workspace preserves non-member profile and public-feature access an
   assert.match(page, /Your next step, in one place/);
   assert.match(page, /Sign in to see your own membership status, profile progress and recent requests/);
   assert.match(page, /\/api\/v1\/me/);
-  assert.match(page, /\/api\/v1\/me\/application-tracking/);
+  assert.match(page, /\/api\/v1\/me\/progress\?limit=5/);
   assert.match(page, /\/api\/v1\/membership\/applications\/me/);
   assert.match(page, /\/api\/v1\/membership\/history/);
   assert.match(page, /\/api\/v1\/notifications/);

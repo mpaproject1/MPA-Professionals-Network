@@ -298,13 +298,35 @@ function normalizeStructuredAttributes(value) {
   if(typeof attributes!=="object"||Array.isArray(attributes))fail(400,"Category details must be a structured object.","VALIDATION_ERROR");
   if(JSON.stringify(attributes).length>8000)fail(400,"Category details are too large.","PAYLOAD_TOO_LARGE");
   const visit=(node,key="")=>{
-    if(/email|phone|mobile|whatsapp|telegram|contact|address_text/i.test(key))fail(400,"Private contact details cannot be included in public listing attributes.","PUBLIC_CONTACT_DETAILS_FORBIDDEN");
+    if(/email|phone|mobile|whatsapp|telegram|contact|address/i.test(key))fail(400,"Private contact details cannot be included in public listing attributes.","PUBLIC_CONTACT_DETAILS_FORBIDDEN");
     if(typeof node==="string")publicText(node,1000,"Category detail",{min:0});
     else if(Array.isArray(node))node.forEach(item=>visit(item,key));
     else if(node&&typeof node==="object")for(const [childKey,child] of Object.entries(node))visit(child,childKey);
     else if(node!==null&&typeof node!=="number"&&typeof node!=="boolean")fail(400,"Category detail values must be text, numbers, booleans or lists.","VALIDATION_ERROR");
   };
   visit(attributes); return attributes;
+}
+function normalizePricingDetails(value) {
+  const details=value===undefined||value===null?{}:value;
+  if(!details||typeof details!=="object"||Array.isArray(details)||JSON.stringify(details).length>2000)fail(400,"Pricing disclosures must be a small structured object.","VALIDATION_ERROR");
+  const allowed=new Set(["unitLabel","minimumAmount","maximumAmount","billingPeriod","taxIncluded","feesIncluded","assumptions"]);
+  for(const key of Object.keys(details))if(!allowed.has(key))fail(400,"Unsupported pricing disclosure field.","VALIDATION_ERROR");
+  const output={};
+  if(details.unitLabel!==undefined)output.unitLabel=publicText(details.unitLabel,50,"Price unit",{min:1});
+  for(const key of ["minimumAmount","maximumAmount"])if(details[key]!==undefined&&details[key]!==null&&details[key]!==""){const amount=Number(details[key]);if(!Number.isFinite(amount)||amount<0)fail(400,"Pricing range amounts must be non-negative.","VALIDATION_ERROR");output[key]=amount;}
+  if(details.billingPeriod!==undefined)output.billingPeriod=String(details.billingPeriod);
+  if(details.taxIncluded!==undefined){if(typeof details.taxIncluded!=="boolean")fail(400,"Tax disclosure must be yes or no.","VALIDATION_ERROR");output.taxIncluded=details.taxIncluded;}
+  if(details.feesIncluded!==undefined){if(typeof details.feesIncluded!=="boolean")fail(400,"Fee disclosure must be yes or no.","VALIDATION_ERROR");output.feesIncluded=details.feesIncluded;}
+  if(details.assumptions!==undefined)output.assumptions=publicText(details.assumptions,500,"Pricing assumptions",{min:0});
+  return output;
+}
+function validateListingPricing(row) {
+  const model=row.pricing_model,amount=row.price_amount,currency=row.currency,details=row.pricing_details||{};
+  if(["fixed","hourly"].includes(model)&&(!(amount>0)||!currency||! /^[A-Z]{3}$/.test(currency)))fail(400,"Fixed and hourly pricing require an amount and ISO currency.","PRICING_DISCLOSURE_REQUIRED");
+  if(model==="unit"&&(!(amount>0)||!currency||! /^[A-Z]{3}$/.test(currency)||!details.unitLabel))fail(400,"Unit pricing requires an amount, currency and unit label.","PRICING_DISCLOSURE_REQUIRED");
+  if(model==="subscription"&&(!(amount>0)||!currency||! /^[A-Z]{3}$/.test(currency)||!["weekly","monthly","quarterly","annually"].includes(details.billingPeriod)))fail(400,"Subscription pricing requires an amount, currency and billing period.","PRICING_DISCLOSURE_REQUIRED");
+  if(model==="range"&&(!Number.isFinite(details.minimumAmount)||!Number.isFinite(details.maximumAmount)||details.minimumAmount<0||details.maximumAmount<details.minimumAmount||!currency||! /^[A-Z]{3}$/.test(currency)))fail(400,"Price ranges require valid minimum and maximum amounts and an ISO currency.","PRICING_DISCLOSURE_REQUIRED");
+  if(["free","quote","not_applicable"].includes(model)&&(amount!==null&&amount!==undefined&&Number(amount)!==0))fail(400,"This pricing model cannot include a fixed amount.","PRICING_DISCLOSURE_INVALID");
 }
 async function validateListingTaxonomy(db,category,subcategory,listingKind) {
   if(!LISTING_KINDS.has(listingKind))fail(400,"Choose a supported listing type.","VALIDATION_ERROR");

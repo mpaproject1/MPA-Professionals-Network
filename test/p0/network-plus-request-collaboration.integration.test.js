@@ -107,6 +107,13 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   assert.equal(businessAccepted.status,"accepted");
   await assert.rejects(()=>requests.getNetworkPlusWorkspace(businessRequest.id,requester.user.id),e=>e.code==="NOT_FOUND");
   assert.ok((await requests.createNetworkPlusWorkspace(businessRequest.id,requester.user.id,requestRef)).id);
+  const opportunityRequest=await requests.createNetworkPlusRequest(requester.user.id,{
+    intent:"business_opportunity",recipientUserId:recipient.user.id,subject:"Seed support programme",summary:"Express interest in the regional seed support programme.",
+    details:{},terms:{opportunityType:"Seed grant",eligibility:"Registered small businesses in the target region.",selectionProcess:"Eligibility screening followed by an independent review.",deadline:"2027-01-15",value:"Grant amount determined by the sponsor."}
+  },requestRef,randomUUID()+randomUUID());
+  await requests.submitNetworkPlusRequest(opportunityRequest.id,requester.user.id,requestRef,randomUUID()+randomUUID());
+  await requests.transitionNetworkPlusRequest(opportunityRequest.id,recipient.user.id,{status:"accepted"},requestRef,randomUUID()+randomUUID());
+  await assert.rejects(()=>requests.createNetworkPlusWorkspace(opportunityRequest.id,requester.user.id,requestRef),e=>e.code==="WORKSPACE_NOT_APPLICABLE");
  await db.query("delete from app_user_role where user_id=$1 and role_id=$2",[reviewer.user.id,reviewerRole.id]);
   const support=await register("support-"+suffix),admin=await register("support-admin-"+suffix);
   const supportRole=(await db.query("select id from app_role where role_code=$1",["network_plus_support"])).rows[0];

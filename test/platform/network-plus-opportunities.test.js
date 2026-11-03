@@ -47,6 +47,8 @@ test("taxonomy-driven drafts are owner-authorized, structured, private and resum
   assert.match(service,/validateListingPricing/);
   assert.match(service,/parseOpportunityLocalDateTime/);
   assert.match(service,/SERVICE_AREA_REQUIRED/);
+  assert.match(service,/secondary_tags/);
+  assert.match(service,/INVALID_SECONDARY_TAGS/);
   assert.match(service,/status=case when status in \('published','paused','rejected'\) then 'draft' else status end/);
 });
 
@@ -85,9 +87,15 @@ test("authenticated API exposes taxonomy, directory, owned listings and persiste
 test("opportunity mall and wizard preserve the no-commerce boundary and draft resume contract",()=>{
   assert.match(landing,/href: "\/network-plus\/opportunities"/);
   assert.match(ui,/Opportunity mall/);
-  assert.match(ui,/Step \{step\} of 7/);
+  assert.match(ui,/Step \{step\} of 8/);
   assert.match(ui,/window\.setTimeout/);
   assert.match(ui,/draft_saved_at/);
+  assert.match(ui,/Areas served/);
+  assert.match(ui,/Available remotely/);
+  assert.match(ui,/Service radius/);
+  assert.match(ui,/Secondary tags/);
+  assert.match(ui,/Price range/);
+  assert.match(ui,/Subscription \/ retainer/);
   assert.match(ui,/Draft restored\. Continue where you left off/);
   assert.match(ui,/Resume draft/);
   assert.match(ui,/Edit listing/);

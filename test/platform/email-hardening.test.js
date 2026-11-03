@@ -49,6 +49,11 @@ test("inbound email rejects missing provider IDs instead of creating random dupl
   const source = await read("../../src/platform/email-operations.js");
   assert.match(source, /PROVIDER_MESSAGE_ID_REQUIRED/);
   assert.doesNotMatch(source, /clean\(input\.messageId\|\|input\.id,300\)\|\|randomUUID\(\)/);
+  const inbound = source.slice(source.indexOf("export async function receiveInboundEmail"), source.indexOf("export function verifyResendWebhookSignature"));
+  assert.match(inbound, /withTransaction/);
+  assert.match(inbound, /on conflict\(provider_message_id\) do nothing/);
+  assert.match(inbound, /email\.inbound\.received/);
+  assert.match(inbound, /verifyResendWebhookSignature/);
 });
 
 test("system-managed templates cannot be edited and template revisions are retained", async () => {

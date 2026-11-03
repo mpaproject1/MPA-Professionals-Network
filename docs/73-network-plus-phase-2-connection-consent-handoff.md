@@ -192,3 +192,24 @@ GitHub Actions run [`41405549658`](https://github.com/mpaproject1/MPA-Profession
 **Current-head evidence:** the latest source commit before this documentation correction is `496914dd8a84dcab67f330514709ddf5134770d4`. No GitHub Actions run or commit status has been returned for the Phase 2 source batch or the fixture correction. The earlier run is historical baseline evidence only and must not be represented as validation of the new migration, encryption compatibility, authority/privacy fixes, DST tests or corrected workspace fixture. The current source changes have not yet been executed against disposable PostgreSQL or in the backend/browser suites. The contact-key rotation utility has not been run. No deployed encryption key has been inspected.
 
 **Phase 2 exit status: NOT CLOSED.** Do not start Phase 3 until a run against the current source head proves the Phase 2 migration forward path and rollback, current authorization/privacy, legacy and `v1` encryption behavior, notifications, DST handling, backend suite, Playwright suite, Biome, TypeScript and production build. The current draft PR remains open; no merge or deployment is authorized.
+
+
+## 13. Phase 2 gate disposition and Phase 3 continuation — 2026-11-03
+
+The user explicitly instructed: **skip the Phase 2 CI Action and continue Phase 3 end to end.** This is a scope/sequence waiver only. It does not change the Phase 2 evidence status:
+
+- Phase 2 remains **NOT VERIFIED**. No current-head disposable PostgreSQL migration/rollback, backend, Playwright, Biome, TypeScript, production-build or GitHub Actions pass is asserted.
+- The historical browser fixture correction and the previously documented security/migration source changes remain source-level work pending runtime proof.
+- Phase 3 implementation has proceeded on the same PR #18 draft branch without treating Phase 2 as passed.
+
+Phase 3 source work now includes:
+- Additive requester disposition fields and the distinct `recipient_withdrawn` platform lifecycle state.
+- Requester-only In progress / Completed / Cancelled updates, required short closure remarks, reopen remarks and immutable event-history records.
+- A My Requests list projection that separates initiated requests from received requests and keeps requester-reported disposition/remarks/reminder history private from recipients and additional participants.
+- Recipient-side withdrawal after acceptance, with reason, audit event, notification and closure of an optional collaboration workspace.
+- Seven-day review due dates and a batch in-app reminder dispatcher with transaction locks and a seven-day repeat interval.
+- Regression additions for requester ownership, closure validation, lifecycle/disposition separation, privacy, reopening, recipient withdrawal and reminder dispatch.
+
+The reminder command is `npm run network-plus:dispatch-review-reminders`. A daily host scheduler entry is still an operational setup task; no production cron, secret, deployment or database action was performed.
+
+See the Phase 3 implementation record in document 70 and the continuation record in document 74. Do not mark Phase 2 verified or PR #18 ready for review based on this waiver.

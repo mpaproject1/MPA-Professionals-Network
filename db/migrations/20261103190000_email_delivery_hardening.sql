@@ -1,5 +1,11 @@
 -- Email delivery hardening: event-level idempotency, provider event ledger,
 -- recipient suppression, and immutable template version history.
+alter table email_verification_token
+  drop constraint if exists email_verification_token_delivery_status_check;
+alter table email_verification_token
+  add constraint email_verification_token_delivery_status_check
+  check (delivery_status in ('pending','sent','failed','captured'));
+
 alter table notification_outbox add column if not exists delivery_status text not null default 'queued';
 alter table notification_outbox add column if not exists delivered_at timestamptz;
 alter table notification_outbox add column if not exists delivery_event_at timestamptz;

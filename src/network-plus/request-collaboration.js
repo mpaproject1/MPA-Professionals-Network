@@ -468,6 +468,7 @@ export async function updateNetworkPlusContactConsent(requestId,userId,input,req
   if(!["accept","decline","revoke"].includes(decision))fail(400,"Choose accept, decline or revoke.","INVALID_CONSENT_DECISION");
   return withTransaction(async db=>{
     const pair=await connectionPair(db,requestId,userId,input?.peerUserId);
+    if(decision==="accept"&&!["accepted","in_progress","completed","closed"].includes(pair.request.status))fail(409,"New contact sharing consent is available only after recipient acceptance and before the connection is withdrawn.","INVALID_REQUEST_STATUS");
     const value=decision==="accept"?validateContactValue(field,input?.value):null;
     const status=decision==="accept"?"accepted":decision==="decline"?"declined":"revoked";
     const recipientUserId=pair.side==="requester"?pair.peerUserId:userId;

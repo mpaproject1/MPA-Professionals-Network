@@ -226,7 +226,7 @@ export async function listNetworkPlusRequests(userId,{status,intent,disposition,
     let support=false;
     if(supportReason||supportTicket){if(!supportRequestId)fail(400,"Support access must be scoped to one request record.","SUPPORT_SCOPE_REQUIRED");await assertSupport(db,userId,supportRequestId,supportReason,supportTicket);support=true;} else await assertEntry(db,userId);
     const rows=(await db.query(`select r.id,r.intent,r.status,r.subject,r.summary,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id,r.business_id,r.service_listing_id,r.version,r.created_at,r.updated_at,
-        coalesce((select p.display_name from person p where p.user_id=r.recipient_user_id),(select o.display_name from organization o where o.id=r.recipient_organization_id),(select b.display_name from network_plus_business b where b.id=r.business_id)) as recipient_label,
+        coalesce((select b.display_name from network_plus_business b where b.id=r.business_id),(select o.display_name from organization o where o.id=r.recipient_organization_id),(select p.display_name from person p where p.user_id=r.recipient_user_id)) as recipient_label,
         (select p.display_name from person p where p.user_id=r.requester_user_id) as requester_label,
         case when r.requester_user_id=$1 then r.requester_disposition end as requester_disposition,
         case when r.requester_user_id=$1 then r.requester_disposition_remark end as requester_disposition_remark,

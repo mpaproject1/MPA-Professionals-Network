@@ -139,7 +139,7 @@ const folders: Folder[] = [
   {
     key: "connections",
     title: "Connections",
-    description: "Build relationships and take part in community work.",
+    description: "Build relationships and take part in community work. Organization-scoped volunteer drives and skill dispatch are not implemented as a verified workflow yet.",
     icon: Handshake,
     tone: "connections",
     links: [

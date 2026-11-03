@@ -85,7 +85,7 @@ test("PostgreSQL geography workbook preview, apply, publish, member selectors an
   assert.ok(published.countries.some(row=>row.country_iso3==="ETH"));
   assert.ok(published.regions.some(row=>row.unit_code==="ET-REG-"+suffix));
   await saveMyResidence(userId,{residenceType:"ethiopia",countryCode:"ETH",adminLevel1Code:"ET-REG-"+suffix,localityNote:"Geography integration fixture"},randomUUID());
-  const residenceAudit=await db.query("select 1 from audit_log where actor_user_id=$1 and action='member.residence_updated' and resource_id=$1::text",[userId]);
+  const residenceAudit=await db.query("select 1 from audit_log where actor_user_id=$1 and action='member.residence_updated' and resource_id=$1::uuid::text",[userId]);
   assert.equal(residenceAudit.rowCount,1,"residence changes must persist their audit event");
   const residence=await getMyResidence(userId);
   assert.equal(residence.admin_level_1_code,"ET-REG-"+suffix);

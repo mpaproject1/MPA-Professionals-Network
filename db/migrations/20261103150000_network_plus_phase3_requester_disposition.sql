@@ -33,7 +33,7 @@ end $phase3$;
 -- Existing submitted requests receive a first review date; drafts are not reminded before submission.
 update network_plus_request
    set review_due_at=coalesce(submitted_at,created_at)+interval '7 days'
- where status not in ('draft','completed','closed')
+ where status not in ('draft','closed')
    and requester_disposition='in_progress'
    and review_due_at is null;
 

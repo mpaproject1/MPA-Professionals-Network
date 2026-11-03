@@ -6,6 +6,7 @@ import {useEffect} from "react";
 import {useUiStore} from "../../lib/store";
 
 const memberShortcuts=[
+ {href:"/notifications#notification-preferences",title:"Notification preferences",detail:"Choose your alerts, devices and contribution updates",icon:Bell},
  {href:"/members",title:"My workspace",detail:"Your professional journey and member services",icon:LayoutDashboard},
  {href:"/jobs",title:"Jobs and opportunities",detail:"Discover roles and follow applications",icon:BriefcaseBusiness},
  {href:"/mentorship",title:"Mentorship",detail:"Connect, schedule and track progress",icon:GraduationCap},

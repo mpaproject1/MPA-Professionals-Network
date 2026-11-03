@@ -38,6 +38,12 @@ insert into network_plus_listing_taxonomy(code,parent_code,label,description,lis
 on conflict(code) do update set label=excluded.label,description=excluded.description,listing_kinds=excluded.listing_kinds,field_schema=excluded.field_schema,sort_order=excluded.sort_order,active=true,updated_at=now();
 
 insert into network_plus_listing_taxonomy(code,parent_code,label,description,listing_kinds,field_schema,sort_order) values
+('trade',null,'Trade & distribution','Wholesale, retail supply and distribution.',array['need','offer','product_profile']::text[],'[]'::jsonb,165),
+('manufacturing',null,'Manufacturing','Production, fabrication and industrial manufacturing.',array['need','offer','product_profile','service_profile']::text[],'[]'::jsonb,170),
+('other',null,'Other professional opportunity','A moderated category for supported opportunities not yet represented in the taxonomy.',array['need','offer','product_profile','service_profile']::text[],'[]'::jsonb,999)
+on conflict(code) do update set label=excluded.label,description=excluded.description,listing_kinds=excluded.listing_kinds,field_schema=excluded.field_schema,sort_order=excluded.sort_order,active=true,updated_at=now();
+
+insert into network_plus_listing_taxonomy(code,parent_code,label,description,listing_kinds,field_schema,sort_order) values
 ('software_development','technology','Software development','Application and software engineering.',array['need','offer','service_profile']::text[],'[{"code":"platform","label":"Platform","type":"multiselect","options":["web","mobile","desktop","api","embedded"],"required":true}]'::jsonb,10),
 ('data_analytics','technology','Data & analytics','Data engineering, analytics and reporting.',array['need','offer','service_profile']::text[],'[{"code":"data_need","label":"Data focus","type":"multiselect","options":["engineering","analytics","visualization","governance","ai_ml"],"required":true}]'::jsonb,20),
 ('office_equipment','products_supply','Office & business equipment','Office and operational equipment.',array['need','offer','product_profile']::text[],'[{"code":"condition","label":"Condition","type":"select","options":["new","used","refurbished","not_applicable"],"required":true}]'::jsonb,10),

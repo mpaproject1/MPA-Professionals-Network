@@ -974,7 +974,7 @@ export default function Organizations() {
           <Card id="org-inquiries">
             <div className="row">
               <div>
-                <div className="h2">Public job inquiries</div>
+                <h2 className="h2">Public job inquiries</h2>
                 <p className="muted">
                   First-stage public interest is not a formal eligible
                   application. Only authorized organization users can inspect

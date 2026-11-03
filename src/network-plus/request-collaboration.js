@@ -274,8 +274,8 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const events=(await db.query("select event_code,from_status,to_status,reason,metadata,created_at from network_plus_request_event where request_id=$1 and ($2::boolean or (actor_user_id=$3 and event_code not like 'request.meeting_%' and event_code not like 'request.contact_consent_%')) order by created_at",[requestId,isPrimaryParticipant,userId])).rows;
     const workspace=(await db.query("select * from network_plus_collaboration_workspace where request_id=$1",[requestId])).rows[0]||null;
     const isRecipientRepresentative=participants.some(p=>p.user_id===userId&&p.participant_role==="recipient_representative"&&p.consent_status!=="revoked");
-    const canReview=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.respond_requests")||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));
-    const canAccept=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));
+    const canReview=isRecipientRepresentative&&await hasCurrentRecipientAuthority(db,row,userId,"business.respond_requests");
+    const canAccept=isRecipientRepresentative&&await hasCurrentRecipientAuthority(db,row,userId,"business.accept_terms");
     return { ...row, recipient_response:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response:null, recipient_response_by:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_by:null, recipient_response_at:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_at:null, participants, clarifications, meetings, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative, canReview, canAccept, canHandoff:isPrimaryParticipant };
   });
 }
@@ -343,18 +343,21 @@ function validateContactValue(field,value){
   if(field==="website"){let url;try{url=new URL(v);}catch{fail(400,"Enter a valid HTTPS website URL.","INVALID_CONTACT_VALUE");}if(url.protocol!=="https:")fail(400,"Contact websites must use HTTPS.","INVALID_CONTACT_VALUE");}
   return v;
 }
-async function assertRecipientRepresentative(db,request,userId){
+async function hasCurrentRecipientAuthority(db,request,userId,capability="business.respond_requests"){
   if(request.business_id){
-    if(!await hasBusinessAuthority(db,request.business_id,userId,"business.respond_requests")&&!await hasBusinessAuthority(db,request.business_id,userId,"business.accept_terms"))fail(403,"The recipient representative no longer has authority for this business request.","BUSINESS_AUTHORITY_REQUIRED");
-    return;
+    if(await hasBusinessAuthority(db,request.business_id,userId,capability))return true;
+    return capability==="business.respond_requests"&&hasBusinessAuthority(db,request.business_id,userId,"business.accept_terms");
   }
   if(request.recipient_organization_id){
-    const active=(await db.query("select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true",[request.recipient_organization_id,userId])).rowCount>0;
-    if(!active)fail(403,"The recipient representative no longer has authority for this organization request.","ORGANIZATION_AUTHORITY_REQUIRED");
-    return;
+    return (await db.query("select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true",[request.recipient_organization_id,userId])).rowCount>0;
   }
-  if(request.recipient_user_id===userId){await assertEntry(db,userId);return;}
-  fail(403,"The selected recipient is no longer authorized for this request.","RECIPIENT_AUTHORITY_REQUIRED");
+  if(request.recipient_user_id===userId){
+    return (await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[userId])).rowCount>0;
+  }
+  return false;
+}
+async function assertRecipientRepresentative(db,request,userId){
+  if(!await hasCurrentRecipientAuthority(db,request,userId))fail(403,"The recipient representative no longer has current authority for this request.","RECIPIENT_AUTHORITY_REQUIRED");
 }
 async function connectionPair(db,requestId,userId,peerUserId){
   const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
@@ -492,7 +495,7 @@ export async function askNetworkPlusClarification(requestId,userId,input,request
     if(!["submitted","under_review"].includes(request.status))fail(409,"Clarification can be requested only while a request is awaiting recipient review.","INVALID_REQUEST_STATUS");
     const actor=await participant(db,requestId,userId);
     if(actor.participant_role!=="recipient_representative")fail(403,"Only the recipient representative can request clarification.","RECIPIENT_ONLY");
-    if(request.business_id&&!await hasBusinessAuthority(db,request.business_id,userId,"business.respond_requests")&&!await hasBusinessAuthority(db,request.business_id,userId,"business.accept_terms"))fail(403,"Your business permission does not allow responding to requests.","BUSINESS_AUTHORITY_REQUIRED");
+    await assertRecipientRepresentative(db,request,userId);
     const openClarification=(await db.query("select id from network_plus_request_clarification where request_id=$1 and status='open' limit 1",[requestId])).rows[0];
     if(openClarification)fail(409,"A clarification is already awaiting the requester response.","CLARIFICATION_ALREADY_OPEN");
     const clarification=(await db.query("insert into network_plus_request_clarification(request_id,asked_by,prompt_code,question) values($1,$2,$3,$4) returning *",[requestId,userId,promptCode,question])).rows[0];

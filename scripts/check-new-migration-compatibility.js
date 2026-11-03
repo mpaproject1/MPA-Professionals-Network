@@ -148,6 +148,29 @@ const requiredColumns = [
   ["network_plus_request", "intent", "text"],
   ["network_plus_request", "status", "text"],
   ["network_plus_request", "requester_user_id", "uuid"],
+  ["network_plus_request", "recipient_response", "text"],
+  ["network_plus_request", "recipient_response_by", "uuid"],
+  ["network_plus_request", "recipient_response_at", "timestamptz"],
+  ["network_plus_request_contact_consent", "request_id", "uuid"],
+  ["network_plus_request_contact_consent", "recipient_user_id", "uuid"],
+  ["network_plus_request_contact_consent", "field_code", "text"],
+  ["network_plus_request_contact_consent", "requester_status", "text"],
+  ["network_plus_request_contact_consent", "recipient_status", "text"],
+  ["network_plus_request_contact_consent", "requester_value_ciphertext", "text"],
+  ["network_plus_request_contact_consent", "recipient_value_ciphertext", "text"],
+  ["network_plus_request_meeting", "id", "uuid"],
+  ["network_plus_request_meeting", "request_id", "uuid"],
+  ["network_plus_request_meeting", "status", "text"],
+  ["network_plus_request_meeting", "starts_at", "timestamptz"],
+  ["network_plus_request_meeting", "timezone", "text"],
+  ["network_plus_request_meeting", "idempotency_hash", "text"],
+  ["network_plus_request_meeting", "request_fingerprint", "text"],
+  ["network_plus_request_clarification", "id", "uuid"],
+  ["network_plus_request_clarification", "request_id", "uuid"],
+  ["network_plus_request_clarification", "prompt_code", "text"],
+  ["network_plus_request_clarification", "question", "text"],
+  ["network_plus_request_clarification", "answer", "text"],
+  ["network_plus_request_clarification", "status", "text"],
   ["network_plus_request_participant", "request_id", "uuid"],
   ["network_plus_request_event", "request_id", "uuid"],
   ["network_plus_request_event", "idempotency_hash", "text"],
@@ -738,6 +761,7 @@ try {
     "ux_network_plus_request_event_idempotency",
     "ux_network_plus_collaboration_event_idempotency",
     "ux_network_plus_collaboration_milestone_idempotency",
+    "network_plus_request_contact_consent_pkey",
     "ux_network_plus_request_meeting_active",
     "ux_network_plus_request_meeting_idempotency",
     "ux_serve_community_initiative_idempotency_hash","ux_serve_community_participation_idempotency_hash","ux_serve_community_participation_active","ux_serve_community_legacy_classification_initiative","uq_community_impact_claim_evidence_url","uq_community_impact_claim_active_assignment"
@@ -808,7 +832,8 @@ try {
     ["verification_reference_request","verification_reference_request_verification_status_check",["pending","received","verified","insufficient","disputed","not_verified","needs_clarification"]],
     ["support_conversation_workflow","support_conversation_workflow_priority_check",["low","normal","high","urgent"]],
     ["support_conversation_workflow","support_conversation_workflow_waiting_on_check",["none","member","organization","provider","internal"]],
-    ["mentorship_match","mentorship_match_mentee_consent_status_check",["pending","accepted","declined"]]
+    ["mentorship_match","mentorship_match_mentee_consent_status_check",["pending","accepted","declined"]],
+    ["network_plus_request","network_plus_request_recipient_response_complete_check",["question"]]
   ];
   for (const [table,name,values] of requiredChecks) {
     const row = (await client.query(

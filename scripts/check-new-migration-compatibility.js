@@ -350,7 +350,7 @@ try {
   const networkPlusPhase2TableBaseline=await client.query("select table_name from information_schema.tables where table_schema='public' and table_name=any($1::text[]) order by table_name",[networkPlusPhase2TableNames]);
   const networkPlusPhase2ColumnBaseline=await client.query(
     "select table_name,column_name,udt_name,is_nullable,column_default from information_schema.columns where table_schema='public' and (table_name=any($1::text[]) or (table_name='network_plus_request' and column_name=any($2::text[]))) order by table_name,column_name",
-    [networkPlusPhase2TableNames,["recipient_response","recipient_response_by","recipient_response_at"]]
+    [networkPlusPhase2TableNames,["recipient_response","recipient_response_by","recipient_response_at","requester_disposition","requester_disposition_remark","requester_disposition_updated_at","review_due_at","review_reminder_sent_at","recipient_withdrawn_at"]]
   );
   const networkPlusPhase2ConstraintBaseline=await client.query(
     "select conrelid::regclass::text relation,conname,pg_get_constraintdef(oid) definition,convalidated from pg_constraint where conrelid=any(array['public.network_plus_request'::regclass,'public.network_plus_request_contact_consent'::regclass,'public.network_plus_request_meeting'::regclass,'public.network_plus_request_clarification'::regclass]) order by relation,conname"

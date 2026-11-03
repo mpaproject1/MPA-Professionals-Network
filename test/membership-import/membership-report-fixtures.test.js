@@ -28,7 +28,6 @@ test("Test Lab membership applications are excluded from management funnel, coho
   let applicationId = null;
   let membershipRecordId = null;
   let paymentId = null;
-  let paymentLinkId = null;
   const snapshotDate = "2026-12-31";
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date());
   const reviewer = { sub: userId, roles: ["system_admin"], permissions: [] };
@@ -57,8 +56,7 @@ test("Test Lab membership applications are excluded from management funnel, coho
       ["QA-" + suffix, "test-lab:" + portfolioId + ":verified-simulation", 1200, "ETB", { testPortfolioId: portfolioId, applicationId: application.id, simulated: true }, { captured: true, noExternalProvider: true }]
     )).rows[0];
     paymentId = payment.id;
-    const paymentLink = (await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2) returning id",[application.id,payment.id])).rows[0];
-    paymentLinkId = paymentLink.id;
+    await db.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2)",[application.id,payment.id]);
 
 
 
@@ -88,7 +86,7 @@ test("Test Lab membership applications are excluded from management funnel, coho
     assert.equal(Number(snapshotTotals.rows[0].total), expectedRealStock, "month-end snapshots must exclude Test Lab membership records");
 
   } finally {
-    if (paymentLinkId) await db.query("delete from membership_application_payment where id=$1", [paymentLinkId]);
+    if (paymentId && applicationId) await db.query("delete from membership_application_payment where application_id=$1 and payment_transaction_id=$2", [applicationId,paymentId]);
     if (paymentId) await db.query("delete from payment_transaction where id=$1", [paymentId]);
     if (membershipRecordId) await db.query("delete from membership_record where id=$1", [membershipRecordId]);
     if (applicationId) await db.query("delete from membership_application where id=$1", [applicationId]);

@@ -115,6 +115,7 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.ok(notifications.includes("&& !user.push_enabled")||notifications.includes("&&!user.push_enabled"));
  assert.ok(pushUi.includes("Notification.requestPermission()"));
  assert.ok(pushUi.includes("userVisibleOnly:true"));
+ assert.ok(pushUi.includes('navigator.serviceWorker.getRegistration("/")'));
  assert.ok(pushUi.includes('window.addEventListener("pageshow",refresh)'));
  assert.ok(pushUi.includes('document.addEventListener("visibilitychange",onVisibility)'));
 });

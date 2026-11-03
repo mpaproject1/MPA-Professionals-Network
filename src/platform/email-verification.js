@@ -88,7 +88,7 @@ export async function deliverEmailVerification(message) {
         captured: true
       }
     });
-    await getPool().query("update email_verification_token set delivery_attempted_at=now(),delivery_status='sent',delivery_error_code=null where token_hash=$1 and consumed_at is null",[sha256(message.token)]);
+    await getPool().query("update email_verification_token set delivery_attempted_at=now(),delivery_status='captured',delivery_error_code=null where token_hash=$1 and consumed_at is null",[sha256(message.token)]);
     return { sent: true, captured: true };
   }
   const resendKey = clean(process.env.RESEND_API_KEY);

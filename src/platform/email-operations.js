@@ -72,7 +72,7 @@ export async function listEmailOutbox(actorId,{folder="outbox",limit=100}={}){
  if(folder==="inbox")return (await db.query("select id,provider_message_id,sender,recipients,subject,text_body,received_at,read_at,archived_at from email_inbox_message where archived_at is null order by received_at desc limit $1",[n])).rows;
  if(folder==="verification-failed")return (await db.query("select t.id,u.email recipient,'Email verification delivery failed' subject,coalesce(t.delivery_error_code,'Delivery failed') last_error,t.delivery_attempted_at created_at,'failed' status from email_verification_token t join app_user u on u.id=t.user_id where t.delivery_status='failed' and t.consumed_at is null order by t.delivery_attempted_at desc nulls last limit $1",[n])).rows;
  const status=folder==="sent"?"sent":folder==="queued"?"pending":null;
- const deliveryFilter=folder==="failed"?"delivery_status in ('failed','bounced','complained')":folder==="sent"?"delivery_status in ('sent','delivered')":null;
+ const deliveryFilter=folder==="failed"?"delivery_status in ('failed','bounced','complained')":folder==="sent"?"delivery_status in ('sent','delivered','captured')":null;
  return (await db.query(`select id,recipient,template_code,coalesce(subject,'') subject,coalesce(text_body,payload->>'text','') text_body,status,delivery_status,delivered_at,delivery_event_at,delivery_event_type,attempts,next_attempt_at,provider_message_id,last_error,delivery_error_code,created_at,updated_at,sent_at
  from notification_outbox where channel='email' and ($1::text is null or status=$1) and ($2::text is null or ${deliveryFilter||"true"}) order by created_at desc limit $3`,[status,deliveryFilter,n])).rows;
 }
@@ -125,7 +125,7 @@ export async function saveEmailDraft(actorId,input){
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)||!subject||(!textBody&&!htmlBody))fail(400,"A valid recipient, subject and message body are required.","VALIDATION_ERROR");
  return (await db.query("insert into email_outbox_draft(created_by,recipient,subject,text_body,html_body) values($1,$2,$3,$4,$5) returning id,recipient,subject,text_body,html_body,status,created_at,updated_at",[actorId,recipient,subject,textBody,htmlBody])).rows[0];
 }
-async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,payload,providerMessageId=null,idempotencyKey=null}){
+async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,payload,idempotencyKey=null}){
  htmlBody=renderBrandedEmail({subject,htmlBody,textBody,preheader:subject});
  const stableIdempotencyKey=emailIdempotencyKey(idempotencyKey);
  if(process.env.TEST_LAB_ENABLED==="true"&&process.env.NODE_ENV==="production")fail(403,"Test Lab is forbidden in production; no email was sent.","TEST_LAB_PRODUCTION_BLOCKED");
@@ -204,7 +204,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
    }
    try{
     await captureTestDelivery({channel:"email",recipient:row.recipient,eventCode:row.template_code,payload:{outboxId:row.id,payload:row.payload}});
-    await db.query("update notification_outbox set status='sent',delivery_status='sent',sent_at=now(),provider_message_id='test-capture',last_error=null,locked_at=null,updated_at=now() where id=$1",[row.id]);
+    await db.query("update notification_outbox set status='sent',delivery_status='captured',delivery_event_type='test_capture',delivery_event_at=now(),sent_at=null,provider_message_id='test-capture',last_error=null,locked_at=null,updated_at=now() where id=$1",[row.id]);
     results.push({id:row.id,status:"captured"});
    }catch(error){
     await db.query("update notification_outbox set status='failed',delivery_status='failed',last_error=$2,delivery_error_code='TEST_CAPTURE_FAILED',locked_at=null,updated_at=now() where id=$1",[row.id,clean(error?.message||"Test delivery capture failed",500)]);

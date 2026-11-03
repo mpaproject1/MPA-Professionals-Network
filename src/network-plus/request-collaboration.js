@@ -276,7 +276,7 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const isRecipientRepresentative=participants.some(p=>p.user_id===userId&&p.participant_role==="recipient_representative"&&p.consent_status!=="revoked");
     const canReview=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.respond_requests")||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));
     const canAccept=isRecipientRepresentative&&(!row.business_id||await hasBusinessAuthority(db,row.business_id,userId,"business.accept_terms"));
-    return { ...row, participants, clarifications, meetings, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative, canReview, canAccept, canHandoff:isPrimaryParticipant };
+    return { ...row, recipient_response:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response:null, recipient_response_by:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_by:null, recipient_response_at:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_at:null, participants, clarifications, meetings, events, workspace, isRequester:row.requester_user_id===userId, isRecipientRepresentative, canReview, canAccept, canHandoff:isPrimaryParticipant };
   });
 }
 export async function addNetworkPlusRequestParticipant(requestId,userId,input,requestIdHeader) {
@@ -486,6 +486,25 @@ export async function askNetworkPlusClarification(requestId,userId,input,request
     await audit(db,requestId,userId,"request.clarification_requested",request.status,"clarification_requested",requestIdHeader,{clarificationId:clarification.id,promptCode});
     await notify(db,request.requester_user_id,"network_plus.request.clarification_requested",requestId,"The recipient asked for a clarification. Open the private request to respond.");
     return clarification;
+  });
+}
+export async function answerNetworkPlusQuestion(requestId,userId,input,requestIdHeader){
+  const answer=clean(input?.answer,2000,"Question response",3);
+  assertNoContactFields({answer});
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
+    if(!request)fail(404,"Request not found.","NOT_FOUND");
+    if(request.intent!=="question")fail(409,"Only question requests accept a direct recipient answer.","INVALID_REQUEST_INTENT");
+    if(!["submitted","under_review"].includes(request.status))fail(409,"A question can be answered only while it is awaiting recipient review.","INVALID_REQUEST_STATUS");
+    const actor=await participant(db,requestId,userId);
+    if(actor.participant_role!=="recipient_representative")fail(403,"Only the recipient can answer this question.","RECIPIENT_ONLY");
+    if(request.business_id&&!await hasBusinessAuthority(db,request.business_id,userId,"business.respond_requests")&&!await hasBusinessAuthority(db,request.business_id,userId,"business.accept_terms"))fail(403,"Your business permission does not allow responding to requests.","BUSINESS_AUTHORITY_REQUIRED");
+    if(request.recipient_response_at)fail(409,"A recipient answer has already been recorded for this question.","QUESTION_ALREADY_ANSWERED");
+    const updated=(await db.query("update network_plus_request set recipient_response=$1,recipient_response_by=$2,recipient_response_at=now(),version=version+1,updated_at=now() where id=$3 returning *",[answer,userId,requestId])).rows[0];
+    await audit(db,requestId,userId,"request.question_answered",request.status,request.status,requestIdHeader,{responseLength:answer.length});
+    await notify(db,request.requester_user_id,"network_plus.request.question_answered",requestId,"The recipient answered your question. Review the private request for the response.");
+    return {id:updated.id,recipient_response:updated.recipient_response,recipient_response_by:updated.recipient_response_by,recipient_response_at:updated.recipient_response_at};
   });
 }
 export async function answerNetworkPlusClarification(requestId,clarificationId,userId,input,requestIdHeader){

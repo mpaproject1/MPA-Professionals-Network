@@ -206,6 +206,7 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
       accepted_at=case when $1='accepted' then now() else accepted_at end,declined_at=case when $1='declined' then now() else declined_at end,
       withdrawn_at=case when $1='withdrawn' then now() else withdrawn_at end,completed_at=case when $1='completed' then now() else completed_at end,
       disputed_at=case when $1='disputed' then now() else disputed_at end,closed_at=case when $1='closed' then now() else closed_at end,
+      review_due_at=case when $1='submitted' and requester_disposition='in_progress' then coalesce(review_due_at,now()+interval '7 days') when $1 in ('declined','withdrawn','completed','closed') then null else review_due_at end,
       version=version+1,updated_at=now() where id=$2 returning *`,[to,requestId])).rows[0];
     await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version},idempotencyHash,requestFingerprint);
     if(["disputed","completed","closed"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to; await db.query("update network_plus_collaboration_workspace set status=$1,completed_at=case when $1=$3 then coalesce(completed_at,now()) else completed_at end,closed_at=case when $1=$4 then coalesce(closed_at,now()) else closed_at end,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId,"completed","closed"]); }
@@ -218,18 +219,65 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
     return updated;
   });
 }
-export async function listNetworkPlusRequests(userId,{status,intent,limit=30,offset=0,supportReason,supportTicket,supportRequestId}={}) {
+export async function listNetworkPlusRequests(userId,{status,intent,disposition,requesterOnly=false,limit=30,offset=0,supportReason,supportTicket,supportRequestId}={}) {
   return withTransaction(async db=>{
     let support=false;
     if(supportReason||supportTicket){if(!supportRequestId)fail(400,"Support access must be scoped to one request record.","SUPPORT_SCOPE_REQUIRED");await assertSupport(db,userId,supportRequestId,supportReason,supportTicket);support=true;} else await assertEntry(db,userId);
-    const rows=(await db.query(`select r.id,r.intent,r.status,r.subject,r.summary,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id,r.business_id,r.service_listing_id,r.version,r.created_at,r.updated_at
+    const rows=(await db.query(`select r.id,r.intent,r.status,r.subject,r.summary,r.requester_user_id,r.recipient_user_id,r.recipient_organization_id,r.business_id,r.service_listing_id,r.version,r.created_at,r.updated_at,
+        r.requester_disposition,r.requester_disposition_remark,r.requester_disposition_updated_at,r.review_due_at,
+        (r.requester_user_id=$1) as is_requester
       from network_plus_request r where (${support} or exists(select 1 from network_plus_request_participant p where p.request_id=r.id and p.user_id=$1 and p.consent_status<>'revoked' and (p.participant_role<>'additional_participant' or p.consent_status='accepted')))
       and ($2::text is null or r.status=$2) and ($3::text is null or r.intent=$3) and ($4::uuid is null or r.id=$4::uuid)
-      order by r.updated_at desc limit $5 offset $6`,[userId,status||null,intent||null,supportRequestId||null,Math.min(100,Math.max(1,Number(limit)||30)),Math.max(0,Number(offset)||0)])).rows;
+      and ($7::text is null or r.requester_disposition=$7) and (not $8::boolean or r.requester_user_id=$1)
+      order by case when r.requester_user_id=$1 and r.requester_disposition='in_progress' then 0 else 1 end,r.updated_at desc limit $5 offset $6`,[userId,status||null,intent||null,supportRequestId||null,Math.min(100,Math.max(1,Number(limit)||30)),Math.max(0,Number(offset)||0),disposition||null,Boolean(requesterOnly)])).rows;
     if(support) for(const row of rows) await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,outcome,metadata) values($1,$2,$3,$4,$5,$6)",[userId,"network_plus.request.support_list","network_plus_request",row.id,"success",{reason:supportReason,ticket:supportTicket}]);
     return rows;
   });
 }
+export async function updateNetworkPlusRequestDisposition(requestId,userId,input,requestIdHeader,idempotencyKey) {
+  const disposition=input?.disposition;
+  if(!["in_progress","completed","cancelled"].includes(disposition))fail(400,"Choose In progress, Completed or Cancelled.","INVALID_DISPOSITION");
+  const remark=String(input?.remark??"").trim();
+  if(disposition!=="in_progress"&&(remark.length<5||remark.length>500))fail(400,"A closing remark of 5–500 characters is required when completing or cancelling a request.","CLOSING_REMARK_REQUIRED");
+  if(disposition==="in_progress"&&remark.length>500)fail(400,"The update remark must be 500 characters or fewer.","VALIDATION_ERROR");
+  if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure idempotency key is required.","IDEMPOTENCY_KEY_REQUIRED");
+  const idempotencyHash=hash(idempotencyKey),fingerprint=hash(JSON.stringify({disposition,remark}));
+  return withTransaction(async db=>{
+    await assertEntry(db,userId);
+    await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",["network-plus-disposition:"+requestId+":"+userId+":"+idempotencyHash]);
+    const replay=(await db.query("select request_fingerprint from network_plus_request_event where request_id=$1 and actor_user_id=$2 and idempotency_hash=$3",[requestId,userId,idempotencyHash])).rows[0];
+    if(replay){if(replay.request_fingerprint!==fingerprint)fail(409,"This update key was already used for different disposition content.","IDEMPOTENCY_CONFLICT");return (await db.query("select * from network_plus_request where id=$1",[requestId])).rows[0];}
+    const row=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
+    if(!row||row.requester_user_id!==userId)fail(404,"Request not found.","NOT_FOUND");
+    if(row.status==="draft")fail(409,"Submit the request before recording its connection outcome.","REQUEST_NOT_SUBMITTED");
+    const previous=row.requester_disposition||"in_progress";
+    if(previous===disposition&&String(row.requester_disposition_remark||"")===remark)return row;
+    if(previous!=="in_progress"&&disposition==="in_progress"&&remark.length<5)fail(400,"Add a short remark explaining why this request is being reopened.","REOPEN_REMARK_REQUIRED");
+    const reopened=previous!=="in_progress"&&disposition==="in_progress";
+    const updated=(await db.query(`update network_plus_request set requester_disposition=$1,requester_disposition_remark=$2,
+      requester_disposition_updated_at=now(),review_due_at=case when $1='in_progress' then now()+interval '7 days' else null end,
+      review_reminder_sent_at=null,version=version+1,updated_at=now() where id=$3 returning *`,[disposition,remark||null,requestId])).rows[0];
+    const eventCode=reopened?"request.disposition_reopened":"request.disposition_updated";
+    const metadata={previousDisposition:previous,disposition,remark:remark||null,source:"requester_reported"};
+    await audit(db,requestId,userId,eventCode,row.status,row.status,requestIdHeader,metadata,idempotencyHash,fingerprint);
+    return updated;
+  });
+}
+export async function dispatchNetworkPlusRequestReviewReminders({limit=100}={}) {
+  return withTransaction(async db=>{
+    const due=(await db.query(`select id,requester_user_id from network_plus_request
+      where requester_disposition='in_progress' and review_due_at<=now()
+        and status not in ('draft','completed','closed')
+      order by review_due_at for update skip locked limit $1`,[Math.min(500,Math.max(1,Number(limit)||100))])).rows;
+    for(const row of due){
+      await notify(db,row.requester_user_id,"network_plus.request.review_reminder",row.id,"A gentle reminder to review this connection request. Update its progress or close it with a short remark.");
+      await db.query("update network_plus_request set review_reminder_sent_at=now(),review_due_at=now()+interval '7 days' where id=$1",[row.id]);
+      await db.query("insert into network_plus_request_event(request_id,actor_user_id,event_code,from_status,to_status,metadata) values($1,null,'request.review_reminder_sent',null,null,$2)",[row.id,{source:"scheduled_review_reminder"}]);
+    }
+    return {sent:due.length};
+  });
+}
+
 export async function grantNetworkPlusSupportAccess(requestId,actorUserId,input,requestIdHeader) {
   return withTransaction(async db=>{
     const roles=(await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[actorUserId])).rows.map(row=>row.role_code);

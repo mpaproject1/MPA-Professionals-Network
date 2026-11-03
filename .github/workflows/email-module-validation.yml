@@ -1,0 +1,142 @@
+name: Email module validation (disposable PostgreSQL)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/workstream-3-progress-members-workspace]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: email-module-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  email-validation:
+    name: Email migrations, backend and browser regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: mpa_email_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mpa_email_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/mpa_email_ci
+      JWT_SECRET: mpa-email-ci-only-secret-at-least-32-characters-long
+      DB_POOL_MAX: 5
+      PORT: 3000
+      CORS_ORIGIN: http://127.0.0.1:3001
+      TEST_LAB_ENABLED: "false"
+      TEST_DELIVERY_MODE: capture
+      MIGRATION_CHECK_EXPECTED_DATABASE: mpa_email_ci
+      MIGRATION_CHECK_ALLOW_ROLLBACK: "YES"
+      API_BASE_URL: http://127.0.0.1:3000
+      WEB_BASE_URL: http://127.0.0.1:3001
+      API_SERVER_BASE_URL: http://127.0.0.1:3000
+      NEXT_TELEMETRY_DISABLED: "1"
+      CI: "true"
+    steps:
+      - name: Check out exact branch revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Assert disposable database identity
+        run: |
+          set -euo pipefail
+          test "$(psql "$DATABASE_URL" -X -A -t -v ON_ERROR_STOP=1 -c 'select current_database()')" = "mpa_email_ci"
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'select current_database(), current_user;'
+
+      - name: Apply all repository migrations to disposable PostgreSQL
+        run: npm run migrate
+
+      - name: Exercise email hardening migration apply and rollback gate
+        run: npm run check:migrations:rollback
+
+      - name: Run the complete backend test inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t TEST_FILES < <(find test tests -type f -name '*.test.js' -print 2>/dev/null | sort || true)
+          if (( ${#TEST_FILES[@]} == 0 )); then
+            echo "No backend tests discovered; refusing a false-green run." >&2
+            exit 1
+          fi
+          printf 'Running %s backend test files.\n' "${#TEST_FILES[@]}"
+          node --test "${TEST_FILES[@]}"
+
+      - name: Install Chromium and system dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Start API and web app against disposable PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results playwright-report
+          node server.js > /tmp/mpa-email-api.log 2>&1 &
+          echo $! > /tmp/mpa-email-api.pid
+          npm run dev --workspace @mpa/web -- --hostname 127.0.0.1 > /tmp/mpa-email-web.log 2>&1 &
+          echo $! > /tmp/mpa-email-web.pid
+          ready_api=0
+          ready_web=0
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:3000/healthz >/dev/null; then ready_api=1; fi
+            if curl -fsS http://127.0.0.1:3001/ >/dev/null; then ready_web=1; fi
+            if [[ "$ready_api" == "1" && "$ready_web" == "1" ]]; then break; fi
+            sleep 2
+          done
+          if [[ "$ready_api" != "1" || "$ready_web" != "1" ]]; then
+            echo "API readiness: $ready_api; web readiness: $ready_web" >&2
+            cat /tmp/mpa-email-api.log || true
+            cat /tmp/mpa-email-web.log || true
+            exit 1
+          fi
+
+      - name: Run email operations and verification Playwright regressions
+        run: npx playwright test e2e/email-operations.spec.js --max-failures=0 --reporter=list,html,json
+
+      - name: Upload migration, backend and browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: email-module-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
+            /tmp/mpa-email-api.log
+            /tmp/mpa-email-web.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop disposable app processes
+        if: always()
+        run: |
+          if [[ -f /tmp/mpa-email-api.pid ]]; then kill "$(cat /tmp/mpa-email-api.pid)" 2>/dev/null || true; fi
+          if [[ -f /tmp/mpa-email-web.pid ]]; then kill "$(cat /tmp/mpa-email-web.pid)" 2>/dev/null || true; fi

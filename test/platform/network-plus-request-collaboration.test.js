@@ -196,7 +196,13 @@ test("meeting local-time conversion rejects both DST gaps and repeated-hour ambi
 });
 
 test("Phase 2 response migration uses a valid PostgreSQL DO block and complete response invariant",()=>{
- assert.match(migration,/do \$\$[\s\S]*?network_plus_request_recipient_response_complete_check[\s\S]*?end \$\$;/);
+ assert.match(migration,/do \$phase2\$[\s\S]*?network_plus_request_recipient_response_complete_check[\s\S]*?end \$phase2\$;/);
  assert.doesNotMatch(migration,/do \$\s*\n/);
  assert.match(migration,/intent='question' and recipient_response is not null and recipient_response_by is not null and recipient_response_at is not null/);
+});
+test("request detail hides private handoff data from former recipient representatives",()=>{
+ const detail=service.slice(service.indexOf("export async function getNetworkPlusRequest"),service.indexOf("export async function addNetworkPlusRequestParticipant"));
+ assert.match(detail,/recipientRepresentativeParticipant[\s\S]*?hasCurrentRecipientAuthority/);
+ assert.match(detail,/const isPrimaryParticipant=.*isRecipientRepresentative/);
+ assert.match(detail,/and \$3::boolean and \(proposer_user_id=\$2 or responder_user_id=\$2\)/);
 });

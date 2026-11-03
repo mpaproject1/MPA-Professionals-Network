@@ -122,10 +122,11 @@ export async function seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,
   [offlineProject.id,members[1].userId]
  );
 
- await tx.query(
-  "insert into finance_payment_record(receipt_number,payer_type,payer_name,payer_email,payer_user_id,amount,currency,purpose,payment_method,payment_date,evidence_file_id,notes,status,recorded_by) values($1,'donor','Synthetic QA Donor',$2,$3,2500,'ETB','Synthetic community donation workflow test','bank_transfer',current_date,$4,'Fictional payment evidence; no money was received or transferred.','recorded',$5)",
+ const donation=(await tx.query(
+  "insert into finance_payment_record(receipt_number,payer_type,payer_name,payer_email,payer_user_id,amount,currency,purpose,payment_method,payment_date,evidence_file_id,notes,status,recorded_by) values($1,'donor','Synthetic QA Donor',$2,$3,2500,'ETB','Synthetic community donation workflow test','bank_transfer',current_date,$4,'Fictional payment evidence; no money was received or transferred.','recorded',$5) returning id",
   ["QA-DONATION-"+prefix,"qa.donor."+prefix+"@example.test",members[0].userId,organizationFile,finance.userId]
- );
+ )).rows[0];
+ await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'finance_payment_record',$2)",[portfolioId,donation.id]);
  const campaignDelivery=(await tx.query(
   "select s.id schedule_id,v.id message_version_id from community_campaign_schedule s join community_campaign c on c.id=s.campaign_id join community_campaign_message_version v on v.campaign_id=c.id where c.campaign_key='community-contribution' and s.slot_key='friday_afternoon' order by v.message_number limit 1"
  )).rows[0];

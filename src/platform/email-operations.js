@@ -426,7 +426,9 @@ export async function receiveInboundEmail(input,providedSecret,signatureHeaders=
   if(!expected||!providedSecret||Buffer.byteLength(expected)!==Buffer.byteLength(providedSecret)||!timingSafeEqual(Buffer.from(expected),Buffer.from(providedSecret)))fail(401,"Inbound email webhook is not authorized.","UNAUTHENTICATED");
  }
  const providerMessageId=clean(input.messageId||input.id||payload.email_id||payload.id,300);
- const sender=clean(input.from||input.sender||payload.from||payload.sender,320);
+ const senderRaw=clean(input.from||input.sender||payload.from||payload.sender,320);
+ const senderMatch=senderRaw.match(/<([^<>]+)>/);
+ const sender=normalizeEmailAddress(senderMatch?.[1]||senderRaw);
  if(!providerMessageId)fail(400,"A stable provider message ID is required for inbound email deduplication.","PROVIDER_MESSAGE_ID_REQUIRED");
  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(sender))fail(400,"Inbound sender address is invalid.","VALIDATION_ERROR");
  const rawRecipients=payload.to??input.to;
@@ -469,6 +471,7 @@ export async function receiveDeliveryWebhook(input,providedSecret,signatureHeade
  const providerEventId=clean(input.eventId||input.event_id||input.id,300);
  const rawEventType=clean(input.eventType||input.type,80).toLowerCase();
  const eventType=rawEventType.startsWith("email.")?rawEventType.slice(6):rawEventType;
+ const deliveryStatus=eventType;
  if(["opened","clicked","delivery_delayed","sent","scheduled"].includes(eventType))return {ignored:true,eventType};
  if(!providerMessageId)fail(400,"providerMessageId is required.","VALIDATION_ERROR");
  if(!providerEventId)fail(400,"A stable provider event ID is required for webhook idempotency.","PROVIDER_EVENT_ID_REQUIRED");
@@ -480,7 +483,7 @@ export async function receiveDeliveryWebhook(input,providedSecret,signatureHeade
  return withTransaction(async tx=>{
   const recorded=(await tx.query("insert into email_delivery_event(provider,provider_event_id,provider_message_id,event_type,payload,processed_at) values($1,$2,$3,$4,$5,null) on conflict(provider,provider_event_id) do nothing returning id",[provider,providerEventId,providerMessageId,eventType,{provider}])).rows[0];
   if(!recorded)return {matched:true,duplicate:true,providerEventId};
-  const result=await tx.query("update notification_outbox set delivery_status=case when delivery_status='complained' then 'complained' when delivery_status='bounced' and $1<>'complained' then 'bounced' when delivery_status='delivered' and $1='failed' then 'delivered' else $1 end,delivered_at=case when $1='delivered' and delivery_status not in ('bounced','complained') then coalesce(delivered_at,now()) else delivered_at end,delivery_event_at=now(),delivery_event_type=case when delivery_status='complained' then delivery_event_type when delivery_status='bounced' and $1<>'complained' then delivery_event_type else $2 end,delivery_error_code=case when delivery_status='complained' then delivery_error_code when delivery_status='bounced' and $1<>'complained' then delivery_error_code when $1 in ('bounced','complained','failed') then $2 else null end,updated_at=now() where id=(select id from notification_outbox where channel='email' and provider_message_id=$3 order by sent_at desc nulls last,created_at desc limit 1) returning id,recipient,payload,template_code,delivery_status,delivered_at",[eventType,eventType,providerMessageId]);
+  const result=await tx.query("update notification_outbox set delivery_status=case when delivery_status='complained' then 'complained' when delivery_status='bounced' and $1<>'complained' then 'bounced' when delivery_status='delivered' and $1='failed' then 'delivered' else $1 end,delivered_at=case when $1='delivered' and delivery_status not in ('bounced','complained') then coalesce(delivered_at,now()) else delivered_at end,delivery_event_at=now(),delivery_event_type=case when delivery_status='complained' then delivery_event_type when delivery_status='bounced' and $1<>'complained' then delivery_event_type else $2 end,delivery_error_code=case when delivery_status='complained' then delivery_error_code when delivery_status='bounced' and $1<>'complained' then delivery_error_code when $1 in ('bounced','complained','failed') then $2 else null end,updated_at=now() where id=(select id from notification_outbox where channel='email' and provider_message_id=$3 order by sent_at desc nulls last,created_at desc limit 1) returning id,recipient,payload,template_code,delivery_status,delivered_at",[deliveryStatus,deliveryStatus,providerMessageId]);
   const row=result.rows[0];
   if(!row){
    const verification=(await tx.query("update email_verification_delivery set provider_delivery_status=case when provider_delivery_status='complained' then 'complained' when provider_delivery_status='bounced' and $1<>'complained' then 'bounced' when provider_delivery_status='delivered' and $1='failed' then 'delivered' else $1 end,delivery_event_at=now(),updated_at=now() where provider_message_id=$2 and provider=$3 returning id,verification_token_id",[eventType,providerMessageId,provider])).rows[0];

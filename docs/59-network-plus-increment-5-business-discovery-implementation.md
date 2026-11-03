@@ -13,6 +13,7 @@ Increment 5 establishes the separate Network-Plus commercial Business Discovery 
 - Canonical identities remain `app_user` and `organization`; there is no second person/member/organization table.
 - `professional_profile`, membership, organization verification and organization membership remain authoritative sources for member and organization identity/access.
 - `service_listing` and `service_request` remain the existing service/Serve-Community foundation. Increment 5 adds `network_plus_service_listing`; it does not alter old service records or states.
+- For Network-Plus commercial discovery, `network_plus_business` plus `network_plus_service_listing` is the single canonical business/listing model. Legacy `service_listing` remains in its existing service/Serve-Community domain; do not dual-write, copy or expose it as a second Network-Plus listing source.
 - A business is not automatically verified because its member or organization owner is verified.
 - A listing is not published merely because it was created or submitted.
 - Organization owner/admin roles are checked against the exact owning organization. Project managers require a separate business-scoped capability assignment. Recruiter/read-only roles receive no implicit business mutation authority.

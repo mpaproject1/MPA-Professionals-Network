@@ -268,7 +268,7 @@ export default function FinanceWorkspacePage() {
     <Card>
       <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
         <div><h2 className="h2">Historical member payment verification</h2><p className="muted">Record the original fee due separately from each actual installment. Partial receipts reduce the outstanding balance but do not unlock the account invitation until the fee is fully settled by verified cash or an approved non-cash disposition.</p></div>
-        <Badge tone={legacyPayments.length ? "warning" : "slate"}>{legacyPayments.length} awaiting Finance</Badge>
+        <Badge tone={legacyPayments.length ? "gold" : "slate"}>{legacyPayments.length} awaiting Finance</Badge>
       </div>
       {legacyQueueError ? <OperationStatus state="error" title="Historical payment queue unavailable" detail={legacyQueueError} /> : legacyPayments.length === 0 ? <OperationStatus state="info" title="No imported membership payments awaiting verification" detail="No unverified legacy membership records were returned from the authoritative source." /> : <div className="grid" style={{gap:12}}>
         {legacyPayments.map(item => {
@@ -276,7 +276,7 @@ export default function FinanceWorkspacePage() {
           return <article key={item.membership_id} className="case-row" style={{display:"grid",gap:12}}>
             <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
               <div><strong>{item.member_name || "Imported member"} · {item.membership_number}</strong><p className="muted">{item.email || "No email recorded"} · {item.product_name} ({item.product_code})</p><p className="muted">Imported {dateLabel(item.imported_at)} · Record status {item.membership_status.replaceAll("_"," ")} · Fee due {item.confirmed_fee_amount==null?"not yet confirmed":Number(item.confirmed_fee_amount).toFixed(2)+" "+item.fee_currency} · Outstanding {item.outstanding_balance==null?"not yet calculated":Number(item.outstanding_balance).toFixed(2)+" "+item.fee_currency}</p></div>
-              <Badge tone="warning">{item.invitation_claimed_at ? "Previously claimed · review record" : item.invitation_expires_at ? "Invitation awaiting claim" : "No invitation recorded"}</Badge>
+              <Badge tone="gold">{item.invitation_claimed_at ? "Previously claimed · review record" : item.invitation_expires_at ? "Invitation awaiting claim" : "No invitation recorded"}</Badge>
             </div>
             {canVerify ? <form className="form-stack" onSubmit={event => void verifyLegacyPayment(event,item)}>
               <div className="grid grid-2">

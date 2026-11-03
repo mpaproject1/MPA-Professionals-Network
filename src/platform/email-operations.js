@@ -86,7 +86,10 @@ export async function saveEmailTemplate(actorId,code,input,requestId){
  if(templateCode==="account.email_verification"&&input.enabled===false)fail(400,"Email verification is security-critical and cannot be disabled.","SECURITY_TEMPLATE_REQUIRED");
  const subject=clean(input.subjectTemplate,300),textBody=String(input.textTemplate||"").slice(0,20000),html=String(input.htmlTemplate||"").slice(0,30000);
  if(!/^[a-zA-Z0-9_.-]{2,100}$/.test(templateCode)||!subject||!textBody)fail(400,"Template code, subject and text body are required.","VALIDATION_ERROR");
- const audience=["all","professional","organization_representative","reviewer","administrator","employer","mentor"].includes(input.audience)?input.audience:"all";
+ const allowedAudiences=["all","professional","organization_representative","reviewer","administrator","employer","mentor"];
+ if(input.audience!==undefined&&!allowedAudiences.includes(input.audience))fail(400,"Choose a supported email template audience.","VALIDATION_ERROR");
+ if(input.enabled!==undefined&&typeof input.enabled!=="boolean")fail(400,"Template enabled must be a boolean.","VALIDATION_ERROR");
+ const audience=input.audience||"all";
  return withTransaction(async tx=>{
   const existing=(await tx.query("select adjustable_by_admin from email_notification_template where template_code=$1 for update",[templateCode])).rows[0];
   if(existing&&!existing.adjustable_by_admin)fail(403,"This system-managed email template cannot be edited by an administrator.","TEMPLATE_LOCKED");

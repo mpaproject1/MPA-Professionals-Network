@@ -37,6 +37,7 @@ const migrationNames = [
   "20261031120000_network_plus_request_collaboration.sql",
   "20261103120000_network_plus_phase0_contract_alignment.sql",
   "20261103130000_network_plus_phase1_needs_offers.sql",
+  "20261103140000_network_plus_phase2_connection_handoff.sql",
   "20261031130000_serve_community_initiatives.sql",
   "20261031140000_serve_community_offline_completed_projects.sql",
   "20261031150000_community_impact_detection.sql",
@@ -737,6 +738,8 @@ try {
     "ux_network_plus_request_event_idempotency",
     "ux_network_plus_collaboration_event_idempotency",
     "ux_network_plus_collaboration_milestone_idempotency",
+    "ux_network_plus_request_meeting_active",
+    "ux_network_plus_request_meeting_idempotency",
     "ux_serve_community_initiative_idempotency_hash","ux_serve_community_participation_idempotency_hash","ux_serve_community_participation_active","ux_serve_community_legacy_classification_initiative","uq_community_impact_claim_evidence_url","uq_community_impact_claim_active_assignment"
   ];
   for (const name of requiredUniqueIndexes) {

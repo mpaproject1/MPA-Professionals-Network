@@ -69,7 +69,7 @@ test("bulk payment import cannot be applied by a system administrator without Fi
 });
 
 test("bulk payment preview requires an XLSX workbook",async()=>{
- await assert.rejects(previewMembershipPaymentImport(finance,{xlsxBase64:""},requestId),error=>error.statusCode===400&&error.code==="XLSX_REQUIRED");
+ await assert.rejects(previewMembershipPaymentImport(finance,{xlsxBase64:""},requestId),error=>error.statusCode===400&&error.code==="FILE_REQUIRED");
 });
 
 test("Finance CSV template matches the XLSX intake contract",()=>{
@@ -107,7 +107,7 @@ test("PostgreSQL Finance XLSX intake applies valid rows independently and preser
   {application_id:app.id,membership_number:"",amount:"100",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:evidenceMethodCode,payment_reference:"evidence-required-"+suffix,evidence_reference:"",evidence_file_id:"",payer_note:"Evidence missing"},
   {application_id:app.id,membership_number:"",amount:"100",currency:"ETB",received_date:new Date().toISOString().slice(0,10),payment_method_code:staleMethodCode,payment_reference:"stale-method-"+suffix,evidence_reference:"",evidence_file_id:"",payer_note:"Method disabled after preview"},
  ];
-  const csvRows=[headers,...rows].map(record=>record.map(value=>{const text=String(value??"");return /[",\r\n]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;}).join(",")).join("\r\n")+"\r\n";
+  const csvRows=[headers,...rows.map(row=>headers.map(header=>row[header]??""))].map(record=>record.map(value=>{const text=String(value??"");return /[",\r\n]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;}).join(",")).join("\r\n")+"\r\n";
  const csvPreview=await previewMembershipPaymentImport(identity,{filename:"bulk-fee-test.csv",csv:csvRows},"fee-bulk-csv-preview-"+suffix);
  assert.equal(csvPreview.rowCount,5);
  assert.equal(csvPreview.errorCount,3);

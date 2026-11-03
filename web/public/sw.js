@@ -59,8 +59,8 @@ self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
   const priority = ["low", "normal", "high", "urgent"].includes(data.priority) ? data.priority : "normal";
-  const title = typeof data.title === "string" && data.title.length <= 100 ? data.title : "MPA · New update";
-  const body = typeof data.body === "string" && data.body.length <= 180 ? data.body : "You have an MPA update. Open the app to review it.";
+  const title = typeof data.title === "string" && data.title.trim() ? data.title.trim().slice(0, 100) : "MPA · New update";
+  const body = typeof data.body === "string" && data.body.trim() ? data.body.trim().slice(0, 180) : "You have an MPA update. Open the app to review it.";
   const url = safeNotificationPath(data.url);
   const options = {
     body,

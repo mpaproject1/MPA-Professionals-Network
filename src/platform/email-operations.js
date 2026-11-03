@@ -152,6 +152,23 @@ export async function saveEmailDraft(actorId,input){
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)||!subject||(!textBody&&!htmlBody))fail(400,"A valid recipient, subject and message body are required.","VALIDATION_ERROR");
  return (await db.query("insert into email_outbox_draft(created_by,recipient,subject,text_body,html_body) values($1,$2,$3,$4,$5) returning id,recipient,subject,text_body,html_body,status,created_at,updated_at",[actorId,recipient,subject,textBody,htmlBody])).rows[0];
 }
+export async function updateEmailDraft(actorId,id,input,requestId=null){
+ const db=getPool();await requireAdmin(db,actorId);
+ const recipient=clean(input.recipient,320),subject=clean(input.subject,300),textBody=String(input.textBody||"").slice(0,20000),htmlBody=String(input.htmlBody||"").slice(0,30000);
+ if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipient)||!subject||(!textBody&&!htmlBody))fail(400,"A valid recipient, subject and message body are required.","VALIDATION_ERROR");
+ const row=(await db.query("update email_outbox_draft set recipient=$2,subject=$3,text_body=$4,html_body=$5,updated_at=now() where id=$1 and status='draft' returning id,recipient,subject,text_body,html_body,status,created_at,updated_at",[id,recipient,subject,textBody,htmlBody])).rows[0];
+ if(!row)fail(404,"Editable email draft not found.","NOT_FOUND");
+ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.draft.updated','email_outbox_draft',$2,$3,'success',$4)",[actorId,id,requestId,{recipient}]);
+ return row;
+}
+export async function cancelEmailDraft(actorId,id,requestId=null){
+ const db=getPool();await requireAdmin(db,actorId);
+ const row=(await db.query("update email_outbox_draft set status='cancelled',updated_at=now() where id=$1 and status='draft' returning id,recipient,status",[id])).rows[0];
+ if(!row)fail(404,"Active email draft not found.","NOT_FOUND");
+ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.draft.cancelled','email_outbox_draft',$2,$3,'success',$4)",[actorId,id,requestId,{recipient:row.recipient}]);
+ return row;
+}
+
 async function sendMessage({recipient,subject,textBody,htmlBody,templateCode,payload,idempotencyKey=null}){
  htmlBody=renderBrandedEmail({subject,htmlBody,textBody,preheader:subject});
  const stableIdempotencyKey=emailIdempotencyKey(idempotencyKey);

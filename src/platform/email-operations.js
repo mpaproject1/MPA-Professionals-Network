@@ -303,6 +303,21 @@ export async function dispatchPendingSystemEmail(){
  return dispatchEmailOutbox(null,{limit:20,system:true});
 }
 
+export async function listEmailRecipientHolds(actorId,{limit=100}={}){
+ const db=getPool();await requireAdmin(db,actorId);
+ const n=Math.min(Math.max(Number(limit)||100,1),200);
+ return (await db.query("select id,email_normalized recipient,reason,source,provider_message_id,created_at from email_recipient_suppression where cleared_at is null order by created_at desc limit $1",[n])).rows;
+}
+export async function releaseEmailRecipientHold(actorId,id,reason,requestId=null){
+ const db=getPool();await requireAdmin(db,actorId);
+ const note=clean(reason,500);
+ if(note.length<8)fail(400,"A reason of at least eight characters is required.","RELEASE_REASON_REQUIRED");
+ const row=(await db.query("update email_recipient_suppression set cleared_at=now(),cleared_by=$1,clear_reason=$2 where id=$3 and cleared_at is null returning id,email_normalized,reason",[actorId,note,id])).rows[0];
+ if(!row)fail(404,"Active recipient hold not found.","NOT_FOUND");
+ await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'email.recipient_hold.released','email_recipient_suppression',$2,$3,'success',$4)",[actorId,id,requestId,{recipient:row.email_normalized,originalReason:row.reason,releaseReason:note}]);
+ return {released:true,recipient:row.email_normalized};
+}
+
 export async function sendTestEmail(actorId,requestId){
  const db=getPool();await requireAdmin(db,actorId);
  const user=(await db.query("select email from app_user where id=$1",[actorId])).rows[0];

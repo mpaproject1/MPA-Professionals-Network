@@ -324,17 +324,20 @@ function contactEncryptionKey(){
   if(typeof secret!=="string"||secret.length<32)fail(503,"Secure contact sharing is not configured. Ask the platform administrator to configure NETWORK_PLUS_CONTACT_ENCRYPTION_KEY.","CONTACT_SHARING_NOT_CONFIGURED");
   return createHash("sha256").update(secret).digest();
 }
-function encryptContactValue(value){
+function encryptContactValue(value,context){
   const iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",contactEncryptionKey(),iv);
+  cipher.setAAD(Buffer.from(context,"utf8"));
   const encrypted=Buffer.concat([cipher.update(value,"utf8"),cipher.final()]);
-  return [iv.toString("base64url"),cipher.getAuthTag().toString("base64url"),encrypted.toString("base64url")].join(".");
+  return ["v1",iv.toString("base64url"),cipher.getAuthTag().toString("base64url"),encrypted.toString("base64url")].join(".");
 }
-function decryptContactValue(value){
-  const [iv,tag,data]=String(value||"").split(".");
-  if(!iv||!tag||!data)fail(500,"Stored contact data is invalid.","CONTACT_DATA_INVALID");
+function decryptContactValue(value,context){
+  const [version,iv,tag,data]=String(value||"").split(".");
+  if(version!=="v1"||!iv||!tag||!data)fail(500,"Stored contact data is invalid or uses an unsupported encryption version.","CONTACT_DATA_INVALID");
   const decipher=createDecipheriv("aes-256-gcm",contactEncryptionKey(),Buffer.from(iv,"base64url"));
+  decipher.setAAD(Buffer.from(context,"utf8"));
   decipher.setAuthTag(Buffer.from(tag,"base64url"));
-  return Buffer.concat([decipher.update(Buffer.from(data,"base64url")),decipher.final()]).toString("utf8");
+  try{return Buffer.concat([decipher.update(Buffer.from(data,"base64url")),decipher.final()]).toString("utf8");}
+  catch{fail(500,"Stored contact data could not be authenticated. Ask the platform administrator to verify the encryption key.","CONTACT_DATA_AUTHENTICATION_FAILED");}
 }
 function validateContactValue(field,value){
   const v=clean(value,field==="business_location"?500:field==="website"?300:180,field.replaceAll("_"," "),2);
@@ -388,7 +391,8 @@ async function contactHandoffFor(db,requestId,userId,peerUserId){
     const peerStatus=side==="requester"?row.recipient_status:row.requester_status;
     const yourCipher=side==="requester"?row.requester_value_ciphertext:row.recipient_value_ciphertext;
     const peerCipher=side==="requester"?row.recipient_value_ciphertext:row.requester_value_ciphertext;
-    return {field:row.field_code,yourStatus,peerStatus,released,yourValue:yourStatus==="accepted"&&yourCipher?decryptContactValue(yourCipher):null,sharedWithYou:released&&peerCipher?decryptContactValue(peerCipher):null};
+    const context=`network-plus-contact:v1:${requestId}:${recipientUserId}:${row.field_code}`;
+    return {field:row.field_code,yourStatus,peerStatus,released,yourValue:yourStatus==="accepted"&&yourCipher?decryptContactValue(yourCipher,context):null,sharedWithYou:released&&peerCipher?decryptContactValue(peerCipher,context):null};
   })};
 }
 export async function updateNetworkPlusContactConsent(requestId,userId,input,requestIdHeader){
@@ -398,9 +402,10 @@ export async function updateNetworkPlusContactConsent(requestId,userId,input,req
   return withTransaction(async db=>{
     const pair=await connectionPair(db,requestId,userId,input?.peerUserId);
     const value=decision==="accept"?validateContactValue(field,input?.value):null;
-    const encrypted=value?encryptContactValue(value):null;
     const status=decision==="accept"?"accepted":decision==="decline"?"declined":"revoked";
     const recipientUserId=pair.side==="requester"?pair.peerUserId:userId;
+    const context=`network-plus-contact:v1:${requestId}:${recipientUserId}:${field}`;
+    const encrypted=value?encryptContactValue(value,context):null;
     if(decision==="revoke"){
       const exists=(await db.query("select 1 from network_plus_request_contact_consent where request_id=$1 and recipient_user_id=$2 and field_code=$3",[requestId,recipientUserId,field])).rowCount>0;
       if(!exists)fail(404,"There is no contact consent to revoke.","CONTACT_CONSENT_NOT_FOUND");

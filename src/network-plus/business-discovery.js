@@ -328,6 +328,7 @@ function validateListingPricing(row) {
   if(model==="subscription"&&(!(amount>0)||!currency||! /^[A-Z]{3}$/.test(currency)||!["weekly","monthly","quarterly","annually"].includes(details.billingPeriod)))fail(400,"Subscription pricing requires an amount, currency and billing period.","PRICING_DISCLOSURE_REQUIRED");
   if(model==="range"&&(!Number.isFinite(details.minimumAmount)||!Number.isFinite(details.maximumAmount)||details.minimumAmount<0||details.maximumAmount<details.minimumAmount||!currency||! /^[A-Z]{3}$/.test(currency)))fail(400,"Price ranges require valid minimum and maximum amounts and an ISO currency.","PRICING_DISCLOSURE_REQUIRED");
   if(["free","quote","not_applicable"].includes(model)&&(amount!==null&&amount!==undefined&&Number(amount)!==0))fail(400,"This pricing model cannot include a fixed amount.","PRICING_DISCLOSURE_INVALID");
+  if(["free","quote","not_applicable"].includes(model)&&currency)fail(400,"This pricing model must not include a currency without an amount.","PRICING_DISCLOSURE_INVALID");
 }
 async function validateListingTaxonomy(db,category,subcategory,listingKind) {
   if(!LISTING_KINDS.has(listingKind))fail(400,"Choose a supported listing type.","VALIDATION_ERROR");

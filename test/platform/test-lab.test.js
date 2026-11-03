@@ -60,3 +60,17 @@ test("test portfolio migration installs ownership capture and portfolio-only reg
  assert.match(sql,/jsonb_each_text/);
  assert.match(sql,/test_portfolio_account/);
 });
+
+test("Test Lab never stores recoverable credentials and gates every operation on a disposable database acknowledgement",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const migration=await readFile(new URL("../../db/migrations/20261103100000_test_lab_no_recoverable_credentials.sql",import.meta.url),"utf8");
+ const service=await readFile(new URL("../../src/platform/test-lab.js",import.meta.url),"utf8");
+ const admin=await readFile(new URL("../../web/app/admin/test-lab/page.tsx",import.meta.url),"utf8");
+ assert.match(migration,/drop column if exists password_ciphertext/i);
+ assert.doesNotMatch(service,/password_ciphertext|encryptSecret|decryptSecret|TEST_LAB_CREDENTIAL_ENCRYPTION_KEY/);
+ assert.match(service,/TEST_LAB_DISPOSABLE_DATABASE==="true"/);
+ assert.match(service,/hashPassword\(account\.password\)/);
+ assert.match(service,/sessionsRevoked:true/);
+ assert.match(admin,/Delete entire test portfolio/);
+ assert.match(admin,/method:"POST"/);
+});

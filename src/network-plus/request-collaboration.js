@@ -429,10 +429,10 @@ async function hasCurrentRecipientAuthority(db,request,userId,capability="busine
 async function assertRecipientRepresentative(db,request,userId){
   if(!await hasCurrentRecipientAuthority(db,request,userId))fail(403,"The recipient representative no longer has current authority for this request.","RECIPIENT_AUTHORITY_REQUIRED");
 }
-async function connectionPair(db,requestId,userId,peerUserId){
+async function connectionPair(db,requestId,userId,peerUserId,{allowRecipientWithdrawn=false}={}){
   const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
   if(!request)fail(404,"Request not found.","NOT_FOUND");
-  if(!["accepted","in_progress","completed","closed"].includes(request.status))fail(409,"Contact and meeting handoffs are available only after recipient acceptance.","RECIPIENT_ACCEPTANCE_REQUIRED");
+  if(!["accepted","in_progress","completed","closed"].includes(request.status)&&!(allowRecipientWithdrawn&&request.status==="recipient_withdrawn"))fail(409,"Contact and meeting handoffs are available only after recipient acceptance.","RECIPIENT_ACCEPTANCE_REQUIRED");
   const actor=await participant(db,requestId,userId);
   if(actor.consent_status!=="accepted")fail(403,"Accept the request invitation before sharing contact details.","PARTICIPANT_CONSENT_REQUIRED");
   let side,peer;
@@ -467,7 +467,7 @@ export async function updateNetworkPlusContactConsent(requestId,userId,input,req
   if(!CONTACT_FIELDS.has(field))fail(400,"Choose a supported contact field.","INVALID_CONTACT_FIELD");
   if(!["accept","decline","revoke"].includes(decision))fail(400,"Choose accept, decline or revoke.","INVALID_CONSENT_DECISION");
   return withTransaction(async db=>{
-    const pair=await connectionPair(db,requestId,userId,input?.peerUserId);
+    const pair=await connectionPair(db,requestId,userId,input?.peerUserId,{allowRecipientWithdrawn:decision!=="accept"});
     if(decision==="accept"&&!["accepted","in_progress","completed","closed"].includes(pair.request.status))fail(409,"New contact sharing consent is available only after recipient acceptance and before the connection is withdrawn.","INVALID_REQUEST_STATUS");
     const value=decision==="accept"?validateContactValue(field,input?.value):null;
     const status=decision==="accept"?"accepted":decision==="decline"?"declined":"revoked";
@@ -493,7 +493,7 @@ export async function updateNetworkPlusContactConsent(requestId,userId,input,req
 export async function getNetworkPlusContactHandoff(requestId,userId,peerUserId){
   return withTransaction(async db=>{
     await assertEntry(db,userId);
-    const pair=await connectionPair(db,requestId,userId,peerUserId);
+    const pair=await connectionPair(db,requestId,userId,peerUserId,{allowRecipientWithdrawn:true});
     return contactHandoffFor(db,requestId,userId,pair.peerUserId);
   });
 }

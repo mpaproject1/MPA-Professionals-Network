@@ -40,6 +40,14 @@ export async function queueEmailNotification(db,userId,templateCode,variables={}
  const user=(await db.query("select u.email,coalesce(np.email_enabled,true) email_enabled from app_user u left join notification_preference np on np.user_id=u.id where u.id=$1",[userId])).rows[0];
  if(!user?.email||(optional&&!user.email_enabled))return false;
  const recipient=normalizeEmailAddress(user.email);
+ const template=(await db.query("select enabled,audience from email_notification_template where template_code=$1",[templateCode])).rows[0];
+ // Fail closed before creating an outbox record: enqueue and dispatch must agree
+ // on the current persisted recipient identity and template governance.
+ if(template?.enabled===false)return false;
+ if(template&&!await recipientMatchesAudience(db,user.email,template.audience)){
+  await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.message.enqueue_audience_rejected','email_notification_template',$1,'failure',$2)",[templateCode,{userId,audience:template.audience,resourceType,resourceId}]);
+  return false;
+ }
  const suppressed=(await db.query("select 1 from email_recipient_suppression where email_normalized=$1 and cleared_at is null limit 1",[recipient])).rowCount>0;
  if(suppressed)return false;
  const eventCode=String(variables.notificationEventCode||variables.notification_event_code||templateCode);
@@ -398,22 +406,27 @@ export async function receiveDeliveryWebhook(input,providedSecret){
  if(!providerEventId)fail(400,"A stable provider event ID is required for webhook idempotency.","PROVIDER_EVENT_ID_REQUIRED");
  if(!["delivered","bounced","complained","failed"].includes(eventType))fail(400,"Unsupported delivery event type.","VALIDATION_ERROR");
  const db=getPool(),provider=clean(input.provider,80)||(input.data?.email_id?"resend":"configured-webhook");
- const recorded=(await db.query("insert into email_delivery_event(provider,provider_event_id,provider_message_id,event_type,payload,processed_at) values($1,$2,$3,$4,$5,null) on conflict(provider,provider_event_id) do nothing returning id",[provider,providerEventId,providerMessageId,eventType,{provider}])).rows[0];
- if(!recorded)return {matched:true,duplicate:true,providerEventId};
- const result=await db.query("update notification_outbox set delivery_status=case when delivery_status='complained' then 'complained' when delivery_status='bounced' and $1<>'complained' then 'bounced' when delivery_status='delivered' and $1='failed' then 'delivered' else $1 end,delivered_at=case when $1='delivered' and delivery_status not in ('bounced','complained') then coalesce(delivered_at,now()) else delivered_at end,delivery_event_at=now(),delivery_event_type=case when delivery_status='complained' then delivery_event_type when delivery_status='bounced' and $1<>'complained' then delivery_event_type else $2 end,delivery_error_code=case when delivery_status='complained' then delivery_error_code when delivery_status='bounced' and $1<>'complained' then delivery_error_code when $1 in ('bounced','complained','failed') then $2 else null end,updated_at=now() where id=(select id from notification_outbox where channel='email' and provider_message_id=$3 order by sent_at desc nulls last,created_at desc limit 1) returning id,recipient,payload,template_code,delivery_status,delivered_at",[eventType,eventType,providerMessageId]);
- const row=result.rows[0];
- if(!row){await db.query("update email_delivery_event set processed_at=null where id=$1",[recorded.id]);return {matched:false,providerMessageId,nextAction:"No outbox row matched this provider message ID; the event is retained for reconciliation."};}
- if(eventType==="bounced"||eventType==="complained"){
-  const reason=eventType==="complained"?"complaint":"hard_bounce";
-  await db.query("insert into email_recipient_suppression(email_normalized,reason,source,provider_message_id) values($1,$2,$3,$4) on conflict(email_normalized) do update set reason=case when email_recipient_suppression.reason='complaint' then email_recipient_suppression.reason else excluded.reason end,source=excluded.source,provider_message_id=excluded.provider_message_id,created_at=now(),cleared_at=null,cleared_by=null,clear_reason=null",[normalizeEmailAddress(row.recipient),reason,provider,providerMessageId]);
- }
- const matchId=row.payload?.matchId||row.payload?.variables?.matchId;
- if(row.template_code==="mentor.mentorship_update"&&matchId){
-  await db.query("update mentorship_match set mentor_notification_status=$1,mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$3",[row.delivery_status==="delivered"?"delivered":"failed",row.delivery_status==="delivered"?"Trusted provider delivery event received.":"Trusted provider failure or suppression event: "+row.delivery_status,matchId]);
- }
- await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.delivery_event.received','notification_outbox',$1,'success',$2)",[row.id,{provider,providerEventId,eventType}]);
- await db.query("update email_delivery_event set outbox_id=$1,processed_at=now() where id=$2",[row.id,recorded.id]);
- return {matched:true,deliveryStatus:row.delivery_status,deliveredAt:row.delivered_at||null,nextAction:row.delivery_status==="delivered"?"Provider reported delivery. This does not prove the recipient read the message.":"Provider reported a delivery failure; the recipient is suppressed for bounce/complaint events and must not be retried automatically."};
+ // The ledger insert, outbox transition, suppression, domain evidence and audit
+ // record commit together. A transient DB error rolls the event insert back so
+ // the provider can safely replay the same event ID.
+ return withTransaction(async tx=>{
+  const recorded=(await tx.query("insert into email_delivery_event(provider,provider_event_id,provider_message_id,event_type,payload,processed_at) values($1,$2,$3,$4,$5,null) on conflict(provider,provider_event_id) do nothing returning id",[provider,providerEventId,providerMessageId,eventType,{provider}])).rows[0];
+  if(!recorded)return {matched:true,duplicate:true,providerEventId};
+  const result=await tx.query("update notification_outbox set delivery_status=case when delivery_status='complained' then 'complained' when delivery_status='bounced' and $1<>'complained' then 'bounced' when delivery_status='delivered' and $1='failed' then 'delivered' else $1 end,delivered_at=case when $1='delivered' and delivery_status not in ('bounced','complained') then coalesce(delivered_at,now()) else delivered_at end,delivery_event_at=now(),delivery_event_type=case when delivery_status='complained' then delivery_event_type when delivery_status='bounced' and $1<>'complained' then delivery_event_type else $2 end,delivery_error_code=case when delivery_status='complained' then delivery_error_code when delivery_status='bounced' and $1<>'complained' then delivery_error_code when $1 in ('bounced','complained','failed') then $2 else null end,updated_at=now() where id=(select id from notification_outbox where channel='email' and provider_message_id=$3 order by sent_at desc nulls last,created_at desc limit 1) returning id,recipient,payload,template_code,delivery_status,delivered_at",[eventType,eventType,providerMessageId]);
+  const row=result.rows[0];
+  if(!row)return {matched:false,providerMessageId,nextAction:"No outbox row matched this provider message ID; the event is retained for reconciliation."};
+  if(eventType==="bounced"||eventType==="complained"){
+   const reason=eventType==="complained"?"complaint":"hard_bounce";
+   await tx.query("insert into email_recipient_suppression(email_normalized,reason,source,provider_message_id) values($1,$2,$3,$4) on conflict(email_normalized) do update set reason=case when email_recipient_suppression.reason='complaint' then email_recipient_suppression.reason else excluded.reason end,source=excluded.source,provider_message_id=excluded.provider_message_id,created_at=now(),cleared_at=null,cleared_by=null,clear_reason=null",[normalizeEmailAddress(row.recipient),reason,provider,providerMessageId]);
+  }
+  const matchId=row.payload?.matchId||row.payload?.variables?.matchId;
+  if(row.template_code==="mentor.mentorship_update"&&matchId){
+   await tx.query("update mentorship_match set mentor_notification_status=$1,mentor_notification_updated_at=now(),mentor_notification_detail=$2 where id=$3",[row.delivery_status==="delivered"?"delivered":"failed",row.delivery_status==="delivered"?"Trusted provider delivery event received.":"Trusted provider failure or suppression event: "+row.delivery_status,matchId]);
+  }
+  await tx.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.delivery_event.received','notification_outbox',$1,'success',$2)",[row.id,{provider,providerEventId,eventType}]);
+  await tx.query("update email_delivery_event set outbox_id=$1,processed_at=now() where id=$2",[row.id,recorded.id]);
+  return {matched:true,deliveryStatus:row.delivery_status,deliveredAt:row.delivered_at||null,nextAction:row.delivery_status==="delivered"?"Provider reported delivery. This does not prove the recipient read the message.":"Provider reported a delivery failure; the recipient is suppressed for bounce/complaint events and must not be retried automatically."};
+ });
 }
 
 // Server worker entry point: only queued platform messages are processed; no caller identity is accepted from HTTP.

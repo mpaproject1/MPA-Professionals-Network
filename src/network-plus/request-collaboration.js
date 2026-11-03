@@ -343,6 +343,19 @@ function validateContactValue(field,value){
   if(field==="website"){let url;try{url=new URL(v);}catch{fail(400,"Enter a valid HTTPS website URL.","INVALID_CONTACT_VALUE");}if(url.protocol!=="https:")fail(400,"Contact websites must use HTTPS.","INVALID_CONTACT_VALUE");}
   return v;
 }
+async function assertRecipientRepresentative(db,request,userId){
+  if(request.business_id){
+    if(!await hasBusinessAuthority(db,request.business_id,userId,"business.respond_requests")&&!await hasBusinessAuthority(db,request.business_id,userId,"business.accept_terms"))fail(403,"The recipient representative no longer has authority for this business request.","BUSINESS_AUTHORITY_REQUIRED");
+    return;
+  }
+  if(request.recipient_organization_id){
+    const active=(await db.query("select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true",[request.recipient_organization_id,userId])).rowCount>0;
+    if(!active)fail(403,"The recipient representative no longer has authority for this organization request.","ORGANIZATION_AUTHORITY_REQUIRED");
+    return;
+  }
+  if(request.recipient_user_id===userId){await assertEntry(db,userId);return;}
+  fail(403,"The selected recipient is no longer authorized for this request.","RECIPIENT_AUTHORITY_REQUIRED");
+}
 async function connectionPair(db,requestId,userId,peerUserId){
   const request=(await db.query("select * from network_plus_request where id=$1 for update",[requestId])).rows[0];
   if(!request)fail(404,"Request not found.","NOT_FOUND");
@@ -358,7 +371,8 @@ async function connectionPair(db,requestId,userId,peerUserId){
   }else fail(403,"Only the requester and an accepted recipient representative can arrange a connection handoff.","PARTICIPANT_FORBIDDEN");
   const other=(await db.query("select participant_role,consent_status from network_plus_request_participant where request_id=$1 and user_id=$2",[requestId,peer])).rows[0];
   if(!other||(side==="requester"&&other.participant_role!=="recipient_representative")||(side==="recipient"&&other.participant_role!=="requester")||other.consent_status!=="accepted")fail(403,"The selected connection partner has not accepted this request.","PARTICIPANT_CONSENT_REQUIRED");
-  if(side==="recipient"&&request.business_id&&!await hasBusinessAuthority(db,request.business_id,userId,"business.respond_requests")&&!await hasBusinessAuthority(db,request.business_id,userId,"business.accept_terms"))fail(403,"Your business permission does not allow contact release.","BUSINESS_AUTHORITY_REQUIRED");
+  if(side==="requester"){await assertEntry(db,userId);await assertRecipientRepresentative(db,request,peer);}
+  else {await assertRecipientRepresentative(db,request,userId);await assertEntry(db,peer);}
   return {request,side,peerUserId:peer};
 }
 async function contactHandoffFor(db,requestId,userId,peerUserId){

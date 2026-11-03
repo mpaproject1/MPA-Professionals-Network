@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+async function dismissPrivacyChoices(page) {\n  const rejectOptional = page.getByRole("button", { name: "Reject optional" });\n  if (await rejectOptional.isVisible().catch(() => false)) await rejectOptional.click();\n}
+
 const organization = (overrides = {}) => ({
   id: "org-e2e-1",
   legal_name: "MPA Test Institution",

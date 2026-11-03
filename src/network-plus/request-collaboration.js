@@ -84,13 +84,14 @@ function canTransition(intent,from,to,actorRole) {
     submitted:["under_review","accepted","declined","withdrawn"],
     under_review:["accepted","declined","withdrawn"],
     clarification_requested:["submitted","withdrawn","declined"],
-    accepted:["in_progress","disputed","closed","completed"],
-    in_progress:["completed","disputed","closed"],
-    disputed:["in_progress","completed","closed"],
-    declined:[],withdrawn:[],completed:["disputed","closed"],closed:[]
+    accepted:["in_progress","disputed","closed","completed","recipient_withdrawn"],
+    in_progress:["completed","disputed","closed","recipient_withdrawn"],
+    disputed:["in_progress","completed","closed","recipient_withdrawn"],
+    declined:[],withdrawn:[],recipient_withdrawn:[],completed:["disputed","closed"],closed:[]
   };
   if(!map[from]?.includes(to))return false;
   if(to==="withdrawn")return actorRole==="requester";
+  if(to==="recipient_withdrawn")return actorRole==="recipient";
   if(["under_review","clarification_requested","accepted","declined"].includes(to))return actorRole==="recipient"||actorRole==="support";
   if(["in_progress","completed","disputed","closed"].includes(to))return actorRole==="requester"||actorRole==="recipient"||actorRole==="support";
   return actorRole==="requester";
@@ -199,17 +200,18 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
     if(to==="accepted"&&role!=="recipient")fail(403,"Only an authorized recipient representative may explicitly accept this request.","RECIPIENT_ACCEPTANCE_REQUIRED");
     if(to==="clarification_requested"&&!input.reason)fail(400,"A clarification reason is required.","REASON_REQUIRED");
     if(to==="declined"&&!input.reason)fail(400,"A decline reason is required.","REASON_REQUIRED");
+    if(to==="recipient_withdrawn"&&(!input.reason||String(input.reason).trim().length<5))fail(400,"Explain why the recipient is withdrawing from this connection.","REASON_REQUIRED");
     if(to==="disputed"&&!input.reason)fail(400,"A dispute reason is required.","REASON_REQUIRED");
     if(to==="completed"&&(!Array.isArray(input.completionEvidence)||!input.completionEvidence.length||input.completionEvidence.some(value=>typeof value!=="string"||value.trim().length<5)))fail(400,"Provide completion evidence or a documented not-applicable reason.","COMPLETION_EVIDENCE_REQUIRED");
     if(to==="in_progress"&&row.status!=="accepted")fail(409,"Only an accepted engagement can start.","ACCEPTANCE_REQUIRED");
     const updated=(await db.query(`update network_plus_request set status=$1,submitted_at=case when $1='submitted' then coalesce(submitted_at,now()) else submitted_at end,
       accepted_at=case when $1='accepted' then now() else accepted_at end,declined_at=case when $1='declined' then now() else declined_at end,
-      withdrawn_at=case when $1='withdrawn' then now() else withdrawn_at end,completed_at=case when $1='completed' then now() else completed_at end,
+      withdrawn_at=case when $1='withdrawn' then now() else withdrawn_at end,recipient_withdrawn_at=case when $1='recipient_withdrawn' then now() else recipient_withdrawn_at end,completed_at=case when $1='completed' then now() else completed_at end,
       disputed_at=case when $1='disputed' then now() else disputed_at end,closed_at=case when $1='closed' then now() else closed_at end,
-      review_due_at=case when $1='submitted' and requester_disposition='in_progress' then coalesce(review_due_at,now()+interval '7 days') when $1 in ('declined','withdrawn','completed','closed') then null else review_due_at end,
+      review_due_at=case when $1='submitted' and requester_disposition='in_progress' then coalesce(review_due_at,now()+interval '7 days') when $1 in ('declined','withdrawn','recipient_withdrawn','completed','closed') then null else review_due_at end,
       version=version+1,updated_at=now() where id=$2 returning *`,[to,requestId])).rows[0];
     await audit(db,requestId,userId,`request.${to}`,row.status,to,requestIdHeader,{reason:input.reason||null,version:updated.version},idempotencyHash,requestFingerprint);
-    if(["disputed","completed","closed"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to; await db.query("update network_plus_collaboration_workspace set status=$1,completed_at=case when $1=$3 then coalesce(completed_at,now()) else completed_at end,closed_at=case when $1=$4 then coalesce(closed_at,now()) else closed_at end,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId,"completed","closed"]); }
+    if(["disputed","completed","closed","recipient_withdrawn"].includes(to)) { const nextWorkspaceStatus=to==="disputed"?"disputed":to==="recipient_withdrawn"?"closed":to; await db.query("update network_plus_collaboration_workspace set status=$1,completed_at=case when $1=$3 then coalesce(completed_at,now()) else completed_at end,closed_at=case when $1=$4 then coalesce(closed_at,now()) else closed_at end,updated_at=now() where request_id=$2",[nextWorkspaceStatus,requestId,"completed","closed"]); }
     if(to==="accepted") {
       await db.query("update network_plus_request_participant set consent_status='accepted',consented_at=now() where request_id=$1 and user_id=$2 and participant_role='recipient_representative'",[requestId,userId]);
       // Acceptance records a connection decision only. Shared workspaces are explicit opt-in.

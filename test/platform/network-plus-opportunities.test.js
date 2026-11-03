@@ -64,7 +64,8 @@ test("discovery filters use parameterized SQL and require verified, approved, pu
   assert.match(query,/s\.listing_kind=\$\$\{args\.length\}/);
   assert.match(query,/location_label/);
   assert.match(query,/s\.audience=any/);
-  assert.match(service,/listing_kind category_code/);
+  assert.match(service,/s\.listing_kind/);
+  assert.match(service,/s\.service_category category_code/);
 });
 
 test("product profiles remain inquiry-only and respect intake availability",()=>{

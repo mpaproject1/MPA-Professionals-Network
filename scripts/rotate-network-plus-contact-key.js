@@ -16,10 +16,12 @@ function contextFor(row) {
   return `network-plus-contact:v1:${row.request_id}:${row.recipient_user_id}:${row.field_code}`;
 }
 function decrypt(value,key,context) {
-  const [version,iv,tag,data] = String(value || "").split(".");
-  if (version !== "v1" || !iv || !tag || !data) throw new Error("A stored contact value has an unsupported or invalid encryption envelope.");
+  const parts = String(value || "").split(".");
+  const legacy = parts.length === 3;
+  const [version,iv,tag,data] = legacy ? ["legacy",...parts] : parts;
+  if ((!legacy && version !== "v1") || !iv || !tag || !data) throw new Error("A stored contact value has an unsupported or invalid encryption envelope.");
   const decipher = createDecipheriv("aes-256-gcm",key,Buffer.from(iv,"base64url"));
-  decipher.setAAD(Buffer.from(context,"utf8"));
+  if (!legacy) decipher.setAAD(Buffer.from(context,"utf8"));
   decipher.setAuthTag(Buffer.from(tag,"base64url"));
   try {
     return Buffer.concat([decipher.update(Buffer.from(data,"base64url")),decipher.final()]).toString("utf8");

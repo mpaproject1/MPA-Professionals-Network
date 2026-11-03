@@ -81,8 +81,8 @@ function canTransition(intent,from,to,actorRole) {
   if(["in_progress","completed"].includes(to)&&!["service_request","supplier_inquiry","expertise_request","partnership_proposal","collaboration_request"].includes(intent))return false;
   const map={
     draft:["submitted","withdrawn"],
-    submitted:["under_review","clarification_requested","accepted","declined","withdrawn"],
-    under_review:["clarification_requested","accepted","declined","withdrawn"],
+    submitted:["under_review","accepted","declined","withdrawn"],
+    under_review:["accepted","declined","withdrawn"],
     clarification_requested:["submitted","withdrawn","declined"],
     accepted:["in_progress","disputed","closed","completed"],
     in_progress:["completed","disputed","closed"],

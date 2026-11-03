@@ -52,3 +52,17 @@ Replace the example account, repository and application paths with the actual ho
 - The existing email/SMS preferences are independent. This work does not claim that email, SMS or digest delivery is implemented by Web Push.
 - Test delivery on real Android Chrome and iOS Safari-installed web apps before release. Validate subscription removal, account switching, expired endpoints, worker restarts, and a cPanel cron run.
 - Do not merge or deploy until the full PR Quality workflow, migration compatibility rehearsal, backend tests, Biome, TypeScript, production build and browser acceptance pass on the latest PR head.
+
+
+## 2026-11-03 integration audit and source updates
+
+The follow-up source audit on PR #18 checked the manifest, app shell, service worker, notification inbox, subscription UI, VAPID configuration, push encryption/delivery service, outbox migration and existing PWA regression suite. The following integration gaps were corrected:
+
+- Service-worker registration is now owned by the app shell's PWA status/install surface; the root provider no longer independently registers the same worker during hydration.
+- The worker's same-origin notification navigation allowlist now includes current destinations such as `/network-plus`, `/recruitment`, `/account`, `/workspaces` and `/learning`. A valid notification deep link no longer falls back to `/notifications` solely because it targets one of these app workspaces.
+- Notification title and body are trimmed and bounded to 100 and 180 characters respectively. Long campaign copy is now shortened for the device panel rather than replaced with a generic fallback message.
+- The install nudge respects the persisted dismissed flag and closes after the browser reports `appinstalled` or the native prompt is accepted.
+- The push settings panel refreshes browser permission and current device subscription state when the user returns to the page, including after changing site permission in browser settings.
+- The existing regression suite `test/platform/pwa-install-push.test.js` now checks the added deep-link destinations, bounded notification copy, install dismissal state and single registration ownership in addition to the existing manifest, migration, encryption and VAPID checks.
+
+**Validation boundary:** these are source changes and authored regression assertions. The test suite, production build, disposable PostgreSQL migration rehearsal and real-device push delivery have not been run in this continuation. Keep the PR draft; do not treat this audit as release approval. The cPanel cron entry and VAPID secrets remain deployment-specific and must be configured by the operator.

@@ -37,7 +37,8 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     await page.setViewportSize({width:390,height:844});
     await page.goto("/network-plus/requests");
     await expect(page.getByRole("heading",{name:"Requests that become collaboration only by agreement."})).toBeVisible();
-    await page.getByLabel("Request type").selectOption("service_request");
+await page.locator("details").filter({hasText:"Start a new connection request"}).locator("summary").click();
+        await page.getByLabel("Request type").selectOption("service_request");
     await page.getByLabel("Find a verified member recipient").fill("Recipient");
     await page.route("**/api/v1/talent?q=*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items:[{user_id:"recipient-1",display_name:"Recipient Professional",professional_title:"Architect"}]}})}));
     await page.getByRole("button",{name:"Search members"}).click();
@@ -51,6 +52,8 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     expect(createPayload.terms.scope).toContain("WCAG AA");
     await expect(page.getByText(/Draft saved. It is not yet submitted/i)).toBeVisible();
     await expect(page).toHaveURL(/requestId=request-1/);
+    await expect(page.getByRole("heading",{name:"My Requests"})).toBeVisible();
+    await expect(page.getByRole("button",{name:"Drafts"})).toBeVisible();
     await expect(page.getByRole("heading",{name:"Platform-observed activity"})).toBeVisible();
     await expect(page.getByRole("heading",{name:"Your reported connection outcomes"})).toBeVisible();
     await expect(page.getByText(/has not been sent to the recipient/i)).toBeVisible();
@@ -77,6 +80,7 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     await page.getByRole("button",{name:"Explicitly accept request"}).click();
     await expect(page.getByRole("button",{name:"Start optional collaboration workspace"})).toBeVisible();
     await page.getByRole("button",{name:"Start optional collaboration workspace"}).click();
+    await page.locator("details").filter({hasText:"Optional shared workspace"}).locator("summary").click();
     await expect(page.getByRole("heading",{name:"Collaboration workspace"})).toBeVisible();
     await expect(page.getByText(/Optional shared workspace enabled/i)).toBeVisible();
   });
@@ -90,7 +94,8 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     });
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:draft})}));
     await page.goto("/network-plus/requests");
-    await page.getByLabel("Request type").selectOption("partnership_proposal");
+await page.locator("details").filter({hasText:"Start a new connection request"}).locator("summary").click();
+        await page.getByLabel("Request type").selectOption("partnership_proposal");
     await page.getByLabel("Published business").selectOption("business-1");
     await page.getByLabel("Subject").fill("Community technology partnership");
     await page.getByLabel("Request summary").fill("Propose a structured technology partnership for community services.");
@@ -118,7 +123,8 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     });
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{...draft,intent:"quote_request"}})}));
     await page.goto("/network-plus/requests?action=quote_request&listingId=listing-1");
-    await expect(page.getByLabel("Request type")).toHaveValue("quote_request");
+await page.locator("details").filter({hasText:"Start a new connection request"}).locator("summary").click();
+        await expect(page.getByLabel("Request type")).toHaveValue("quote_request");
     await page.getByRole("button",{name:"Continue"}).click();
     await expect(page.getByLabel("Subject")).toHaveValue("Quote Request · Business equipment");
     await page.getByRole("button",{name:"Continue"}).click();

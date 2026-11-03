@@ -924,6 +924,7 @@ try {
     if(!found)throw new Error(`Network-Plus Phase 2 check constraint on ${table} is missing required invariant fragments: ${fragments.join(", ")}.`);
   };
   requirePhase2Check("network_plus_request",["recipient_response is null","recipient_response_by is null","recipient_response_at is null","intent = 'question'","recipient_response is not null","recipient_response_by is not null","recipient_response_at is not null"]);
+  requirePhase2Check("network_plus_request",["status <> 'recipient_withdrawn'","accepted_at is not null","recipient_withdrawn_at is not null"]);
   requirePhase2Check("network_plus_request_contact_consent",["field_code","'email'","'phone'","'whatsapp'","'website'","'business_location'"]);
   requirePhase2Check("network_plus_request_contact_consent",["requester_status","'pending'","'accepted'","'declined'","'revoked'"]);
   requirePhase2Check("network_plus_request_contact_consent",["recipient_status","'pending'","'accepted'","'declined'","'revoked'"]);

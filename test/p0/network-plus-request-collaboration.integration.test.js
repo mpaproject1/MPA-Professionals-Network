@@ -227,3 +227,34 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   await assert.rejects(()=>requests.getNetworkPlusRequest(draft.id,support.user.id,{supportReason,supportTicket}),e=>e.code==="SUPPORT_GRANT_REQUIRED");
 
 });
+
+
+test("Phase 3 requester disposition is separate from lifecycle status, requires closure remarks, preserves reopen history and sends due review reminders",async t=>{
+ if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
+ const suffix=randomUUID().replace(/-/g,"");
+ const requester=await register("disposition-requester-"+suffix);await setMembership(requester.user.id);
+ const recipient=await verifiedRecipient("disposition-recipient-"+suffix,(await register("disposition-reviewer-"+suffix)).user.id);
+ const request=await requests.createNetworkPlusRequest(requester.user.id,{
+   intent:"interest",recipientUserId:recipient.user.id,subject:"Explore a supplier introduction",summary:"I would like to discuss a possible professional connection.",details:{},terms:{}
+ },`np-disposition-${suffix}`,randomUUID()+randomUUID());
+ await requests.submitNetworkPlusRequest(request.id,requester.user.id,`np-disposition-submit-${suffix}`,randomUUID()+randomUUID());
+ await assert.rejects(()=>requests.updateNetworkPlusRequestDisposition(request.id,requester.user.id,{disposition:"completed",remark:""},`np-disposition-close-${suffix}`,randomUUID()+randomUUID()),e=>e.code==="CLOSING_REMARK_REQUIRED");
+ const completed=await requests.updateNetworkPlusRequestDisposition(request.id,requester.user.id,{disposition:"completed",remark:"Contact exchanged; we will continue directly."},`np-disposition-complete-${suffix}`,randomUUID()+randomUUID());
+ assert.equal(completed.status,"submitted","request lifecycle status must not be rewritten by requester disposition");
+ assert.equal(completed.requester_disposition,"completed");
+ const reopened=await requests.updateNetworkPlusRequestDisposition(request.id,requester.user.id,{disposition:"in_progress",remark:"Reopening to continue the introduction."},`np-disposition-reopen-${suffix}`,randomUUID()+randomUUID());
+ assert.equal(reopened.requester_disposition,"in_progress");
+ await assert.rejects(()=>requests.updateNetworkPlusRequestDisposition(request.id,recipient.user.id,{disposition:"cancelled",remark:"Recipient cannot set requester outcome."},`np-disposition-outsider-${suffix}`,randomUUID()+randomUUID()),e=>e.code==="NOT_FOUND");
+ const db=getPool();
+ await db.query("update network_plus_request set review_due_at=now()-interval '1 minute' where id=$1",[request.id]);
+ const reminders=await requests.dispatchNetworkPlusRequestReviewReminders({limit:10});
+ assert.equal(reminders.sent,1);
+ const row=(await db.query("select requester_disposition,review_due_at,review_reminder_sent_at from network_plus_request where id=$1",[request.id])).rows[0];
+ assert.equal(row.requester_disposition,"in_progress");
+ assert.ok(row.review_reminder_sent_at);
+ assert.ok(new Date(row.review_due_at)>new Date());
+ const history=(await db.query("select event_code,metadata from network_plus_request_event where request_id=$1 order by created_at",[request.id])).rows;
+ assert.ok(history.some(event=>event.event_code==="request.disposition_updated"&&event.metadata.disposition==="completed"));
+ assert.ok(history.some(event=>event.event_code==="request.disposition_reopened"));
+ assert.ok(history.some(event=>event.event_code==="request.review_reminder_sent"));
+});

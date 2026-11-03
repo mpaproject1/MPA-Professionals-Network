@@ -3,12 +3,12 @@ import { expect, test } from "@playwright/test";
 const draft = {
   id: "request-1", intent: "service_request", status: "draft",
   subject: "Website accessibility review", summary: "Request an accessibility review of our public website.",
-  requester_user_id: "requester-1", isRequester: true, isRecipientRepresentative: false,
+  requester_user_id: "requester-1", isRequester: true, is_requester: true, requester_disposition:"in_progress", isRecipientRepresentative: false,
   participants: [{ user_id: "requester-1", participant_role: "requester", consent_status: "accepted" }],
   events: [], workspace: null,
 };
 const submitted = {
-  ...draft, status: "submitted", isRequester: false, isRecipientRepresentative: true, canReview: true, canAccept: true,
+  ...draft, status: "submitted", isRequester: false, is_requester: false, isRecipientRepresentative: true, canReview: true, canAccept: true,
   participants: [
     { user_id: "requester-1", participant_role: "requester", consent_status: "accepted" },
     { user_id: "recipient-1", participant_role: "recipient_representative", consent_status: "pending" },

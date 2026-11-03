@@ -9,10 +9,10 @@ import {
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
 import { OperationStatus } from "../../components/operation-status";
+import { OrganizationWorkspaceOverview } from "../../components/organization-workspace-overview";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
-import { OrganizationWorkspaceOverview } from "../../components/organization-workspace-overview";
 
 type Inquiry = {
   id: string;

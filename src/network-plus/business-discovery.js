@@ -462,10 +462,10 @@ export async function listProfessionalServices(viewerId,filters={}) {
   const q=String(filters.q||"").trim().slice(0,120);
   if(q){args.push(`%${q}%`);where.push(`(s.title ilike $${args.length} or s.summary ilike $${args.length} or s.description ilike $${args.length} or b.display_name ilike $${args.length})`);}
   const category=String(filters.category||"").trim().toLowerCase();
-  if(category){args.push(category);where.push(`s.service_category=${args.length}`);}
-  const subcategory=String(filters.subcategory||"").trim().toLowerCase();if(subcategory){args.push(subcategory);where.push(`s.subcategory_code=${args.length}`);}
-  const listingKind=String(filters.listingKind||"").trim().toLowerCase();if(listingKind){if(!LISTING_KINDS.has(listingKind))fail(400,"Choose a supported listing type.","VALIDATION_ERROR");args.push(listingKind);where.push(`s.listing_kind=${args.length}`);}
-  const location=String(filters.location||"").trim().slice(0,120);if(location){args.push(`%${location}%`);where.push(`coalesce(s.location_label,'') ilike ${args.length}`);}
+  if(category){args.push(category);where.push(`s.service_category=$${args.length}`);}
+  const subcategory=String(filters.subcategory||"").trim().toLowerCase();if(subcategory){args.push(subcategory);where.push(`s.subcategory_code=$${args.length}`);}
+  const listingKind=String(filters.listingKind||"").trim().toLowerCase();if(listingKind){if(!LISTING_KINDS.has(listingKind))fail(400,"Choose a supported listing type.","VALIDATION_ERROR");args.push(listingKind);where.push(`s.listing_kind=$${args.length}`);}
+  const location=String(filters.location||"").trim().slice(0,120);if(location){args.push(`%${location}%`);where.push(`coalesce(s.location_label,'') ilike $${args.length}`);}
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);
   args.push(visibleAudiences(access));where.push("s.audience=any($"+args.length+"::text[])");
   const base=` from network_plus_service_listing s join network_plus_business b on b.id=s.business_id where ${where.join(" and ")}`;

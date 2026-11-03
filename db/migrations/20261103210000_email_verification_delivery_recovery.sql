@@ -32,3 +32,8 @@ alter table email_delivery_event
 create index if not exists ix_email_delivery_event_verification
   on email_delivery_event(verification_delivery_id)
   where verification_delivery_id is not null;
+
+alter table email_verification_delivery
+  add column if not exists provider_delivery_status text
+    check (provider_delivery_status is null or provider_delivery_status in ('delivered','bounced','complained','failed')),
+  add column if not exists delivery_event_at timestamptz;

@@ -104,6 +104,7 @@ test("Network-Plus requests require recipient acceptance, create participant-onl
   const formerRepresentativeDetail=await requests.getNetworkPlusRequest(businessQuestion.id,requestReviewer.user.id);
   assert.equal(formerRepresentativeDetail.isRecipientRepresentative,false);
   assert.equal(formerRepresentativeDetail.recipient_response,null);
+  await db.query("insert into network_plus_business_access(business_id,user_id,capability_code,granted_by) values($1,$2,'business.respond_requests',$3)",[business.id,requestReviewer.user.id,businessOwner.user.id]);
   const businessRequest=await requests.createNetworkPlusRequest(requester.user.id,{intent:"partnership_proposal",businessId:business.id,subject:"Verified business partnership",summary:"Propose a defined partnership with measurable community outputs.",details:{},terms:{purpose:"Deliver a community technology pilot.",scope:"Design and deliver a three-month pilot.",contributions:["Technical expertise"],responsibilities:["Coordinate implementation"],outputs:["Pilot and outcomes report"],timeline:{proposed:"Three months"},authorizedRepresentatives:["Business owner representative","Requester representative"]}},requestRef,randomUUID()+randomUUID());
   assert.equal(businessRequest.recipient_user_id,businessOwner.user.id);
   const businessParticipants=await db.query("select user_id from network_plus_request_participant where request_id=$1",[businessRequest.id]);

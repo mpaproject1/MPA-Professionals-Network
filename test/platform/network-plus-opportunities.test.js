@@ -43,7 +43,7 @@ test("taxonomy-driven drafts are owner-authorized, structured, private and resum
   assert.match(service,/network_plus_service_listing_geography/);
   assert.match(service,/validateListingPricing/);
   assert.match(service,/SERVICE_AREA_REQUIRED/);
-  assert.match(service,/status=case when status in \('published','paused'\) then 'draft' else status end/);
+  assert.match(service,/status=case when status in \('published','paused','rejected'\) then 'draft' else status end/);
 });
 
 test("discovery filters use parameterized SQL and require verified, approved, published businesses",()=>{

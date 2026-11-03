@@ -14,12 +14,14 @@ import styles from "./membership-center.module.css";
 type ReportRow = Record<string, string | number | null>;
 type ReportResult = { report?: { title?: string; definition?: string }; generatedAt?: string; rows: ReportRow[]; totals?: Record<string, number> };
 type Me = { roles?: string[]; permissions?: string[] };
-type Filters = { from: string; to: string; q: string; status: string; memberStatus: string };
+type Filters = { from: string; to: string; q: string; status: string; memberStatus: string; geographyUnitId?: string };
+type GeographyUnit = { id: string; label: string; unit_level: string; parent_id?: string | null };
+type GeographyReference = { countries?: GeographyUnit[]; regions?: GeographyUnit[]; federalCities?: GeographyUnit[]; children?: GeographyUnit[] };
 
 const addisDateParts = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()).reduce<Record<string, string>>((parts, part) => { if (part.type !== "literal") parts[part.type] = part.value; return parts; }, {});
 const today = () => { const parts = addisDateParts(); return parts.year + "-" + parts.month + "-" + parts.day; };
 const currentYear = () => Number(addisDateParts().year);
-const initialFilters = (): Filters => ({ from: `${currentYear()}-01-01`, to: today(), q: "", status: "", memberStatus: "" });
+const initialFilters = (): Filters => ({ from: `${currentYear()}-01-01`, to: today(), q: "", status: "", memberStatus: "", geographyUnitId: "" });
 const number = (value: unknown) => Number(value || 0);
 const clean = (value: unknown) => String(value ?? "").toLowerCase().replaceAll("_", " ");
 const appPending = new Set(["submitted", "in_review", "correction_required"]);
@@ -66,7 +68,7 @@ function Kpi({ label, value, detail, icon: Icon, tone = "navy" }: { label: strin
 }
 
 async function downloadReport(token: string, id: string, filters: Filters, format: "csv" | "xlsx") {
-  const params = new URLSearchParams({ format, from: filters.from, to: filters.to, q: filters.q, status: filters.status, memberStatus: filters.memberStatus });
+  const params = new URLSearchParams({ format, from: filters.from, to: filters.to, q: filters.q, status: filters.status, memberStatus: filters.memberStatus, geographyUnitId: filters.geographyUnitId || "" });
   const response = await fetch(`/api/v1/admin/reports/${id}/export?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
   if (!response.ok) {
     let message = "The membership report export failed.";
@@ -90,6 +92,7 @@ export default function MembershipCenterPage() {
   const hydrateToken = useUiStore(state => state.hydrateToken);
   const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "signin">("loading");
   const [roles, setRoles] = useState<string[]>([]);
+  const [geographyOptions, setGeographyOptions] = useState<Array<{id:string;label:string}>>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [applications, setApplications] = useState<ReportResult | null>(null);
@@ -136,12 +139,22 @@ export default function MembershipCenterPage() {
         currentPermissions.some(permission => ["membership.review", "membership.activate", "members.view", "members.manage", "reports.view"].includes(permission));
       setRoles(currentRoles);
       setPermissions(currentPermissions);
+      try {
+        const reference = await api<GeographyReference>("/api/v1/member-geography/reference", {}, token);
+        const units = [...(reference.countries || []), ...(reference.regions || []), ...(reference.federalCities || []), ...(reference.children || [])];
+        const byId = new Map(units.map(unit => [unit.id, unit]));
+        setGeographyOptions(units.map(unit => {
+          const parent = unit.parent_id ? byId.get(unit.parent_id) : undefined;
+          const level = unit.unit_level.replaceAll("_", " ");
+          return { id: unit.id, label: level + " · " + unit.label + (parent ? " — " + parent.label : "") };
+        }));
+      } catch { setGeographyOptions([]); }
       if (!allowed) { setAccess("denied"); setApplications(null); setMembership(null); setMonthlyApplications(null); setCohortApplications(null); setMonthEndStock(null); setApplicationAging(null); setRenewalPipeline(null); setReviewerPerformance(null); setFinance(null); setFinanceAvailable(false); setGeneratedAt(""); return; }
 
       const [appResult, memberResult, monthlyResult, cohortResult, monthEndResult, agingResult, renewalResult] = await Promise.all([
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status }) }, token),
         // Current member stock is deliberately unbounded by the application-period filter.
-        api<ReportResult>("/api/v1/admin/reports/membership-status/run", { method: "POST", body: JSON.stringify({ q: nextFilters.q, status: nextFilters.memberStatus }) }, token),
+        api<ReportResult>("/api/v1/admin/reports/membership-status/run", { method: "POST", body: JSON.stringify({ q: nextFilters.q, status: nextFilters.memberStatus, geographyUnitId: nextFilters.geographyUnitId || "" }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-applications/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status, groupBy: "month" }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-application-cohorts/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to, q: nextFilters.q, status: nextFilters.status }) }, token),
         api<ReportResult>("/api/v1/admin/reports/membership-month-end-stock/run", { method: "POST", body: JSON.stringify({ from: nextFilters.from, to: nextFilters.to }) }, token),
@@ -268,6 +281,7 @@ export default function MembershipCenterPage() {
         <label>To<input type="date" value={filters.to} onChange={event => setFilters(current => ({ ...current, to: event.target.value }))}/></label>
         <label>Application stage<select value={filters.status} onChange={event => setFilters(current => ({ ...current, status: event.target.value }))}><option value="">All stages</option><option value="submitted">Submitted</option><option value="in_review">In review</option><option value="correction_required">Needs information</option><option value="approved">Approved</option><option value="payment_pending">Payment pending</option><option value="paid">Paid</option><option value="activated">Activated</option><option value="rejected">Rejected</option><option value="withdrawn">Withdrawn</option></select></label>
         <label>Member status<select value={filters.memberStatus} onChange={event => setFilters(current => ({ ...current, memberStatus: event.target.value }))}><option value="">All member statuses</option><option value="active">Active</option><option value="expired">Expired</option><option value="payment_verification_required">Finance verification required</option><option value="not_yet_active">Not yet active</option><option value="pending">Pending</option><option value="suspended">Suspended</option><option value="cancelled">Cancelled</option></select></label>
+        <label>Member residence<select value={filters.geographyUnitId || ""} onChange={event => setFilters(current => ({ ...current, geographyUnitId: event.target.value }))}><option value="">All locations</option><option value="unrecorded">Not recorded / outdated reference</option>{geographyOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
         <label className={styles.searchFilter}>Plan / application search<input value={filters.q} onChange={event => setFilters(current => ({ ...current, q: event.target.value.slice(0, 100) }))} placeholder="Search plan or application type"/></label>
         <button className="btn btn-primary" type="button" onClick={() => void load(filters)} disabled={busy}>{busy ? "Applying…" : "Apply filters"}</button>
       </div>

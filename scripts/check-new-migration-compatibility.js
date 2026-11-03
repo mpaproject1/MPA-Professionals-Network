@@ -846,7 +846,6 @@ try {
     "ux_network_plus_collaboration_event_idempotency",
     "ux_network_plus_collaboration_milestone_idempotency",
     "network_plus_request_contact_consent_pkey",
-    "ix_network_plus_contact_consent_peer",
     "ux_network_plus_request_meeting_active",
     "ux_network_plus_request_meeting_idempotency",
     "ix_network_plus_request_meeting_history",
@@ -887,6 +886,18 @@ try {
          !row.indexdef.includes("'declined'"))) {
       throw new Error("The mentorship rematching index must be partial and cover only proposed/accepted matches that have not been declined by the mentee.");
     }
+  }
+  // This is a lookup index, not a uniqueness constraint. The table's
+  // (request_id, recipient_user_id, field_code) primary key supplies the
+  // uniqueness invariant; the recipient-first index supports peer inbox reads.
+  const contactConsentPeerIndex = await client.query(
+    "select indexdef from pg_indexes where schemaname=$1 and indexname=$2",
+    ["public", "ix_network_plus_contact_consent_peer"]
+  );
+  if (!contactConsentPeerIndex.rows[0]?.indexdef ||
+      !contactConsentPeerIndex.rows[0].indexdef.includes("network_plus_request_contact_consent") ||
+      !contactConsentPeerIndex.rows[0].indexdef.includes("recipient_user_id")) {
+    throw new Error("The recipient-first contact-consent lookup index is missing or malformed.");
   }
   const supportGrantIndex=await client.query("select 1 from pg_indexes where schemaname=$1 and indexname=$2",["public","ix_network_plus_request_support_grant_active"]);
   if(!supportGrantIndex.rowCount) throw new Error("The active request-scoped support grant index is missing.");

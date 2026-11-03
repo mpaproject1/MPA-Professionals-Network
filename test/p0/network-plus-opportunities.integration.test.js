@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import test, { after } from "node:test";
 import * as membership from "../../src/membership/service.js";
 import * as businessDiscovery from "../../src/network-plus/business-discovery.js";
+import * as requestCollaboration from "../../src/network-plus/request-collaboration.js";
 import { closePool, getPool } from "../../src/platform/db.js";
 
 function accountInput(label){
@@ -63,6 +64,10 @@ test("Needs and Offers persist guided drafts, validate taxonomy, moderate listin
  const catalog=await businessDiscovery.listProfessionalServices(owner.user.id,{listingKind:"product_profile",category:"products_supply"});
  assert.ok(catalog.items.some(row=>row.id===product.id));
  assert.equal(catalog.items.find(row=>row.id===product.id).listing_kind,"product_profile");
+ await assert.rejects(()=>requestCollaboration.createNetworkPlusRequest(outsider.user.id,{intent:"service_request",recipientUserId:owner.user.id,serviceListingId:product.id,subject:"Order irrigation equipment",summary:"Attempt to turn a discovery profile into a product order.",details:{},terms:{scope:"Supply irrigation pumps",deliverables:["Deliver ten pumps"],pricing:{proposal:"Fixed quotation requested"},schedule:{requested:"To be agreed"}}},"np-product-order-"+suffix,randomUUID()+randomUUID()),e=>e.code==="PRODUCT_PROFILE_DISCOVERY_ONLY");
+ const inquiry=await requestCollaboration.createNetworkPlusRequest(outsider.user.id,{intent:"supplier_inquiry",recipientUserId:owner.user.id,serviceListingId:product.id,subject:"Question about irrigation pump",summary:"Please share the available pump specifications and supply capacity.",details:{question:"Which models are currently available?"},terms:{}},"np-product-inquiry-"+suffix,randomUUID()+randomUUID());
+ assert.ok(inquiry.id,"product discovery supports a supplier inquiry connection, not a checkout or order");
+
 
  await businessDiscovery.changeProfessionalServiceStatus(product.id,owner.user.id,"paused","Owner temporarily pauses the catalog profile","np-product-pause-"+suffix);
  assert.ok(!(await businessDiscovery.listProfessionalServices(owner.user.id,{listingKind:"product_profile"})).items.some(row=>row.id===product.id));

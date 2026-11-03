@@ -41,6 +41,10 @@ export async function queueEmailNotification(db,userId,templateCode,variables={}
  if(!user?.email||(optional&&!user.email_enabled))return false;
  const recipient=normalizeEmailAddress(user.email);
  const template=(await db.query("select enabled,audience from email_notification_template where template_code=$1",[templateCode])).rows[0];
+ if(!template){
+  await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.message.enqueue_template_missing','email_notification_template',$1,'failure',$2)",[templateCode,{userId,resourceType,resourceId}]);
+  return false;
+ }
  // Fail closed before creating an outbox record: enqueue and dispatch must agree
  // on the current persisted recipient identity and template governance.
  if(template?.enabled===false)return false;
@@ -287,7 +291,7 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
   });
   const results=[];
   for(const row of rows){
-   if(row.enabled===false||(row.audience&&!await recipientMatchesAudience(db,row.recipient,row.audience))){
+   if((row.template_code!=="admin.manual"&&(row.enabled!==true||!row.audience))||(row.audience&&!await recipientMatchesAudience(db,row.recipient,row.audience))){
     await db.query("update notification_outbox set status='cancelled',delivery_status='cancelled',delivery_event_type=$2,delivery_event_at=now(),locked_at=null,updated_at=now() where id=$1",[row.id,row.enabled===false?"template_disabled":"audience_mismatch"]);
     results.push({id:row.id,status:"cancelled"});continue;
    }
@@ -324,6 +328,12 @@ export async function dispatchEmailOutbox(actorId,{limit=20,onlyId=null,system=f
   try{
    let subject=row.subject||"",textBody=row.text_body||row.payload?.text||"",htmlBody=row.html_body||row.payload?.html||"";
    const template=(await db.query("select subject_template,text_template,html_template,enabled,audience,adjustable_by_admin from email_notification_template where template_code=$1",[row.template_code])).rows[0];
+   if(!template&&row.template_code!=="admin.manual"){
+    await db.query("update notification_outbox set status='cancelled',delivery_status='cancelled',delivery_event_type='template_missing',delivery_event_at=now(),last_error='Workflow email template is not configured',locked_at=null,updated_at=now() where id=$1",[row.id]);
+    await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.message.template_missing','notification_outbox',$1,'failure',$2)",[row.id,{templateCode:row.template_code}]);
+    results.push({id:row.id,status:"cancelled",reason:"template_missing"});
+    continue;
+   }
    if(template&&!await recipientMatchesAudience(db,row.recipient,template.audience)){
     await db.query("update notification_outbox set status='cancelled',delivery_status='cancelled',delivery_event_type='audience_mismatch',delivery_event_at=now(),last_error='Recipient does not match the notification template audience',locked_at=null,updated_at=now() where id=$1",[row.id]);
     await db.query("insert into audit_log(action,resource_type,resource_id,outcome,metadata) values('email.message.audience_rejected','notification_outbox',$1,'failure',$2)",[row.id,{templateCode:row.template_code,audience:template.audience}]);

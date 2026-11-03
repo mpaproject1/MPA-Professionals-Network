@@ -43,11 +43,11 @@ export function assertEmailDeliveryConfigured() {
 export async function createEmailVerification(db, userId, email, registrationReference, firstName = "") {
   assertEmailDeliveryConfigured();
   const token = randomBytes(32).toString("base64url");
+  const encrypted = encryptVerificationToken(token);
   const tokenRow = (await db.query(
     "insert into email_verification_token(user_id,token_hash,expires_at) values($1,$2,now()+interval '24 hours') returning id",
     [userId, sha256(token)]
   )).rows[0];
-  const encrypted = encryptVerificationToken(token);
   await db.query(
     "insert into email_verification_delivery(verification_token_id,encrypted_token,encryption_iv,encryption_tag) values($1,$2,$3,$4)",
     [tokenRow.id, encrypted.encryptedToken, encrypted.encryptionIv, encrypted.encryptionTag]

@@ -12,7 +12,7 @@ test("Test Lab membership applications are excluded from management funnel, coho
   }
   const db = getPool();
   const suffix = randomUUID();
-  const digits = suffix.replace(/\\D/g, "").slice(0, 8).padEnd(8, "7");
+  const digits = suffix.replace(/\D/g, "").slice(0, 8).padEnd(8, "7");
   const created = await membership.register({
     email: "test-lab-report-" + suffix + "@example.test",
     password: "TestLabReportFixture!2026",

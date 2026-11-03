@@ -645,3 +645,12 @@ Do not build a marketplace, CRM, investor execution system, business performance
 The Needs & Offers implementation now extends the canonical business/listing model with governed category/subcategory taxonomy, category-specific structured fields, versioned service-area references, remote availability, capacity/intake/lead-time disclosures, target-audience segments and structured pricing disclosures. The `/network-plus/opportunities` app workspace provides server-driven discovery, an eight-step guided wizard, server-persisted autosave/resume, owner edit/pause/close controls, private business evidence upload and independent business/listing review workspaces.
 
 Implementation details and the regression plan are recorded in [docs/72-network-plus-phase-1-needs-offers-implementation.md](72-network-plus-phase-1-needs-offers-implementation.md). This is a source-level implementation record, not a claim that CI, disposable PostgreSQL, full backend tests, Playwright or production deployment have passed.
+
+
+## Phase 2 implementation record — connection requests and consent handoff
+
+Phase 2 extends the canonical `network_plus_request` foundation with four lightweight intents (`interest`, `question`, `quote_request`, `meeting_request`), structured recipient clarification, field-specific bilateral contact consent, one-time meeting proposal/counterproposal/confirmation, and a dedicated Network-Plus notification category. Contact values are application-encrypted and remain undisclosed until both participants consent to the same field. Listing detail actions deep-link into the existing request workspace with the listing context preselected. Lightweight requests do not enable collaboration workspaces; the existing optional workspace remains unchanged for eligible legacy engagement intents.
+
+The implementation also closes Phase 1 integration gaps: product profiles now accept the four discovery-only connection intents without enabling commerce, listing detail cards expose contextual icon-led actions, paused/unavailable listings remain protected by the request service, and meeting location fields reject contact details or meeting links.
+
+See [docs/73-network-plus-phase-2-connection-consent-handoff.md](73-network-plus-phase-2-connection-consent-handoff.md) for schema, routes, privacy rules, encryption configuration and regression plan. Source-level implementation is recorded; disposable PostgreSQL migration execution, full test suites, CI and deployed encryption-key configuration remain to be verified.

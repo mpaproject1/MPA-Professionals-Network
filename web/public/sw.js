@@ -1,10 +1,11 @@
 /* MPA PWA foundation. Never cache API responses, authenticated pages, or user-specific data. */
 const CACHE_PREFIX = "mpa-pwa-";
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v5";
 const STATIC_CACHE = `${CACHE_PREFIX}static-${CACHE_VERSION}`;
+const OFFLINE_PUBLIC_ROUTES = ["/", "/mobile", "/about", "/jobs", "/serve-community"];
 const PRECACHE_URLS = [
-  "/",
-  "/mobile",
+  ...OFFLINE_PUBLIC_ROUTES,
+
   "/manifest.webmanifest",
   "/brand/mpa-pwa-icon.svg",
   "/brand/apple-touch-icon.png",
@@ -95,32 +96,48 @@ self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "MPA_SKIP_WAITING") self.skipWaiting();
 });
 
+function offlineNavigationHtml() {
+  return "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"theme-color\" content=\"#0A3258\"><title>MPA offline workspace</title><body style=\"font:16px system-ui;max-width:44rem;margin:8vh auto;padding:1.25rem;color:#0A3258;background:#f7f9fb\"><p style=\"font-size:12px;font-weight:700;letter-spacing:.15em\">MPA · OFFLINE</p><h1 style=\"font-size:2rem\">Your front-end is ready offline.</h1><p>You can still open public pages saved on this device. Sign-in, account records, notifications, forms and changes need an internet connection.</p><nav aria-label=\"Offline navigation\" style=\"display:grid;gap:.75rem;margin:2rem 0\"><a style=\"padding:1rem;border:1px solid #cbd5e1;border-radius:12px;background:white;color:#0A3258\" href=\"/mobile\">MPA mobile home</a><a style=\"padding:1rem;border:1px solid #cbd5e1;border-radius:12px;background:white;color:#0A3258\" href=\"/about\">About MPA</a><a style=\"padding:1rem;border:1px solid #cbd5e1;border-radius:12px;background:white;color:#0A3258\" href=\"/jobs\">Jobs and opportunities</a><a style=\"padding:1rem;border:1px solid #cbd5e1;border-radius:12px;background:white;color:#0A3258\" href=\"/serve-community\">Serve the community</a></nav><p>Pages you have not opened while online may not yet be available offline.</p><button onclick=\"location.reload()\">Try connection again</button></body></html>";
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Never intercept APIs, authentication, private workspaces, or workflow mutations.
+  // Private and authenticated routes always require the network. Never cache their HTML.
   const privatePrefixes = [
-    "/api/", "/auth/", "/account/", "/admin/", "/dashboard/",
-    "/notifications", "/membership", "/verification", "/organizations",
-    "/applications", "/applications/", "/mentorship/requests", "/services/requests"
+    "/api", "/auth", "/account", "/admin", "/dashboard", "/notifications",
+    "/membership", "/verification", "/organizations", "/applications",
+    "/members", "/mentorship", "/learning", "/network-plus", "/track",
+    "/profile", "/saved", "/services", "/workspaces", "/recruitment"
   ];
-  if (privatePrefixes.some((prefix) => url.pathname === prefix || url.pathname.startsWith(prefix))) return;
+  if (privatePrefixes.some((prefix) => url.pathname === prefix || url.pathname.startsWith(prefix + "/"))) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(async () => {
-      // Public landing page may have been precached. Never replay a private URL.
-      const cachedHome = await caches.match("/");
-      if (cachedHome && url.pathname === "/") return cachedHome;
-      const cachedMobileHome = await caches.match("/mobile");
-      if (cachedMobileHome && url.pathname === "/mobile") return cachedMobileHome;
-      return new Response(
-        "<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"theme-color\" content=\"#0A3258\"><title>Offline · MPA</title><body style=\"font:16px system-ui;max-width:38rem;margin:12vh auto;padding:1.25rem;color:#0A3258\"><h1>You’re offline</h1><p>Reconnect to continue using MPA. Sign-in, forms, notifications, review decisions and account data require a live connection.</p><button onclick=\"location.reload()\">Try again</button></body></html>",
-        { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }, status: 503 }
-      );
-    }));
+    const isPublicOfflineRoute = OFFLINE_PUBLIC_ROUTES.includes(url.pathname) && !url.search;
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        const contentType = response.headers.get("content-type") || "";
+        const cacheControl = response.headers.get("cache-control") || "";
+        if (isPublicOfflineRoute && response.ok && contentType.includes("text/html") && !/private|no-store/i.test(cacheControl)) {
+          const cache = await caches.open(STATIC_CACHE);
+          await cache.put(url.pathname, response.clone());
+        }
+        return response;
+      } catch {
+        if (isPublicOfflineRoute) {
+          const cached = await caches.match(url.pathname);
+          if (cached) return cached;
+        }
+        return new Response(offlineNavigationHtml(), {
+          headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+          status: 503
+        });
+      }
+    })());
     return;
   }
 

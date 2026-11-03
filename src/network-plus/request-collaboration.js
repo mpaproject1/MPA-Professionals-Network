@@ -341,8 +341,8 @@ export async function getNetworkPlusRequest(requestId,userId,{supportReason,supp
     const canAccept=isRecipientRepresentative&&await hasCurrentRecipientAuthority(db,row,userId,"business.accept_terms");
     return { ...row,
       recipient_response:isRecipientRepresentative||row.requester_user_id===userId||row.recipient_user_id===userId?row.recipient_response:null,
-      recipient_response_by:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_by:null,
-      recipient_response_at:isRecipientRepresentative||row.requester_user_id===userId?row.recipient_response_at:null,
+      recipient_response_by:isRecipientRepresentative||row.requester_user_id===userId||row.recipient_user_id===userId?row.recipient_response_by:null,
+      recipient_response_at:isRecipientRepresentative||row.requester_user_id===userId||row.recipient_user_id===userId?row.recipient_response_at:null,
       requester_disposition:row.requester_user_id===userId?row.requester_disposition:null,
       requester_disposition_remark:row.requester_user_id===userId?row.requester_disposition_remark:null,
       requester_disposition_updated_at:row.requester_user_id===userId?row.requester_disposition_updated_at:null,

@@ -246,6 +246,9 @@ test("Phase 3 requester disposition is separate from lifecycle status, requires 
  const completed=await requests.updateNetworkPlusRequestDisposition(request.id,requester.user.id,{disposition:"completed",remark:"Contact exchanged; we will continue directly."},`np-disposition-complete-${suffix}`,randomUUID()+randomUUID());
  assert.equal(completed.status,"submitted","request lifecycle status must not be rewritten by requester disposition");
  assert.equal(completed.requester_disposition,"completed");
+ const recipientView=await requests.getNetworkPlusRequest(request.id,recipient.user.id);
+ assert.equal(recipientView.requester_disposition,null,"requester-reported outcomes must not be disclosed to the recipient");
+ assert.ok(!recipientView.events.some(event=>event.event_code.startsWith("request.disposition_")),"requester disposition history must remain private");
  const reopened=await requests.updateNetworkPlusRequestDisposition(request.id,requester.user.id,{disposition:"in_progress",remark:"Reopening to continue the introduction."},`np-disposition-reopen-${suffix}`,randomUUID()+randomUUID());
  assert.equal(reopened.requester_disposition,"in_progress");
  await requests.transitionNetworkPlusRequest(request.id,recipient.user.id,{status:"accepted"},`np-disposition-accept-${suffix}`,randomUUID()+randomUUID());

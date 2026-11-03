@@ -15,6 +15,7 @@ async function mockOpportunityMall(page,{drafts=[],items=[listing]}={}){
  await page.route("**/api/v1/notifications?*",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{counts:{unread:0}}})}));
  await page.route("**/api/v1/network-plus/access",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{eligible:true,access:{member:true,organization:false},nextAction:"Choose discovery."}})}));
  await page.route("**/api/v1/network-plus/listing-taxonomy",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:taxonomy})}));
+ await page.route("**/api/v1/network-plus/geography-reference",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{version:null,countries:[],regions:[],federalCities:[],children:[]}})}));
  await page.route("**/api/v1/network-plus/my/businesses",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[business]})}));
  await page.route("**/api/v1/network-plus/my/listings",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:drafts})}));
  await page.route("**/api/v1/network-plus/listings",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{items,limit:20,offset:0,total:items.length,hasMore:false}})}));
@@ -42,7 +43,7 @@ test("guided listing wizard autosaves category-specific fields and submits for m
  await page.route("**/api/v1/network-plus/services/np-draft-1/submit",async route=>{submitted=true;await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{...draft,status:"pending_review"}})});});
  await page.goto("/network-plus/opportunities");await page.getByRole("button",{name:"Create listing"}).click();
  await page.getByRole("button",{name:/I offer/}).first().click();await page.getByRole("button",{name:"Start private draft"}).click();
- await expect(page.getByText("Step 1 of 7")).toBeVisible();await page.getByRole("button",{name:"Continue"}).click();
+ await expect(page.getByText("Step 1 of 8")).toBeVisible();await page.getByRole("button",{name:"Continue"}).click();
  await page.getByRole("button",{name:"Technology & digital"}).click();await page.getByRole("button",{name:"Continue"}).click();
  await page.getByLabel("Listing title").fill("Data engineering support");
  await page.getByLabel("Short summary").fill("Experienced team available for data engineering and analytics.");
@@ -50,7 +51,7 @@ test("guided listing wizard autosaves category-specific fields and submits for m
  await page.getByRole("button",{name:"Continue"}).click();
  await page.getByLabel("More specific category").selectOption("software_development");
  await page.getByLabel("Technology area").selectOption(["data"]);await page.getByLabel("Platform").selectOption(["web"]);
- await page.getByRole("button",{name:"Continue"}).click();await page.getByRole("button",{name:"Continue"}).click();await page.getByRole("button",{name:"Continue"}).click();
+ await page.getByRole("button",{name:"Continue"}).click();await page.getByRole("button",{name:"Continue"}).click();await page.getByRole("button",{name:"Continue"}).click();await page.getByRole("button",{name:"Continue"}).click();
  await expect(page.getByRole("heading",{name:"Ready to submit?"})).toBeVisible();
  await page.getByRole("button",{name:"Submit for independent moderation"}).click();
  await expect.poll(()=>submitted).toBe(true);await expect(page.getByRole("heading",{name:"My listings"})).toBeVisible();

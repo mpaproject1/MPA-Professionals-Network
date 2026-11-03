@@ -35,7 +35,7 @@ test("Needs and Offers persist guided drafts, validate taxonomy, moderate listin
  assert.equal(replay.id,draft.id);assert.equal(replay.idempotent,true);
  await assert.rejects(()=>businessDiscovery.createOpportunityListingDraft(business.id,owner.user.id,{...initial,listingKind:"need"},"np-create-conflict-"+suffix,key),e=>e.code==="IDEMPOTENCY_CONFLICT");
 
- const base={listingKind:"offer",categoryCode:"technology",subcategoryCode:"software_development",title:"Verified data engineering capacity",summary:"Experienced team available for structured data engineering work.",description:"A synthetic offer describing data pipeline design, implementation and support for organizations seeking reliable analytics foundations.",wizardStep:4,audience:"both",deliveryMode:"hybrid",locationLabel:"Addis Ababa",structuredAttributes:{},pricingModel:"quote"};
+ const base={listingKind:"offer",categoryCode:"technology",subcategoryCode:"software_development",title:"Verified data engineering capacity",summary:"Experienced team available for structured data engineering work.",description:"A synthetic offer describing data pipeline design, implementation and support for organizations seeking reliable analytics foundations.",wizardStep:4,audience:"both",deliveryMode:"hybrid",locationLabel:"Addis Ababa",structuredAttributes:{},pricingModel:"quote",timezone:"Africa/Addis_Ababa",nextAvailableAt:"2026-12-01T09:00"};
  await businessDiscovery.saveOpportunityListingDraft(draft.id,owner.user.id,base,"np-autosave-"+suffix);
  const geographyVersion=(await db.query("select id from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0];
  let geographyUnitId=null;
@@ -48,8 +48,9 @@ test("Needs and Offers persist guided drafts, validate taxonomy, moderate listin
    assert.equal(area.label,geographyUnit.label);assert.equal(area.geography_version_id,geographyVersion.id);
   }
  }
- const persisted=(await db.query("select wizard_step,title,subcategory_code,structured_attributes,draft_saved_at,status from network_plus_service_listing where id=$1",[draft.id])).rows[0];
+ const persisted=(await db.query("select wizard_step,title,subcategory_code,structured_attributes,draft_saved_at,status,timezone,next_available_at from network_plus_service_listing where id=$1",[draft.id])).rows[0];
  assert.equal(persisted.wizard_step,4);assert.equal(persisted.title,base.title);assert.equal(persisted.subcategory_code,"software_development");assert.ok(persisted.draft_saved_at);assert.equal(persisted.status,"draft");
+ assert.equal(persisted.timezone,"Africa/Addis_Ababa");assert.equal(new Date(persisted.next_available_at).toISOString(),"2026-12-01T06:00:00.000Z");
  await assert.rejects(()=>businessDiscovery.submitProfessionalServiceListing(draft.id,owner.user.id,"np-incomplete-"+suffix),e=>e.code==="LISTING_CATEGORY_FIELD_REQUIRED");
  await assert.rejects(()=>businessDiscovery.saveOpportunityListingDraft(draft.id,outsider.user.id,{title:"Unauthorized edit"},"np-outsider-"+suffix),e=>e.code==="BUSINESS_FORBIDDEN");
  await businessDiscovery.saveOpportunityListingDraft(draft.id,owner.user.id,{structuredAttributes:{technology_area:["data"],platform:["web"]},wizardStep:7},"np-complete-"+suffix);

@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, MapPinned, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { useUiStore } from "../lib/store";
-import { Card } from "./ui";
 import { OperationStatus } from "./operation-status";
+import { Card } from "./ui";
+
 type Group={country_code?:string;country_name?:string;unit_code?:string;label?:string;unit_level?:string;member_count:number};
 type Summary={publishedVersion?:{id:string;version_label:string;published_at:string}|null;residencesOutsidePublishedVersion:number;residenceTypes:{residence_type:string;member_count:number}[];countries:Group[];ethiopiaLevel1:Group[];ethiopiaLevel2:Group[];ethiopiaLevel3:Group[];generatedAt:string};
 export function MemberGeographySummary(){

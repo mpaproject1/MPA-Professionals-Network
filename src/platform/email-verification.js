@@ -1,9 +1,9 @@
-import { classifyEmailDeliveryError, emailRetryDelaySeconds } from "./email-retry-policy.js";
 import { createHash, randomBytes } from "node:crypto";
-import { encryptVerificationToken, decryptVerificationToken } from "./email-verification-crypto.js";
-import { getPool, withTransaction } from "./db.js";
 import { loadConfig } from "./config.js";
+import { getPool, withTransaction } from "./db.js";
+import { classifyEmailDeliveryError, emailRetryDelaySeconds } from "./email-retry-policy.js";
 import { renderVerificationEmail } from "./email-template.js";
+import { decryptVerificationToken, encryptVerificationToken } from "./email-verification-crypto.js";
 
 const sha256 = value => createHash("sha256").update(String(value)).digest("hex");
 const clean = value => String(value || "").trim();

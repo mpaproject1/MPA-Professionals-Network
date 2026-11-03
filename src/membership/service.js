@@ -678,6 +678,7 @@ export async function captureMembershipMonthEndSnapshot(now=new Date()){
  if(!window.eligible)return {captured:false,snapshotDate:window.snapshotDate,reason:"outside_month_end_capture_window"};
  return withTransaction(async db=>{
   await db.query("select pg_advisory_xact_lock(hashtext($1))",["membership-month-end:"+window.snapshotDate]);
+  await db.query("delete from membership_month_end_snapshot where snapshot_date=$1::date",[window.snapshotDate]);
   const result=await db.query(`insert into membership_month_end_snapshot(snapshot_date,membership_status,product_code,member_count)
    select $1::date,effective_status,coalesce(product_code,'UNSPECIFIED'),count(*)::int
    from (

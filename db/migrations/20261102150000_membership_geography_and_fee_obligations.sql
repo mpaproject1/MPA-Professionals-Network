@@ -456,9 +456,6 @@ insert into app_permission(permission_code,area,label,description,sensitive,syst
  ('finance.payment.adjust','Finance','Approve non-cash membership fee adjustments','Approve sponsorship, honored-member and volunteer-activity fee settlements with maker/checker audit.',true,false),
  ('finance.payment.import','Finance','Import pending membership payments','Import payment rows into a pending queue; each payment still requires individual Finance verification.',true,false)
 on conflict(permission_code) do update set area=excluded.area,label=excluded.label,description=excluded.description,sensitive=excluded.sensitive,system_only=excluded.system_only;
-)
-      or (unit_level<>'country' and parent_id is not null and country_iso3 is null and country_m49 is null))
-);
 create index if not exists membership_geography_unit_parent_idx on membership_geography_unit(version_id,parent_id,unit_level,active);
 create index if not exists membership_geography_unit_lookup_idx on membership_geography_unit(version_id,unit_level,active,label);
 

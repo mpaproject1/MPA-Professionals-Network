@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import {
+  applyMemberGeographyImport,
+  getMemberGeographySummary,
+  getMyResidence,
+  listMemberGeography,
   memberGeographyImportTemplate,
   previewMemberGeographyImport,
-  applyMemberGeographyImport,
   publishMemberGeographyVersion,
-  listMemberGeography,
   saveMyResidence,
-  getMyResidence,
-  getMemberGeographySummary,
 } from "../../src/membership/geography.js";
 import * as membership from "../../src/membership/service.js";
 import { getPool } from "../../src/platform/db.js";

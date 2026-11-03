@@ -61,6 +61,7 @@ test("administrative audit report applies date, outcome and search filters to kn
     }, runRequestId);
 
     assert.equal(result.report.id, "audit-activity");
+    assert.equal(result.reportingTimezone, "Africa/Addis_Ababa", "report results declare the MPA civil reporting timezone");
     assert.match(result.report.definition, /Operational audit events/);
     assert.equal(result.filters.from, today);
     assert.equal(result.filters.to, today);
@@ -83,6 +84,7 @@ test("administrative audit report applies date, outcome and search filters to kn
     assert.equal(csv.contentType, "text/csv; charset=utf-8");
     assert.match(csv.filename, /\.csv$/);
     assert.equal(csv.buffer.subarray(0, 3).toString("utf8"), "\uFEFF");
+    assert.ok(csv.buffer.toString("utf8").includes("Reporting timezone: Africa/Addis_Ababa"), "CSV exports include reporting timezone metadata");
     assert.ok(csv.buffer.toString("utf8").includes(marker), "CSV export should contain the known matching row");
 
     const xlsx = await exportReport(identity, "audit-activity", {
@@ -94,6 +96,7 @@ test("administrative audit report applies date, outcome and search filters to kn
     const worksheet = readZipEntry(xlsx.buffer, "xl/worksheets/sheet1.xml");
     assert.ok(worksheet.includes(marker), "XLSX export should contain the known matching row");
     assert.ok(worksheet.includes("success"), "XLSX export should preserve the filtered outcome");
+    assert.ok(worksheet.includes("Reporting timezone: Africa/Addis_Ababa"), "XLSX exports include reporting timezone metadata");
 
     await assert.rejects(
       runReport(identity, "audit-activity", { from: today, to: "2000-01-01" }, randomUUID()),

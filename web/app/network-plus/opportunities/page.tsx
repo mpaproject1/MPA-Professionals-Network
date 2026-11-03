@@ -5,7 +5,7 @@ import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 
 type Taxon={code:string;parent_code:string|null;label:string;description:string;listing_kinds:string[];field_schema:{code:string;label:string;type:string;options?:string[];required?:boolean}[]};
-type Business={id:string;display_name:string;business_kind:string;verification_status:string;moderation_status:string;publication_status:string};
+type Business={id:string;display_name:string;business_kind:string;description?:string;website?:string|null;location_label?:string|null;verification_status:string;moderation_status:string;publication_status:string};
 type Organization={id:string;display_name?:string;name?:string};
 type Listing={id:string;business_id:string;business_name:string;title:string|null;summary:string|null;description?:string|null;category_code?:string|null;subcategory_code?:string|null;listing_kind:string;structured_attributes?:Record<string,any>;wizard_step:number;draft_saved_at?:string|null;status:string;moderation_reason?:string|null;location_label?:string|null;published_at?:string|null;pricing_model?:string;audience?:string;delivery_mode?:string;capacity?:number|null;price_amount?:number|null;currency?:string|null};
 type ListingResult={items:Listing[];total:number;hasMore:boolean};
@@ -24,6 +24,7 @@ export default function NetworkPlusOpportunitiesPage(){
  const [audience,setAudience]=useState("both"),[deliveryMode,setDeliveryMode]=useState("remote"),[locationLabel,setLocationLabel]=useState(""),[capacity,setCapacity]=useState(""),[pricingModel,setPricingModel]=useState("quote"),[priceAmount,setPriceAmount]=useState(""),[currency,setCurrency]=useState("ETB");
  const [businessName,setBusinessName]=useState(""),[businessDescription,setBusinessDescription]=useState(""),[ownerType,setOwnerType]=useState("member"),[organizationId,setOrganizationId]=useState(""),[businessWebsite,setBusinessWebsite]=useState(""),[businessLocation,setBusinessLocation]=useState("");
  const [evidenceBusinessId,setEvidenceBusinessId]=useState(""),[evidenceFileId,setEvidenceFileId]=useState(""),[evidenceType,setEvidenceType]=useState("business registration");
+ const [editingBusinessId,setEditingBusinessId]=useState(""),[editBusinessName,setEditBusinessName]=useState(""),[editBusinessDescription,setEditBusinessDescription]=useState(""),[editBusinessWebsite,setEditBusinessWebsite]=useState(""),[editBusinessLocation,setEditBusinessLocation]=useState("");
  const [saving,setSaving]=useState(false),[loading,setLoading]=useState(true),[saveState,setSaveState]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const saveQueue=useRef<Promise<void>>(Promise.resolve());
 
@@ -87,8 +88,14 @@ export default function NetworkPlusOpportunitiesPage(){
  };
  const addEvidence=async()=>{
   if(!token||!evidenceBusinessId||!evidenceFileId)return;setSaving(true);setError("");setNotice("");
-  try{await api("/api/v1/network-plus/businesses/"+evidenceBusinessId+"/evidence",{method:"POST",body:JSON.stringify({fileObjectId:evidenceFileId,evidenceType})},token);setNotice("Private verification evidence attached. You can now submit the business for independent verification.");setEvidenceFileId("");}
+  try{await api("/api/v1/network-plus/businesses/"+evidenceBusinessId+"/evidence",{method:"POST",body:JSON.stringify({fileObjectId:evidenceFileId,evidenceType})},token);await api("/api/v1/network-plus/businesses/"+evidenceBusinessId+"/verification",{method:"POST",body:JSON.stringify({})},token);setNotice("Private evidence attached and business submitted for independent verification.");setEvidenceFileId("");setEvidenceBusinessId("");await load();}
   catch(e){setError(e instanceof ApiError?e.message:"Evidence could not be attached.");}finally{setSaving(false);}
+ };
+ const beginBusinessEdit=(b:Business)=>{setEditingBusinessId(b.id);setEditBusinessName(b.display_name);setEditBusinessDescription(b.description||"");setEditBusinessWebsite(b.website||"");setEditBusinessLocation(b.location_label||"");};
+ const saveBusinessEdit=async()=>{
+  if(!token||!editingBusinessId)return;setSaving(true);setError("");setNotice("");
+  try{await api("/api/v1/network-plus/businesses/"+editingBusinessId,{method:"PATCH",body:JSON.stringify({displayName:editBusinessName,description:editBusinessDescription,website:editBusinessWebsite||null,locationLabel:editBusinessLocation||null})},token);setEditingBusinessId("");setNotice("Business profile updated. Verification and moderation must be renewed before it is publicly discoverable.");await load();}
+  catch(e){setError(e instanceof ApiError?e.message:"Business profile could not be updated.");}finally{setSaving(false);}
  };
  const businessAction=async(id:string,action:string,body:Record<string,any>={})=>{
   if(!token)return;setSaving(true);setError("");setNotice("");

@@ -3,21 +3,13 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 
 import { hashPassword } from "../membership/identity.js";
+import * as membership from "../membership/service.js";
+import { TEST_LAB_PERSONAS, TEST_LAB_SCENARIOS } from "./test-lab-catalog.js";
 import { getPool, withTransaction } from "./db.js";
 import { seedTestLabDomainFixtures } from "./test-lab-domain-fixtures.js";
 import { createXlsx } from "./xlsx.js";
 
-const ROLE_FIXTURES = [
- {persona:"Member — incomplete profile",name:["Amina","Yusuf"],role:"member"},
- {persona:"Member — pending membership",name:["Bilal","Ahmed"],role:"member"},
- {persona:"Active member — verification pending",name:["Hana","Mohammed"],role:"member"},
- {persona:"Verified professional / mentor",name:["Yusuf","Ibrahim"],role:"member"},
- {persona:"Membership reviewer",name:["Mariam","Abdi"],role:"reviewer"},
- {persona:"Verification reviewer",name:["Ahmed","Nur"],role:"verification_reviewer"},
- {persona:"Independent appeal reviewer",name:["Fatima","Hassan"],role:"appeal_reviewer"},
- {persona:"Finance officer",name:["Ibrahim","Suleiman"],role:"finance_officer"},
- {persona:"Support staff",name:["Samira","Ali"],role:"supporting_staff"}
-];
+const ROLE_FIXTURES = TEST_LAB_PERSONAS.map(({persona,name,role})=>({persona,name,role}));
 const ROLE_NAMES = {
  member:"Member", reviewer:"Reviewer", verification_reviewer:"Verification Reviewer",
  appeal_reviewer:"Appeal Reviewer", finance_officer:"Finance Officer", supporting_staff:"Supporting Staff"
@@ -38,6 +30,33 @@ async function assertSafeEnvironment(db){
  if(!actual)throw fail(503,"The configured database could not be identified. No test data was changed.","TEST_LAB_DATABASE_UNAVAILABLE");
  return actual;
 }
+async function seedTestLabPaymentJourneys({portfolioId,prefix,accounts,requestId}) {
+ const db=getPool(),applicants=accounts.filter(account=>account.role==="member").slice(4,7);
+ const finance=accounts.find(account=>account.role==="finance_officer");
+ if(applicants.length!==3||!finance)throw fail(409,"Payment journey personas are incomplete.","TEST_PAYMENT_FIXTURE_PREREQUISITE_MISSING");
+ const product=(await db.query("select currency from membership_product where product_code='BASIC' and active=true limit 1")).rows[0];
+ if(!product)throw fail(409,"The Basic membership product is unavailable.","TEST_PAYMENT_FIXTURE_PREREQUISITE_MISSING");
+ const methodCode="tlcash_"+prefix;
+ await db.query("insert into membership_payment_method(method_code,method_type,display_name,enabled,currency,instructions,requires_evidence,updated_by,metadata) values($1,'cash','Test Lab simulated cash',true,$2,'Synthetic payment simulation only; no money is collected.',false,$3,$4) on conflict(method_code) do update set enabled=true,currency=excluded.currency,instructions=excluded.instructions,requires_evidence=false,updated_by=excluded.updated_by,metadata=excluded.metadata",[methodCode,product.currency,finance.userId,{testLab:true,portfolioId}]);
+ try {
+  for(let index=0;index<applicants.length;index++){
+   const account=applicants[index];
+   const application=await membership.createApplication(account.userId,{productCode:"BASIC",applicationType:"new",termsAcknowledged:true,idempotencyKey:"testlab_"+prefix+"_application_"+(index+1)},"test-lab:"+portfolioId+":application:"+(index+1));
+   const fee=typeof application.fee_snapshot==="string"?JSON.parse(application.fee_snapshot):application.fee_snapshot;
+   const payment=await membership.createManualPayment(application.id,account.userId,{paymentMethodCode:methodCode,amount:Number(fee.amount),currency:fee.currency,purpose:"membership_fee",channel:"cash",idempotencyKey:"testlab_"+prefix+"_payment_"+(index+1)},"test-lab:"+portfolioId+":payment:"+(index+1));
+   await db.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'membership_application',$2),($1,'payment_transaction',$3) on conflict do nothing",[portfolioId,application.id,payment.id]);
+   const link=(await db.query("select id from membership_application_payment where application_id=$1 and payment_transaction_id=$2",[application.id,payment.id])).rows[0];
+   if(link?.id)await db.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'membership_application_payment',$2) on conflict do nothing",[portfolioId,link.id]);
+   if(index===1)await membership.verifyPayment(payment.id,finance.userId,{decision:"approved",note:"Synthetic Test Lab verification; no external funds were transferred."},"test-lab:"+portfolioId+":verify:"+ (index+1));
+   if(index===2)await membership.verifyPayment(payment.id,finance.userId,{decision:"rejected",note:"Synthetic Test Lab rejection; no external funds were transferred."},"test-lab:"+portfolioId+":verify:"+ (index+1));
+   const seededStatus=index===0?"pending":index===1?"succeeded":"failed";
+   await db.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','membership_payment_fixture_created',$2)",[portfolioId,{paymentId:payment.id,status:seededStatus,amount:payment.amount,currency:payment.currency,applicationId:application.id}]);
+  }
+ } finally {
+  await db.query("delete from membership_payment_method where method_code=$1 and metadata->>'testLab'='true' and metadata->>'portfolioId'=$2",[methodCode,portfolioId]);
+ }
+}
+
 function makePortfolioName(value){const name=clean(value,100);if(name.length<4)throw fail(400,"Portfolio name must contain at least four characters.","VALIDATION_ERROR");return name;}
 function makeEmail(prefix,role,index){return `qa.${prefix}.${role.replace(/_/g,"-")}.${index}@example.test`;}
 function randomId(){return crypto.randomUUID();}
@@ -90,26 +109,19 @@ export async function createTestPortfolio(identity,input={},requestId=null){
     [email,{testPortfolioId:portfolioId,synthetic:true},`This is a test-only message for portfolio ${portfolioId}. No external email will be sent while delivery capture is enabled.`]);
    accounts.push({email,password,displayName:fixture.name.join(" "),persona:fixture.persona,role:fixture.role,userId:user.id});
   }
-  // Clearly simulated transactions only: no provider API, webhook or bank integration is invoked.
-  for(const [index,status,amount] of [[1,"succeeded",1200],[2,"pending",1200],[3,"failed",50000]]){
-   const payment=(await tx.query(`insert into payment_transaction(provider,provider_transaction_id,idempotency_key,purpose,amount,currency,status,request_payload,response_payload)
-    values('test-simulator',$1,$2,'test_lab_simulation',$3,'ETB',$4,$5,$6) returning id`,
-    [`QA-${prefix}-PAY-${index}`,`test-lab:${portfolioId}:payment:${index}`,amount,status,{testPortfolioId:portfolioId,simulated:true},{captured:true,noExternalProvider:true}])).rows[0];
-   await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'payment_transaction',$2)",[portfolioId,payment.id]);
-   await tx.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','simulated_payment_created',$2)",[portfolioId,{paymentId:payment.id,status,amount,currency:"ETB"}]);
-  }
+  // Payment journeys are created after this transaction through the membership service.
   // Seed real membership-application records through the existing schema so testers can
   // exercise member draft, submission, correction and payment-pending journeys.
   const memberAccounts=accounts.filter(account=>account.role==="member");
   const reviewerAccount=accounts.find(account=>account.role==="reviewer");
   const basicProduct=(await tx.query("select id,price,currency from membership_product where product_code='BASIC' and active=true limit 1")).rows[0];
   if(memberAccounts.length<4||!reviewerAccount||!basicProduct)throw fail(409,"Membership fixture prerequisites are missing; apply the membership migrations first.","TEST_FIXTURE_PREREQUISITE_MISSING");
-  const applicationStates=["draft","submitted","correction_required","payment_pending"];
+  const applicationStates=["draft","submitted","correction_required","approved"];
   const applicationIds=[];
   for(let i=0;i<4;i++){
    const status=applicationStates[i],account=memberAccounts[i];
    const application=(await tx.query(`insert into membership_application(user_id,application_type,membership_product_id,status,submitted_at,reviewed_at,approved_at,data_snapshot,fee_snapshot)
-    values($1,'new',$2,$3,case when $3='draft' then null else now() end,case when $3 in ('correction_required','payment_pending') then now() else null end,case when $3='payment_pending' then now() else null end,$4,$5) returning id`,
+    values($1,'new',$2,$3,case when $3='draft' then null else now() end,case when $3 in ('correction_required','approved') then now() else null end,case when $3='approved' then now() else null end,$4,$5) returning id`,
     [account.userId,basicProduct.id,status,{synthetic:true,testPortfolioId:portfolioId,persona:account.persona},{productCode:"BASIC",amount:Number(basicProduct.price),currency:basicProduct.currency}])).rows[0];
    applicationIds.push(application.id);
    await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'membership_application',$2)",[portfolioId,application.id]);
@@ -119,21 +131,17 @@ export async function createTestPortfolio(identity,input={},requestId=null){
     const correction=(await tx.query("insert into membership_correction(application_id,requested_by,status,requested_fields,reviewer_note) values($1,$2,'open',$3,'Please complete the synthetic profile fields for this QA case.') returning id",[application.id,reviewerAccount.userId,["professionalProfile"]])).rows[0];
     await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'membership_correction',$2)",[portfolioId,correction.id]);
    }
-   if(status==="payment_pending"){
-    const review=(await tx.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,'approved','Synthetic QA approval; payment remains pending.',$3) returning id",[application.id,reviewerAccount.userId,[{field:"application",status:"approved"}]])).rows[0];
+   if(status==="approved"){
+    const review=(await tx.query("insert into membership_application_review(application_id,reviewer_user_id,decision,note,checklist) values($1,$2,'approved','Synthetic QA application approval; payment journey is covered by the membership service fixtures.',$3) returning id",[application.id,reviewerAccount.userId,[{field:"application",status:"approved"}]])).rows[0];
     await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'membership_application_review',$2)",[portfolioId,review.id]);
-    const payment=(await tx.query(`insert into payment_transaction(provider,provider_transaction_id,idempotency_key,purpose,amount,currency,status,request_payload,response_payload)
-     values('test-simulator',$1,$2,'test_lab_simulation',$3,$4,'pending',$5,$6) returning id`,
-     [`QA-${prefix}-MEMBERSHIP-PAYMENT`,`test-lab:${portfolioId}:membership-payment`,Number(basicProduct.price),basicProduct.currency,{testPortfolioId:portfolioId,applicationId:application.id,simulated:true},{captured:true,noExternalProvider:true}])).rows[0];
-    const link=(await tx.query("insert into membership_application_payment(application_id,payment_transaction_id) values($1,$2) returning id",[application.id,payment.id])).rows[0];
-    await tx.query("insert into test_portfolio_record(portfolio_id,table_name,entity_id) values($1,'payment_transaction',$2),($1,'membership_application_payment',$3)",[portfolioId,payment.id,link.id]);
-    await tx.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','simulated_membership_payment_pending',$2)",[portfolioId,{paymentId:payment.id,applicationId:application.id,amount:Number(basicProduct.price),currency:basicProduct.currency}]);
    }
   }
   await seedTestLabDomainFixtures({tx,portfolioId,prefix,accounts,createdFiles:syntheticFiles});
  });
+ await seedTestLabPaymentJourneys({portfolioId,prefix,accounts,requestId});
  } catch(error) {
-  await Promise.allSettled(syntheticFiles.map(key=>rm(safeStoragePath(key),{force:true})));
+  try { await resetTestPortfolio(identity,portfolioId,{confirmation:name,reason:"Automatic cleanup after incomplete Test Lab portfolio creation."},requestId); }
+  catch { await Promise.allSettled(syntheticFiles.map(key=>rm(safeStoragePath(key),{force:true}))); }
   throw error;
  }
  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'test_lab.portfolio.created','test_portfolio',$2,$3,'success',$4)",
@@ -287,27 +295,36 @@ export async function getTestPortfolioOperations(identity,portfolioId){
  const portfolio=(await db.query("select id,name,status from test_portfolio where id=$1",[portfolioId])).rows[0];
  if(!portfolio)throw fail(404,"Test portfolio not found.","NOT_FOUND");
  const deliveries=(await db.query("select id,channel,recipient,event_code,payload,captured_at from test_delivery_capture where portfolio_id=$1 order by captured_at desc limit 200",[portfolioId])).rows;
- const payments=(await db.query(`select r.entity_id id,p.provider_transaction_id,p.purpose,p.amount,p.currency,p.status,p.created_at,p.updated_at
-  from test_portfolio_record r join payment_transaction p on p.id=r.entity_id
-  where r.portfolio_id=$1 and r.table_name='payment_transaction' and p.provider='test-simulator' and p.purpose='test_lab_simulation'
-  order by p.created_at desc`,[portfolioId])).rows;
+ const payments=(await db.query("select p.id,p.provider_transaction_id,p.purpose,p.amount,p.currency,p.status,p.created_at,p.updated_at,a.id application_id,a.status application_status,a.tracking_reference,account.email applicant_email from test_portfolio_record r join payment_transaction p on p.id=r.entity_id join membership_application_payment ap on ap.payment_transaction_id=p.id join membership_application a on a.id=ap.application_id left join test_portfolio_account account on account.portfolio_id=r.portfolio_id and account.user_id=a.user_id where r.portfolio_id=$1 and r.table_name='payment_transaction' and p.provider='manual' and p.purpose='membership' order by p.created_at desc",[portfolioId])).rows;
  return {portfolio,deliveries,payments};
 }
+
+export async function exportTestPortfolioScenarioWorkbook(identity,portfolioId){
+ requireSystemAdmin(identity);const db=getPool();await assertSafeEnvironment(db);
+ const portfolio=(await db.query("select id,name,status from test_portfolio where id=$1",[portfolioId])).rows[0];
+ if(!portfolio||portfolio.status!=="active")throw fail(404,"Active test portfolio not found.","NOT_FOUND");
+ const accounts=(await db.query("select email,persona,role_code from test_portfolio_account where portfolio_id=$1",[portfolioId])).rows;
+ const byPersona=new Map(accounts.map(row=>[row.persona,row]));
+ const rows=TEST_LAB_SCENARIOS.map(scenario=>{const persona=TEST_LAB_PERSONAS.find(item=>item.personaKey===scenario.personaKey);const account=persona?byPersona.get(persona.persona):null;return {"Portfolio":portfolio.name,"Scenario ID":scenario.id,"Module":scenario.module,"Scenario":scenario.title,"Actor role":scenario.actorRole,"Actor persona":persona?.persona||"","Actor email":account?.email||"","Review / counterparty role":scenario.reviewerRole,"Expected result":scenario.expected,"Evidence to capture":scenario.evidence,"Execution status":"Not started","Evidence reference":"","Actual result":"","Tester notes":"","Executed by":"","Executed at":""};});
+ const buffer=createXlsx(rows,Object.keys(rows[0]));
+ return {buffer,filename:"mpa-test-scenarios-evidence-"+portfolioId.slice(0,8)+".xlsx"};
+}
+
 export async function simulateTestPayment(identity,portfolioId,paymentId,input={},requestId=null){
  requireSystemAdmin(identity);const db=getPool();await assertSafeEnvironment(db);
  const next=String(input.status||"").trim().toLowerCase();
- if(!["pending","succeeded","failed","cancelled"].includes(next))throw fail(400,"Choose pending, succeeded, failed or cancelled for a simulated payment.","VALIDATION_ERROR");
- return withTransaction(async tx=>{
-  const payment=(await tx.query(`select p.* from payment_transaction p join test_portfolio_record r on r.entity_id=p.id and r.table_name='payment_transaction' and r.portfolio_id=$1
-   join test_portfolio t on t.id=r.portfolio_id and t.status='active'
-   where p.id=$2 and p.provider='test-simulator' and p.purpose='test_lab_simulation' for update of p`,[portfolioId,paymentId])).rows[0];
-  if(!payment)throw fail(404,"Simulated payment was not found in this active test portfolio.","NOT_FOUND");
-  if(payment.status===next)return {paymentId,status:next,replayed:true,simulated:true};
-  if(!["initiated","pending"].includes(payment.status))throw fail(409,"A completed simulated payment cannot be reopened or changed to a different outcome.","PAYMENT_ALREADY_DECIDED");
-  const updated=(await tx.query("update payment_transaction set status=$1,response_payload=response_payload || $2::jsonb,completed_at=case when $1 in ('succeeded','failed','cancelled') then now() else null end,updated_at=now() where id=$3 returning id,status,amount,currency,provider_transaction_id",
-   [next,{simulated:true,testPortfolioId:portfolioId,simulationReason:clean(input.reason,240)||"QA payment simulation",simulatedAt:new Date().toISOString()},paymentId])).rows[0];
-  await tx.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','simulated_payment_status_changed',$2)",[portfolioId,{paymentId,status:next,amount:payment.amount,currency:payment.currency}]);
-  await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'test_lab.payment.simulated','payment_transaction',$2,$3,'success',$4)",[identity.sub,paymentId,requestId,{portfolioId,from:payment.status,to:next,reason:clean(input.reason,240)}]);
-  return {...updated,simulated:true,replayed:false};
- });
+ if(!["pending","succeeded","failed","refunded","needs_correction"].includes(next))throw fail(400,"Choose pending, succeeded, failed or refunded for a simulated membership payment.","VALIDATION_ERROR");
+ const payment=(await db.query("select p.* from payment_transaction p join test_portfolio_record r on r.entity_id=p.id and r.table_name='payment_transaction' and r.portfolio_id=$1 join test_portfolio t on t.id=r.portfolio_id and t.status='active' join membership_application_payment ap on ap.payment_transaction_id=p.id where p.id=$2 and p.provider='manual' and p.purpose='membership'",[portfolioId,paymentId])).rows[0];
+ if(!payment)throw fail(404,"A membership-service payment was not found in this active test portfolio.","NOT_FOUND");
+ const finance=(await db.query("select user_id from test_portfolio_account where portfolio_id=$1 and role_code='finance_officer' order by email limit 1",[portfolioId])).rows[0];
+ if(!finance)throw fail(409,"This portfolio has no finance test persona.","TEST_PAYMENT_FIXTURE_PREREQUISITE_MISSING");
+ if(payment.status===next)return {paymentId,status:next,replayed:true,simulated:true};
+ if(next==="pending")throw fail(409,"A decided payment cannot be returned to pending. Create a fresh scenario instead.","PAYMENT_ALREADY_DECIDED");
+ if(next==="needs_correction"){if(payment.status!=="pending")throw fail(409,"Only a pending synthetic membership payment can receive a correction request.","PAYMENT_ALREADY_DECIDED");const updated=await membership.verifyPayment(paymentId,finance.user_id,{decision:"needs_correction",note:clean(input.reason,240)||"Synthetic Test Lab request for additional payment evidence."},requestId);await db.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','simulated_membership_payment_correction_requested',$2)",[portfolioId,{paymentId,status:updated.status,amount:payment.amount,currency:payment.currency}]);return {paymentId,status:updated.status,decision:"needs_correction",simulated:true,replayed:false};}
+ if(next==="refunded"){if(payment.status!=="succeeded")throw fail(409,"Only a successful synthetic payment can be refunded.","PAYMENT_NOT_REVERSIBLE");const reversal=await membership.reverseMembershipPayment(paymentId,finance.user_id,{type:"refund",reason:clean(input.reason,240)||"Synthetic Test Lab refund scenario."},requestId);await db.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','simulated_membership_payment_refunded',$2)",[portfolioId,{paymentId,reversalId:reversal.id,status:"refunded"}]);return {paymentId,status:"refunded",simulated:true,replayed:false};}
+ if(payment.status!=="pending")throw fail(409,"Only a pending synthetic membership payment can be decided.","PAYMENT_ALREADY_DECIDED");
+ const decision=next==="succeeded"?"approved":"rejected";
+ const updated=await membership.verifyPayment(paymentId,finance.user_id,{decision,note:clean(input.reason,240)||"Synthetic Test Lab payment outcome; no external funds were transferred."},requestId);
+ await db.query("insert into test_delivery_capture(portfolio_id,channel,event_code,payload) values($1,'payment','simulated_membership_payment_status_changed',$2)",[portfolioId,{paymentId,status:updated.status,amount:payment.amount,currency:payment.currency}]);
+ return {paymentId,status:updated.status,simulated:true,replayed:false};
 }

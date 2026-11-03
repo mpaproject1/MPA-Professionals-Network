@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { testLabConfiguration } from "../../src/platform/test-lab.js";
 import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
+import { TEST_LAB_PERSONAS, TEST_LAB_SCENARIOS } from "../../src/platform/test-lab-catalog.js";
 
 test("Test Lab reports capture mode only when explicitly configured",()=>{
  const before={nodeEnv:process.env.NODE_ENV,enabled:process.env.TEST_LAB_ENABLED,disposable:process.env.TEST_LAB_DISPOSABLE_DATABASE,delivery:process.env.TEST_DELIVERY_MODE};
@@ -75,4 +76,51 @@ test("Test Lab never stores recoverable credentials and gates every operation on
  assert.match(service,/accounts\.map\(\(\{userId,password/);
  assert.match(admin,/Delete entire test portfolio/);
  assert.match(admin,/method:"POST"/);
+});
+
+
+test("Test Lab catalogue contains 22 distinct role-based personas and 22 traceable scenarios",()=>{
+ assert.equal(TEST_LAB_PERSONAS.length,22);
+ assert.equal(new Set(TEST_LAB_PERSONAS.map(row=>row.persona)).size,22);
+ assert.equal(new Set(TEST_LAB_PERSONAS.map(row=>row.personaKey)).size,22);
+ assert.equal(TEST_LAB_SCENARIOS.length,22);
+ assert.equal(new Set(TEST_LAB_SCENARIOS.map(row=>row.id)).size,22);
+ const installedRoles=new Set(["member","reviewer","verification_reviewer","appeal_reviewer","finance_officer","supporting_staff"]);
+ for(const persona of TEST_LAB_PERSONAS)assert.ok(installedRoles.has(persona.role),persona.role);
+ for(const scenario of TEST_LAB_SCENARIOS){
+  assert.ok(TEST_LAB_PERSONAS.some(persona=>persona.personaKey===scenario.personaKey),scenario.id);
+  assert.ok(scenario.expected.length>10&&scenario.evidence.length>5,scenario.id);
+ }
+});
+
+test("Test Lab membership payment fixtures use the real membership service lifecycle",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const service=await readFile(new URL("../../src/platform/test-lab.js",import.meta.url),"utf8");
+ assert.match(service,/membership\.createApplication\(/);
+ assert.match(service,/membership\.createManualPayment\(/);
+ assert.match(service,/membership\.verifyPayment\(/);
+ assert.match(service,/membership\.reverseMembershipPayment\(/);
+ assert.match(service,/decision:"needs_correction"/);
+ assert.match(service,/metadata->>'testLab'='true'/);
+ assert.doesNotMatch(service,/insert into payment_transaction\(provider,provider_transaction_id,idempotency_key,purpose/);
+ assert.match(service,/p\.provider='manual' and p\.purpose='membership'/);
+});
+
+test("scenario workbook exports execution and evidence capture columns",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const service=await readFile(new URL("../../src/platform/test-lab.js",import.meta.url),"utf8");
+ assert.match(service,/exportTestPortfolioScenarioWorkbook/);
+ for(const column of ["Execution status","Evidence reference","Actual result","Tester notes","Executed by","Executed at"])assert.ok(service.includes(column),column);
+});
+
+test("Test Lab API exposes the scenario workbook and portfolio operations monitoring",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const server=await readFile(new URL("../../server.js",import.meta.url),"utf8");
+ const admin=await readFile(new URL("../../web/app/admin/test-lab/page.tsx",import.meta.url),"utf8");
+ assert.match(server,/scenarios\.xlsx/);
+ assert.match(server,/getTestPortfolioOperations/);
+ assert.match(server,/simulateTestPayment/);
+ assert.match(admin,/Operations/);
+ assert.match(admin,/Captured delivery events/);
+ assert.match(admin,/Simulate success/);
 });

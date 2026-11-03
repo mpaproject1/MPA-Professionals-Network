@@ -104,3 +104,11 @@ test("complaint holds cannot be manually released and retry requires a cleared h
   assert.match(source, /RECIPIENT_HOLD_ACTIVE/);
   assert.match(source, /delivery_status in \('failed','bounced'\)/);
 });
+
+test("verification email and retry paths honor active recipient holds", async () => {
+  const verification = await read("../../src/platform/email-verification.js");
+  assert.match(verification, /email_recipient_suppression/);
+  assert.match(verification, /RECIPIENT_SUPPRESSED/);
+  const operations = await read("../../src/platform/email-operations.js");
+  assert.match(operations, /verification recipient is on an outbound email hold/);
+});

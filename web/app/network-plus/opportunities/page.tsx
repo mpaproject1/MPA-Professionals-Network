@@ -17,7 +17,7 @@ export default function NetworkPlusOpportunitiesPage(){
  const token=useUiStore(s=>s.token);
  const [view,setView]=useState<"discover"|"mine"|"create"|"business">("discover");
  const [taxonomy,setTaxonomy]=useState<Taxon[]>([]),[businesses,setBusinesses]=useState<Business[]>([]),[organizations,setOrganizations]=useState<Organization[]>([]);
- const [mine,setMine]=useState<Listing[]>([]),[results,setResults]=useState<Listing[]>([]),[q,setQ]=useState(""),[kindFilter,setKindFilter]=useState(""),[categoryFilter,setCategoryFilter]=useState(""),[locationFilter,setLocationFilter]=useState("");
+ const [mine,setMine]=useState<Listing[]>([]),[results,setResults]=useState<Listing[]>([]),[q,setQ]=useState(""),[kindFilter,setKindFilter]=useState(""),[categoryFilter,setCategoryFilter]=useState(""),[subcategoryFilter,setSubcategoryFilter]=useState(""),[locationFilter,setLocationFilter]=useState("");
  const [selected,setSelected]=useState<Listing|null>(null),[businessId,setBusinessId]=useState(""),[draftId,setDraftId]=useState("");
  const [step,setStep]=useState(1),[listingKind,setListingKind]=useState("offer"),[categoryCode,setCategoryCode]=useState(""),[subcategoryCode,setSubcategoryCode]=useState("");
  const [title,setTitle]=useState(""),[summary,setSummary]=useState(""),[description,setDescription]=useState(""),[attributes,setAttributes]=useState<Record<string,any>>({});
@@ -41,10 +41,9 @@ export default function NetworkPlusOpportunitiesPage(){
     api<Taxon[]>("/api/v1/network-plus/listing-taxonomy",{},token),
     api<Business[]>("/api/v1/network-plus/my/businesses",{},token),
     api<Organization[]>("/api/v1/organizations",{},token),
-    api<Listing[]>("/api/v1/network-plus/my/listings",{},token),
-    api<ListingResult>("/api/v1/network-plus/listings",{},token)
+    api<Listing[]>("/api/v1/network-plus/my/listings",{},token)
    ]);
-   setTaxonomy(tax||[]);setBusinesses(biz||[]);setOrganizations(org||[]);setMine(my||[]);setResults(found?.items||[]);
+   setTaxonomy(tax||[]);setBusinesses(biz||[]);setOrganizations(org||[]);setMine(my||[]);
    if(!businessId&&biz?.length)setBusinessId(biz[0].id);
   }catch(e){setError(e instanceof ApiError?e.message:"Network-Plus directory could not be loaded.");}
   finally{setLoading(false);}

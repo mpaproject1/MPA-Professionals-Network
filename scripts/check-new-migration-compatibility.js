@@ -848,7 +848,6 @@ try {
     "network_plus_request_contact_consent_pkey",
     "ux_network_plus_request_meeting_active",
     "ux_network_plus_request_meeting_idempotency",
-    "ix_network_plus_request_clarification_open",
     "ux_serve_community_initiative_idempotency_hash","ux_serve_community_participation_idempotency_hash","ux_serve_community_participation_active","ux_serve_community_legacy_classification_initiative","uq_community_impact_claim_evidence_url","uq_community_impact_claim_active_assignment"
   ];
   for (const name of requiredUniqueIndexes) {
@@ -911,6 +910,21 @@ try {
       !meetingHistoryDefinition.includes("request_id") ||
       !meetingHistoryDefinition.includes("created_at")) {
     throw new Error("The meeting-history lookup index is missing, malformed, or unexpectedly unique.");
+  }
+  // Open clarification threads are queried by request/status/time. This is
+  // deliberately non-unique; a request may have multiple clarification rows.
+  const clarificationIndex = await client.query(
+    "select indexdef from pg_indexes where schemaname=$1 and indexname=$2",
+    ["public", "ix_network_plus_request_clarification_open"]
+  );
+  const clarificationDefinition = clarificationIndex.rows[0]?.indexdef || "";
+  if (!clarificationDefinition ||
+      clarificationDefinition.toUpperCase().includes("CREATE UNIQUE INDEX") ||
+      !clarificationDefinition.includes("network_plus_request_clarification") ||
+      !clarificationDefinition.includes("request_id") ||
+      !clarificationDefinition.includes("status") ||
+      !clarificationDefinition.includes("created_at")) {
+    throw new Error("The clarification lookup index is missing, malformed, or unexpectedly unique.");
   }
   const supportGrantIndex=await client.query("select 1 from pg_indexes where schemaname=$1 and indexname=$2",["public","ix_network_plus_request_support_grant_active"]);
   if(!supportGrantIndex.rowCount) throw new Error("The active request-scoped support grant index is missing.");

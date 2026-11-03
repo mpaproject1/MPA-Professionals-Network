@@ -396,6 +396,11 @@ export async function submitProfessionalServiceListing(listingId,userId,requestI
     await assertBusinessOwner(db,row.business_id,userId);
     await assertBusinessPublishable(db,row.business_id,{requirePublished:true});
     if(!["draft","changes_requested","rejected","paused","suspended"].includes(row.status))fail(409,"This listing is not ready for moderation submission.","INVALID_STATE");
+    if(!row.title||!row.summary||!row.description||!row.service_category)fail(400,"Complete the title, summary, description and category before submitting this listing.","LISTING_INCOMPLETE");
+    const taxonomy=(await db.query("select field_schema,listing_kinds from network_plus_listing_taxonomy where code=$1 and active=true",[row.service_category])).rows[0];
+    if(!taxonomy||!taxonomy.listing_kinds.includes(row.listing_kind||"service_profile"))fail(400,"The selected listing category is no longer valid for this listing type.","INVALID_LISTING_CATEGORY");
+    for(const field of taxonomy.field_schema||[]){const value=row.structured_attributes?.[field.code];if(field.required&&(value===undefined||value===null||value===""||(Array.isArray(value)&&!value.length)))fail(400,"Complete the required category-specific field: "+field.label+".","LISTING_CATEGORY_FIELD_REQUIRED");}
+
     const updated=(await db.query("update network_plus_service_listing set status='pending_review',moderation_reason=null,submitted_by=$2,updated_at=now() where id=$1 returning *",[listingId])).rows[0];
     await audit(db,userId,"network_plus.service_listing_submitted","network_plus_service_listing",listingId,requestId,{businessId:row.business_id,from:row.status,to:"pending_review"});
     const reviewers=(await db.query(`select distinct u.id from app_user u where u.status='active' and

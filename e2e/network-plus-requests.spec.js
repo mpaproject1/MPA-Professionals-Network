@@ -55,16 +55,16 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   });
 
-  test("only explicit recipient acceptance reveals an accepted-engagement workspace",async({page})=>{
+  test("recipient acceptance does not create a workspace until a participant opts in",async({page})=>{
     await mockSession(page);
-    let accepted=false;
-    const current=()=>accepted?{...submitted,status:"accepted",workspace:{id:"workspace-1",purpose:"Accessibility review",scope:"WCAG AA review"}}:submitted;
+    let accepted=false,workspaceEnabled=false;
+    const current=()=>accepted?{...submitted,status:"accepted",workspace:workspaceEnabled?{id:"workspace-1",purpose:"Accessibility review",scope:"WCAG AA review"}:null}:submitted;
     await page.route("**/api/v1/network-plus/requests",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[current()]})}));
     await page.route("**/api/v1/network-plus/requests/request-1/transitions",async route=>{
       expect(route.request().postDataJSON().status).toBe("accepted");accepted=true;
       await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:current()})});
     });
-    await page.route("**/api/v1/network-plus/requests/request-1/workspace",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{workspace:{id:"workspace-1"},milestones:[],events:[]}})}));
+    await page.route("**/api/v1/network-plus/requests/request-1/workspace",async route=>{if(route.request().method()==="POST"){workspaceEnabled=true;await route.fulfill({status:201,contentType:"application/json",body:JSON.stringify({data:{id:"workspace-1",purpose:"Accessibility review",scope:"WCAG AA review"}})});}else await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{workspace:{id:"workspace-1"},milestones:[],events:[]}})});});
     await page.route("**/api/v1/network-plus/requests/request-1",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:current()})}));
     await page.setViewportSize({width:1280,height:900});
     await page.goto("/network-plus/requests");
@@ -72,8 +72,10 @@ test.describe("Network-Plus request and collaboration journey",()=>{
     await expect(page.getByRole("button",{name:"Explicitly accept request"})).toBeVisible();
     await expect(page.getByText(/Awaiting the recipient’s explicit decision/i)).toBeVisible();
     await page.getByRole("button",{name:"Explicitly accept request"}).click();
+    await expect(page.getByRole("button",{name:"Start optional collaboration workspace"})).toBeVisible();
+    await page.getByRole("button",{name:"Start optional collaboration workspace"}).click();
     await expect(page.getByRole("heading",{name:"Collaboration workspace"})).toBeVisible();
-    await expect(page.getByText(/Created after recipient acceptance/i)).toBeVisible();
+    await expect(page.getByText(/Optional shared workspace enabled/i)).toBeVisible();
   });
   test("routes a business proposal through canonical business ownership without exposing owner identifiers",async({page})=>{
     await mockSession(page);

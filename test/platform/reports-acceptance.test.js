@@ -4,7 +4,7 @@ import test from "node:test";
 import { inflateRawSync } from "node:zlib";
 import * as membership from "../../src/membership/service.js";
 import { getPool } from "../../src/platform/db.js";
-import { exportReport, runReport } from "../../src/platform/reports.js";
+import { deleteSavedView, exportReport, listSavedViews, runReport, saveSavedView } from "../../src/platform/reports.js";
 import * as marketplaceDemand from "../../src/services-mentorship/demand.js";
 
 async function createRequester() {
@@ -108,6 +108,17 @@ test("administrative audit report applies date, outcome and search filters to kn
     assert.equal(audit.rows.filter(row => row.action === "report.exported").length, 3);
 
     const requesterId = await createRequester();
+    const savedViewOwner = { sub: requesterId, roles: ["membership_reviewer"], permissions: [] };
+    const savedViewName = "membership-center-" + randomUUID();
+    const savedView = await saveSavedView(savedViewOwner, {
+      reportId: "membership-applications",
+      name: savedViewName,
+      filters: { from: today, to: today, status: "submitted", memberStatus: "active", geographyUnitId: "unrecorded" },
+    }, randomUUID());
+    const savedViews = await listSavedViews(savedViewOwner);
+    assert.ok(savedViews.some(view => view.id === savedView.id && view.filters.geographyUnitId === "unrecorded"), "saved membership filters retain member status and residence scope");
+    await deleteSavedView(savedViewOwner, savedView.id, randomUUID());
+
     const demandTitle = "report-support-demand-" + randomUUID();
     await marketplaceDemand.createDemand(requesterId, {
       demandType: "service",

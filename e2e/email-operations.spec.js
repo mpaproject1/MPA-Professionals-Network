@@ -23,7 +23,7 @@ test("registration mode switch presents organization representative and legal-en
 test("email operations APIs reject unauthenticated access",async()=>{
  const api=await playwrightRequest.newContext({baseURL:API_BASE});
  try{
-  for(const path of ["/api/v1/admin/email/operations","/api/v1/admin/email/messages?folder=failed","/api/v1/admin/email/templates"]){
+  for(const path of ["/api/v1/admin/email/operations","/api/v1/admin/email/messages?folder=failed","/api/v1/admin/email/templates","/api/v1/admin/email/recipient-holds"]){
    const response=await api.get(path);
    expect(response.status(),path).toBe(401);
   }

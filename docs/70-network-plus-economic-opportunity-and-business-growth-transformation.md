@@ -350,20 +350,220 @@ Do not merge these lifecycles into one status field. Recipient can accept while 
 - High-risk offers need category-specific disclosures and review; no guarantee or implied endorsement.
 - Keep audit events for consent and administrative action, not surveillance of off-platform conversations.
 
-## 12. UX requirements
+## 12. UI/UX direction — a professional opportunity mall, delivered as an app
 
-- Main entry asks: **“What do you need, or what can you offer?”**
-- Make Need and Offer prominent; browsing does not require publishing.
-- Searchable, plain-language categories.
-- Progressive disclosure; only relevant fields appear.
-- Each listing has **I'm interested / Connect** and a concise explanation of next steps.
-- Clear consent language before sharing contact details.
-- Compact **My Requests** page with filters: All, Awaiting response, In progress, Completed, Cancelled.
-- Each card has one clear next action and no project-management clutter.
-- Ask for closure remark when requester marks Completed or Cancelled.
-- Draft, pause, edit and close listing controls.
-- Responsive, accessible desktop/mobile experience consistent with MPA app design.
-- Notifications reveal no sensitive content and deep-link to the request.
+### 12.1 Experience concept and design principle
+
+Network-Plus should feel like entering a well-organized, modern professional business centre or curated opportunity mall: users can browse distinct “spaces” for needs, offers, products, services, finance, expertise, partners and growth opportunities, quickly recognize what is relevant, open a focused detail view and make a purposeful connection.
+
+This is a **discovery and connection experience**, not an e-commerce mall. The visual metaphor is for orientation, browsing and discovery only. Do not introduce shopping carts, checkout, order placement, product purchase flows, payment, inventory reservation or transaction tracking. “My Requests” remains a personal connection register, not a basket of goods.
+
+The interface must feel like a **minimal, modern desktop/mobile app**, not a conventional content-heavy website or a collection of long web forms. Prioritize:
+- visual discovery over paragraphs of explanatory text;
+- recognizable category tiles, icons, photography/illustration and concise listing cards;
+- clear hierarchy, compact navigation and focused work surfaces;
+- one obvious next action at a time;
+- structured choices and filters over unrestricted free-text fields;
+- progressive disclosure from broad intent to specific detail;
+- continuity: users can pause, leave and resume without losing their work.
+
+Use the MPA product design system and established brand tokens. Maintain a calm, professional visual language: consistent iconography, restrained color, strong spacing, clear status indicators and high-quality responsive layouts. Avoid a playful consumer-shopping aesthetic, excessive gradients, dense dashboards, decorative gamification or a marketing-site hero layout.
+
+### 12.2 App shell and information architecture
+
+Use a compact app shell with persistent, predictable navigation. Avoid duplicating the same destination in multiple navigation systems.
+
+Primary destinations:
+- **Discover** — browse the opportunity mall and search across needs, offers, businesses, products, services and programmes.
+- **Needs & Offers** — publish, edit, pause and manage the user's own listings.
+- **My Requests** — follow initiated connections and update their simple disposition.
+- **Saved** — bookmark listings for later; saved items are not requests.
+- **Notifications** — responses, consent decisions, meeting proposals and reminders.
+- **My Profile / Business** — identity, business representation, visibility and contact-sharing preferences.
+
+The Discover landing surface should open with a compact search field and a clear prompt such as **“What are you looking for?”** and **“What can you offer?”**. Present a browsable visual category shelf rather than a long list of links.
+
+Suggested category spaces:
+- Start a business
+- Find finance & resources
+- Grow or expand
+- Find partners & co-founders
+- Products & services
+- Suppliers & distribution
+- Grants & programmes
+- Skills, advice & mentorship
+
+Category labels and grouping must come from the canonical taxonomy in Section 4. Do not create duplicate taxonomies for separate screens.
+
+### 12.3 Opportunity mall browsing and discovery
+
+Make browsing feel like exploring a curated professional directory:
+- Category spaces use distinct but consistent icons and subtle visual identities.
+- Feature relevant opportunities in compact cards with a clear title, publisher identity, location, category, a few key structured attributes and a visible verification/eligibility label where applicable.
+- Use product/service imagery where it improves recognition; never make imagery a substitute for specifications or accessible text.
+- Provide search, filters and sort controls that can be combined without losing the user's place.
+- Offer useful filter chips such as category, location/region, remote/in-person, sector, support type, amount range (where appropriate), expertise and recently added.
+- Show useful empty states with a next action (change filters, explore a related category or publish a need); do not show dead ends.
+- Use progressive loading or pagination appropriate to the existing stack; do not load an unbounded catalog.
+- Keep the user's current category, query and filters when returning from a listing detail.
+- Clearly distinguish **Need**, **Offer**, **Opportunity**, **Business**, and **Product/Service**. Never imply that a listing is endorsed, guaranteed or independently verified beyond the exact verification shown.
+
+A listing detail should read as a concise opportunity profile, not a long landing page. Put the most decision-useful information first, then expandable sections for specifications, eligibility, publisher details and optional attachments. Keep the primary action visible: **I'm interested / Connect**. Secondary actions may include Save and Report.
+
+### 12.4 Guided creation — broad choice first, specific details later
+
+Publishing a Need or Offer must be a guided, step-by-step experience, not one large form.
+
+The journey starts with a broad, plain-language choice:
+1. **What would you like to do?** — I need something / I can offer something.
+2. **What area is it about?** — choose a broad category (e.g. start-up, finance, equipment, partner, growth, product/service, supplier, expertise).
+3. **What specifically do you need or offer?** — reveal the relevant subcategories based on the previous choice.
+4. **Who or what are you looking for?** — select the target person/provider/organization or audience where relevant.
+5. **Where does it apply?** — choose location/region and remote, in-person or either.
+6. **What are the key details?** — show only the structured fields required for that selected type.
+7. **How should interested people respond?** — question, quotation, contact exchange or meeting.
+8. **Review and publish** — show a compact preview and visibility summary before publication.
+
+The sequence is adaptive: skip irrelevant steps, combine very short steps when appropriate and never force every user through all eight screens. A user publishing a simple product/service offer should not see finance or co-founder fields. A user looking for a mentor should not see equipment quantity. Ask only for data that improves matching, eligibility, trust or first contact.
+
+### 12.5 Structured input first; free text only where it adds meaning
+
+The platform needs consistent data for matching, reporting and analysis. Therefore:
+- Prefer single-select, multi-select, searchable reference lists, range controls, location selectors, toggles and date pickers over unrestricted text boxes.
+- Use canonical category/subcategory values, sector lists, geography hierarchy, support types, skills, experience bands and response preferences.
+- Use controlled units and currencies for amounts, quantities and capacity; store normalized values and display localized labels.
+- Use structured options for common reasons, outcomes, meeting preferences, contact methods and cancellation/decline reasons.
+- Provide “Other” only when necessary; if selected, reveal a short supporting field and retain the canonical parent category.
+- Use free text for a concise title (when not generated), a short context/message, an optional description and closure remarks. Give clear character guidance and sensible limits.
+- Never require a long narrative to submit an ordinary listing or connection request.
+- Avoid asking the same question in multiple steps. Reuse values already provided and let users edit them from the review screen.
+- Use conditional validation and explain errors beside the relevant control; preserve entered values after validation failures.
+
+Where possible, generate a readable summary from structured answers (for example, “Looking for an equipment supplier in Addis Ababa; small production machinery; quotation or direct contact”). Let the user edit the short summary without forcing them to rewrite the structured data.
+
+This is not a requirement to eliminate all text. It is a requirement to make structured data the default and free text the exception, so reports and matching are comparable across users.
+
+### 12.6 One focused step at a time — progressive disclosure
+
+At any point in a guided flow, show the current task and only the fields needed to complete it. Hide unrelated steps and fields until their parent choice makes them relevant.
+
+Each step should include:
+- a short question as the heading;
+- a one-line explanation only when needed;
+- a small set of clear selectable options or a compact control;
+- a visible **Back** action and a clear **Continue** action;
+- a discreet progress indicator (e.g. “Step 2 of 5”) and a meaningful step label;
+- a clear indication when a step is optional.
+
+Do not render the entire form with disabled, hidden-looking or collapsed sections. Do not make users scroll through a long form to discover what comes next. On mobile, keep the active task comfortably within the viewport where practical; on desktop, use a compact centered work area or side-by-side preview only when it helps the task.
+
+The user must always understand:
+- what decision is being made now;
+- why the information is requested;
+- what happens next;
+- whether the information is private, shared with selected parties or public.
+
+### 12.7 Lightweight gamification — progress, confidence and completion
+
+Use gentle, task-oriented gamification to make the process encouraging without turning professional networking into a game.
+
+Suitable patterns:
+- step progress with a clear sense of advancement;
+- small completion indicators for required sections;
+- positive confirmation when a useful profile/listing is ready to publish;
+- optional profile/listing completeness guidance;
+- contextual suggestions such as “Add a service area to help nearby businesses find you”;
+- a clear completion state and next useful action after publishing or sending a request.
+
+Do not use points, leaderboards, streak pressure, public rankings, random rewards, manipulative urgency or badges that imply trust/verification. Never reward users for exposing more personal data, sending more requests or sharing contact details. Completion indicators must reflect useful information quality, not popularity or commercial success.
+
+### 12.8 Save draft, autosave and resume exactly where the user left
+
+Every multi-step listing creation/edit flow must support persistent drafts:
+- Create a draft as soon as the user begins a publish flow, with an appropriate draft identifier and owner.
+- Autosave changes after a short debounce and when moving between steps; also save on explicit **Save and exit**.
+- Show a quiet save state such as **Saving…**, **Saved**, or **Couldn't save — retry**. Never imply that unsaved data is saved.
+- Persist the current step, selected category/subcategory, structured answers, optional text, attachment references and relevant UI progress.
+- When the user returns, offer **Continue draft** and reopen the same draft at the last completed/current step with previous answers restored.
+- Support multiple drafts and make their category, last-updated time and status easy to recognize.
+- Allow the user to discard a draft with a clear confirmation. Do not silently delete drafts on navigation, logout or browser refresh.
+- Handle expired sessions, network interruptions and concurrent edits safely. Do not overwrite newer data silently; provide recovery or conflict guidance.
+- Drafts remain private to their owner and are never discoverable or notified to potential recipients before publication.
+- Draft state is distinct from Published, Paused, Closed and Expired listing states.
+
+Connection requests should also preserve entered content if the user navigates backward or encounters a validation/network error. Do not create a submitted request or notify the recipient until the user confirms the final send action. If a draft connection is supported, label it clearly as unsent.
+
+### 12.9 Connection initiation should be short and contextual
+
+The **I'm interested / Connect** action should open a focused, contextual mini-flow:
+1. Choose the reason/intent from relevant structured options.
+2. Choose the desired next step (ask a question, request a quote, exchange contact details or request a meeting).
+3. Add a short optional message or only the category-specific details needed.
+4. Review what will be sent and who can see it.
+5. Confirm **Send request**.
+
+Do not ask the requester to re-enter listing information already known to the system. Do not expose private contact details at this stage. Keep the bilateral, field-specific consent workflow from Section 6.2 separate and explicit.
+
+### 12.10 My Requests as a compact personal connection shelf
+
+My Requests should feel like a tidy personal tray of active introductions, not a CRM pipeline or project board.
+
+Use compact cards with:
+- listing/opportunity title and publisher;
+- request intent and date;
+- a small, plain-language response/consent indicator;
+- requester disposition: In progress, Completed or Cancelled;
+- one contextual next action.
+
+Default to open items and useful attention cues (awaiting response, consent decision needed, meeting proposal received, or requester review due). Provide filters for All, Awaiting response, In progress, Completed and Cancelled. Keep historical requests searchable and accessible without crowding the default view.
+
+Do not add kanban columns, task assignments, milestone timelines, deal values, pipeline forecasts, transaction stages or performance dashboards. The three requester disposition states remain exactly as defined in Section 7.
+
+### 12.11 Responsive app interaction and visual behavior
+
+- Desktop: compact navigation rail/sidebar, restrained top bar, useful search, content-first discovery grid and focused detail/work surfaces. Do not stretch forms and cards across the full screen without purpose.
+- Mobile: touch-friendly navigation, cards and controls; one primary action per screen; safe-area-aware layouts; no hover-only information or actions.
+- Use consistent iconography and status treatments. Icons always have accessible labels where meaning is not obvious.
+- Use subtle transitions for navigation, step changes, card selection and save confirmation. Respect reduced-motion preferences.
+- Use skeletons or calm loading states; avoid layout shifts and blocking full-screen spinners for small operations.
+- Support keyboard navigation, visible focus, semantic headings, accessible names, sufficient contrast, screen readers and error announcements.
+- Maintain clear empty, loading, success, error, offline and permission-denied states.
+- Preserve the user's scroll position and browsing context when opening/closing details or returning from a request.
+
+### 12.12 Reporting and analytics quality by design
+
+Structured inputs are a product requirement, not merely a UI preference. The UI must capture consistent dimensions so reporting can answer questions across categories and regions without manually interpreting long descriptions.
+
+Define and reuse canonical values for:
+- listing type, category and subcategory;
+- sector and business stage;
+- geography and service area;
+- need/offer and support type;
+- amount/currency and quantity/unit where relevant;
+- target role, skill and experience;
+- response preference and connection intent;
+- recipient response, contact-consent state and meeting handoff state;
+- requester disposition and standardized closure reason.
+
+Keep optional narrative separate from these dimensions. Do not infer structured outcomes from free-text remarks. Report platform-observed events separately from self-reported status and remarks, as required by Section 9. Build filters and aggregate reports from canonical fields, with privacy-safe aggregation and small-cohort suppression.
+
+### 12.13 UX acceptance criteria
+
+The UI/UX is acceptable only when:
+1. A new user can understand the main opportunity categories without reading a long explanation.
+2. A user can begin with a broad need/offer choice and reach relevant specific fields without seeing unrelated fields.
+3. Common listing and connection flows use structured options first and short text only where useful.
+4. Users see one focused step at a time, with clear progress, Back and Continue controls.
+5. A user can leave a multi-step draft, return later and resume at the same step with all saved answers restored.
+6. Save state is honest and recoverable after network/session interruptions.
+7. A listing can be browsed as a professional opportunity card and opened as a concise detail view.
+8. A user can initiate interest, ask a question, request a quote or request a meeting without completing a long application.
+9. Private contact information remains hidden until the exact required consent is obtained.
+10. My Requests remains a simple connection register and does not become a CRM or deal pipeline.
+11. Desktop and mobile both feel like the same coherent app, with keyboard and assistive-technology support.
+12. Structured data is consistent enough to support meaningful cross-category and geographic reports.
+13. Visual polish and gamification never imply endorsement, guaranteed results, verified transactions or economic impact.
+
 
 ## 13. Phased implementation
 
@@ -376,7 +576,8 @@ Do not merge these lifecycles into one status field. Recipient can accept while 
 **Exit:** one canonical business/listing model and one connection-request foundation, with no duplicate entities or contradictory intent contracts.
 
 ### Phase 1 — Needs and Offers directory
-- Implement taxonomy with progressive, category-specific fields.
+- Implement taxonomy with progressive, category-specific fields and the professional opportunity-mall discovery experience.
+- Implement the guided broad-to-specific listing wizard, structured-first inputs, one-step-at-a-time interaction, autosave, persistent drafts and resume.
 - Reuse verified business/organization identity and moderation.
 - Deliver member/business/organization publishing, editing, pausing, closing and discovery.
 - Deliver product/service catalog as discovery-only profiles, not commerce listings.
@@ -394,6 +595,7 @@ Do not merge these lifecycles into one status field. Recipient can accept while 
 
 ### Phase 3 — My Requests and closure disposition
 - Automatically save every initiated connection request in My Requests.
+- Deliver the compact app-style My Requests shelf, contextual actions, status filters and preserved browsing/request context.
 - Implement In progress, Completed and Cancelled with required short closing remark.
 - Implement review reminders, reopen history and recipient-side decline/withdrawal.
 - Label system-observed events separately from requester-reported outcomes.

@@ -224,6 +224,8 @@ test("Network-Plus Phase 3 adds requester-owned closure disposition, append-only
  assert.match(service,/for update skip locked/);
  assert.match(service,/request\.review_reminder_sent/);
  assert.match(service,/recipient_withdrawn/);
+ assert.match(service,/contact_consent_revoked_by_withdrawal/);
+ assert.match(service,/allowRecipientWithdrawn/);
  assert.match(server,/networkPlusRequests\.updateNetworkPlusRequestDisposition/);
  assert.match(server,/network-plus\.request\.disposition/);
  assert.match(ui,/My Requests/);

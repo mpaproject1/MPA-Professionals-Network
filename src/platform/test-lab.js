@@ -24,7 +24,7 @@ const ROLE_NAMES = {
 };
 const fail=(status,message,code="BUSINESS_RULE")=>Object.assign(new Error(message),{statusCode:status,code});
 const clean=(v,max=120)=>String(v??"").trim().slice(0,max);
-function testLabEnabled(){return process.env.NODE_ENV!=="production"&&process.env.TEST_LAB_ENABLED==="true";}
+function testLabEnabled(){return process.env.NODE_ENV!=="production"&&process.env.TEST_LAB_ENABLED==="true"&&process.env.TEST_LAB_DISPOSABLE_DATABASE==="true";}
 function randomPassword(){return crypto.randomBytes(24).toString("base64url")+"!7";}
 function usernameToken(){return crypto.randomBytes(5).toString("hex");}
 function requireSystemAdmin(identity){

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
+import {randomUUID} from "node:crypto";
 import test from "node:test";
 import {classifyMatch, normalizeLegacyMember} from "../../src/membership-import/contract.js";
 import {applyMemberImport, claimMemberInvitation, exportMembers, memberImportTemplate, memberImportXlsxTemplate, previewMemberImport} from "../../src/membership/admin-bulk.js";
-import {createXlsx, parseXlsxRows} from "../../src/platform/xlsx.js";
-import {getPool} from "../../src/platform/db.js";
 import * as membership from "../../src/membership/service.js";
-import {randomUUID} from "node:crypto";
+import {getPool} from "../../src/platform/db.js";
 import {assertPaymentTransition, createManualPayment,verifyManualPayment} from "../../src/platform/payment-workflow.js";
+import {createXlsx, parseXlsxRows} from "../../src/platform/xlsx.js";
 
 test("legacy membership rows normalize into a stable contract",()=>{
   const row=normalizeLegacyMember({legacy_member_id:" OLD-1 ",email:" A@EXAMPLE.COM ",paid_amount:"1200",paid_currency:"etb"});

@@ -43,7 +43,8 @@ export function PushNotificationSettings({token}:{token:string}){
    const result=await Notification.requestPermission();
    setPermission(result);
    if(result!=="granted")throw new Error(result==="denied"?"Notifications are blocked in your browser settings. Change the site permission there before trying again.":"Notification permission was not granted.");
-   const registration=await navigator.serviceWorker.register("/sw.js",{scope:"/"});
+   const existingRegistration=await navigator.serviceWorker.getRegistration("/");
+   const registration=existingRegistration||await navigator.serviceWorker.register("/sw.js",{scope:"/"});
    const ready=await navigator.serviceWorker.ready;
    const manager=ready.pushManager||registration.pushManager;
    let subscription=await manager.getSubscription();

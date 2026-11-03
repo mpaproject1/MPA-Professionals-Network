@@ -9,6 +9,7 @@ if(process.env.MIGRATION_CHECK_ALLOW_ROLLBACK!=="YES")throw new Error("MIGRATION
 if(/(^|[_-])(prod|production|live)([_-]|$)/i.test(expectedDatabase)||!/(test|sandbox|ci|verify)/i.test(expectedDatabase))throw new Error("Refusing to rehearse email migration outside an explicitly named disposable database.");
 
 const sql=await readFile(new URL("../db/migrations/20261103190000_email_delivery_hardening.sql",import.meta.url),"utf8");
+const templateSql=await readFile(new URL("../db/migrations/20261103200000_email_workflow_template_coverage.sql",import.meta.url),"utf8");
 const client=new Client({connectionString,connectionTimeoutMillis:10000});
 let open=false;
 try{
@@ -24,6 +25,9 @@ try{
  await client.query("set local lock_timeout='5s'");
  await client.query("set local statement_timeout='30s'");
  await client.query(sql);
+ await client.query(templateSql);
+ const templateCoverage=(await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count;
+ if(templateCoverage!==3)throw new Error("Organization email audience templates were not seeded.");
  const after=(await client.query(`select
   exists(select 1 from information_schema.columns where table_schema='public' and table_name='notification_outbox' and column_name='email_event_key') has_event_key,
   to_regclass('public.email_delivery_event') is not null has_events,

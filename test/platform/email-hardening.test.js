@@ -127,3 +127,11 @@ test("provider callbacks arriving before outbox persistence are reconciled on la
   assert.match(source, /processed_at is null/);
   assert.match(source, /email\.delivery_event\.reconciled/);
 });
+
+test("provider webhook accepts Resend payload field names and acknowledges non-delivery events", async () => {
+  const source = await read("../../src/platform/email-operations.js");
+  assert.match(source, /input\.data\?\.email_id/);
+  assert.match(source, /input\.id,300/);
+  assert.match(source, /rawEventType\.startsWith\("email\."/);
+  assert.match(source, /delivery_delayed/);
+});

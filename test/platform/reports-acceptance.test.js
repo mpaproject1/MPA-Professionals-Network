@@ -172,7 +172,7 @@ test("membership dashboard aggregates and monthly trend are available only throu
     const monthEndStock = await runReport(reviewer, "membership-month-end-stock", { from: "2026-01-01", to: new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date()) }, randomUUID());
     assert.equal(monthEndStock.report.id, "membership-month-end-stock");
     for (const row of monthEndStock.rows) {
-      assert.match(String(row.Month), /^\\d{4}-\\d{2}$/);
+      assert.match(String(row.Month), /^\d{4}-\d{2}$/);
       for (const key of ["Active members", "Expired members", "Suspended members", "Payment verification required", "Other statuses"]) assert.ok(Number.isFinite(Number(row[key])), key);
     }
 

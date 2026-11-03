@@ -40,6 +40,23 @@ function BarList({ title, rows, labelKey, valueKey, empty }: { title: string; ro
   </section>;
 }
 
+function CohortConversionList({ rows, days }: { rows: ReportRow[]; days: 30 | 90 }) {
+  const matureKey = days === 30 ? "Mature 30-day cohort" : "Mature 90-day cohort";
+  const activatedKey = days === 30 ? "Activated within 30 days" : "Activated within 90 days";
+  return <section className={styles.chart} aria-label={days + "-day application cohort conversion"}>
+    <div className={styles.chartHeading}><h3>{days}-day cohort conversion</h3><span>By submission month</span></div>
+    {rows.length ? <div className={styles.bars}>{rows.map(row => {
+      const mature = number(row[matureKey]);
+      const activated = number(row[activatedKey]);
+      const rate = mature > 0 ? (activated / mature * 100) : null;
+      return <div className={styles.barRow} key={String(row["Cohort month"])}>
+        <div className={styles.barMeta}><span>{String(row["Cohort month"])}</span><strong>{rate === null ? "Not mature" : rate.toFixed(1) + "%"}</strong></div>
+        <small>{activated.toLocaleString()} of {mature.toLocaleString()} mature applications activated within {days} days</small>
+      </div>;
+    })}</div> : <p className={styles.emptyChart}>No cohorts with a completed {days}-day observation window matched this period.</p>}
+  </section>;
+}
+
 function Kpi({ label, value, detail, icon: Icon, tone = "navy" }: { label: string; value: number | string; detail: string; icon: typeof Users; tone?: "navy" | "lemon" | "blue" | "muted" }) {
   return <article className={styles.kpi}>
     <div className={styles.kpiTop}><span>{label}</span><span className={styles.kpiIcon + " " + styles[tone]}><Icon size={18} /></span></div>
@@ -278,6 +295,8 @@ export default function MembershipCenterPage() {
       <BarList title="Application pipeline" rows={statusChart} labelKey="Status" valueKey="Applications" empty={applications ? "No applications matched this period." : "Application report unavailable; retry after checking access."}/>
       <BarList title="Open application queue ageing" rows={applicationAging?.rows || []} labelKey="Age band" valueKey="Applications" empty={applicationAging ? "No open applications are waiting." : "Application ageing report unavailable."}/>
       <BarList title="Renewal and expiry pipeline" rows={renewalPipeline?.rows || []} labelKey="Renewal window" valueKey="Members" empty={renewalPipeline ? "No verified-paid memberships are due in the next 90 days." : "Renewal pipeline unavailable."}/></Card>
+      <Card><CohortConversionList rows={cohortApplications?.rows || []} days={30}/></Card>
+      <Card><CohortConversionList rows={cohortApplications?.rows || []} days={90}/></Card>
       <Card><BarList title="Current membership by plan" rows={planChart} labelKey="Product" valueKey="Members" empty={membership ? "No membership records were returned." : "Membership report unavailable; retry after checking access."}/></Card>
       <Card><BarList title="Applications by membership plan" rows={applicationPlanChart} labelKey="Product" valueKey="Applications" empty="No applications matched this period."/></Card>
       <Card>

@@ -272,7 +272,7 @@ export async function dispatchNetworkPlusRequestReviewReminders({limit=100}={}) 
     for(const row of due){
       await notify(db,row.requester_user_id,"network_plus.request.review_reminder",row.id,"A gentle reminder to review this connection request. Update its progress or close it with a short remark.");
       await db.query("update network_plus_request set review_reminder_sent_at=now(),review_due_at=now()+interval '7 days' where id=$1",[row.id]);
-      await db.query("insert into network_plus_request_event(request_id,actor_user_id,event_code,from_status,to_status,metadata) values($1,null,'request.review_reminder_sent',null,null,$2)",[row.id,{source:"scheduled_review_reminder"}]);
+      await db.query("insert into network_plus_request_event(request_id,actor_user_id,event_code,from_status,to_status,metadata) values($1,$2,'request.review_reminder_sent',null,null,$3)",[row.id,row.requester_user_id,{source:"scheduled_review_reminder",actor:"system"}]);
     }
     return {sent:due.length};
   });

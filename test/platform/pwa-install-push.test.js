@@ -52,7 +52,7 @@ test("push endpoint validation rejects insecure, local and non-provider endpoint
 });
 
 test("PWA install shell registers service worker and exposes a standalone manifest",async()=>{
- const [layout,shell,manifest,worker,checker,api,notifications,pushUi,appleIcon,mobilePage,pushService]=await Promise.all([
+ const [layout,shell,manifest,worker,checker,api,notifications,pushUi,appleIcon,mobilePage,notificationsPage,pushService]=await Promise.all([
   readFile(new URL("../../web/app/layout.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/components/shell.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/public/manifest.webmanifest",import.meta.url),"utf8"),
@@ -63,6 +63,7 @@ test("PWA install shell registers service worker and exposes a standalone manife
   readFile(new URL("../../web/components/push-notification-settings.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../web/public/brand/apple-touch-icon.png",import.meta.url)),
   readFile(new URL("../../web/app/mobile/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../../web/app/notifications/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../../src/platform/web-push.js",import.meta.url),"utf8")
  ]);
  const config=JSON.parse(manifest);
@@ -78,7 +79,16 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.match(shell,/className=\{token\?"mobile-nav mobile-nav--signed-in":"mobile-nav mobile-nav--public"\}/);
  assert.ok(mobilePage.includes("Your MPA, in your pocket."));
  assert.ok(mobilePage.includes('href:"/mentorship"'));
- assert.ok(mobilePage.includes('href:"/notifications"'));
+ assert.ok(mobilePage.includes('href:"/notifications#notification-preferences"'));
+ assert.ok(mobilePage.indexOf('title:"Notification preferences"')<mobilePage.indexOf('title:"My workspace"'));
+ assert.ok(worker.includes('const CACHE_VERSION = "v5"'));
+ assert.ok(worker.includes('const OFFLINE_PUBLIC_ROUTES = ["/", "/mobile", "/about", "/jobs", "/serve-community"]'));
+ assert.ok(worker.includes("function offlineNavigationHtml()"));
+ assert.ok(worker.includes("await cache.put(url.pathname, response.clone())"));
+ assert.ok(worker.includes('"/members", "/mentorship", "/learning", "/network-plus", "/track"'));
+ assert.ok(notificationsPage.indexOf('id="notification-preferences"')<notificationsPage.indexOf('aria-label="Notification summary"'));
+ assert.ok(notificationsPage.includes("<PushNotificationSettings token={token}/>"));
+ assert.doesNotMatch(notificationsPage,/<details[^>]*>[\\s\\S]*Notification preferences/);
  assert.ok(shell.includes('const mobilePrimaryHrefs=token?["/jobs","/members","/network-plus","/mentorship"]'));
  assert.ok(shell.includes('const mobileHomeNav:NavItem=["/mobile","Home",Home]'));
  assert.ok(shell.includes('localStorage.getItem("mpa-install-prompt-dismissed-v1")'));

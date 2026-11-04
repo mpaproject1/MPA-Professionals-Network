@@ -78,3 +78,10 @@ Payment reporting periods use verification/completion timestamps where available
 The report queries and UI changes are committed to the feature branch, but this document does not claim that CI or browser acceptance passed. The latest observed PR Quality run #905 for code commit `56da8b278972dc6890cabb05b8c1ff24c4b4a0f6` failed in all four jobs: Biome, TypeScript, backend PostgreSQL tests and Next.js/browser acceptance. GitHub returned empty step summaries and `404 BlobNotFound` for the job logs, so the failure causes remain unverified. JavaScript syntax parsing passed for `src/platform/reports.js`, `test/p2/report-exports.test.js` and `test/p0/role-workspace-authorization.test.js`; this is not a substitute for executing those tests. The latest branch head must pass the full PR Quality workflow before Phase 2 or Phase 1 is marked complete.
 
 No production database migration or deployment has been executed.
+
+
+## Current PR Quality evidence update — 2026-11-04
+
+The previous pending/no-run statement is superseded for automated PR Quality validation by [run 41772344170](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41772344170), run #1358, on exact commit `494b8c97b83029868dabc725839d3621995879fe`. The workflow completed successfully: Biome lint, TypeScript, Next.js production build plus the configured Chromium/browser and membership-card PDF acceptance, and disposable-PostgreSQL migration compatibility plus the complete backend test-file suite all passed. See [the consolidated validation record](78-pr-quality-run-41772344170-validation-record.md).
+
+This corrects only the CI evidence status. It does not close any separately listed manual/device/browser journey, live deployment, provider-delivery, scheduled-operation, data-governance, encryption-key rotation, or other product acceptance gap that this run did not execute.

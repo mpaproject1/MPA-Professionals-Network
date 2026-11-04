@@ -102,7 +102,7 @@ export async function saveEmailTemplate(actorId,code,input,requestId){
  if(templateCode==="account.email_verification"&&input.audience!==undefined&&input.audience!=="all")fail(400,"Email verification is security-critical and must remain available to all eligible account holders.","SECURITY_TEMPLATE_AUDIENCE_LOCKED");
  const subject=clean(input.subjectTemplate,300),textBody=String(input.textTemplate||"").slice(0,20000),html=String(input.htmlTemplate||"").slice(0,30000);
  if(!/^[a-zA-Z0-9_.-]{2,100}$/.test(templateCode)||!subject||!textBody)fail(400,"Template code, subject and text body are required.","VALIDATION_ERROR");
- const allowedAudiences=["all","professional","organization_representative","reviewer","administrator","employer","mentor"];
+ const allowedAudiences=["all","professional","organization_representative","reviewer","administrator","employer","mentor","support_manager"];
  if(input.audience!==undefined&&!allowedAudiences.includes(input.audience))fail(400,"Choose a supported email template audience.","VALIDATION_ERROR");
  if(input.enabled!==undefined&&typeof input.enabled!=="boolean")fail(400,"Template enabled must be a boolean.","VALIDATION_ERROR");
  const audience=input.audience||"all";
@@ -231,13 +231,14 @@ async function recipientMatchesAudience(db,recipient,audience){
  if(!audience||audience==="all")return true;
  const row=(await db.query(`select u.account_type,
   exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('system_admin','admin','platform_admin')) is_admin,
+  (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('system_admin','admin','platform_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='support.inquiries.manage')) is_support_manager,
   (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','verification_reviewer','appeal_reviewer','system_admin')) or
    exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code in ('organizations.review','jobs.review','verification.review'))) is_reviewer,
   (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code='mentor') or exists(select 1 from mentorship_match mm where mm.mentor_user_id=u.id) or exists(select 1 from mentorship m where m.mentor_user_id=u.id)) is_mentor,
   exists(select 1 from organization_membership om where om.user_id=u.id and om.status='active' and om.role_code in ('owner','administrator','recruiter')) is_employer
  from app_user u where lower(u.email)=lower($1) limit 1`,[recipient])).rows[0];
  if(!row)return false;
- return emailAudienceMatches(audience,{accountType:row.account_type,isAdmin:row.is_admin,isReviewer:row.is_reviewer,isMentor:row.is_mentor,isEmployer:row.is_employer});
+ return emailAudienceMatches(audience,{accountType:row.account_type,isAdmin:row.is_admin,isSupportManager:row.is_support_manager,isReviewer:row.is_reviewer,isMentor:row.is_mentor,isEmployer:row.is_employer});
 }
 
 async function reconcilePendingEmailDeliveryEvents(db){

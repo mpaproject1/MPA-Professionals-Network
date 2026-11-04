@@ -255,3 +255,10 @@ Expired portfolios are subject to account expiry handling: synthetic accounts ar
 - [ ] The portfolio has been reset and any file-cleanup warnings reconciled.
 - [ ] Unrelated portfolios and non-test records remain untouched.
 - [ ] The QA environment remains configured for capture mode and is not exposed as a production feature.
+
+
+## Automated CI evidence update — 2026-11-04
+
+The complete backend test-file suite and disposable-PostgreSQL migration compatibility gate passed in [PR Quality run 41772344170](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41772344170) on exact commit `494b8c97b83029868dabc725839d3621995879fe`. Biome, TypeScript, production build and the workflow's configured browser/PDF acceptance also passed. See [docs/78](78-pr-quality-run-41772344170-validation-record.md).
+
+This is automated test evidence only. It does not certify a tester's completion of the manual scenarios in this document, a live Test Lab account login, actual credential workbook download/opening, payment simulation in a running development deployment, or portfolio-scoped reset/file cleanup. Keep those acceptance steps open until directly exercised and evidenced.

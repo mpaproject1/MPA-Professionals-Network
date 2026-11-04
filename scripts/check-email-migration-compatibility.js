@@ -60,6 +60,8 @@ try{
  if(invalidWorkflowAudiences.rowCount)throw new Error("Workflow email templates have missing or incorrect recipient audiences: "+JSON.stringify(invalidWorkflowAudiences.rows));
  const supportTemplate=(await client.query("select audience from email_notification_template where template_code='support.inquiry_escalated'")).rows[0];
  if(supportTemplate?.audience!=="support_manager")throw new Error("Support escalation template must target the support_manager audience.");
+ const auditOutcomes=(await client.query("select pg_get_constraintdef(oid) definition from pg_constraint where conrelid='public.audit_log'::regclass and conname='audit_log_outcome_check'")).rows[0]?.definition||"";
+ if(!auditOutcomes.includes("failure")||!auditOutcomes.includes("retry_scheduled"))throw new Error("Audit outcome constraint does not support the email dispatcher failure/retry audit events.");
  const templateCoverage=(await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count;
  if(templateCoverage!==3)throw new Error("Organization email audience templates were not seeded.");
  const verificationAfter=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, exists(select 1 from information_schema.columns where table_schema='public' and table_name='email_delivery_event' and column_name='verification_delivery_id') event_link, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];

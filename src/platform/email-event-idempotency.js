@@ -31,6 +31,7 @@ export function emailAudienceMatches(audience, identity = {}) {
   if (audience === "employer") return identity.accountType === "organization_representative" && identity.isEmployer === true;
   if (audience === "reviewer") return identity.isReviewer === true;
   if (audience === "administrator") return identity.isAdmin === true;
+  if (audience === "support_manager") return identity.isSupportManager === true;
   if (audience === "mentor") return identity.isMentor === true;
   return false;
 }

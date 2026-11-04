@@ -1,7 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import test from "node:test";
 import { emailAudienceMatches } from "../../src/platform/email-event-idempotency.js";
 
 test("email template inventory resolves both branches of conditional producers", () => {

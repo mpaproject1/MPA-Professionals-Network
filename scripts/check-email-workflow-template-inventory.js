@@ -72,7 +72,7 @@ function lineAt(source, offset) {
 
 function resolveLiteral(expression, constants) {
   const value = expression.trim();
-  const literal = value.match(/^(['"])(.*?)\\1$/s);
+  const literal = value.match(/^(['"])(.*?)\1$/s);
   if (literal) return literal[2];
   const template = value.match(/^`([^$]*)`$/s);
   if (template) return template[1];

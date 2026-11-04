@@ -45,3 +45,10 @@ Open **Admin → Development Test Lab** (`/admin/test-lab`). Do not create a por
 Use the portfolio's **Reset** action, inspect the inventory preview, enter a reason of at least eight characters and select **Delete entire test portfolio**. Reset deletes only portfolio-registered records and eligible private-local evidence files. Foreign-key ownership gaps block unsafe deletion. File cleanup can report warnings after the database transaction; reconcile them before declaring the portfolio fully disposed.
 
 See the [Start and Use Guide](77-test-lab-start-and-use-guide.md) for the full tester workflow, operational controls, troubleshooting and end-of-cycle checklist.
+
+
+## Automated CI evidence update — 2026-11-04
+
+The complete backend test-file suite and disposable-PostgreSQL migration compatibility gate passed in [PR Quality run 41772344170](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41772344170) on exact commit `494b8c97b83029868dabc725839d3621995879fe`. Biome, TypeScript, production build and the workflow's configured browser/PDF acceptance also passed. See [docs/78](78-pr-quality-run-41772344170-validation-record.md).
+
+This is automated test evidence only. It does not certify a tester's completion of the manual scenarios in this document, a live Test Lab account login, actual credential workbook download/opening, payment simulation in a running development deployment, or portfolio-scoped reset/file cleanup. Keep those acceptance steps open until directly exercised and evidenced.

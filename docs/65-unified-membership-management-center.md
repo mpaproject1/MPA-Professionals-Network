@@ -842,8 +842,8 @@ Trace exact payment application and membership-record schemas, all payment creat
 
 ### Remaining before this work can be certified complete
 
-- **CI has not yet been observed for the latest head.** The GitHub workflow-run lookup returned no run for the latest commit. The branch's PR Quality workflow must execute and pass; do not treat the absence of a run as a pass.
-- Run and fix all failures from the complete disposable-PostgreSQL migration/upgrade rehearsal, backend test suite, Biome, TypeScript, production build and Playwright suite. The added tests are not yet claimed as passing.
+- **Superseded by PR Quality run 41772344170 (2026-11-04):** the exact tested commit `494b8c97b83029868dabc725839d3621995879fe` passed Biome, TypeScript, production build/configured browser and PDF acceptance, disposable-PostgreSQL migration compatibility and the complete backend test-file suite. See [docs/78](78-pr-quality-run-41772344170-validation-record.md).
+- The PR Quality migration/upgrade rehearsal, backend suite, Biome, TypeScript, production build and configured browser/PDF acceptance now pass on the exact SHA recorded in docs/78. Broader module-specific Playwright journeys and manual acceptance remain open where not covered by that workflow.
 - Execute the new GitHub Actions reference-workbook workflow, inspect the artifact, upload it through the geography admin workspace and publish the first reference version. Until this is done, member profile geography correctly reports that no published reference version is available.
 - The generated geography workbook includes UN M49 country/area entries and Ethiopian Regions/Federal Cities. It intentionally does **not** invent Zones, Sub-cities, Districts or Towns. An authoritative Ethiopian lower-level administrative dataset must be appended before those lower levels can be selected. Parent/level validation is in place.
 - Validate real XLSX round-trips for both import workbooks in CI and verify row-level preview, apply, duplicate replay and cleanup behavior against disposable PostgreSQL.
@@ -878,7 +878,7 @@ Trace exact payment application and membership-record schemas, all payment creat
 | Membership Center | Dashboard shell and navigation exist, but most navigation still routes to separate legacy workspaces. Fee-balance and geography summary components are imported but not rendered. Ageing/renewal report requests do not consistently receive the dashboard's selected filters. | Partially integrated; this is a concrete remaining product implementation task, not merely a test-certification task. |
 | Dashboard copy and geography filters | Some dashboard explanatory copy still describes geography as unpersisted/unstructured despite the new schema and APIs. | Update copy and expose only geography filters backed by published, valid reference data. |
 | Automated tests | Contract/authorization/workbook tests and migration rehearsal assertions exist. The inspected tests do not establish full database transaction coverage for all new workflows. | Test coverage is present but insufficient evidence of end-to-end correctness until the full suites and scenario tests execute. |
-| CI / release | PR Quality workflow is configured to provision disposable PostgreSQL and run migrations, backend tests, Biome, TypeScript, production build and selected Playwright tests. | No passing check result was observed for audited head 2351db0. Older workflow runs are not evidence for this head. No live staging verification is claimed. |
+| CI / release | PR Quality workflow provisions disposable PostgreSQL and runs migration compatibility, backend tests, Biome, TypeScript, production build and configured browser/PDF acceptance. | PASS on `494b8c97b83029868dabc725839d3621995879fe` in run [41772344170](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41772344170). Live staging verification and broader manual acceptance are not claimed. |
 
 ### 26.2 Concrete Membership Center gaps found in source
 
@@ -967,7 +967,7 @@ Do not mark this workstream complete until all of the following are evidenced:
 ### Validation status — do not infer a pass
 
 - Exact latest head: `d9718be9f0fb49ef1114c8e693306115a2ac6bb2`.
-- GitHub Actions workflow-run lookup for this exact SHA returned no runs; exact-SHA combined commit status returned no status entries. This is **pending/unverified**, not a pass.
+- **Superseded:** exact tested SHA `494b8c97b83029868dabc725839d3621995879fe` has successful PR Quality run [41772344170](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41772344170).
 - No PostgreSQL, backend, Biome, TypeScript, production build or Playwright result is claimed for these commits.
 - The new lifecycle test requires the disposable PostgreSQL service configured in PR Quality. It has been committed but not executed in this environment.
 - WP1 is improved but not fully complete: legacy workflows remain separate routes; no new in-center workflow tabs or geography filter controls have been introduced. The shared filters are propagated only to reports whose query semantics support them. The renewal report remains a current rolling expiry view.
@@ -1016,7 +1016,7 @@ For sponsorship, Finance must link an existing registered sponsoring organizatio
 
 ### Validation status
 
-The source and migration changes are committed. The latest PR Quality workflow lookup did not return a run for implementation SHA `c5e79db774996cfbe8096e8d005c3bbe89c8ed45`; the most recent workflow-dispatch runs are for older SHAs. This is pending/unverified, not a pass. The migration, PostgreSQL integration test, TypeScript, Biome, production build and Playwright checks have not been executed against this latest implementation head. The available GitHub connection exposes run inspection and rerun actions but no workflow-dispatch action, so a fresh exact-head run still needs to be started from GitHub Actions before merge.
+The earlier no-run statement is superseded by PR Quality run [41772344170](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41772344170), which passed on exact SHA `494b8c97b83029868dabc725839d3621995879fe`. The configured workflow passed disposable-PostgreSQL migration compatibility, all backend test files, Biome, TypeScript, production build and its configured browser/PDF acceptance. This does not replace the outstanding manual/report-export/operational checks listed below.
 
 ## 29. WP3 workbook/geography and WP4 Finance operational completion — 2026-11-03
 
@@ -1076,8 +1076,8 @@ The source and migration changes are committed. The latest PR Quality workflow l
 
 ### Current validation and outstanding gates
 
-- Current PR head before this documentation commit: `fc00c51201dac4e70e70f4e6a8fd09bd01540316`. The exact-head workflow lookup returned no Actions run or commit-status entries. The latest recorded PR Quality run remains an older failure on `491c554ae1e589d8358f54f2d1789e96f646b97e`, not this implementation head.
-- No local test suite, PostgreSQL migration run, Biome, TypeScript, production build or Playwright result is claimed. All new integration tests and migrations remain **committed but unverified** until PR Quality executes against the final head.
+- Historical note: the earlier head `fc00c51201dac4e70e70f4e6a8fd09bd01540316` had no exact-head run at the time. The current promoted main head `494b8c97b83029868dabc725839d3621995879fe` subsequently passed PR Quality run [41772344170](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41772344170).
+- The above earlier status is superseded for automated CI evidence: run 41772344170 passed the disposable PostgreSQL migration compatibility gate, all backend test files, Biome, TypeScript, production build and configured browser/PDF acceptance on the promoted main SHA. The separate operational/manual acceptance gaps remain open.
 - The available GitHub connection supports run inspection and reruns but does not expose a workflow-dispatch action. The branch pushes made through this connection have not produced a new Actions run. Start PR Quality and the geography-reference workflow from GitHub Actions if automatic runs remain suppressed.
 - Do not enable Zone/Sub-city/District/Town selectors until an authoritative source dataset, source license, release date, stable codes and parent mappings are independently verified and imported.
 - Do not merge or deploy on the basis of these implementation commits alone. Complete the exact-head migration, backend, Biome, TypeScript, build and browser gates; inspect the geography workbook artifact; verify actual device push delivery; and resolve the supervisor role scope before declaring WP3/WP4 complete.
@@ -1142,7 +1142,7 @@ The source and migration changes are committed. The latest PR Quality workflow l
 - Added explicit authorization-helper tests for the system-admin / Finance / membership-reviewer permission boundary, and an idempotent payment-reversal retry assertion.
 - Updated the member-expiry worker to use the Addis Ababa civil date, matching the dashboard, renewal pipeline and month-end capture calendar.
 
-### Remaining before CI / acceptance
+### Remaining after CI — operational and broader acceptance
 
 1. Run all new and existing backend tests against disposable PostgreSQL, including the new additive snapshot migration, Test Lab reset registry changes, report filtering and export tests.
 2. Run migration rehearsal from a clean schema and every supported prior migration state; verify the month-end snapshot worker against the migrated schema.
@@ -1157,3 +1157,8 @@ The source and migration changes are committed. The latest PR Quality workflow l
 - Supervisor role and permissions. The current role catalogue has no supervisor role; no role or assignment has been silently added.
 - Verified Ethiopian Zone, Sub-city, District/Woreda and Town reference dataset. Current published levels remain the supported filter choices; missing lower-level records are not fabricated.
 - Ethiopian-calendar display convention, rejected/withdrawn application and export retention rules, historic membership reconstruction before the snapshot migration, and acquisition-cost data for cost-per-acquisition reporting.
+
+
+## PR Quality status update — 2026-11-04
+
+[PR Quality run 41772344170](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41772344170) (run #1358) completed successfully on exact commit `494b8c97b83029868dabc725839d3621995879fe`. Biome, TypeScript, Next.js production build plus the configured browser/PDF acceptance, disposable-PostgreSQL migration compatibility and all backend test files passed. This supersedes earlier no-run/pending statements for the tested commit. It does not convert unexecuted module-specific manual/browser/device/deployment/provider/operational acceptance rows into PASS; those remain open until their own evidence is recorded. Consolidated evidence: [docs/78](78-pr-quality-run-41772344170-validation-record.md).

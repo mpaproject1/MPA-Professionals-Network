@@ -13,7 +13,7 @@ test("Workstream 7 PostgreSQL security workflows", { skip: !enabled }, async (t)
   const db = getPool();
   const database = (await db.query("select current_database() name")).rows[0]?.name;
   const expectedDatabase = process.env.MIGRATION_CHECK_EXPECTED_DATABASE || "mpa_test";
-  assert.match(expectedDatabase, /test|disposable|ci/i, "security integration tests require an explicitly disposable database name");
+  assert.match(expectedDatabase, /(?:^|[_-])(?:test|disposable|ci)(?:$|[_-])/i, "security integration tests require an explicitly disposable database name");
   assert.equal(database, expectedDatabase, `security integration tests may only write to the configured disposable database ${expectedDatabase}`);
   const suffix = crypto.randomUUID();
   const emails = [];

@@ -1144,10 +1144,10 @@ The earlier no-run statement is superseded by PR Quality run [41772344170](https
 
 ### Remaining after CI — operational and broader acceptance
 
-1. Run all new and existing backend tests against disposable PostgreSQL, including the new additive snapshot migration, Test Lab reset registry changes, report filtering and export tests.
-2. Run migration rehearsal from a clean schema and every supported prior migration state; verify the month-end snapshot worker against the migrated schema.
-3. Run Biome, TypeScript, production build and the full Playwright suite on the exact PR #18 head. Complete desktop/mobile, keyboard, touch, accessibility and dark/light browser acceptance.
-4. Verify report totals against source records and Finance totals, verify export row-limit metadata and role masking, and inspect real generated CSV/XLSX files.
+1. **Automated backend and migration gates: PASS** in PR Quality run 41772344170 on `494b8c97b83029868dabc725839d3621995879fe`; the disposable PostgreSQL legacy-schema upgrade, repository migration application/compatibility rehearsal and all backend test files completed successfully.
+2. **Automated static/build gates: PASS** in the same run: Biome, TypeScript and Next.js production build.
+3. **Configured browser/PDF acceptance: PASS** in the same run, including Chromium browser acceptance and membership-card PDF parsing. This is not equivalent to the full Playwright suite or every Membership Center user journey.
+4. **Still open:** verify report totals against source records and Finance totals; verify export row-limit metadata and role masking; inspect actual generated CSV/XLSX files; and complete the Membership Center's full desktop/mobile, keyboard, touch, accessibility and dark/light acceptance.
 5. Observe the first scheduled month-end snapshot in a running development instance; snapshots are forward-only and no historic month-end values are fabricated.
 
 ### Governance / data dependencies still not hard-coded

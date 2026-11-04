@@ -174,17 +174,29 @@ test("actual provider failure is retried and a later accepted attempt is persist
     if (calls === 1) return { ok: false, status: 503, json: async () => ({}) };
     return { ok: true, status: 200, json: async () => ({ id: prefix + "-provider-accepted" }) };
   };
-  const first = await dispatchEmailOutbox(null, { system: true, onlyId: outboxId, limit: 1 });
-  assert.equal(first.results[0].status, "pending");
-  await db.query("update notification_outbox set next_attempt_at=now() where id=$1", [outboxId]);
-  const second = await dispatchEmailOutbox(null, { system: true, onlyId: outboxId, limit: 1 });
-  assert.equal(second.results[0].status, "sent");
-  assert.equal(calls, 2);
-  const row = await db.query("select status,delivery_status,attempts,provider_message_id from notification_outbox where id=$1", [outboxId]);
-  assert.equal(row.rows[0].status, "sent");
-  assert.equal(row.rows[0].delivery_status, "sent");
-  assert.equal(row.rows[0].attempts, 2);
-  assert.equal(row.rows[0].provider_message_id, prefix + "-provider-accepted");
+  // Exercise provider retry even when this workflow globally enables Test Lab capture.
+  const previousDeliveryMode = process.env.TEST_DELIVERY_MODE;
+  const previousTestLabEnabled = process.env.TEST_LAB_ENABLED;
+  delete process.env.TEST_DELIVERY_MODE;
+  process.env.TEST_LAB_ENABLED = "false";
+  try {
+    const first = await dispatchEmailOutbox(null, { system: true, onlyId: outboxId, limit: 1 });
+    assert.equal(first.results[0].status, "pending");
+    await db.query("update notification_outbox set next_attempt_at=now() where id=$1", [outboxId]);
+    const second = await dispatchEmailOutbox(null, { system: true, onlyId: outboxId, limit: 1 });
+    assert.equal(second.results[0].status, "sent");
+    assert.equal(calls, 2);
+    const row = await db.query("select status,delivery_status,attempts,provider_message_id from notification_outbox where id=$1", [outboxId]);
+    assert.equal(row.rows[0].status, "sent");
+    assert.equal(row.rows[0].delivery_status, "sent");
+    assert.equal(row.rows[0].attempts, 2);
+    assert.equal(row.rows[0].provider_message_id, prefix + "-provider-accepted");
+  } finally {
+    if (previousDeliveryMode === undefined) delete process.env.TEST_DELIVERY_MODE;
+    else process.env.TEST_DELIVERY_MODE = previousDeliveryMode;
+    if (previousTestLabEnabled === undefined) delete process.env.TEST_LAB_ENABLED;
+    else process.env.TEST_LAB_ENABLED = previousTestLabEnabled;
+  }
 });
 
 test("active recipient suppression blocks real provider delivery", { skip: !enabled && skipReason }, async () => {

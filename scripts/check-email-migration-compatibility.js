@@ -22,6 +22,7 @@ try{
  const templateCoverageBefore=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count);
  const workflowCoverageBefore=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["professional.workflow_update","employer.candidate_update","employer.offer_approval_required","employer.interview_scheduled","employer.interview_response","mentor.mentorship_update","organization.membership_added","organization.membership_updated"]])).rows[0].count);
  const supportTemplateBefore=(await client.query("select audience from email_notification_template where template_code='support.inquiry_escalated'")).rows[0]?.audience||null;
+ const supportTemplateVersionsBefore=Number((await client.query("select count(*)::int count from email_template_version where template_code='support.inquiry_escalated'")).rows[0].count);
 
  const verificationBefore=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
  const before=(await client.query(`select
@@ -90,7 +91,8 @@ try{
  if(Boolean(verificationRestored.has_delivery_table)!==Boolean(verificationBefore.has_delivery_table)||verificationRestored.audience!==verificationBefore.audience)throw new Error("Verification recovery migration rollback did not restore the disposable schema/template baseline.");
  const templateCoverageAfter=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count);
  const supportTemplateAfter=(await client.query("select audience from email_notification_template where template_code='support.inquiry_escalated'")).rows[0]?.audience||null;
- if(supportTemplateAfter!==supportTemplateBefore)throw new Error("Support escalation template migration rollback did not restore its prior state.");
+ const supportTemplateVersionsAfter=Number((await client.query("select count(*)::int count from email_template_version where template_code='support.inquiry_escalated'")).rows[0].count);
+ if(supportTemplateAfter!==supportTemplateBefore||supportTemplateVersionsAfter!==supportTemplateVersionsBefore)throw new Error("Support escalation template migration rollback did not restore its prior template/version baseline.");
  if(templateCoverageAfter!==templateCoverageBefore)throw new Error("Email template coverage migration rollback did not restore the original template baseline.");
  process.stdout.write("Email hardening migration apply/rollback compatibility passed.\n");
 }catch(error){

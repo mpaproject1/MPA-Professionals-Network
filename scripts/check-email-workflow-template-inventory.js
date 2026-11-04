@@ -70,14 +70,48 @@ function lineAt(source, offset) {
   return source.slice(0, offset).split("\n").length;
 }
 
-function resolveLiteral(expression, constants) {
-  const value = expression.trim();
-  const literal = value.match(/^(['"])(.*?)\1$/s);
-  if (literal) return literal[2];
-  const template = value.match(/^`([^$]*)`$/s);
-  if (template) return template[1];
-  if (/^[A-Za-z_$][\w$]*$/.test(value)) return constants.get(value) || null;
+function topLevelConditional(value) {
+  let quote = null, escaped = false, paren = 0, brace = 0, bracket = 0, question = -1, nested = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === "\`") { quote = ch; continue; }
+    if (ch === "(") paren += 1;
+    else if (ch === ")") paren -= 1;
+    else if (ch === "{") brace += 1;
+    else if (ch === "}") brace -= 1;
+    else if (ch === "[") bracket += 1;
+    else if (ch === "]") bracket -= 1;
+    else if (paren === 0 && brace === 0 && bracket === 0) {
+      if (ch === "?") { if (question < 0) question = i; nested += 1; }
+      else if (ch === ":" && question >= 0) {
+        nested -= 1;
+        if (nested === 0) return [value.slice(0, question), value.slice(question + 1, i), value.slice(i + 1)];
+      }
+    }
+  }
   return null;
+}
+function resolveLiterals(expression, constants, seen = new Set()) {
+  let value = expression.trim();
+  while (value.startsWith("(") && value.endsWith(")")) value = value.slice(1, -1).trim();
+  const literal = value.match(/^(['"])(.*?)\1$/s);
+  if (literal) return [literal[2]];
+  const template = value.match(/^\`([^$]*)\`$/s);
+  if (template) return [template[1]];
+  if (/^[A-Za-z_$][\w$]*$/.test(value)) {
+    if (seen.has(value) || !constants.has(value)) return [];
+    const next = new Set(seen); next.add(value);
+    return resolveLiterals(constants.get(value), constants, next);
+  }
+  const conditional = topLevelConditional(value);
+  if (conditional) return [...new Set([...resolveLiterals(conditional[1], constants, seen), ...resolveLiterals(conditional[2], constants, seen)])];
+  return [];
 }
 
 const sourceFiles = (await Promise.all([".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx"].map(suffix => filesUnder(sourceRoot, suffix))))
@@ -98,14 +132,16 @@ for (const file of sourceFiles) {
   for (const match of source.matchAll(pattern)) {
     const openIndex = match.index + match[0].lastIndexOf("(");
     const args = splitArguments(matchingCall(source, openIndex));
-    const templateCode = resolveLiteral(args[2] || "", constants);
+    const templateCodes = resolveLiterals(args[2] || "", constants);
     const location = path.relative(root, file) + ":" + lineAt(source, match.index);
-    if (!templateCode) {
+    if (!templateCodes.length) {
       unresolved.push(location + " — third argument is not a statically resolvable template code");
       continue;
     }
-    if (!producers.has(templateCode)) producers.set(templateCode, []);
-    producers.get(templateCode).push(location);
+    for (const templateCode of templateCodes) {
+      if (!producers.has(templateCode)) producers.set(templateCode, []);
+      producers.get(templateCode).push(location);
+    }
   }
 }
 

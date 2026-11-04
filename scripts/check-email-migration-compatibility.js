@@ -12,6 +12,7 @@ const sql=await readFile(new URL("../db/migrations/20261103190000_email_delivery
 const templateSql=await readFile(new URL("../db/migrations/20261103200000_email_workflow_template_coverage.sql",import.meta.url),"utf8");
 const verificationSql=await readFile(new URL("../db/migrations/20261103210000_email_verification_delivery_recovery.sql",import.meta.url),"utf8");
 const workflowTemplateSql=await readFile(new URL("../db/migrations/20261103220000_email_workflow_template_complete.sql",import.meta.url),"utf8");
+const supportTemplateSql=await readFile(new URL("../db/migrations/20261103230000_support_escalation_email_template.sql",import.meta.url),"utf8");
 const client=new Client({connectionString,connectionTimeoutMillis:10000});
 let open=false;
 try{
@@ -20,6 +21,7 @@ try{
  if(identity.database_name!==expectedDatabase||identity.schema_name!=="public")throw new Error("Connected database/schema does not match the explicitly approved disposable target.");
  const templateCoverageBefore=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count);
  const workflowCoverageBefore=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["professional.workflow_update","employer.candidate_update","employer.offer_approval_required","employer.interview_scheduled","employer.interview_response","mentor.mentorship_update","organization.membership_added","organization.membership_updated"]])).rows[0].count);
+ const supportTemplateBefore=(await client.query("select audience from email_notification_template where template_code='support.inquiry_escalated'")).rows[0]?.audience||null;
 
  const verificationBefore=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
  const before=(await client.query(`select
@@ -39,6 +41,7 @@ try{
  await client.query(templateSql);
  await client.query(verificationSql);
  await client.query(workflowTemplateSql);
+ await client.query(supportTemplateSql);
  const invalidWorkflowAudiences=await client.query(`with expected(template_code,audience) as (values
   ('professional.workflow_update','professional'),
   ('employer.candidate_update','employer'),
@@ -54,6 +57,8 @@ try{
  left join email_notification_template t using(template_code)
  where t.template_code is null or t.audience is distinct from e.audience`);
  if(invalidWorkflowAudiences.rowCount)throw new Error("Workflow email templates have missing or incorrect recipient audiences: "+JSON.stringify(invalidWorkflowAudiences.rows));
+ const supportTemplate=(await client.query("select audience from email_notification_template where template_code='support.inquiry_escalated'")).rows[0];
+ if(supportTemplate?.audience!=="support_manager")throw new Error("Support escalation template must target the support_manager audience.");
  const templateCoverage=(await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count;
  if(templateCoverage!==3)throw new Error("Organization email audience templates were not seeded.");
  const verificationAfter=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, exists(select 1 from information_schema.columns where table_schema='public' and table_name='email_delivery_event' and column_name='verification_delivery_id') event_link, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
@@ -84,6 +89,8 @@ try{
  const verificationRestored=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
  if(Boolean(verificationRestored.has_delivery_table)!==Boolean(verificationBefore.has_delivery_table)||verificationRestored.audience!==verificationBefore.audience)throw new Error("Verification recovery migration rollback did not restore the disposable schema/template baseline.");
  const templateCoverageAfter=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count);
+ const supportTemplateAfter=(await client.query("select audience from email_notification_template where template_code='support.inquiry_escalated'")).rows[0]?.audience||null;
+ if(supportTemplateAfter!==supportTemplateBefore)throw new Error("Support escalation template migration rollback did not restore its prior state.");
  if(templateCoverageAfter!==templateCoverageBefore)throw new Error("Email template coverage migration rollback did not restore the original template baseline.");
  process.stdout.write("Email hardening migration apply/rollback compatibility passed.\n");
 }catch(error){

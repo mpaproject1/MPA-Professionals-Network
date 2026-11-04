@@ -23,6 +23,8 @@ try{
  const workflowCoverageBefore=Number((await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["professional.workflow_update","employer.candidate_update","employer.offer_approval_required","employer.interview_scheduled","employer.interview_response","mentor.mentorship_update","organization.membership_added","organization.membership_updated"]])).rows[0].count);
  const supportTemplateBefore=(await client.query("select audience from email_notification_template where template_code='support.inquiry_escalated'")).rows[0]?.audience||null;
  const supportTemplateVersionsBefore=Number((await client.query("select count(*)::int count from email_template_version where template_code='support.inquiry_escalated'")).rows[0].count);
+ const audienceConstraintsBefore=(await client.query("select conrelid::regclass::text relation_name,conname,pg_get_constraintdef(oid) definition from pg_constraint where contype='c' and conrelid in ('public.email_notification_template'::regclass,'public.email_template_version'::regclass) and pg_get_expr(conbin,conrelid) ilike '%audience%' order by relation_name,conname")).rows;
+ const auditOutcomeConstraintBefore=(await client.query("select pg_get_constraintdef(oid) definition from pg_constraint where conrelid='public.audit_log'::regclass and conname='audit_log_outcome_check'")).rows[0]?.definition||null;
 
  const verificationBefore=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
  const before=(await client.query(`select
@@ -62,6 +64,9 @@ try{
  if(supportTemplate?.audience!=="support_manager")throw new Error("Support escalation template must target the support_manager audience.");
  const auditOutcomes=(await client.query("select pg_get_constraintdef(oid) definition from pg_constraint where conrelid='public.audit_log'::regclass and conname='audit_log_outcome_check'")).rows[0]?.definition||"";
  if(!auditOutcomes.includes("failure")||!auditOutcomes.includes("retry_scheduled"))throw new Error("Audit outcome constraint does not support the email dispatcher failure/retry audit events.");
+ const audienceConstraintsAfter=(await client.query("select conrelid::regclass::text relation_name,conname,pg_get_constraintdef(oid) definition from pg_constraint where contype='c' and conrelid in ('public.email_notification_template'::regclass,'public.email_template_version'::regclass) and pg_get_expr(conbin,conrelid) ilike '%audience%' order by relation_name,conname")).rows;
+ if(!audienceConstraintsAfter.some(row=>row.relation_name==="email_notification_template"&&row.definition.includes("support_manager")))throw new Error("Live email template audience constraint does not permit the new support_manager audience.");
+ if(audienceConstraintsAfter.some(row=>row.relation_name==="email_template_version"&&!row.definition.includes("support_manager")))throw new Error("Email template version audience constraint was not extended consistently.");
  const templateCoverage=(await client.query("select count(*)::int count from email_notification_template where template_code=any($1::text[])",[["organization.registration_received","organization.review_queue_item","organization.review_update"]])).rows[0].count;
  if(templateCoverage!==3)throw new Error("Organization email audience templates were not seeded.");
  const verificationAfter=(await client.query("select to_regclass('public.email_verification_delivery') is not null has_delivery_table, exists(select 1 from information_schema.columns where table_schema='public' and table_name='email_delivery_event' and column_name='verification_delivery_id') event_link, (select audience from email_notification_template where template_code='account.email_verification') audience")).rows[0];
@@ -95,6 +100,9 @@ try{
  const supportTemplateAfter=(await client.query("select audience from email_notification_template where template_code='support.inquiry_escalated'")).rows[0]?.audience||null;
  const supportTemplateVersionsAfter=Number((await client.query("select count(*)::int count from email_template_version where template_code='support.inquiry_escalated'")).rows[0].count);
  if(supportTemplateAfter!==supportTemplateBefore||supportTemplateVersionsAfter!==supportTemplateVersionsBefore)throw new Error("Support escalation template migration rollback did not restore its prior template/version baseline.");
+ const audienceConstraintsAfterRollback=(await client.query("select conrelid::regclass::text relation_name,conname,pg_get_constraintdef(oid) definition from pg_constraint where contype='c' and conrelid in ('public.email_notification_template'::regclass,'public.email_template_version'::regclass) and pg_get_expr(conbin,conrelid) ilike '%audience%' order by relation_name,conname")).rows;
+ const auditOutcomeConstraintAfterRollback=(await client.query("select pg_get_constraintdef(oid) definition from pg_constraint where conrelid='public.audit_log'::regclass and conname='audit_log_outcome_check'")).rows[0]?.definition||null;
+ if(JSON.stringify(audienceConstraintsAfterRollback)!==JSON.stringify(audienceConstraintsBefore)||auditOutcomeConstraintAfterRollback!==auditOutcomeConstraintBefore)throw new Error("Support email migration rollback did not restore the original audience and audit outcome constraints.");
  if(templateCoverageAfter!==templateCoverageBefore)throw new Error("Email template coverage migration rollback did not restore the original template baseline.");
  process.stdout.write("Email hardening migration apply/rollback compatibility passed.\n");
 }catch(error){

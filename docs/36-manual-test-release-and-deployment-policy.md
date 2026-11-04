@@ -84,3 +84,10 @@ The cPanel deployment record documents:
 - The user reports the portal workflows they tested are working well.
 
 These observations are not a substitute for a full repeatable local test run, exhaustive authorization/isolation acceptance, or a database restore rehearsal. See [cPanel deployment progress and checklist](33-cpanel-deployment-progress-and-repeatable-checklist.md), [whole-platform readiness audit](34-whole-platform-readiness-audit.md), and [workflow reconciliation matrix](31-workflow-reconciliation-matrix.md).
+
+
+## Current automated validation status — 2026-11-04
+
+The historical statement above that GitHub Actions CI was removed is superseded for the current promoted main branch. The active `.github/workflows/pr-quality.yml` workflow completed successfully in [run 41772344170](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41772344170) on exact commit `494b8c97b83029868dabc725839d3621995879fe`. Biome, TypeScript, production build, configured browser/PDF acceptance, disposable-PostgreSQL migration compatibility and the complete backend test-file suite passed. See [docs/78](78-pr-quality-run-41772344170-validation-record.md).
+
+The policy's evidence-separation requirements remain in force: a successful PR Quality run does not prove live deployment, all manual journeys, physical-device/PWA acceptance, provider delivery, database restore rehearsal or other tests not executed by that workflow. Record those separately and do not mark them PASS without direct evidence.

@@ -497,3 +497,10 @@ Delivered in the branch:
 - admin Test Lab screen, API endpoints, setup documentation and contract/XLSX tests.
 
 **Fixture scope limitation:** the initial fixture pack is an account, notification, email-capture and simulated-payment foundation. It does not yet pre-create every domain workflow entity listed in Section 6 (such as fully linked membership-review/verification, organization/job, service/mentorship, project/donation and event journeys). Those fixtures must be added through their owning domain services and tested against their existing permissions before the test portfolio can be described as a complete end-to-end business-data pack. The ownership trigger captures future UUID-keyed rows that directly reference test accounts; non-UUID/composite-key tables require explicit cleanup coverage. See Section 11 of the setup runbook for the safety boundary.
+
+
+## Automated CI evidence update — 2026-11-04
+
+The complete backend test-file suite and disposable-PostgreSQL migration compatibility gate passed in [PR Quality run 41772344170](https://github.com/mpaproject1/MPA-Professionals-Network/actions/runs/41772344170) on exact commit `494b8c97b83029868dabc725839d3621995879fe`. Biome, TypeScript, production build and the workflow's configured browser/PDF acceptance also passed. See [docs/78](78-pr-quality-run-41772344170-validation-record.md).
+
+This is automated test evidence only. It does not certify a tester's completion of the manual scenarios in this document, a live Test Lab account login, actual credential workbook download/opening, payment simulation in a running development deployment, or portfolio-scoped reset/file cleanup. Keep those acceptance steps open until directly exercised and evidenced.

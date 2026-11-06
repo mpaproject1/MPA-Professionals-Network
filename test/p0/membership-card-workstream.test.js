@@ -9,7 +9,8 @@ const [service,server,bulkPage,bulkCss,singlePage,verifyPage,membershipService]=
   read("../../web/app/admin/membership-cards/page.tsx"),
   read("../../web/app/admin/membership-cards/membership-cards.module.css"),
   read("../../web/app/membership/card/page.tsx"),
-  read("../../web/app/membership/verify/page.tsx")
+  read("../../web/app/membership/verify/page.tsx"),
+  read("../../src/membership/service.js")
 ]);
 
 test("single card issuance requires an active eligible membership record, not an account role",()=>{

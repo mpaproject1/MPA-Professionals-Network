@@ -6,13 +6,13 @@ const b64url=value=>Buffer.from(value).toString("base64url");
 const fromB64url=value=>Buffer.from(String(value||""),"base64url");
 const sha256=value=>createHash("sha256").update(value).digest("hex");
 const PUSH_HOSTS=["fcm.googleapis.com","push.services.mozilla.com","notify.windows.com","push.apple.com"];
-function notificationPushUrl(value){
+function notificationPushUrl(value,category){
  const url=String(value||"");
- if(!url.startsWith("/")||url.startsWith("//")||url.includes("\\\\")||[...url].some(ch=>ch.charCodeAt(0)<32||ch.charCodeAt(0)===127))return "/notifications";
+ if(!url.startsWith("/")||url.startsWith("//")||url.includes("\\")||[...url].some(ch=>ch.charCodeAt(0)<32||ch.charCodeAt(0)===127))return "/notifications";
  const path=url.split(/[?#]/)[0];
  if(path==="/network-plus/businesses"||path.startsWith("/network-plus/businesses/"))return "/network-plus";
  if(path==="/admin/network-plus/businesses"||path.startsWith("/admin/network-plus/businesses/"))return "/admin";
- if(path==="/profile")return "/account/security";
+ if(category==="security"&&path==="/profile")return "/account/security";
  return url;
 }
 function fail(status,message,code="VALIDATION_ERROR"){throw Object.assign(new Error(message),{statusCode:status,code});}
@@ -129,7 +129,7 @@ async function deliverOne(row,config,customPayload=null){
  const endpoint=validPushEndpoint(row.endpoint);if(!endpoint)return {ok:false,expired:true,status:410,code:"INVALID_ENDPOINT"};
  const payload=customPayload||{title:row.priority==="urgent"||row.priority==="high"?"MPA · Action needed":"MPA · New update",
    body:row.priority==="urgent"||row.priority==="high"?"You have an important MPA update. Open the app to review it.":"You have a new MPA update. Open the app to review it.",
-   url:notificationPushUrl(row.action_url),
+   url:notificationPushUrl(row.action_url,row.category),
    notificationId:row.notification_event_id,priority:row.priority};
  const body=encryptWebPushPayload({p256dh:row.p256dh,auth:row.auth_secret},payload);
  try{

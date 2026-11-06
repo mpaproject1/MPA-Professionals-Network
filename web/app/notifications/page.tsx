@@ -49,7 +49,6 @@ export default function NotificationsPage(){
    </div>
   </header>
   <section id="notification-preferences" hidden={!preferencesOpen} className="mb-6 scroll-mt-24 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5" aria-labelledby="notification-preferences-title">
-     <section id="notification-preferences" hidden={!preferencesOpen} className="mb-6 scroll-mt-24 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5" aria-labelledby="notification-preferences-title">
       <div className="mb-4"><p className="text-xs font-bold uppercase tracking-[.16em] text-[var(--muted)]">Your controls</p><h2 id="notification-preferences-title" className="mt-1 text-xl font-semibold">Notification preferences</h2><p className="mt-1 text-sm text-[var(--muted)]">Choose which updates reach you and which devices can alert you.</p></div>
       <div className="mb-4"><PushNotificationSettings token={token}/></div>
       <div className="grid gap-4 border-t border-[var(--border)] p-4 sm:grid-cols-2">
@@ -59,7 +58,6 @@ export default function NotificationsPage(){
        <div className="sm:col-span-2"><div className="mb-3"><p className="text-sm font-medium">In-app categories</p><p className="mt-1 text-xs text-[var(--muted)]">All categories start enabled. Turn off only the optional updates you do not want; critical security alerts always remain on.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{categories.filter(c=>c.value!=="all").map(c=><label key={c.value} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={c.value==="security"||preferences?.in_app_categories?.[c.value]!==false} disabled={c.value==="security"||!preferences||savingPreferences||!preferences.in_app_enabled} onChange={e=>void savePreferences({in_app_categories:{...(preferences?.in_app_categories||{}),[c.value]:e.target.checked}})}/><span><span className="block">{c.label}</span>{c.value==="security"?<span className="block text-xs text-[var(--muted)]">Critical security alerts are always shown.</span>:null}</span></label>)}</div></div>
        {savingPreferences?<p className="text-sm text-[var(--muted)]" aria-live="polite" aria-atomic="true">Saving your notification preferences…</p>:null}
       </div>
-     </section>
   </section>
   <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Notification summary">
    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-sm text-[var(--muted)]">Unread</p><p className="mt-1 text-2xl font-semibold">{data?.counts.unread??"—"}</p></div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, ChevronLeft, ChevronRight, Clock3, Download, Eye, FileText, History, Plus, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, History, Plus, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
@@ -78,6 +78,8 @@ export default function MembershipAdminWorkspace() {
   const [decisionFor, setDecisionFor] = useState<Application | null>(null);
   const [decision, setDecision] = useState<"approved" | "correction_required" | "rejected">("approved");
   const [decisionNote, setDecisionNote] = useState("");
+  const [canReview, setCanReview] = useState(false);
+  const [canActivate, setCanActivate] = useState(false);
 
   const loadPlans = useCallback(async () => {
     if (!token) return;
@@ -102,13 +104,22 @@ export default function MembershipAdminWorkspace() {
     }
   }, [token]);
   const refresh = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     try {
+      const me = await api<Me>("/api/v1/me", {}, token);
+      const roles = Array.isArray(me.roles) ? me.roles : [];
+      const permissions = Array.isArray(me.permissions) ? me.permissions : [];
+      setCanReview(roles.some(role => ["system_admin", "reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
+      setCanActivate(roles.includes("system_admin") || permissions.includes("membership.activate"));
       await Promise.all([loadPlans(), loadQueue()]);
+    } catch (cause) {
+      setPlanError(cause instanceof ApiError ? cause.message : "Your membership administration permissions could not be confirmed.");
+      setQueueError(cause instanceof ApiError ? cause.message : "Your membership administration permissions could not be confirmed.");
     } finally {
       setLoading(false);
     }
-  }, [loadPlans, loadQueue]);
+  }, [token, loadPlans, loadQueue]);
   useEffect(() => { void refresh(); }, [refresh]);
 
   const filtered = useMemo(() => applications.filter(item => {
@@ -183,8 +194,6 @@ export default function MembershipAdminWorkspace() {
       }, token);
       setPlanFeedback({ kind: "success", message: editingCode ? "New plan version saved. Existing applications retain their original fee and terms." : "Membership plan created successfully." });
       await loadPlans();
-      setEditingCode("");
-      setDraft(blankDraft());
       setPlanStep(4);
     } catch (cause) {
       setPlanFeedback({ kind: "error", message: cause instanceof ApiError ? cause.message : "The plan could not be saved. Your entries are still here; correct the issue and retry." });
@@ -255,8 +264,6 @@ export default function MembershipAdminWorkspace() {
     setEvidence(null);
   }
 
-  const canReview = true;
-  const canActivate = true;
   const statusOptions = Array.from(new Set(applications.map(item => item.status))).sort();
 
   return <div className="grid" style={{ gap: 16 }}>
@@ -388,7 +395,19 @@ export default function MembershipAdminWorkspace() {
           {planFeedback && planStep !== 4 && <div className={planFeedback.kind === "success" ? "form-success" : "form-error"} role={planFeedback.kind === "success" ? "status" : "alert"}>{planFeedback.message}</div>}
           <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
             <button type="button" className="btn btn-ghost" disabled={busy === "plan"} onClick={() => planStep === 1 ? closePlanModal() : setPlanStep(value => Math.max(1, value - 1))}>{planStep === 1 ? "Cancel" : "Back"}</button>
-            {planStep < 4 ? <button type="button" className="btn btn-primary" onClick={() => setPlanStep(value => Math.min(4, value + 1))}>Continue <ChevronRight size={16} /></button> :
+            {planStep < 4 ? <button type="button" className="btn btn-primary" onClick={() => {
+            const validFees = [draft.amount, draft.taxAmount, draft.serviceFee].every(value => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0);
+            if (planStep === 1 && (!draft.productCode.trim() || !draft.name.trim() || !/^[A-Z]{3}$/.test(draft.currency) || !validFees)) {
+              setPlanFeedback({ kind: "error", message: "Complete the plan code, name, three-letter currency and valid non-negative fee amounts before continuing." });
+              return;
+            }
+            if (planStep === 2 && (!draft.effectiveFrom || (draft.billingModel !== "lifetime" && (!draft.durationDays || Number(draft.durationDays) < 1)) || (draft.planEffectiveFrom && draft.planEffectiveTo && draft.planEffectiveTo < draft.planEffectiveFrom))) {
+              setPlanFeedback({ kind: "error", message: "Check the validity dates, duration and billing settings before continuing." });
+              return;
+            }
+            setPlanFeedback(null);
+            setPlanStep(value => Math.min(4, value + 1));
+          }}>Continue <ChevronRight size={16} /></button> :
               planFeedback?.kind === "success" ? <button type="button" className="btn btn-primary" onClick={closePlanModal}>Done</button> :
               <button type="submit" className="btn btn-primary" disabled={busy === "plan"}>{busy === "plan" ? "Creating…" : editingCode ? "Save plan version" : "Create membership plan"}</button>}
           </div>

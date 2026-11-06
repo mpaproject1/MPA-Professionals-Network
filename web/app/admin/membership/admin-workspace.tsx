@@ -72,7 +72,7 @@ export default function MembershipAdminWorkspace() {
   const [editingCode, setEditingCode] = useState("");
   const [draft, setDraft] = useState<Draft>(blankDraft());
   const [planFeedback, setPlanFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
-  const [queueFeedback, setQueueFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  const [queueFeedback, setQueueFeedback] = useState<{ kind: "success" | "error"; message: string; applicationId?: string } | null>(null);
   const [selected, setSelected] = useState<Application | null>(null);
   const [historyFor, setHistoryFor] = useState<Application | null>(null);
   const [evidence, setEvidence] = useState<{ name: string; url: string; type: string } | null>(null);
@@ -233,12 +233,12 @@ export default function MembershipAdminWorkspace() {
         method: "POST",
         body: JSON.stringify({ decision, note: decisionNote.trim(), requestedFields: decision === "correction_required" ? ["membership_details"] : undefined })
       }, token);
-      setQueueFeedback({ kind: "success", message: "Decision recorded for " + (decisionFor.tracking_reference || "the selected application") + "." });
+      setQueueFeedback({ kind: "success", applicationId: decisionFor.id, message: "Decision recorded for " + (decisionFor.tracking_reference || "the selected application") + "." });
       setDecisionFor(null);
       setDecisionNote("");
       await loadQueue();
     } catch (cause) {
-      setQueueFeedback({ kind: "error", message: cause instanceof ApiError ? cause.message : "The review decision failed. No successful decision was confirmed." });
+      setQueueFeedback({ kind: "error", applicationId: decisionFor.id, message: cause instanceof ApiError ? cause.message : "The review decision failed. No successful decision was confirmed." });
     } finally {
       setBusy("");
     }
@@ -249,10 +249,10 @@ export default function MembershipAdminWorkspace() {
     setQueueFeedback(null);
     try {
       await api("/api/v1/membership/applications/" + encodeURIComponent(item.id) + "/activate", { method: "POST" }, token);
-      setQueueFeedback({ kind: "success", message: "Membership activation recorded for " + (item.tracking_reference || "the selected application") + "." });
+      setQueueFeedback({ kind: "success", applicationId: item.id, message: "Membership activation recorded for " + (item.tracking_reference || "the selected application") + "." });
       await loadQueue();
     } catch (cause) {
-      setQueueFeedback({ kind: "error", message: cause instanceof ApiError ? cause.message : "Activation failed. The application remains unchanged unless the server confirms otherwise." });
+      setQueueFeedback({ kind: "error", applicationId: item.id, message: cause instanceof ApiError ? cause.message : "Activation failed. The application remains unchanged unless the server confirms otherwise." });
     } finally {
       setBusy("");
     }
@@ -333,7 +333,6 @@ export default function MembershipAdminWorkspace() {
           <div><h2 className="h2">Membership review queue</h2><p className="muted">Find an application, inspect its evidence and history, then take only the action your role permits.</p></div>
           <button type="button" className="btn btn-ghost" disabled={loading} onClick={() => void loadQueue()}><RefreshCw size={15} /> Refresh queue</button>
         </div>
-        {queueFeedback && <div className={queueFeedback.kind === "success" ? "form-success" : "form-error"} role={queueFeedback.kind === "success" ? "status" : "alert"}>{queueFeedback.message}</div>}
         {queueError && <div className="form-error" role="alert">{queueError} <button type="button" className="btn btn-ghost" onClick={() => void loadQueue()}>Retry</button></div>}
         <div className="grid grid-3" style={{ gap: 8, margin: "12px 0" }}>
           <div className="membership-progress"><small className="muted">Total applications</small><div className="h2">{applications.length}</div></div>
@@ -370,12 +369,14 @@ export default function MembershipAdminWorkspace() {
                       {["submitted", "in_review"].includes(item.status) && canReview && <button type="button" className="btn btn-primary" style={{ padding: "6px 8px", minWidth: 34 }} title="Review application: approve, request correction or reject" aria-label="Review application" onClick={() => { setDecisionFor(item); setDecision("approved"); setDecisionNote(""); }}><ShieldCheck size={15} /></button>}
                       {item.status === "paid" && canActivate && <button type="button" className="btn btn-ghost" style={{ padding: "6px 8px", minWidth: 34 }} title="Activate membership after server-side checks" aria-label="Activate membership" onClick={() => void activate(item)}><Check size={15} /></button>}
                     </div>
+                    {queueFeedback?.applicationId === item.id && <div className={queueFeedback.kind === "success" ? "form-success" : "form-error"} role={queueFeedback.kind === "success" ? "status" : "alert"} aria-live="polite" style={{ marginTop: 6 }}>{queueFeedback.message}</div>}
                   </td>
                 </tr>)}
                 {!visibleRows.length && <tr><td colSpan={6} style={{ padding: 24, textAlign: "center" }} className="muted">{queueError ? "Queue unavailable until the load error is resolved." : "No applications match these filters."}</td></tr>}
               </tbody>
             </table>
           </div>}
+        {queueFeedback && !filtered.some(item => item.id === queueFeedback.applicationId) && <div className={queueFeedback.kind === "success" ? "form-success" : "form-error"} role={queueFeedback.kind === "success" ? "status" : "alert"} aria-live="polite">{queueFeedback.message}</div>}
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
           <small className="muted">Showing {filtered.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, filtered.length)} of {filtered.length} matching applications</small>
           <div className="row"><button type="button" className="btn btn-ghost" disabled={page <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}><ChevronLeft size={15} /> Previous</button><span className="muted">Page {page} / {pageCount}</span><button type="button" className="btn btn-ghost" disabled={page >= pageCount} onClick={() => setPage(value => Math.min(pageCount, value + 1))}>Next <ChevronRight size={15} /></button></div>

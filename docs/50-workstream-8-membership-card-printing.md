@@ -37,3 +37,23 @@ Batch generation and print requests are recorded in `audit_log` with the actor, 
 Backend contract tests cover eligibility, identifier separation, authorization routes, the 100-card cap, minimal payload fields, audit events and QR compatibility. Browser acceptance selects two fixture members, prepares and requests printing, creates an A4 PDF through Chromium, then independently parses it with `pypdf` to verify page count, A4 page dimensions, member names, membership numbers, QR label and absence of internal UUIDs or contact/payment data.
 
 No production migration or deployment is required for this workstream.
+
+
+## Member command-centre status and exact-size single-card output
+
+The member workspace now leads with a status summary before the application and plan content. Its checklist is derived from the current account response, persisted application timestamps/status, payment state and the active membership record; it does not mark review, settlement or activation complete merely because an application form was opened. Activated applications remain visible in **My applications** with the literal `activated` state and a direct membership-ID link when the active record is eligible.
+
+Card-loading errors are retained and shown in the member workspace. They are no longer silently converted to a missing card, so an active membership and a card-service failure can be distinguished.
+
+### Shared eligibility contract
+
+- `/api/v1/me.has_active_membership` and member card issuance use the same effective membership status, Addis Ababa civil date and legacy-import Finance reconciliation requirement.
+- Administrator single-card issuance now loads the legacy-import source and reconciliation evidence before applying the same eligibility guard. It cannot bypass the legacy payment safeguard by omitting those fields.
+- Candidate listing, batch issuance and profile-picture eligibility use the same Addis Ababa date boundary and preserve the existing Finance verification/reversal requirement for imported records.
+- No role or permission is added, and the UI does not grant access independently of the API.
+
+### Single-member PDF / print acceptance
+
+The member card print stylesheet isolates the card from the shared application shell and prints one landscape page at exactly **85.6 × 53.98 mm**, with zero page margin. The toolbar, page note, portal navigation, mobile navigation and all other shell content are hidden from print. The card remains the only visible print surface; its QR verification and card details are preserved. The browser print dialog provides **Save as PDF** and physical printing.
+
+The single-card Playwright acceptance test creates a PDF and parses it independently with `pypdf`. It asserts one page, exact ID-card page dimensions, the expected member name and canonical membership number, QR label, and absence of portal navigation, page-toolbar text, contact details and internal UUIDs. This is separate from the existing A4 bulk-print acceptance test.

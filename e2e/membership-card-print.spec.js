@@ -87,7 +87,7 @@ test("single member membership ID PDF is one exact-size card with no portal chro
    "print('PAGES='+str(len(r.pages)))",
    "print('ID_SIZE='+str(all(abs(float(p.mediabox.width)-242.65)<0.5 and abs(float(p.mediabox.height)-153.01)<0.5 for p in r.pages)))",
    "print('TEXT='+chr(10).join((p.extract_text() or '') for p in r.pages))"
-  ].join("\\n");
+  ].join("\n");
   const extracted=execFileSync("python3",["-c",parser,pdfPath],{encoding:"utf8"});
   expect(extracted).toContain("PAGES=1");
   expect(extracted).toContain("ID_SIZE=True");

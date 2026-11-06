@@ -35,17 +35,15 @@ export function notificationCategoryFor(eventCode,resourceType,payload={}){
  return "system";
 }
 export function notificationActionUrl(value,category,resourceType,payload={},resourceId=null){
- const url=safeInternalUrl(value);
- if(url){
-  const path=url.split(/[?#]/)[0];
-  // Older Network-Plus notifications used a business-detail URL that is not a route in this branch.
-  if((path==="/network-plus/businesses"||path.startsWith("/network-plus/businesses/")))return "/network-plus";
-  // There is no dedicated business-verification admin page in this branch; route reviewers to the admin workspace rather than a dead URL.
-  if((path==="/admin/network-plus/businesses"||path.startsWith("/admin/network-plus/businesses/")))return "/admin";
-  if(category==="security"&&path==="/profile")return "/account/security";
-  return url;
- }
- return defaultActionUrl(category,resourceType,payload,resourceId);
+ const url=safeInternalUrl(value)||safeInternalUrl(defaultActionUrl(category,resourceType,payload,resourceId));
+ if(!url)return null;
+ const path=url.split(/[?#]/)[0];
+ // Older Network-Plus notifications used a business-detail URL that is not a route in this branch.
+ if(path==="/network-plus/businesses"||path.startsWith("/network-plus/businesses/"))return "/network-plus";
+ // There is no dedicated business-verification admin page in this branch; route reviewers to the admin workspace rather than a dead URL.
+ if(path==="/admin/network-plus/businesses"||path.startsWith("/admin/network-plus/businesses/"))return "/admin";
+ if(category==="security"&&path==="/profile")return "/account/security";
+ return url;
 }
 export function notificationActionLabel(category,resourceType,payload={}){
  const supplied=String(payload.actionLabel||payload.action_label||"").trim();

@@ -394,9 +394,7 @@ export default function MembershipAdminWorkspace() {
           </div>}
           {planStep === 4 && <div className="grid">
             <div className="membership-progress"><h3 className="h2">{draft.name || "New membership plan"}</h3><p className="muted">{draft.productCode || "Plan code pending"} · {draft.currency} {Number(draft.amount || 0).toLocaleString()} base + {draft.currency} {Number(draft.taxAmount || 0).toLocaleString()} tax + {draft.currency} {Number(draft.serviceFee || 0).toLocaleString()} service fee</p><p>{readable(draft.billingModel)} · {draft.billingModel === "lifetime" ? "Lifetime validity" : (draft.durationDays || "—") + " days"} · {draft.renewalRequired ? "Renewal required" : "No renewal"} · {draft.active ? "Published for new applications" : "Inactive"}</p><p className="muted">Effective {draft.effectiveFrom}; availability {draft.planEffectiveFrom || "any date"} to {draft.planEffectiveTo || "no end date"}.</p><p>{draft.description || "No description supplied."}</p><small className="muted">{draft.benefits.split("\n").filter(Boolean).length} benefit(s) · {draft.eligibilityText.split("\n").filter(Boolean).length} eligibility requirement(s)</small></div>
-            {planFeedback && <div className={planFeedback.kind === "success" ? "form-success" : "form-error"} role={planFeedback.kind === "success" ? "status" : "alert"}>{planFeedback.message}</div>}
           </div>}
-          {planFeedback && planStep !== 4 && <div className={planFeedback.kind === "success" ? "form-success" : "form-error"} role={planFeedback.kind === "success" ? "status" : "alert"}>{planFeedback.message}</div>}
           <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
             <button type="button" className="btn btn-ghost" disabled={busy === "plan"} onClick={() => planStep === 1 ? closePlanModal() : setPlanStep(value => Math.max(1, value - 1))}>{planStep === 1 ? "Cancel" : "Back"}</button>
             {planStep < 4 ? <button type="button" className="btn btn-primary" onClick={() => {
@@ -415,6 +413,7 @@ export default function MembershipAdminWorkspace() {
               planFeedback?.kind === "success" ? <button type="button" className="btn btn-primary" onClick={closePlanModal}>Done</button> :
               <button type="submit" className="btn btn-primary" disabled={busy === "plan"}>{busy === "plan" ? "Creating…" : editingCode ? "Save plan version" : "Create membership plan"}</button>}
           </div>
+          {planFeedback && <div className={planFeedback.kind === "success" ? "form-success" : "form-error"} role={planFeedback.kind === "success" ? "status" : "alert"} aria-live="polite">{planFeedback.message}</div>}
         </form>
       </section>
     </div>}

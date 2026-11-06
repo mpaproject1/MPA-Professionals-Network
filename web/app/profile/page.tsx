@@ -1,10 +1,13 @@
 "use client";
 import {
+  Check,
   ClipboardCopy,
   CreditCard,
   Eye,
   FileCheck2,
   Globe2,
+  LoaderCircle,
+  LockKeyhole,
   LogIn,
   RefreshCw,
   ShieldCheck,
@@ -109,6 +112,7 @@ export default function Profile() {
     clearToken = useUiStore((s) => s.clearToken),
     language = useUiStore((s) => s.language);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [activeProfileStep, setActiveProfileStep] = useState("personal-information");
   const [membershipApplications,setMembershipApplications]=useState<ProfileMembershipApplication[]>([]);
   const [membershipReferencesError,setMembershipReferencesError]=useState("");
   const [copyNotice,setCopyNotice]=useState("");
@@ -453,6 +457,20 @@ export default function Profile() {
   async function copyDisplayReference(value:string){const ref=String(value||"").trim();if(!ref){setCopyNotice("A display reference has not been assigned yet.");return;}try{await navigator.clipboard.writeText(ref);setCopyNotice("Reference copied to clipboard.");}catch{setCopyNotice("Clipboard access is unavailable. Select the displayed reference and copy it manually.");}}
   const update = (key: keyof typeof blank, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
+  const profileSteps = [
+    { id: "personal-information", label: "Personal details", hint: "Your name and contact information", locked: false, complete: Boolean(form.firstName.trim() && form.lastName.trim()) },
+    { id: "professional-summary", label: "Professional summary", hint: "Your role, expertise and introduction", locked: false, complete: Boolean(form.headline.trim() || form.bio.trim()) },
+    { id: "professional-experience", label: "Experience & expertise", hint: "Roles, skills and professional classifications", locked: !profile?.has_active_membership, complete: Boolean(profile?.has_active_membership && (experienceDrafts.length > 0 || talentForm.professionalTitle.trim())) },
+    { id: "guided-professional-profile", label: "Education & portfolio", hint: "Qualifications, work samples and private evidence", locked: !profile?.has_active_membership, complete: false },
+    { id: "verification-review", label: "Verification review", hint: "Submit professional claims to an authorized reviewer", locked: !profile?.has_active_membership, complete: false },
+  ];
+  const completedSteps = profileSteps.filter((step) => step.complete).length;
+  const stepProgress = Math.round((completedSteps / profileSteps.length) * 100);
+  function openProfileStep(step: (typeof profileSteps)[number]) {
+    if (step.locked) return;
+    setActiveProfileStep(step.id);
+    document.getElementById(step.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   const isOrganizationAccount=Boolean(profile?.roles?.some(role=>["organization_representative","organization_owner","organization_admin","organization_member","organization"].includes(role)));
   if (organizationOnly) return (
     <div className={`grid ${styles.page}`} style={{ gap: 18, minWidth: 0, width: "100%" }}>
@@ -489,13 +507,14 @@ export default function Profile() {
         </Card>
       ) : (
         <>
-          <nav className={styles.sectionNav} aria-label="Profile sections">
-            <a href="#personal-information">Personal information</a>
-            <a href="#professional-summary">Professional profile</a>
-            <a href="#membership-and-verification">Membership &amp; verification</a>
-            <a href="#notification-preferences">Notifications</a>
-            <a href="#account-preferences">Account preferences</a>
-          </nav>
+          <section className={styles.stepper} aria-label="Professional profile onboarding">
+            <div className={styles.stepperTop}><div><div className="eyebrow">Your profile journey</div><h2 className="h2">Build your professional profile step by step</h2><p className="muted">Complete each available step. Your information stays private unless you explicitly consent to sharing it.</p></div><strong className={styles.stepperPercent}>{stepProgress}%</strong></div>
+            <div className={styles.stepperTrack} role="progressbar" aria-label="Onboarding steps completed" aria-valuemin={0} aria-valuemax={100} aria-valuenow={stepProgress}><span style={{ width: `${stepProgress}%` }} /></div>
+            <nav className={styles.stepperTabs} aria-label="Profile onboarding steps">
+              {profileSteps.map((step,index) => { const current=activeProfileStep===step.id; return <button key={step.id} type="button" className={`${styles.stepTab} ${current?styles.stepTabActive:""} ${step.complete?styles.stepTabComplete:""} ${step.locked?styles.stepTabLocked:""}`} aria-current={current?"step":undefined} aria-disabled={step.locked||undefined} title={step.locked?"Available after your MPA membership becomes active. Your saved information remains available.":step.hint} onClick={()=>openProfileStep(step)}><span className={styles.stepIcon}>{step.locked?<LockKeyhole size={16} aria-hidden="true"/>:step.complete?<Check size={17} aria-hidden="true"/>:current?<LoaderCircle size={17} className={styles.stepSpinner} aria-hidden="true"/>:<span>{index+1}</span>}</span><span className={styles.stepTabText}><b>{step.label}</b><small>{step.locked?"Membership required":step.complete?"Completed":current?"You are here":step.hint}</small></span></button>; })}
+            </nav>
+            {!profile?.has_active_membership?<p className={styles.stepperNote}><LockKeyhole size={15}/> Locked steps cover member-only professional records, evidence review and directory controls. They unlock automatically when your membership is active. <a href="/membership">View membership options</a>.</p>:<p className={styles.stepperNote}>Completed steps show a check mark. The current step is highlighted with a subtle spinner.</p>}
+          </section>
           <section id="member-residence" aria-label="Member residence"><MemberResidenceEditor /></section>
           <section className={styles.completionCard} aria-labelledby={`${profileId}-completion-title`}>
             <div className={styles.completionHeading}><div><div className="eyebrow">Your progress</div><h2 id={`${profileId}-completion-title`}>Profile completion</h2></div><strong>{profile ? `${Math.max(0,Math.min(100,Number(profile.completion_percent)||0))}%` : loading ? "Loading…" : "Not available"}</strong></div>
@@ -658,6 +677,7 @@ export default function Profile() {
             </form>
           </Card>
           {profile?.has_active_membership ? <>
+          <section id="professional-experience" className={styles.stepSection}>
           <Card>
             <div className="row">
               <div>
@@ -805,7 +825,11 @@ export default function Profile() {
               </button>
             </form>
           </Card>
+          </section>
+          <section id="guided-professional-profile" className={styles.stepSection}>
           <GuidedProfessionalProfile onNationalitySaved={(value) => { setForm((f) => ({ ...f, nationality: value })); setProfile((p) => p ? ({ ...p, nationality: value }) : p); }} />
+                    </section>
+          <section id="verification-review" className={styles.stepSection}>
           <Card>
             <div className="row">
               <div>
@@ -865,6 +889,8 @@ export default function Profile() {
               {savingVisibility ? "Saving…" : "Save directory privacy settings"}
             </button>
           </Card>
+          <Card><div className="eyebrow">Ready for professional review?</div><h2 className="h2">Submit your professional claims for review</h2><p className="muted">When your profile details and supporting evidence are ready, open the verification workspace to create a professional verification case, add the claims you want reviewed, attach private evidence and follow the reviewer checklist. Your information remains unverified until an authorized reviewer records a decision.</p><a className="btn btn-primary" href="/verification">Continue to professional claim review</a></Card>
+          </section>
           </> : <Card>
             <div id="membership-and-verification" className="eyebrow">Membership unlocks professional review</div>
             <h2 className="h2">Your profile can be prepared now</h2>

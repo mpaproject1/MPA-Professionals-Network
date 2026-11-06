@@ -134,6 +134,11 @@ export default function MembershipAdminWorkspace() {
     return (!query.trim() || haystack.includes(query.trim().toLowerCase())) &&
       (statusFilter === "all" || item.status === statusFilter) &&
       (typeFilter === "all" || item.application_type === typeFilter);
+  }).sort((a, b) => {
+    const rank = (status: string) => ["submitted", "in_review"].includes(status) ? 0 : status === "correction_required" ? 1 : status === "paid" ? 2 : 3;
+    const byAction = rank(a.status) - rank(b.status);
+    if (byAction) return byAction;
+    return new Date(b.submitted_at || b.created_at || 0).getTime() - new Date(a.submitted_at || a.created_at || 0).getTime();
   }), [applications, query, statusFilter, typeFilter]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const visibleRows = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -277,11 +282,11 @@ export default function MembershipAdminWorkspace() {
     </div>
 
     <div role="tablist" aria-label="Membership administration sections" className="row" style={{ gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
-      {canManagePlans && <button type="button" role="tab" aria-selected={tab === "plans"} className={"btn " + (tab === "plans" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("plans")}>1. Membership plans <span className="muted">({plans.length})</span></button>}
-      <button type="button" role="tab" aria-selected={tab === "queue"} className={"btn " + (tab === "queue" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("queue")}>Membership review queue <span className="muted">({applications.length})</span></button>
+      {canManagePlans && <button id="membership-plans-tab" type="button" role="tab" aria-controls="membership-plans-panel" aria-selected={tab === "plans"} tabIndex={tab === "plans" ? 0 : -1} className={"btn " + (tab === "plans" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("plans")}>1. Membership plans <span className="muted">({plans.length})</span></button>}
+      <button id="membership-review-tab" type="button" role="tab" aria-controls="membership-review-panel" aria-selected={tab === "queue"} tabIndex={tab === "queue" ? 0 : -1} className={"btn " + (tab === "queue" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("queue")}>2. Review queue <span className="muted">({applications.length})</span></button>
     </div>
 
-    {canManagePlans && tab === "plans" && <section role="tabpanel" aria-label="Membership plans" className="grid" style={{ gap: 14 }}>
+    {canManagePlans && tab === "plans" && <section id="membership-plans-panel" role="tabpanel" aria-labelledby="membership-plans-tab" className="grid" style={{ gap: 14 }}>
       <Card>
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
           <div><h2 className="h2">Membership plan catalogue</h2><p className="muted">Published terms are versioned. Existing applications keep the plan snapshot they accepted.</p></div>
@@ -306,7 +311,7 @@ export default function MembershipAdminWorkspace() {
       </Card>
     </section>}
 
-    {tab === "queue" && <section role="tabpanel" aria-label="Membership review queue" className="grid" style={{ gap: 12 }}>
+    {tab === "queue" && <section id="membership-review-panel" role="tabpanel" aria-labelledby="membership-review-tab" className="grid" style={{ gap: 12 }}>
       <Card>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
           <div><h2 className="h2">Membership review queue</h2><p className="muted">Find an application, inspect its evidence and history, then take only the action your role permits.</p></div>
@@ -341,7 +346,7 @@ export default function MembershipAdminWorkspace() {
                     {item.payment ? <><Badge tone={statusTone(item.payment.status)}>{readable(item.payment.status)}</Badge><small className="muted" style={{ display: "block" }}>{money(item.payment.amount, item.payment.currency)}</small></> : <small className="muted">Not submitted</small>}
                   </td>
                   <td style={{ padding: "11px 8px", borderBottom: "1px solid var(--border)" }}><Badge tone={statusTone(item.status)}>{readable(item.status)}</Badge></td>
-                  <td style={{ padding: "11px 8px", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}><small>{item.submitted_at || item.created_at ? new Date(item.submitted_at || item.created_at).toLocaleDateString() : "—"}</small></td>
+                  <td style={{ padding: "11px 8px", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}><small>{item.submitted_at || item.created_at ? new Date(String(item.submitted_at || item.created_at)).toLocaleDateString() : "—"}</small></td>
                   <td style={{ padding: "11px 8px", borderBottom: "1px solid var(--border)" }}>
                     <div className="row" style={{ gap: 4, flexWrap: "nowrap" }}>
                       <button type="button" className="btn btn-ghost" style={{ padding: "6px 8px", minWidth: 34 }} title="Open application details" aria-label="Open application details" onClick={() => setSelected(item)}><Eye size={15} /></button>
@@ -425,7 +430,7 @@ export default function MembershipAdminWorkspace() {
           <p><small className="muted">Applicant</small><br /><strong>{selected.display_name || selected.data_snapshot?.professionalDetails?.fullName || "Not supplied"}</strong><br /><small>{selected.email || "Email unavailable"}</small></p>
           <p><small className="muted">Application status</small><br /><Badge tone={statusTone(selected.status)}>{readable(selected.status)}</Badge></p>
           <p><small className="muted">Plan terms at application</small><br /><strong>{money(selected.fee_snapshot?.amount ?? 0, selected.fee_snapshot?.currency || "ETB")}</strong><br /><small>{selected.fee_snapshot?.productName || selected.fee_snapshot?.productCode || "Plan"} · fee version {selected.fee_snapshot?.feeRuleVersion ?? "legacy"}</small></p>
-          <p><small className="muted">Submitted</small><br /><strong>{selected.submitted_at || selected.created_at ? new Date(selected.submitted_at || selected.created_at).toLocaleString() : "Not recorded"}</strong></p>
+          <p><small className="muted">Submitted</small><br /><strong>{selected.submitted_at || selected.created_at ? new Date(String(selected.submitted_at || selected.created_at)).toLocaleString() : "Not recorded"}</strong></p>
         </div>
         {selected.application_type === "renewal" && <p className="muted">Renewal · current membership ends {selected.previous_membership_end_date || "date not recorded"}. Do not interrupt the current membership period.</p>}
         <div className="membership-progress"><h3 className="h2">Payment reconciliation</h3>{selected.payment ? <><p>{selected.payment.currency} {selected.payment.amount} · {readable(selected.payment.status)} · {selected.payment.channel}</p><p className="muted">Transaction {selected.payment.id} · Reference {selected.payment.reference || "not supplied"} · Reconciliation {selected.payment.reconciliation_status || "not recorded"}</p><p className="muted">Verified {selected.payment.verified_at ? new Date(selected.payment.verified_at).toLocaleString() : "not recorded"}{selected.payment.verified_by_name ? " by " + selected.payment.verified_by_name : ""}</p>{selected.payment.verification_note && <p><strong>Finance / reviewer note:</strong> {selected.payment.verification_note}</p>}{selected.payment.reconciliation_note && <p className="muted">Reconciliation note: {selected.payment.reconciliation_note}</p>}{selected.payment.reversal && <p className="form-error">Reversed / refunded: {selected.payment.reversal.type} · {selected.payment.reversal.reason}</p>}</> : <p className="muted">No payment is attached to this application.</p>}</div>

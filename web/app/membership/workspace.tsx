@@ -107,7 +107,7 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
  const openApplication=applications.find(app=>["submitted","in_review","correction_required","approved","payment_pending","paid"].includes(app.status))||applications.find(app=>app.status==="rejected");
  const latestApplication=applications[0]||null;
  const latestApplicationStatus=latestApplication?.status||"";
- const applicationPaymentVerified=latestApplication?.payment?.status==="succeeded"&&!latestApplication.payment.reversal;
+ const applicationPaymentVerified=Boolean(latestApplication?.payment&&latestApplication.payment.status==="succeeded"&&!latestApplication.payment.reversal);
  const applicationReviewComplete=hasActiveMembership||["approved","payment_pending","paid","activated","rejected"].includes(latestApplicationStatus);
  const applicationSubmitted=hasActiveMembership||Boolean(latestApplication?.submitted_at);
  const applicationTermsComplete=hasActiveMembership||Boolean(latestApplication?.terms_acknowledged_at);

@@ -1,5 +1,5 @@
 "use client";
-import {ArrowLeft,ArrowRight,Check,CheckCircle2,ClipboardList,Clock3,FilePlus2,HeartHandshake,Plus,RefreshCw,Send,Users} from "lucide-react";
+import {ArrowLeft,ArrowRight,Check,CheckCircle2,HeartHandshake,Plus,RefreshCw,Send,Users} from "lucide-react";
 import Link from "next/link";
 import {type FormEvent,useCallback,useEffect,useMemo,useState} from "react";
 import {api} from "../../../lib/api";
@@ -91,7 +91,7 @@ export default function ServeCommunityManagePage(){
    </div>}
   </section>
 
-  {formOpen?<div className="sc-proposal-overlay" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)closeForm()}}>
+  {formOpen?<div className="sc-proposal-overlay" role="presentation">
    <section className="sc-proposal-dialog" role="dialog" aria-modal="true" aria-labelledby="sc-proposal-title">
     <div className="sc-proposal-dialog-head"><div><div className="eyebrow">{editingId?"Revise private proposal":"New proposal · Private draft"}</div><h2 id="sc-proposal-title">{editingId?"Revise initiative":"Create an initiative draft"}</h2><p>Four focused steps. Your work is saved as a private draft until you submit it for independent review.</p></div><button type="button" className="sc-dialog-close" onClick={closeForm} aria-label="Close proposal form">×</button></div>
     <nav className="sc-proposal-steps" aria-label="Proposal creation steps">{steps.map((s,index)=><button key={s.label} type="button" className={step===index?"is-current":step>index?"is-complete":""} aria-current={step===index?"step":undefined} onClick={()=>{if(index<step){setStep(index);setError("")}}}><span>{step>index?<Check size={14}/>:index+1}</span><strong>{s.label}</strong><small>{s.hint}</small></button>)}</nav>

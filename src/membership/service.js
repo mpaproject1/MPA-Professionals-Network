@@ -776,32 +776,52 @@ export async function listApplicationsForReview(){
 
 export async function listMembershipPaymentsForFinance(){
  const db=getPool();
- const result=await db.query(`select * from (
+ const result=await db.query(\`select * from (
   select pt.id payment_id,pt.status payment_status,pt.amount,pt.currency,pt.channel,pt.source,pt.purpose_reference,
    pt.request_payload->>'reference' payment_reference,pt.created_at,pt.verified_at,pt.verification_note,
+   pt.evidence_file_id,evidence_file.original_name evidence_file_name,
+   coalesce(verified_person.display_name,case when pt.verified_by is not null then 'Finance user' end) verified_by_name,
    ma.id application_id,ma.tracking_reference,ma.application_type,ma.status application_status,
-   mp.product_code,mp.name product_name,pr.reconciliation_status,pr.note reconciliation_note,
+   mp.product_code,mp.name product_name,pr.reconciliation_status,pr.note reconciliation_note,pr.reconciled_at,
+   coalesce(reconciled_person.display_name,case when pr.reconciled_by is not null then 'Finance user' end) reconciled_by_name,
    exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id) reversed
   from payment_transaction pt
   join membership_application_payment ap on ap.payment_transaction_id=pt.id
   join membership_application ma on ma.id=ap.application_id
   join membership_product mp on mp.id=ma.membership_product_id
-  left join payment_reconciliation pr on pr.payment_transaction_id=pt.id
+  left join lateral (select prx.reconciliation_status,prx.note,prx.reconciled_by,prx.reconciled_at
+   from payment_reconciliation prx where prx.payment_transaction_id=pt.id
+   order by prx.reconciled_at desc nulls last limit 1) pr on true
+  left join app_user verified_user on verified_user.id=pt.verified_by
+  left join person verified_person on verified_person.user_id=verified_user.id
+  left join app_user reconciled_user on reconciled_user.id=pr.reconciled_by
+  left join person reconciled_person on reconciled_person.user_id=reconciled_user.id
+  left join file_object evidence_file on evidence_file.id=pt.evidence_file_id
   where pt.status in ('pending','succeeded','failed','refunded')
   union all
   select pt.id payment_id,pt.status payment_status,pt.amount,pt.currency,pt.channel,pt.source,pt.purpose_reference,
    pt.request_payload->>'reference' payment_reference,pt.created_at,pt.verified_at,pt.verification_note,
+   pt.evidence_file_id,evidence_file.original_name evidence_file_name,
+   coalesce(verified_person.display_name,case when pt.verified_by is not null then 'Finance user' end) verified_by_name,
    null::uuid application_id,mr.membership_number tracking_reference,'legacy_import'::text application_type,mr.status application_status,
-   mp.product_code,mp.name product_name,pr.reconciliation_status,pr.note reconciliation_note,
+   mp.product_code,mp.name product_name,pr.reconciliation_status,pr.note reconciliation_note,pr.reconciled_at,
+   coalesce(reconciled_person.display_name,case when pr.reconciled_by is not null then 'Finance user' end) reconciled_by_name,
    (pt.status='refunded') reversed
   from payment_transaction pt
-  join payment_reconciliation pr on pr.payment_transaction_id=pt.id
+  join lateral (select prx.membership_id,prx.reconciliation_status,prx.note,prx.reconciled_by,prx.reconciled_at
+   from payment_reconciliation prx where prx.payment_transaction_id=pt.id
+   order by prx.reconciled_at desc nulls last limit 1) pr on true
   join membership_record mr on mr.id=pr.membership_id and mr.source='legacy_import'
   join membership_product mp on mp.id=mr.membership_product_id
+  left join app_user verified_user on verified_user.id=pt.verified_by
+  left join person verified_person on verified_person.user_id=verified_user.id
+  left join app_user reconciled_user on reconciled_user.id=pr.reconciled_by
+  left join person reconciled_person on reconciled_person.user_id=reconciled_user.id
+  left join file_object evidence_file on evidence_file.id=pt.evidence_file_id
   where pt.source='legacy_import' and pt.status in ('succeeded','refunded')
  ) finance_membership_payments
  order by case when payment_status='pending' then 0 else 1 end,created_at desc
- limit 500`);
+ limit 500\`);
  return result.rows;
 }
 

@@ -333,7 +333,7 @@ export default function MembershipAdminWorkspace() {
       </Card>
     </section>}
 
-    {tab === "queue" && <section id="membership-review-panel" role="tabpanel" aria-labelledby="membership-review-tab" className="grid" style={{ gap: 12 }}>
+    {canViewQueue && tab === "queue" && <section id="membership-review-panel" role="tabpanel" aria-labelledby="membership-review-tab" className="grid" style={{ gap: 12 }}>
       <Card>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
           <div><h2 className="h2">Membership review queue</h2><p className="muted">Find an application, inspect its evidence and history, then take only the action your role permits.</p></div>

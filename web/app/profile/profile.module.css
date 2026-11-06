@@ -137,3 +137,30 @@
 .completionCard>p,.completionUnavailable{margin:0;color:var(--muted);font-size:13px;line-height:1.6}
 .completionUnavailable{padding:10px 12px;border-radius:9px;background:var(--surface)}
 @media(max-width:520px){.completionCard{padding:16px}.completionHeading h2{font-size:16px}.completionHeading>strong{font-size:20px}.completionTrack{height:15px}}
+
+
+/* Progressive professional onboarding */
+.stepper{display:grid;gap:14px;padding:18px;border:1px solid var(--border);border-radius:16px;background:var(--surface);min-width:0}
+.stepperTop{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.stepperTop h2{margin:3px 0 4px}
+.stepperTop p{margin:0;max-width:720px}
+.stepperPercent{font-size:25px;font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
+.stepperTrack{height:12px;overflow:hidden;border-radius:999px;background:var(--border)}
+.stepperTrack span{display:block;height:100%;border-radius:inherit;background:var(--brand-lemon);transition:width .25s ease}
+.stepperTabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;min-width:0}
+.stepTab{display:flex;align-items:flex-start;gap:9px;min-width:0;min-height:76px;padding:11px 10px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);text-align:left;cursor:pointer;transition:border-color .18s ease,background .18s ease}
+.stepTab:hover,.stepTab:focus-visible{border-color:var(--primary);background:var(--surface-muted);outline-offset:2px}
+.stepTabActive{border:2px solid var(--primary);background:var(--surface-muted);padding:10px 9px}
+.stepTabComplete .stepIcon{background:var(--brand-lemon);color:#0A3258}
+.stepTabLocked{opacity:.78;cursor:not-allowed;background:var(--surface-muted)}
+.stepIcon{display:grid;place-items:center;flex:0 0 28px;width:28px;height:28px;border-radius:50%;background:var(--surface-muted);color:var(--text);font-size:13px;font-weight:750}
+.stepTabText{display:grid;gap:4px;min-width:0}
+.stepTabText b{font-size:12px;line-height:1.35}
+.stepTabText small{font-size:11px;line-height:1.35;color:var(--muted)}
+.stepSpinner{animation:profile-step-spin 1.2s linear infinite;color:var(--primary)}
+@keyframes profile-step-spin{to{transform:rotate(360deg)}}
+.stepperNote{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.stepperNote a{font-weight:700;color:var(--primary)}
+.stepSection{display:grid;gap:16px;scroll-margin-top:100px}
+@media(max-width:900px){.stepperTabs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.stepper{padding:13px}.stepperTop{gap:8px}.stepperPercent{font-size:21px}.stepperTabs{grid-template-columns:1fr}.stepTab{min-height:60px}.stepTabText b{font-size:13px}}

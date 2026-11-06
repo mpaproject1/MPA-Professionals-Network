@@ -364,7 +364,7 @@ export default function MembershipAdminWorkspace() {
                     <div>{item.fee_snapshot?.productName || item.fee_snapshot?.productCode || "Membership"}</div><small className="muted">{money(item.fee_snapshot?.amount ?? 0, item.fee_snapshot?.currency || "ETB")} · v{item.fee_snapshot?.feeRuleVersion ?? "legacy"}</small>
                   </td>
                   <td style={{ padding: "11px 8px", borderBottom: "1px solid var(--border)" }}>
-                    {item.payment ? <><Badge tone={statusTone(item.payment.status)}>{readable(item.payment.status)}</Badge><small className="muted" style={{ display: "block" }}>{money(item.payment.amount, item.payment.currency)}</small></> : <small className="muted">Not submitted</small>}
+                    {item.payment ? <><Badge tone={statusTone(item.payment.status)}>{readable(item.payment.status)}</Badge><small className="muted" style={{ display: "block" }}>{money(item.payment.amount, item.payment.currency)}</small>{item.payment.reconciliation_status && <small className="muted" style={{ display: "block" }}>Reconciled: {readable(item.payment.reconciliation_status)}{item.payment.reconciled_by_name ? " · by " + item.payment.reconciled_by_name : ""}</small>}</> : <small className="muted">Not submitted</small>}
                   </td>
                   <td style={{ padding: "11px 8px", borderBottom: "1px solid var(--border)" }}><Badge tone={statusTone(item.status)}>{readable(item.status)}</Badge></td>
                   <td style={{ padding: "11px 8px", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}><small>{item.submitted_at || item.created_at ? new Date(String(item.submitted_at || item.created_at)).toLocaleDateString() : "—"}</small></td>

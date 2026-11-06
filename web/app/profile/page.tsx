@@ -1,10 +1,13 @@
 "use client";
 import {
+  Check,
   ClipboardCopy,
   CreditCard,
   Eye,
   FileCheck2,
   Globe2,
+  LoaderCircle,
+  LockKeyhole,
   LogIn,
   RefreshCw,
   ShieldCheck,
@@ -109,6 +112,9 @@ export default function Profile() {
     clearToken = useUiStore((s) => s.clearToken),
     language = useUiStore((s) => s.language);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState("professional-profile");
+  const [activeProfileStep, setActiveProfileStep] = useState("personal-information");
+  const [educationPortfolioComplete, setEducationPortfolioComplete] = useState(false);
   const [membershipApplications,setMembershipApplications]=useState<ProfileMembershipApplication[]>([]);
   const [membershipReferencesError,setMembershipReferencesError]=useState("");
   const [copyNotice,setCopyNotice]=useState("");
@@ -236,6 +242,7 @@ export default function Profile() {
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => { document.getElementById(activeProfileStep)?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [activeProfileStep]);
   useEffect(() => {
     if (!token || !profile?.profile_picture_file_id) {
       setProfilePictureUrl("");
@@ -453,6 +460,20 @@ export default function Profile() {
   async function copyDisplayReference(value:string){const ref=String(value||"").trim();if(!ref){setCopyNotice("A display reference has not been assigned yet.");return;}try{await navigator.clipboard.writeText(ref);setCopyNotice("Reference copied to clipboard.");}catch{setCopyNotice("Clipboard access is unavailable. Select the displayed reference and copy it manually.");}}
   const update = (key: keyof typeof blank, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
+  const profileSteps = [
+    { id: "personal-information", label: "Personal identity", hint: "Your name and optional membership-card photograph", locked: false, complete: Boolean(form.firstName.trim() && form.lastName.trim()) },
+    { id: "professional-summary", label: "Professional introduction", hint: "Your role, expertise and introduction", locked: false, complete: Boolean(form.headline.trim() || form.bio.trim()) },
+    { id: "professional-experience", label: "Work experience", hint: "Roles, responsibilities and achievements", locked: !profile?.has_active_membership, complete: Boolean(profile?.has_active_membership && (experienceDrafts.length > 0 || talentForm.professionalTitle.trim())) },
+    { id: "guided-professional-profile", label: "Education, skills & portfolio", hint: "Qualifications, languages, skills and work samples", locked: !profile?.has_active_membership, complete: educationPortfolioComplete },
+    { id: "professional-privacy", label: "Portfolio & privacy", hint: "Review visibility and directory consent", locked: !profile?.has_active_membership, complete: false },
+    { id: "verification-review", label: "Verification", hint: "Submit claims and evidence for independent review", locked: !profile?.has_active_membership, complete: false },
+  ];
+  const completedSteps = profileSteps.filter((step) => step.complete).length;
+  const stepProgress = Math.round((completedSteps / profileSteps.length) * 100);
+  function openProfileStep(step: (typeof profileSteps)[number]) {
+    if (step.locked) return;
+    setActiveProfileStep(step.id);
+  }
   const isOrganizationAccount=Boolean(profile?.roles?.some(role=>["organization_representative","organization_owner","organization_admin","organization_member","organization"].includes(role)));
   if (organizationOnly) return (
     <div className={`grid ${styles.page}`} style={{ gap: 18, minWidth: 0, width: "100%" }}>
@@ -489,26 +510,33 @@ export default function Profile() {
         </Card>
       ) : (
         <>
-          <nav className={styles.sectionNav} aria-label="Profile sections">
-            <a href="#personal-information">Personal information</a>
-            <a href="#professional-summary">Professional profile</a>
-            <a href="#membership-and-verification">Membership &amp; verification</a>
-            <a href="#notification-preferences">Notifications</a>
-            <a href="#account-preferences">Account preferences</a>
+          <nav className={styles.workspaceTabs} aria-label="Profile workspace sections">
+            {[
+              { id: "professional-profile", label: "Professional profile", detail: "Your six-step profile" },
+              { id: "member-details", label: "Member details", detail: "Optional residence details" },
+              { id: "preferences", label: "Preferences", detail: "Contact channels and language" },
+              { id: "account", label: "Account", detail: "Membership and sign-in" },
+            ].map((tab) => <button key={tab.id} type="button" className={`${styles.workspaceTab} ${activeWorkspaceTab === tab.id ? styles.workspaceTabActive : ""}`} aria-current={activeWorkspaceTab === tab.id ? "page" : undefined} onClick={() => setActiveWorkspaceTab(tab.id)}><b>{tab.label}</b><small>{tab.detail}</small></button>)}
           </nav>
-          <section id="member-residence" aria-label="Member residence"><MemberResidenceEditor /></section>
+          {activeWorkspaceTab === "member-details" && <section className={styles.workspacePanel} aria-label="Optional member details"><div><div className="eyebrow">Member details · optional</div><h2 className="h2">Residence information</h2><p className="muted">This information helps MPA understand member distribution and route relevant services. It is account information, not part of your professional profile, and is not shown in the public talent directory.</p></div><MemberResidenceEditor /></section>}
+          {activeWorkspaceTab === "professional-profile" && <>
+          <section className={styles.stepper} aria-label="Professional profile onboarding">
+            <div className={styles.stepperTop}><div><div className="eyebrow">Your profile journey</div><h2 className="h2">Build your professional profile step by step</h2><p className="muted">Complete each available step. Your information stays private unless you explicitly consent to sharing it.</p></div><strong className={styles.stepperPercent}>{stepProgress}%</strong></div>
+            <div className={styles.stepperTrack} role="progressbar" aria-label="Onboarding steps completed" aria-valuemin={0} aria-valuemax={100} aria-valuenow={stepProgress}><span style={{ width: `${stepProgress}%` }} /></div>
+            <nav className={styles.stepperTabs} aria-label="Profile onboarding steps">
+              {profileSteps.map((step,index) => { const current=activeProfileStep===step.id; return <button key={step.id} type="button" className={`${styles.stepTab} ${current?styles.stepTabActive:""} ${step.complete?styles.stepTabComplete:""} ${step.locked?styles.stepTabLocked:""}`} aria-current={current?"step":undefined} aria-disabled={step.locked||undefined} title={step.locked?"Available after your MPA membership becomes active. Your saved information remains available.":step.hint} onClick={()=>openProfileStep(step)}><span className={styles.stepIcon}>{step.locked?<LockKeyhole size={16} aria-hidden="true"/>:step.complete?<Check size={17} aria-hidden="true"/>:current?<LoaderCircle size={17} className={styles.stepSpinner} aria-hidden="true"/>:<span>{index+1}</span>}</span><span className={styles.stepTabText}><b>{step.label}</b><small>{step.locked?"Membership required":step.complete?"Completed":current?"You are here":step.hint}</small></span></button>; })}
+            </nav>
+            {!profile?.has_active_membership?<p className={styles.stepperNote}><LockKeyhole size={15}/> Locked steps cover member-only professional records, evidence review and directory controls. They unlock automatically when your membership is active. <a href="/membership">View membership options</a>.</p>:<p className={styles.stepperNote}>Completed steps show a check mark. The current step is highlighted with a subtle spinner.</p>}
+          </section>
           <section className={styles.completionCard} aria-labelledby={`${profileId}-completion-title`}>
             <div className={styles.completionHeading}><div><div className="eyebrow">Your progress</div><h2 id={`${profileId}-completion-title`}>Profile completion</h2></div><strong>{profile ? `${Math.max(0,Math.min(100,Number(profile.completion_percent)||0))}%` : loading ? "Loading…" : "Not available"}</strong></div>
             {profile ? <progress className={styles.completionTrack} max={100} value={Math.max(0,Math.min(100,Number(profile.completion_percent)||0))} aria-label={`Profile ${Math.max(0,Math.min(100,Number(profile.completion_percent)||0))}% complete`} /> : <div className={styles.completionUnavailable} role="status">Profile completion is shown when your account record has loaded.</div>}
             <p>Complete the relevant profile details at your own pace. Saving your profile does not change verification or directory eligibility.</p>
           </section>
-          <Card>
-            <div className="eyebrow">Membership application references</div><p className="muted">Use these display references when contacting MPA Support Desk. Internal record IDs are never shown as a fallback.</p>{membershipReferencesError&&<p className="muted" role="status">{membershipReferencesError}</p>}{membershipApplications.length===0&&!membershipReferencesError?<p className="muted">No membership applications are currently available for this account.</p>:membershipApplications.map(app=><div className="row" key={app.id} style={{justifyContent:"space-between",flexWrap:"wrap",padding:"8px 0",borderBottom:"1px solid var(--border)"}}><div><b>{app.tracking_reference||"Reference not assigned yet"}</b><div className="muted">{(app.application_type||"membership").replaceAll("_"," ")} · {app.status.replaceAll("_"," ")}</div></div>{app.tracking_reference&&<button type="button" className="btn btn-ghost" onClick={()=>void copyDisplayReference(app.tracking_reference||"")}><ClipboardCopy size={15}/> Copy reference</button>}</div>)}{copyNotice&&<p className="muted" role="status" aria-live="polite">{copyNotice}</p>}
-          </Card>
-          <Card>
+          <Card hidden={!["personal-information","professional-summary"].includes(activeProfileStep)}>
             <div className="row">
               <div>
-                <div className="eyebrow">Account</div>
+                <div className="eyebrow">Professional identity</div>
                 <div className="h2">
                   {profile?.display_name || "Your professional profile"}
                 </div>
@@ -520,13 +548,13 @@ export default function Profile() {
               <ShieldCheck color="var(--primary)" />
             </div>
             {loading && <OperationStatus state="loading" title="Loading your account profile" detail="We’re retrieving your saved profile, membership visibility and account preferences. Your profile is not being changed." />}
-            <section aria-labelledby={`${profileId}-picture-heading`} className="grid" style={{ gridTemplateColumns: "auto minmax(0,1fr)", alignItems: "center", gap: 14, padding: 14, border: "1px solid var(--border)", borderRadius: 12 }}>
+            <section hidden={activeProfileStep !== "personal-information"} aria-labelledby={`${profileId}-picture-heading`} className="grid" style={{ gridTemplateColumns: "auto minmax(0,1fr)", alignItems: "center", gap: 14, padding: 14, border: "1px solid var(--border)", borderRadius: 12 }}>
               <div style={{ width: 92, height: 92, borderRadius: 12, overflow: "hidden", display: "grid", placeItems: "center", background: "linear-gradient(145deg,#0A3258,#174A78)", color: "#fff", border: "2px solid #97C024", fontSize: 28, fontWeight: 800 }}>
                 {profilePictureUrl ? <img src={profilePictureUrl} alt="Your professional profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span>{(profile?.first_name?.[0] || "M").toUpperCase()}{(profile?.last_name?.[0] || "P").toUpperCase()}</span>}
               </div>
               <div className="grid" style={{ gap: 7 }}>
                 <h2 id={`${profileId}-picture-heading`} className="h2" style={{ margin: 0 }}>Profile photograph</h2>
-                <p className="muted" style={{ margin: 0 }}>JPG or PNG, up to 10 MiB. Your image is stored privately and used on your membership card; a branded placeholder is used if you skip this.</p>
+                <p className="muted" style={{ margin: 0 }}>Optional. Use a recent, clear, well-lit professional portrait with a simple background. This same private photo is used on your MPA membership card; a branded placeholder appears if you skip it. Avoid group photos, filters and heavy editing.</p>
                 <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
                   <label className="btn btn-primary" style={{ cursor: uploadingPicture ? "wait" : "pointer" }}>
                     {uploadingPicture ? "Saving photo…" : profile?.profile_picture_file_id ? "Change photograph" : "Upload photograph"}
@@ -541,7 +569,7 @@ export default function Profile() {
               <p className={styles.formHint}>
                 Start with your name. The other details are optional and can be added later. Changes are saved only when you select Save profile.
               </p>
-              <fieldset className="form-category grid" style={{gap:12}}><legend id="personal-information">1. Personal information</legend>
+              <fieldset hidden={activeProfileStep !== "personal-information"} className="form-category grid" style={{gap:12}}><legend id="personal-information">1. Personal information</legend>
               <p className="muted">Use the name you want associated with your MPA account. Contact details and sensitive personal information are not automatically made public.</p><div className="grid grid-2">
                 {(
                   [
@@ -588,7 +616,7 @@ export default function Profile() {
                   </div>
                 ))}
               </div></fieldset>
-              <fieldset className="form-category grid" style={{gap:12}}><legend id="professional-summary">2. Professional summary</legend>
+              <fieldset hidden={activeProfileStep !== "professional-summary"} className="form-category grid" style={{gap:12}}><legend id="professional-summary">2. Professional summary</legend>
               <p className="muted">Introduce your work and expertise in your own words. These details are separate from verified credentials; adding them does not mean MPA has verified them.</p><div>
                 <label htmlFor={`${profileId}-headline`}>Professional headline</label>
                 <p className={styles.fieldHint}>Summarize your role and expertise in one sentence. Example: “Public Health Specialist | Program Management”.</p>
@@ -658,6 +686,7 @@ export default function Profile() {
             </form>
           </Card>
           {profile?.has_active_membership ? <>
+          <section id="professional-experience" hidden={activeProfileStep !== "professional-experience"} className={styles.stepSection}>
           <Card>
             <div className="row">
               <div>
@@ -805,7 +834,11 @@ export default function Profile() {
               </button>
             </form>
           </Card>
-          <GuidedProfessionalProfile onNationalitySaved={(value) => { setForm((f) => ({ ...f, nationality: value })); setProfile((p) => p ? ({ ...p, nationality: value }) : p); }} />
+          </section>
+          <section id="guided-professional-profile" hidden={activeProfileStep !== "guided-professional-profile"} className={styles.stepSection}>
+          <GuidedProfessionalProfile onNationalitySaved={(value) => { setForm((f) => ({ ...f, nationality: value })); setProfile((p) => p ? ({ ...p, nationality: value }) : p); }} onProgressChange={setEducationPortfolioComplete} />
+                    </section>
+          <section id="professional-privacy" hidden={activeProfileStep !== "professional-privacy"} className={styles.stepSection}>
           <Card>
             <div className="row">
               <div>
@@ -865,6 +898,8 @@ export default function Profile() {
               {savingVisibility ? "Saving…" : "Save directory privacy settings"}
             </button>
           </Card>
+          </section>
+          <section id="verification-review" hidden={activeProfileStep !== "verification-review"} className={styles.stepSection}><Card><div className="eyebrow">Professional verification</div><h2 className="h2">Submit claims for independent review</h2><p className="muted">Professional claims, supporting documents, reviewer checklists, decisions and appeals belong in the dedicated Verification workspace. Choose the appropriate program, add each claim, attach the documents requested by its checklist, and follow the status and next action shown for every claim. A submitted claim is not a verified credential.</p><a className="btn btn-primary" href="/verification">Open professional verification and credentials</a></Card></section>
           </> : <Card>
             <div id="membership-and-verification" className="eyebrow">Membership unlocks professional review</div>
             <h2 className="h2">Your profile can be prepared now</h2>
@@ -874,6 +909,8 @@ export default function Profile() {
               <a className="btn btn-ghost" href="/membership#my-applications">Track an existing application</a>
             </div>
           </Card>}
+          </>}
+          {activeWorkspaceTab === "preferences" && <>
           <Card>
             <div className="row">
               <div>
@@ -931,38 +968,19 @@ export default function Profile() {
                 </p>
               </div>
             </div>
-            <div className="row">
-              <CreditCard color="var(--gold)" />
-              <div>
-                <div className="h2">Membership and payments</div>
-                <p className="muted">
-                  Check your application, review, and payment status in the membership workspace. Membership is not active until the required review, payment verification, and activation steps are confirmed.
-                </p>
-              </div>
-            </div>
-            <div className="row">
-              <WifiOff color="var(--gold)" />
-              <div>
-                <div className="h2">Field workspace</div>
-                <p className="muted">
-                  Offline field evidence is not reported as synchronized until
-                  the server confirms it.
-                </p>
-                <a className="btn btn-ghost" href="/field">
-                  Open field workspace
-                </a>
-              </div>
-            </div>
-            <div className="row">
-              <FileCheck2 color="var(--primary)" />
-              <div>
-                <div className="h2">Verification and credentials</div>
-                <p className="muted">
-                  Private by default; accessible only to authorized participants
-                  and reviewers under server-side policy.
-                </p>
-              </div>
-            </div>
+            <p className="muted">Language changes affect the interface only. They do not change your professional-profile information, membership status or verification results. Use the language control in the site header to switch when another language is available.</p>
+          </Card>
+          </>}
+          {activeWorkspaceTab === "account" && <>
+          <Card>
+            <div className="eyebrow">Account and membership</div>
+            <h2 className="h2">{profile?.display_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Your MPA account"}</h2>
+            <p className="muted">{profile?.email || "Email unavailable"} · {loading ? "Loading…" : profile?.status || "Account status unavailable"}</p>
+            <div className="row" style={{flexWrap:"wrap",gap:8}}><a className="btn btn-primary" href="/membership">Open membership and payments</a><a className="btn btn-ghost" href="/verification">Professional verification and credentials</a></div>
+            <p className="muted">Membership applications and payment records are managed in Membership. Credential claims, private evidence, reviewer decisions and appeals are managed in Verification. Field operations remain a separate operational workspace and are not part of your profile.</p>
+          <Card>
+            <div className="eyebrow">Membership application references</div><p className="muted">Use these display references when contacting MPA Support Desk. Internal record IDs are never shown as a fallback.</p>{membershipReferencesError&&<p className="muted" role="status">{membershipReferencesError}</p>}{membershipApplications.length===0&&!membershipReferencesError?<p className="muted">No membership applications are currently available for this account.</p>:membershipApplications.map(app=><div className="row" key={app.id} style={{justifyContent:"space-between",flexWrap:"wrap",padding:"8px 0",borderBottom:"1px solid var(--border)"}}><div><b>{app.tracking_reference||"Reference not assigned yet"}</b><div className="muted">{(app.application_type||"membership").replaceAll("_"," ")} · {app.status.replaceAll("_"," ")}</div></div>{app.tracking_reference&&<button type="button" className="btn btn-ghost" onClick={()=>void copyDisplayReference(app.tracking_reference||"")}><ClipboardCopy size={15}/> Copy reference</button>}</div>)}{copyNotice&&<p className="muted" role="status" aria-live="polite">{copyNotice}</p>}
+          </Card>
           </Card>
           <button type="button"
             className="btn btn-ghost"
@@ -979,6 +997,7 @@ export default function Profile() {
           >
             Sign out
           </button>
+          </>}
         </>
       )}
       {error && <FormFeedback kind="error" message={error} />}

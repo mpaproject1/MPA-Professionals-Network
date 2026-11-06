@@ -42,7 +42,7 @@ export default function MembershipCardPage(){
   const verifyUrl=origin+card.verificationPath;
   const cardStyle={background:`linear-gradient(125deg,${s.background_start},${s.background_end})`,color:s.text_color,"--card-accent":s.accent_color} as CSSProperties;
   return <main className={styles.shell}>
-    <div className={styles.toolbar}><div><p className={styles.eyebrow}>OFFICIAL MEMBER CREDENTIAL</p><h1>Membership ID</h1><p>ATM-size landscape card · 85.6 × 53.98 mm · Print or save as PDF</p></div><div className={styles.actions}><a href="/profile" className={styles.secondary}>Profile & photo</a><button type="button" onClick={()=>window.print()} className={styles.primary}>Print / Save PDF</button></div></div>
+    <div className={styles.toolbar}><div><p className={styles.eyebrow}>OFFICIAL MEMBER CREDENTIAL</p><h1>Membership ID</h1><p>Exact-size membership ID · 85.6 × 53.98 mm · Download PDF or print</p></div><div className={styles.actions}><a href="/profile" className={styles.secondary}>Profile & photo</a><button type="button" onClick={()=>window.print()} className={styles.primary}>Download PDF / Print ID</button></div></div>
     <section className={styles.preview} aria-label="Membership ID card preview">
       <article className={`${styles.card} ${s.background_style==="midnight"?styles.midnight:""} ${s.background_style==="gradient"?styles.gradient:""}`} style={cardStyle}>
         <div className={styles.orbOne}/><div className={styles.orbTwo}/><div className={styles.lines}/>
@@ -55,6 +55,6 @@ export default function MembershipCardPage(){
         <footer className={styles.cardFooter}><span>{s.footer_text}</span><span className={styles.footerSeal}>● VERIFY ONLINE</span></footer>
       </article>
     </section>
-    <p className={styles.note}>Your membership ID is issued by MPA and cannot be edited from this page. The QR code checks the current record online; a printed card is not proof of active status if the membership has expired, been suspended, or been revoked.</p>
+    <p className={styles.note}>Choose “Save as PDF” in the print dialog to download the exact-size membership ID. Your membership ID is issued by MPA and cannot be edited from this page. The QR code checks the current record online; a printed card is not proof of active status if the membership has expired, been suspended, or been revoked.</p>
   </main>;
 }

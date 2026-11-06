@@ -161,7 +161,17 @@ export async function getMe(userId){
   const r=await db.query(`select u.id user_id,u.username,u.email,u.status,u.account_type,p.id person_id,p.first_name,p.middle_name,p.last_name,p.display_name,p.phone,p.date_of_birth,p.sex,p.nationality,
     pr.id profile_id,pr.headline,pr.bio,pr.visibility,pr.completion_percent,pr.profile_picture_file_id,
     coalesce((select jsonb_agg(r.role_code order by r.role_code) from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id),'[]'::jsonb) roles,
-    exists(select 1 from membership_record mr where mr.user_id=u.id and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date)) has_active_membership
+    exists(select 1 from membership_record mr
+       where mr.user_id=u.id and mr.status='active'
+         and mr.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date
+         and (mr.end_date is null or mr.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date)
+         and (coalesce(mr.source,'')<>'legacy_import' or exists(
+           select 1 from payment_reconciliation pr
+           join payment_transaction pt on pt.id=pr.payment_transaction_id
+           where pr.membership_id=mr.id and pr.reconciliation_status='matched'
+             and pt.source='legacy_import' and pt.status='succeeded'
+             and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)
+         ))) has_active_membership
     from app_user u left join person p on p.user_id=u.id left join professional_profile pr on pr.person_id=p.id where u.id=$1`,[userId]);
   if(!r.rows[0]) throw httpError(404,"Account not found.","NOT_FOUND");
   const row=r.rows[0];

@@ -60,3 +60,46 @@ test("bulk membership print produces independently parsed A4 PDF with one eligib
   expect(extracted).not.toMatch(/payment|recovery email|private address/i);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
+
+
+test("single member membership ID PDF is one exact-size card with no portal chrome or extra page",async({page})=>{
+ await page.addInitScript(()=>{
+  sessionStorage.setItem("mpa-session-token","membership-card-single-print-ci-token");
+  localStorage.setItem("mpa-privacy-preferences-v1",JSON.stringify({version:"2026-10-16-v1",necessary:true,analytics:false,personalization:false,updatedAt:new Date().toISOString()}));
+ });
+ const singleCard={membershipNumber:"MPA-2026-77DD88EE",memberName:"Amina Yusuf",membershipType:"Professional",status:"active",startDate:"2026-01-01",endDate:"2026-12-31",verificationPath:"/membership/verify?membershipNumber=MPA-2026-77DD88EE&token="+"b".repeat(43),settings};
+ await page.route("**/api/v1/membership/card",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:singleCard})}));
+ await page.route("**/api/v1/me",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{has_active_membership:true,roles:["member"],permissions:[],email:"amina@example.test",display_name:"Amina Yusuf"}})}));
+ await page.goto("/membership/card");
+ await expect(page.getByRole("heading",{name:"Membership ID"})).toBeVisible();
+ await expect(page.getByText("Amina Yusuf")).toBeVisible();
+ await page.emulateMedia({media:"print"});
+ const pdf=await page.pdf({printBackground:true,preferCSSPageSize:true});
+ expect(pdf.subarray(0,5).toString()).toBe("%PDF-");
+ const directory=await mkdtemp(join(tmpdir(),"mpa-single-membership-card-"));
+ const pdfPath=join(directory,"membership-id.pdf");
+ try{
+  await writeFile(pdfPath,pdf);
+  const parser=[
+   "from pypdf import PdfReader",
+   "import sys",
+   "r=PdfReader(sys.argv[1])",
+   "print('PAGES='+str(len(r.pages)))",
+   "print('ID_SIZE='+str(all(abs(float(p.mediabox.width)-242.65)<0.5 and abs(float(p.mediabox.height)-153.01)<0.5 for p in r.pages)))",
+   "print('TEXT='+chr(10).join((p.extract_text() or '') for p in r.pages))"
+  ].join("\n");
+  const extracted=execFileSync("python3",["-c",parser,pdfPath],{encoding:"utf8"});
+  expect(extracted).toContain("PAGES=1");
+  expect(extracted).toContain("ID_SIZE=True");
+  expect(extracted).toContain("Amina Yusuf");
+  expect(extracted).toContain("MPA-2026-77DD88EE");
+  expect(extracted).toContain("SCAN TO VERIFY");
+  expect(extracted).not.toContain("OFFICIAL MEMBER CREDENTIAL");
+  expect(extracted).not.toContain("Download PDF");
+  expect(extracted).not.toContain("Profile & photo");
+  expect(extracted).not.toContain("Job Portal");
+  expect(extracted).not.toContain("My-Workspace");
+  expect(extracted).not.toContain("@");
+  expect(extracted).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});

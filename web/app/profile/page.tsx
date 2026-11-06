@@ -241,6 +241,7 @@ export default function Profile() {
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => { document.getElementById(activeProfileStep)?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [activeProfileStep]);
   useEffect(() => {
     if (!token || !profile?.profile_picture_file_id) {
       setProfilePictureUrl("");
@@ -470,7 +471,6 @@ export default function Profile() {
   function openProfileStep(step: (typeof profileSteps)[number]) {
     if (step.locked) return;
     setActiveProfileStep(step.id);
-    document.getElementById(step.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   const isOrganizationAccount=Boolean(profile?.roles?.some(role=>["organization_representative","organization_owner","organization_admin","organization_member","organization"].includes(role)));
   if (organizationOnly) return (

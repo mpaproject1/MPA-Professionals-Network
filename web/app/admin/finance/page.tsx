@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { Download, Eye, X } from "lucide-react";
 import { FinanceMembershipObligations } from "../../../components/finance-membership-obligations";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
@@ -20,7 +21,12 @@ type Payment = {
   created_at: string;
   verified_at?: string | null;
   verification_note?: string | null;
-  application_id: string;
+  evidence_file_id?: string | null;
+  evidence_file_name?: string | null;
+  verified_by_name?: string | null;
+  reconciled_by_name?: string | null;
+  reconciled_at?: string | null;
+  application_id: string | null;
   tracking_reference?: string | null;
   application_type: string;
   application_status: string;
@@ -99,6 +105,7 @@ export default function FinanceWorkspacePage() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [evidencePreview, setEvidencePreview] = useState<{ name: string; type: string; url: string; text?: string } | null>(null);
   const [decisions, setDecisions] = useState<Record<string, "approved" | "needs_correction" | "rejected">>({});
   const [verificationNotes, setVerificationNotes] = useState<Record<string, string>>({});
   const [reversalTypes, setReversalTypes] = useState<Record<string, "refund" | "reversal">>({});
@@ -167,6 +174,41 @@ export default function FinanceWorkspacePage() {
     setAccess("loading");
     void load();
   }, [hydrated, token, load]);
+
+  async function previewPaymentEvidence(payment: Payment) {
+    if (!token || !payment.evidence_file_id || busy) return;
+    setBusy("evidence:" + payment.payment_id);
+    setError("");
+    try {
+      const response = await fetch("/api/v1/files/" + encodeURIComponent(payment.evidence_file_id), {
+        headers: { Authorization: "Bearer " + token }, cache: "no-store"
+      });
+      if (!response.ok) throw new Error(response.status === 403 ? "Your Finance permissions do not allow access to this payment evidence." : "Payment evidence could not be loaded.");
+      const blob = await response.blob();
+      const extension = (payment.evidence_file_name || "").toLowerCase().split(".").pop() || "";
+      const detected = blob.type || "application/octet-stream";
+      const type = detected === "application/octet-stream" ? (extension === "pdf" ? "application/pdf" : ["png", "jpg", "jpeg", "webp", "gif"].includes(extension) ? "image/" + (extension === "jpg" ? "jpeg" : extension) : extension === "txt" ? "text/plain" : detected) : detected;
+      if (!type.includes("pdf") && !type.startsWith("image/") && !type.startsWith("text/")) {
+        throw new Error("In-app preview supports PDF, image and text evidence. This file type cannot be previewed safely.");
+      }
+      setEvidencePreview({ name: payment.evidence_file_name || "Payment evidence", type, url: URL.createObjectURL(blob), text: type.startsWith("text/") ? await blob.text() : undefined });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Payment evidence preview failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+  function closeEvidencePreview() {
+    if (evidencePreview?.url) URL.revokeObjectURL(evidencePreview.url);
+    setEvidencePreview(null);
+  }
+  function downloadEvidencePreview() {
+    if (!evidencePreview) return;
+    const anchor = document.createElement("a");
+    anchor.href = evidencePreview.url;
+    anchor.download = evidencePreview.name || "payment-evidence";
+    anchor.click();
+  }
 
   async function verifyPayment(event: FormEvent, payment: Payment) {
     event.preventDefault();
@@ -315,7 +357,7 @@ export default function FinanceWorkspacePage() {
     </Card>
     <Card>
       <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-        <div><h2 className="h2">Payment records</h2><p className="muted">Up to 500 membership payment records, newest and pending items first. Applicant contact details and private application evidence are not included in this queue.</p></div>
+        <div><h2 className="h2">Payment records</h2><p className="muted">Up to 500 membership payment records, newest and pending items first. Applicant contact details are excluded; Finance can preview payment-specific evidence here before downloading.</p></div>
         <Badge tone="slate">{rows.length} records returned</Badge>
       </div>
       {rows.length === 0 ? <OperationStatus state="info" title="No membership payments in this queue" detail="No matching payment records were returned. Refresh to check the current source records." /> : rows.map(payment => <article key={payment.payment_id} className="case-row" style={{ alignItems: "flex-start" }}>
@@ -330,9 +372,10 @@ export default function FinanceWorkspacePage() {
             <p><span className="muted">Channel / source</span><br/><b>{payment.channel} · {payment.source}</b></p>
             <p><span className="muted">Payment reference</span><br/><b>{payment.payment_reference || payment.purpose_reference || "Not supplied"}</b></p>
             <p><span className="muted">Submitted</span><br/><b>{dateLabel(payment.created_at)}</b></p>
-            <p><span className="muted">Verified</span><br/><b>{dateLabel(payment.verified_at)}</b></p>
-            <p><span className="muted">Reconciliation</span><br/><b>{payment.reconciliation_status || "Not recorded"}</b></p>
+            <p><span className="muted">Verified</span><br/><b>{dateLabel(payment.verified_at)}</b>{payment.verified_by_name ? <><br/><small className="muted">By {payment.verified_by_name}</small></> : null}</p>
+            <p><span className="muted">Reconciliation</span><br/><b>{payment.reconciliation_status || "Not recorded"}</b>{payment.reconciled_by_name ? <><br/><small className="muted">By {payment.reconciled_by_name} · {dateLabel(payment.reconciled_at)}</small></> : null}</p>
           </div>
+          {payment.evidence_file_id && <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}><button type="button" className="btn btn-ghost" disabled={busy === "evidence:" + payment.payment_id} onClick={() => void previewPaymentEvidence(payment)}><Eye size={15} /> {busy === "evidence:" + payment.payment_id ? "Loading evidence…" : "Preview payment evidence"}</button></div>}
           {payment.verification_note && <p className="muted">Payment note: {payment.verification_note}</p>}
           {canIssueVoucher && payment.payment_status === "succeeded" && !payment.reversed && payment.application_type !== "legacy_import" && <button type="button" className="btn btn-primary" disabled={busy === payment.payment_id} onClick={() => void issueMembershipVoucher(payment)}>Issue QR payment voucher</button>}
 
@@ -354,5 +397,12 @@ export default function FinanceWorkspacePage() {
       </article>)}
     </Card>
     <Card><p className="muted">Payment verification, reversal and reconciliation remain audited financial actions. A successful payment does not by itself approve or activate a membership application.</p></Card>
+    {evidencePreview && <div role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeEvidencePreview(); }} style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(2,8,23,.82)", display: "grid", placeItems: "center", padding: 16 }}>
+      <section role="dialog" aria-modal="true" aria-labelledby="finance-payment-evidence-title" className="card grid" style={{ width: "min(1100px, 100%)", height: "min(88vh, 850px)", gridTemplateRows: "auto 1fr auto", overflow: "hidden" }}>
+        <div className="row" style={{ justifyContent: "space-between" }}><div><div className="eyebrow">Finance · private payment evidence</div><h2 id="finance-payment-evidence-title" className="h2">{evidencePreview.name}</h2></div><button type="button" className="btn btn-ghost" onClick={closeEvidencePreview} aria-label="Close evidence preview"><X size={18} /></button></div>
+        {evidencePreview.type.startsWith("image/") ? <div style={{ overflow: "auto", display: "grid", placeItems: "center", background: "var(--surface)" }}><img src={evidencePreview.url} alt={"Payment evidence preview: " + evidencePreview.name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} /></div> : evidencePreview.type === "application/pdf" ? <iframe title={"Payment PDF evidence preview: " + evidencePreview.name} src={evidencePreview.url} style={{ width: "100%", height: "100%", border: "1px solid var(--border)", borderRadius: 8 }} /> : <pre style={{ overflow: "auto", whiteSpace: "pre-wrap", padding: 16, background: "var(--surface)", borderRadius: 8 }}>{evidencePreview.text}</pre>}
+        <div className="row" style={{ justifyContent: "flex-end" }}><button type="button" className="btn btn-ghost" onClick={downloadEvidencePreview}><Download size={15} /> Download evidence</button><button type="button" className="btn btn-primary" onClick={closeEvidencePreview}>Close preview</button></div>
+      </section>
+    </div>}
   </div>;
 }

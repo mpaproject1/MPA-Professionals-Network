@@ -38,3 +38,11 @@ test("notification actions resolve to routes present in the current workspace",(
   assert.equal(notificationActionLabel("recruitment","job_application",{}),"View application");
   assert.equal(notificationActionLabel("services","service_request",{}),"Open service request");
 });
+
+test("notification category defaults are explicitly enabled without overwriting member opt-outs",async()=>{
+  const {readFile}=await import("node:fs/promises");
+  const migration=await readFile(new URL("../../db/migrations/20261106190000_notification_preferences_enabled_by_default.sql",import.meta.url),"utf8");
+  assert.match(migration,/ALTER COLUMN in_app_categories SET DEFAULT/);
+  assert.match(migration,/\|\| COALESCE\(in_app_categories, '\{\}'::jsonb\)/);
+  assert.match(migration,/in_app_categories \?& ARRAY/);
+});

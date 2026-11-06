@@ -267,7 +267,7 @@ export async function submitBusinessVerification(businessId,userId,requestId) {
     const reviewers=(await db.query(`select distinct u.id from app_user u
       where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($1::text[]))
         or exists(select 1 from app_user_permission p where p.user_id=u.id and p.permission_code='business.verify'))`,[BUSINESS_REVIEW_ROLES])).rows;
-    for(const reviewer of reviewers)await createInAppNotification(db,reviewer.id,"network_plus.business_verification_review_required","network_plus_business",businessId,{message:"A business profile is awaiting independent verification review.",nextAction:"Review the business verification case and record a reasoned decision.",actionUrl:"/admin",actionRequired:true,priority:"high",eventVersion:row.created_at});
+    for(const reviewer of reviewers)await createInAppNotification(db,reviewer.id,"network_plus.business_verification_review_required","network_plus_business",businessId,{message:"A business profile is awaiting independent verification review.",nextAction:"Open the administration workspace to locate the pending business verification case and record a reasoned decision.",actionLabel:"Open admin workspace",actionUrl:"/admin",actionRequired:true,priority:"high",eventVersion:row.created_at});
     return row;
   });
 }
@@ -645,7 +645,7 @@ export async function submitBusinessModeration(businessId,userId,requestId) {
     if(!updated)fail(409,"Business profile is already under review or cannot be resubmitted.","INVALID_STATE");
     await audit(db,userId,"network_plus.business_profile_submitted","network_plus_business",businessId,requestId,{});
     const reviewers=(await db.query("select distinct u.id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($1::text[])) or exists(select 1 from app_user_permission p where p.user_id=u.id and p.permission_code='business.moderate'))",[LISTING_REVIEW_ROLES])).rows;
-    for(const reviewer of reviewers)await createInAppNotification(db,reviewer.id,"network_plus.business_profile_review_required","network_plus_business",businessId,{message:"A verified business profile is awaiting moderation.",nextAction:"Review the public business profile and approve, reject or suspend it with a reason.",actionUrl:"/admin",actionRequired:true,priority:"high",eventVersion:updated.updated_at});
+    for(const reviewer of reviewers)await createInAppNotification(db,reviewer.id,"network_plus.business_profile_review_required","network_plus_business",businessId,{message:"A verified business profile is awaiting moderation.",nextAction:"Open the administration workspace to locate the submitted business profile and record a reasoned moderation decision.",actionLabel:"Open admin workspace",actionUrl:"/admin",actionRequired:true,priority:"high",eventVersion:updated.updated_at});
     return updated;
   });
 }

@@ -39,9 +39,9 @@ export function notificationActionUrl(value,category,resourceType,payload={}){
  if(url){
   const path=url.split(/[?#]/)[0];
   // Older Network-Plus notifications used a business-detail URL that is not a route in this branch.
-  if(/^\\/network-plus\\/businesses(?:\\/|$)/.test(path))return "/network-plus";
+  if((path==="/network-plus/businesses"||path.startsWith("/network-plus/businesses/")))return "/network-plus";
   // There is no dedicated business-verification admin page in this branch; route reviewers to the admin workspace rather than a dead URL.
-  if(/^\\/admin\\/network-plus\\/businesses(?:\\/|$)/.test(path))return "/admin";
+  if((path==="/admin/network-plus/businesses"||path.startsWith("/admin/network-plus/businesses/")))return "/admin";
   return url;
  }
  return defaultActionUrl(category,resourceType,payload);

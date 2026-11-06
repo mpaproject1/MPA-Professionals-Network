@@ -24,10 +24,11 @@ type Draft = {
   renewalRequired: boolean; gracePeriodDays: string; effectiveFrom: string; planEffectiveFrom: string;
   planEffectiveTo: string; active: boolean; benefits: string; eligibilityText: string;
 };
+type FeeSnapshot = { productName?: string; productCode?: string; amount?: string | number; currency?: string; feeRuleVersion?: number | string };
 type Application = {
   id: string; tracking_reference?: string; display_name?: string | null; user_id?: string;
   email?: string; application_type: string; status: string; created_at: string; submitted_at?: string | null;
-  updated_at?: string; previous_membership_end_date?: string | null; fee_snapshot?: Record<string, any>;
+  updated_at?: string; previous_membership_end_date?: string | null; fee_snapshot?: FeeSnapshot;
   name?: string; review_history?: Array<{ decision: string; note?: string; createdAt: string; actorName?: string }>;
   payment?: { id: string; status: string; amount: string | number; currency: string; channel: string;
     reference?: string | null; verification_note?: string | null; created_at?: string;

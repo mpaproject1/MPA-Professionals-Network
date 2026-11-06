@@ -6,6 +6,15 @@ const b64url=value=>Buffer.from(value).toString("base64url");
 const fromB64url=value=>Buffer.from(String(value||""),"base64url");
 const sha256=value=>createHash("sha256").update(value).digest("hex");
 const PUSH_HOSTS=["fcm.googleapis.com","push.services.mozilla.com","notify.windows.com","push.apple.com"];
+function notificationPushUrl(value){
+ const url=String(value||"");
+ if(!url.startsWith("/")||url.startsWith("//")||url.includes("\\\\")||[...url].some(ch=>ch.charCodeAt(0)<32||ch.charCodeAt(0)===127))return "/notifications";
+ const path=url.split(/[?#]/)[0];
+ if(path==="/network-plus/businesses"||path.startsWith("/network-plus/businesses/"))return "/network-plus";
+ if(path==="/admin/network-plus/businesses"||path.startsWith("/admin/network-plus/businesses/"))return "/admin";
+ if(path==="/profile")return "/account/security";
+ return url;
+}
 function fail(status,message,code="VALIDATION_ERROR"){throw Object.assign(new Error(message),{statusCode:status,code});}
 function vapidConfig(){
  const publicKey=String(process.env.WEB_PUSH_VAPID_PUBLIC_KEY||"").trim();
@@ -120,7 +129,7 @@ async function deliverOne(row,config,customPayload=null){
  const endpoint=validPushEndpoint(row.endpoint);if(!endpoint)return {ok:false,expired:true,status:410,code:"INVALID_ENDPOINT"};
  const payload=customPayload||{title:row.priority==="urgent"||row.priority==="high"?"MPA · Action needed":"MPA · New update",
    body:row.priority==="urgent"||row.priority==="high"?"You have an important MPA update. Open the app to review it.":"You have a new MPA update. Open the app to review it.",
-   url:row.action_url&&row.action_url.startsWith("/")&&!row.action_url.startsWith("//")?row.action_url:"/notifications",
+   url:notificationPushUrl(row.action_url),
    notificationId:row.notification_event_id,priority:row.priority};
  const body=encryptWebPushPayload({p256dh:row.p256dh,auth:row.auth_secret},payload);
  try{
@@ -139,7 +148,7 @@ export async function dispatchPendingPushNotifications(limit=50){
    from notification_push_delivery d join notification_push_subscription s on s.id=d.subscription_id
    join notification_event n on n.id=d.notification_event_id and n.user_id=s.user_id
    where d.status='pending' order by d.created_at,d.id limit $1`,[batch])).rows;
-  for(const row of rows){const portfolio=(await db.query("select portfolio_id from test_portfolio_account where user_id=$1 limit 1",[row.user_id])).rows[0]?.portfolio_id||null;await captureTestDelivery({channel:"push",eventCode:row.category||"notification",payload:{notificationId:row.notification_event_id,title:row.title,body:row.body,actionUrl:row.action_url},portfolioId:portfolio});await db.query("update notification_push_delivery set status='sent',delivered_at=now(),last_error_code='TEST_CAPTURED',updated_at=now() where id=$1",[row.id]);}
+  for(const row of rows){const portfolio=(await db.query("select portfolio_id from test_portfolio_account where user_id=$1 limit 1",[row.user_id])).rows[0]?.portfolio_id||null;await captureTestDelivery({channel:"push",eventCode:row.category||"notification",payload:{notificationId:row.notification_event_id,title:row.title,body:row.body,actionUrl:notificationPushUrl(row.action_url)},portfolioId:portfolio});await db.query("update notification_push_delivery set status='sent',delivered_at=now(),last_error_code='TEST_CAPTURED',updated_at=now() where id=$1",[row.id]);}
   return {sent:rows.length,failed:0,skipped:false,mode:"capture",captured:rows.length};
  }
  const config=vapidConfig();if(!config)return {sent:0,failed:0,skipped:true,reason:"VAPID_NOT_CONFIGURED"};
@@ -162,7 +171,7 @@ export async function dispatchPendingPushNotifications(limit=50){
   if(row.revoked_at||row.push_enabled!==true||row.read_at||row.archived_at||(row.category==="community_campaign"&&row.community_campaign_enabled!==true)){
    await db.query("UPDATE notification_push_delivery SET status='failed',last_error_code='PUSH_SUPPRESSED',updated_at=now() WHERE id=$1",[row.id]);failed++;return;
   }
-  const campaignPayload=row.category==="community_campaign"?{title:String(row.title||"MPA · Community contribution").slice(0,100),body:String(row.body||"A new community contribution invitation is available.").slice(0,3000),url:row.action_url&&row.action_url.startsWith("/")&&!row.action_url.startsWith("//")?row.action_url:"/notifications",notificationId:row.notification_event_id,priority:"low"}:null;
+  const campaignPayload=row.category==="community_campaign"?{title:String(row.title||"MPA · Community contribution").slice(0,100),body:String(row.body||"A new community contribution invitation is available.").slice(0,3000),url:notificationPushUrl(row.action_url),notificationId:row.notification_event_id,priority:"low"}:null;
   const result=await deliverOne(row,config,campaignPayload);
   if(result.ok){
    await db.query("UPDATE notification_push_delivery SET status='sent',delivered_at=now(),last_status_code=$2,last_error_code=NULL,updated_at=now() WHERE id=$1",[row.id,result.status]);

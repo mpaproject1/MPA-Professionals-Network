@@ -34,6 +34,9 @@ test("notification actions resolve to routes present in the current workspace",(
   assert.equal(notificationActionUrl("/admin/network-plus/businesses","network_plus","network_plus_business",{}),"/admin");
   assert.equal(notificationActionUrl(null,"membership","membership_application",{}),"/membership");
   assert.equal(notificationActionUrl(null,"verification","verification_case",{}),"/verification");
+  assert.equal(notificationActionUrl("/profile","security","security_event",{}),"/account/security");
+  assert.equal(notificationActionUrl(null,"events_learning","event",{}),"/learning");
+  assert.equal(notificationActionUrl(null,"services","service_request",{},"request-1"),"/services?requestId=request-1#service-request-request-1");
   assert.equal(notificationActionLabel("membership","membership_application",{}),"Open membership");
   assert.equal(notificationActionLabel("recruitment","job_application",{}),"View application");
   assert.equal(notificationActionLabel("services","service_request",{}),"Open service request");

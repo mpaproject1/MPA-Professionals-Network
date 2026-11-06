@@ -40,15 +40,16 @@ export default function NotificationsPage(){
  return <main className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-6">
   <header className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
    <div><p className="mb-2 text-sm font-semibold uppercase tracking-[.16em] text-[var(--muted)]">MPA Professionals Network</p><h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight"><Bell size={28}/> Action center</h1><p className="mt-2 max-w-2xl text-[var(--muted)]">Important changes, next steps and requests that need your attention.</p></div>
-   {canReview?<Link href="/dashboard" className="btn btn-secondary inline-flex items-center gap-2 self-start"><AlertTriangle size={16}/> Review & intervention queues</Link>:null}<button type="button" className="btn btn-secondary inline-flex items-center gap-2 self-start" onClick={()=>void load()} disabled={loading} aria-busy={loading}><RefreshCw size={16}/>{loading?"Checking notifications…":"Check latest notifications"}</button>
+   <div className="flex flex-wrap items-center gap-2 self-start">
+    {canReview?<Link href="/dashboard" className="btn btn-secondary inline-flex items-center gap-2"><AlertTriangle size={16}/> Review queues</Link>:null}
+    <button type="button" className="btn btn-secondary inline-flex min-h-10 items-center gap-2" aria-label={preferencesOpen?"Hide notification settings":"Notification settings"} aria-expanded={preferencesOpen} aria-controls="notification-preferences" onClick={()=>setPreferencesOpen(open=>!open)}>
+     <Settings2 size={16}/>{preferencesOpen?"Close settings":"Settings"}
+    </button>
+    <button type="button" className="btn btn-secondary inline-flex items-center gap-2" onClick={()=>void load()} disabled={loading} aria-busy={loading}><RefreshCw size={16}/>{loading?"Checking notifications…":"Refresh"}</button>
+   </div>
   </header>
-  <div className="flex justify-end">
-   <button type="button" className="btn btn-secondary inline-flex min-h-10 items-center gap-2" aria-label={preferencesOpen?"Hide notification settings":"Notification settings"} aria-expanded={preferencesOpen} aria-controls="notification-preferences" onClick={()=>setPreferencesOpen(open=>!open)}>
-    <Settings2 size={16}/>{preferencesOpen?"Close settings":"Settings"}
-   </button>
-  </div>
-  {preferencesOpen?(
-     <section id="notification-preferences" className="mb-6 scroll-mt-24 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5" aria-labelledby="notification-preferences-title">
+  <section id="notification-preferences" hidden={!preferencesOpen} className="mb-6 scroll-mt-24 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5" aria-labelledby="notification-preferences-title">
+     <section id="notification-preferences" hidden={!preferencesOpen} className="mb-6 scroll-mt-24 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5" aria-labelledby="notification-preferences-title">
       <div className="mb-4"><p className="text-xs font-bold uppercase tracking-[.16em] text-[var(--muted)]">Your controls</p><h2 id="notification-preferences-title" className="mt-1 text-xl font-semibold">Notification preferences</h2><p className="mt-1 text-sm text-[var(--muted)]">Choose which updates reach you and which devices can alert you.</p></div>
       <div className="mb-4"><PushNotificationSettings token={token}/></div>
       <div className="grid gap-4 border-t border-[var(--border)] p-4 sm:grid-cols-2">
@@ -59,7 +60,7 @@ export default function NotificationsPage(){
        {savingPreferences?<p className="text-sm text-[var(--muted)]" aria-live="polite" aria-atomic="true">Saving your notification preferences…</p>:null}
       </div>
      </section>
-  ):null}
+  </section>
   <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Notification summary">
    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-sm text-[var(--muted)]">Unread</p><p className="mt-1 text-2xl font-semibold">{data?.counts.unread??"—"}</p></div>
    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-sm text-[var(--muted)]">Action required</p><p className="mt-1 text-2xl font-semibold">{data?.counts.action_required??"—"}</p></div>

@@ -427,7 +427,7 @@ export async function createApplication(userId,input,requestId){
     await audit(db,userId,"membership.application_submitted","membership_application",row.id,requestId,{applicationType:type,productCode:prod.product_code});
     await notify(db,userId,"membership_application_submitted","membership_application",row.id,{productCode:prod.product_code,eventVersion:row.submitted_at||row.updated_at||row.id});
     const reviewers=(await db.query("select distinct u.id user_id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='members.manage'))")).rows;
-    for(const reviewer of reviewers)await notify(db,reviewer.user_id,"membership_review_queue_item","membership_application",row.id,{category:"membership",message:"A membership application is ready for review.",nextAction:"Open the existing membership review queue, review required evidence, and record a reasoned decision.",actionUrl:"/membership",reviewerQueue:true,actionRequired:true,priority:"high",eventVersion:row.submitted_at||row.updated_at||row.id});
+    for(const reviewer of reviewers)await notify(db,reviewer.user_id,"membership_review_queue_item","membership_application",row.id,{category:"membership",message:"A membership application is ready for review.",nextAction:"Open the existing membership review queue, review required evidence, and record a reasoned decision.",actionUrl:"/admin/membership",reviewerQueue:true,actionRequired:true,priority:"high",eventVersion:row.submitted_at||row.updated_at||row.id});
     return row;
   });
 }
@@ -461,7 +461,7 @@ export async function reviewApplication(applicationId,reviewerId,input,requestId
       const outstanding=(await db.query("select pt.id,pt.status from membership_application_payment ap join payment_transaction pt on pt.id=ap.payment_transaction_id where ap.application_id=$1 and pt.status in ('initiated','pending','succeeded') limit 1",[applicationId])).rows[0];
       if(outstanding){
         const financeUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role r on r.id=ur.role_id where r.role_code in ('finance_officer','system_admin') union select distinct up.user_id from app_user_permission up where up.permission_code='finance.manage'")).rows;
-        for(const finance of financeUsers)await notify(db,finance.user_id,"membership_payment_reconciliation_required","payment_transaction",outstanding.id,{category:"membership",message:"The membership application was rejected while a payment remains unverified or succeeded.",nextAction:"Verify any outstanding payment and reconcile/refund confirmed funds according to policy.",actionUrl:"/membership",reviewerQueue:true,actionRequired:true,priority:"high"});
+        for(const finance of financeUsers)await notify(db,finance.user_id,"membership_payment_reconciliation_required","payment_transaction",outstanding.id,{category:"membership",message:"The membership application was rejected while a payment remains unverified or succeeded.",nextAction:"Verify any outstanding payment and reconcile/refund confirmed funds according to policy.",actionUrl:"/admin/finance",reviewerQueue:true,actionRequired:true,priority:"high"});
       }
     }
     return review;
@@ -479,7 +479,7 @@ export async function respondCorrection(applicationId,userId,input,requestId){
     await audit(db,userId,"membership.correction_responded","membership_application",applicationId,requestId,{correctionId:open.id});
     await notify(db,userId,"membership_correction_submitted","membership_application",applicationId,{message:"Your response to the membership correction request was submitted.",nextAction:"Wait for the reviewer to reassess the updated application.",actionUrl:"/membership",eventVersion:updated.updated_at||open.id});
     const reviewers=(await db.query("select distinct u.id user_id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code in ('reviewer','system_admin')) or exists(select 1 from app_user_permission up where up.user_id=u.id and up.permission_code='members.manage'))")).rows;
-    for(const reviewer of reviewers)await notify(db,reviewer.user_id,"membership_correction_received","membership_application",applicationId,{category:"membership",message:"A member responded to a requested correction.",nextAction:"Reopen the membership review queue and review the member's response.",actionUrl:"/membership",reviewerQueue:true,actionRequired:true,priority:"high",eventVersion:open.id});
+    for(const reviewer of reviewers)await notify(db,reviewer.user_id,"membership_correction_received","membership_application",applicationId,{category:"membership",message:"A member responded to a requested correction.",nextAction:"Reopen the membership review queue and review the member's response.",actionUrl:"/admin/membership",reviewerQueue:true,actionRequired:true,priority:"high",eventVersion:open.id});
     return updated;
   });
 }
@@ -547,7 +547,7 @@ export async function createManualPayment(applicationId,userId,input,requestId){
     await audit(db,userId,"membership.payment_submitted","payment_transaction",p.id,requestId,{applicationId,channel,paymentMethodCode:method?.method_code||null,paymentMethodSnapshotSha256:createHash("sha256").update(JSON.stringify(paymentMethodSnapshot)).digest("hex")});
     await notify(db,userId,"membership_payment_submitted","membership_application",applicationId,{paymentId:p.id,eventVersion:p.id});
     const financeUsers=(await db.query("select distinct ur.user_id from app_user_role ur join app_role r on r.id=ur.role_id where r.role_code in ('finance_officer','system_admin') union select distinct up.user_id from app_user_permission up where up.permission_code='finance.manage'")).rows;
-    for(const finance of financeUsers)await notify(db,finance.user_id,"membership_payment_review_required","payment_transaction",p.id,{category:"membership",message:"A membership payment is awaiting finance verification.",nextAction:"Review the payment evidence and reconcile it against the application fee snapshot; application approval is a separate decision.",actionUrl:"/membership",reviewerQueue:true,actionRequired:true,priority:"high"});
+    for(const finance of financeUsers)await notify(db,finance.user_id,"membership_payment_review_required","payment_transaction",p.id,{category:"membership",message:"A membership payment is awaiting finance verification.",nextAction:"Review the payment evidence and reconcile it against the application fee snapshot; application approval is a separate decision.",actionUrl:"/admin/finance",reviewerQueue:true,actionRequired:true,priority:"high"});
     return p;
   });
 }

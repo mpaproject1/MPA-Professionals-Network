@@ -248,7 +248,7 @@ export async function updateBusiness(businessId,userId,input,requestId) {
       publication_status=case when publication_status='published' then 'paused' else publication_status end,updated_at=now()
       where id=$6 returning *`,[next.displayName,next.tradingName,next.description,next.website,next.locationLabel,businessId])).rows[0];
     await audit(db,userId,"network_plus.business_updated","network_plus_business",businessId,requestId,{fields:entries.map(([key])=>key)});
-    await notifyOwners(db,businessId,"network_plus.business_profile_updated",{message:"Business profile details were updated. Verification and moderation may need renewed review.",nextAction:"Review the updated profile and submit it for verification.",actionUrl:"/network-plus/businesses/"+businessId,eventVersion:row.updated_at});
+    await notifyOwners(db,businessId,"network_plus.business_profile_updated",{message:"Business profile details were updated. Verification and moderation may need renewed review.",nextAction:"Review the updated profile and submit it for verification.",actionUrl:"/network-plus",eventVersion:row.updated_at});
     return row;
   });
 }
@@ -267,7 +267,7 @@ export async function submitBusinessVerification(businessId,userId,requestId) {
     const reviewers=(await db.query(`select distinct u.id from app_user u
       where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($1::text[]))
         or exists(select 1 from app_user_permission p where p.user_id=u.id and p.permission_code='business.verify'))`,[BUSINESS_REVIEW_ROLES])).rows;
-    for(const reviewer of reviewers)await createInAppNotification(db,reviewer.id,"network_plus.business_verification_review_required","network_plus_business",businessId,{message:"A business profile is awaiting independent verification review.",nextAction:"Review the business verification case and record a reasoned decision.",actionUrl:"/admin/network-plus/businesses",actionRequired:true,priority:"high",eventVersion:row.created_at});
+    for(const reviewer of reviewers)await createInAppNotification(db,reviewer.id,"network_plus.business_verification_review_required","network_plus_business",businessId,{message:"A business profile is awaiting independent verification review.",nextAction:"Review the business verification case and record a reasoned decision.",actionUrl:"/admin",actionRequired:true,priority:"high",eventVersion:row.created_at});
     return row;
   });
 }
@@ -290,7 +290,7 @@ export async function reviewBusinessVerification(businessId,userId,input,request
       verification_expires_at=$2,verified_by=$3,publication_status=case when $1='suspended' then 'suspended' when $1='verified' then publication_status else 'paused' end,updated_at=now() where id=$4`,[status==="appealed"?"under_review":status,expiry,userId,businessId]);
     if(status==="suspended")await transitionBusinessListings(db,businessId,userId,["published","paused","pending_review"],"suspended",requestId,reason,"network_plus.listing_suspended_by_business_moderation");
     await audit(db,userId,"network_plus.business_verification_decided","network_plus_business",businessId,requestId,{caseId:open.id,status,reason,expiresAt:expiry?.toISOString()||null});
-    await notifyOwners(db,businessId,"network_plus.business_verification_decided",{message:"A decision was recorded for the business verification case.",nextAction:status==="verified"?"Continue to listing moderation and publication.":"Review the decision reason and provide any requested clarification.",actionUrl:"/network-plus/businesses/"+businessId,status,eventVersion:updated.updated_at});
+    await notifyOwners(db,businessId,"network_plus.business_verification_decided",{message:"A decision was recorded for the business verification case.",nextAction:status==="verified"?"Continue to listing moderation and publication.":"Review the decision reason and provide any requested clarification.",actionUrl:"/network-plus",status,eventVersion:updated.updated_at});
     return updated;
   });
 }
@@ -515,7 +515,7 @@ export async function moderateProfessionalServiceListing(listingId,userId,input,
       suspended_at=case when $1='suspended' then now() else null end,
       suspension_reason=case when $1='suspended' then $2 else null end,updated_at=now() where id=$4 returning *`,[status,reason,userId,listingId])).rows[0];
     await audit(db,userId,"network_plus.service_listing_moderated","network_plus_service_listing",listingId,requestId,{status,reason,businessId:row.business_id,from:row.status,to:status});
-    await notifyOwners(db,row.business_id,"network_plus.service_listing_moderation_decided",{message:"A moderation decision was recorded for a professional service listing.",nextAction:status==="published"?"Your listing is now visible to eligible Network-Plus members.":"Review the moderation reason and update the listing if changes are requested.",actionUrl:"/network-plus/businesses/"+row.business_id,status,eventVersion:updated.updated_at});
+    await notifyOwners(db,row.business_id,"network_plus.service_listing_moderation_decided",{message:"A moderation decision was recorded for a professional service listing.",nextAction:status==="published"?"Your listing is now visible to eligible Network-Plus members.":"Review the moderation reason and update the listing if changes are requested.",actionUrl:"/network-plus",status,eventVersion:updated.updated_at});
     return updated;
   });
 }
@@ -593,10 +593,10 @@ export async function addBusinessOwner(businessId,userId,input,requestId) {
       await audit(db,userId,"network_plus.business_paused_for_ownership_consent","network_plus_business",businessId,requestId,{from:"published",to:"paused"});
     }
     await audit(db,userId,"network_plus.business_co_owner_invited","network_plus_business_ownership",row.id,requestId,{businessId,ownerType});
-    if(ownerType==="member")await createInAppNotification(db,ownerUserId,"network_plus.business_ownership_consent_required","network_plus_business_ownership",row.id,{message:"You have been invited as a co-owner of a Network-Plus business.",nextAction:"Review and explicitly accept or decline this ownership association.",actionUrl:"/network-plus/businesses",actionRequired:true,priority:"high"});
+    if(ownerType==="member")await createInAppNotification(db,ownerUserId,"network_plus.business_ownership_consent_required","network_plus_business_ownership",row.id,{message:"You have been invited as a co-owner of a Network-Plus business.",nextAction:"Review and explicitly accept or decline this ownership association.",actionUrl:"/network-plus",actionRequired:true,priority:"high"});
     else {
       const orgOwners=(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code=any($2::text[])",[organizationId,ORG_OWNER_ROLES])).rows;
-      for(const orgOwner of orgOwners)await createInAppNotification(db,orgOwner.user_id,"network_plus.business_ownership_consent_required","network_plus_business_ownership",row.id,{message:"Your organization has been invited as a joint business co-owner.",nextAction:"An active organization owner or administrator must accept or decline the ownership association.",actionUrl:"/network-plus/businesses",actionRequired:true,priority:"high"});
+      for(const orgOwner of orgOwners)await createInAppNotification(db,orgOwner.user_id,"network_plus.business_ownership_consent_required","network_plus_business_ownership",row.id,{message:"Your organization has been invited as a joint business co-owner.",nextAction:"An active organization owner or administrator must accept or decline the ownership association.",actionUrl:"/network-plus",actionRequired:true,priority:"high"});
     }
     return row;
   });
@@ -633,7 +633,7 @@ export async function grantBusinessAccess(businessId,userId,input,requestId) {
     }else if(!(await hasCurrentActiveMembership(db,targetUserId)))fail(403,"A delegated manager must have current active membership.","TARGET_SCOPE_FORBIDDEN");
     const row=(await db.query("insert into network_plus_business_access(business_id,user_id,capability_code,granted_by,expires_at,revoked_at) values($1,$2,$3,$4,$5,null) on conflict(business_id,user_id,capability_code) do update set granted_by=excluded.granted_by,expires_at=excluded.expires_at,revoked_at=null returning *",[businessId,targetUserId,capability,userId,expiresAt])).rows[0];
     await audit(db,userId,"network_plus.business_access_granted","network_plus_business_access",row.id,requestId,{businessId,targetUserId,capability});
-    await createInAppNotification(db,targetUserId,"network_plus.business_access_granted","network_plus_business",businessId,{message:"A business owner delegated a scoped capability to you.",nextAction:"Open Business Discovery to review the business resources assigned to you.",actionUrl:"/network-plus/businesses"});
+    await createInAppNotification(db,targetUserId,"network_plus.business_access_granted","network_plus_business",businessId,{message:"A business owner delegated a scoped capability to you.",nextAction:"Open Business Discovery to review the business resources assigned to you.",actionUrl:"/network-plus"});
     return row;
   });
 }
@@ -645,7 +645,7 @@ export async function submitBusinessModeration(businessId,userId,requestId) {
     if(!updated)fail(409,"Business profile is already under review or cannot be resubmitted.","INVALID_STATE");
     await audit(db,userId,"network_plus.business_profile_submitted","network_plus_business",businessId,requestId,{});
     const reviewers=(await db.query("select distinct u.id from app_user u where u.status='active' and (exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id and r.role_code=any($1::text[])) or exists(select 1 from app_user_permission p where p.user_id=u.id and p.permission_code='business.moderate'))",[LISTING_REVIEW_ROLES])).rows;
-    for(const reviewer of reviewers)await createInAppNotification(db,reviewer.id,"network_plus.business_profile_review_required","network_plus_business",businessId,{message:"A verified business profile is awaiting moderation.",nextAction:"Review the public business profile and approve, reject or suspend it with a reason.",actionUrl:"/admin/network-plus/businesses",actionRequired:true,priority:"high",eventVersion:updated.updated_at});
+    for(const reviewer of reviewers)await createInAppNotification(db,reviewer.id,"network_plus.business_profile_review_required","network_plus_business",businessId,{message:"A verified business profile is awaiting moderation.",nextAction:"Review the public business profile and approve, reject or suspend it with a reason.",actionUrl:"/admin",actionRequired:true,priority:"high",eventVersion:updated.updated_at});
     return updated;
   });
 }
@@ -725,7 +725,7 @@ export async function revokeBusinessAccess(businessId,accessId,userId,requestId)
     if(!row)fail(404,"Active business delegation not found.","NOT_FOUND");
     const updated=(await db.query("update network_plus_business_access set revoked_at=now() where id=$1 returning *",[accessId])).rows[0];
     await audit(db,userId,"network_plus.business_access_revoked","network_plus_business_access",accessId,requestId,{businessId,targetUserId:row.user_id,capability:row.capability_code});
-    await createInAppNotification(db,row.user_id,"network_plus.business_access_revoked","network_plus_business",businessId,{message:"A business owner revoked a previously delegated capability.",nextAction:"Your access to the affected business capability has ended.",actionUrl:"/network-plus/businesses"});
+    await createInAppNotification(db,row.user_id,"network_plus.business_access_revoked","network_plus_business",businessId,{message:"A business owner revoked a previously delegated capability.",nextAction:"Your access to the affected business capability has ended.",actionUrl:"/network-plus"});
     return updated;
   });
 }

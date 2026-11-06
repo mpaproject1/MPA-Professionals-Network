@@ -14,7 +14,7 @@ function present(row){
   const title=row.title||payload.title||eventTitle(row.event_code);
   const body=row.body||payload.message||payload.summary||payload.nextAction||payload.next_action||(payload.status?(`Status updated: ${String(payload.status).replace(/[_-]+/g," ").toLowerCase()}`):"There is an update to review in your MPA Network account.");
   return {id:row.id,category:row.category,title,body,priority:row.priority,actionRequired:row.action_required,
-    actionUrl:safeInternalUrl(row.action_url),resourceType:row.resource_type,resourceId:row.resource_id,
+    actionUrl:notificationActionUrl(row.action_url,row.category,row.resource_type,payload),actionLabel:notificationActionLabel(row.category,row.resource_type,payload),resourceType:row.resource_type,resourceId:row.resource_id,
     eventCode:row.event_code,createdAt:row.created_at,readAt:row.read_at,archivedAt:row.archived_at};
 }
 const NOTIFICATION_CATEGORIES=new Set(["membership","verification","opportunities","recruitment","organizations","mentorship","services","events_learning","community_impact","community_campaign","network_plus","security","system"]);
@@ -34,11 +34,33 @@ export function notificationCategoryFor(eventCode,resourceType,payload={}){
  if(code.startsWith("event.")||code.startsWith("event_")||code.startsWith("learning.")||code.startsWith("learning_"))return "events_learning";
  return "system";
 }
+export function notificationActionUrl(value,category,resourceType,payload={}){
+ const url=safeInternalUrl(value);
+ if(url){
+  const path=url.split(/[?#]/)[0];
+  // Older Network-Plus notifications used a business-detail URL that is not a route in this branch.
+  if(/^\\/network-plus\\/businesses(?:\\/|$)/.test(path))return "/network-plus";
+  // There is no dedicated business-verification admin page in this branch; route reviewers to the admin workspace rather than a dead URL.
+  if(/^\\/admin\\/network-plus\\/businesses(?:\\/|$)/.test(path))return "/admin";
+  return url;
+ }
+ return defaultActionUrl(category,resourceType,payload);
+}
+export function notificationActionLabel(category,resourceType,payload={}){
+ const supplied=String(payload.actionLabel||payload.action_label||"").trim();
+ if(supplied)return supplied.slice(0,80);
+ if(resourceType==="job_application")return payload.audience==="employer"?"Review candidate":"View application";
+ if(resourceType==="service_request"||resourceType==="service_request_delivery"||resourceType==="service_payment")return "Open service request";
+ if(resourceType==="service_listing"||resourceType==="service_listing_announcement")return "View service listing";
+ if(resourceType==="verification_case"||resourceType==="verification_claim"||resourceType==="verification_appeal")return "Open verification case";
+ const labels={membership:"Open membership",verification:"Open verification",opportunities:"Browse opportunities",recruitment:"Open recruitment",organizations:"Open organization workspace",mentorship:"Open mentorship",services:"Open services",events_learning:"Open learning",community_impact:"Open contribution record",community_campaign:"View invitation",network_plus:"Open Network-Plus",security:"Review account security",system:"Open account dashboard"};
+ return labels[category]||"View update";
+}
 function defaultActionUrl(category,resourceType,payload={}){
  const explicit=safeInternalUrl(payload.actionUrl||payload.action_url);
  if(explicit)return explicit;
  if(payload.reviewerQueue===true||payload.reviewer_queue===true){
-  const queues={membership:"/membership",verification:"/verification",organizations:"/organizations",recruitment:"/recruitment",mentorship:"/mentorship",services:"/services",security:"/dashboard"};
+  const queues={membership:"/admin/membership",verification:"/verification",organizations:"/admin/organizations",recruitment:"/recruitment",mentorship:"/admin/marketplace",services:"/admin/marketplace",security:"/account/security"};
   return queues[category]||"/dashboard";
  }
  const routes={membership:"/membership",verification:"/verification",opportunities:"/jobs",community_impact:"/community-impact/recognition",community_campaign:"/notifications",network_plus:"/network-plus/requests",recruitment:"/jobs",organizations:"/organizations",mentorship:"/mentorship",services:"/services",security:"/profile",system:"/dashboard"};

@@ -13,6 +13,7 @@ on:
       - main
       - reconciliation/holistic-gates
       - feat/workstream-3-progress-members-workspace
+      - feat/membership-command-center-card-pdf
       - feat/serve-community-impact-workflows
       - feat/serve-community-g5-reconciled
       - feat/serve-community-g6-reconciled

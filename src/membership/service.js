@@ -211,7 +211,7 @@ export async function listMyApplications(userId){
 
 export async function listMembershipProducts(){
   const db=getPool();
-  return (await db.query(`select p.product_code,coalesce(r.plan_name,p.name) name,
+  return (await db.query(`select p.product_code,coalesce(r.plan_name,p.name) AS "name",
     coalesce(r.plan_description,p.description) description,
     coalesce(r.billing_model,p.billing_model) billing_model,
     (coalesce(r.base_amount,p.price)+coalesce(r.tax_amount,0)+coalesce(r.service_fee,0)) price,

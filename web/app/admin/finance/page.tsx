@@ -169,6 +169,18 @@ export default function FinanceWorkspacePage() {
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
   useEffect(() => {
+    if (!evidencePreview) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (evidencePreview.url) URL.revokeObjectURL(evidencePreview.url);
+        setEvidencePreview(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [evidencePreview]);
+
+  useEffect(() => {
     if (!hydrated) return;
     if (!token) { setAccess("signin"); return; }
     setAccess("loading");

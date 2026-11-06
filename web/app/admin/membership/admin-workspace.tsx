@@ -251,7 +251,9 @@ export default function MembershipAdminWorkspace() {
       const response = await fetch("/api/v1/files/" + encodeURIComponent(fileId), { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
       if (!response.ok) throw new Error(response.status === 403 ? "Your role cannot access this private attachment." : "The private attachment could not be loaded.");
       const blob = await response.blob();
-      const type = blob.type || "application/octet-stream";
+      const extension = fileName.toLowerCase().split(".").pop() || "";
+      const detectedType = blob.type || "application/octet-stream";
+      const type = detectedType === "application/octet-stream" ? (extension === "pdf" ? "application/pdf" : ["png", "jpg", "jpeg", "webp", "gif"].includes(extension) ? "image/" + (extension === "jpg" ? "jpeg" : extension) : detectedType) : detectedType;
       if (!type.includes("pdf") && !type.startsWith("image/")) throw new Error("In-app preview supports PDF and image evidence. Download this file securely instead.");
       const url = URL.createObjectURL(blob);
       setEvidence({ name: fileName, url, type });

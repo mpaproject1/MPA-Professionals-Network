@@ -3,14 +3,15 @@ import {readFile} from "node:fs/promises";
 import test from "node:test";
 
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [service,server,bulkPage,bulkCss,singlePage,verifyPage,membershipService]=await Promise.all([
+const [service,server,bulkPage,bulkCss,singlePage,verifyPage,membershipService,membershipWorkspace]=await Promise.all([
   read("../../src/membership/card.js"),
   read("../../server.js"),
   read("../../web/app/admin/membership-cards/page.tsx"),
   read("../../web/app/admin/membership-cards/membership-cards.module.css"),
   read("../../web/app/membership/card/page.tsx"),
   read("../../web/app/membership/verify/page.tsx"),
-  read("../../src/membership/service.js")
+  read("../../src/membership/service.js"),
+  read("../../web/app/membership/workspace.tsx")
 ]);
 
 test("single card issuance requires an active eligible membership record, not an account role",()=>{
@@ -87,4 +88,14 @@ test("member active flag and every card issuance path share the Addis-date legac
   assert.match(adminLookup,/legacy_payment_verified/);
   assert.match(adminLookup,/assertEligible\(row\)/);
   assert.match(service,/coalesce\(m\.source,''\)<>'legacy_import'/);
+});
+
+test("member membership workspace leads with live status, surfaces card errors and labels activated applications",()=>{
+  assert.match(membershipWorkspace,/membership-status-hero/);
+  assert.match(membershipWorkspace,/membership-status-checklist/);
+  assert.match(membershipWorkspace,/membershipCardError/);
+  assert.doesNotMatch(membershipWorkspace,/api<MembershipCardSummary>\("\/api\/v1\/membership\/card",\{\},token\)\.catch\(\(\)=>null\)/);
+  assert.match(membershipWorkspace,/Membership application activated\./);
+  assert.match(membershipWorkspace,/a\.status==="activated"/);
+  assert.match(membershipWorkspace,/openApplication\.terms_acknowledged_at\?"✓":"3"/);
 });

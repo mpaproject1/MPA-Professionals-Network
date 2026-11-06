@@ -164,3 +164,5 @@
 .stepSection{display:grid;gap:16px;scroll-margin-top:100px}
 @media(max-width:900px){.stepperTabs{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.stepper{padding:13px}.stepperTop{gap:8px}.stepperPercent{font-size:21px}.stepperTabs{grid-template-columns:1fr}.stepTab{min-height:60px}.stepTabText b{font-size:13px}}
+
+.stepSection[hidden]{display:none!important}

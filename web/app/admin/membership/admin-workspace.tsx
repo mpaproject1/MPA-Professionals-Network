@@ -125,6 +125,19 @@ export default function MembershipAdminWorkspace() {
     }
   }, [token, loadPlans, loadQueue]);
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    if (!planModal && !selected && !historyFor && !decisionFor && !evidence) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (evidence) { if (evidence.url) URL.revokeObjectURL(evidence.url); setEvidence(null); }
+      else if (decisionFor) setDecisionFor(null);
+      else if (historyFor) setHistoryFor(null);
+      else if (selected) setSelected(null);
+      else if (planModal && busy !== "plan") { setPlanModal(false); setPlanFeedback(null); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [planModal, selected, historyFor, decisionFor, evidence, busy]);
 
   const filtered = useMemo(() => applications.filter(item => {
     const haystack = [

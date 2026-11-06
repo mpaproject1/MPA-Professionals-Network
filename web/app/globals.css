@@ -1519,3 +1519,23 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 .mpa-members-workspace nav[aria-label="Your workspace shortcuts"]>a>svg,.mpa-jobs-page .tagline svg,.mpa-mentorship-page .case-row svg{color:var(--primary);flex:none}
 .mpa-members-workspace .badge,.mpa-jobs-page .badge,.mpa-mentorship-page .badge{white-space:normal;line-height:1.35}
 .dark .mpa-members-workspace nav[aria-label="Your workspace shortcuts"]>a:hover,.dark .mpa-jobs-page [id$="-cards"]>.card:hover,.dark .mpa-mentorship-page>.grid>.card:hover{box-shadow:0 14px 30px rgba(0,0,0,.3)}
+
+/* Membership command centre: status-first, compact and responsive. */
+.membership-status-hero{gap:18px;border:1px solid color-mix(in srgb,var(--primary) 24%,var(--border));background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 7%,var(--surface)),var(--surface));box-shadow:var(--shadow)}
+.membership-status-hero>.row h2{font-size:clamp(22px,2.5vw,30px);line-height:1.15}
+.membership-status-identity{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:14px;border:1px solid var(--border);border-radius:14px;background:color-mix(in srgb,var(--surface) 86%,var(--bg))}
+.membership-status-identity>div{display:grid;gap:5px;min-width:0}
+.membership-status-identity>div>span{font-size:11px}
+.membership-status-identity strong{font-size:14px;overflow-wrap:anywhere}
+.membership-status-checklist{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.membership-status-checklist>div{display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;column-gap:8px;row-gap:3px;min-width:0;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.membership-status-checklist>div>span{grid-row:span 2;width:26px;height:26px;display:grid;place-items:center;border:1px solid var(--border);border-radius:50%;font-size:12px;font-weight:800;color:var(--muted)}
+.membership-status-checklist>div>span.membership-check-done{background:var(--brand-lemon,#E5F044);border-color:var(--brand-lemon,#E5F044);color:var(--brand-navy-deep,#0A3258)}
+.membership-status-checklist b{font-size:12px}
+.membership-status-checklist small{font-size:11px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+.membership-card-alert{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border:1px solid color-mix(in srgb,#D97706 35%,var(--border));border-radius:12px;background:color-mix(in srgb,#D97706 8%,var(--surface))}
+.membership-card-alert p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.membership-activated-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px}
+.membership-activated-row p{margin:0}
+@media(max-width:760px){.membership-status-identity{grid-template-columns:repeat(2,minmax(0,1fr))}.membership-status-checklist{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.membership-status-identity,.membership-status-checklist{grid-template-columns:1fr}.membership-card-alert{align-items:flex-start;flex-direction:column}}

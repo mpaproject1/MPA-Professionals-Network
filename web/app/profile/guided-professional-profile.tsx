@@ -19,7 +19,7 @@ const blankPortfolio=():PortfolioDraft=>({title:"",itemType:"project",descriptio
 const groups={nationality:"professional_nationalities",occupation:"professional_occupations",industry:"professional_industries",experience_range:"professional_experience_ranges",language:"professional_languages",skill:"professional_skills",qualification_type:"professional_qualifications",education_level:"professional_education_levels",institution:"professional_institutions",field_of_study:"professional_fields_of_study"} as const;
 function selected(refs:ProfileRef[]|undefined,type:string){return refs?.find(r=>r.relation_type===type);}
 function asDraft(e:Education):EducationDraft{return {draftKey:crypto.randomUUID(),educationLevelItemId:e.education_level_item_id||"",educationLevelCustom:e.education_level_custom||"",institutionItemId:e.institution_item_id||"",institutionCustom:e.institution_name_custom||"",fieldOfStudyItemId:e.field_of_study_item_id||"",fieldOfStudyCustom:e.field_of_study_custom||"",qualificationItemId:e.qualification_item_id||"",qualificationCustom:e.qualification_custom||"",graduationYear:e.graduation_year==null?"":String(e.graduation_year),startYear:e.start_year==null?"":String(e.start_year),completionYear:e.completion_year==null?"":String(e.completion_year),currentlyStudying:Boolean(e.currently_studying),explanation:e.explanation||"",visibility:e.visibility||"private"};}
-export default function GuidedProfessionalProfile({onNationalitySaved}:{onNationalitySaved:(value:string)=>void}){
+export default function GuidedProfessionalProfile({onNationalitySaved,onProgressChange}:{onNationalitySaved:(value:string)=>void;onProgressChange?:(complete:boolean)=>void}){
  const profileFormId=useId();
  const token=useUiStore(s=>s.token);
  const [refs,setRefs]=useState<RefItem[]>([]),[_profile,setProfile]=useState<Profile>({}),[_education,setEducation]=useState<EducationDraft[]>([]),[portfolio,setPortfolio]=useState<Portfolio[]>([]),[account,setAccount]=useState<AccountProfile>({});
@@ -58,6 +58,7 @@ export default function GuidedProfessionalProfile({onNationalitySaved}:{onNation
   finally{setLoading(false);}
  },[token]);
  useEffect(()=>{void refresh();},[refresh]);
+ useEffect(()=>{onProgressChange?.(Boolean(_education.length||portfolio.length||_profile.skills?.length||_profile.languages?.length));},[_education.length,portfolio.length,_profile.skills?.length,_profile.languages?.length,onProgressChange]);
  function setRef(type:string,id:string){setSelectedRefs(s=>({...s,[type]:id}));if(byId.get(id)?.code!=="OTHER")setCustomRefs(s=>({...s,[type]:""}));}
  async function saveReferences(event:FormEvent){
   event.preventDefault();if(!token)return;setSaving(true);setError("");setNotice("");

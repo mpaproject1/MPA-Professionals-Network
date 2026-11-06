@@ -890,7 +890,7 @@ export default function Profile() {
               {savingVisibility ? "Saving…" : "Save directory privacy settings"}
             </button>
           </Card>
-          <Card><div className="eyebrow">Ready for professional review?</div><h2 className="h2">Submit your professional claims for review</h2><p className="muted">When your profile details and supporting evidence are ready, open the verification workspace to create a professional verification case, add the claims you want reviewed, attach private evidence and follow the reviewer checklist. Your information remains unverified until an authorized reviewer records a decision.</p><a className="btn btn-primary" href="/verification">Continue to professional claim review</a></Card>
+          <Card><div className="eyebrow">Profile preparation complete?</div><h2 className="h2">Your professional information is ready for review</h2><p className="muted">You have completed the profile preparation steps. You can now submit your professional claims for review. In the verification workspace, create a case, select each claim, attach private supporting evidence and follow the reviewer checklist. An authorized reviewer will assess the submission and may request corrections. Submission does not mean a claim is verified. Your information remains unverified until an authorized reviewer records a decision.</p><a className="btn btn-primary" href="/verification">Submit claims for professional review</a></Card>
           </section>
           </> : <Card>
             <div id="membership-and-verification" className="eyebrow">Membership unlocks professional review</div>

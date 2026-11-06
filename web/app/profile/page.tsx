@@ -561,7 +561,7 @@ export default function Profile() {
               <p className={styles.formHint}>
                 Start with your name. The other details are optional and can be added later. Changes are saved only when you select Save profile.
               </p>
-              <fieldset className="form-category grid" style={{gap:12}}><legend id="personal-information">1. Personal information</legend>
+              <fieldset hidden={activeProfileStep !== "personal-information"} className="form-category grid" style={{gap:12}}><legend id="personal-information">1. Personal information</legend>
               <p className="muted">Use the name you want associated with your MPA account. Contact details and sensitive personal information are not automatically made public.</p><div className="grid grid-2">
                 {(
                   [
@@ -608,7 +608,7 @@ export default function Profile() {
                   </div>
                 ))}
               </div></fieldset>
-              <fieldset className="form-category grid" style={{gap:12}}><legend id="professional-summary">2. Professional summary</legend>
+              <fieldset hidden={activeProfileStep !== "professional-summary"} className="form-category grid" style={{gap:12}}><legend id="professional-summary">2. Professional summary</legend>
               <p className="muted">Introduce your work and expertise in your own words. These details are separate from verified credentials; adding them does not mean MPA has verified them.</p><div>
                 <label htmlFor={`${profileId}-headline`}>Professional headline</label>
                 <p className={styles.fieldHint}>Summarize your role and expertise in one sentence. Example: “Public Health Specialist | Program Management”.</p>
@@ -678,7 +678,7 @@ export default function Profile() {
             </form>
           </Card>
           {profile?.has_active_membership ? <>
-          <section id="professional-experience" className={styles.stepSection}>
+          <section id="professional-experience" hidden={activeProfileStep !== "professional-experience"} className={styles.stepSection}>
           <Card>
             <div className="row">
               <div>
@@ -827,10 +827,10 @@ export default function Profile() {
             </form>
           </Card>
           </section>
-          <section id="guided-professional-profile" className={styles.stepSection}>
+          <section id="guided-professional-profile" hidden={activeProfileStep !== "guided-professional-profile"} className={styles.stepSection}>
           <GuidedProfessionalProfile onNationalitySaved={(value) => { setForm((f) => ({ ...f, nationality: value })); setProfile((p) => p ? ({ ...p, nationality: value }) : p); }} onProgressChange={setEducationPortfolioComplete} />
                     </section>
-          <section id="verification-review" className={styles.stepSection}>
+          <section id="verification-review" hidden={activeProfileStep !== "verification-review"} className={styles.stepSection}>
           <Card>
             <div className="row">
               <div>

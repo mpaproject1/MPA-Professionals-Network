@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, History, Plus, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
@@ -55,7 +55,8 @@ const readable = (value: string) => value.replaceAll("_", " ");
 
 export default function MembershipAdminWorkspace() {
   const token = useUiStore(state => state.token);
-  const [tab, setTab] = useState<"plans" | "queue">("plans");
+  const [tab, setTab] = useState<"plans" | "queue">("queue");
+  const initialTabSet = useRef(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,9 +115,9 @@ export default function MembershipAdminWorkspace() {
       const permissions = Array.isArray(me.permissions) ? me.permissions : [];
       const managePlans = roles.includes("system_admin") || permissions.includes("members.manage");
       setCanManagePlans(managePlans);
+      if (!initialTabSet.current) { setTab(managePlans ? "plans" : "queue"); initialTabSet.current = true; }
       setCanReview(roles.some(role => ["system_admin", "reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
       setCanActivate(roles.includes("system_admin") || permissions.includes("membership.activate"));
-      if (!managePlans) setTab("queue");
       await Promise.all([managePlans ? loadPlans() : Promise.resolve(), loadQueue()]);
     } catch (cause) {
       setPlanError(cause instanceof ApiError ? cause.message : "Your membership administration permissions could not be confirmed.");

@@ -80,6 +80,7 @@ export default function MembershipAdminWorkspace() {
   const [decisionFor, setDecisionFor] = useState<Application | null>(null);
   const [decision, setDecision] = useState<"approved" | "correction_required" | "rejected">("approved");
   const [decisionNote, setDecisionNote] = useState("");
+  const [canViewQueue, setCanViewQueue] = useState(false);
   const [canReview, setCanReview] = useState(false);
   const [canActivate, setCanActivate] = useState(false);
   const [canManagePlans, setCanManagePlans] = useState(false);
@@ -114,11 +115,14 @@ export default function MembershipAdminWorkspace() {
       const roles = Array.isArray(me.roles) ? me.roles : [];
       const permissions = Array.isArray(me.permissions) ? me.permissions : [];
       const managePlans = roles.includes("system_admin") || permissions.includes("members.manage");
+      const decisionRoles = roles.some(role => ["system_admin", "reviewer", "membership_reviewer"].includes(role));
+      const viewQueue = decisionRoles || permissions.some(permission => ["membership.review", "members.view"].includes(permission));
       setCanManagePlans(managePlans);
+      setCanViewQueue(viewQueue);
       if (!initialTabSet.current) { setTab(managePlans ? "plans" : "queue"); initialTabSet.current = true; }
-      setCanReview(roles.some(role => ["system_admin", "reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
-      setCanActivate(roles.includes("system_admin") || permissions.includes("membership.activate"));
-      await Promise.all([managePlans ? loadPlans() : Promise.resolve(), loadQueue()]);
+      setCanReview(decisionRoles || permissions.includes("membership.review"));
+      setCanActivate(decisionRoles || permissions.includes("membership.activate"));
+      await Promise.all([managePlans ? loadPlans() : Promise.resolve(), viewQueue ? loadQueue() : Promise.resolve()]);
     } catch (cause) {
       setPlanError(cause instanceof ApiError ? cause.message : "Your membership administration permissions could not be confirmed.");
       setQueueError(cause instanceof ApiError ? cause.message : "Your membership administration permissions could not be confirmed.");
@@ -300,7 +304,7 @@ export default function MembershipAdminWorkspace() {
 
     <div role="tablist" aria-label="Membership administration sections" className="row" style={{ gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
       {canManagePlans && <button id="membership-plans-tab" type="button" role="tab" aria-controls="membership-plans-panel" aria-selected={tab === "plans"} tabIndex={tab === "plans" ? 0 : -1} className={"btn " + (tab === "plans" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("plans")}>1. Membership plans <span className="muted">({plans.length})</span></button>}
-      <button id="membership-review-tab" type="button" role="tab" aria-controls="membership-review-panel" aria-selected={tab === "queue"} tabIndex={tab === "queue" ? 0 : -1} className={"btn " + (tab === "queue" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("queue")}>2. Review queue <span className="muted">({applications.length})</span></button>
+      {canViewQueue && <button id="membership-review-tab" type="button" role="tab" aria-controls="membership-review-panel" aria-selected={tab === "queue"} tabIndex={tab === "queue" ? 0 : -1} className={"btn " + (tab === "queue" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("queue")}>2. Review queue <span className="muted">({applications.length})</span></button>}
     </div>
 
     {canManagePlans && tab === "plans" && <section id="membership-plans-panel" role="tabpanel" aria-labelledby="membership-plans-tab" className="grid" style={{ gap: 14 }}>

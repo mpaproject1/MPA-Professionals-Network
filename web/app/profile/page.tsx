@@ -113,6 +113,7 @@ export default function Profile() {
     language = useUiStore((s) => s.language);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [activeProfileStep, setActiveProfileStep] = useState("personal-information");
+  const [educationPortfolioComplete, setEducationPortfolioComplete] = useState(false);
   const [membershipApplications,setMembershipApplications]=useState<ProfileMembershipApplication[]>([]);
   const [membershipReferencesError,setMembershipReferencesError]=useState("");
   const [copyNotice,setCopyNotice]=useState("");
@@ -461,7 +462,7 @@ export default function Profile() {
     { id: "personal-information", label: "Personal details", hint: "Your name and contact information", locked: false, complete: Boolean(form.firstName.trim() && form.lastName.trim()) },
     { id: "professional-summary", label: "Professional summary", hint: "Your role, expertise and introduction", locked: false, complete: Boolean(form.headline.trim() || form.bio.trim()) },
     { id: "professional-experience", label: "Experience & expertise", hint: "Roles, skills and professional classifications", locked: !profile?.has_active_membership, complete: Boolean(profile?.has_active_membership && (experienceDrafts.length > 0 || talentForm.professionalTitle.trim())) },
-    { id: "guided-professional-profile", label: "Education & portfolio", hint: "Qualifications, work samples and private evidence", locked: !profile?.has_active_membership, complete: false },
+    { id: "guided-professional-profile", label: "Education & portfolio", hint: "Qualifications, work samples and private evidence", locked: !profile?.has_active_membership, complete: educationPortfolioComplete },
     { id: "verification-review", label: "Verification review", hint: "Submit professional claims to an authorized reviewer", locked: !profile?.has_active_membership, complete: false },
   ];
   const completedSteps = profileSteps.filter((step) => step.complete).length;
@@ -827,7 +828,7 @@ export default function Profile() {
           </Card>
           </section>
           <section id="guided-professional-profile" className={styles.stepSection}>
-          <GuidedProfessionalProfile onNationalitySaved={(value) => { setForm((f) => ({ ...f, nationality: value })); setProfile((p) => p ? ({ ...p, nationality: value }) : p); }} />
+          <GuidedProfessionalProfile onNationalitySaved={(value) => { setForm((f) => ({ ...f, nationality: value })); setProfile((p) => p ? ({ ...p, nationality: value }) : p); }} onProgressChange={setEducationPortfolioComplete} />
                     </section>
           <section id="verification-review" className={styles.stepSection}>
           <Card>

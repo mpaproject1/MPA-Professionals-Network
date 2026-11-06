@@ -1,6 +1,6 @@
 "use client";
 
-import {ArrowRight, BriefcaseBusiness, CheckCircle2, Clock3, Compass, FileCheck2, GraduationCap, HelpCircle, RefreshCw, ShieldCheck, UserRound, Users} from "lucide-react";
+import {Activity, ArrowRight, BriefcaseBusiness, ChartNoAxesCombined, CheckCircle2, Compass, FileCheck2, GraduationCap, HandHeart, IdCard, LayoutDashboard, Network, RefreshCw, ShieldCheck, Users, UserRound} from "lucide-react";
 import Link from "next/link";
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {CommunityImpactWorkspacePanel} from "../../components/community-impact-workspace-panel";
@@ -94,6 +94,7 @@ export default function MembersWorkspacePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const requestSequence = useRef(0);
+  const [activeSection,setActiveSection] = useState("overview");
 
   const load = useCallback(async () => {
     const sequence = ++requestSequence.current;
@@ -251,121 +252,29 @@ export default function MembersWorkspacePage() {
   else if (membershipExpired) next = { title: "Review your expired membership", detail: "Your membership history reports an expired or ended membership. Review renewal options and current eligibility with the membership service.", href: "/membership", label: "Review renewal options" };
   else if (profilePercent !== null && profilePercent < 100) next = { title: "Complete your professional profile", detail: "Your account reports " + profilePercent + "% completion. Finish the profile details relevant to your professional record.", href: "/profile", label: "Continue profile" };
 
-  const recentItems = (data?.tracking.items || []).slice(0, 3);
-  const notifications = (data?.inbox.items || []).slice(0, 2);
-  const shortcutItems = [
-    { href: "/profile", label: "Profile", detail: "Identity and professional details", icon: UserRound, visible: true },
-    { href: "/membership", label: "Membership", detail: active ? "Membership and renewal details" : "Application and status", icon: ShieldCheck, visible: true },
-    { href: "/membership/card", label: "Membership card", detail: "Active members", icon: FileCheck2, visible: active },
-    { href: "/jobs", label: "Jobs", detail: "Explore opportunities", icon: BriefcaseBusiness, visible: true },
-    { href: "/mentorship", label: "Mentorship", detail: "Mentor and mentee requests", icon: Users, visible: true },
-    { href: "/serve-community", label: "Serve-Community", detail: "Community service opportunities", icon: Compass, visible: active },
-    { href: "/verification", label: "Professional verification", detail: "Eligible members", icon: GraduationCap, visible: active },
-  ].filter((item) => item.visible);
-
-  return <main className="mpa-members-workspace">
-    <header data-guide-target="workspace-overview" className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div className="min-w-0"><div className="eyebrow">My MPA workspace</div><h1 className="h1">Welcome back, {name}.</h1><p className="muted max-w-3xl">See where things stand and continue with the next step. Progress reflects account and application records returned by the service, not pages you have opened.</p></div>
-      <button id="refresh-workspace" type="button" className="btn btn-ghost shrink-0" onClick={() => void load()} disabled={loading} aria-label="Refresh your workspace status"><RefreshCw size={16} aria-hidden="true" /> {loading ? "Refreshing…" : "Refresh status"}</button>
-    </header>
-
-    {error ? <Card><p className="form-error" role="alert">{error}</p><button type="button" className="btn btn-secondary mt-3" onClick={() => void load()} disabled={loading}>Retry loading account status</button></Card> : null}
-    {loading && !data ? <OperationStatus state="loading" title="Loading your workspace" detail="Checking your account, membership application, recent requests and notifications." /> : null}
-    {data?.errors.length ? <Card><p className="muted" role="status">Some workspace information could not be loaded: {data.errors.join(", ")}. Missing data is not treated as completed progress.</p><button type="button" className="btn btn-ghost mt-2" onClick={() => void load()} disabled={loading}>Retry loading missing information</button></Card> : null}
-
-    {data ? <>
-      <section aria-labelledby="continue-title" className="mb-6 rounded-2xl border border-[var(--primary)]/35 bg-[var(--surface)] p-5 shadow-sm sm:p-7">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="eyebrow">Continue where you left off</div>
-            <h2 id="continue-title" className="h2 mt-1">{next.title}</h2>
-            <p className="muted mt-2 max-w-2xl">{next.detail}</p>
-            <div className="mt-4 flex flex-wrap items-center gap-2" aria-label="Current account status">
-              <Badge tone={active ? "green" : paymentAttention ? "gold" : "slate"}>{active ? "Active member" : membershipExpired ? "Expired membership" : latestMembership?.status ? labelStatus(latestMembership.status) : "Not currently an active member"}</Badge>
-              {latestApplication ? <Badge tone={paymentAttention ? "gold" : waitingReview ? "slate" : "green"}>Application: {labelStatus(latestApplication.status)}</Badge> : <Badge tone="slate">No application returned</Badge>}
-              {profilePercent !== null ? <Badge tone={profilePercent >= 100 ? "green" : "slate"}>Profile {profilePercent}%</Badge> : <Badge tone="slate">Profile progress unavailable</Badge>}
-            </div>
-          </div>
-          <div className="w-full sm:w-auto sm:min-w-52">
-            {next.href === "#refresh-workspace"
-              ? <button type="button" className="btn btn-primary w-full justify-center" onClick={() => void load()} disabled={loading}>{loading ? "Refreshing…" : next.label} <ArrowRight size={16} /></button>
-              : <Link className="btn btn-primary w-full justify-center" href={next.href}>{next.label} <ArrowRight size={16} /></Link>}
-            <p className="muted mt-2 text-xs">Only server-confirmed account and application states count as progress.</p>
-          </div>
-        </div>
-      </section>
-
-      <section aria-labelledby="member-activity-title" className="mb-7">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-          <div><div className="eyebrow">Your professional life at MPA</div><h2 id="member-activity-title" className="h2">Everything in one place</h2><p className="muted">Open a space, continue an activity or check a response without searching across separate portals.</p></div>
-          <Link className="btn btn-ghost" href="/track">View all progress <ArrowRight size={15}/></Link>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {[
-            {href:"/membership",title:"Membership",detail:"Join, renew and manage"},
-            {href:"/profile",title:"My Career",detail:"Profile, skills and credentials"},
-            {href:"/jobs",title:"Opportunities",detail:"Jobs and professional openings"},
-            {href:"/mentorship",title:"My Mentorship",detail:"Goals, guidance and learning"},
-            {href:"/services",title:"Services",detail:"Request or provide expertise"},
-            {href:"/network",title:"Network",detail:"Professional connections"},
-            {href:"/serve-community",title:"Contributions",detail:"Initiatives and volunteering"},
-            {href:"/track",title:"My Progress",detail:"Requests and responses"},
-          ].map((item) => <Link key={item.href} href={item.href} className="flex min-h-24 flex-col justify-between rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 transition hover:border-[var(--primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
-            <strong>{item.title}</strong><span className="muted text-sm">{item.detail}</span><span className="text-sm underline underline-offset-4">Open space <ArrowRight size={13} className="inline"/></span>
-          </Link>)}
-        </div>
-        <div className="mt-3 grid grid-cols-3 gap-3">
-          <Card><span className="muted text-sm">All records</span><div className="metric">{data.tracking.summary?.total ?? "—"}</div></Card>
-          <Card><span className="muted text-sm">Needs your attention</span><div className="metric">{data.tracking.summary?.nextSteps ?? "—"}</div></Card>
-          <Card><span className="muted text-sm">Waiting or active</span><div className="metric">{data.tracking.summary?.active ?? "—"}</div></Card>
-        </div>
-      </section>
-
-      <section aria-labelledby="progress-title" className="mb-7">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><div className="eyebrow">Your journey</div><h2 id="progress-title" data-guide-target="workspace-progress" className="h2">Membership setup</h2></div><span className="muted text-sm">{journey.filter((step) => step.state === "complete").length} of {journey.length} steps confirmed</span></div>
-        <ol className="grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-5" aria-label="Membership progress steps">
-          {journey.map((step, index) => {
-            const completed = step.state === "complete";
-            const attention = step.state === "attention";
-            const current = step.state === "current";
-            const Icon = completed ? CheckCircle2 : attention ? Clock3 : step.state === "locked" ? ShieldCheck : step.state === "unknown" ? HelpCircle : Clock3;
-            return <li key={step.title} className="min-w-0">
-              <Card>
-                <div className="flex items-start gap-3">
-                  <span className={"flex h-9 w-9 shrink-0 items-center justify-center rounded-full border " + (completed ? "border-emerald-600/40 bg-emerald-500/10 text-emerald-700" : attention ? "border-amber-600/50 bg-amber-500/10 text-amber-800" : current ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--text)]" : "border-[var(--border)] text-[var(--muted)]")} aria-hidden="true"><Icon size={18} /></span>
-                  <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Step {index + 1}</p><h3 className="mt-1 font-semibold">{step.title}</h3><p className="muted mt-1 text-sm">{step.description}</p></div>
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2"><Badge tone={completed ? "green" : attention ? "gold" : "slate"}>{completed ? "Confirmed" : attention ? "Needs attention" : current ? "Next step" : step.state === "unknown" ? "Not confirmed" : step.state === "waiting" ? "Waiting" : "Locked"}</Badge>{step.href ? <Link href={step.href} className="text-sm underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4" aria-label={step.action || "Open " + step.title}>{step.action || "Open"}</Link> : null}</div>
-              </Card>
-            </li>;
-          })}
-        </ol>
-      </section>
-
-      <CommunityImpactWorkspacePanel token={token || ""} />
-
-      <VolunteerPledgePanel token={token || ""} active={active} />
-
-      <section aria-labelledby="shortcuts-title" className="mb-7">
-        <div className="mb-3"><div className="eyebrow">Quick access</div><h2 id="shortcuts-title" data-guide-target="workspace-shortcuts" className="h2">Your workspace</h2></div>
-        <nav aria-label="Your workspace shortcuts" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {shortcutItems.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} className="group flex min-w-0 items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 transition hover:border-[var(--primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:p-4"><Icon size={20} className="mt-0.5 shrink-0" aria-hidden="true" /><span className="min-w-0"><span className="block font-semibold">{item.label}</span><span className="muted mt-1 block text-sm">{item.detail}</span></span><ArrowRight size={15} className="ml-auto mt-1 shrink-0 opacity-70" aria-hidden="true" /></Link>; })}
-        </nav>
-      </section>
-
-      <section aria-labelledby="activity-title" className="mb-7 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="eyebrow">Status updates</div><h2 id="activity-title" className="h2">Recent activity</h2></div><Link className="text-sm underline underline-offset-4" href="/track">View all activity</Link></div>
-          {recentItems.length ? <ol className="m-0 list-none p-0">{recentItems.map((item, index) => <li key={item.id || item.trackingReference || index} className="border-t border-[var(--border)] py-3 first:border-t-0"><div className="flex items-start gap-3"><Clock3 size={17} className="mt-1 shrink-0" aria-hidden="true" /><div className="min-w-0"><p className="font-semibold">{item.title || "Application or request update"}</p><p className="muted text-sm">{labelStatus(item.statusLabel || item.status)}{item.nextAction ? " · " + item.nextAction : ""}</p>{dateLabel(item.updatedAt || item.submittedAt) ? <p className="muted mt-1 text-xs">Updated {dateLabel(item.updatedAt || item.submittedAt)}</p> : null}</div></div></li>)}</ol> : <p className="muted">{data.errors.includes("Application and request activity") ? "Recent activity could not be loaded. Retry to check your current server-reported status." : "No recent activity was returned. When you submit a request or application, its server-reported status will appear here."}</p>}
-        </Card>
-        <Card><div className="mb-3 flex items-center justify-between gap-3"><div><div className="eyebrow">Your inbox</div><h2 className="h2">Recent updates</h2></div><Link className="text-sm underline underline-offset-4" href="/notifications">Open notifications</Link></div>
-          {notifications.length ? <ul className="m-0 list-none p-0">{notifications.map((item, index) => <li key={item.id || index} className="border-t border-[var(--border)] py-3 first:border-t-0"><p className="font-semibold">{item.title || "Update"}</p><p className="muted mt-1 text-sm">{item.body || "Open notifications to review this update."}</p>{safeInternalHref(item.actionUrl) ? <Link href={safeInternalHref(item.actionUrl)!} className="mt-2 inline-flex items-center gap-1 text-sm underline underline-offset-4">Review update <ArrowRight size={14} /></Link> : null}</li>)}</ul> : <p className="muted">{data.errors.includes("Recent notifications") ? "Recent notifications could not be loaded. Retry to check for updates." : "No recent notifications were returned."}</p>}
-        </Card>
-      </section>
-
-      <footer className="flex flex-wrap items-start justify-between gap-4 border-t border-[var(--border)] pt-5">
-        <div className="max-w-2xl"><h2 className="font-semibold">Need a hand?</h2><p className="muted mt-1 text-sm">Use the Guide control for the current screen tour, or contact support if a status looks incorrect. Your application, payment and membership activation are separate server-controlled decisions.</p></div>
-        <div className="flex flex-wrap gap-2"><button type="button" data-guide-target="workspace-help" className="btn btn-primary" onClick={()=>window.dispatchEvent(new Event("mpa:open-guide"))}>Show me around</button><SupportAction label="Get help" /><Link href="/membership" className="btn btn-ghost">Membership guidance <ArrowRight size={15} /></Link></div>
-      </footer>
-    </> : null}
+  const recentItems=(data?.tracking.items||[]).slice(0,4),notifications=(data?.inbox.items||[]).slice(0,3);
+  const sections=[{id:"overview",label:"Overview",icon:LayoutDashboard},{id:"membership",label:"Membership",icon:IdCard},{id:"career",label:"Career",icon:BriefcaseBusiness},{id:"mentorship",label:"Mentorship",icon:GraduationCap},{id:"services",label:"Services",icon:HandHeart},{id:"network",label:"Network",icon:Network},{id:"impact",label:"Impact",icon:ChartNoAxesCombined},{id:"activity",label:"Activity",icon:Activity}];
+  const confirmedSteps=journey.filter(step=>step.state==="complete").length;
+  return <main className="mpa-members-workspace member-command">
+    <header className="member-topline" data-guide-target="workspace-overview"><div><div className="eyebrow">MPA · MEMBER COMMAND CENTRE</div><h1 className="member-welcome">Welcome back, {name}.</h1><p className="muted">Your membership, professional journey and community impact — in one focused workspace.</p></div><div className="member-top-actions"><Badge tone={active?"green":paymentAttention?"gold":"slate"}>{active?"Active member":membershipExpired?"Expired membership":"Membership status"}</Badge><button id="refresh-workspace" className="btn btn-ghost" onClick={()=>void load()} disabled={loading}><RefreshCw size={15}/>{loading?"Refreshing":"Refresh"}</button></div></header>
+    {error?<Card><p className="form-error" role="alert">{error}</p><button className="btn btn-secondary mt-3" onClick={()=>void load()}>Retry account status</button></Card>:null}
+    {loading&&!data?<OperationStatus state="loading" title="Loading your workspace" detail="Checking your account, membership application, recent requests and notifications."/>:null}
+    {data?.errors.length?<Card><p className="muted" role="status">Some workspace information could not be loaded: {data.errors.join(", ")}. Missing data is not treated as completed progress.</p><button className="btn btn-ghost mt-2" onClick={()=>void load()}>Retry missing information</button></Card>:null}
+    {data?<><section className="member-hero"><div><div className="member-hero-kicker">YOUR NEXT BEST ACTION</div><h2>{next.title}</h2><p>{next.detail}</p><div className="member-hero-tags"><Badge tone={active?"green":"slate"}>{active?"Membership active":"Membership status"}</Badge>{latestApplication?<Badge tone={paymentAttention?"gold":waitingReview?"slate":"green"}>Application · {labelStatus(latestApplication.status)}</Badge>:null}{profilePercent!==null?<Badge tone="slate">Profile · {profilePercent}%</Badge>:null}</div></div><div className="member-hero-action"><div className="member-profile-ring" style={{background:"conic-gradient(#c5f36b "+(profilePercent??0)+"%,rgba(166,198,218,.17) 0)"}}><strong>{profilePercent===null?"—":profilePercent+"%"}</strong><span>PROFILE</span></div>{next.href==="#refresh-workspace"?<button className="btn btn-primary" onClick={()=>void load()}>{next.label}<ArrowRight size={14}/></button>:<Link className="btn btn-primary" href={next.href}>{next.label}<ArrowRight size={14}/></Link>}<small>Only server-confirmed states count as progress.</small></div></section>
+      <nav className="member-category-nav" aria-label="Member workspace categories">{sections.map(s=>{const Icon=s.icon;return <button key={s.id} type="button" aria-pressed={activeSection===s.id} className={activeSection===s.id?"is-active":""} onClick={()=>setActiveSection(s.id)}><Icon size={16}/>{s.label}</button>;})}</nav>
+      <div id="member-panel" className="member-section-panel">
+        {activeSection==="overview"?<><div className="member-section-heading"><div><span className="eyebrow">AT A GLANCE</span><h2>Everything important, in focus.</h2></div><Link href="/track" className="member-text-link">All progress <ArrowRight size={14}/></Link></div>
+          <div className="member-metric-grid"><Card><small>All records</small><div className="metric">{data.tracking.summary?.total??"—"}</div></Card><Card><small>Needs attention</small><div className="metric">{data.tracking.summary?.nextSteps??"—"}</div></Card><Card><small>Waiting or active</small><div className="metric">{data.tracking.summary?.active??"—"}</div></Card><Card><small>Journey confirmed</small><div className="metric">{confirmedSteps} / {journey.length}</div></Card></div>
+          <section className="member-overview-journey"><div className="member-inline-heading"><h3>Your membership journey</h3><button className="member-text-link" onClick={()=>setActiveSection("membership")}>View details <ArrowRight size={13}/></button></div><div className="member-journey-track">{journey.map((step,i)=><div key={step.title} className={step.state==="complete"?"is-complete":""}><span>{step.state==="complete"?<CheckCircle2 size={14}/>:i+1}</span><small>{step.title}</small></div>)}</div></section>
+          <CommunityImpactWorkspacePanel token={token||""} compact/><div className="member-overview-bottom"><Card><h3>Recent activity</h3>{recentItems.slice(0,3).map((x,i)=><p key={x.id||i} className="member-feed-row"><strong>{x.title||"Request update"}</strong><span>{labelStatus(x.statusLabel||x.status)} · {dateLabel(x.updatedAt||x.submittedAt)}</span></p>)}<button className="member-text-link" onClick={()=>setActiveSection("activity")}>View activity <ArrowRight size={13}/></button></Card><Card><h3>Recent updates</h3>{notifications.slice(0,2).map((x,i)=><p key={x.id||i} className="member-feed-row"><strong>{x.title||"Update"}</strong><span>{x.body}</span></p>)}<Link href="/notifications" className="member-text-link">Open inbox <ArrowRight size={13}/></Link></Card></div></>:null}
+        {activeSection==="membership"?<><div className="member-section-heading"><div><span className="eyebrow">MEMBERSHIP</span><h2>{active?"Your membership is active":"Membership setup"}</h2><p>Application, payment, review and activation are separate service-controlled decisions.</p></div><Link className="btn btn-primary" href="/membership">Open membership <ArrowRight size={14}/></Link></div><div className="member-journey-detail-grid">{journey.map((step,i)=><Card key={step.title}><small>STEP {i+1} · {step.state.toUpperCase()}</small><h3>{step.title}</h3><p className="muted text-sm">{step.description}</p>{step.href?<Link href={step.href}>{step.action||"Open"} <ArrowRight size={13}/></Link>:null}</Card>)}</div></>:null}
+        {activeSection==="career"?<><div className="member-section-heading"><div><span className="eyebrow">CAREER</span><h2>Your professional identity</h2></div></div><div className="member-destination-grid"><Link href="/profile" className="member-destination-card"><UserRound/><div><strong>Professional profile</strong><p>Identity, experience, skills and credentials</p></div></Link>{active?<Link href="/verification" className="member-destination-card"><FileCheck2/><div><strong>Professional verification</strong><p>Evidence and verified professional claims</p></div></Link>:null}<Link href="/jobs" className="member-destination-card"><BriefcaseBusiness/><div><strong>Career opportunities</strong><p>Discover professional openings</p></div></Link></div></>:null}
+        {activeSection==="mentorship"?<div className="member-section-heading"><div><span className="eyebrow">MENTORSHIP</span><h2>Guidance and professional learning</h2><p>Manage mentor and mentee requests, goals and learning.</p></div><Link className="btn btn-primary" href="/mentorship">Open mentorship <ArrowRight size={14}/></Link></div>:null}
+        {activeSection==="services"?<><div className="member-section-heading"><div><span className="eyebrow">SERVICES</span><h2>Share your professional expertise</h2></div><Link href="/services" className="btn btn-ghost">Browse services</Link></div><VolunteerPledgePanel token={token||""} active={active}/></>:null}
+        {activeSection==="network"?<><div className="member-section-heading"><div><span className="eyebrow">NETWORK</span><h2>Professional connections and community</h2></div></div><div className="member-destination-grid"><Link href="/network" className="member-destination-card"><Network/><div><strong>Professional network</strong><p>Connect with fellow professionals.</p></div></Link><Link href="/network-plus" className="member-destination-card"><Users/><div><strong>Network-Plus</strong><p>Enhanced collaboration and opportunities.</p></div></Link><Link href="/serve-community" className="member-destination-card"><Compass/><div><strong>Community initiatives</strong><p>Explore ways to contribute.</p></div></Link></div></>:null}
+        {activeSection==="impact"?<><div className="member-section-heading"><div><span className="eyebrow">VERIFIED CONTRIBUTION</span><h2>Your Community Impact</h2></div><Link href="/community-impact/score" className="btn btn-ghost">Full score record</Link></div><CommunityImpactWorkspacePanel token={token||""}/></>:null}
+        {activeSection==="activity"?<><div className="member-section-heading"><div><span className="eyebrow">REQUESTS & RESPONSES</span><h2>Your activity centre</h2></div><Link href="/track" className="btn btn-primary">All records</Link></div><div className="member-overview-bottom"><Card><h3>Recent activity</h3>{recentItems.map((x,i)=><p key={x.id||i} className="member-feed-row"><strong>{x.title||"Request update"}</strong><span>{labelStatus(x.statusLabel||x.status)} · {dateLabel(x.updatedAt||x.submittedAt)}</span></p>)}</Card><Card><h3>Recent notifications</h3>{notifications.map((x,i)=><p key={x.id||i} className="member-feed-row"><strong>{x.title||"Update"}</strong><span>{x.body}</span></p>)}<Link href="/notifications">Open notifications</Link></Card></div></>:null}
+      </div><footer className="member-help-footer"><div><strong>Need a hand?</strong><p>Use the Guide control for this screen or contact support if a status looks incorrect.</p></div><div><button data-guide-target="workspace-help" className="btn btn-ghost" onClick={()=>window.dispatchEvent(new Event("mpa:open-guide"))}>Show me around</button><SupportAction label="Get help"/><Link href="/membership" className="btn btn-ghost">Membership guidance</Link></div></footer>
+    </>:null}
   </main>;
 }

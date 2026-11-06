@@ -115,7 +115,7 @@ export default function MembershipAdminWorkspace() {
       setCanManagePlans(managePlans);
       setCanReview(roles.some(role => ["system_admin", "reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
       setCanActivate(roles.includes("system_admin") || permissions.includes("membership.activate"));
-      setTab(managePlans ? "plans" : "queue");
+      if (!managePlans) setTab("queue");
       await Promise.all([managePlans ? loadPlans() : Promise.resolve(), loadQueue()]);
     } catch (cause) {
       setPlanError(cause instanceof ApiError ? cause.message : "Your membership administration permissions could not be confirmed.");

@@ -39,7 +39,7 @@ export default function GuidedProfessionalProfile({onNationalitySaved,onProgress
     api<Portfolio[]>("/api/v1/me/portfolio",{},token),
     api<AccountProfile>("/api/v1/me",{},token)
    ]);
-   setRefs(r);setEducationDrafts(e.map(asDraft));setPortfolio(items);setAccount(accountInfo);
+   setRefs(r);setEducation(e.map(asDraft));setEducationDrafts(e.map(asDraft));setPortfolio(items);setAccount(accountInfo);
    const next:Record<string,string>={},custom:Record<string,string>={};
    for(const type of ["nationality","occupation","industry","experience_range"]){const item=selected(p.references,type);next[type]=item?.reference_item_id||"";custom[type]=item?.custom_value||"";}
    if(!next.nationality&&accountInfo.nationality){const match=r.find(item=>item.dataset_key===groups.nationality&&item.label.toLowerCase()===String(accountInfo.nationality).toLowerCase());if(match)next.nationality=match.id;else{const other=r.find(item=>item.dataset_key===groups.nationality&&item.code==="OTHER");if(other){next.nationality=other.id;custom.nationality=accountInfo.nationality;}}}

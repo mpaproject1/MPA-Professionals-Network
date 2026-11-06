@@ -80,6 +80,7 @@ export default function MembershipAdminWorkspace() {
   const [decisionNote, setDecisionNote] = useState("");
   const [canReview, setCanReview] = useState(false);
   const [canActivate, setCanActivate] = useState(false);
+  const [canManagePlans, setCanManagePlans] = useState(false);
 
   const loadPlans = useCallback(async () => {
     if (!token) return;
@@ -110,9 +111,12 @@ export default function MembershipAdminWorkspace() {
       const me = await api<Me>("/api/v1/me", {}, token);
       const roles = Array.isArray(me.roles) ? me.roles : [];
       const permissions = Array.isArray(me.permissions) ? me.permissions : [];
+      const managePlans = roles.includes("system_admin") || permissions.includes("members.manage");
+      setCanManagePlans(managePlans);
       setCanReview(roles.some(role => ["system_admin", "reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
       setCanActivate(roles.includes("system_admin") || permissions.includes("membership.activate"));
-      await Promise.all([loadPlans(), loadQueue()]);
+      setTab(managePlans ? "plans" : "queue");
+      await Promise.all([managePlans ? loadPlans() : Promise.resolve(), loadQueue()]);
     } catch (cause) {
       setPlanError(cause instanceof ApiError ? cause.message : "Your membership administration permissions could not be confirmed.");
       setQueueError(cause instanceof ApiError ? cause.message : "Your membership administration permissions could not be confirmed.");
@@ -273,11 +277,11 @@ export default function MembershipAdminWorkspace() {
     </div>
 
     <div role="tablist" aria-label="Membership administration sections" className="row" style={{ gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
-      <button type="button" role="tab" aria-selected={tab === "plans"} className={"btn " + (tab === "plans" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("plans")}>1. Membership plans <span className="muted">({plans.length})</span></button>
-      <button type="button" role="tab" aria-selected={tab === "queue"} className={"btn " + (tab === "queue" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("queue")}>2. Review queue <span className="muted">({applications.length})</span></button>
+      {canManagePlans && <button type="button" role="tab" aria-selected={tab === "plans"} className={"btn " + (tab === "plans" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("plans")}>1. Membership plans <span className="muted">({plans.length})</span></button>}
+      <button type="button" role="tab" aria-selected={tab === "queue"} className={"btn " + (tab === "queue" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("queue")}>Membership review queue <span className="muted">({applications.length})</span></button>
     </div>
 
-    {tab === "plans" && <section role="tabpanel" aria-label="Membership plans" className="grid" style={{ gap: 14 }}>
+    {canManagePlans && tab === "plans" && <section role="tabpanel" aria-label="Membership plans" className="grid" style={{ gap: 14 }}>
       <Card>
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
           <div><h2 className="h2">Membership plan catalogue</h2><p className="muted">Published terms are versioned. Existing applications keep the plan snapshot they accepted.</p></div>

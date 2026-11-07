@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { loadConfig } from "./config.js";
 import { getPool, withTransaction } from "./db.js";
-import * as memberReferrals from "./member-referrals.js";
 import { classifyEmailDeliveryError, emailRetryDelaySeconds } from "./email-retry-policy.js";
 import { renderVerificationEmail } from "./email-template.js";
 import { decryptVerificationToken, encryptVerificationToken } from "./email-verification-crypto.js";
@@ -222,6 +221,7 @@ export async function verifyEmailToken(rawToken, requestId) {
     await db.query("update email_verification_token set consumed_at=now() where user_id=$1 and consumed_at is null", [row.user_id]);
     await db.query("update email_verification_delivery set status='expired',locked_at=null,updated_at=now() where verification_token_id in (select id from email_verification_token where user_id=$1 and consumed_at is not null) and status in ('pending','processing','failed')", [row.user_id]);
     const verifiedUser = (await db.query("update app_user set email_verified_at=coalesce(email_verified_at,now()),updated_at=now() where id=$1 returning registration_reference", [row.user_id])).rows[0];
+    const memberReferrals = await import("./member-referrals.js");
     await memberReferrals.recordMembershipMilestone(db, row.user_id, "email_verified", row.user_id);
     await db.query(
       "insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'account.email_verified','account',$2,$3,'success',$4)",

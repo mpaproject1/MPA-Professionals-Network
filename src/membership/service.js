@@ -780,6 +780,7 @@ export async function listMembershipPaymentsForFinance(){
  const result=await db.query(`select * from (
   select pt.id payment_id,pt.status payment_status,pt.amount,pt.currency,pt.channel,pt.source,pt.purpose_reference,
    pt.request_payload->>'reference' payment_reference,pt.created_at,pt.verified_at,pt.verification_note,
+   coalesce(nullif(member_person.display_name,''),concat_ws(' ',member_person.first_name,member_person.middle_name,member_person.last_name)) member_name,
    pt.evidence_file_id,evidence_file.original_name evidence_file_name,
    coalesce(verified_person.display_name,case when pt.verified_by is not null then 'Finance user' end) verified_by_name,
    ma.id application_id,ma.tracking_reference,ma.application_type,ma.status application_status,
@@ -798,10 +799,12 @@ export async function listMembershipPaymentsForFinance(){
   left join app_user reconciled_user on reconciled_user.id=pr.reconciled_by
   left join person reconciled_person on reconciled_person.user_id=reconciled_user.id
   left join file_object evidence_file on evidence_file.id=pt.evidence_file_id
+  left join person member_person on member_person.user_id=ma.user_id
   where pt.status in ('pending','succeeded','failed','refunded')
   union all
   select pt.id payment_id,pt.status payment_status,pt.amount,pt.currency,pt.channel,pt.source,pt.purpose_reference,
    pt.request_payload->>'reference' payment_reference,pt.created_at,pt.verified_at,pt.verification_note,
+   mr.membership_number member_name,
    pt.evidence_file_id,evidence_file.original_name evidence_file_name,
    coalesce(verified_person.display_name,case when pt.verified_by is not null then 'Finance user' end) verified_by_name,
    null::uuid application_id,mr.membership_number tracking_reference,'legacy_import'::text application_type,mr.status application_status,

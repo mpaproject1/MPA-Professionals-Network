@@ -1,16 +1,17 @@
 "use client";
 
-import { Download, Eye, X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { FinanceMembershipObligations } from "../../../components/finance-membership-obligations";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";
+import { FinanceOperationsRegister, type FinanceManualReceipt } from "../../../components/admin/finance-operations-register";
 
 type Payment = {
   payment_id: string;
+  member_name?: string | null;
   payment_status: string;
   amount: string | number;
   currency: string;
@@ -93,6 +94,7 @@ export default function FinanceWorkspacePage() {
   const hydrateToken = useUiStore(state => state.hydrateToken);
   const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "signin">("loading");
   const [rows, setRows] = useState<Payment[]>([]);
+  const [manualReceipts, setManualReceipts] = useState<FinanceManualReceipt[]>([]);
   const [legacyPayments, setLegacyPayments] = useState<LegacyMembershipPayment[]>([]);
   const [legacyDrafts, setLegacyDrafts] = useState<Record<string, LegacyPaymentDraft>>({});
   const [legacyQueueError, setLegacyQueueError] = useState("");
@@ -106,10 +108,6 @@ export default function FinanceWorkspacePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [evidencePreview, setEvidencePreview] = useState<{ name: string; type: string; url: string; text?: string } | null>(null);
-  const [decisions, setDecisions] = useState<Record<string, "approved" | "needs_correction" | "rejected">>({});
-  const [verificationNotes, setVerificationNotes] = useState<Record<string, string>>({});
-  const [reversalTypes, setReversalTypes] = useState<Record<string, "refund" | "reversal">>({});
-  const [reversalReasons, setReversalReasons] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -125,6 +123,7 @@ export default function FinanceWorkspacePage() {
       if (!readAccess) {
         setAccess("denied");
         setRows([]);
+        setManualReceipts([]);
         setLegacyPayments([]);
         setSummaryRows([]);
         setSummaryError("");
@@ -136,6 +135,17 @@ export default function FinanceWorkspacePage() {
       setCanIssueVoucher(financeRole || platformAdmin || roles.includes("admin") || permissions.some(permission => ["finance.voucher.issue", "finance.manage"].includes(permission)));
       const payments = await api<Payment[]>("/api/v1/finance/membership/payments", {}, token);
       setRows(Array.isArray(payments) ? payments : []);
+      try {
+        const receiptResult = await api<{items: FinanceManualReceipt[];total:number;hasMore:boolean}>("/api/v1/finance/receipts?limit=100&offset=0", {}, token);
+        const allReceipts = Array.isArray(receiptResult.items) ? [...receiptResult.items] : [];
+        for (let offset = 100; offset < receiptResult.total; offset += 100) {
+          const next = await api<{items: FinanceManualReceipt[]}>("/api/v1/finance/receipts?limit=100&offset=" + offset, {}, token);
+          allReceipts.push(...(Array.isArray(next.items) ? next.items : []));
+        }
+        setManualReceipts(allReceipts);
+      } catch {
+        setManualReceipts([]);
+      }
       setLegacyQueueError("");
       try {
         const legacyQueue = await api<{ rows: LegacyMembershipPayment[] }>("/api/v1/finance/membership/legacy-payment-verification", {}, token);
@@ -156,6 +166,7 @@ export default function FinanceWorkspacePage() {
       setAccess("allowed");
     } catch (cause) {
       setRows([]);
+      setManualReceipts([]);
       setLegacyPayments([]);
       setSummaryRows([]);
       setSummaryError("");
@@ -187,28 +198,65 @@ export default function FinanceWorkspacePage() {
     void load();
   }, [hydrated, token, load]);
 
-  async function previewPaymentEvidence(payment: Payment) {
-    if (!token || !payment.evidence_file_id || busy) return;
-    setBusy("evidence:" + payment.payment_id);
+  async function previewFinanceEvidence(fileId: string, fileName: string) {
+    if (!token || !fileId || busy) return;
+    setBusy("evidence:" + fileId);
     setError("");
     try {
-      const response = await fetch("/api/v1/files/" + encodeURIComponent(payment.evidence_file_id), {
-        headers: { Authorization: "Bearer " + token }, cache: "no-store"
-      });
+      const response = await fetch("/api/v1/files/" + encodeURIComponent(fileId), { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
       if (!response.ok) throw new Error(response.status === 403 ? "Your Finance permissions do not allow access to this payment evidence." : "Payment evidence could not be loaded.");
       const blob = await response.blob();
-      const extension = (payment.evidence_file_name || "").toLowerCase().split(".").pop() || "";
+      const extension = fileName.toLowerCase().split(".").pop() || "";
       const detected = blob.type || "application/octet-stream";
       const type = detected === "application/octet-stream" ? (extension === "pdf" ? "application/pdf" : ["png", "jpg", "jpeg", "webp", "gif"].includes(extension) ? "image/" + (extension === "jpg" ? "jpeg" : extension) : extension === "txt" ? "text/plain" : detected) : detected;
-      if (!type.includes("pdf") && !type.startsWith("image/") && !type.startsWith("text/")) {
-        throw new Error("In-app preview supports PDF, image and text evidence. This file type cannot be previewed safely.");
-      }
-      setEvidencePreview({ name: payment.evidence_file_name || "Payment evidence", type, url: URL.createObjectURL(blob), text: type.startsWith("text/") ? await blob.text() : undefined });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Payment evidence preview failed.");
-    } finally {
-      setBusy("");
-    }
+      if (!type.includes("pdf") && !type.startsWith("image/") && !type.startsWith("text/")) throw new Error("In-app preview supports PDF, image and text evidence. This file type cannot be previewed safely.");
+      setEvidencePreview({ name: fileName || "Payment evidence", type, url: URL.createObjectURL(blob), text: type.startsWith("text/") ? await blob.text() : undefined });
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Payment evidence preview failed."); }
+    finally { setBusy(""); }
+  }
+  async function verifyPaymentInline(id: string, decision: "approved" | "needs_correction" | "rejected", note: string) {
+    if (!token || !canVerify || busy) return;
+    setBusy(id); setError(""); setNotice("");
+    try {
+      await api("/api/v1/payments/" + id + "/verify", { method: "POST", body: JSON.stringify({ decision, note, evidenceChecked: [] }) }, token);
+      setNotice("Payment decision recorded. Membership approval and activation remain separate decisions."); await load();
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : "Payment verification could not be recorded."); }
+    finally { setBusy(""); }
+  }
+  async function reversePaymentInline(id: string, type: "refund" | "reversal", reason: string, legacy: boolean) {
+    if (!token || !canReverse || reason.trim().length < 8 || busy) return;
+    setBusy(id); setError(""); setNotice("");
+    try {
+      if (legacy) await api("/api/v1/finance/membership/legacy-payment-verification/" + id + "/reverse", { method: "POST", body: JSON.stringify({ reversalType: type, reason }) }, token);
+      else await api("/api/v1/payments/" + id + "/reverse", { method: "POST", body: JSON.stringify({ type, reason }) }, token);
+      setNotice("Payment refund/reversal recorded and linked financial state updated."); await load();
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : "Payment reversal could not be recorded."); }
+    finally { setBusy(""); }
+  }
+  async function decideManualReceipt(id: string, decision: "verified" | "rejected", note: string) {
+    if (!token || !canVerify || busy || (decision === "rejected" && note.trim().length < 8)) return;
+    setBusy(id); setError(""); setNotice("");
+    try { await api("/api/v1/finance/receipts/" + id + "/decision", { method: "POST", body: JSON.stringify({ decision, note }) }, token); setNotice("Manual finance receipt decision recorded."); await load(); }
+    catch (cause) { setError(cause instanceof ApiError ? cause.message : "Receipt decision could not be recorded."); }
+    finally { setBusy(""); }
+  }
+  async function reverseManualReceipt(id: string, reason: string) {
+    if (!token || !canReverse || reason.trim().length < 8 || busy) return;
+    setBusy(id); setError(""); setNotice("");
+    try { await api("/api/v1/finance/receipts/" + id + "/reverse", { method: "POST", body: JSON.stringify({ reason }) }, token); setNotice("Manual finance payment reversed and active voucher revoked."); await load(); }
+    catch (cause) { setError(cause instanceof ApiError ? cause.message : "Manual finance payment could not be reversed."); }
+    finally { setBusy(""); }
+  }
+  async function issueFinanceVoucher(id: string, manual: boolean) {
+    if (!token || !canIssueVoucher || busy) return;
+    setBusy(id); setError(""); setNotice("");
+    try {
+      const path = manual ? "/api/v1/finance/receipts/" + id + "/voucher" : "/api/v1/finance/membership/payments/" + id + "/voucher";
+      const voucher = await api<{token?:string;verificationPath?:string;voucherNumber:string}> (path, { method: "POST", body: JSON.stringify({}) }, token);
+      if (voucher.token && voucher.verificationPath) window.open("/admin/finance/receipts/voucher?data=" + encodeURIComponent(JSON.stringify(voucher)), "_blank", "noopener,noreferrer");
+      setNotice("Verified payment voucher prepared."); await load();
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : "Payment voucher could not be issued."); }
+    finally { setBusy(""); }
   }
   function closeEvidencePreview() {
     if (evidencePreview?.url) URL.revokeObjectURL(evidencePreview.url);
@@ -220,30 +268,6 @@ export default function FinanceWorkspacePage() {
     anchor.href = evidencePreview.url;
     anchor.download = evidencePreview.name || "payment-evidence";
     anchor.click();
-  }
-
-  async function verifyPayment(event: FormEvent, payment: Payment) {
-    event.preventDefault();
-    if (!token || !canVerify || busy) return;
-    setBusy(payment.payment_id);
-    setError("");
-    setNotice("");
-    try {
-      await api("/api/v1/payments/" + payment.payment_id + "/verify", {
-        method: "POST",
-        body: JSON.stringify({
-          decision: decisions[payment.payment_id] || "approved",
-          note: verificationNotes[payment.payment_id] || "",
-          evidenceChecked: [],
-        }),
-      }, token);
-      setNotice("Payment decision recorded. Membership application approval and activation remain separate decisions.");
-      await load();
-    } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : "Payment verification could not be recorded.");
-    } finally {
-      setBusy("");
-    }
   }
 
   async function verifyLegacyPayment(event: FormEvent, item: LegacyMembershipPayment) {
@@ -267,49 +291,6 @@ export default function FinanceWorkspacePage() {
     }
   }
 
-  async function issueMembershipVoucher(payment: Payment) {
-    if (!token || !canIssueVoucher || busy) return;
-    setBusy(payment.payment_id); setError(""); setNotice("");
-    try {
-      const voucher = await api<{token?:string;verificationPath?:string;payment?:unknown;voucherNumber:string;alreadyIssued?:boolean}>("/api/v1/finance/membership/payments/" + payment.payment_id + "/voucher", { method:"POST", body:JSON.stringify({}) }, token);
-      if (voucher.token && voucher.verificationPath) {
-        window.open("/admin/finance/receipts/voucher?data=" + encodeURIComponent(JSON.stringify(voucher)), "_blank", "noopener,noreferrer");
-        setNotice("Verified membership payment voucher prepared. Use Print / Save as PDF in the opened voucher.");
-      } else setNotice("An active voucher already exists. Its one-time QR token cannot be recovered; request an authorized replacement if the original is unavailable.");
-    } catch (cause) { setError(cause instanceof ApiError ? cause.message : "Membership payment voucher could not be issued."); }
-    finally { setBusy(""); }
-  }
-
-  async function reversePayment(event: FormEvent, payment: Payment) {
-    event.preventDefault();
-    const reason = (reversalReasons[payment.payment_id] || "").trim();
-    if (!token || !canReverse || reason.length < 8 || busy) return;
-    setBusy(payment.payment_id);
-    setError("");
-    setNotice("");
-    try {
-      const reversalType = reversalTypes[payment.payment_id] || "refund";
-      if (payment.application_type === "legacy_import") {
-        await api("/api/v1/finance/membership/legacy-payment-verification/" + payment.payment_id + "/reverse", {
-          method: "POST",
-          body: JSON.stringify({ reversalType, reason }),
-        }, token);
-        setNotice("Historical payment reversal recorded. The legacy membership no longer qualifies for a verified-paid status or an unclaimed invitation.");
-      } else {
-        await api("/api/v1/payments/" + payment.payment_id + "/reverse", {
-          method: "POST",
-          body: JSON.stringify({ type: reversalType, reason }),
-        }, token);
-        setNotice("Payment refund/reversal recorded. Any linked active membership is handled by the existing reversal workflow.");
-      }
-      await load();
-    } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : "Payment reversal could not be recorded.");
-    } finally {
-      setBusy("");
-    }
-  }
-
   if (!hydrated || access === "loading") return <Card><OperationStatus state="loading" title="Checking finance permissions" detail="Verifying the current account before retrieving payment records." /></Card>;
   if (access === "signin") return <Card><h1 className="h1">Sign in required</h1><p className="muted">Finance payment records are available only to authorized finance staff and administrators.</p><a className="btn btn-primary" href="/login?next=/admin/finance">Sign in</a></Card>;
   if (access === "denied") return <Card><OperationStatus state="error" title="Finance workspace access denied" detail={error || "Your account does not have finance payment queue access. Membership-review permissions do not grant finance access."} /><a className="btn btn-ghost" href="/dashboard">Return to your dashboard</a></Card>;
@@ -319,7 +300,7 @@ export default function FinanceWorkspacePage() {
     <div className="row" style={{gap:8,flexWrap:"wrap"}}><a className="btn btn-primary" href="/admin/finance/receipts">Record manual payment & issue QR vouchers</a><a className="btn btn-ghost" href="/admin/reports?report=manual-finance-receipts">Manual finance receipts report</a></div>
     {error && <p className="form-error" role="alert">{error}</p>}
     {notice && <p className="form-success" role="status" aria-live="polite">{notice}</p>}
-    <Card>
+    <Card id="historical-member-payment-verification">
       <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
         <div><h2 className="h2">Historical member payment verification</h2><p className="muted">Record the original fee due separately from each actual installment. Partial receipts reduce the outstanding balance but do not unlock the account invitation until the fee is fully settled by verified cash or an approved non-cash disposition.</p></div>
         <Badge tone={legacyPayments.length ? "gold" : "slate"}>{legacyPayments.length} awaiting Finance</Badge>
@@ -367,47 +348,20 @@ export default function FinanceWorkspacePage() {
         <a className="btn btn-ghost" href="/admin/reports?report=payment-reconciliation">Payment reconciliation</a>
       </div>
     </Card>
-    <Card>
-      <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-        <div><h2 className="h2">Payment records</h2><p className="muted">Up to 500 membership payment records, newest and pending items first. Applicant contact details are excluded; Finance can preview payment-specific evidence here before downloading.</p></div>
-        <Badge tone="slate">{rows.length} records returned</Badge>
-      </div>
-      {rows.length === 0 ? <OperationStatus state="info" title="No membership payments in this queue" detail="No matching payment records were returned. Refresh to check the current source records." /> : rows.map(payment => <article key={payment.payment_id} className="case-row" style={{ alignItems: "flex-start" }}>
-        <div style={{ flex: 1, minWidth: 0 }} className="grid">
-          <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-            <div><strong>{payment.product_name || payment.product_code} · {payment.application_type === "legacy_import" ? "Historical membership" : payment.application_type}</strong><p className="muted">Application {payment.tracking_reference || payment.application_id}</p></div>
-            <Badge tone={payment.payment_status === "succeeded" ? "green" : payment.payment_status === "pending" ? "gold" : "slate"}>{payment.payment_status.replaceAll("_", " ")}</Badge>
-          </div>
-          <div className="grid grid-2">
-            <p><span className="muted">Amount</span><br/><b>{payment.currency} {payment.amount}</b></p>
-            <p><span className="muted">{payment.application_type === "legacy_import" ? "Membership state" : "Application state"}</span><br/><b>{payment.application_status.replaceAll("_", " ")}</b></p>
-            <p><span className="muted">Channel / source</span><br/><b>{payment.channel} · {payment.source}</b></p>
-            <p><span className="muted">Payment reference</span><br/><b>{payment.payment_reference || payment.purpose_reference || "Not supplied"}</b></p>
-            <p><span className="muted">Submitted</span><br/><b>{dateLabel(payment.created_at)}</b></p>
-            <p><span className="muted">Verified</span><br/><b>{dateLabel(payment.verified_at)}</b>{payment.verified_by_name ? <><br/><small className="muted">By {payment.verified_by_name}</small></> : null}</p>
-            <p><span className="muted">Reconciliation</span><br/><b>{payment.reconciliation_status || "Not recorded"}</b>{payment.reconciled_by_name ? <><br/><small className="muted">By {payment.reconciled_by_name} · {dateLabel(payment.reconciled_at)}</small></> : null}</p>
-          </div>
-          {payment.evidence_file_id && <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}><button type="button" className="btn btn-ghost" disabled={busy === "evidence:" + payment.payment_id} onClick={() => void previewPaymentEvidence(payment)}><Eye size={15} /> {busy === "evidence:" + payment.payment_id ? "Loading evidence…" : "Preview payment evidence"}</button></div>}
-          {payment.verification_note && <p className="muted">Payment note: {payment.verification_note}</p>}
-          {canIssueVoucher && payment.payment_status === "succeeded" && !payment.reversed && payment.application_type !== "legacy_import" && <button type="button" className="btn btn-primary" disabled={busy === payment.payment_id} onClick={() => void issueMembershipVoucher(payment)}>Issue QR payment voucher</button>}
-
-          {payment.reconciliation_note && <p className="muted">Reconciliation note: {payment.reconciliation_note}</p>}
-          {payment.reversed && <p className="form-error" role="status">A refund or reversal is already recorded for this payment.</p>}
-          {canVerify && payment.payment_status === "pending" && payment.source !== "provider_webhook" && ["manual", "bank_transfer", "cash", "other"].includes(payment.channel) && ["submitted", "in_review", "correction_required", "approved", "payment_pending"].includes(payment.application_status) && <form className="form-stack" onSubmit={event => void verifyPayment(event, payment)}>
-            <h3 className="h2">Verify payment</h3>
-            <label>Decision<select value={decisions[payment.payment_id] || "approved"} onChange={event => setDecisions(current => ({ ...current, [payment.payment_id]: event.target.value as "approved" | "needs_correction" | "rejected" }))}><option value="approved">Approve payment</option><option value="needs_correction">Request correction</option><option value="rejected">Reject payment</option></select></label>
-            <label>Finance note<textarea rows={2} maxLength={1000} value={verificationNotes[payment.payment_id] || ""} onChange={event => setVerificationNotes(current => ({ ...current, [payment.payment_id]: event.target.value }))} placeholder="Record what was checked or what needs correction."/></label>
-            <button type="submit" className="btn btn-primary" disabled={busy === payment.payment_id}>{busy === payment.payment_id ? "Recording…" : "Record payment decision"}</button>
-          </form>}
-          {canReverse && payment.payment_status === "succeeded" && !payment.reversed && <form className="form-stack" onSubmit={event => void reversePayment(event, payment)}>
-            <h3 className="h2">Refund or reverse payment</h3>
-            <label>Action<select value={reversalTypes[payment.payment_id] || "refund"} onChange={event => setReversalTypes(current => ({ ...current, [payment.payment_id]: event.target.value as "refund" | "reversal" }))}><option value="refund">Refund</option><option value="reversal">Payment reversal</option></select></label>
-            <label>Reason<textarea required minLength={8} maxLength={1000} value={reversalReasons[payment.payment_id] || ""} onChange={event => setReversalReasons(current => ({ ...current, [payment.payment_id]: event.target.value }))} placeholder="Explain why this payment is being refunded or reversed."/></label>
-            <button type="submit" className="btn btn-ghost" disabled={busy === payment.payment_id || (reversalReasons[payment.payment_id] || "").trim().length < 8}>{busy === payment.payment_id ? "Recording…" : "Record refund / reversal"}</button>
-          </form>}
-        </div>
-      </article>)}
-    </Card>
+    <FinanceOperationsRegister
+      payments={rows}
+      receipts={manualReceipts}
+      canVerify={canVerify}
+      canReverse={canReverse}
+      canIssueVoucher={canIssueVoucher}
+      busy={busy}
+      onPreview={(fileId,fileName)=>void previewFinanceEvidence(fileId,fileName)}
+      onVerifyPayment={(id,decision,note)=>void verifyPaymentInline(id,decision,note)}
+      onReversePayment={(id,type,reason,legacy)=>void reversePaymentInline(id,type,reason,legacy)}
+      onVerifyReceipt={(id,decision,note)=>void decideManualReceipt(id,decision,note)}
+      onReverseReceipt={(id,reason)=>void reverseManualReceipt(id,reason)}
+      onIssueVoucher={(id,manual)=>void issueFinanceVoucher(id,manual)}
+    />
     <Card><p className="muted">Payment verification, reversal and reconciliation remain audited financial actions. A successful payment does not by itself approve or activate a membership application.</p></Card>
     {evidencePreview && <div role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeEvidencePreview(); }} style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(2,8,23,.82)", display: "grid", placeItems: "center", padding: 16 }}>
       <section role="dialog" aria-modal="true" aria-labelledby="finance-payment-evidence-title" className="card grid" style={{ width: "min(1100px, 100%)", height: "min(88vh, 850px)", gridTemplateRows: "auto 1fr auto", overflow: "hidden" }}>

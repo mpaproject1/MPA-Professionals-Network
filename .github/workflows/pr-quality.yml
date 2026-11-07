@@ -257,7 +257,7 @@ jobs:
           test -s .next/BUILD_ID
           test -s .next/routes-manifest.json
           test -s .next/build-manifest.json
-          echo "Production build artifacts exist. No deployment or upload is performed."
+          echo "Production build artifacts exist and are ready for browser acceptance; no deployment is performed."
 
       - name: Upload production build for browser acceptance
         if: ${{ steps.production_build.outcome == 'success' && steps.build_output.outcome == 'success' }}

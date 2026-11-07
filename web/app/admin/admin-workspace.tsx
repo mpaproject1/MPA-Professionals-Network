@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BookOpenCheck, Building2, ClipboardCheck, ClipboardList, CreditCard, FileBarChart, Fingerprint, Mail, MessageSquareText, Scale, ShieldCheck, Store, Users } from "lucide-react";
+import { Activity, BookOpenCheck, BriefcaseBusiness, Building2, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardList, CreditCard, FileBarChart, Fingerprint, HeartHandshake, Mail, MessageSquareText, Scale, ShieldCheck, Store, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -39,6 +39,9 @@ const destinations: Destination[] = [
   { href: "/admin/support", label: "Support", description: "Inquiries and knowledge base", icon: MessageSquareText },
 ];
 
+const groupFor=(href:string)=>href==="/admin"?"Overview":["/admin/membership","/admin/members","/admin/members/catalog","/admin/membership-card","/admin/accounts","/admin/account-governance","/admin/organizations","/organizations"].includes(href)?"People":href.startsWith("/admin/finance")||href.includes("payment-methods")?"Finance":["/admin/jobs/review","/admin/network-plus/businesses","/admin/network-plus/services","/admin/marketplace","/admin/serve-community/offline-projects","/admin/mentorship-interest","/admin/mentorship-reports","/admin/service-mentorship-cases","/admin/public-media-stories"].includes(href)?"Opportunities":href.startsWith("/admin/community-impact")||href==="/admin/referrals"?"Community Impact":["/admin/support","/admin/community-campaigns","/admin/email"].includes(href)?"Communications":href==="/admin/reports"?"Reports":"Governance";
+const groupIcons={Overview:Activity,People:Users,Finance:CreditCard,Opportunities:BriefcaseBusiness,"Community Impact":HeartHandshake,Communications:Mail,Reports:FileBarChart,Governance:ShieldCheck};
+const groupOrder=["Overview","People","Finance","Opportunities","Community Impact","Communications","Reports","Governance"];
 export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const token = useUiStore((state) => state.token);
@@ -46,7 +49,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const hydrateToken = useUiStore((state) => state.hydrateToken);
   const [roles, setRoles] = useState<string[] | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
-  const [reportIds, setReportIds] = useState<string[]>([]);
+  const [reportIds, setReportIds] = useState<string[]>([]);\n  const [collapsed, setCollapsed] = useState(false);\n  const [expandedGroups, setExpandedGroups] = useState<string[]>(["People","Finance","Opportunities","Community Impact"]);\n  useEffect(() => { try { setCollapsed(window.localStorage.getItem("mpa-admin-sidebar-collapsed") === "true"); const saved=window.localStorage.getItem("mpa-admin-sidebar-groups"); if(saved) setExpandedGroups(JSON.parse(saved) as string[]); } catch { /* keep defaults */ } }, []);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
   useEffect(() => {
@@ -75,7 +78,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     if (exact) return exact;
     return [...destinations].sort((a, b) => b.href.length - a.href.length).find((item) => pathname.startsWith(`${item.href}/`));
   }, [pathname]);
-  const roleSummary = roles === null ? "Resolving account access…" : roles.length ? roles.map((role) => role.replaceAll("_", " ")).join(" · ") : "No administrator role confirmed";
+  const grouped=useMemo(()=>groupOrder.map(group=>({group,items:navDestinations.filter(item=>groupFor(item.href)===group)})).filter(entry=>entry.items.length),[navDestinations]);\n  const roleSummary = roles === null ? "Resolving account access…" : roles.length ? roles.map((role) => role.replaceAll("_", " ")).join(" · ") : "No administrator role confirmed";\n  const toggleCollapsed=()=>setCollapsed(value=>{const next=!value;try{window.localStorage.setItem("mpa-admin-sidebar-collapsed",String(next));}catch{}return next;});\n  const toggleGroup=(group:string)=>setExpandedGroups(value=>{const next=value.includes(group)?value.filter(item=>item!==group):[...value,group];try{window.localStorage.setItem("mpa-admin-sidebar-groups",JSON.stringify(next));}catch{}return next;});
   const navDestinations = useMemo(() => {
     const platformAdmin = Boolean(roles?.some((role) => ["system_admin", "admin", "platform_admin"].includes(role)));
     const membershipReviewer = Boolean(roles?.some((role) => ["reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
@@ -108,24 +111,4 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     });
   }, [roles, permissions, reportIds]);
 
-  return <div className={styles.workspace}>
-    <aside className={styles.sidebar} aria-label="Administration navigation">
-      <div className={styles.brand}><span className={styles.brandMark}><Building2 size={19} /></span><div><strong>MPA operations</strong><span>Administration workspace</span></div></div>
-      <nav className={styles.nav} aria-label="Admin workspaces">
-        {navDestinations.map(({ href, label, description, icon: Icon, exact = false }) => {
-          const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-          return <Link key={href} href={href} title={description} aria-current={active ? "page" : undefined} className={active ? styles.active : styles.link}>
-            <Icon size={18} aria-hidden="true" /><span className={styles.linkText}><strong>{label}</strong><small>{description}</small></span>
-          </Link>;
-        })}
-      </nav>
-      <div className={styles.access}><span>Signed-in role information</span><p>{roleSummary}</p><small>Navigation is for discovery only. Every page and action must still be authorized by the server.</small></div>
-    </aside>
-    <section className={styles.content}>
-      <nav className={styles.breadcrumbs} aria-label="Breadcrumb">
-        <Link href="/admin">Administration</Link><span aria-hidden="true">/</span><span aria-current="page">{current?.label ?? "Workspace"}</span>
-      </nav>
-      {children}
-    </section>
-  </div>;
-}
+  return <div className={`${styles.workspace} ${collapsed?styles.collapsed:""}`}><aside className={styles.sidebar} aria-label="Administration navigation"><div className={styles.brand}><span className={styles.brandMark}><Building2 size={19}/></span>{!collapsed&&<div><strong>MPA operations</strong><span>Administration</span></div>}<button type="button" className={styles.collapseButton} onClick={toggleCollapsed} aria-label={collapsed?"Expand navigation":"Collapse navigation"}>{collapsed?<ChevronRight size={17}/>:<ChevronLeft size={17}/>}</button></div><nav className={styles.nav} aria-label="Admin workspaces">{grouped.map(({group,items})=>{const Icon=groupIcons[group as keyof typeof groupIcons];const open=expandedGroups.includes(group)||items.some(item=>item.href===pathname||pathname.startsWith(`${item.href}/`));if(group==="Overview")return items.map(item=><Link key={item.href} href={item.href} title={collapsed?item.label:item.description} aria-current={pathname===item.href?"page":undefined} className={pathname===item.href?styles.active:styles.link}><item.icon size={18}/>{!collapsed&&<span className={styles.linkText}>{item.label}</span>}</Link>);return <section className={styles.navGroup} key={group}><button type="button" className={styles.groupButton} onClick={()=>collapsed?toggleCollapsed():toggleGroup(group)} aria-expanded={open} title={collapsed?group:undefined}><Icon size={17}/>{!collapsed&&<><span>{group}</span><small>{items.length}</small><ChevronDown size={14} className={open?styles.chevronOpen:styles.chevron}/></>}</button>{open&&!collapsed&&<div className={styles.groupItems}>{items.map(item=>{const active=item.href===pathname||pathname.startsWith(`${item.href}/`);return <Link key={item.href} href={item.href} title={item.description} aria-current={active?"page":undefined} className={active?styles.active:styles.link}><item.icon size={16}/><span className={styles.linkText}>{item.label}</span></Link>;})}</div>}</section>;})}</nav>{!collapsed&&<div className={styles.access}><span>Signed-in access</span><p>{roleSummary}</p><small>Server-side authorization protects every action.</small></div>}</aside><section className={styles.content}><nav className={styles.breadcrumbs} aria-label="Breadcrumb"><Link href="/admin">Administration</Link><span>/</span><span aria-current="page">{current?.label??"Workspace"}</span></nav>{children}</section></div>;

@@ -260,7 +260,7 @@ export async function getMentorshipProgrammeMetrics(actorId){
  const n=v=>v===null||v===undefined?null:Number(v);
  const totalMatches=n(row.total_match_proposals)||0,respondedMatches=n(row.responded_match_proposals)||0;
  const totalSessionResponses=n(row.responded_session_proposals)||0,confirmed=n(row.confirmed_sessions)||0;
- const totalLearning=n(row.total_learning_submissions)||0,acceptedLearning=n(row.accepted_learning_submissions)||0;
+ const totalLearning=n(row.total_learning_submissions)||0,acceptedLearning=n(row.accepted_learning_submissions)||0;\n const totalActivities=n(row.total_learning_activities)||0,completedActivities=n(row.completed_learning_activities)||0;
  const completed=n(row.completed_relationships)||0,closed=completed+(n(row.cancelled_relationships)||0);
  return {
   activeRelationships:n(row.active_relationships)||0,pausedRelationships:n(row.paused_relationships)||0,
@@ -278,7 +278,7 @@ export async function getMentorshipProgrammeMetrics(actorId){
   definitions:{
    mentorResponseRate:"Responded match proposals divided by all recorded match proposals.",
    sessionConfirmationRate:"Confirmed sessions divided by session proposals with a recorded response.",
-   learningAcceptanceRate:"Accepted versioned submissions divided by all submitted versions.",
+   learningAcceptanceRate:"Accepted versioned submissions divided by all submitted versions.",\n   learningCompletionRate:"Published learning activities with an accepted submission divided by all published activities.",
    relationshipCompletionRate:"Completed relationships divided by completed plus cancelled relationships.",
    safeguarding:"Aggregate count only; case details remain in the separately authorized Support Desk queue."
   }

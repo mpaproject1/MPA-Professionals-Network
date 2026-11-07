@@ -70,7 +70,7 @@ async function settings(db=getPool()){
 }
 export async function getMyMembershipCard(userId){
   const db=getPool();
-  const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
+  const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
       p.name membership_type,coalesce((a.fee_snapshot->>'renewalRequired')::boolean,p.renewal_required) renewal_required,
       coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m
@@ -104,7 +104,6 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
   if(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(number)||/^MPA-(MEM|APP|REF)-/i.test(number)) throw fail(400,"This is an internal account, payment or application reference, not a membership number. Use the human-readable MPA membership ID shown in the member workspace.","WRONG_MEMBERSHIP_IDENTIFIER");
   const db=getPool();
   const row=(await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
-      ${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
       p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m join membership_product p on p.id=m.membership_product_id
     join app_user u on u.id=m.user_id left join person on person.user_id=u.id
@@ -221,7 +220,7 @@ export async function rotateMembershipCardVerification(recordId,actorId,requestI
 export async function verifyMembershipCard(identifier,token){
   if(typeof identifier!=="string"||!identifier.trim()||identifier.length>100||typeof token!=="string") return {valid:false,status:"invalid",message:"This membership ID could not be verified."};
   const db=getPool();
-  const row=(await db.query(`select m.id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
+  const row=(await db.query(`select m.id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
       p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m join membership_product p on p.id=m.membership_product_id
     join person on person.user_id=m.user_id

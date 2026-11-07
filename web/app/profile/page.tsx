@@ -17,6 +17,7 @@ import {
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
 import { MemberResidenceEditor } from "../../components/member-residence-editor";
+import { MemberReferralWorkspace } from "../../components/member-referral-workspace";
 import { OperationStatus } from "../../components/operation-status";
 import { SupportAction } from "../../components/support-action";
 import { Badge, Card } from "../../components/ui";
@@ -516,8 +517,10 @@ export default function Profile() {
               { id: "member-details", label: "Member details", detail: "Optional residence details" },
               { id: "preferences", label: "Preferences", detail: "Contact channels and language" },
               { id: "account", label: "Account", detail: "Membership and sign-in" },
+              { id: "referrals", label: "Referrals", detail: "Invite members and track outcomes" },
             ].map((tab) => <button key={tab.id} type="button" className={`${styles.workspaceTab} ${activeWorkspaceTab === tab.id ? styles.workspaceTabActive : ""}`} aria-current={activeWorkspaceTab === tab.id ? "page" : undefined} onClick={() => setActiveWorkspaceTab(tab.id)}><b>{tab.label}</b><small>{tab.detail}</small></button>)}
           </nav>
+          {activeWorkspaceTab === "referrals" && <section className={styles.workspacePanel} aria-label="Member referrals"><MemberReferralWorkspace compact /></section>}
           {activeWorkspaceTab === "member-details" && <section className={styles.workspacePanel} aria-label="Optional member details"><div><div className="eyebrow">Member details · optional</div><h2 className="h2">Residence information</h2><p className="muted">This information helps MPA understand member distribution and route relevant services. It is account information, not part of your professional profile, and is not shown in the public talent directory.</p></div><MemberResidenceEditor /></section>}
           {activeWorkspaceTab === "professional-profile" && <>
           <section className={styles.stepper} aria-label="Professional profile onboarding">

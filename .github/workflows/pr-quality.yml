@@ -259,6 +259,15 @@ jobs:
           test -s .next/build-manifest.json
           echo "Production build artifacts exist. No deployment or upload is performed."
 
+      - name: Upload production build for browser acceptance
+        if: ${{ steps.production_build.outcome == 'success' && steps.build_output.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-production-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: web/.next/
+          if-no-files-found: error
+          retention-days: 1
+
 
 
       - name: Fail production build job when build validation fails
@@ -295,6 +304,11 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install locked dependencies
         run: npm ci
+      - name: Download exact production build
+        uses: actions/download-artifact@v4
+        with:
+          name: next-production-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: web/.next/
       - name: Cache Playwright browser binaries
         uses: actions/cache@v4
         with:

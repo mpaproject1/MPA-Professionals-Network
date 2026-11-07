@@ -25,12 +25,20 @@ test("membership card status reflects current dates and lifecycle status",()=>{
 
 test("unverified legacy imports are not treated as active card-eligible memberships",()=>{
   const now=new Date("2026-10-15T12:00:00.000Z");
-  assert.equal(getMembershipCardStatus({source:"legacy_import",legacy_payment_verified:false,status:"active",start_date:"2026-01-01",end_date:"2026-12-31"},now),"payment_verification_required");
-  assert.equal(getMembershipCardStatus({source:"legacy_import",legacy_payment_verified:true,status:"active",start_date:"2026-01-01",end_date:"2026-12-31"},now),"active");
+  assert.equal(getMembershipCardStatus({source:"legacy_import",legacy_fee_settled:false,status:"active",start_date:"2026-01-01",end_date:"2026-12-31"},now),"payment_verification_required");
+  assert.equal(getMembershipCardStatus({source:"legacy_import",legacy_fee_settled:true,status:"active",start_date:"2026-01-01",end_date:"2026-12-31"},now),"active");
 });
 
 test("membership card dates follow the Addis Ababa civil day at UTC date boundaries",()=>{
   const justAfterMidnightInAddis=new Date("2026-10-15T21:30:00.000Z");
   assert.equal(getMembershipCardStatus({status:"active",start_date:"2026-10-16",end_date:null},justAfterMidnightInAddis),"active");
   assert.equal(getMembershipCardStatus({status:"active",start_date:"2026-01-01",end_date:"2026-10-15"},justAfterMidnightInAddis),"expired");
+});
+
+test("legacy imported membership is card-eligible only after the full historical obligation is settled",()=>{
+  const now=new Date("2026-10-15T12:00:00.000Z");
+  const imported={source:"legacy_import",status:"active",start_date:"2026-01-01",end_date:"2026-12-31"};
+  assert.equal(getMembershipCardStatus({...imported,legacy_fee_settled:false},now),"payment_verification_required");
+  assert.equal(getMembershipCardStatus({...imported,legacy_fee_settled:true},now),"active");
+  assert.equal(getMembershipCardStatus({source:"online",status:"active",start_date:"2026-01-01",end_date:"2026-12-31"},now),"active");
 });

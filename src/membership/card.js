@@ -57,8 +57,15 @@ function cardPayload(row,cardSettings){
   return {membershipNumber:row.membership_number,memberName:row.member_name||"MPA Member",membershipType:row.membership_type,status:"active",startDate:row.start_date,endDate:row.end_date,verificationPath:"/membership/verify?membershipNumber="+encodeURIComponent(row.membership_number)+"&token="+encodeURIComponent(token),settings:cardSettings};
 }
 async function settings(db=getPool()){
-  const row=(await db.query("select header_text,subtitle_text,footer_text,background_style,background_start,background_end,accent_color,text_color,show_membership_type from membership_card_settings where id=1")).rows[0];
-  return row||DEFAULT_SETTINGS;
+  try{
+    const row=(await db.query("select header_text,subtitle_text,footer_text,background_style,background_start,background_end,accent_color,text_color,show_membership_type from membership_card_settings where id=1")).rows[0];
+    return row||DEFAULT_SETTINGS;
+  }catch(error){
+    // Card appearance settings are optional; missing configuration must not block
+    // retrieval of a membership record or its canonical membership number.
+    if(error?.code==="42P01") return DEFAULT_SETTINGS;
+    throw error;
+  }
 }
 export async function getMyMembershipCard(userId){
   const db=getPool();

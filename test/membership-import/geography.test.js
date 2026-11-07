@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   applyMemberGeographyImport,
   getMemberGeographySummary,
+  exportPublishedMemberGeography,
   getMyResidence,
   listMemberGeography,
   memberGeographyImportTemplate,
@@ -28,6 +29,10 @@ test("geography reference workbook exposes a versioned parent-child import contr
 
 test("ordinary members cannot preview administrative geography imports",async()=>{
  await assert.rejects(previewMemberGeographyImport(member,{xlsxBase64:"invalid"},requestId),error=>error.statusCode===403&&error.code==="FORBIDDEN");
+});
+
+test("ordinary members cannot export administrative geography workbooks",async()=>{
+ await assert.rejects(exportPublishedMemberGeography(member),error=>error.statusCode===403&&error.code==="FORBIDDEN");
 });
 
 
@@ -79,6 +84,14 @@ test("PostgreSQL geography workbook preview, apply, publish, member selectors an
   versionIds.push(applied.versionId);
   assert.equal(applied.status,"draft");
   await publishMemberGeographyVersion(identity,applied.versionId,{reason:"Publish verified geography fixture"},randomUUID());
+
+  const exported=await exportPublishedMemberGeography(identity);
+  const exportedWorkbook=parseXlsxRows(exported.workbook);
+  assert.equal(exported.rowCount,3);
+  assert.equal(exportedWorkbook.rows.length,3);
+  assert.ok(exportedWorkbook.rows.some(row=>row.unit_code==="ETH"&&row.country_m49==="231"));
+  assert.ok(exportedWorkbook.rows.some(row=>row.unit_code==="USA"&&row.country_m49==="840"));
+  assert.ok(exportedWorkbook.rows.some(row=>row.unit_code==="ET-REG-"+suffix&&row.parent_code==="ETH"));
 
   const published=await listMemberGeography(identity);
   assert.equal(published.version.id,applied.versionId);

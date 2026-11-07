@@ -88,6 +88,7 @@ test("member active flag and every card issuance path share the Addis-date legac
   assert.match(service,/legacy_fee_settled/);
   assert.match(service,/ensureMembershipNumber/);
   assert.match(service,/membership\.number_assigned/);
+  assert.match(service,/withTransaction\(async tx=>/);
   assert.match(service,/membership_number is null/);
   assert.match(service,/MEMBERSHIP_PLAN_UNAVAILABLE/);
   assert.match(service,/coalesce\(p\.name,application_product\.name\)/);

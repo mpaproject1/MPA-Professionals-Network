@@ -1322,12 +1322,13 @@ export async function updateMentorshipGoal(goalId,userId,input,requestId){
 
 export async function listMentorshipLearningActivities(mentorshipId,userId){
   const db=getPool(),m=await mentorshipParticipant(db,mentorshipId,userId);
-  return (await db.query(`select a.id,a.mentorship_id,a.title,a.instructions,a.due_at,a.status,a.created_at,a.updated_at,
+  return (await db.query(`select a.id,a.mentorship_id,a.title,a.instructions,a.due_at,a.status,a.goal_id,g.title goal_title,a.created_at,a.updated_at,
     coalesce((select jsonb_agg(jsonb_build_object(
       'id',s.id,'version',s.version,'response',s.response,'status',s.status,'submittedAt',s.submitted_at,
-      'reviews',coalesce((select jsonb_agg(jsonb_build_object('id',r.id,'decision',r.decision,'feedback',r.feedback,'createdAt',r.created_at) order by r.created_at) from mentorship_learning_review r where r.submission_id=s.id),'[]'::jsonb)
+      'reviews',coalesce((select jsonb_agg(jsonb_build_object('id',r.id,'decision',r.decision,'feedback',r.feedback,'strengths',r.strengths,'areasToImprove',r.areas_to_improve,'recommendedNextAction',r.recommended_next_action,'furtherResources',r.further_resources,'overallAssessment',r.overall_assessment,'createdAt',r.created_at) order by r.created_at) from mentorship_learning_review r where r.submission_id=s.id),'[]'::jsonb)
     ) order by s.version desc) from mentorship_learning_submission s where s.activity_id=a.id and s.submitted_by=$2),'[]'::jsonb) submissions
-    from mentorship_learning_activity a where a.mentorship_id=$1 and a.status='published' order by a.due_at nulls last,a.created_at desc`,[mentorshipId,m.mentee_user_id])).rows;
+    from mentorship_learning_activity a left join mentorship_goal g on g.id=a.goal_id
+    where a.mentorship_id=$1 and a.status='published' order by a.due_at nulls last,a.created_at desc`,[mentorshipId,m.mentee_user_id])).rows;
 }
 
 export async function listMyMentorshipLearningProgress(userId){
@@ -1353,7 +1354,12 @@ export async function createMentorshipLearningActivity(mentorshipId,userId,input
     if(instructions.length<10||instructions.length>4000)throw error(400,"Activity instructions must contain 10 to 4,000 characters.","VALIDATION_ERROR");
     let dueAt=null;
     if(input.dueAt){dueAt=new Date(input.dueAt);if(Number.isNaN(dueAt.getTime()))throw error(400,"Choose a valid activity due date.","VALIDATION_ERROR");}
-    const row=(await db.query("insert into mentorship_learning_activity(mentorship_id,created_by,title,instructions,due_at) values($1,$2,$3,$4,$5) returning id,mentorship_id,title,instructions,due_at,status,created_at,updated_at",[mentorshipId,userId,title,instructions,dueAt])).rows[0];
+    const goalId=input.goalId||null;
+    if(goalId){
+      const goal=(await db.query("select id from mentorship_goal where id=$1 and mentorship_id=$2",[goalId,mentorshipId])).rows[0];
+      if(!goal)throw error(400,"Choose a goal that belongs to this mentorship relationship.","INVALID_GOAL");
+    }
+    const row=(await db.query("insert into mentorship_learning_activity(mentorship_id,created_by,title,instructions,due_at,goal_id) values($1,$2,$3,$4,$5,$6) returning id,mentorship_id,title,instructions,due_at,goal_id,status,created_at,updated_at",[mentorshipId,userId,title,instructions,dueAt,goalId])).rows[0];
     await audit(db,userId,"mentorship.learning_activity_created","mentorship_learning_activity",row.id,requestId);
     await createInAppNotification(db,m.mentee_user_id,"mentorship.learning_activity_created","mentorship_learning_activity",row.id,{title:"New mentorship activity",message:"Your mentor has published a practical activity for your agreed professional goal.",actionRequired:true,nextAction:"Open My Mentorship to review and complete this activity.",dedupeKey:"mentorship-learning-activity:"+row.id});
     return row;
@@ -1389,9 +1395,18 @@ export async function reviewMentorshipLearningSubmission(submissionId,userId,inp
     const latest=(await db.query("select id from mentorship_learning_submission where activity_id=$1 and submitted_by=$2 order by version desc limit 1",[submission.activity_id,submission.submitted_by])).rows[0];
     if(latest?.id!==submissionId)throw error(409,"A newer submission exists. Review the latest version.","STALE_SUBMISSION");
     if(!["accepted","changes_requested"].includes(input.decision))throw error(400,"Choose accepted or changes requested.","VALIDATION_ERROR");
-    const feedback=String(input.feedback||"").trim();
+    const structured=input.structuredFeedback&&typeof input.structuredFeedback==="object"?input.structuredFeedback:null;
+    const strengths=String(structured?.strengths||"").trim()||null;
+    const areasToImprove=String(structured?.areasToImprove||"").trim()||null;
+    const recommendedNextAction=String(structured?.recommendedNextAction||"").trim()||null;
+    const furtherResources=String(structured?.furtherResources||"").trim()||null;
+    const overallAssessment=String(structured?.overallAssessment||"").trim()||null;
+    if(structured&&(!strengths||!areasToImprove||!recommendedNextAction||!["exceeds_expectations","meets_expectations","developing","needs_support"].includes(overallAssessment)))throw error(400,"Structured feedback requires strengths, improvement areas, a recommended next action and an overall assessment.","STRUCTURED_FEEDBACK_REQUIRED");
+    const feedback=structured
+      ? ["Strengths: "+strengths,"Areas to improve: "+areasToImprove,"Recommended next action: "+recommendedNextAction,furtherResources?"Further resources: "+furtherResources:null,"Overall assessment: "+overallAssessment.replaceAll("_"," ")].filter(Boolean).join("\\n\\n")
+      : String(input.feedback||"").trim();
     if(feedback.length<5||feedback.length>3000)throw error(400,"Feedback must contain 5 to 3,000 characters.","VALIDATION_ERROR");
-    const review=(await db.query("insert into mentorship_learning_review(submission_id,reviewer_user_id,decision,feedback) values($1,$2,$3,$4) returning id,submission_id,decision,feedback,created_at",[submissionId,userId,input.decision,feedback])).rows[0];
+    const review=(await db.query("insert into mentorship_learning_review(submission_id,reviewer_user_id,decision,feedback,strengths,areas_to_improve,recommended_next_action,further_resources,overall_assessment) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id,submission_id,decision,feedback,strengths,areas_to_improve,recommended_next_action,further_resources,overall_assessment,created_at",[submissionId,userId,input.decision,feedback,strengths,areasToImprove,recommendedNextAction,furtherResources,overallAssessment])).rows[0];
     await db.query("update mentorship_learning_submission set status=$1,updated_at=now() where id=$2",[input.decision,submissionId]);
     await audit(db,userId,"mentorship.learning_submission_reviewed","mentorship_learning_submission",submissionId,requestId,{decision:input.decision,reviewId:review.id});
     await createInAppNotification(db,submission.submitted_by,"mentorship.learning_submission_reviewed","mentorship_learning_submission",submissionId,{title:input.decision==="accepted"?"Mentor accepted your work":"Mentor requested an improvement",message:feedback,actionRequired:input.decision==="changes_requested",nextAction:input.decision==="accepted"?"Review the mentor feedback and continue to your next goal.":"Review the feedback and submit an improved version.",dedupeKey:"mentorship-learning-review:"+review.id});

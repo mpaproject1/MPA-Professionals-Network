@@ -153,6 +153,9 @@ export default function MembersWorkspacePage() {
   useEffect(() => {
     if (hydrated) void load();
   }, [hydrated, load]);
+  useEffect(() => {
+    if (window.location.hash === "#referrals") setActiveSection("referrals");
+  }, []);
 
   const latestApplication = useMemo(() => {
     if (!data?.applications.length) return null;

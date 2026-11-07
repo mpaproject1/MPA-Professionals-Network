@@ -65,7 +65,7 @@ export function MemberReferralWorkspace({ compact = false }: { compact?: boolean
       const result = await api<ReferralData>("/api/v1/me/referrals", {}, token);
       setData(result);
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : "Referral information could not be loaded. Please retry.");
+      setError(cause instanceof ApiError && cause.code === "ACTIVE_MEMBERSHIP_REQUIRED" ? "Referral invitations are available to members with a currently active MPA membership. Your account and any existing referral records remain unchanged." : cause instanceof ApiError ? cause.message : "Referral information could not be loaded. Please retry.");
       setData(null);
     } finally {
       setLoading(false);

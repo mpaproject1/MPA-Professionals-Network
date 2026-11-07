@@ -777,7 +777,7 @@ export async function listApplicationsForReview(){
 
 export async function listMembershipPaymentsForFinance(){
  const db=getPool();
- const result=await db.query(\`select * from (
+ const result=await db.query(`select * from (
   select pt.id payment_id,pt.status payment_status,pt.amount,pt.currency,pt.channel,pt.source,pt.purpose_reference,
    pt.request_payload->>'reference' payment_reference,pt.created_at,pt.verified_at,pt.verification_note,
    pt.evidence_file_id,evidence_file.original_name evidence_file_name,
@@ -822,7 +822,7 @@ export async function listMembershipPaymentsForFinance(){
   where pt.source='legacy_import' and pt.status in ('succeeded','refunded')
  ) finance_membership_payments
  order by case when payment_status='pending' then 0 else 1 end,created_at desc
- limit 500\`);
+ limit 500`);
  return result.rows;
 }
 

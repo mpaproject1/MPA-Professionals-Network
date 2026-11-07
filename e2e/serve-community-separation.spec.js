@@ -51,7 +51,7 @@ test.describe("Serve-Community approved initiative journey",()=>{
   await page.getByRole("button",{name:"Continue"}).click();
   await page.getByRole("button",{name:"Create private draft"}).click();
   await expect(page.locator(".sc-owner-card").getByRole("heading",{name:"New community initiative proposal"})).toBeVisible();
-  await expect(page.locator(".sc-owner-card").getByText("draft",{exact:true})).toBeVisible();
+  await expect(page.locator(".sc-owner-card").getByText("Draft in progress",{exact:true})).toBeVisible();
   await expect.poll(()=>ownerReads).toBeGreaterThan(1);
 
   // A hard reload must retrieve the saved record from the owner endpoint, not local component state.
@@ -63,7 +63,7 @@ test.describe("Serve-Community approved initiative journey",()=>{
   await page.getByRole("button",{name:"Submit for review"}).click();
   await expect.poll(()=>submissionRequest!==null).toBe(true);
   expect(submitted).toBe(true);
-  await expect(page.locator(".sc-owner-card").getByText("submitted",{exact:true})).toBeVisible();
+  await expect(page.locator(".sc-owner-card").getByText("Under review",{exact:true})).toBeVisible();
  });
  test("independent reviewers can approve an initiative through the restricted moderation page",async({page})=>{await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","reviewer-session"));const queue={data:{items:[{id:initiative.id,title:initiative.title,category:initiative.category,summary:initiative.summary,description:initiative.description,status:"submitted",submitted_at:initiative.publishedAt,ownerType:"member"}],limit:40,offset:0}};await page.route("**/api/v1/admin/serve-community/initiatives**",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(queue)}));let decision=null;await page.route("**/api/v1/admin/serve-community/initiatives/*/review",async route=>{decision=route.request().postDataJSON();await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"approved"}})})});await page.goto("/admin/serve-community");await expect(page.getByRole("heading",{name:initiative.title})).toBeVisible();await page.getByLabel("Reason for decision").fill("The proposal demonstrates a clear public benefit and has an appropriate participation scope.");await page.getByRole("button",{name:"Approve"}).click();await expect.poll(()=>decision!==null).toBe(true);expect(decision).toMatchObject({decision:"approve"})});
 

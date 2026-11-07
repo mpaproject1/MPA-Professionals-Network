@@ -15,6 +15,7 @@ export default function MembershipAdministrationPage() {
   const hydrated = useUiStore(state => state.hydrated);
   const hydrateToken = useUiStore(state => state.hydrateToken);
   const [access, setAccess] = useState<AccessState>("loading");
+  const [canManageFinanceConfig, setCanManageFinanceConfig] = useState(false);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 
@@ -31,6 +32,7 @@ export default function MembershipAdministrationPage() {
         if (cancelled) return;
         const roles = Array.isArray(me.roles) ? me.roles : [];
         const permissions = Array.isArray(me.permissions) ? me.permissions : [];
+        setCanManageFinanceConfig(roles.includes("finance_officer") || permissions.includes("finance.manage"));
         const allowed =
           roles.some(role => ["system_admin", "reviewer", "membership_reviewer"].includes(role)) ||
           permissions.some(permission => ["membership.review", "members.view", "members.manage"].includes(permission));
@@ -49,5 +51,5 @@ export default function MembershipAdministrationPage() {
   if (access === "denied") {
     return <Card><h1 className="h1">You do not have access to this workspace</h1><p className="muted">Membership application review and activation are available only to authorized membership administrators. Plan administration is separately permissioned. Finance authority remains separate and does not grant access to applicant records.</p><a className="btn btn-ghost" href="/admin/finance">Open Finance workspace</a></Card>;
   }
-  return <MembershipAdminWorkspace />;
+  return <><MembershipAdminWorkspace />{canManageFinanceConfig && <a className="btn btn-ghost" href="/admin/membership/payment-methods">Manage finance payment methods</a>}</>;
 }

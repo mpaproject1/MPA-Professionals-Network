@@ -50,6 +50,7 @@ import * as testLab from "./src/platform/test-lab.js";
 import * as userAdmin from "./src/platform/user-admin.js";
 import * as volunteerPledges from "./src/platform/volunteer-pledges.js";
 import {disablePushForUser, dispatchPendingPushNotifications, getPushSubscriptionStatus, getWebPushPublicConfiguration, registerPushSubscription, removePushSubscription} from "./src/platform/web-push.js";
+import {runDueMentorshipSessionReminders} from "./src/services-mentorship/reminders.js";
 import {beginAdminPasskeyAuthentication, beginAdminPasskeyRegistration, finishAdminPasskeyAuthentication, finishAdminPasskeyRegistration, listAdminPasskeys, recoverAdminPasskey, revokeAdminPasskey} from "./src/platform/webauthn.js";
 import {assertFinancePaymentQueueAccess,assertMembershipActivationAccess,assertMembershipReviewAccess,assertMembershipReviewQueueAccess,assertPaymentReversalAccess,assertPaymentVerificationAccess} from "./src/platform/workspace-authorization.js";
 import * as marketplaceDemand from "./src/services-mentorship/demand.js";
@@ -1075,6 +1076,12 @@ async function runPushDelivery(){
   if(pushWorkerRunning)return;
   pushWorkerRunning=true;
   try {
+    try {
+      const reminders=await runDueMentorshipSessionReminders();
+      if(reminders.notificationsEnqueued)logger.info("mentorship.session_reminders.enqueued",reminders);
+    } catch(error) {
+      logger.warn("mentorship.session_reminders.enqueue_failed",{error:error.message,code:error.code||"MENTORSHIP_REMINDER_ENQUEUE_FAILED"});
+    }
     const result=await dispatchPendingPushNotifications(Number(process.env.PUSH_DELIVERY_BATCH_SIZE)||50);
     if(result.sent||result.failed)logger.info("push.outbox.dispatched",{sent:result.sent||0,failed:result.failed||0,mode:result.mode||"provider"});
   } catch(error) {

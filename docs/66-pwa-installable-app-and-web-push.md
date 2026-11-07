@@ -85,3 +85,7 @@ The follow-up source audit on PR #18 checked the manifest, app shell, service wo
 - Moved the notification preference controls and device push settings to the top of the signed-in Action Center, above notification counts and the inbox. They are no longer hidden inside a collapsed disclosure.
 - Added a first-position Notification preferences shortcut on the installed app's `/mobile` home, deep-linking directly to the visible preference section.
 - Added regression assertions for offline route allowlisting, private-route exclusions, cached public HTML, the offline hub and notification preference placement. Runtime validation remains outstanding; do not claim offline browser acceptance until tested with DevTools offline mode and on installed Android/iOS devices.
+
+## Mentorship session reminders
+
+The persistent API push worker now checks for mutually confirmed mentorship sessions every 30 seconds and enqueues idempotent one-day and one-hour reminders for both participants. The standalone `scripts/dispatch-web-push.js` job runs the same scheduler before draining the push outbox, so an existing cPanel dispatch job is also supported. Both paths share the notification-event deduplication key; running both does not create duplicate reminders. Reminders respect each participant's notification preferences and subscription state. Verify that the API worker is running and that Web Push is configured before treating lock-screen delivery as active. The in-app notification remains the source of truth when device push is unavailable.

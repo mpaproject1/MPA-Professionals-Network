@@ -59,6 +59,22 @@ export function memberGeographyImportTemplate(identity){
  authorized(identity);
  return createXlsx([],COLUMNS);
 }
+
+export async function exportPublishedMemberGeography(identity){
+ authorized(identity);
+ const db=getPool();
+ const version=(await db.query("select id,version_label from membership_geography_version where status='published' order by published_at desc limit 1")).rows[0];
+ if(!version)throw fail(404,"There is no published geography version to export.","GEOGRAPHY_NOT_PUBLISHED");
+ const result=await db.query(`select u.unit_code,u.label,u.unit_level,coalesce(p.unit_code,'') parent_code,
+  coalesce(u.country_iso3,'') country_iso3,coalesce(u.country_m49,'') country_m49,
+  u.source_name,u.source_version,coalesce(to_char(u.effective_from,'YYYY-MM-DD'),'') effective_from,
+  coalesce(to_char(u.effective_to,'YYYY-MM-DD'),'') effective_to,u.active,u.metadata
+  from membership_geography_unit u
+  left join membership_geography_unit p on p.id=u.parent_id and p.version_id=u.version_id
+  where u.version_id=$1 order by case u.unit_level when 'country' then 0 when 'region' then 1 when 'federal_city' then 1 when 'zone' then 2 when 'sub_city' then 2 else 3 end,u.unit_code`,[version.id]);
+ const rows=result.rows.map(row=>({...row,active:row.active?"true":"false",metadata:JSON.stringify(row.metadata||{})}));
+ return {workbook:createXlsx(rows,COLUMNS),versionLabel:version.version_label,rowCount:rows.length};
+}
 export async function listMemberGeography(identity){
  if(!identity?.sub)throw fail(401,"Sign in to view member residence reference data.","UNAUTHORIZED");
  const db=getPool();

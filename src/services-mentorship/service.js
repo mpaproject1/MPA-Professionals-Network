@@ -974,6 +974,7 @@ export async function setMentorAvailability(profileId,userId,input,requestId){
       const validTime=v=>/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(v);
       if(!validTime(start)||!validTime(end)||start>=end) throw error(400,"Availability start and end times must be valid and end after start on the same day.","VALIDATION_ERROR");
       const timezone=String(s.timezone||"Africa/Addis_Ababa").trim();
+      if(timezone.length>80)throw error(400,"Availability timezone is too long.","VALIDATION_ERROR");
       try{new Intl.DateTimeFormat("en-US",{timeZone:timezone}).format(new Date());}
       catch{throw error(400,"Choose a valid IANA timezone for every availability slot.","INVALID_TIMEZONE");}
       const day=Number(s.dayOfWeek),startMinute=Number(start.slice(0,2))*60+Number(start.slice(3,5)),endMinute=Number(end.slice(0,2))*60+Number(end.slice(3,5));

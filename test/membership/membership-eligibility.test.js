@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { legacyMembershipFeeSettledSql, membershipIsCurrentlyActiveSql } from "../../src/membership/eligibility.js";
+import { legacyMembershipFeeSettledSql, legacyMembershipPaymentVerificationRequiredSql, membershipIsCurrentlyActiveSql } from "../../src/membership/eligibility.js";
 
 test("legacy settlement requires at least one linked obligation and no outstanding linked balance",()=>{
   const sql=legacyMembershipFeeSettledSql("mr");
@@ -25,4 +25,13 @@ test("membership active predicate applies Addis Ababa inclusive dates and legacy
 test("eligibility SQL only accepts trusted simple table aliases",()=>{
   assert.throws(()=>legacyMembershipFeeSettledSql("m; drop table membership_record"),TypeError);
   assert.throws(()=>membershipIsCurrentlyActiveSql("m --"),TypeError);
+});
+
+test("legacy membership payment verification is distinct from inactive or expired membership",()=>{
+  const sql=legacyMembershipPaymentVerificationRequiredSql("mr");
+  assert.match(sql,/mr\.status='active'/);
+  assert.match(sql,/mr\.source,''\)='legacy_import'/);
+  assert.match(sql,/not \(/);
+  assert.match(sql,/membership_fee_obligation_balance/);
+  assert.match(sql,/Africa\/Addis_Ababa/);
 });

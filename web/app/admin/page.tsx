@@ -122,6 +122,11 @@ export default function AdminPage() {
   }, [hydrated, token, canSeeOperationalQueues, loadOperationalQueues]);
   const totalUnreviewed = (operationalQueues?.rows || []).reduce((sum, row) => sum + Math.max(0, Number(row.Unreviewed) || 0), 0);
   const operationalQueueLinks: Record<string, string> = { "Membership application": "/admin/membership-center", "Professional verification": "/verification", "Organization verification": "/organizations", "Marketplace demand": "/admin/marketplace" };
+  const workspaceShortcuts = [
+    ...(isPlatformAdmin ? [{ href:"/admin/accounts", label:"Account and Team", description:"Manage accounts, roles and access." }, { href:"/admin/experience", label:"Help, guides and demos", description:"Open contextual guides and training scenarios." }] : []),
+    ...(roles.some(role => ["reviewer","system_admin"].includes(role)) || permissions.includes("jobs.review") ? [{ href:"/admin/jobs/review", label:"Vacancy review", description:"Review submitted vacancies and publication decisions." }] : []),
+    ...(roles.some(role => ["supporting_staff","system_admin"].includes(role)) ? [{ href:"/admin/mentorship-reports", label:"Mentorship reports", description:"Review confidential participant reports and outcomes." }] : []),
+  ];
   async function decideInquiry(item: Inquiry, status: string, considerNonMember: boolean) {
     try {
       await api(`/api/v1/opportunity-inquiries/${item.id}`, { method: "PATCH", body: JSON.stringify({ status, consider_non_member: considerNonMember }) }, token);
@@ -190,6 +195,7 @@ export default function AdminPage() {
         <article className={styles.metric}><span>Opportunity inquiries</span><strong>{!canReviewInquiries ? "—" : loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "Unavailable" : inquiries.length}</strong><small>{!canReviewInquiries ? "Review permission required" : loading ? "Retrieving current results" : sectionErrors.includes("opportunity inquiries") ? "Could not verify this count · retry to check" : "Records returned to this workspace"}</small></article>
         <article className={styles.metric}><span>Operational queue groups</span><strong>{operationalQueues ? new Set(operationalQueues.rows.map((row) => row.Queue)).size : "—"}</strong><small>{operationalQueues ? "Authoritative backend report groups" : "Awaiting verified queue snapshot"}</small></article>
       </section>
+      {workspaceShortcuts.length > 0 && <section className={styles.section} aria-labelledby="admin-workspace-shortcuts"><div className={styles.sectionHeader}><div><h2 id="admin-workspace-shortcuts">Your workspaces</h2><p>Open the dedicated workspace for each authorized operational task.</p></div></div><div className={styles.moduleGrid}>{workspaceShortcuts.map(({href,label,description})=><a className={styles.moduleCard} href={href} key={href}><span className={styles.moduleCopy}><strong>{label}</strong><span>{description}</span></span><span className={styles.moduleArrow} aria-hidden="true">↗</span></a>)}</div></section>}
       {canSeeOperationalQueues && (
         <section className={styles.section} aria-labelledby="admin-operational-queues-heading">
           <div className={styles.sectionHeader}>

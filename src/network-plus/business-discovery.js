@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
 import { assertOrganizationCapability, hasCurrentActiveMembership, hasProfessionalIdentity, policyError } from "../platform/identity-policy.js";
 import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
@@ -13,6 +13,7 @@ const LISTING_KINDS = new Set(["need","offer","product_profile","service_profile
 const MODIFIABLE = new Set(["displayName","tradingName","description","website","locationLabel"]);
 const LISTING_MODIFIABLE = new Set(["title","summary","description","serviceCategory","audience","deliveryMode","remoteAvailable","locationLabel","capacity","pricingModel","priceAmount","currency","pricingDetails","availability","credentials"]);
 const hash = value => createHash("sha256").update(String(value)).digest("hex");
+const newOpportunityReference = () => "MPA-OPP-" + new Date().toISOString().slice(0,10).replaceAll("-","") + "-" + randomUUID().slice(0,8).toUpperCase();
 const fingerprint = value => hash(JSON.stringify(value));
 function fail(status,message,code="BUSINESS_RULE"){ throw policyError(status,message,code); }
 function text(value,max,field,{min=1,optional=false}={}) {
@@ -355,7 +356,7 @@ export async function createOpportunityListingDraft(businessId,userId,input,requ
     const existing=(await db.query("select * from network_plus_service_listing where request_idempotency_hash=$1 for update",[keyHash])).rows[0];
     if(existing){if(existing.request_fingerprint!==payloadFingerprint)fail(409,"This draft key was already used for different details.","IDEMPOTENCY_CONFLICT");return {...existing,idempotent:true};}
     await validateListingTaxonomy(db,category,subcategory,listingKind);
-    const row=(await db.query("insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,listing_kind,subcategory_code,structured_attributes,wizard_step,draft_saved_at,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12) returning *",[businessId,userId,title,summary,description,category,listingKind,subcategory,attributes,step,keyHash,payloadFingerprint])).rows[0];
+    const row=(await db.query("insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,listing_kind,subcategory_code,structured_attributes,wizard_step,draft_saved_at,public_reference,request_idempotency_hash,request_fingerprint) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12,$13) returning *",[businessId,userId,title,summary,description,category,listingKind,subcategory,attributes,step,newOpportunityReference(),keyHash,payloadFingerprint])).rows[0];
     await audit(db,userId,"network_plus.listing_draft_created","network_plus_service_listing",row.id,requestId,{businessId,listingKind});return row;
   });
 }
@@ -435,7 +436,7 @@ export async function saveOpportunityListingDraft(listingId,userId,input,request
 }
 export async function listMyOpportunityListings(userId) {
   const db=getPool();await assertEntry(db,userId);const businesses=await listMyBusinesses(userId),ids=businesses.map(b=>b.id);if(!ids.length)return [];
-  return (await db.query("select s.id,s.business_id,b.display_name business_name,s.title,s.summary,s.description,s.service_category category_code,s.subcategory_code,s.listing_kind,s.structured_attributes,s.wizard_step,s.draft_saved_at,s.status,s.moderation_reason,s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.pricing_details,s.remote_available,s.service_radius_km,s.availability_status,s.lead_time_days,s.active_work_limit,s.timezone,s.next_available_at,s.target_audience,s.secondary_tags,(select coalesce(jsonb_agg(jsonb_build_object('id',u.id,'version_id',lg.geography_version_id,'code',u.unit_code,'label',u.label,'level',u.unit_level) order by u.label),'[]'::jsonb) from network_plus_service_listing_geography lg join membership_geography_unit u on u.id=lg.geography_unit_id and u.version_id=lg.geography_version_id where lg.listing_id=s.id) geography_areas,s.created_at,s.updated_at,s.published_at from network_plus_service_listing s join network_plus_business b on b.id=s.business_id where s.business_id=any($1::uuid[]) order by case when s.status='draft' then 0 else 1 end,s.updated_at desc",[ids])).rows;
+  return (await db.query("select s.id,s.public_reference,s.business_id,b.display_name business_name,s.title,s.summary,s.description,s.service_category category_code,s.subcategory_code,s.listing_kind,s.structured_attributes,s.wizard_step,s.draft_saved_at,s.status,s.moderation_reason,s.audience,s.delivery_mode,s.location_label,s.capacity,s.pricing_model,s.price_amount,s.currency,s.pricing_details,s.remote_available,s.service_radius_km,s.availability_status,s.lead_time_days,s.active_work_limit,s.timezone,s.next_available_at,s.target_audience,s.secondary_tags,(select coalesce(jsonb_agg(jsonb_build_object('id',u.id,'version_id',lg.geography_version_id,'code',u.unit_code,'label',u.label,'level',u.unit_level) order by u.label),'[]'::jsonb) from network_plus_service_listing_geography lg join membership_geography_unit u on u.id=lg.geography_unit_id and u.version_id=lg.geography_version_id where lg.listing_id=s.id) geography_areas,s.created_at,s.updated_at,s.published_at from network_plus_service_listing s join network_plus_business b on b.id=s.business_id where s.business_id=any($1::uuid[]) order by case when s.status='draft' then 0 else 1 end,s.updated_at desc",[ids])).rows;
 }
 export async function createProfessionalServiceListing(businessId,userId,input,requestId,idempotencyKey) {
   if(typeof idempotencyKey!=="string"||!/^[A-Za-z0-9_-]{32,200}$/.test(idempotencyKey))fail(400,"A secure idempotency key is required.","IDEMPOTENCY_KEY_REQUIRED");
@@ -447,8 +448,8 @@ export async function createProfessionalServiceListing(businessId,userId,input,r
       if(existing.request_fingerprint!==payloadFingerprint)fail(409,"This submission key was already used for different listing details.","IDEMPOTENCY_CONFLICT");
       return {...existing,idempotent:true};
     }
-    const row=(await db.query(`insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,audience,delivery_mode,location_label,capacity,pricing_model,price_amount,currency,pricing_details,remote_available,availability,credentials,request_idempotency_hash,request_fingerprint)
-      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) returning *`,[businessId,userId,normalized.title,normalized.summary,normalized.description,normalized.serviceCategory,normalized.audience,normalized.deliveryMode,normalized.locationLabel,normalized.capacity,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.pricingDetails,normalized.remoteAvailable,normalized.availability,normalized.credentials,keyHash,payloadFingerprint])).rows[0];
+    const row=(await db.query(`insert into network_plus_service_listing(business_id,created_by,title,summary,description,service_category,audience,delivery_mode,location_label,capacity,pricing_model,price_amount,currency,pricing_details,remote_available,availability,credentials,public_reference,request_idempotency_hash,request_fingerprint)
+      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) returning *`,[businessId,userId,normalized.title,normalized.summary,normalized.description,normalized.serviceCategory,normalized.audience,normalized.deliveryMode,normalized.locationLabel,normalized.capacity,normalized.pricingModel,normalized.priceAmount,normalized.currency,normalized.pricingDetails,normalized.remoteAvailable,normalized.availability,normalized.credentials,newOpportunityReference(),keyHash,payloadFingerprint])).rows[0];
     await audit(db,userId,"network_plus.service_listing_created","network_plus_service_listing",row.id,requestId,{businessId});
     return row;
   });
@@ -475,7 +476,8 @@ export async function submitProfessionalServiceListing(listingId,userId,requestI
     const row=(await db.query("select * from network_plus_service_listing where id=$1 for update",[listingId])).rows[0];
     if(!row)fail(404,"Professional service listing not found.","NOT_FOUND");
     await assertBusinessOwner(db,row.business_id,userId);
-    await assertBusinessPublishable(db,row.business_id,{requirePublished:true});
+    const businessState=(await db.query("select verification_status,publication_status from network_plus_business where id=$1",[row.business_id])).rows[0];
+    if(!businessState||businessState.publication_status==="archived"||businessState.publication_status==="suspended"||businessState.verification_status==="suspended")fail(409,"This business is suspended or archived and cannot submit new opportunities.","BUSINESS_NOT_PUBLISHABLE");
     if(!["draft","changes_requested","rejected","paused","suspended"].includes(row.status))fail(409,"This listing is not ready for moderation submission.","INVALID_STATE");
     if(!row.title||!row.summary||!row.description||!row.service_category)fail(400,"Complete the title, summary, description and category before submitting this listing.","LISTING_INCOMPLETE");
     const taxonomy=(await db.query("select field_schema,listing_kinds from network_plus_listing_taxonomy where code=$1 and active=true",[row.service_category])).rows[0];
@@ -509,13 +511,19 @@ export async function moderateProfessionalServiceListing(listingId,userId,input,
     if(row.created_by===userId||row.submitted_by===userId)fail(403,"A listing creator or submitter cannot moderate their own listing.","SELF_REVIEW_FORBIDDEN");
     await assertIndependentBusinessReviewer(db,row.business_id,userId);
     if(status==="suspended" ? !["published","paused","pending_review"].includes(row.status) : !["pending_review","suspended"].includes(row.status))fail(409,"This listing is not in a state eligible for the requested moderation decision.","INVALID_STATE");
-    if(status==="published")await assertBusinessPublishable(db,row.business_id,{requirePublished:true});
+    let moderationStatus=status;
+    if(status==="published"){
+      const businessState=(await db.query("select verification_status,publication_status from network_plus_business where id=$1",[row.business_id])).rows[0];
+      if(!businessState||businessState.publication_status==="archived"||businessState.publication_status==="suspended"||businessState.verification_status==="suspended")fail(409,"A suspended or archived business cannot have an approved opportunity published.","BUSINESS_NOT_PUBLISHABLE");
+      try{await assertBusinessPublishable(db,row.business_id,{requirePublished:true});}
+      catch{moderationStatus="approved_pending_business";}
+    }
     const updated=(await db.query(`update network_plus_service_listing set status=$1,moderation_reason=$2,reviewed_by=$3,reviewed_at=now(),
       published_at=case when $1='published' then now() else published_at end,
       suspended_at=case when $1='suspended' then now() else null end,
-      suspension_reason=case when $1='suspended' then $2 else null end,updated_at=now() where id=$4 returning *`,[status,reason,userId,listingId])).rows[0];
-    await audit(db,userId,"network_plus.service_listing_moderated","network_plus_service_listing",listingId,requestId,{status,reason,businessId:row.business_id,from:row.status,to:status});
-    await notifyOwners(db,row.business_id,"network_plus.service_listing_moderation_decided",{message:"A moderation decision was recorded for a professional service listing.",nextAction:status==="published"?"Your listing is now visible to eligible Network-Plus members.":"Review the moderation reason and update the listing if changes are requested.",actionUrl:"/network-plus",status,eventVersion:updated.updated_at});
+      suspension_reason=case when $1='suspended' then $2 else null end,updated_at=now() where id=$4 returning *`,[moderationStatus,reason,userId,listingId])).rows[0];
+    await audit(db,userId,"network_plus.service_listing_moderated","network_plus_service_listing",listingId,requestId,{status:moderationStatus,reason,businessId:row.business_id,from:row.status,to:moderationStatus});
+    await notifyOwners(db,row.business_id,"network_plus.service_listing_moderation_decided",{message:"A moderation decision was recorded for a professional service listing.",nextAction:moderationStatus==="published"?"Your listing is now visible to eligible Network-Plus members.":moderationStatus==="approved_pending_business"?"Your listing content is approved. Complete business verification and profile publication before it becomes visible.":"Review the moderation reason and update the listing if changes are requested.",actionUrl:"/network-plus",status:moderationStatus,eventVersion:updated.updated_at});
     return updated;
   });
 }
@@ -664,7 +672,11 @@ export async function reviewBusinessModeration(businessId,userId,input,requestId
     const updated=(await db.query("update network_plus_business set moderation_status=$1,publication_status=case when $1='suspended' then 'suspended' when $1='approved' then 'published' else 'draft' end,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];
     if(status==="suspended")await transitionBusinessListings(db,businessId,userId,["published","paused","pending_review"],"suspended",requestId,reason,"network_plus.listing_suspended_by_business_verification");
     await audit(db,userId,"network_plus.business_profile_moderated","network_plus_business",businessId,requestId,{status,reason});
-    await notifyOwners(db,businessId,"network_plus.business_profile_moderation_decided",{message:"A moderation decision was recorded for your business profile.",nextAction:status==="approved"?"Your approved business profile is now discoverable by eligible Network-Plus members.":"Review the decision reason and make any requested corrections.",status,eventVersion:updated.updated_at});
+    if(status==="approved"){
+      const released=(await db.query("update network_plus_service_listing set status=$1,published_at=coalesce(published_at,now()),updated_at=now() where business_id=$2 and status=$3 returning id",["published",businessId,"approved_pending_business"])).rows;
+      for(const listing of released)await audit(db,userId,"network_plus.service_listing_published_after_business_approval","network_plus_service_listing",listing.id,requestId,{businessId,from:"approved_pending_business",to:"published"});
+    }
+    await notifyOwners(db,businessId,"network_plus.business_profile_moderation_decided",{message:"A decision was recorded for your business profile.",nextAction:status==="approved"?"Your approved business profile is now discoverable. Previously approved listings are now eligible for discovery.":"Review the decision reason and make any requested corrections.",status,eventVersion:updated.updated_at});
     return updated;
   });
 }
@@ -675,6 +687,10 @@ export async function changeBusinessPublicationStatus(businessId,userId,status,r
     if(status==="published")await assertBusinessPublishable(db,businessId);
     if(business.publication_status==="suspended")fail(409,"Only an independent moderator can clear a business suspension.","MODERATION_CLEARANCE_REQUIRED");
     const updated=(await db.query("update network_plus_business set publication_status=$1,updated_at=now() where id=$2 returning *",[status,businessId])).rows[0];
+    if(status==="published"){
+      const released=(await db.query("update network_plus_service_listing set status=$1,published_at=coalesce(published_at,now()),updated_at=now() where business_id=$2 and status=$3 returning id",["published",businessId,"approved_pending_business"])).rows;
+      for(const listing of released)await audit(db,userId,"network_plus.service_listing_published_after_business_approval","network_plus_service_listing",listing.id,requestId,{businessId,from:"approved_pending_business",to:"published"});
+    }
     await audit(db,userId,"network_plus.business_publication_changed","network_plus_business",businessId,requestId,{from:business.publication_status,to:status,reason:String(reason||"").trim().slice(0,500)||null});
     return updated;
   });

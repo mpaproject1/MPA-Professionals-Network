@@ -97,6 +97,7 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
      const confirmedActiveMembership=Boolean(me.has_active_membership)||cardConfirmsActive;
      setHasActiveMembership(confirmedActiveMembership);
      setMembershipStatusUnavailable(false);
+     setMembershipPaymentVerificationRequired(Boolean(me.membership_payment_verification_required));
      setAccountIdentity({email:String(me.email||""),phone:String(me.phone||""),displayName:String(me.display_name||[me.first_name,me.middle_name,me.last_name].filter(Boolean).join(" ")),headline:String(me.headline||"")});
      setProfessionalDetails(current=>({...current,fullName:current.fullName||String(me.display_name||[me.first_name,me.middle_name,me.last_name].filter(Boolean).join(" ")),sector:current.sector||""}));
      if(confirmedActiveMembership){

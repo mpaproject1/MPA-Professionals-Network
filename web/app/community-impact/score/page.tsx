@@ -45,7 +45,7 @@ export default function CommunityImpactScorePage(){
       <small>Policy version {item.explanation.policyVersion}</small></div>:null}</>:null}
    </div></article>}) : <p className="impact-empty-note">No verified contribution score entries are available yet. Once authorized evaluations are recorded, their explanations will appear here.</p>}
   </section>
-  <footer className="impact-score-disclaimer"><ShieldCheck size={18}/><p><strong>Transparent by design. Fair by policy.</strong><br/>This is a private evaluation record based on reviewer-verified contributions. It is not a membership, hiring, award or opportunity eligibility decision. Your privacy choice does not reduce your score.</p><span className={data.publicScoreEnabled?"impact-visibility-on":"impact-visibility-private"}>{data.publicScoreEnabled?"Public score enabled":"Private · not published"}</span></footer>
+  <footer className="impact-score-disclaimer"><ShieldCheck size={18}/><p><strong>Transparent by design. Fair by policy.</strong><br/>This is a private evaluation record based on reviewer-verified contributions. It is not a membership, hiring, award or opportunity eligibility decision. Your privacy choice does not reduce your score.</p><span className={data.publicScoreEnabled?"impact-visibility-on":"impact-visibility-private"}>{data.publicScoreEnabled?"Public score enabled":"Private · not publicly published"}</span></footer>
   <div className="impact-score-bottom"><span>MPA COMMUNITY IMPACT</span><span>Evidence · Contribution · Outcomes</span><button type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/> Refresh record</button></div>
   </>:null}
  </main>;

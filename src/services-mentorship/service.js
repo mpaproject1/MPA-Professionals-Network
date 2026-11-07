@@ -1263,12 +1263,12 @@ export async function changeMentorshipSession(sessionId,userId,status,notes,requ
 
 export async function listMentorshipSessions(mentorshipId,userId){
   const db=getPool(); await mentorshipParticipant(db,mentorshipId,userId);
-  return (await db.query("select s.id,s.mentorship_id,s.scheduled_start_at,s.scheduled_end_at,s.mode,case when s.coordination_status='accepted' then s.location_label else null end location_label,case when s.coordination_status='accepted' then s.meeting_reference else null end meeting_reference,s.agenda,s.status,s.notes,s.completed_at,s.created_by,s.created_at,s.updated_at,s.coordination_status,s.proposed_by,s.responded_by,s.responded_at,s.proposal_note,cp.id change_proposal_id,cp.status change_proposal_status,cp.proposed_by change_proposed_by,cp.previous_start_at change_previous_start_at,cp.previous_end_at change_previous_end_at,cp.proposed_start_at change_proposed_start_at,cp.proposed_end_at change_proposed_end_at,cp.proposal_note change_proposal_note,cp.responded_at change_responded_at,cp.response_note change_response_note from mentorship_session s left join lateral (select id,status,proposed_by,previous_start_at,previous_end_at,proposed_start_at,proposed_end_at,proposal_note,responded_at,response_note from mentorship_session_change_proposal where session_id=s.id order by created_at desc limit 1) cp on true where s.mentorship_id=$1 order by s.scheduled_start_at",[mentorshipId])).rows;
+  return (await db.query("select s.id,s.mentorship_id,s.scheduled_start_at,s.scheduled_end_at,s.mode,case when s.coordination_status='accepted' then s.location_label else null end location_label,case when s.coordination_status='accepted' then s.meeting_reference else null end meeting_reference,s.agenda,s.status,s.notes,s.preparation_checklist,s.agreed_actions,s.outcome_summary,s.session_timezone,s.completed_at,s.created_by,s.created_at,s.updated_at,s.coordination_status,s.proposed_by,s.responded_by,s.responded_at,s.proposal_note,cp.id change_proposal_id,cp.status change_proposal_status,cp.proposed_by change_proposed_by,cp.previous_start_at change_previous_start_at,cp.previous_end_at change_previous_end_at,cp.proposed_start_at change_proposed_start_at,cp.proposed_end_at change_proposed_end_at,cp.proposal_note change_proposal_note,cp.responded_at change_responded_at,cp.response_note change_response_note from mentorship_session s left join lateral (select id,status,proposed_by,previous_start_at,previous_end_at,proposed_start_at,proposed_end_at,proposal_note,responded_at,response_note from mentorship_session_change_proposal where session_id=s.id order by created_at desc limit 1) cp on true where s.mentorship_id=$1 order by s.scheduled_start_at",[mentorshipId])).rows;
 }
 
 export async function listMyMentorshipSessions(userId){
   const db=getPool();
-  return (await db.query("select s.id,s.mentorship_id,s.scheduled_start_at,s.scheduled_end_at,s.mode,case when s.coordination_status='accepted' then s.location_label else null end location_label,case when s.coordination_status='accepted' then s.meeting_reference else null end meeting_reference,s.agenda,s.status,s.created_at,s.updated_at,s.coordination_status,s.proposed_by,s.responded_at,cp.id change_proposal_id,cp.status change_proposal_status,cp.proposed_by change_proposed_by,cp.proposed_start_at change_proposed_start_at,cp.proposed_end_at change_proposed_end_at,cp.responded_at change_responded_at from mentorship_session s join mentorship m on m.id=s.mentorship_id left join lateral (select id,status,proposed_by,proposed_start_at,proposed_end_at,responded_at from mentorship_session_change_proposal where session_id=s.id order by created_at desc limit 1) cp on true where (m.mentor_user_id=$1 or m.mentee_user_id=$1) order by s.scheduled_start_at desc limit 200",[userId])).rows;
+  return (await db.query("select s.id,s.mentorship_id,s.scheduled_start_at,s.scheduled_end_at,s.mode,case when s.coordination_status='accepted' then s.location_label else null end location_label,case when s.coordination_status='accepted' then s.meeting_reference else null end meeting_reference,s.agenda,s.status,s.preparation_checklist,s.agreed_actions,s.outcome_summary,s.session_timezone,s.created_at,s.updated_at,s.coordination_status,s.proposed_by,s.responded_at,cp.id change_proposal_id,cp.status change_proposal_status,cp.proposed_by change_proposed_by,cp.proposed_start_at change_proposed_start_at,cp.proposed_end_at change_proposed_end_at,cp.responded_at change_responded_at from mentorship_session s join mentorship m on m.id=s.mentorship_id left join lateral (select id,status,proposed_by,proposed_start_at,proposed_end_at,responded_at from mentorship_session_change_proposal where session_id=s.id order by created_at desc limit 1) cp on true where (m.mentor_user_id=$1 or m.mentee_user_id=$1) order by s.scheduled_start_at desc limit 200",[userId])).rows;
 }
 
 export async function submitMentorshipFeedback(mentorshipId,userId,input,requestId){
@@ -1554,5 +1554,38 @@ export async function reviewPublicMediaStory(storyId,actorId,input,requestId){
   const row=(await tx.query("update public_media_story set moderation_status=$1,moderation_note=$2,moderated_by=$3,moderated_at=now(),updated_at=now() where id=$4 returning id,moderation_status,moderation_note,moderated_at",[input.status,note,actorId,storyId])).rows[0];
   await audit(tx,actorId,"public_media_story.moderated","public_media_story",storyId,requestId,{status:input.status,consentVersion:story.consent_version});
   return {...row,nextAction:input.status==="approved"?"The consented story is approved for public display.":"The story was rejected and remains private."};
+ });
+}
+
+export async function updateMentorshipSessionDetails(sessionId,userId,input,requestId){
+ return withTransaction(async db=>{
+  const session=(await db.query("select s.*,m.mentor_user_id,m.mentee_user_id from mentorship_session s join mentorship m on m.id=s.mentorship_id where s.id=$1 for update of s",[sessionId])).rows[0];
+  if(!session)throw error(404,"Mentorship session not found.","NOT_FOUND");
+  if(session.mentor_user_id!==userId&&session.mentee_user_id!==userId)throw error(403,"Only a participant can update this session record.","FORBIDDEN");
+  if(session.coordination_status!=="accepted"||!["scheduled","completed"].includes(session.status))throw error(409,"Session preparation and follow-up are available only for confirmed sessions.","INVALID_STATE");
+  const checklist=Array.isArray(input.preparationChecklist)?input.preparationChecklist:[];
+  const actions=Array.isArray(input.agreedActions)?input.agreedActions:[];
+  if(checklist.length>20||actions.length>20)throw error(400,"A session can have at most 20 preparation items and 20 follow-up actions.","VALIDATION_ERROR");
+  const preparationChecklist=checklist.map(item=>{
+   const label=String(typeof item==="string"?item:item?.label||"").trim();
+   if(label.length<2||label.length>240)throw error(400,"Preparation items must contain 2 to 240 characters.","VALIDATION_ERROR");
+   return {label,completed:typeof item==="object"&&item?.completed===true};
+  });
+  const agreedActions=actions.map(item=>{
+   const description=String(item?.description||"").trim();
+   if(description.length<2||description.length>300)throw error(400,"Follow-up actions must contain 2 to 300 characters.","VALIDATION_ERROR");
+   let dueAt=null;
+   if(item?.dueAt){dueAt=new Date(item.dueAt);if(Number.isNaN(dueAt.getTime()))throw error(400,"A follow-up action has an invalid due date.","VALIDATION_ERROR");dueAt=dueAt.toISOString();}
+   return {description,dueAt,completed:item?.completed===true};
+  });
+  const sessionTimezone=String(input.sessionTimezone||session.session_timezone||"Africa/Addis_Ababa").trim();
+  try{new Intl.DateTimeFormat("en-US",{timeZone:sessionTimezone}).format(new Date());}
+  catch{throw error(400,"Choose a valid IANA session timezone.","INVALID_TIMEZONE");}
+  if(sessionTimezone.length>80)throw error(400,"Session timezone is too long.","VALIDATION_ERROR");
+  const outcomeSummary=input.outcomeSummary===undefined?session.outcome_summary:String(input.outcomeSummary||"").trim()||null;
+  if(outcomeSummary&&outcomeSummary.length>2000)throw error(400,"Session outcome must be 2,000 characters or fewer.","VALIDATION_ERROR");
+  const row=(await db.query("update mentorship_session set preparation_checklist=$1::jsonb,agreed_actions=$2::jsonb,outcome_summary=$3,session_timezone=$4,updated_at=now() where id=$5 returning id,preparation_checklist,agreed_actions,outcome_summary,session_timezone,updated_at",[JSON.stringify(preparationChecklist),JSON.stringify(agreedActions),outcomeSummary,sessionTimezone,sessionId])).rows[0];
+  await audit(db,userId,"mentorship.session_details_updated","mentorship_session",sessionId,requestId,{preparationItems:preparationChecklist.length,followUpActions:agreedActions.length});
+  return row;
  });
 }

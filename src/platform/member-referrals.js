@@ -77,7 +77,7 @@ export async function recordJobApplicationStage(db,applicationId,status,actorUse
  const mapping={shortlisted:"shortlisted",interview:"interview",accepted:"offer_accepted",hired:"employment_reported",rejected:"declined",withdrawn:"withdrawn"};
  const eventCode=mapping[status];if(!eventCode)return;
  const rows=(await db.query("select id,status from member_referral_attribution where referral_type='employment' and job_application_id=$1 for update",[applicationId])).rows;
- for(const row of rows){await db.query("update member_referral_attribution set status=$1,updated_at=now() where id=$2",[eventCode,row.id]);await event(db,row.id,eventCode,row.status,eventCode,actorUserId);}
+ for(const row of rows){if(row.status===eventCode)continue;await db.query("update member_referral_attribution set status=$1,updated_at=now() where id=$2",[eventCode,row.id]);await event(db,row.id,eventCode,row.status,eventCode,actorUserId);}
 }
 export async function listMyReferralProgress(userId){
  const db=getPool();

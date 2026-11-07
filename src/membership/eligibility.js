@@ -36,3 +36,14 @@ export function membershipIsCurrentlyActiveSql(tableAlias) {
     and (coalesce(${alias}.source,'')<>'legacy_import' or ${legacyMembershipFeeSettledSql(alias)})
   )`;
 }
+
+export function legacyMembershipPaymentVerificationRequiredSql(tableAlias) {
+  const alias = assertAlias(tableAlias);
+  return `(
+    ${alias}.status='active'
+    and ${alias}.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date
+    and (${alias}.end_date is null or ${alias}.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date)
+    and coalesce(${alias}.source,'')='legacy_import'
+    and not ${legacyMembershipFeeSettledSql(alias)}
+  )`;
+}

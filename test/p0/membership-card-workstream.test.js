@@ -86,6 +86,9 @@ test("member active flag and every card issuance path share the Addis-date legac
   assert.match(service,/function addisAbabaCivilDate/);
   assert.match(service,/timeZone:"Africa\/Addis_Ababa"/);
   assert.match(service,/legacy_fee_settled/);
+  assert.match(service,/ensureMembershipNumber/);
+  assert.match(service,/membership\.number_assigned/);
+  assert.match(service,/membership_number is null/);
   assert.match(eligibility,/membership_fee_obligation_balance/);
   assert.match(eligibility,/balance\.outstanding_balance=0/);
   assert.match(eligibility,/balance\.outstanding_balance>0/);
@@ -102,6 +105,7 @@ test("member membership workspace leads with live status, surfaces card errors a
   assert.match(membershipWorkspace,/membership-status-hero/);
   assert.match(membershipWorkspace,/membership-status-checklist/);
   assert.match(membershipWorkspace,/membershipCardError/);
+  assert.match(membershipWorkspace,/cardConfirmsActive/);
   assert.doesNotMatch(membershipWorkspace,/api<MembershipCardSummary>\("\/api\/v1\/membership\/card",\{\},token\)\.catch\(\(\)=>null\)/);
   assert.match(membershipWorkspace,/Membership application activated\./);
   assert.match(membershipWorkspace,/a\.status==="activated"/);
@@ -132,6 +136,7 @@ test("membership products and authenticated member data load independently",()=>
 test("membership API failures are shown as unknown status, never as an inactive decision",()=>{
   assert.match(membershipWorkspace,/membershipStatusUnavailable/);
   assert.match(membershipWorkspace,/membershipPaymentVerificationRequired/);
+  assert.match(membershipWorkspace,/Finance must confirm full historical fee settlement/);
   assert.match(membershipWorkspace,/Do not submit a duplicate membership application/);
   assert.match(membershipWorkspace,/Status unavailable/);
   assert.match(membershipWorkspace,/We could not confirm your current membership status/);

@@ -27,6 +27,7 @@ type ReferralData = {
 
 const statusLabels: Record<string, string> = {
   registered: "Registered",
+  email_verified: "Email verified",
   membership_application_submitted: "Application submitted",
   membership_approved: "Approved",
   membership_declined: "Declined",

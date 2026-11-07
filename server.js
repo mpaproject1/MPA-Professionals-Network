@@ -693,7 +693,8 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/mentorship/") && parts[4]==="activities") return ok(res,await servicesMentorship.createMentorshipLearningActivity(parts[3],identity.sub,await body(req),requestId),requestId,201);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/mentorship-activities/") && parts[4]==="submissions") return ok(res,await servicesMentorship.submitMentorshipLearningActivity(parts[3],identity.sub,await body(req),requestId),requestId,201);
     if(req.method==="POST" && parts.length===5 && p.startsWith("api/v1/mentorship-learning-submissions/") && parts[4]==="review") return ok(res,await servicesMentorship.reviewMentorshipLearningSubmission(parts[3],identity.sub,await body(req),requestId),requestId);
-    if(req.method==="GET" && p==="api/v1/me/mentorship-requests") return ok(res,await servicesMentorship.listMyMentorshipRequests(identity.sub),requestId);
+    if(req.method==="GET" && p==="api/v1/me/mentorship-learning-progress") return ok(res,await servicesMentorship.listMyMentorshipLearningProgress(identity.sub),requestId);
+     if(req.method==="GET" && p==="api/v1/me/mentorship-requests") return ok(res,await servicesMentorship.listMyMentorshipRequests(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/me/mentorship-interest") return ok(res,await mentorshipOperations.listMentorshipInterestPool(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/me/mentorship-operations") return ok(res,await mentorshipOperations.getMentorshipOperationalReport(identity.sub),requestId);
     if(req.method==="GET" && p==="api/v1/me/mentorship-reports") return ok(res,await mentorshipOperations.listMyMentorshipParticipantReports(identity.sub,{limit:query(req.url).get("limit")||50}),requestId);

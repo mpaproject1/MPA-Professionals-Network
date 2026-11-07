@@ -4,7 +4,7 @@ import { createXlsx, parseXlsxRows } from "../platform/xlsx.js";
 
 const SOURCE = "UNSD M49 / MPA Ethiopian administrative reference";
 const COLUMNS = ["unit_code","label","unit_level","parent_code","country_iso3","country_m49","source_name","source_version","effective_from","effective_to","active","metadata"];
-const LEVELS = new Set(["country","region","federal_city","zone","sub_city","district","town"]);
+const LEVELS = new Set(["country","region","federal_city","zone","sub_city","district","town","woreda"]);
 const ALLOWED = {
   region: new Set(["country:ETH"]),
   federal_city: new Set(["country:ETH"]),
@@ -12,6 +12,7 @@ const ALLOWED = {
   sub_city: new Set(["federal_city"]),
   district: new Set(["zone","sub_city"]),
   town: new Set(["zone","sub_city"]),
+  woreda: new Set(["zone","sub_city"]),
 };
 function fail(statusCode,message,code="BUSINESS_RULE"){return Object.assign(new Error(message),{statusCode,code});}
 function clean(value,max=240){return String(value??"").trim().slice(0,max);}
@@ -29,7 +30,7 @@ function parseRows(rows){
   const rowSourceUrl=clean(row.metadata.sourceUrl,1000);if(!/^https:\/\//i.test(rowSourceUrl))row.errors.push("metadata.sourceUrl must be an HTTPS source URL for every reference row.");
   if(!/^[A-Z0-9][A-Z0-9._-]{1,79}$/.test(row.unit_code))row.errors.push("unit_code must be 2–80 letters, digits, dots, underscores or dashes.");
   if(!row.label)row.errors.push("label is required.");
-  if(!LEVELS.has(row.unit_level))row.errors.push("unit_level must be country, region, federal_city, zone, sub_city, district or town.");
+  if(!LEVELS.has(row.unit_level))row.errors.push("unit_level must be country, region, federal_city, zone, sub_city, district, town or woreda.");
   if(seen.has(row.unit_code))row.errors.push("unit_code is duplicated in this workbook.");seen.add(row.unit_code);
   if(row.unit_level==="country"){
     if(row.parent_code)row.errors.push("A country cannot have a parent_code.");
@@ -126,15 +127,15 @@ export async function saveMyResidence(userId,input={},requestId){
   const a1=type==="ethiopia"?await unit(level1):null,a2=type==="ethiopia"?await unit(level2):null,a3=type==="ethiopia"?await unit(level3):null;
   if(a1&&(!["region","federal_city"].includes(a1.unit_level)||a1.parent_id!==country.id))throw fail(400,"Choose a Region or Federal City belonging to Ethiopia.","GEOGRAPHY_PARENT_MISMATCH");
   if(a2&&((a1.unit_level==="region"&&a2.unit_level!=="zone")||(a1.unit_level==="federal_city"&&a2.unit_level!=="sub_city")||a2.parent_id!==a1.id))throw fail(400,"Choose a Zone for a Region or a Sub-city for a Federal City.","GEOGRAPHY_PARENT_MISMATCH");
-  if(a3&&(!a2||!["district","town"].includes(a3.unit_level)||a3.parent_id!==a2.id))throw fail(400,"Choose a District or Town belonging to the selected Zone or Sub-city.","GEOGRAPHY_PARENT_MISMATCH");
+  if(a3&&(!a2||!["district","town","woreda"].includes(a3.unit_level)||a3.parent_id!==a2.id))throw fail(400,"Choose a District, Woreda or Town belonging to the selected Zone or City Division.","GEOGRAPHY_PARENT_MISMATCH");
   if(a1){
    const expected=a1.unit_level==="region"?"zone":"sub_city";
    const available=(await tx.query("select 1 from membership_geography_unit where version_id=$1 and parent_id=$2 and unit_level=$3 and active=true limit 1",[version.id,a1.id,expected])).rowCount>0;
    if(available&&!a2)throw fail(400,"Choose a "+(expected==="zone"?"Zone":"Sub-city")+" from the published hierarchy.","GEOGRAPHY_LEVEL2_REQUIRED");
   }
   if(a2){
-   const available=(await tx.query("select 1 from membership_geography_unit where version_id=$1 and parent_id=$2 and unit_level in ('district','town') and active=true limit 1",[version.id,a2.id])).rowCount>0;
-   if(available&&!a3)throw fail(400,"Choose a District or Town from the published hierarchy.","GEOGRAPHY_LEVEL3_REQUIRED");
+   const available=(await tx.query("select 1 from membership_geography_unit where version_id=$1 and parent_id=$2 and unit_level in ('district','town','woreda') and active=true limit 1",[version.id,a2.id])).rowCount>0;
+   if(available&&!a3)throw fail(400,"Choose a District, Woreda or Town from the published hierarchy.","GEOGRAPHY_LEVEL3_REQUIRED");
   }
   await tx.query(`insert into member_residence(user_id,residence_type,geography_version_id,country_unit_id,admin_level_1_id,admin_level_2_id,admin_level_3_id,diaspora_area,street_address,locality_note,updated_at)
    values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now())

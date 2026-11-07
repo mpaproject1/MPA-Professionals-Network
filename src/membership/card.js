@@ -68,7 +68,7 @@ async function settings(db=getPool()){
     throw error;
   }
 }
-async function ensureMembershipNumber(db,row,userId,requestId){
+async function ensureMembershipNumber(row,userId,requestId){
   const existing=String(row.membership_number||"").trim();
   if(existing)return existing;
   const startDate=membershipDateString(row.start_date)||new Date().toISOString().slice(0,10);
@@ -76,14 +76,18 @@ async function ensureMembershipNumber(db,row,userId,requestId){
   for(let attempt=0;attempt<5;attempt++){
     const candidate=`MPA-${year}-${randomUUID().slice(0,8).toUpperCase()}`;
     try{
-      const updated=await db.query("update membership_record set membership_number=$1,updated_at=now() where id=$2 and (membership_number is null or btrim(membership_number)='') returning membership_number",[candidate,row.membership_record_id]);
-      if(updated.rows[0]){
-        row.membership_number=updated.rows[0].membership_number;
-        await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.number_assigned','membership_record',$2,$3,'success',$4)",[userId||null,row.membership_record_id,requestId||null,JSON.stringify({source:"member_card_access"})]);
-        return row.membership_number;
-      }
-      const current=(await db.query("select membership_number from membership_record where id=$1",[row.membership_record_id])).rows[0]?.membership_number;
-      if(current){row.membership_number=current;return current;}
+      const assigned=await withTransaction(async tx=>{
+        const current=(await tx.query("select membership_number from membership_record where id=$1 for update",[row.membership_record_id])).rows[0];
+        if(!current)throw fail(404,"Membership record was not found while assigning its membership ID.","MEMBERSHIP_NOT_FOUND");
+        const currentNumber=String(current.membership_number||"").trim();
+        if(currentNumber)return currentNumber;
+        const updated=await tx.query("update membership_record set membership_number=$1,updated_at=now() where id=$2 and (membership_number is null or btrim(membership_number)='') returning membership_number",[candidate,row.membership_record_id]);
+        if(!updated.rows[0])throw fail(409,"Membership ID assignment changed concurrently. Retry the card request.","MEMBERSHIP_NUMBER_ASSIGNMENT_CONFLICT");
+        await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.number_assigned','membership_record',$2,$3,'success',$4)",[userId||null,row.membership_record_id,requestId||null,JSON.stringify({source:"member_card_access"})]);
+        return updated.rows[0].membership_number;
+      });
+      row.membership_number=assigned;
+      return assigned;
     }catch(error){
       if(error?.code!=="23505")throw error;
     }
@@ -108,7 +112,7 @@ export async function getMyMembershipCard(userId,requestId){
   if(!row) throw fail(404,"No membership record is available for this account. Complete membership approval and activation first.","MEMBERSHIP_NOT_FOUND");
   assertEligible(row);
   if(!row.membership_type)throw fail(409,"Your membership record exists, but its membership plan is not linked. MPA membership support must restore the plan before a valid card can be issued.","MEMBERSHIP_PLAN_UNAVAILABLE");
-  await ensureMembershipNumber(db,row,userId,requestId);
+  await ensureMembershipNumber(row,userId,requestId);
   const cardSettings=await settings(db);
   const token=tokenFor(row.membership_record_id,row.card_token_version);
   return {
@@ -145,7 +149,7 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
 export async function listEligibleMembershipCardsForAdmin({q="",limit=50,offset=0,actorId=null,requestId=null}={}){
   const search=String(q||"").trim().slice(0,100),pageSize=Math.min(Math.max(Number(limit)||50,1),100),start=Math.max(Number(offset)||0,0),db=getPool();
   const result=await db.query(`select m.id membership_record_id,m.start_date,m.membership_number,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name,coalesce(p.name,application_product.name) membership_type,m.end_date from membership_record m left join membership_product p on p.id=m.membership_product_id left join membership_application a on a.id=m.application_id left join membership_product application_product on application_product.id=a.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where m.status='active' and coalesce(p.id,application_product.id) is not null and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")} and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name))) like lower('%'||$1||'%')) order by m.membership_number limit $2 offset $3`,[search,pageSize,start]);
-  for(const row of result.rows)row.membership_number=await ensureMembershipNumber(db,row,actorId,requestId);
+  for(const row of result.rows)row.membership_number=await ensureMembershipNumber(row,actorId,requestId);
   const total=Number((await db.query(`select count(*)::int count from membership_record m left join membership_product p on p.id=m.membership_product_id left join membership_application a on a.id=m.application_id left join membership_product application_product on application_product.id=a.membership_product_id left join person on person.user_id=m.user_id where m.status='active' and coalesce(p.id,application_product.id) is not null and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")} and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name))) like lower('%'||$1||'%'))`,[search])).rows[0]?.count||0);
   return {items:result.rows.map(row=>({membershipNumber:row.membership_number,memberName:row.member_name||"MPA Member",membershipType:row.membership_type,startDate:row.start_date,endDate:row.end_date})),total,limit:pageSize,offset:start,hasMore:start+result.rows.length<total};
 }

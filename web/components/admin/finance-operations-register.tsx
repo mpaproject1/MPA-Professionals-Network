@@ -107,7 +107,7 @@ export function FinanceOperationsRegister({payments,receipts,historicalPanel,can
 
   const all = useMemo(() => [
     ...payments.map(p=>({kind:"membership" as const,id:p.payment_id,reference:p.payment_reference||p.purpose_reference||p.payment_id,payer:p.member_name||"Member account",payerType:"Member",accountReference:p.tracking_reference||"Membership account",purpose:p.product_name||"Membership payment",amount:p.amount,currency:p.currency,status:p.reversed?"refunded":p.payment_status,method:p.channel,date:p.created_at,evidence:p.evidence_file_id,evidenceName:p.evidence_file_name,reconciliation:p.reconciliation_status||"unreconciled",raw:p})),
-    ...receipts.map(r=>({kind:"receipt" as const,id:r.id,reference:r.receiptNumber,payer:r.payerName,payerType:r.payerType==="organization"?"Organization":r.payerType==="member"?"Member":label(r.payerType),accountReference:r.organizationName||r.payerUserId||"",purpose:r.purpose,amount:r.amount,currency:r.currency,status:r.status==="recorded"?"pending":r.status,method:r.paymentMethod,date:r.paymentDate,evidence:r.evidenceFileId,evidenceName:"Payment evidence",reconciliation:"manual record",raw:r}))
+    ...receipts.map(r=>({kind:"receipt" as const,id:r.id,reference:r.receiptNumber,payer:r.payerName,payerType:r.payerType==="organization"?"Organization":r.payerType==="member"?"Member":label(r.payerType),accountReference:r.organizationName||r.payerUserId||"",purpose:r.purpose,amount:r.amount,currency:r.currency,status:r.status==="recorded"?"pending":r.status==="rejected"?"failed":r.status,method:r.paymentMethod,date:r.paymentDate,evidence:r.evidenceFileId,evidenceName:"Payment evidence",reconciliation:"manual record",raw:r}))
   ],[payments,receipts]);
 
   const counts = useMemo(()=>({
@@ -119,7 +119,7 @@ export function FinanceOperationsRegister({payments,receipts,historicalPanel,can
   }),[all]);
   const filtered=useMemo(()=>all.filter(x=>{
     const term=query.trim().toLowerCase();
-    const text=[x.reference,x.payer,x.payerType,x.purpose,x.method,x.id].join(" ").toLowerCase();
+    const text=[x.reference,x.payer,x.payerType,x.accountReference,x.purpose,x.method,x.id].join(" ").toLowerCase();
     if(term&&!text.includes(term))return false;
     if(account!=="all"&&x.payerType.toLowerCase()!==account)return false;
     if(tab==="queue"&&!["pending","initiated","recorded"].includes(x.status))return false;

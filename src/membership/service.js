@@ -162,7 +162,9 @@ export async function getMe(userId){
     pr.id profile_id,pr.headline,pr.bio,pr.visibility,pr.completion_percent,pr.profile_picture_file_id,
     coalesce((select jsonb_agg(r.role_code order by r.role_code) from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=u.id),'[]'::jsonb) roles,
     exists(select 1 from membership_record mr
-       where mr.user_id=u.id and ${membershipIsCurrentlyActiveSql("mr")}) has_active_membership
+       where mr.user_id=u.id and ${membershipIsCurrentlyActiveSql("mr")}) has_active_membership,
+    exists(select 1 from membership_record mr
+       where mr.user_id=u.id and ${legacyMembershipPaymentVerificationRequiredSql("mr")}) membership_payment_verification_required
     from app_user u left join person p on p.user_id=u.id left join professional_profile pr on pr.person_id=p.id where u.id=$1`,[userId]);
   if(!r.rows[0]) throw httpError(404,"Account not found.","NOT_FOUND");
   const row=r.rows[0];

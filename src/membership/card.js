@@ -68,7 +68,29 @@ async function settings(db=getPool()){
     throw error;
   }
 }
-export async function getMyMembershipCard(userId){
+async function ensureMembershipNumber(db,row,userId,requestId){
+  const existing=String(row.membership_number||"").trim();
+  if(existing)return existing;
+  const startDate=membershipDateString(row.start_date)||new Date().toISOString().slice(0,10);
+  const year=startDate.slice(0,4);
+  for(let attempt=0;attempt<5;attempt++){
+    const candidate=`MPA-${year}-${randomUUID().slice(0,8).toUpperCase()}`;
+    try{
+      const updated=await db.query("update membership_record set membership_number=$1,updated_at=now() where id=$2 and (membership_number is null or btrim(membership_number)='') returning membership_number",[candidate,row.membership_record_id]);
+      if(updated.rows[0]){
+        row.membership_number=updated.rows[0].membership_number;
+        await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.number_assigned','membership_record',$2,$3,'success',$4)",[userId||null,row.membership_record_id,requestId||null,JSON.stringify({source:"member_card_access"})]);
+        return row.membership_number;
+      }
+      const current=(await db.query("select membership_number from membership_record where id=$1",[row.membership_record_id])).rows[0]?.membership_number;
+      if(current){row.membership_number=current;return current;}
+    }catch(error){
+      if(error?.code!=="23505")throw error;
+    }
+  }
+  throw fail(503,"Your membership is eligible, but MPA could not assign its missing membership ID. Retry or contact membership support.","MEMBERSHIP_NUMBER_ASSIGNMENT_FAILED");
+}
+export async function getMyMembershipCard(userId,requestId){
   const db=getPool();
   const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
       p.name membership_type,coalesce((a.fee_snapshot->>'renewalRequired')::boolean,p.renewal_required) renewal_required,
@@ -84,6 +106,7 @@ export async function getMyMembershipCard(userId){
   const row=r.rows[0];
   if(!row) throw fail(404,"No membership record is available for this account. Complete membership approval and activation first.","MEMBERSHIP_NOT_FOUND");
   assertEligible(row);
+  await ensureMembershipNumber(db,row,userId,requestId);
   const cardSettings=await settings(db);
   const token=tokenFor(row.membership_record_id,row.card_token_version);
   return {

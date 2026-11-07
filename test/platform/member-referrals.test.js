@@ -27,6 +27,7 @@ test("referral schema enforces separate types and duplicate prevention",()=>{
 test("verified email advances an existing membership referral without exposing identity",()=>{
  assert.ok(emailVerification.includes('recordMembershipMilestone(db, row.user_id, "email_verified", row.user_id)'));
  assert.ok(service.includes('email_verified:"email_verified"'));
+ assert.ok(service.includes('eventCode==="email_verified"?"membership":"recruitment"'));
 });
 test("membership attribution follows registration, application, review and activation events",()=>{
  for(const name of ["captureMembershipRegistration","recordMembershipMilestone","recordMembershipActivated"])assert.ok(service.includes(name));

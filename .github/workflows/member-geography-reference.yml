@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/member-geography-reference.yml'
       - 'scripts/generate-member-geography-reference.js'
+      - 'scripts/lib/ethiopia-geography-reference.js'
       - 'scripts/validate-member-geography-reference.js'
       - 'src/platform/xlsx.js'
       - 'src/membership/geography.js'
@@ -22,7 +23,7 @@ permissions:
 
 jobs:
   generate-reference:
-    name: Generate current UN M49 and Ethiopia geography workbook
+    name: Generate UN M49 plus Ethiopia zones sub-cities and woredas
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -35,7 +36,7 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Generate workbook from published reference sources
+      - name: Generate workbook from pinned UN M49 and Ethiopia administrative sources
         run: node scripts/generate-member-geography-reference.js artifacts/member-geography-reference.xlsx
       - name: Validate workbook codes, hierarchy and provenance
         run: node scripts/validate-member-geography-reference.js artifacts/member-geography-reference.xlsx

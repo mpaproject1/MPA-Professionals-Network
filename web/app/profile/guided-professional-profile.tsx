@@ -19,7 +19,7 @@ const blankPortfolio=():PortfolioDraft=>({title:"",itemType:"project",descriptio
 const groups={nationality:"professional_nationalities",occupation:"professional_occupations",industry:"professional_industries",experience_range:"professional_experience_ranges",language:"professional_languages",skill:"professional_skills",qualification_type:"professional_qualifications",education_level:"professional_education_levels",institution:"professional_institutions",field_of_study:"professional_fields_of_study"} as const;
 function selected(refs:ProfileRef[]|undefined,type:string){return refs?.find(r=>r.relation_type===type);}
 function asDraft(e:Education):EducationDraft{return {draftKey:crypto.randomUUID(),educationLevelItemId:e.education_level_item_id||"",educationLevelCustom:e.education_level_custom||"",institutionItemId:e.institution_item_id||"",institutionCustom:e.institution_name_custom||"",fieldOfStudyItemId:e.field_of_study_item_id||"",fieldOfStudyCustom:e.field_of_study_custom||"",qualificationItemId:e.qualification_item_id||"",qualificationCustom:e.qualification_custom||"",graduationYear:e.graduation_year==null?"":String(e.graduation_year),startYear:e.start_year==null?"":String(e.start_year),completionYear:e.completion_year==null?"":String(e.completion_year),currentlyStudying:Boolean(e.currently_studying),explanation:e.explanation||"",visibility:e.visibility||"private"};}
-export default function GuidedProfessionalProfile({onNationalitySaved}:{onNationalitySaved:(value:string)=>void}){
+export default function GuidedProfessionalProfile({onNationalitySaved,onProgressChange}:{onNationalitySaved:(value:string)=>void;onProgressChange:(complete:boolean)=>void}){
  const profileFormId=useId();
  const token=useUiStore(s=>s.token);
  const [refs,setRefs]=useState<RefItem[]>([]),[_profile,setProfile]=useState<Profile>({}),[_education,setEducation]=useState<EducationDraft[]>([]),[portfolio,setPortfolio]=useState<Portfolio[]>([]),[account,setAccount]=useState<AccountProfile>({});
@@ -39,7 +39,7 @@ export default function GuidedProfessionalProfile({onNationalitySaved}:{onNation
     api<Portfolio[]>("/api/v1/me/portfolio",{},token),
     api<AccountProfile>("/api/v1/me",{},token)
    ]);
-   setRefs(r);setEducationDrafts(e.map(asDraft));setPortfolio(items);setAccount(accountInfo);
+   setRefs(r);setEducationDrafts(e.map(asDraft));setEducation(e.map(asDraft));setPortfolio(items);setAccount(accountInfo);onProgressChange(e.length>0&&items.length>0);
    const next:Record<string,string>={},custom:Record<string,string>={};
    for(const type of ["nationality","occupation","industry","experience_range"]){const item=selected(p.references,type);next[type]=item?.reference_item_id||"";custom[type]=item?.custom_value||"";}
    if(!next.nationality&&accountInfo.nationality){const match=r.find(item=>item.dataset_key===groups.nationality&&item.label.toLowerCase()===String(accountInfo.nationality).toLowerCase());if(match)next.nationality=match.id;else{const other=r.find(item=>item.dataset_key===groups.nationality&&item.code==="OTHER");if(other){next.nationality=other.id;custom.nationality=accountInfo.nationality;}}}
@@ -56,7 +56,7 @@ export default function GuidedProfessionalProfile({onNationalitySaved}:{onNation
    setSkillIds(customSkillValues.length&&otherSkillOption?[...selectedSkillIds,otherSkillOption.id]:selectedSkillIds);setOtherSkills(customSkillValues.join(", "));
   }catch(e){setError(e instanceof ApiError?e.message:"Guided profile data could not be loaded. Retry without losing your entries.");}
   finally{setLoading(false);}
- },[token]);
+ },[token,onProgressChange]);
  useEffect(()=>{void refresh();},[refresh]);
  function setRef(type:string,id:string){setSelectedRefs(s=>({...s,[type]:id}));if(byId.get(id)?.code!=="OTHER")setCustomRefs(s=>({...s,[type]:""}));}
  async function saveReferences(event:FormEvent){
@@ -92,7 +92,7 @@ export default function GuidedProfessionalProfile({onNationalitySaved}:{onNation
     if(e.qualificationItemId&&byId.get(e.qualificationItemId)?.code==="OTHER"&&!e.qualificationCustom.trim())throw new Error("Enter the qualification after selecting Other.");
    }
    const saved=await api<Education[]>("/api/v1/me/education",{method:"PUT",body:JSON.stringify({education:educationDrafts.map(e=>({educationLevelItemId:e.educationLevelItemId,educationLevelCustom:e.educationLevelCustom,institutionItemId:e.institutionItemId,institutionCustom:e.institutionCustom,fieldOfStudyItemId:e.fieldOfStudyItemId,fieldOfStudyCustom:e.fieldOfStudyCustom,qualificationItemId:e.qualificationItemId||null,qualificationCustom:e.qualificationCustom,graduationYear:e.completionYear||e.graduationYear||null,startYear:e.startYear||null,completionYear:e.completionYear||null,currentlyStudying:e.currentlyStudying,explanation:e.explanation,visibility:e.visibility}))})},token);
-   setEducation(saved.map(asDraft));setEducationDrafts(saved.map(asDraft));setNotice("Education records saved successfully.");
+   setEducation(saved.map(asDraft));setEducationDrafts(saved.map(asDraft));onProgressChange(saved.length>0&&portfolio.length>0);setNotice("Education records saved successfully.");
   }catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Education records could not be saved. Your previous saved records remain unchanged.");}
   finally{setSaving(false);}
  }
@@ -118,7 +118,7 @@ export default function GuidedProfessionalProfile({onNationalitySaved}:{onNation
   event.preventDefault();if(!token)return;setSaving(true);setError("");setNotice("");
   try{
    await api("/api/v1/me/portfolio",{method:"POST",body:JSON.stringify({title:portfolioDraft.title,itemType:portfolioDraft.itemType,description:portfolioDraft.description,externalUrl:portfolioDraft.externalUrl||null,visibility:portfolioDraft.visibility,evidenceFileId:portfolioDraft.evidenceFileId||null,evidenceLabel:portfolioDraft.evidenceLabel||null,startedOn:portfolioDraft.startedOn||null,completedOn:portfolioDraft.completedOn||null,skillReferenceIds:portfolioSkillIds,occupationReferenceIds:portfolioOccupationIds})},token);
-   setPortfolioDraft(blankPortfolio());setPortfolioSkillIds([]);setPortfolioOccupationIds([]);const items=await api<Portfolio[]>("/api/v1/me/portfolio",{},token);setPortfolio(items);setNotice("Portfolio item saved. Any attached evidence remains private and is available only to you and authorized review workflows.");
+   setPortfolioDraft(blankPortfolio());setPortfolioSkillIds([]);setPortfolioOccupationIds([]);const items=await api<Portfolio[]>("/api/v1/me/portfolio",{},token);setPortfolio(items);onProgressChange(educationDrafts.length>0&&items.length>0);setNotice("Portfolio item saved. Any attached evidence remains private and is available only to you and authorized review workflows.");
   }catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"Portfolio item could not be saved.");}
   finally{setSaving(false);}
  }
@@ -130,7 +130,7 @@ export default function GuidedProfessionalProfile({onNationalitySaved}:{onNation
  async function removePortfolio(id:string){
   if(!token||!confirm("Remove this portfolio item from your profile? The private evidence file remains stored but will no longer be linked to this item."))return;
   setError("");setNotice("");
-  try{await api(`/api/v1/me/portfolio/${id}`,{method:"DELETE"},token);setPortfolio(rows=>rows.filter(row=>row.id!==id));setNotice("Portfolio item removed.");}
+  try{await api(`/api/v1/me/portfolio/${id}`,{method:"DELETE"},token);setPortfolio(rows=>{const next=rows.filter(row=>row.id!==id);onProgressChange(educationDrafts.length>0&&next.length>0);return next;});setNotice("Portfolio item removed.");}
   catch(e){setError(e instanceof ApiError?e.message:"Portfolio item could not be removed.");}
  }
  function renderReferenceField(type:string,label:string,group:string){

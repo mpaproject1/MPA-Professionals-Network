@@ -11,7 +11,7 @@ type Feedback={id:string;comments?:string|null;created_at:string};
 type Details={goals:Goal[];sessions:Session[];feedback:Feedback[]};
 export function MentorshipRoleDashboard({role,currentUserId,matches,relationships,details}:{role:"mentor"|"mentee";currentUserId:string;matches:Match[];relationships:Relationship[];details:Record<string,Details>}){
  const now=Date.now();
- const pendingMatches=matches.filter(item=>item.match_role===role&&item.status==="proposed"&&(role!=="mentee"||item.mentee_consent_status!=="declined"));
+ const pendingMatches=matches.filter(item=>role==="mentor"?(item.match_role==="mentor"&&item.status==="proposed"):(item.match_role==="mentee"&&item.status==="accepted"&&item.mentee_consent_status==="pending"));
  const sessions=relationships.flatMap(relationship=>(details[relationship.id]?.sessions||[]).map(session=>({relationship,session})));
  const pendingSession=sessions.filter(({session})=>session.coordination_status==="proposed"&&session.proposed_by!==currentUserId);
  const upcoming=sessions.filter(({session})=>session.coordination_status==="accepted"&&session.status==="scheduled"&&new Date(session.scheduled_start_at).getTime()>=now).sort((a,b)=>new Date(a.session.scheduled_start_at).getTime()-new Date(b.session.scheduled_start_at).getTime());

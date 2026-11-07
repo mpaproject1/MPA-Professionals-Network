@@ -25,14 +25,15 @@ test("organization-only identity cannot use personal professional capabilities",
   await assert.rejects(() => assertProfessionalIdentity(db, "user-org"), error => error.code === "PROFESSIONAL_PROFILE_FORBIDDEN" && error.statusCode === 403);
 });
 
-test("current membership check uses status and inclusive validity dates", async () => {
+test("current membership check uses shared Addis-date and legacy settlement eligibility", async () => {
   let queryText = "";
   let queryArgs;
   const db = { query: async (sql, args) => { queryText = sql; queryArgs = args; return { rowCount: 1, rows: [{}] }; } };
   assert.equal(await hasCurrentActiveMembership(db, "user-1"), true);
   assert.match(queryText, /status='active'/);
-  assert.match(queryText, /start_date<=current_date/);
-  assert.match(queryText, /end_date>=current_date/);
+  assert.match(queryText, /start_date<=\(now\(\) at time zone 'Africa\/Addis_Ababa'\)::date/);
+  assert.match(queryText, /end_date is null or .*end_date>=/);
+  assert.match(queryText, /membership_fee_obligation_balance/);
   assert.deepEqual(queryArgs, ["user-1"]);
 });
 

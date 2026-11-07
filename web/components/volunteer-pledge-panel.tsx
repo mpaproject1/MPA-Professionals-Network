@@ -29,7 +29,7 @@ export function VolunteerPledgePanel({token,active}:{token:string;active:boolean
   {error?<p className="form-error mb-3" role="alert">{error}</p>:null}{notice?<p className="muted mb-3" role="status">{notice}</p>:null}
   {loading?<Card><p className="muted">Loading your saved service pledges…</p></Card>:null}
   {items.map(item=><Card key={item.id}><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><strong>{item.service_title}</strong><p className="muted text-sm">{item.service_category} · {item.hours_per_week} hours/week · {item.duration_weeks} weeks</p></div><div className="flex items-center gap-2"><Badge tone={item.status==="active"?"green":"slate"}>{item.status.replaceAll("_"," ")}</Badge><button type="button" className="btn btn-ghost" onClick={()=>setEditing(editing===item.id?null:item.id)}>{editing===item.id?"Close":"Edit"}</button></div></div>
-   {editing===item.id?<div className="form-grid">
+   {editing===item.id?<>(<div className="form-grid">
     <label>Service title<input value={item.service_title} maxLength={120} onChange={e=>changeItem(item.id,"service_title",e.target.value)}/></label>
     <label>Professional service category<input value={item.service_category} maxLength={80} placeholder="e.g. Legal advice, design, mentoring" onChange={e=>changeItem(item.id,"service_category",e.target.value)}/></label>
     <label className="sm:col-span-2">What can you offer?<textarea rows={3} maxLength={2000} value={item.description} onChange={e=>changeItem(item.id,"description",e.target.value)}/></label>
@@ -41,7 +41,7 @@ export function VolunteerPledgePanel({token,active}:{token:string;active:boolean
     <label>Delivery mode<select value={item.delivery_mode} onChange={e=>changeItem(item.id,"delivery_mode",e.target.value)}><option value="flexible">Flexible</option><option value="remote">Remote</option><option value="in_person">In person</option><option value="hybrid">Hybrid</option></select></label>
     <label>Location (optional)<input value={item.location_text||""} maxLength={240} onChange={e=>changeItem(item.id,"location_text",e.target.value)}/></label>
     <label>Status<select value={item.status} onChange={e=>changeItem(item.id,"status",e.target.value)}><option value="active">Available</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label>
-   </div><div className="mt-4 flex flex-wrap gap-2"><button type="button" className="btn btn-primary" disabled={busy===item.id} onClick={()=>void saveExisting(item)}><Save size={15}/>{busy===item.id?"Saving…":"Save changes"}</button><button type="button" className="btn btn-ghost" disabled={Boolean(busy)} onClick={()=>void withdraw(item)}><Trash2 size={15}/>Withdraw pledge</button></div>:null}
+   </div><div className="mt-4 flex flex-wrap gap-2"><button type="button" className="btn btn-primary" disabled={busy===item.id} onClick={()=>void saveExisting(item)}><Save size={15}/>{busy===item.id?"Saving…":"Save changes"}</button><button type="button" className="btn btn-ghost" disabled={Boolean(busy)} onClick={()=>void withdraw(item)}><Trash2 size={15}/>Withdraw pledge</button></div>)</>:null}
   </Card>)}
   {creating?<Card><h3 className="h3 mb-3">New service pledge</h3><form className="form-grid" onSubmit={saveNew}>
    <label>Service title<input required minLength={4} maxLength={120} value={draft.service_title} onChange={e=>setDraft({...draft,service_title:e.target.value})}/></label>

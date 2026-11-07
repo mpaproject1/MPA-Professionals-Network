@@ -43,6 +43,7 @@ export function MentorshipLearningActivities({ mentorshipId, role, token }: { me
   }, [mentorshipId, token]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { setView("assigned"); }, [role]);
 
   async function createActivity(event: FormEvent) {
     event.preventDefault();
@@ -106,7 +107,7 @@ export function MentorshipLearningActivities({ mentorshipId, role, token }: { me
       <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
         <div><div className="eyebrow">Practical learning</div><h3 className="h2">Activities and assignments</h3><p className="muted">Activities are set by your assigned mentor. Submissions are versioned, and mentor feedback remains attached to each review.</p></div>
         <button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={loading}>Refresh activities</button>
-        <nav className="row" aria-label="Learning activity views" style={{gap:6,flexWrap:"wrap"}}>{([{id:"assigned",label:"Assigned to me"},{id:"review",label:"Submitted for review"},{id:"completed",label:"Completed learning"}] as const).map(item=><button key={item.id} type="button" className={view===item.id?"btn btn-primary":"btn btn-ghost"} aria-pressed={view===item.id} onClick={()=>setView(item.id)}>{item.label}</button>)}</nav>
+        <nav className="row" aria-label="Learning activity views" style={{gap:6,flexWrap:"wrap"}}>{(role==="mentor"?([{id:"assigned",label:"My activities"},{id:"review",label:"Submitted for review"},{id:"completed",label:"Completed learning"}] as const):([{id:"assigned",label:"Assigned to me"},{id:"completed",label:"Completed learning"}] as const)).map(item=><button key={item.id} type="button" className={view===item.id?"btn btn-primary":"btn btn-ghost"} aria-pressed={view===item.id} onClick={()=>setView(item.id)}>{item.label}</button>)}</nav>
       </div>
       {error ? <FormFeedback kind="error" message={error} onRetry={() => void load()} retryLabel="Retry" /> : null}
       {role === "mentor" ? <form className="grid" style={{ gap: 8, marginTop: 12 }} onSubmit={createActivity}>

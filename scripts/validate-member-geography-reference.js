@@ -8,7 +8,7 @@ const required=["unit_code","label","unit_level","parent_code","country_iso3","c
 const workbook=parseXlsxRows(await readFile(file));
 for(const column of required)assert.ok(workbook.headers.includes(column),"Missing required geography workbook column: "+column);
 assert.ok(workbook.rows.length>100,"UN M49 workbook unexpectedly contains too few country/area rows.");
-const byCode=new Map();
+const byCode=new Map(),iso3Codes=new Set(),m49Codes=new Set();
 for(const row of workbook.rows){
  const code=String(row.unit_code||"").trim().toUpperCase();
  assert.ok(code,"Every geography row needs a stable unit code.");
@@ -23,6 +23,9 @@ for(const row of workbook.rows){
  if(row.unit_level==="country"){
   assert.match(String(row.country_iso3||""),/^[A-Z]{3}$/,"Country row has invalid ISO-alpha3: "+code);
   assert.match(String(row.country_m49||""),/^[0-9]{3}$/,"Country row has invalid M49 code: "+code);
+  assert.ok(!iso3Codes.has(String(row.country_iso3)),"Duplicate country ISO-alpha3 code: "+row.country_iso3);
+  assert.ok(!m49Codes.has(String(row.country_m49)),"Duplicate UN M49 code: "+row.country_m49);
+  iso3Codes.add(String(row.country_iso3));m49Codes.add(String(row.country_m49));
   assert.equal(String(row.parent_code||""),"","Country rows cannot have parents.");
  }else{
   assert.equal(String(row.parent_code||""),"ETH","Only Ethiopia level-one records may be added by this reference generator.");

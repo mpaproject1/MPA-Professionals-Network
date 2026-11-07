@@ -9,6 +9,7 @@ const service=await readFile(new URL("../../src/platform/member-referrals.js",im
 const membership=await readFile(new URL("../../src/membership/service.js",import.meta.url),"utf8");
 const jobs=await readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8");
 const routes=await readFile(new URL("../../server.js",import.meta.url),"utf8");
+const emailVerification=await readFile(new URL("../../src/platform/email-verification.js",import.meta.url),"utf8");
 
 test("referral schema enforces separate types and duplicate prevention",()=>{
  assert.match(migration,/member_referral_code/);
@@ -20,6 +21,10 @@ test("referral schema enforces separate types and duplicate prevention",()=>{
  assert.match(applicationMigration,/alter table job_application add column if not exists referral_code/);
  assert.match(migration,/status_visibility_consent/);
  assert.match(retentionMigration,/retention_policy_snapshot/);
+});
+test("verified email advances an existing membership referral without exposing identity",()=>{
+ assert.ok(emailVerification.includes('recordMembershipMilestone(db, row.user_id, "email_verified", row.user_id)'));
+ assert.ok(service.includes('email_verified:"email_verified"'));
 });
 test("membership attribution follows registration, application, review and activation events",()=>{
  for(const name of ["captureMembershipRegistration","recordMembershipMilestone","recordMembershipActivated"])assert.ok(service.includes(name));

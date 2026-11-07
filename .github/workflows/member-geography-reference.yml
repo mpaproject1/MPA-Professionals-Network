@@ -9,6 +9,10 @@ on:
       - 'scripts/generate-member-geography-reference.js'
       - 'scripts/validate-member-geography-reference.js'
       - 'src/platform/xlsx.js'
+      - 'src/membership/geography.js'
+      - 'web/app/admin/membership-geography/page.tsx'
+      - 'db/migrations/*membership_geography*'
+      - 'test/membership-import/geography.test.js'
   workflow_dispatch:
   schedule:
     - cron: "17 4 * * 1"

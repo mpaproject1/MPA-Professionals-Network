@@ -123,12 +123,15 @@ export async function proposeMentorshipSessionChange(sessionId,userId,input,requ
   const start=new Date(input.proposedStartAt),end=new Date(input.proposedEndAt);
   if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||start<=new Date()||end<=start||end-start>4*60*60*1000)fail(400,"Choose a future start and end time no more than four hours apart.","VALIDATION_ERROR");
   if(start.toISOString()===new Date(session.scheduled_start_at).toISOString()&&end.toISOString()===new Date(session.scheduled_end_at).toISOString())fail(400,"The proposed schedule is unchanged.","NO_SCHEDULE_CHANGE");
+  const proposedTimezone=String(input.sessionTimezone||session.session_timezone||"Africa/Addis_Ababa").trim();
+  if(proposedTimezone.length>80)fail(400,"Session timezone is too long.","VALIDATION_ERROR");
+  try{new Intl.DateTimeFormat("en-US",{timeZone:proposedTimezone}).format(new Date());}catch{fail(400,"Choose a valid IANA session timezone.","INVALID_TIMEZONE");}
   const note=String(input.note||"").trim();
   if(note.length>1000)fail(400,"The schedule-change note must be 1,000 characters or fewer.","VALIDATION_ERROR");
   const pending=(await db.query("select id from mentorship_session_change_proposal where session_id=$1 and status='pending' for update",[sessionId])).rows[0];
   if(pending)fail(409,"A schedule change is already awaiting the other participant's response.","CHANGE_ALREADY_PENDING");
   await assertSessionFitsAvailability(db,session.mentor_user_id,start.toISOString(),end.toISOString());
-  const proposal=(await db.query("insert into mentorship_session_change_proposal(session_id,proposed_by,previous_start_at,previous_end_at,proposed_start_at,proposed_end_at,proposal_note) values($1,$2,$3,$4,$5,$6,$7) returning *",[sessionId,userId,session.scheduled_start_at,session.scheduled_end_at,start.toISOString(),end.toISOString(),note||null])).rows[0];
+  const proposal=(await db.query("insert into mentorship_session_change_proposal(session_id,proposed_by,previous_start_at,previous_end_at,proposed_start_at,proposed_end_at,proposal_note,proposed_timezone) values($1,$2,$3,$4,$5,$6,$7,$8) returning *",[sessionId,userId,session.scheduled_start_at,session.scheduled_end_at,start.toISOString(),end.toISOString(),note||null,proposedTimezone])).rows[0];
   await audit(db,userId,"mentorship.session_change_proposed","mentorship_session_change_proposal",proposal.id,requestId,{sessionId,previousStartAt:session.scheduled_start_at,proposedStartAt:proposal.proposed_start_at,proposedEndAt:proposal.proposed_end_at});
   const other=session.mentor_user_id===userId?session.mentee_user_id:session.mentor_user_id;
   await notify(db,other,"mentorship.session_change_proposed","mentorship_session_change_proposal",proposal.id,{message:"The other participant proposed a change to a confirmed mentorship session.",nextAction:"Review the proposed time and accept or decline it. The existing confirmed appointment remains in place until you accept.",actionUrl:"/mentorship",actionRequired:true,priority:"high"});
@@ -150,7 +153,7 @@ export async function respondToMentorshipSessionChange(proposalId,userId,status,
    if(proposal.mentorship_status!=="active"||proposal.session_status!=="scheduled"||proposal.coordination_status!=="accepted")fail(409,"The original session is no longer eligible for rescheduling.","SESSION_NOT_RESCHEDULABLE");
    if(new Date(proposal.current_start_at).toISOString()!==new Date(proposal.previous_start_at).toISOString()||new Date(proposal.current_end_at).toISOString()!==new Date(proposal.previous_end_at).toISOString())fail(409,"The confirmed appointment changed after this proposal was created. Refresh the session before responding.","STALE_SCHEDULE_PROPOSAL");
    await assertSessionFitsAvailability(db,proposal.mentor_user_id,proposal.proposed_start_at,proposal.proposed_end_at);
-   await db.query("update mentorship_session set scheduled_start_at=$1,scheduled_end_at=$2,updated_at=now() where id=$3",[proposal.proposed_start_at,proposal.proposed_end_at,proposal.session_id]);
+   await db.query("update mentorship_session set scheduled_start_at=$1,scheduled_end_at=$2,session_timezone=coalesce($4,session_timezone),updated_at=now() where id=$3",[proposal.proposed_start_at,proposal.proposed_end_at,proposal.session_id,proposal.proposed_timezone||null]);
   }
   const updated=(await db.query("update mentorship_session_change_proposal set status=$1,responded_by=$2,responded_at=now(),response_note=$3 where id=$4 returning *",[status,userId,responseNote,proposalId])).rows[0];
   await audit(db,userId,"mentorship.session_change_"+status,"mentorship_session_change_proposal",proposalId,requestId,{sessionId:proposal.session_id,status});

@@ -967,13 +967,29 @@ export async function setMentorAvailability(profileId,userId,input,requestId){
     if(p.user_id!==userId) throw error(403,"Only the mentor can manage availability.","FORBIDDEN");
     await requirePersonalProfessionalCapability(db,userId);
     if(!Array.isArray(input.slots)) throw error(400,"slots must be an array.","VALIDATION_ERROR");
+    const normalizedSlots=[];
     for(const s of input.slots){
       if(!Number.isInteger(Number(s.dayOfWeek))||Number(s.dayOfWeek)<0||Number(s.dayOfWeek)>6) throw error(400,"dayOfWeek must be 0-6.","VALIDATION_ERROR");
       const start=String(s.startTime||""),end=String(s.endTime||"");
       const validTime=v=>/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(v);
       if(!validTime(start)||!validTime(end)||start>=end) throw error(400,"Availability start and end times must be valid and end after start on the same day.","VALIDATION_ERROR");
-      if(s.timezone!==undefined&&(!String(s.timezone).trim()||String(s.timezone).length>80)) throw error(400,"timezone must be a valid non-empty timezone identifier.","VALIDATION_ERROR");
+      const timezone=String(s.timezone||"Africa/Addis_Ababa").trim();
+      try{new Intl.DateTimeFormat("en-US",{timeZone:timezone}).format(new Date());}
+      catch{throw error(400,"Choose a valid IANA timezone for every availability slot.","INVALID_TIMEZONE");}
+      const day=Number(s.dayOfWeek),startMinute=Number(start.slice(0,2))*60+Number(start.slice(3,5)),endMinute=Number(end.slice(0,2))*60+Number(end.slice(3,5));
+      if(normalizedSlots.some(slot=>slot.day===day&&slot.timezone===timezone&&startMinute<slot.endMinute&&endMinute>slot.startMinute))throw error(400,"Weekly availability slots cannot overlap on the same day and timezone.","OVERLAPPING_AVAILABILITY");
+      normalizedSlots.push({day,startMinute,endMinute,dayOfWeek:day,startTime:start,endTime:end,timezone});
     }
+    const conflicts=(await db.query(`select s.id from mentorship_session s join mentorship m on m.id=s.mentorship_id
+      where m.mentor_user_id=$1 and s.status='scheduled' and s.coordination_status='accepted'
+        and s.scheduled_end_at>now()
+        and not exists(
+          select 1 from jsonb_to_recordset($2::jsonb) as a("dayOfWeek" integer,"startTime" text,"endTime" text,timezone text)
+          where a."dayOfWeek"=extract(dow from (s.scheduled_start_at at time zone a.timezone))::int
+            and a."startTime"::time <= (s.scheduled_start_at at time zone a.timezone)::time
+            and a."endTime"::time >= (s.scheduled_end_at at time zone a.timezone)::time
+        ) limit 1`,[userId,JSON.stringify(normalizedSlots)] )).rows[0];
+    if(conflicts)throw error(409,"Your new weekly availability would remove a confirmed session commitment. Keep a slot covering every confirmed session before saving.","CONFIRMED_SESSION_CONFLICT");
     await db.query("delete from mentor_availability where mentor_profile_id=$1",[profileId]);
     for(const s of input.slots){
       await db.query("insert into mentor_availability(mentor_profile_id,day_of_week,start_time,end_time,timezone) values($1,$2,$3,$4,$5)",[profileId,Number(s.dayOfWeek),s.startTime,s.endTime,s.timezone||"Africa/Addis_Ababa"]);
@@ -988,8 +1004,12 @@ export async function addMentorTimeOff(profileId,userId,input,requestId){
     const p=(await db.query("select user_id from mentor_profile where id=$1",[profileId])).rows[0];
     if(!p) throw error(404,"Mentor profile not found.","NOT_FOUND");
     if(p.user_id!==userId) throw error(403,"Only the mentor can manage availability.","FORBIDDEN");
-    if(!input.startsAt||!input.endsAt) throw error(400,"startsAt and endsAt are required.","VALIDATION_ERROR");
-    const row=(await db.query("insert into mentor_time_off(mentor_profile_id,starts_at,ends_at,reason) values($1,$2,$3,$4) returning *",[profileId,input.startsAt,input.endsAt,input.reason||null])).rows[0];
+    const startsAt=new Date(input.startsAt),endsAt=new Date(input.endsAt);
+    if(!input.startsAt||!input.endsAt||!Number.isFinite(startsAt.getTime())||!Number.isFinite(endsAt.getTime())||endsAt<=startsAt)throw error(400,"Choose a valid unavailable period with an end after its start.","VALIDATION_ERROR");
+    const commitment=(await db.query("select s.id from mentorship_session s join mentorship m on m.id=s.mentorship_id where m.mentor_user_id=$1 and s.status='scheduled' and s.coordination_status='accepted' and s.scheduled_start_at < $3 and s.scheduled_end_at > $2 limit 1",[userId,startsAt.toISOString(),endsAt.toISOString()])).rows[0];
+    if(commitment)throw error(409,"This unavailable period overlaps a confirmed session. Reschedule that session with the other participant before blocking this time.","CONFIRMED_SESSION_CONFLICT");
+    const reason=String(input.reason||"").trim().slice(0,300)||null;
+    const row=(await db.query("insert into mentor_time_off(mentor_profile_id,starts_at,ends_at,reason) values($1,$2,$3,$4) returning *",[profileId,startsAt.toISOString(),endsAt.toISOString(),reason])).rows[0];
     await audit(db,userId,"mentorship.time_off_added","mentor_profile",profileId,requestId,{timeOffId:row.id});
     return row;
   });
@@ -1419,6 +1439,7 @@ export async function getMyMentorProfile(userId){
  const profile=(await db.query("select mp.*,p.display_name from mentor_profile mp join person p on p.user_id=mp.user_id where mp.user_id=$1",[userId])).rows[0];
  if(!profile)return null;
  profile.availability=(await db.query("select id,day_of_week,start_time,end_time,timezone,active from mentor_availability where mentor_profile_id=$1 order by day_of_week,start_time",[profile.id])).rows;
+ profile.time_off=(await db.query("select id,starts_at,ends_at,reason from mentor_time_off where mentor_profile_id=$1 and ends_at>now() order by starts_at",[profile.id])).rows;
  return profile;
 }
 

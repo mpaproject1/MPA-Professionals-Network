@@ -1,10 +1,13 @@
+import { membershipIsCurrentlyActiveSql } from "../membership/eligibility.js";
+
 /**
  * Shared account capability policy.
  *
  * A user's organization workspace and personal professional identity are
  * separate capabilities. Organization membership must be checked against the
  * requested organization; it must never be inferred from a platform role.
- * Membership is current only when status, Addis Ababa inclusive date bounds and\n * any required historical fee settlement all agree.
+ * Membership is current only when status, Addis Ababa inclusive date bounds and
+ * any required historical fee settlement all agree.
  */
 export const PROFESSIONAL_IDENTITY_ROLES = Object.freeze(["member", "professional"]);
 export const ORGANIZATION_RESOURCE_ROLES = Object.freeze(["owner", "administrator", "recruiter", "project_manager"]);

@@ -79,7 +79,7 @@ test("QR verification accepts canonical membership number and preserves existing
 
 test("member active flag and every card issuance path share the Addis-date legacy settlement safeguard",()=>{
   assert.match(membershipService,/has_active_membership/);
-  assert.match(membershipService,/membershipIsCurrentlyActiveSql\("mr"\)/);
+  assert.match(membershipService,/membershipIsCurrentlyActiveSql\("mr"\)/);\n  assert.match(membershipService,/legacyMembershipPaymentVerificationRequiredSql\("mr"\)/);
   assert.match(membershipService,/from "\.\/eligibility\.js"/);
   assert.match(membershipService,/Africa\/Addis_Ababa/);
   assert.match(service,/function addisAbabaCivilDate/);
@@ -129,7 +129,7 @@ test("membership products and authenticated member data load independently",()=>
 
 
 test("membership API failures are shown as unknown status, never as an inactive decision",()=>{
-  assert.match(membershipWorkspace,/membershipStatusUnavailable/);
+  assert.match(membershipWorkspace,/membershipStatusUnavailable/);\n  assert.match(membershipWorkspace,/membershipPaymentVerificationRequired/);\n  assert.match(membershipWorkspace,/Do not submit a duplicate membership application/);
   assert.match(membershipWorkspace,/Status unavailable/);
   assert.match(membershipWorkspace,/We could not confirm your current membership status/);
   assert.match(membershipWorkspace,/!membershipStatusUnavailable&&!hasActiveMembership/);

@@ -118,5 +118,5 @@ test("membership workspace still loads the canonical ID and plan when the separa
  await expect(page.getByText("Your membership is active")).toBeVisible();
  await expect(page.getByText("MPA-2026-99AA11BB")).toBeVisible();
  await expect(page.getByText("Lifetime",{exact:true})).toBeVisible();
- await expect(page.getByRole("link",{name:/View.*membership card|Membership ID/i})).toBeVisible();
+ await expect(page.getByRole("link",{name:/View \/ download membership ID/i})).toBeVisible();
 });

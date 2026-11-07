@@ -29,8 +29,8 @@ export default function MembershipCardPage(){
   useEffect(()=>{
     let cancelled=false;
     if(!queryReady)return;
-    if(!token){setLoading(false);return;}
-    setLoading(true);
+    if(!token){setCard(null);setError("");setLoading(false);return;}
+    setCard(null);setError("");setLoading(true);
     const path=membershipNumber?`/api/v1/admin/membership-card?membershipNumber=${encodeURIComponent(membershipNumber)}`:"/api/v1/membership/card";
     void api<MembershipCard>(path,{},token).then(value=>{if(!cancelled)setCard(value);}).catch(e=>{if(!cancelled)setError(e instanceof ApiError?e.message:"We couldn't load your membership card.");}).finally(()=>{if(!cancelled)setLoading(false);});
     return ()=>{cancelled=true;};

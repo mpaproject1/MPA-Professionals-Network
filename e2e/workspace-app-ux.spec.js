@@ -50,6 +50,7 @@ test.describe("MPA application workspace UX", () => {
     // The welcome heading renders before the account-backed workspace data. Wait for
     // the progress section as the explicit signal that the workspace has hydrated.
     await expect(page.getByRole("heading", { name: "Membership progress", exact: true })).toBeVisible();
+    await expect(page.locator("#progress-title")).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Your workspace shortcuts" })).toBeVisible();
     const refresh = page.getByRole("button", { name: "Refresh", exact: true });
     await refresh.focus();
@@ -82,8 +83,17 @@ test.describe("MPA application workspace UX", () => {
     const mobile = page.getByRole("navigation", { name: "Mobile navigation" });
     await expect(mobile).toBeVisible();
     const mobileMore = mobile.getByRole("button", { name: "Open more signed-in destinations" });
+    await expect(mobileMore).toBeVisible();
+    const dockBounds = await mobile.boundingBox();
+    const moreBounds = await mobileMore.boundingBox();
+    expect(dockBounds).not.toBeNull();
+    expect(moreBounds).not.toBeNull();
+    expect(moreBounds.x + moreBounds.width).toBeLessThanOrEqual(390);
     await mobileMore.click();
     await expect(mobile.getByRole("link", { name: "Membership", exact: true })).toBeVisible();
+    const morePanelBounds = await mobile.locator(".mobile-more-panel").boundingBox();
+    expect(morePanelBounds).not.toBeNull();
+    expect(morePanelBounds.y + morePanelBounds.height).toBeLessThanOrEqual(dockBounds.y + 1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 

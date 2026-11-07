@@ -45,7 +45,6 @@ export default function AdminPage() {
   const [operationalQueues, setOperationalQueues] = useState<OperationalQueueSnapshot | null>(null);
   const [operationalQueueLoading, setOperationalQueueLoading] = useState(false);
   const [operationalQueueError, setOperationalQueueError] = useState("");
-  const [moduleQuery, setModuleQuery] = useState("");
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
 

@@ -93,11 +93,12 @@ async function ensureMembershipNumber(db,row,userId,requestId){
 export async function getMyMembershipCard(userId,requestId){
   const db=getPool();
   const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
-      p.name membership_type,coalesce((a.fee_snapshot->>'renewalRequired')::boolean,p.renewal_required) renewal_required,
+      coalesce(p.name,application_product.name) membership_type,coalesce((a.fee_snapshot->>'renewalRequired')::boolean,p.renewal_required,application_product.renewal_required) renewal_required,
       coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m
     left join membership_product p on p.id=m.membership_product_id
     left join membership_application a on a.id=m.application_id
+    left join membership_product application_product on application_product.id=a.membership_product_id
     join app_user u on u.id=m.user_id
     left join person on person.user_id=u.id
     where m.user_id=$1 and m.status<>'pending'
@@ -128,8 +129,10 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
   if(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(number)||/^MPA-(MEM|APP|REF)-/i.test(number)) throw fail(400,"This is an internal account, payment or application reference, not a membership number. Use the human-readable MPA membership ID shown in the member workspace.","WRONG_MEMBERSHIP_IDENTIFIER");
   const db=getPool();
   const row=(await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
-      p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
+      coalesce(p.name,application_product.name) membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m left join membership_product p on p.id=m.membership_product_id
+    left join membership_application a on a.id=m.application_id
+    left join membership_product application_product on application_product.id=a.membership_product_id
     join app_user u on u.id=m.user_id left join person on person.user_id=u.id
     where upper(m.membership_number)=$1 and m.status<>'pending'
     order by (m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")}) desc,m.start_date desc nulls last,m.created_at desc limit 1`,[number])).rows[0];
@@ -247,12 +250,15 @@ export async function verifyMembershipCard(identifier,token){
   if(typeof identifier!=="string"||!identifier.trim()||identifier.length>100||typeof token!=="string") return {valid:false,status:"invalid",message:"This membership ID could not be verified."};
   const db=getPool();
   const row=(await db.query(`select m.id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
-      p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
-    from membership_record m join membership_product p on p.id=m.membership_product_id
+      coalesce(p.name,application_product.name) membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
+    from membership_record m left join membership_product p on p.id=m.membership_product_id
+    left join membership_application a on a.id=m.application_id
+    left join membership_product application_product on application_product.id=a.membership_product_id
     join person on person.user_id=m.user_id
     where (m.id::text=$1 or upper(m.membership_number)=upper($1)) limit 1`,[identifier.trim()])).rows[0];
   if(!row||!tokenMatches(tokenFor(row.id,row.card_token_version),token))
     return {valid:false,status:"invalid",message:"This membership ID could not be verified."};
+  if(!row.membership_type)return {valid:false,status:"plan_unavailable",membershipNumber:row.membership_number,message:"This membership record has no linked plan. Contact MPA membership support."};
   const status=getMembershipCardStatus(row);
   return {valid:status==="active",status,membershipNumber:row.membership_number,memberName:row.member_name||"MPA Member",membershipType:row.membership_type,startDate:row.start_date,endDate:row.end_date,verifiedAt:new Date().toISOString(),message:status==="active"?"This membership is currently active.":status==="expired"?"This membership is not currently active.":`This membership is ${status}.`};
 }

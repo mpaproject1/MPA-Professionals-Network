@@ -96,7 +96,7 @@ export async function getMyMembershipCard(userId,requestId){
       p.name membership_type,coalesce((a.fee_snapshot->>'renewalRequired')::boolean,p.renewal_required) renewal_required,
       coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m
-    join membership_product p on p.id=m.membership_product_id
+    left join membership_product p on p.id=m.membership_product_id
     left join membership_application a on a.id=m.application_id
     join app_user u on u.id=m.user_id
     left join person on person.user_id=u.id
@@ -106,6 +106,7 @@ export async function getMyMembershipCard(userId,requestId){
   const row=r.rows[0];
   if(!row) throw fail(404,"No membership record is available for this account. Complete membership approval and activation first.","MEMBERSHIP_NOT_FOUND");
   assertEligible(row);
+  if(!row.membership_type)throw fail(409,"Your membership record exists, but its membership plan is not linked. MPA membership support must restore the plan before a valid card can be issued.","MEMBERSHIP_PLAN_UNAVAILABLE");
   await ensureMembershipNumber(db,row,userId,requestId);
   const cardSettings=await settings(db);
   const token=tokenFor(row.membership_record_id,row.card_token_version);
@@ -128,12 +129,13 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
   const db=getPool();
   const row=(await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
       p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
-    from membership_record m join membership_product p on p.id=m.membership_product_id
+    from membership_record m left join membership_product p on p.id=m.membership_product_id
     join app_user u on u.id=m.user_id left join person on person.user_id=u.id
     where upper(m.membership_number)=$1 and m.status<>'pending'
     order by (m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")}) desc,m.start_date desc nulls last,m.created_at desc limit 1`,[number])).rows[0];
   if(!row) throw fail(404,"No membership record matches that membership ID. Account IDs and application references are not accepted here.","MEMBERSHIP_NOT_FOUND");
   assertEligible(row);
+  if(!row.membership_type)throw fail(409,"This membership record has no linked plan. Restore its membership plan before issuing a card.","MEMBERSHIP_PLAN_UNAVAILABLE");
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.card_admin_issued','membership_record',$2,$3,'success',$4)",[actorId,row.membership_record_id,requestId,JSON.stringify({issuedCount:1})]);
   return cardPayload(row,await settings(db));
 }

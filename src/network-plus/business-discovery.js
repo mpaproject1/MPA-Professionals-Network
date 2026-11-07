@@ -513,10 +513,11 @@ export async function moderateProfessionalServiceListing(listingId,userId,input,
     if(status==="suspended" ? !["published","paused","pending_review"].includes(row.status) : !["pending_review","suspended"].includes(row.status))fail(409,"This listing is not in a state eligible for the requested moderation decision.","INVALID_STATE");
     let moderationStatus=status;
     if(status==="published"){
-      const businessState=(await db.query("select verification_status,publication_status from network_plus_business where id=$1",[row.business_id])).rows[0];
+      const businessState=(await db.query("select b.business_kind,b.verification_status,b.moderation_status,b.publication_status,b.verification_expires_at, exists(select 1 from network_plus_business_ownership bo join organization o on o.id=bo.owner_organization_id where bo.business_id=b.id and bo.owner_type='organization' and bo.status='active' and bo.consent_status='accepted' and o.verification_status<>'verified') organization_unverified, (select count(*)::int from network_plus_business_ownership bo where bo.business_id=b.id and bo.status='pending') pending_owner_count, (select count(*)::int from network_plus_business_ownership bo where bo.business_id=b.id and bo.status='active' and bo.consent_status='accepted') active_owner_count from network_plus_business b where b.id=$1",[row.business_id])).rows[0];
       if(!businessState||businessState.publication_status==="archived"||businessState.publication_status==="suspended"||businessState.verification_status==="suspended")fail(409,"A suspended or archived business cannot have an approved opportunity published.","BUSINESS_NOT_PUBLISHABLE");
-      try{await assertBusinessPublishable(db,row.business_id,{requirePublished:true});}
-      catch{moderationStatus="approved_pending_business";}
+      const businessReady=businessState.verification_status==="verified"&&(!businessState.verification_expires_at||new Date(businessState.verification_expires_at)>new Date())&&!businessState.organization_unverified&&Number(businessState.pending_owner_count)===0&&(businessState.business_kind!=="joint"||Number(businessState.active_owner_count)>=2)&&businessState.moderation_status==="approved"&&businessState.publication_status==="published";
+      if(businessReady)await assertBusinessPublishable(db,row.business_id,{requirePublished:true});
+      else moderationStatus="approved_pending_business";
     }
     const updated=(await db.query(`update network_plus_service_listing set status=$1,moderation_reason=$2,reviewed_by=$3,reviewed_at=now(),
       published_at=case when $1='published' then now() else published_at end,

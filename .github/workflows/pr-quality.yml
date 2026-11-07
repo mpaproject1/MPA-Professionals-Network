@@ -226,7 +226,7 @@ jobs:
           fi
 
   production-build:
-    name: Next.js build, browser acceptance and membership card PDF validation (no deployment)
+    name: Next.js production build validation (no deployment)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -259,6 +259,21 @@ jobs:
           test -s .next/build-manifest.json
           echo "Production build artifacts exist. No deployment or upload is performed."
 
+
+
+      - name: Fail production build job when build validation fails
+        if: always()
+        env:
+          PRODUCTION_BUILD_OUTCOME: ${{ steps.production_build.outcome }}
+          BUILD_OUTPUT_OUTCOME: ${{ steps.build_output.outcome }}
+        run: |
+          set -euo pipefail
+          echo "Production build: $PRODUCTION_BUILD_OUTCOME"
+          echo "Build artifact verification: $BUILD_OUTPUT_OUTCOME"
+          if [[ "$PRODUCTION_BUILD_OUTCOME" != "success" || "$BUILD_OUTPUT_OUTCOME" != "success" ]]; then
+            echo "Production build validation failed." >&2
+            exit 1
+          fi
 
 
   browser-acceptance:

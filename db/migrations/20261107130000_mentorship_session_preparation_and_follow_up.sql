@@ -27,3 +27,8 @@ COMMENT ON COLUMN mentorship_session.preparation_checklist IS 'Participant-share
 COMMENT ON COLUMN mentorship_session.agreed_actions IS 'Participant-shared follow-up actions recorded after a mentorship session.';
 COMMENT ON COLUMN mentorship_session.outcome_summary IS 'Brief participant-shared outcome record; not a confidential safeguarding report.';
 COMMENT ON COLUMN mentorship_session.session_timezone IS 'IANA timezone used when proposing and documenting this session.';
+
+-- Supports the bounded, frequent lookup for confirmed upcoming-session reminders.
+CREATE INDEX IF NOT EXISTS mentorship_session_reminder_due_idx
+  ON mentorship_session(scheduled_start_at)
+  WHERE status='scheduled' AND coordination_status='accepted';

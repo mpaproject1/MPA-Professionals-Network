@@ -126,7 +126,7 @@ export default function MembershipInvoicePage() {
           <small>Muslim Professionals Association · Keep this receipt for your records.</small>
         </footer>
       </article>
-      <style jsx>{`
+      <style jsx global>{`
         .invoice-page { max-width: 900px; margin: 0 auto; padding: 24px; color: #172b3d; }
         .invoice-actions { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:18px; }
         .invoice-actions a { color: var(--link, #1b4d80); }

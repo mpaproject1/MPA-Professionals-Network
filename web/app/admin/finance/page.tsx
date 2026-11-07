@@ -2,7 +2,7 @@
 
 import { Download, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
-import { FinanceOperationsRegister, type FinanceManualReceipt } from "../../../components/admin/finance-operations-register";
+import { type FinanceManualReceipt, FinanceOperationsRegister } from "../../../components/admin/finance-operations-register";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";

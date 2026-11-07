@@ -281,3 +281,36 @@ export async function getMentorshipProgrammeMetrics(actorId){
   }
  };
 }
+
+export async function listMentorshipProgrammeRelationships(actorId,filters={}){
+ const db=getPool();
+ if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized mentorship programme access is required.","FORBIDDEN");
+ const allowed=new Set(["active","paused","completed","cancelled"]);
+ const status=String(filters.status||"all");
+ if(status!=="all"&&!allowed.has(status))fail(400,"Choose a supported relationship status.","VALIDATION_ERROR");
+ const args=[],where=[];
+ if(status!=="all"){args.push(status);where.push("m.status=$"+args.length);}
+ const search=String(filters.query||"").trim().slice(0,120);
+ if(search){args.push("%"+search+"%");where.push("(pm.display_name ilike $"+args.length+" or pe.display_name ilike $"+args.length+" or m.goals ilike $"+args.length+")");}
+ const clause=where.length?"where "+where.join(" and "):"";
+ return (await db.query(`
+  select m.id,m.status,m.goals,m.created_at,m.updated_at,pm.display_name mentor_name,pe.display_name mentee_name,
+   coalesce(activity.last_activity_at,m.updated_at,m.created_at) last_activity_at,
+   floor(extract(epoch from (now()-coalesce(activity.last_activity_at,m.updated_at,m.created_at)))/86400)::int days_since_activity,
+   (m.status='active' and coalesce(activity.last_activity_at,m.updated_at,m.created_at)<now()-interval '30 days') attention_required
+  from mentorship m
+  join person pm on pm.user_id=m.mentor_user_id
+  join person pe on pe.user_id=m.mentee_user_id
+  left join lateral (
+   select max(event_at) last_activity_at from (
+    select s.updated_at event_at from mentorship_session s where s.mentorship_id=m.id
+    union all select g.updated_at from mentorship_goal g where g.mentorship_id=m.id
+    union all select a.updated_at from mentorship_learning_activity a where a.mentorship_id=m.id
+    union all select sub.updated_at from mentorship_learning_submission sub join mentorship_learning_activity a on a.id=sub.activity_id where a.mentorship_id=m.id
+   ) events
+  ) activity on true
+  ${clause}
+  order by attention_required desc,last_activity_at asc nulls first
+  limit 200
+ `,args)).rows;
+}

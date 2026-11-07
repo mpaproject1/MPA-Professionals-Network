@@ -37,22 +37,26 @@ test.describe("Serve-Community approved initiative journey",()=>{
     owned.status="submitted";
     await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{id:initiative.id,status:"submitted"}})});
   });
+  await page.addInitScript(()=>sessionStorage.setItem("mpa-session-token","owner-session"));
   await page.goto("/serve-community/manage");
-  await page.evaluate(()=>sessionStorage.setItem("mpa-session-token","owner-session"));
-  await page.reload();
+  await expect(page.getByRole("heading",{name:"Community initiatives"})).toBeVisible();
+  await page.getByRole("button",{name:"Create an initiative"}).click();
   await expect(page.getByRole("heading",{name:"Create an initiative draft"})).toBeVisible();
   await page.getByRole("button",{name:"Reject optional"}).click();
   await page.getByLabel("Initiative title").fill("New community initiative proposal");
+  await page.getByRole("button",{name:"Continue"}).click();
   await page.getByLabel("Short summary").fill("A community programme with practical learning and volunteer support.");
   await page.getByLabel("Full description").fill("This programme will coordinate local volunteers to provide practical learning support for young people and community organisations.");
-  await page.getByRole("button",{name:"Save private draft"}).click();
+  await page.getByRole("button",{name:"Continue"}).click();
+  await page.getByRole("button",{name:"Continue"}).click();
+  await page.getByRole("button",{name:"Create private draft"}).click();
   await expect(page.locator(".sc-owner-card").getByRole("heading",{name:"New community initiative proposal"})).toBeVisible();
   await expect(page.locator(".sc-owner-card").getByText("draft",{exact:true})).toBeVisible();
   await expect.poll(()=>ownerReads).toBeGreaterThan(1);
 
   // A hard reload must retrieve the saved record from the owner endpoint, not local component state.
   await page.reload();
-  await expect(page.getByRole("heading",{name:"Create an initiative draft"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Community initiatives"})).toBeVisible();
   await expect(page.locator(".sc-owner-card").getByRole("heading",{name:"New community initiative proposal"})).toBeVisible();
   await expect(page.locator(".sc-owner-card").getByText("draft",{exact:true})).toBeVisible();
 

@@ -47,7 +47,7 @@ export default function MembershipAdministrationPage() {
     return <Card><h1 className="h1">Sign in required</h1><p className="muted">Sign in with an authorized MPA membership administration account.</p><a className="btn btn-primary" href="/login?next=/admin/membership">Sign in</a></Card>;
   }
   if (access === "denied") {
-    return <Card><h1 className="h1">You do not have access to this workspace</h1><p className="muted">Membership application review and plan administration are available only to authorized membership administrators. Finance authority remains separate and does not grant access to applicant records.</p><a className="btn btn-ghost" href="/admin/finance">Open Finance workspace</a></Card>;
+    return <Card><h1 className="h1">You do not have access to this workspace</h1><p className="muted">Membership application review and activation are available only to authorized membership administrators. Plan administration is separately permissioned. Finance authority remains separate and does not grant access to applicant records.</p><a className="btn btn-ghost" href="/admin/finance">Open Finance workspace</a></Card>;
   }
   return <MembershipAdminWorkspace />;
 }

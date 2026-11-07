@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getPool, withTransaction } from "../platform/db.js";
 import { createXlsx, parseXlsxRows } from "../platform/xlsx.js";
 
-const SOURCE = "UNSD M49 / MPA Ethiopian administrative reference";
+const SOURCE = "UNSD M49 + Open Admin Data Ethiopia (CC BY 4.0)";
 const COLUMNS = ["unit_code","label","unit_level","parent_code","country_iso3","country_m49","source_name","source_version","effective_from","effective_to","active","metadata"];
 const LEVELS = new Set(["country","region","federal_city","zone","sub_city","district","town","woreda"]);
 const ALLOWED = {

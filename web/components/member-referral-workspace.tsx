@@ -168,10 +168,10 @@ export function MemberReferralWorkspace({ compact = false }: { compact?: boolean
           <table className={styles.table}>
             <thead><tr><th>Referral</th><th>Opportunity</th><th>Latest outcome</th><th>Date</th></tr></thead>
             <tbody>{visibleItems.map((item) => <tr key={item.id}>
-              <td><strong>{item.referred_person || "Private referral"}</strong><small>{item.referral_type === "employment" ? "Employment referral" : "Membership referral"}</small></td>
-              <td>{item.referral_type === "employment" ? item.job_title || "Job opportunity" : "MPA membership"}</td>
-              <td><span className={styles.status}>{label(item.status)}</span></td>
-              <td>{dateLabel(item.created_at)}</td>
+              <td data-label="Referral"><strong>{item.referred_person || "Private referral"}</strong><small>{item.referral_type === "employment" ? "Employment referral" : "Membership referral"}</small></td>
+              <td data-label="Opportunity">{item.referral_type === "employment" ? item.job_title || "Job opportunity" : "MPA membership"}</td>
+              <td data-label="Latest outcome"><span className={styles.status}>{label(item.status)}</span></td>
+              <td data-label="Date">{dateLabel(item.created_at)}</td>
             </tr>)}
             {!visibleItems.length ? <tr><td colSpan={4} className={styles.empty}>No referral outcomes match these filters.</td></tr> : null}</tbody>
           </table>

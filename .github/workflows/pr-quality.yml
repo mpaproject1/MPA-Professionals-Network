@@ -259,6 +259,27 @@ jobs:
           test -s .next/build-manifest.json
           echo "Production build artifacts exist. No deployment or upload is performed."
 
+
+
+  browser-acceptance:
+    name: Browser acceptance (only after backend and production build pass)
+    needs:
+      - backend-tests
+      - production-build
+    if: ${{ needs.backend-tests.result == 'success' && needs.production-build.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
       - name: Cache Playwright browser binaries
         uses: actions/cache@v4
         with:
@@ -274,9 +295,34 @@ jobs:
           cache-dependency-path: .github/workflows/pr-quality.yml
       - name: Install independent PDF reader
         run: python -m pip install --disable-pip-version-check pypdf==5.9.0
-      - name: Test support assistant, contextual tours and membership card printing
+      - name: Start production server
+        env:
+          WEB_BASE_URL: http://127.0.0.1:3001
+          PORT: 3001
+        run: |
+          set -euo pipefail
+          npm run start --workspace @mpa/web > /tmp/mpa-web.log 2>&1 &
+          echo "$!" > /tmp/mpa-web.pid
+      - name: Verify production server readiness
+        id: server_ready
+        continue-on-error: true
+        env:
+          WEB_BASE_URL: http://127.0.0.1:3001
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 15); do
+            if curl --connect-timeout 2 --max-time 5 -fsS "$WEB_BASE_URL/" >/dev/null; then
+              echo "Production server is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Production server did not become ready; browser tests will be skipped."
+          cat /tmp/mpa-web.log || true
+          exit 1
+      - name: Run browser acceptance only when server is ready
         id: browser_acceptance
-        if: always()
+        if: ${{ steps.server_ready.outcome == 'success' }}
         env:
           WEB_BASE_URL: http://127.0.0.1:3001
           PORT: 3001
@@ -284,29 +330,7 @@ jobs:
           PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
         run: |
           set -euo pipefail
-          if [ -s web/.next/BUILD_ID ]; then
-            echo "Starting production server for browser acceptance."
-            npm run start --workspace @mpa/web > /tmp/mpa-web.log 2>&1 &
-          else
-            echo "Production build failed; starting the development server to collect browser diagnostics as a fallback."
-            npm run dev --workspace @mpa/web -- --hostname 127.0.0.1 > /tmp/mpa-web.log 2>&1 &
-          fi
-          WEB_PID=$!
-          trap 'kill "$WEB_PID" 2>/dev/null || true' EXIT
-          READY=0
-          for attempt in $(seq 1 60); do
-            if curl -fsS "$WEB_BASE_URL/" >/dev/null; then READY=1; break; fi
-            sleep 2
-          done
-          if [ "$READY" != "1" ]; then
-            echo "Production server did not become ready; server log follows."
-            cat /tmp/mpa-web.log
-            exit 1
-          fi
-
           echo "=== Browser acceptance: run every selected spec and collect every failure ==="
-          # A zero failure cap means unlimited: execute the entire selected suite.
-          # Preserve machine-readable/HTML reports, screenshots, videos and traces.
           mkdir -p test-results playwright-report
           npx playwright test \
             e2e/support-bot-movement.spec.js \
@@ -320,9 +344,14 @@ jobs:
             e2e/workspace-app-ux.spec.js \
             e2e/organization-workspace.spec.js \
             --max-failures=0 \
-            --reporter=list,html,json 
-
-      - name: Upload complete browser diagnostics (reports, traces, screenshots, videos and server logs)
+            --reporter=list,html,json
+      - name: Stop production server
+        if: always()
+        run: |
+          if [ -f /tmp/mpa-web.pid ]; then
+            kill "$(cat /tmp/mpa-web.pid)" 2>/dev/null || true
+          fi
+      - name: Upload browser diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -330,26 +359,23 @@ jobs:
           path: |
             test-results/
             playwright-report/
-            /tmp/mpa-playwright.log
             /tmp/mpa-web.log
           if-no-files-found: warn
           retention-days: 14
-
-      - name: Fail the job after production and browser diagnostics are collected
+      - name: Fail if server readiness or browser acceptance failed
         if: always()
         env:
-          PRODUCTION_BUILD_OUTCOME: ${{ steps.production_build.outcome }}
-          BUILD_OUTPUT_OUTCOME: ${{ steps.build_output.outcome }}
+          SERVER_READY_OUTCOME: ${{ steps.server_ready.outcome }}
           BROWSER_ACCEPTANCE_OUTCOME: ${{ steps.browser_acceptance.outcome }}
         run: |
           set -euo pipefail
-          echo "Production build: $PRODUCTION_BUILD_OUTCOME"
-          echo "Build artifact verification: $BUILD_OUTPUT_OUTCOME"
+          echo "Production server readiness: $SERVER_READY_OUTCOME"
           echo "Browser acceptance: $BROWSER_ACCEPTANCE_OUTCOME"
-          if [[ "$PRODUCTION_BUILD_OUTCOME" != "success" || "$BUILD_OUTPUT_OUTCOME" != "success" || "$BROWSER_ACCEPTANCE_OUTCOME" != "success" ]]; then
-            echo "One or more production/browser validation stages failed; all possible diagnostics have been collected." >&2
+          if [[ "$SERVER_READY_OUTCOME" != "success" || "$BROWSER_ACCEPTANCE_OUTCOME" != "success" ]]; then
+            echo "Browser acceptance did not complete successfully." >&2
             exit 1
           fi
+
 
 
 # Browser role journeys are temporarily excluded from required PR CI because the

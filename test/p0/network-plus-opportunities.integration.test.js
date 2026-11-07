@@ -97,7 +97,7 @@ test("an offer can be submitted and moderated before business verification, then
  const business=(await db.query("insert into network_plus_business(business_kind,display_name,description,verification_status,moderation_status,publication_status,created_by) values('individual',$1,$2,'submitted','not_submitted','draft',$3) returning id",["Pre-approval Test Business "+suffix.slice(0,8),"Synthetic business identity used to verify the pre-approval opportunity workflow.",owner.user.id])).rows[0];
  await db.query("insert into network_plus_business_ownership(business_id,owner_type,owner_user_id,owner_role,consent_status,status,consented_at,created_by) values($1,'member',$2,'primary_owner','accepted','active',now(),$2)",[business.id,owner.user.id]);
  const draft=await businessDiscovery.createOpportunityListingDraft(business.id,owner.user.id,{listingKind:"offer",wizardStep:1},"np-preapproval-create-"+suffix,randomUUID()+randomUUID());
- assert.match(draft.public_reference,/^MPA-OPP-\\d{8}-[A-F0-9]{8}$/);
+ assert.match(draft.public_reference,/^MPA-OPP-\d{8}-[A-F0-9]{8}$/);
  await businessDiscovery.saveOpportunityListingDraft(draft.id,owner.user.id,{
   listingKind:"offer",categoryCode:"technology",subcategoryCode:"software_development",
   title:"Pre-approval software engineering offer",

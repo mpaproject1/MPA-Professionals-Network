@@ -94,6 +94,11 @@ test("member active flag and every card issuance path share the Addis-date legac
   assert.match(service,/coalesce\(p\.name,application_product\.name\)/);
   assert.match(service,/status:"plan_unavailable"/);
   assert.match(service,/application_product\.id=a\.membership_product_id/);
+  const adminEligible=service.slice(service.indexOf("export async function listEligibleMembershipCardsForAdmin"),service.indexOf("export async function getMembershipCardsForAdmin"));
+  assert.match(adminEligible,/ensureMembershipNumber/);
+  assert.match(adminEligible,/join app_user u on u.id=m.user_id/);
+  const qrVerify=service.slice(service.indexOf("export async function verifyMembershipCard"));
+  assert.match(qrVerify,/left join person on person.user_id=m.user_id/);
   assert.match(service,/left join membership_product p on p.id=m.membership_product_id/);
   assert.match(server,/actorId:identity\.sub,requestId/);
   assert.match(eligibility,/membership_fee_obligation_balance/);

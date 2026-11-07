@@ -48,6 +48,9 @@ test("employment attribution attaches to formal applications and verified hiring
  assert.ok(service.includes("confirmEmploymentOutcome"));
  assert.ok(service.includes("verifyEmploymentReferral"));
  assert.ok(service.includes("candidate_and_employer_confirmation"));
+ const stageWriter=service.slice(service.indexOf("export async function recordJobApplicationStage"),service.indexOf("export async function listMyReferralProgress"));
+ for(const stage of ['shortlisted:"shortlisted"','interview:"interview"','accepted:"offer_accepted"','hired:"employment_reported"','rejected:"declined"','withdrawn:"withdrawn"'])assert.ok(stageWriter.includes(stage));
+ assert.ok(stageWriter.includes("if(row.status===eventCode)continue"));
 });
 test("referral scoring requires an independently approved active policy",()=>{
  assert.ok(migration.includes("member_referral_score_policy"));

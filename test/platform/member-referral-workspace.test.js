@@ -23,7 +23,7 @@ test("profile includes the same personal referral URL and invitation actions", (
 });
 
 test("referral activity separates membership and employment milestones", () => {
-  for (const status of ["registered", "membership_application_submitted", "membership_approved", "membership_declined", "membership_activated"]) {
+  for (const status of ["registered", "email_verified", "membership_application_submitted", "membership_approved", "membership_declined", "membership_activated"]) {
     assert.ok(component.includes(status), "missing membership milestone " + status);
   }
   for (const status of ["application_submitted", "shortlisted", "interview", "offer_accepted", "employment_reported", "employment_verified"]) {

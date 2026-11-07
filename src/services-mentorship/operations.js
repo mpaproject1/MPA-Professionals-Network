@@ -230,3 +230,52 @@ export async function updateMentorshipParticipantReport(actorId,reportId,input,r
   return row;
  });
 }
+
+/** Aggregate-only programme metrics; confidential case details stay in the restricted queue. */
+export async function getMentorshipProgrammeMetrics(actorId){
+ const db=getPool();
+ if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized mentorship programme access is required.","FORBIDDEN");
+ const row=(await db.query(`
+  select
+   (select count(*)::int from mentorship where status='active') active_relationships,
+   (select count(*)::int from mentorship where status='paused') paused_relationships,
+   (select count(*)::int from mentorship where status='completed') completed_relationships,
+   (select count(*)::int from mentorship where status='cancelled') cancelled_relationships,
+   (select count(*)::int from mentorship_match where status='proposed') pending_match_invitations,
+   (select count(*)::int from mentorship_match where proposed_at is not null) total_match_proposals,
+   (select count(*)::int from mentorship_match where proposed_at is not null and responded_at is not null) responded_match_proposals,
+   (select round(avg(extract(epoch from (responded_at-proposed_at))/60)::numeric,1) from mentorship_match where proposed_at is not null and responded_at is not null) average_match_response_minutes,
+   (select count(*)::int from mentorship_session where coordination_status='proposed') pending_session_confirmations,
+   (select count(*)::int from mentorship_session where coordination_status in ('accepted','declined')) responded_session_proposals,
+   (select count(*)::int from mentorship_session where coordination_status='accepted') confirmed_sessions,
+   (select count(*)::int from mentorship_learning_submission where status='accepted') accepted_learning_submissions,
+   (select count(*)::int from mentorship_learning_submission) total_learning_submissions,
+   (select count(*)::int from mentorship_feedback) participant_feedback_entries,
+   (select count(*)::int from mentorship_participant_report where status in ('open','reviewing')) unresolved_safeguarding_cases
+ `).rows[0]||{};
+ const n=v=>v===null||v===undefined?null:Number(v);
+ const totalMatches=n(row.total_match_proposals)||0,respondedMatches=n(row.responded_match_proposals)||0;
+ const totalSessionResponses=n(row.responded_session_proposals)||0,confirmed=n(row.confirmed_sessions)||0;
+ const totalLearning=n(row.total_learning_submissions)||0,acceptedLearning=n(row.accepted_learning_submissions)||0;
+ const completed=n(row.completed_relationships)||0,closed=completed+(n(row.cancelled_relationships)||0);
+ return {
+  activeRelationships:n(row.active_relationships)||0,pausedRelationships:n(row.paused_relationships)||0,
+  completedRelationships:completed,pendingMatchInvitations:n(row.pending_match_invitations)||0,
+  averageMatchResponseMinutes:n(row.average_match_response_minutes),
+  mentorResponseRate:totalMatches?Math.round(respondedMatches/totalMatches*100):null,
+  pendingSessionConfirmations:n(row.pending_session_confirmations)||0,
+  sessionConfirmationRate:totalSessionResponses?Math.round(confirmed/totalSessionResponses*100):null,
+  acceptedLearningSubmissions:acceptedLearning,
+  learningAcceptanceRate:totalLearning?Math.round(acceptedLearning/totalLearning*100):null,
+  relationshipCompletionRate:closed?Math.round(completed/closed*100):null,
+  participantFeedbackEntries:n(row.participant_feedback_entries)||0,
+  unresolvedSafeguardingCases:n(row.unresolved_safeguarding_cases)||0,
+  definitions:{
+   mentorResponseRate:"Responded match proposals divided by all recorded match proposals.",
+   sessionConfirmationRate:"Confirmed sessions divided by session proposals with a recorded response.",
+   learningAcceptanceRate:"Accepted versioned submissions divided by all submitted versions.",
+   relationshipCompletionRate:"Completed relationships divided by completed plus cancelled relationships.",
+   safeguarding:"Aggregate count only; case details remain in the separately authorized Support Desk queue."
+  }
+ };
+}

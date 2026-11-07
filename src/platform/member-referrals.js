@@ -64,7 +64,7 @@ export async function captureEmploymentApplication(db,jobId,referredUserId,appli
  return row;
 }
 export async function recordMembershipMilestone(db,referredUserId,eventCode,actorUserId){
- const allowed={membership_application_submitted:"membership_application_submitted",membership_approved:"membership_approved",membership_declined:"membership_declined"};
+ const allowed={email_verified:"email_verified",membership_application_submitted:"membership_application_submitted",membership_approved:"membership_approved",membership_declined:"membership_declined"};
  const next=allowed[eventCode];if(!next)return;
  const rows=(await db.query("select id,status from member_referral_attribution where referral_type='membership' and referred_user_id=$1 for update",[referredUserId])).rows;
  for(const row of rows){if(row.status===next)continue;await db.query("update member_referral_attribution set status=$1,updated_at=now() where id=$2",[next,row.id]);await event(db,row.id,next,row.status,next,actorUserId);}

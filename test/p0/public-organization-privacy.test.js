@@ -47,7 +47,7 @@ test("direct visits to the public organization directory redirect to Services", 
 });
 
 test("membership management is separated from the member self-service page", () => {
-  assert.match(membershipPage, /\{!adminWorkspace&&token&&<Card>/);
+  assert.match(membershipPage, /\{!adminWorkspace&&token&&<section className="membership-status-hero/);
   assert.match(membershipPage, /\{adminWorkspace&&token&&\(roles\.includes/);
   assert.match(membershipPage, /\{adminWorkspace&&token&&\(roles\.some/);
   assert.match(adminMembershipPage, /Membership application review and activation are available only to authorized/);

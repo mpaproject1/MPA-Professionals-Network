@@ -395,8 +395,8 @@ test("finance payment workspace uses a privacy-minimized queue and separate fina
   const queue = service.slice(service.indexOf("export async function listMembershipPaymentsForFinance"), service.indexOf("export async function attachApplicationFile"));
   assert.ok(!/u\.email|data_snapshot|attachments/.test(queue));
   assert.ok(financeUi.includes('api<Payment[]>("/api/v1/finance/membership/payments"'));
-  assert.ok(financeUi.includes('api("/api/v1/payments/" + payment.payment_id + "/verify"'));
-  assert.ok(financeUi.includes('api("/api/v1/payments/" + payment.payment_id + "/reverse"'));
+  assert.ok(financeUi.includes('api("/api/v1/payments/" + id + "/verify"'));
+  assert.ok(financeUi.includes('api("/api/v1/payments/" + id + "/reverse"'));
   assert.ok(!membershipUi.includes("finance_officer"));
   assert.ok(!membershipUi.includes("finance.manage"));
   assert.ok(!membershipUi.includes("finance.view"));

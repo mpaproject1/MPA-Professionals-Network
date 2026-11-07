@@ -35,7 +35,7 @@ function membershipDateString(value) {
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
   }
-  const match = String(value).match(/^(\\d{4}-\\d{2}-\\d{2})/);
+  const match = String(value).match(/^([0-9]{4}-[0-9]{2}-[0-9]{2})/);
   return match ? match[1] : null;
 }
 export function getMembershipCardStatus(row, now=new Date()) {

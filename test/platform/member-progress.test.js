@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import test from "node:test";
 import { readFile } from "node:fs/promises";
+import test from "node:test";
 import { buildMemberProgress } from "../../src/platform/member-progress.js";
 
 const serverSource=await readFile(new URL("../../server.js",import.meta.url),"utf8");

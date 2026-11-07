@@ -87,7 +87,7 @@ export function MemberReferralWorkspace({ compact = false }: { compact?: boolean
   const countFor = (type: string, statuses?: string[]) => counts
     .filter((item) => (type === "all" || item.referral_type === type) && (!statuses || statuses.includes(item.status)))
     .reduce((total, item) => total + Number(item.count || 0), 0);
-  const registrations = countFor("membership", ["registered"]);
+  const registrations = countFor("membership");
   const activeMembers = countFor("membership", ["membership_activated"]);
   const awaitingReview = countFor("membership", ["membership_application_submitted"]);
   const verifiedEmployment = countFor("employment", ["employment_verified"]);

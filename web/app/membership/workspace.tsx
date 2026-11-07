@@ -32,7 +32,8 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
  const releaseAction=(key:string)=>{inFlightActions.current.delete(key);};
  const [adminPlans,setAdminPlans]=useState<AdminPlan[]>([]),[adminPlansError,setAdminPlansError]=useState("");
  const [hasActiveMembership,setHasActiveMembership]=useState(false);
- const [membershipStatusUnavailable,setMembershipStatusUnavailable]=useState(false);\n const [membershipPaymentVerificationRequired,setMembershipPaymentVerificationRequired]=useState(false);
+ const [membershipStatusUnavailable,setMembershipStatusUnavailable]=useState(false);
+ const [membershipPaymentVerificationRequired,setMembershipPaymentVerificationRequired]=useState(false);
  const [membershipCard,setMembershipCard]=useState<MembershipCardSummary|null>(null),[membershipCardError,setMembershipCardError]=useState("");
  const [renewalMode,setRenewalMode]=useState(false);
  const [applicationModalOpen,setApplicationModalOpen]=useState(false),[applicationStep,setApplicationStep]=useState<1|2|3|4>(1),[eligibilityConfirmed,setEligibilityConfirmed]=useState(false);
@@ -103,7 +104,7 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
      if(confirmedActiveMembership){
       if(cardResult.value){setMembershipCard(cardResult.value);setMembershipCardError("");}
       else{setMembershipCard(null);setMembershipCardError(cardResult.error instanceof ApiError?cardResult.error.message:"Your membership is active, but the membership ID could not be loaded. Retry or contact membership support.");}
-     }else{setMembershipCard(null);setMembershipCardError("");}
+     }else{setMembershipCard(null);setMembershipCardError(me.membership_payment_verification_required?(cardResult.error instanceof ApiError?cardResult.error.message:"Finance must confirm full historical fee settlement before a membership ID can be issued."):"");}
      if(adminWorkspace&&((me.roles||[]).some(role=>["reviewer","membership_reviewer","system_admin"].includes(role))||(me.permissions||[]).some(permission=>["membership.review","members.view"].includes(permission)))){
       try{const review=await api<Application[]>("/api/v1/review/membership/applications",{},token);setReviewApplications(Array.isArray(review)?review:[]);}
       catch(reviewError){setReviewApplications([]);failures.push(reviewError instanceof ApiError?reviewError.message:"Membership review applications could not be loaded.");}
@@ -175,9 +176,9 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
  const latestApplication=applications[0]||null;
  const latestApplicationStatus=latestApplication?.status||"";
  const applicationPaymentVerified=Boolean(latestApplication?.payment&&latestApplication.payment.status==="succeeded"&&!latestApplication.payment.reversal);
- const applicationReviewComplete=hasActiveMembership||["approved","payment_pending","paid","activated","rejected"].includes(latestApplicationStatus);
- const applicationSubmitted=hasActiveMembership||Boolean(latestApplication?.submitted_at);
- const applicationTermsComplete=hasActiveMembership||Boolean(latestApplication?.terms_acknowledged_at);
+ const applicationReviewComplete=hasActiveMembership||membershipPaymentVerificationRequired||["approved","payment_pending","paid","activated","rejected"].includes(latestApplicationStatus);
+ const applicationSubmitted=hasActiveMembership||membershipPaymentVerificationRequired||Boolean(latestApplication?.submitted_at);
+ const applicationTermsComplete=hasActiveMembership||membershipPaymentVerificationRequired||Boolean(latestApplication?.terms_acknowledged_at);
  const settlementComplete=hasActiveMembership||applicationPaymentVerified||["paid","activated"].includes(latestApplicationStatus);
  const membershipStatusLabel=membershipStatusUnavailable?"Status unavailable":membershipPaymentVerificationRequired?"Finance verification required":hasActiveMembership?"Active":latestApplicationStatus==="correction_required"?"Action required":latestApplicationStatus?latestApplicationStatus.replaceAll("_"," "):"Not active";
  const membershipNextAction=membershipStatusUnavailable?"We could not confirm your current membership status. Retry the status check; do not submit a duplicate application until your existing record is confirmed.":membershipPaymentVerificationRequired?"Your imported membership record is within its validity dates, but Finance must confirm full historical fee settlement before an MPA membership ID can be issued. Contact MPA Finance or membership support; do not submit a duplicate application.":hasActiveMembership?(membershipCardError?"Membership is active. The ID card service needs attention; retry card loading or contact membership support.":"Your membership is active. Your membership ID is ready to view or print."):latestApplicationStatus==="activated"?"Your application is marked activated, but the current membership record is not eligible. Contact membership support to reconcile the record.":latestApplicationStatus==="correction_required"?"Respond to the requested application correction.":latestApplicationStatus==="rejected"?"Review the decision and contact membership support if you need clarification.":latestApplicationStatus==="paid"?"The required fee settlement is confirmed. Wait for an authorized membership activation decision.":latestApplicationStatus==="approved"||latestApplicationStatus==="payment_pending"?"Complete the configured payment step, then wait for Finance verification.":latestApplicationStatus==="submitted"||latestApplicationStatus==="in_review"?"Your application is being processed. Follow its status and any requested action below.":"Choose an available membership plan to begin your application.";

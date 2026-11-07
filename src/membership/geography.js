@@ -47,12 +47,22 @@ function parseRows(rows){
 }
 function validateHierarchy(rows){
  const byCode=new Map(rows.map(row=>[row.unit_code,row]));
+ const iso3Codes=new Set(),m49Codes=new Set();
  for(const row of rows){
-  if(row.unit_level==="country")continue;
+  if(row.unit_level==="country"){
+   if(iso3Codes.has(row.country_iso3))row.errors.push("Country ISO alpha-3 code is duplicated in this workbook.");iso3Codes.add(row.country_iso3);
+   if(m49Codes.has(row.country_m49))row.errors.push("UN M49 country code is duplicated in this workbook.");m49Codes.add(row.country_m49);
+   continue;
+  }
   const parent=byCode.get(row.parent_code);
   if(!parent){row.errors.push("parent_code must reference a row in this workbook; import a complete versioned hierarchy.");continue;}
   if(!ALLOWED[row.unit_level]?.has(parent.unit_level==="country"?"country:"+parent.country_iso3:parent.unit_level))row.errors.push("The selected parent level is not valid for "+row.unit_level+".");
   if(["region","federal_city"].includes(row.unit_level)&&parent.country_iso3!=="ETH")row.errors.push("Ethiopian regions and federal cities must belong to the Ethiopia country row (ETH).");
+ }
+ if(rows.length){
+  const ethiopia=byCode.get("ETH");
+  if(!ethiopia||ethiopia.unit_level!=="country"||ethiopia.country_iso3!=="ETH")rows[0].errors.push("The complete reference version must include Ethiopia (ETH) as a country row.");
+  if(!rows.some(row=>["region","federal_city"].includes(row.unit_level)&&row.parent_code==="ETH"))rows[0].errors.push("The reference version must include Ethiopia's Region or Federal City level.");
  }
 }
 export function memberGeographyImportTemplate(identity){
@@ -145,7 +155,9 @@ export async function previewMemberGeographyImport(identity,input={},requestId){
  const headers=parsed.headers.map(h=>h.trim());
  const missing=COLUMNS.filter(column=>!headers.includes(column));
  if(missing.length)throw fail(400,"The workbook is missing columns: "+missing.join(", "),"MISSING_COLUMNS");
- const rows=parseRows(parsed.rows);validateHierarchy(rows);
+ const rows=parseRows(parsed.rows);
+ if(!rows.length)throw fail(400,"The geography workbook must contain country and Ethiopian administrative reference rows.","GEOGRAPHY_WORKBOOK_EMPTY");
+ validateHierarchy(rows);
  const errors=rows.reduce((sum,row)=>sum+row.errors.length,0);
  const batchId=randomUUID();
  await withTransaction(async tx=>{

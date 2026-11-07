@@ -334,5 +334,6 @@ export default function Mentorship(){
      </div>}
    </Card>}
    <div className="footer-note">The matching score is not invented in this interface. Human governance and explicit acceptance remain authoritative.</div>
+   <nav className="mentorship-mobile-nav" aria-label="Mobile mentorship workspaces"><a href="#my-mentorship-overview"><Bookmark size={18}/><span>My workspace</span></a><a href="#mentorship-session-hub-title"><Clock3 size={18}/><span>Sessions</span></a><a href="#mentorship-learning-goals"><Target size={18}/><span>Learning</span></a><a href="#active-mentorships"><HeartHandshake size={18}/><span>People</span></a></nav>
  </div>;
 }

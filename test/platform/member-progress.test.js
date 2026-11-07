@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { buildMemberProgress } from "../../src/platform/member-progress.js";
+
+const serverSource=await readFile(new URL("../../server.js",import.meta.url),"utf8");
 
 test("member progress combines member-owned records across domains and prioritizes member actions", () => {
   const result = buildMemberProgress({
@@ -120,4 +123,20 @@ test("application progress preserves employer and membership payment responsibil
   assert.equal(result.items.find(item => item.recordId === "offer-rejected").responsibility, "external_response");
   assert.equal(result.items.find(item => item.recordId === "membership-paid").responsibility, "mpa_action");
   assert.equal(result.items.find(item => item.recordId === "membership-paid").nextAction, "Await activation");
+});
+
+
+test("member progress and legacy application-tracking routes authenticate before reading private records", () => {
+  const progressStart = serverSource.indexOf('if(req.method==="GET" && p==="api/v1/me/progress")');
+  const trackingStart = serverSource.indexOf('if(req.method==="GET" && p==="api/v1/me/application-tracking")');
+  const nextRouteStart = serverSource.indexOf('if(req.method==="GET" && p==="api/v1/admin/support/knowledge")');
+  assert.notEqual(progressStart, -1);
+  assert.notEqual(trackingStart, -1);
+  assert.notEqual(nextRouteStart, -1);
+  const progressRoute = serverSource.slice(progressStart, trackingStart);
+  const trackingRoute = serverSource.slice(trackingStart, nextRouteStart);
+  assert.match(progressRoute, /const identity=await auth\(req\)/);
+  assert.match(trackingRoute, /const identity=await auth\(req\)/);
+  assert.match(progressRoute, /identity\.sub/);
+  assert.match(trackingRoute, /identity\.sub/);
 });

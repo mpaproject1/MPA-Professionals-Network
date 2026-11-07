@@ -89,6 +89,7 @@ function geographyRows(suffix){
   unit("ET-SUBCITY-"+suffix,"Test City Division "+suffix,"sub_city","ET-CITY-"+suffix),
   unit("ET-CITY-WOREDA-"+suffix,"Test City Woreda "+suffix,"woreda","ET-SUBCITY-"+suffix)
  ];
+}
 
 test("geography XLSX round-trip preserves source fields and the complete parent-code contract",()=>{
  const rows=geographyRows("ROUNDTRIP");

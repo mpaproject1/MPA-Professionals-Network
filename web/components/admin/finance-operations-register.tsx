@@ -136,6 +136,13 @@ export function FinanceOperationsRegister({payments,receipts,historicalPanel,can
     return true;
   }),[all,query,account,tab,status]);
   const active=selected?all.find(x=>x.kind===selected.kind&&x.id===selected.id):null;
+  useEffect(()=>{
+    if(!active)return;
+    const closeOnEscape=(event:KeyboardEvent)=>{if(event.key==="Escape")setSelected(null);};
+    window.addEventListener("keydown",closeOnEscape);
+    return()=>window.removeEventListener("keydown",closeOnEscape);
+  },[active]);
+
 
   return <div className="grid" style={{gap:12}}>
     <Card>
@@ -199,7 +206,7 @@ export function FinanceOperationsRegister({payments,receipts,historicalPanel,can
         {filtered.length===0&&<p className="muted" style={{padding:20,textAlign:"center"}}>No payment records match these filters.</p>}
       </div>
     </Card>}
-    {tab!=="outstanding"&&active&&<Card>
+    {tab!=="outstanding"&&active&&<div role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setSelected(null);}} style={{position:"fixed",inset:0,zIndex:1050,background:"rgba(2,8,23,.48)",display:"flex",justifyContent:"flex-end"}}><section role="dialog" aria-modal="true" aria-label="Payment details" className="card grid" style={{width:"min(620px,100%)",height:"100%",overflowY:"auto",padding:20,borderRadius:0,alignContent:"start"}}>
       <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start"}}><div><div className="eyebrow">PAYMENT DETAIL · {active.kind==="membership"?"MEMBERSHIP":"MANUAL FINANCE"}</div><h2 className="h2">{active.reference}</h2><p className="muted">{active.payer} · {active.payerType} account{active.accountReference?" · "+active.accountReference:""}</p></div><button type="button" className="btn btn-ghost" onClick={()=>setSelected(null)}>Close detail</button></div>
       <div className="grid grid-3" style={{gap:10}}><p><span className="muted">Amount</span><br/><strong>{money(active.amount,active.currency)}</strong></p><p><span className="muted">Purpose</span><br/><strong>{active.purpose}</strong></p><p><span className="muted">Status</span><br/><Badge tone={statusTone(active.status)}>{label(active.status)}</Badge></p><p><span className="muted">Method</span><br/><strong>{label(active.method)}</strong></p><p><span className="muted">Date</span><br/><strong>{date(active.date)}</strong></p><p><span className="muted">Reconciliation</span><br/><strong>{label(active.reconciliation)}</strong></p></div>
       {active.evidence&&<button type="button" className="btn btn-ghost" disabled={busy!==""} onClick={()=>onPreview(active.evidence!,active.evidenceName||"Payment evidence")}>Preview payment evidence</button>}
@@ -213,6 +220,6 @@ export function FinanceOperationsRegister({payments,receipts,historicalPanel,can
         {canReverse&&active.kind==="membership"&&active.status==="succeeded"&&!active.raw.reversed&&<section className="case-row"><h3 className="h2">Refund or reverse payment</h3><label>Action<select value={reverseType[active.id]||"refund"} onChange={e=>setReverseType(v=>({...v,[active.id]:e.target.value as "refund"|"reversal"}))}><option value="refund">Refund</option><option value="reversal">Reverse payment</option></select></label><label>Reason<textarea rows={2} minLength={8} value={reasons[active.id]||""} onChange={e=>setReasons(v=>({...v,[active.id]:e.target.value}))}/></label><button className="btn btn-ghost" type="button" disabled={busy!==""||(reasons[active.id]||"").trim().length<8} onClick={()=>onReversePayment(active.id,reverseType[active.id]||"refund",reasons[active.id]||"",active.raw.application_type==="legacy_import")}>Record refund / reversal</button></section>}
         {canReverse&&active.kind==="receipt"&&active.status==="verified"&&<section className="case-row"><h3 className="h2">Reverse manual finance payment</h3><label>Reason<textarea rows={2} minLength={8} value={reasons[active.id]||""} onChange={e=>setReasons(v=>({...v,[active.id]:e.target.value}))}/></label><button className="btn btn-ghost" type="button" disabled={busy!==""||(reasons[active.id]||"").trim().length<8} onClick={()=>onReverseReceipt(active.id,reasons[active.id]||"")}>Reverse & revoke voucher</button></section>}
       </div>
-    </Card>}
+    </section></div>}
   </div>;
 }

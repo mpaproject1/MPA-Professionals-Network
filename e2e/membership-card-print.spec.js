@@ -103,3 +103,20 @@ test("single member membership ID PDF is one exact-size card with no portal chro
   expect(extracted).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
+
+test("membership workspace still loads the canonical ID and plan when the separate account summary request fails",async({page})=>{
+ await page.addInitScript(()=>{
+  sessionStorage.setItem("mpa-session-token","membership-workspace-card-fallback-ci-token");
+  localStorage.setItem("mpa-privacy-preferences-v1",JSON.stringify({version:"2026-10-16-v1",necessary:true,analytics:false,personalization:false,updatedAt:new Date().toISOString()}));
+ });
+ const card={membershipNumber:"MPA-2026-99AA11BB",memberName:"Amina Yusuf",membershipType:"Lifetime",status:"active",startDate:"2026-01-01",endDate:null,renewalRequired:false,verificationPath:"/membership/verify?membershipNumber=MPA-2026-99AA11BB&token="+"c".repeat(43),settings};
+ await page.route("**/api/v1/membership/products",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[]})}));
+ await page.route("**/api/v1/membership/applications/me",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[]})}));
+ await page.route("**/api/v1/me",route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({error:{code:"TEMPORARY_FAILURE",message:"Account summary temporarily unavailable."}})}));
+ await page.route("**/api/v1/membership/card",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:card})}));
+ await page.goto("/membership");
+ await expect(page.getByText("Your membership is active")).toBeVisible();
+ await expect(page.getByText("MPA-2026-99AA11BB")).toBeVisible();
+ await expect(page.getByText("Lifetime",{exact:true})).toBeVisible();
+ await expect(page.getByRole("link",{name:/View.*membership card|Membership ID/i})).toBeVisible();
+});

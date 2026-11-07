@@ -45,3 +45,11 @@ test("member and admin APIs are exposed",()=>{
  assert.ok(routes.includes('p==="api/v1/admin/referrals"'));
  assert.ok(routes.includes("verifyEmploymentReferral"));
 });
+
+
+test("referral event insert values follow the declared SQL column order",()=>{
+ const eventWriter=service.slice(service.indexOf("async function event"),service.indexOf("export async function ensureMyReferralCode"));
+ assert.match(eventWriter,/member_referral_event\(attribution_id,actor_user_id,event_code,from_status,to_status,metadata,retention_policy_version_id,retention_policy_snapshot\)/);
+ assert.match(eventWriter,/\[attribution,actor\|\|null,eventCode,fromStatus,toStatus,JSON\.stringify\(metadata\),retention\.versionId/);
+ assert.doesNotMatch(eventWriter,/\[attribution,eventCode,fromStatus,toStatus,actor\|\|null/);
+});

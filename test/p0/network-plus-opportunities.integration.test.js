@@ -86,4 +86,36 @@ test("Needs and Offers persist guided drafts, validate taxonomy, moderate listin
  await businessDiscovery.changeProfessionalServiceStatus(product.id,owner.user.id,"archived","Owner closes the product discovery profile","np-product-close-"+suffix);
  assert.equal((await db.query("select status from network_plus_service_listing where id=$1",[product.id])).rows[0].status,"archived");
 });
+
+test("an offer can be submitted and moderated before business verification, then becomes discoverable only after business approval",async t=>{
+ if(!process.env.DATABASE_URL){t.skip("requires the disposable PostgreSQL database configured by PR Quality");return;}
+ const db=getPool(),suffix=randomUUID().replace(/-/g,"");
+ const owner=await register("preapproval-owner-"+suffix),reviewer=await register("preapproval-reviewer-"+suffix);
+ await Promise.all([setMembership(owner.user.id),setMembership(reviewer.user.id)]);
+ const role=(await db.query("select id from app_role where role_code='business_moderator'")).rows[0];assert.ok(role);
+ await db.query("insert into app_user_role(user_id,role_id) values($1,$2) on conflict do nothing",[reviewer.user.id,role.id]);
+ const business=(await db.query("insert into network_plus_business(business_kind,display_name,description,verification_status,moderation_status,publication_status,created_by) values('individual',$1,$2,'submitted','not_submitted','draft',$3) returning id",["Pre-approval Test Business "+suffix.slice(0,8),"Synthetic business identity used to verify the pre-approval opportunity workflow.",owner.user.id])).rows[0];
+ await db.query("insert into network_plus_business_ownership(business_id,owner_type,owner_user_id,owner_role,consent_status,status,consented_at,created_by) values($1,'member',$2,'primary_owner','accepted','active',now(),$2)",[business.id,owner.user.id]);
+ const draft=await businessDiscovery.createOpportunityListingDraft(business.id,owner.user.id,{listingKind:"offer",wizardStep:1},"np-preapproval-create-"+suffix,randomUUID()+randomUUID());
+ assert.match(draft.public_reference,/^MPA-OPP-\\d{8}-[A-F0-9]{8}$/);
+ await businessDiscovery.saveOpportunityListingDraft(draft.id,owner.user.id,{
+  listingKind:"offer",categoryCode:"technology",subcategoryCode:"software_development",
+  title:"Pre-approval software engineering offer",
+  summary:"A professional software engineering offer submitted before business approval.",
+  description:"This synthetic offer validates that listing content can enter moderation while the associated business verification and profile review are still pending.",
+  structuredAttributes:{technology_area:["data"],platform:["web"]},wizardStep:7,audience:"both",
+  deliveryMode:"remote",remoteAvailable:true,pricingModel:"quote",timezone:"Africa/Addis_Ababa"
+ },"np-preapproval-save-"+suffix);
+ const submitted=await businessDiscovery.submitProfessionalServiceListing(draft.id,owner.user.id,"np-preapproval-submit-"+suffix);
+ assert.equal(submitted.status,"pending_review");
+ const moderated=await businessDiscovery.moderateProfessionalServiceListing(draft.id,reviewer.user.id,{status:"published",reason:"Offer content reviewed and approved."},"np-preapproval-moderate-"+suffix);
+ assert.equal(moderated.status,"approved_pending_business");
+ assert.ok(!(await businessDiscovery.listProfessionalServices(owner.user.id,{q:"Pre-approval software engineering offer"})).items.some(row=>row.id===draft.id),"approved content must remain hidden while business approval is pending");
+ await db.query("update network_plus_business set verification_status='verified',verified_at=now(),verified_by=$2,moderation_status='pending_review',moderation_submitted_by=$2 where id=$1",[business.id,owner.user.id]);
+ await businessDiscovery.reviewBusinessModeration(business.id,reviewer.user.id,{status:"approved",reason:"Business verification and profile evidence independently reviewed."},"np-preapproval-business-approve-"+suffix);
+ const released=(await db.query("select status from network_plus_service_listing where id=$1",[draft.id])).rows[0];
+ assert.equal(released.status,"published");
+ assert.ok((await businessDiscovery.listProfessionalServices(owner.user.id,{q:"Pre-approval software engineering offer"})).items.some(row=>row.id===draft.id),"listing should enter discovery only after business approval");
+});
+
 after(async()=>{await closePool();});

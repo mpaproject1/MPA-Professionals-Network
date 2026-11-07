@@ -2,11 +2,11 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  // The current E2E fixtures share stable CI identities and mutable organization
-  // state. Keep the complete suite deterministic until those fixtures are isolated
-  // per test; this does not skip or relax any tests.
+  // Keep tests within each spec sequential so stateful journeys retain their
+  // intended order, while allowing two independent spec files to run together.
+  // Each Playwright test still receives its own isolated browser context.
   fullyParallel: false,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 2 : undefined,
   retries: 0,
   reporter: "list",
   timeout: 60000,
@@ -15,7 +15,9 @@ export default defineConfig({
     baseURL: process.env.WEB_BASE_URL || "http://127.0.0.1:3001",
     headless: true,
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    // Failure traces preserve actionable browser diagnostics without retaining
+    // large video files for every failed test.
+    video: "off",
     trace: "retain-on-failure"
   }
 });

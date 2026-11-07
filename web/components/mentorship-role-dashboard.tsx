@@ -10,7 +10,7 @@ type Session={id:string;status:string;scheduled_start_at:string;scheduled_end_at
 type Feedback={id:string;comments?:string|null;created_at:string};
 type LearningProgress={id:string;mentorship_id:string;title:string;due_at?:string|null;mentor_user_id:string;mentee_user_id:string;submission_status?:string|null;submission_id?:string|null};
 type Details={goals:Goal[];sessions:Session[];feedback:Feedback[]};
-export function MentorshipRoleDashboard({role,currentUserId,matches,relationships,details,learningProgress}:{role:"mentor"|"mentee";currentUserId:string;matches:Match[];relationships:Relationship[];details:Record<string,Details>;learningProgress:LearningProgress[]}){
+export function MentorshipRoleDashboard({role,currentUserId,matches,relationships,details,learningProgress,maxActiveMentees}:{role:"mentor"|"mentee";currentUserId:string;matches:Match[];relationships:Relationship[];details:Record<string,Details>;learningProgress:LearningProgress[];maxActiveMentees?:number}){
  const now=Date.now();
  const pendingMatches=matches.filter(item=>role==="mentor"?(item.match_role==="mentor"&&item.status==="proposed"):(item.match_role==="mentee"&&item.status==="accepted"&&item.mentee_consent_status==="pending"));
  const sessions=relationships.flatMap(relationship=>(details[relationship.id]?.sessions||[]).map(session=>({relationship,session})));
@@ -27,6 +27,7 @@ export function MentorshipRoleDashboard({role,currentUserId,matches,relationship
    <Card><div className="muted">{role==="mentor"?"Active mentees":"Current mentor"}</div><div style={{fontSize:22,fontWeight:750,marginTop:6}}>{role==="mentor"?relationships.filter(item=>item.mentor_user_id===currentUserId&&item.status==="active").length:relationships.find(item=>item.mentee_user_id===currentUserId&&item.status==="active")?.mentor_name||"Not matched yet"}</div></Card>
    <Card><div className="muted">Upcoming sessions</div><div style={{fontSize:22,fontWeight:750,marginTop:6}}>{upcoming.length}</div><small className="muted">{upcoming[0]?new Date(upcoming[0].session.scheduled_start_at).toLocaleString():"No confirmed appointment"}</small></Card>
    <Card><div className="muted">{role==="mentor"?"Pending invitations":"Pending match decisions"}</div><div style={{fontSize:22,fontWeight:750,marginTop:6}}>{pendingMatches.length}</div></Card>
+   {role==="mentor"?<Card><div className="muted">Available capacity</div><div style={{fontSize:22,fontWeight:750,marginTop:6}}>{Math.max(0,Number(maxActiveMentees||0)-relationships.filter(item=>item.mentor_user_id===currentUserId&&["active","paused"].includes(item.status)).length)}</div><small className="muted">Open mentee places against your saved limit</small></Card>:null}
   </div>
   <Card><div className="row" style={{gap:8,alignItems:"center"}}><Flag size={17}/><div><b>Next best action</b><p className="muted">{nextAction}</p></div><span style={{flex:1}}/><Link className="text-link" href={pendingMatches.length?"#mentorship-invitations":pendingSession.length?"#mentorship-sessions":overdue.length?"#mentorship-learning-goals":upcoming.length?"#mentorship-session-hub-title":"#active-mentorships"}>Open <ArrowRight size={14}/></Link></div></Card>
   <div className="grid grid-2" style={{gap:10}}>

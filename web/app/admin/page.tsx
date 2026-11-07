@@ -188,7 +188,7 @@ export default function AdminPage() {
       </section>
       <section className={styles.metrics} aria-label="Overview summary">
         <article className={styles.metric}><span>Opportunity inquiries</span><strong>{!canReviewInquiries ? "—" : loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "Unavailable" : inquiries.length}</strong><small>{!canReviewInquiries ? "Review permission required" : loading ? "Retrieving current results" : sectionErrors.includes("opportunity inquiries") ? "Could not verify this count · retry to check" : "Records returned to this workspace"}</small></article>
-        <article className={styles.metric}><span>Available workspaces</span><strong>{workspaces.length}</strong><small>Filtered by your assigned platform role</small></article>
+        <article className={styles.metric}><span>Operational queue groups</span><strong>{operationalQueues ? new Set(operationalQueues.rows.map((row) => row.Queue)).size : "—"}</strong><small>{operationalQueues ? "Authoritative backend report groups" : "Awaiting verified queue snapshot"}</small></article>
       </section>
       {canSeeOperationalQueues && (
         <section className={styles.section} aria-labelledby="admin-operational-queues-heading">

@@ -30,12 +30,22 @@ function addisAbabaCivilDate(now=new Date()) {
   const values=Object.fromEntries(parts.map(part=>[part.type,part.value]));
   return `${values.year}-${values.month}-${values.day}`;
 }
+function membershipDateString(value) {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+  }
+  const match = String(value).match(/^(\\d{4}-\\d{2}-\\d{2})/);
+  return match ? match[1] : null;
+}
 export function getMembershipCardStatus(row, now=new Date()) {
   if(["revoked","cancelled","merged"].includes(row.status)) return "revoked";
   if(row.status==="suspended") return "suspended";
   if(coalesceLegacySource(row.source)==="legacy_import" && !row.legacy_payment_verified) return "payment_verification_required";
   const today=addisAbabaCivilDate(now);
-  if(row.status!=="active"||String(row.start_date).slice(0,10)>today||(row.end_date&&String(row.end_date).slice(0,10)<today)) return "expired";
+  const startDate=membershipDateString(row.start_date);
+  const endDate=membershipDateString(row.end_date);
+  if(row.status!=="active"||!startDate||startDate>today||(endDate&&endDate<today)) return "expired";
   return "active";
 }
 function assertEligible(row){

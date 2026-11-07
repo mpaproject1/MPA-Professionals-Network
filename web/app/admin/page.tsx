@@ -1,5 +1,5 @@
 "use client";
-import { BookOpenCheck, Building2, ClipboardList, FileBarChart, Fingerprint, HelpCircle, Mail, MessageSquareText, RefreshCw, Search, ShieldCheck, UserCog, Users } from "lucide-react";
+import { ClipboardList, RefreshCw, ShieldCheck, UserCog } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
@@ -123,26 +123,6 @@ export default function AdminPage() {
   }, [hydrated, token, canSeeOperationalQueues, loadOperationalQueues]);
   const totalUnreviewed = (operationalQueues?.rows || []).reduce((sum, row) => sum + Math.max(0, Number(row.Unreviewed) || 0), 0);
   const operationalQueueLinks: Record<string, string> = { "Membership application": "/admin/membership-center", "Professional verification": "/verification", "Organization verification": "/organizations", "Marketplace demand": "/admin/marketplace" };
-  const workspaces = [
-    {title:"Organizations",desc:"Search organizations, inspect linked accounts and open verification review workflows.",href:"/admin/organizations",Icon:Building2,group:"Review & service",access:"org"},
-    {title:"Vacancy review",desc:"Review submitted job vacancies and approve publication only after MPA governance checks.",href:"/admin/jobs/review",Icon:ClipboardList,group:"Review & service",access:"jobs"},
-    {title:"Account and Team",desc:"Search platform accounts, review status and manage roles with audit reasons.",href:"/admin/accounts",Icon:Users,group:"People & access",access:"admin"},
-    {title:"Membership Center",desc:"Unified membership dashboard, application approvals, paid-member register, renewals, analytics and governed exports.",href:"/admin/membership-center",Icon:ShieldCheck,group:"People & access",access:"membership"},
-    {title:"Serve-Community review",desc:"Moderate shared demand, listings and provider matching.",href:"/admin/marketplace",Icon:ClipboardList,group:"Review & service",access:"staff"},
-    {title:"Support desk",desc:"Manage inquiries, handoffs and the support knowledge base.",href:"/admin/support",Icon:MessageSquareText,group:"Review & service",access:"staff"},
-    {title:"Mentorship participant reports",desc:"Review confidential participant reports and record audited outcomes.",href:"/admin/mentorship-reports",Icon:ClipboardList,group:"Review & service",access:"support"},
-    {title:"Service and mentorship case records",desc:"Open case-specific participant information through audited Support Desk access.",href:"/admin/service-mentorship-cases",Icon:Users,group:"Review & service",access:"support"},
-    {title:"Public video story moderation",desc:"Review consented participant stories, verify transcripts and approve or reject publication.",href:"/admin/public-media-stories",Icon:ShieldCheck,group:"Review & service",access:"support"},
-    {title:"Mentorship interest review",desc:"Review consented mentor interest and propose specific matches.",href:"/admin/mentorship-interest",Icon:Users,group:"Review & service",access:"support"},
-    {title:"Reports & exports",desc:"Generate scoped reports and audited exports.",href:"/admin/reports",Icon:FileBarChart,group:"Governance",access:"admin"},
-    {title:"Reference data",desc:"Maintain governed professional options and staged imports.",href:"/admin/reference-portfolio",Icon:BookOpenCheck,group:"Governance",access:"admin"},
-    {title:"Security",desc:"Manage administrator passkeys and recovery controls.",href:"/admin/security",Icon:Fingerprint,group:"Governance",access:"admin"},
-    {title:"Email operations",desc:"Review delivery queues, templates and retries.",href:"/admin/email",Icon:Mail,group:"Governance",access:"admin"},
-    {title:"Community contribution campaigns",desc:"Edit 30 message drafts, review approvals, configure weekly slots and monitor delivery.",href:"/admin/community-campaigns",Icon:MessageSquareText,group:"Governance",access:"admin"},
-    {title:"Help, guides and demos",desc:"Manage contextual guides, launch training scenarios and find support resources.",href:"/admin/experience",Icon:HelpCircle,group:"Enablement",access:"admin"},
-  ].filter((item) => (!moduleQuery.trim() || (item.title + " " + item.desc + " " + item.group).toLowerCase().includes(moduleQuery.trim().toLowerCase())) && (item.access === "membership" ? roles.some(role => ["system_admin","admin","reviewer","membership_reviewer"].includes(role)) || permissions.some(permission => ["membership.review","membership.activate","members.view","members.manage","reports.view"].includes(permission)) : item.access === "finance" ? roles.some(role => ["system_admin","finance_officer"].includes(role)) || permissions.includes("finance.manage") : item.access === "jobs" ? roles.some(role => ["reviewer","system_admin"].includes(role)) || permissions.includes("jobs.review") : item.access === "membership-cards" ? roles.some(role => ["system_admin","reviewer"].includes(role)) || permissions.some(permission => ["members.view","members.manage"].includes(permission)) : item.access === "org" ? roles.some(role => ["system_admin","admin","reviewer"].includes(role)) : item.access === "support" ? roles.some(role => ["system_admin","supporting_staff"].includes(role)) : item.access === "staff" ? isPlatformAdmin || roles.includes("supporting_staff") : isPlatformAdmin));
-
-
   async function decideInquiry(item: Inquiry, status: string, considerNonMember: boolean) {
     try {
       await api(`/api/v1/opportunity-inquiries/${item.id}`, { method: "PATCH", body: JSON.stringify({ status, consider_non_member: considerNonMember }) }, token);
@@ -204,8 +184,8 @@ export default function AdminPage() {
     <div className="grid">
       <AdminPageHeader eyebrow="MPA · Platform operations" title="Admin overview" description="A focused starting point for operational queues, assigned reviews and authorized platform workspaces." actions={<div className={styles.roleChips}>{roles.map((role) => <Badge key={role} tone="slate">{role.replaceAll("_", " ")}</Badge>)}</div>} />
       <section className={styles.welcome} aria-label="Operational overview">
-        <div className={styles.welcomeCopy}><span className={styles.kicker}>OPERATIONS WORKSPACE</span><h2>Good administration starts with clear queues.</h2><p>Choose the workspace for the task at hand. Sensitive records stay within their existing permission boundaries and review flows.</p></div>
-        <div className={styles.searchWrap}><label htmlFor="admin-workspace-search">Find a workspace</label><div className={styles.searchBox}><Search size={18} aria-hidden="true"/><input id="admin-workspace-search" value={moduleQuery} onChange={(event) => setModuleQuery(event.target.value)} placeholder="Search members, organizations, reports…" /></div></div>
+        <div className={styles.welcomeCopy}><span className={styles.kicker}>MPA ADMINISTRATION</span><h2>Clear priorities. Accountable operations.</h2><p>Monitor verified workload, open the relevant workspace from the left navigation, and act within your assigned permissions.</p></div>
+        <div className={styles.roleChips}>{roles.map((role) => <Badge key={role} tone="slate">{role.replaceAll("_", " ")}</Badge>)}</div>
       </section>
       <section className={styles.metrics} aria-label="Overview summary">
         <article className={styles.metric}><span>Opportunity inquiries</span><strong>{!canReviewInquiries ? "—" : loading ? "…" : sectionErrors.includes("opportunity inquiries") ? "Unavailable" : inquiries.length}</strong><small>{!canReviewInquiries ? "Review permission required" : loading ? "Retrieving current results" : sectionErrors.includes("opportunity inquiries") ? "Could not verify this count · retry to check" : "Records returned to this workspace"}</small></article>
@@ -235,19 +215,6 @@ export default function AdminPage() {
           </> : <Card><p className="muted">No queue report snapshot has been loaded yet.</p><button type="button" className="btn btn-ghost" onClick={() => void loadOperationalQueues()}>Load queue counts</button></Card>}
         </section>
       )}
-      <section className={styles.section} aria-labelledby="admin-workspaces-heading">
-        <div className={styles.sectionHeader}><div><h2 id="admin-workspaces-heading">Workspaces</h2><p>Open a focused workspace to search, review and take authorized action.</p></div><span className={styles.sectionCount}>Core administration</span></div>
-        <div className={styles.moduleGrid}>
-          {workspaces.map(({title,desc,href,Icon,group}) => (
-            <a className={styles.moduleCard} href={href} key={href}>
-              <span className={styles.moduleIcon}><Icon size={20} aria-hidden="true"/></span>
-              <span className={styles.moduleCopy}><small>{group}</small><strong>{title}</strong><span>{desc}</span></span>
-              <span className={styles.moduleArrow} aria-hidden="true">↗</span>
-            </a>
-          ))}
-        </div>
-        {moduleQuery.trim() && workspaces.length === 0 && <p className={styles.noResults} role="status">No available workspace matches “{moduleQuery}”. Try another search term or clear the search.</p>}
-      </section>
       {error && (
         <div className="field-banner" role="alert">
           <ShieldCheck size={18} />

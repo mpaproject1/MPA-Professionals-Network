@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Badge, Card } from "../ui";
 import { FinanceMembershipObligations } from "../finance-membership-obligations";
 
@@ -22,7 +22,7 @@ export type FinanceManualReceipt = {
 };
 type Tab = "register" | "queue" | "reconciliation" | "refunds" | "outstanding";
 type Props = {
-  payments: FinancePaymentRow[]; receipts: FinanceManualReceipt[];
+  payments: FinancePaymentRow[]; receipts: FinanceManualReceipt[]; historicalPanel?: ReactNode;
   canVerify: boolean; canReverse: boolean; canIssueVoucher: boolean; busy: string;
   onPreview: (fileId: string, fileName: string) => void;
   onVerifyPayment: (id: string, decision: "approved" | "needs_correction" | "rejected", note: string) => void;
@@ -36,7 +36,7 @@ const label = (value?: string | null) => (value || "—").replaceAll("_"," ");
 const statusTone = (status: string): "green" | "gold" | "slate" => ["succeeded","verified"].includes(status) ? "green" : ["pending","recorded"].includes(status) ? "gold" : "slate";
 const date = (value?: string | null) => value ? new Date(value).toLocaleDateString() : "—";
 
-export function FinanceOperationsRegister({payments,receipts,canVerify,canReverse,canIssueVoucher,busy,onPreview,onVerifyPayment,onReversePayment,onVerifyReceipt,onReverseReceipt,onIssueVoucher}:Props) {
+export function FinanceOperationsRegister({payments,receipts,historicalPanel,canVerify,canReverse,canIssueVoucher,busy,onPreview,onVerifyPayment,onReversePayment,onVerifyReceipt,onReverseReceipt,onIssueVoucher}:Props) {
   const [tab,setTab]=useState<Tab>("register");
   const [status,setStatus]=useState("all");
   const [account,setAccount]=useState("all");
@@ -93,7 +93,7 @@ export function FinanceOperationsRegister({payments,receipts,canVerify,canRevers
       {([["register","Payment register"],["queue","Payment queue"],["reconciliation","Historical reconciliation"],["refunds","Refunds & reversals"],["outstanding","Outstanding payments"]] as [Tab,string][]).map(([key,name])=><button key={key} type="button" role="tab" aria-selected={tab===key} className={tab===key?"btn btn-primary":"btn btn-ghost"} onClick={()=>{setTab(key);setSelected(null);setStatus("all");}}>{name}{key==="queue"&&counts.outstanding>0?" · "+counts.outstanding:""}</button>)}
     </div>
     {tab==="outstanding" ? <FinanceMembershipObligations /> : null}
-    {tab==="reconciliation" ? <Card><h2 className="h2">Historical member payment verification</h2><p className="muted">Review imported membership balances, historical installments and original evidence. Open the dedicated verification queue for the complete fee and installment workflow.</p><a className="btn btn-primary" href="#historical-member-payment-verification">Open historical verification queue</a></Card> : null}
+    {tab==="reconciliation" ? historicalPanel : null}
     {tab!=="outstanding"&&<Card>
       <div className="row" style={{justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
         <div><h2 className="h2" style={{marginBottom:2}}>{tab==="register"?"Payment register":tab==="queue"?"Payments awaiting action":tab==="refunds"?"Refund and reversal register":"Historical payment transactions"}</h2><p className="muted">{filtered.length} matching records · select a row to inspect and act without leaving this workspace</p></div>

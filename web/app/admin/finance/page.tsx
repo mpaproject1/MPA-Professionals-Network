@@ -291,15 +291,7 @@ export default function FinanceWorkspacePage() {
     }
   }
 
-  if (!hydrated || access === "loading") return <Card><OperationStatus state="loading" title="Checking finance permissions" detail="Verifying the current account before retrieving payment records." /></Card>;
-  if (access === "signin") return <Card><h1 className="h1">Sign in required</h1><p className="muted">Finance payment records are available only to authorized finance staff and administrators.</p><a className="btn btn-primary" href="/login?next=/admin/finance">Sign in</a></Card>;
-  if (access === "denied") return <Card><OperationStatus state="error" title="Finance workspace access denied" detail={error || "Your account does not have finance payment queue access. Membership-review permissions do not grant finance access."} /><a className="btn btn-ghost" href="/dashboard">Return to your dashboard</a></Card>;
-
-  return <div className="grid" style={{ gap: 16 }}>
-    <AdminPageHeader eyebrow="MPA · Finance operations" title="Membership payment queue" description="Verify eligible payments, review payment exceptions and record authorized reversals. This workspace does not approve or activate membership applications." actions={<><button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={busy !== ""}>{busy === "load" ? "Refreshing…" : "Refresh queue"}</button></>} />
-    <div className="row" style={{gap:8,flexWrap:"wrap"}}><a className="btn btn-primary" href="/admin/finance/receipts">Record manual payment & issue QR vouchers</a><a className="btn btn-ghost" href="/admin/reports?report=manual-finance-receipts">Manual finance receipts report</a></div>
-    {error && <p className="form-error" role="alert">{error}</p>}
-    {notice && <p className="form-success" role="status" aria-live="polite">{notice}</p>}
+  const historicalVerificationPanel = (
     <Card id="historical-member-payment-verification">
       <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
         <div><h2 className="h2">Historical member payment verification</h2><p className="muted">Record the original fee due separately from each actual installment. Partial receipts reduce the outstanding balance but do not unlock the account invitation until the fee is fully settled by verified cash or an approved non-cash disposition.</p></div>
@@ -329,6 +321,17 @@ export default function FinanceWorkspacePage() {
         })}
       </div>}
     </Card>
+  );
+
+  if (!hydrated || access === "loading") return <Card><OperationStatus state="loading" title="Checking finance permissions" detail="Verifying the current account before retrieving payment records." /></Card>;
+  if (access === "signin") return <Card><h1 className="h1">Sign in required</h1><p className="muted">Finance payment records are available only to authorized finance staff and administrators.</p><a className="btn btn-primary" href="/login?next=/admin/finance">Sign in</a></Card>;
+  if (access === "denied") return <Card><OperationStatus state="error" title="Finance workspace access denied" detail={error || "Your account does not have finance payment queue access. Membership-review permissions do not grant finance access."} /><a className="btn btn-ghost" href="/dashboard">Return to your dashboard</a></Card>;
+
+  return <div className="grid" style={{ gap: 16 }}>
+    <AdminPageHeader eyebrow="MPA · Finance operations" title="Membership payment queue" description="Verify eligible payments, review payment exceptions and record authorized reversals. This workspace does not approve or activate membership applications." actions={<><button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={busy !== ""}>{busy === "load" ? "Refreshing…" : "Refresh queue"}</button></>} />
+    <div className="row" style={{gap:8,flexWrap:"wrap"}}><a className="btn btn-primary" href="/admin/finance/receipts">Record manual payment & issue QR vouchers</a><a className="btn btn-ghost" href="/admin/reports?report=manual-finance-receipts">Manual finance receipts report</a></div>
+    {error && <p className="form-error" role="alert">{error}</p>}
+    {notice && <p className="form-success" role="status" aria-live="polite">{notice}</p>}
     <Card>
       <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div><h2 className="h2">Finance summary</h2><p className="muted">Current membership-payment position by currency. Generated {dateLabel(summaryGeneratedAt)}. No amounts from different currencies are combined.</p></div>
@@ -351,6 +354,7 @@ export default function FinanceWorkspacePage() {
     <FinanceOperationsRegister
       payments={rows}
       receipts={manualReceipts}
+      historicalPanel={historicalVerificationPanel}
       canVerify={canVerify}
       canReverse={canReverse}
       canIssueVoucher={canIssueVoucher}

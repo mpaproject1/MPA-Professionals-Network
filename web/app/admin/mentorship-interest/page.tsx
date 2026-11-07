@@ -6,6 +6,7 @@ import { FormFeedback } from "../../../components/form-feedback";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
+import "../mentorship-admin.css";
 
 type InterestItem = {
   interest_id: string;
@@ -68,8 +69,8 @@ export default function MentorshipInterestReviewPage() {
     } finally { setBusyId(""); }
   }
 
-  return <main className="page-shell" style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 18px" }}>
-    <Link className="text-link" href="/admin">← Back to administration</Link>
+  return <main className="page-shell mpa-mentorship-admin" style={{ maxWidth: 1240, margin: "0 auto", padding: "22px 16px" }}>
+    <Link className="text-link" href="/admin">← Administration</Link><nav className="mentorship-admin-nav" aria-label="Mentorship administration"><Link href="/admin/mentorship-interest" aria-current="page">Matching queue</Link><Link href="/admin/mentorship-reports" >Confidential reports</Link></nav>
     <div className="eyebrow" style={{ marginTop: 16 }}>Support Desk · Matching decisions</div>
     <h1 className="h1">Mentorship interest review</h1>
     <p className="muted">This queue shows only explicit expressions of interest from eligible approved mentors for requests whose owners opted into the minimized mentor pool. The matching team sees participant names needed for review, but no contact addresses. Proposing a match does not start a relationship: the mentor must respond and the mentee must accept that specific match.</p>

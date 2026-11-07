@@ -6,6 +6,7 @@ import { FormFeedback } from "../../../components/form-feedback";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
+import "../mentorship-admin.css";
 
 type ParticipantReport = {
   id: string; mentorship_id: string; session_id?: string | null; reporter_user_id: string;
@@ -52,8 +53,8 @@ export default function MentorshipReportsPage() {
     } finally { setBusyId(""); }
   }
 
-  return <main className="page-shell" style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 18px" }}>
-    <Link className="text-link" href="/admin">← Back to administration</Link>
+  return <main className="page-shell mpa-mentorship-admin" style={{ maxWidth: 1240, margin: "0 auto", padding: "22px 16px" }}>
+    <Link className="text-link" href="/admin">← Administration</Link><nav className="mentorship-admin-nav" aria-label="Mentorship administration"><Link href="/admin/mentorship-interest" >Matching queue</Link><Link href="/admin/mentorship-reports" aria-current="page">Confidential reports</Link></nav>
     <div className="eyebrow" style={{ marginTop: 16 }}>Support Desk · Confidential queue</div>
     <h1 className="h1">Mentorship participant reports</h1>
     <p className="muted">Only authorized Support Desk staff can access this queue. Reporter identity comes from the authenticated account; no contact address is collected by the report form. Keep report details confidential and record decisions.</p>

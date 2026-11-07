@@ -2,6 +2,7 @@
 
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import "./mentorship-learning.css";
 import { FormFeedback } from "./form-feedback";
 import { Badge, Card } from "./ui";
 
@@ -91,6 +92,7 @@ export function MentorshipLearningActivities({ mentorshipId, role, token }: { me
   }
 
   return (
+    <div className="mentorship-learning">
     <Card>
       <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
         <div><div className="eyebrow">Practical learning</div><h3 className="h2">Activities and assignments</h3><p className="muted">Activities are set by your assigned mentor. Submissions are versioned, and mentor feedback remains attached to each review.</p></div>
@@ -132,5 +134,6 @@ export function MentorshipLearningActivities({ mentorshipId, role, token }: { me
         })}
       </div>
     </Card>
+    </div>
   );
 }

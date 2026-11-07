@@ -39,6 +39,8 @@ begin
    select unit_level,parent_id,version_id into a3 from membership_geography_unit where id=new.admin_level_3_id;
    if a3.unit_level not in ('district','town','woreda') or a3.parent_id<>new.admin_level_2_id or a3.version_id<>new.geography_version_id then raise exception 'The selected district, woreda or town does not belong to the selected zone or city division';end if;
   end if;
- else if c.country_iso3='ETH' then raise exception 'Choose Diaspora only when residence is outside Ethiopia';end if;end if;
+ else
+  if c.country_iso3='ETH' then raise exception 'Choose Diaspora only when residence is outside Ethiopia';end if;
+ end if;
  return new;
 end $$;

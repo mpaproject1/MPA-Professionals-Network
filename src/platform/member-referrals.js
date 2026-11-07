@@ -25,7 +25,7 @@ async function codeRow(db,code){
 }
 async function event(db,attribution,eventCode,fromStatus,toStatus,actor,metadata={}){
  const retention=await retentionSnapshot(db,"referral_attribution_records");
- await db.query("insert into member_referral_event(attribution_id,actor_user_id,event_code,from_status,to_status,metadata,retention_policy_version_id,retention_policy_snapshot) values($1,$2,$3,$4,$5,$6,$7,$8)",[attribution,eventCode,fromStatus,toStatus,actor||null,JSON.stringify(metadata),retention.versionId,retention.snapshot?JSON.stringify(retention.snapshot):null]);
+ await db.query("insert into member_referral_event(attribution_id,actor_user_id,event_code,from_status,to_status,metadata,retention_policy_version_id,retention_policy_snapshot) values($1,$2,$3,$4,$5,$6,$7,$8)",[attribution,actor||null,eventCode,fromStatus,toStatus,JSON.stringify(metadata),retention.versionId,retention.snapshot?JSON.stringify(retention.snapshot):null]);
  const policy=(await db.query("select id,points from member_referral_score_policy where status='active' limit 1")).rows[0];
  const points=Number(policy?.points?.[eventCode]??0);
  if(policy&&Number.isInteger(points)&&points>=0){const scoreRetention=await retentionSnapshot(db,"score_ledger");await db.query("insert into member_referral_score_ledger(attribution_id,event_code,points,policy_id,retention_policy_version_id,retention_policy_snapshot) values($1,$2,$3,$4,$5,$6) on conflict(attribution_id,event_code) do nothing",[attribution,eventCode,points,policy.id,scoreRetention.versionId,scoreRetention.snapshot?JSON.stringify(scoreRetention.snapshot):null]);}

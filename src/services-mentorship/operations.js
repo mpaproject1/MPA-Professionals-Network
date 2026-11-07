@@ -314,3 +314,28 @@ export async function listMentorshipProgrammeRelationships(actorId,filters={}){
   limit 200
  `,args)).rows;
 }
+
+export async function listMentorshipProgrammePendingDecisions(actorId){
+ const db=getPool();
+ if(!(await hasRole(db,actorId,["supporting_staff","system_admin"])))fail(403,"Authorized mentorship programme access is required.","FORBIDDEN");
+ return (await db.query(`
+  select 'mentor_invitation'::text decision_type,mm.id decision_id,pm.display_name mentor_name,pe.display_name mentee_name,
+   mr.goals summary,mm.proposed_at created_at,'mentor'::text awaiting_role
+  from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id
+  join person pm on pm.user_id=mm.mentor_user_id join person pe on pe.user_id=mm.mentee_user_id
+  where mm.status='proposed'
+  union all
+  select 'mentee_consent'::text,mm.id,pm.display_name,pe.display_name,mr.goals,mm.proposed_at,'mentee'::text
+  from mentorship_match mm join mentorship_request mr on mr.id=mm.request_id
+  join person pm on pm.user_id=mm.mentor_user_id join person pe on pe.user_id=mm.mentee_user_id
+  where mm.status='accepted' and mm.mentee_consent_status='pending'
+  union all
+  select 'session_confirmation'::text,s.id,pm.display_name,pe.display_name,coalesce(s.agenda,'Mentorship session'),s.created_at,
+   case when s.proposed_by=m.mentor_user_id then 'mentee' else 'mentor' end
+  from mentorship_session s join mentorship m on m.id=s.mentorship_id
+  join person pm on pm.user_id=m.mentor_user_id join person pe on pe.user_id=m.mentee_user_id
+  where s.coordination_status='proposed' and s.status='scheduled'
+  order by created_at asc
+  limit 300
+ `)).rows;
+}

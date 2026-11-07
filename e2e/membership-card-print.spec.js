@@ -120,3 +120,20 @@ test("membership workspace still loads the canonical ID and plan when the separa
  await expect(page.getByText("Lifetime",{exact:true})).toBeVisible();
  await expect(page.getByRole("link",{name:/View \/ download membership ID/i})).toBeVisible();
 });
+
+test("imported membership awaiting Finance settlement is not shown as inactive or prompted to reapply",async({page})=>{
+ await page.addInitScript(()=>{
+  sessionStorage.setItem("mpa-session-token","membership-workspace-finance-verification-ci-token");
+  localStorage.setItem("mpa-privacy-preferences-v1",JSON.stringify({version:"2026-10-16-v1",necessary:true,analytics:false,personalization:false,updatedAt:new Date().toISOString()}));
+ });
+ await page.route("**/api/v1/membership/products",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[]})}));
+ await page.route("**/api/v1/membership/applications/me",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:[]})}));
+ await page.route("**/api/v1/me",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{has_active_membership:false,membership_payment_verification_required:true,roles:["member"],permissions:[],email:"imported@example.test",display_name:"Imported Member"}})}));
+ await page.route("**/api/v1/membership/card",route=>route.fulfill({status:409,contentType:"application/json",body:JSON.stringify({error:{code:"MEMBERSHIP_NOT_ELIGIBLE",message:"This membership is payment_verification_required and cannot be used to issue a card."}})}));
+ await page.goto("/membership");
+ await expect(page.getByRole("heading",{name:"Your imported membership needs Finance verification"})).toBeVisible();
+ await expect(page.getByText("Finance verification required",{exact:true})).toBeVisible();
+ await expect(page.getByText(/Do not submit a duplicate membership application/)).toBeVisible();
+ await expect(page.getByRole("link",{name:"Explore membership plans"})).toHaveCount(0);
+ await expect(page.getByRole("heading",{name:"Available membership plans"})).toHaveCount(0);
+});

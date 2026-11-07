@@ -193,7 +193,7 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
      <h2 className="h2" style={{margin:"6px 0"}}>{membershipStatusUnavailable?"We could not confirm your membership status":membershipPaymentVerificationRequired?"Your imported membership needs Finance verification":hasActiveMembership?"Your membership is active":latestApplicationStatus==="activated"?"Activation recorded · membership record needs attention":latestApplicationStatus==="correction_required"?"Your action is required":latestApplicationStatus==="rejected"?"Application decision recorded":latestApplication?"Your application is in progress":"Your membership journey starts here"}</h2>
      <p className="muted" style={{margin:0}}>{membershipNextAction}</p>
     </div>
-    <Badge tone={membershipStatusUnavailable?"slate":membershipPaymentVerificationRequired?"gold":hasActiveMembership?"green":latestApplicationStatus==="rejected"?"red":latestApplication?"gold":"slate"}>{membershipStatusLabel}</Badge>
+    <Badge tone={membershipStatusUnavailable?"slate":membershipPaymentVerificationRequired?"blue":hasActiveMembership?"green":latestApplicationStatus==="rejected"?"red":latestApplication?"gold":"slate"}>{membershipStatusLabel}</Badge>
    </div>
    {hasActiveMembership&&<div className="membership-status-identity">
     <div><span className="muted">Membership ID</span><strong>{membershipCard?.membershipNumber||"Temporarily unavailable"}</strong></div>

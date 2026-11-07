@@ -1405,7 +1405,7 @@ export async function reviewMentorshipLearningSubmission(submissionId,userId,inp
     const recommendedNextAction=String(structured?.recommendedNextAction||"").trim()||null;
     const furtherResources=String(structured?.furtherResources||"").trim()||null;
     const overallAssessment=String(structured?.overallAssessment||"").trim()||null;
-    if(structured&&(!strengths||!areasToImprove||!recommendedNextAction||!["exceeds_expectations","meets_expectations","developing","needs_support"].includes(overallAssessment)))throw error(400,"Structured feedback requires strengths, improvement areas, a recommended next action and an overall assessment.","STRUCTURED_FEEDBACK_REQUIRED");
+    if(structured&&(!strengths||strengths.length<3||strengths.length>1200||!areasToImprove||areasToImprove.length<3||areasToImprove.length>1200||!recommendedNextAction||recommendedNextAction.length<3||recommendedNextAction.length>1200||(furtherResources&&furtherResources.length>1200)||!["exceeds_expectations","meets_expectations","developing","needs_support"].includes(overallAssessment)))throw error(400,"Structured feedback requires strengths, improvement areas and next action of 3 to 1,200 characters, optional resources up to 1,200 characters, and a valid overall assessment.","STRUCTURED_FEEDBACK_REQUIRED");
     const feedback=structured
       ? ["Strengths: "+strengths,"Areas to improve: "+areasToImprove,"Recommended next action: "+recommendedNextAction,furtherResources?"Further resources: "+furtherResources:null,"Overall assessment: "+overallAssessment.replaceAll("_"," ")].filter(Boolean).join("\n\n")
       : String(input.feedback||"").trim();

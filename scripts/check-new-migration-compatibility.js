@@ -76,7 +76,8 @@ const migrationNames = [
   "20261102170000_membership_fee_disposition_idempotency.sql",
   "20261102180000_membership_fee_balance_currency_integrity.sql",
   "20261102190000_membership_geography_country_uniqueness.sql",
-  "20261102200000_membership_import_allow_zero_declared_amount.sql"
+  "20261102200000_membership_import_allow_zero_declared_amount.sql",
+  "20261107090000_network_plus_preapproval_opportunity_references.sql"
 ];
 const requiredCommunityImpactTaxonomyDatasets = ["community_impact_contribution_categories","community_impact_contribution_types","community_impact_contributor_roles","community_impact_evidence_types"];
 const migrationDirectory = fileURLToPath(new URL("../db/migrations/", import.meta.url));

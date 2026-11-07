@@ -1593,3 +1593,15 @@ export async function updateMentorshipSessionDetails(sessionId,userId,input,requ
   return row;
  });
 }
+
+export async function removeMentorTimeOff(profileId,timeOffId,userId,requestId){
+ return withTransaction(async db=>{
+  const profile=(await db.query("select id,user_id from mentor_profile where id=$1 for update",[profileId])).rows[0];
+  if(!profile)throw error(404,"Mentor profile not found.","NOT_FOUND");
+  if(profile.user_id!==userId)throw error(403,"Only the mentor can manage availability.","FORBIDDEN");
+  const row=(await db.query("delete from mentor_time_off where id=$1 and mentor_profile_id=$2 returning id",[timeOffId,profileId])).rows[0];
+  if(!row)throw error(404,"Unavailable period not found.","NOT_FOUND");
+  await audit(db,userId,"mentorship.time_off_removed","mentor_profile",profileId,requestId,{timeOffId});
+  return {removed:true,id:row.id};
+ });
+}

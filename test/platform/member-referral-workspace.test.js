@@ -11,6 +11,7 @@ const service = await readFile(new URL("../../src/platform/member-referrals.js",
 test("member command centre exposes the existing referral workspace", () => {
   assert.match(members, /id:"referrals",label:"Referrals"/);
   assert.match(members, /activeSection==="referrals".*MemberReferralWorkspace/s);
+  assert.match(members, /window\.location\.hash === "#referrals"/);
   assert.match(component, /api<ReferralData>\("\/api\/v1\/me\/referrals"/);
 });
 

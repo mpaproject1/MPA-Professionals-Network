@@ -752,6 +752,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/opportunity-inquiries") { const identity=await auth(req); return ok(res,await publicOpportunity.listInquiries(identity.sub,{type:query(req.url).get("type"),status:query(req.url).get("status")}),requestId); }
     if(req.method==="PATCH" && parts.length===4 && p.startsWith("api/v1/opportunity-inquiries/")) { const identity=await auth(req); const b=await body(req); return ok(res,await publicOpportunity.decideInquiry(parts[3],identity.sub,b,requestId,req.headers["x-idempotency-key"]),requestId); }
     if(req.method==="GET" && p==="api/v1/me/progress") {
+      const identity=await auth(req);
       const q=query(req.url);
       const keys=["applications","serviceRequests","mentorshipRequests","mentorshipMatches","mentorships","mentorshipSessions","mentorshipLearningActivities","organizationMentorshipRequests","verificationCases","referenceRequests","communityImpactClaims","talentInquiries","networkPlusRequests","initiativeParticipations","memberInitiatives","referrals","candidateReferrals","recognitionNominations","recognitionAwards"];
       const calls=[
@@ -781,7 +782,7 @@ const server=http.createServer(async (req,res)=>{
       sources.recognitionAwards=settled[17];
       return ok(res,memberProgress.buildMemberProgress(sources,{limit:q.get("limit")||50,offset:q.get("offset")||0,view:q.get("view")||"all",category:q.get("category")||"all"}),requestId);
     }
-    if(req.method==="GET" && p==="api/v1/me/application-tracking") { const q=query(req.url); return ok(res,await applicationTracking.getApplicationTracking(identity.sub,{limit:q.get("limit")||undefined,offset:q.get("offset")||undefined,reference:q.get("reference")||undefined}),requestId); }
+    if(req.method==="GET" && p==="api/v1/me/application-tracking") { const identity=await auth(req); const q=query(req.url); return ok(res,await applicationTracking.getApplicationTracking(identity.sub,{limit:q.get("limit")||undefined,offset:q.get("offset")||undefined,reference:q.get("reference")||undefined}),requestId); }
     if(req.method==="GET" && p==="api/v1/admin/support/knowledge") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin","admin","platform_admin","supporting_staff"],["support.knowledge.manage","support.inquiries.manage"]); return ok(res,await supportBot.adminGetKnowledge(),requestId); }
     if(req.method==="POST" && p==="api/v1/admin/support/knowledge/categories") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin","admin","platform_admin"],["support.knowledge.manage"]); return ok(res,await supportBot.adminSaveCategory(identity.sub,await body(req),requestId),requestId,201); }
     if(req.method==="POST" && p==="api/v1/admin/support/knowledge/articles") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin","admin","platform_admin"],["support.knowledge.manage"]); return ok(res,await supportBot.adminSaveArticle(identity.sub,await body(req),requestId),requestId,201); }

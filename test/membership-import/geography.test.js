@@ -15,6 +15,7 @@ import {
 import * as membership from "../../src/membership/service.js";
 import { getPool } from "../../src/platform/db.js";
 import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
+import { buildEthiopiaAdministrativeRows } from "../../scripts/lib/ethiopia-geography-reference.js";
 
 const admin={sub:"system-admin",roles:["system_admin"],permissions:[]};
 const member={sub:"member-user",roles:["member"],permissions:[]};
@@ -36,24 +37,68 @@ test("ordinary members cannot export administrative geography workbooks",async()
 });
 
 
+
+test("Ethiopia source mapping retains real parentage, maps Addis sub-cities and excludes contested records",()=>{
+ const ids=["ET01","ET02","ET03","ET04","ET05","ET06","ET07","ET08","ET11","ET12","ET13","ET16","ET14","ET15"];
+ const regions=ids.map(id=>({id,name:{en:id,local:id}}));
+ regions.push({id:"ET99",name:{en:"Contested",local:"Contested"}});
+ const zones=[
+  {id:"ET0101",name:{en:"Tigray Zone",local:"Tigray Zone"},parent:{id:"ET01"}},
+  {id:"ET1401",name:{en:"Region 14",local:"Region 14"},parent:{id:"ET14"}},
+  {id:"ET1501",name:{en:"Dire Dawa urban",local:"Dire Dawa urban"},parent:{id:"ET15"}},
+  {id:"ET1502",name:{en:"Dire Dawa rural",local:"Dire Dawa rural"},parent:{id:"ET15"}},
+  {id:"ET9901",name:{en:"Contested zone",local:"Contested zone"},parent:{id:"ET99"}}
+ ];
+ const woredas=[
+  {id:"ET010101",name:{en:"Tigray woreda",local:"Tigray woreda"},parent:{id:"ET0101"}},
+  ...Array.from({length:11},(_,i)=>({id:"ET14010"+(i+1),name:{en:"Sub City "+(i+1),local:"Sub City "+(i+1)},parent:{id:"ET1401"}})),
+  {id:"ET150101",name:{en:"Dire Dawa woreda",local:"Dire Dawa woreda"},parent:{id:"ET1501"}},
+  {id:"ET990101",name:{en:"Contested woreda",local:"Contested woreda"},parent:{id:"ET9901"}}
+ ];
+ const rows=buildEthiopiaAdministrativeRows({regions,zones,woredas});
+ const byCode=new Map(rows.map(row=>[row.unit_code,row]));
+ assert.equal(rows.filter(row=>row.unit_level==="region").length,12);
+ assert.equal(rows.filter(row=>row.unit_level==="federal_city").length,2);
+ assert.equal(rows.filter(row=>row.unit_level==="zone").length,1);
+ assert.equal(rows.filter(row=>row.unit_level==="sub_city").length,13);
+ assert.equal(rows.filter(row=>row.unit_level==="woreda").length,2);
+ assert.equal(byCode.get("ET140101").unit_level,"sub_city");
+ assert.equal(byCode.get("ET140101").parent_code,"ET-FED-ADDIS-ABABA");
+ assert.equal(byCode.get("ET1501").unit_level,"sub_city");
+ assert.equal(byCode.get("ET150101").unit_level,"woreda");
+ assert.equal(byCode.get("ET150101").parent_code,"ET1501");
+ assert.equal(byCode.get("ET010101").unit_level,"woreda");
+ assert.equal(byCode.get("ET010101").parent_code,"ET0101");
+ assert.ok(!rows.some(row=>row.unit_code.startsWith("ET99")));
+ assert.equal(JSON.parse(byCode.get("ET010101").metadata).sourceLicense,"CC-BY-4.0");
+});
+
 const GEO_COLUMNS=["unit_code","label","unit_level","parent_code","country_iso3","country_m49","source_name","source_version","effective_from","effective_to","active","metadata"];
 const SOURCE_URL="https://unstats.un.org/unsd/methodology/m49/overview/";
 function geographyRows(suffix){
  const metadata=JSON.stringify({sourceUrl:SOURCE_URL});
+ const base={country_iso3:"",country_m49:"",source_name:"MPA geography integration fixture",source_version:"test-1",effective_from:"",effective_to:"",active:"true",metadata};
+ const unit=(unit_code,label,unit_level,parent_code)=>({...base,unit_code,label,unit_level,parent_code});
  return [
   {unit_code:"ETH",label:"Ethiopia",unit_level:"country",parent_code:"",country_iso3:"ETH",country_m49:"231",source_name:"UNSD M49",source_version:"current",effective_from:"",effective_to:"",active:"true",metadata:JSON.stringify({sourceUrl:SOURCE_URL,residenceSelectable:true})},
   {unit_code:"USA",label:"United States",unit_level:"country",parent_code:"",country_iso3:"USA",country_m49:"840",source_name:"UNSD M49",source_version:"current",effective_from:"",effective_to:"",active:"true",metadata:JSON.stringify({sourceUrl:SOURCE_URL,residenceSelectable:true})},
-  {unit_code:"ET-REG-"+suffix,label:"Test Region "+suffix,unit_level:"region",parent_code:"ETH",country_iso3:"",country_m49:"",source_name:"MPA geography integration fixture",source_version:"test-1",effective_from:"",effective_to:"",active:"true",metadata},
+  unit("ET-REG-"+suffix,"Test Region "+suffix,"region","ETH"),
+  unit("ET-ZONE-"+suffix,"Test Zone "+suffix,"zone","ET-REG-"+suffix),
+  unit("ET-WOREDA-"+suffix,"Test Woreda "+suffix,"woreda","ET-ZONE-"+suffix),
+  unit("ET-CITY-"+suffix,"Test Chartered City "+suffix,"federal_city","ETH"),
+  unit("ET-SUBCITY-"+suffix,"Test City Division "+suffix,"sub_city","ET-CITY-"+suffix),
+  unit("ET-CITY-WOREDA-"+suffix,"Test City Woreda "+suffix,"woreda","ET-SUBCITY-"+suffix)
  ];
-}
 
 test("geography XLSX round-trip preserves source fields and the complete parent-code contract",()=>{
  const rows=geographyRows("ROUNDTRIP");
  const parsed=parseXlsxRows(createXlsx(rows,GEO_COLUMNS));
  assert.deepEqual(parsed.headers,GEO_COLUMNS);
- assert.equal(parsed.rows.length,3);
+ assert.equal(parsed.rows.length,8);
  assert.equal(parsed.rows[2].parent_code,"ETH");
  assert.equal(JSON.parse(parsed.rows[2].metadata).sourceUrl,SOURCE_URL);
+ assert.equal(parsed.rows[4].unit_level,"woreda");
+ assert.equal(parsed.rows[7].parent_code,"ET-SUBCITY-ROUNDTRIP");
 });
 
 test("geography preview requires an HTTPS primary source before creating an import batch",async()=>{
@@ -87,21 +132,26 @@ test("PostgreSQL geography workbook preview, apply, publish, member selectors an
 
   const exported=await exportPublishedMemberGeography(identity);
   const exportedWorkbook=parseXlsxRows(exported.workbook);
-  assert.equal(exported.rowCount,3);
-  assert.equal(exportedWorkbook.rows.length,3);
+  assert.equal(exported.rowCount,8);
+  assert.equal(exportedWorkbook.rows.length,8);
   assert.ok(exportedWorkbook.rows.some(row=>row.unit_code==="ETH"&&row.country_m49==="231"));
   assert.ok(exportedWorkbook.rows.some(row=>row.unit_code==="USA"&&row.country_m49==="840"));
   assert.ok(exportedWorkbook.rows.some(row=>row.unit_code==="ET-REG-"+suffix&&row.parent_code==="ETH"));
+  assert.ok(exportedWorkbook.rows.some(row=>row.unit_code==="ET-ZONE-"+suffix&&row.parent_code==="ET-REG-"+suffix));
+  assert.ok(exportedWorkbook.rows.some(row=>row.unit_code==="ET-WOREDA-"+suffix&&row.unit_level==="woreda"&&row.parent_code==="ET-ZONE-"+suffix));
+  assert.ok(exportedWorkbook.rows.some(row=>row.unit_code==="ET-SUBCITY-"+suffix&&row.unit_level==="sub_city"));
 
   const published=await listMemberGeography(identity);
   assert.equal(published.version.id,applied.versionId);
   assert.ok(published.countries.some(row=>row.country_iso3==="ETH"));
   assert.ok(published.regions.some(row=>row.unit_code==="ET-REG-"+suffix));
-  await saveMyResidence(userId,{residenceType:"ethiopia",countryCode:"ETH",adminLevel1Code:"ET-REG-"+suffix,localityNote:"Geography integration fixture"},randomUUID());
+  await saveMyResidence(userId,{residenceType:"ethiopia",countryCode:"ETH",adminLevel1Code:"ET-REG-"+suffix,adminLevel2Code:"ET-ZONE-"+suffix,adminLevel3Code:"ET-WOREDA-"+suffix,localityNote:"Geography integration fixture"},randomUUID());
   const residenceAudit=await db.query("select 1 from audit_log where actor_user_id=$1 and action='member.residence_updated' and resource_id=$1::uuid::text",[userId]);
   assert.equal(residenceAudit.rowCount,1,"residence changes must persist their audit event");
   const residence=await getMyResidence(userId);
   assert.equal(residence.admin_level_1_code,"ET-REG-"+suffix);
+  assert.equal(residence.admin_level_2_code,"ET-ZONE-"+suffix);
+  assert.equal(residence.admin_level_3_code,"ET-WOREDA-"+suffix);
   assert.equal(residence.geography_version_id,applied.versionId);
   const summary=await getMemberGeographySummary(identity);
   assert.equal(summary.publishedVersion.id,applied.versionId,"aggregation must use the exact published geography version used by profile selectors");

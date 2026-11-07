@@ -14,7 +14,7 @@ It contains:
 
 ## Ethiopian source mapping and exclusions
 
-The workbook uses the source repository at [Jafermenza/ethiopia-administrative-divisions](https://github.com/Jafermenza/ethiopia-administrative-divisions), pinned to commit \`418739e33760bf79661f3914e2d8c9cf33248437\` (release date 8 September 2026; CC BY 4.0). The source describes its Ethiopia data as derived from OCHA COD-AB / HDX. The source is pinned so a later upstream edit cannot silently change the generated workbook.
+The workbook uses the source repository at [Jafermenza/ethiopia-administrative-divisions](https://github.com/Jafermenza/ethiopia-administrative-divisions), pinned to commit \`418739e33760bf79661f3914e2d8c9cf33248437\` (release date 8 September 2026; CC BY 4.0). The linked Jafermenza repository is a fork/mirror; the dataset attribution remains **Open Admin Data**. The source describes its Ethiopia data as derived from OCHA COD-AB / HDX. The source is pinned so a later upstream edit cannot silently change the generated workbook.
 
 The reviewed mapping for this source release is:
 
@@ -38,7 +38,8 @@ The source does not define an independent sub-city layer for all cities. No miss
 Primary sources:
 
 - UN Statistics Division M49: https://unstats.un.org/unsd/methodology/m49/overview/
-- Ethiopia administrative divisions dataset (CC BY 4.0): https://github.com/Jafermenza/ethiopia-administrative-divisions
+- Ethiopia administrative divisions dataset (CC BY 4.0), upstream attribution: https://github.com/open-admin-data/ethiopia-administrative-divisions
+- Selected Jafermenza fork/mirror: https://github.com/Jafermenza/ethiopia-administrative-divisions
 - Pinned source commit: https://github.com/Jafermenza/ethiopia-administrative-divisions/tree/418739e33760bf79661f3914e2d8c9cf33248437
 - Underlying OCHA COD-AB / HDX source referenced by the dataset: https://data.humdata.org/dataset/cod-ab-eth
 

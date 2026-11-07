@@ -258,7 +258,7 @@ export async function getMentorshipProgrammeMetrics(actorId){
    (select count(*)::int from mentorship_learning_submission) total_learning_submissions,
    (select count(*)::int from mentorship_feedback) participant_feedback_entries,
    (select count(*)::int from mentorship_participant_report where status in ('open','reviewing')) unresolved_safeguarding_cases
- `).rows[0]||{};
+ `)).rows[0]||{};
  const n=v=>v===null||v===undefined?null:Number(v);
  const totalMatches=n(row.total_match_proposals)||0,respondedMatches=n(row.responded_match_proposals)||0;
  const totalSessionResponses=n(row.responded_session_proposals)||0,confirmed=n(row.confirmed_sessions)||0;

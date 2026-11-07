@@ -54,7 +54,8 @@ test("membership management is separated from the member self-service page", () 
   assert.match(
     adminMembershipPage,
     /return\s*<>\s*<MembershipAdminWorkspace\s*\/>\s*\{\s*canManageFinanceConfig\s*&&\s*<a className="btn btn-ghost" href="\/admin\/membership\/payment-methods">Manage finance payment methods<\/a>\s*\}\s*<\/>;/,
-  );  assert.match(adminMembershipPage, /membership\.review/);
+  );
+  assert.match(adminMembershipPage, /membership\.review/);
   assert.doesNotMatch(adminMembershipPage, /MembershipWorkspace adminWorkspace/);
   assert.match(adminMembershipPage, /\/admin\/membership\/payment-methods/);
 });

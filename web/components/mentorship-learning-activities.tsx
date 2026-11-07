@@ -29,8 +29,12 @@ export function MentorshipLearningActivities({ mentorshipId, role, token }: { me
     setLoading(true);
     setError("");
     try {
-      const result = await api<Activity[]>(`/api/v1/mentorship/${encodeURIComponent(mentorshipId)}/activities`, {}, token);
+      const [result, goalRows] = await Promise.all([
+        api<Activity[]>(`/api/v1/mentorship/${encodeURIComponent(mentorshipId)}/activities`, {}, token),
+        api<Goal[]>(`/api/v1/mentorship/${encodeURIComponent(mentorshipId)}/goals`, {}, token)
+      ]);
       setActivities(Array.isArray(result) ? result : []);
+      setGoals(Array.isArray(goalRows) ? goalRows : []);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Your learning activities could not be loaded.");
     } finally {
@@ -53,6 +57,7 @@ export function MentorshipLearningActivities({ mentorshipId, role, token }: { me
       setTitle("");
       setInstructions("");
       setDueAt("");
+      setGoalId("");
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The learning activity could not be saved.");
@@ -127,7 +132,7 @@ export function MentorshipLearningActivities({ mentorshipId, role, token }: { me
               <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><b>Latest submission · v{latest.version}</b><Badge>{latest.status.replaceAll("_", " ")}</Badge></div>
               <p>{latest.response}</p>
               <p className="muted">Submitted {new Date(latest.submittedAt).toLocaleString()}</p>
-              {latest.reviews.map(review => <div className="case-row" key={review.id}><div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><b>Mentor feedback</b><Badge>{review.decision.replaceAll("_", " ")}</Badge></div><p>{review.feedback}</p><p className="muted">{new Date(review.createdAt).toLocaleString()}</p></div>)}
+              {latest.reviews.map(review => <div className="case-row" key={review.id}><div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><b>Mentor feedback</b><Badge>{review.decision.replaceAll("_", " ")}</Badge></div>{review.strengths?<><p><b>Strengths:</b> {review.strengths}</p><p><b>Areas to improve:</b> {review.areasToImprove}</p><p><b>Next action:</b> {review.recommendedNextAction}</p>{review.furtherResources?<p><b>Resources:</b> {review.furtherResources}</p>:null}<p><b>Assessment:</b> {(review.overallAssessment||"").replaceAll("_"," ")}</p></>:<p>{review.feedback}</p>}<p className="muted">{new Date(review.createdAt).toLocaleString()}</p></div>)}
               {role === "mentor" && latest.status !== "accepted" ? <div className="grid" style={{ gap: 8 }}>
                 <div className="grid grid-2" style={{gap:8}}><label>Strengths demonstrated<textarea required minLength={3} maxLength={1200} rows={2} value={feedback[latest.id]?.strengths||""} onChange={event=>setFeedback(current=>({...current,[latest.id]:{strengths:event.target.value,areasToImprove:current[latest.id]?.areasToImprove||"",recommendedNextAction:current[latest.id]?.recommendedNextAction||"",furtherResources:current[latest.id]?.furtherResources||"",overallAssessment:current[latest.id]?.overallAssessment||""}}))}/></label><label>Areas to improve<textarea required minLength={3} maxLength={1200} rows={2} value={feedback[latest.id]?.areasToImprove||""} onChange={event=>setFeedback(current=>({...current,[latest.id]:{strengths:current[latest.id]?.strengths||"",areasToImprove:event.target.value,recommendedNextAction:current[latest.id]?.recommendedNextAction||"",furtherResources:current[latest.id]?.furtherResources||"",overallAssessment:current[latest.id]?.overallAssessment||""}}))}/></label><label>Recommended next action<textarea required minLength={3} maxLength={1200} rows={2} value={feedback[latest.id]?.recommendedNextAction||""} onChange={event=>setFeedback(current=>({...current,[latest.id]:{strengths:current[latest.id]?.strengths||"",areasToImprove:current[latest.id]?.areasToImprove||"",recommendedNextAction:event.target.value,furtherResources:current[latest.id]?.furtherResources||"",overallAssessment:current[latest.id]?.overallAssessment||""}}))}/></label><label>Further resources (optional)<textarea maxLength={1200} rows={2} value={feedback[latest.id]?.furtherResources||""} onChange={event=>setFeedback(current=>({...current,[latest.id]:{strengths:current[latest.id]?.strengths||"",areasToImprove:current[latest.id]?.areasToImprove||"",recommendedNextAction:current[latest.id]?.recommendedNextAction||"",furtherResources:event.target.value,overallAssessment:current[latest.id]?.overallAssessment||""}}))}/></label><label>Overall assessment<select required value={feedback[latest.id]?.overallAssessment||""} onChange={event=>setFeedback(current=>({...current,[latest.id]:{strengths:current[latest.id]?.strengths||"",areasToImprove:current[latest.id]?.areasToImprove||"",recommendedNextAction:current[latest.id]?.recommendedNextAction||"",furtherResources:current[latest.id]?.furtherResources||"",overallAssessment:event.target.value}}))}><option value="">Choose assessment</option><option value="exceeds_expectations">Exceeds expectations</option><option value="meets_expectations">Meets expectations</option><option value="developing">Developing</option><option value="needs_support">Needs support</option></select></label></div>
                 <div className="row" style={{ gap: 8, flexWrap: "wrap" }}><button type="button" className="btn btn-primary" disabled={busy === latest.id} onClick={() => void reviewWork(latest.id, "accepted")}>Accept work</button><button type="button" className="btn btn-ghost" disabled={busy === latest.id} onClick={() => void reviewWork(latest.id, "changes_requested")}>Request improvement</button></div>

@@ -100,3 +100,21 @@ test("member membership workspace leads with live status, surfaces card errors a
   assert.match(membershipWorkspace,/a\.status==="activated"/);
   assert.match(membershipWorkspace,/openApplication\.terms_acknowledged_at\?"✓":"3"/);
 });
+
+
+test("optional membership card settings cannot block canonical membership card retrieval",()=>{
+  const settings=service.slice(service.indexOf("async function settings"),service.indexOf("export async function getMyMembershipCard"));
+  assert.match(settings,/error\?\.code==="42P01"/);
+  assert.match(settings,/return DEFAULT_SETTINGS/);
+});
+
+test("membership products and authenticated member data load independently",()=>{
+  const start=membershipWorkspace.indexOf("const load=useCallback");
+  const end=membershipWorkspace.indexOf("useEffect(()=>{if(hydrated)",start);
+  const load=membershipWorkspace.slice(start,end);
+  assert.match(load,/Promise\.all\(\[/);
+  assert.match(load,/settle\(api<Product\[]>\("\/api\/v1\/membership\/products"\)\)/);
+  assert.match(load,/settle\(api<Me>\("\/api\/v1\/me"/);
+  assert.match(load,/membershipCardError/);
+  assert.match(load,/failures\.push/);
+});

@@ -21,7 +21,7 @@ export async function runDueMentorshipSessionReminders(){
   from mentorship_session s
   join mentorship m on m.id=s.mentorship_id
   where s.status='scheduled' and s.coordination_status='accepted'
-    and m.status='active' and s.scheduled_start_at>now()
+    and m.status in ('active','paused') and s.scheduled_start_at>now()
     and s.scheduled_start_at<=now()+interval '24 hours'
   order by s.scheduled_start_at asc
  `)).rows;
@@ -35,7 +35,7 @@ export async function runDueMentorshipSessionReminders(){
      message:kind==="one_hour"?"Your confirmed mentorship session starts within an hour. Open your workspace to review the agenda and meeting details.":"Your confirmed mentorship session is coming up within 24 hours. Review the agenda and meeting details in your mentorship workspace.",
      nextAction:"Prepare for the confirmed session and review any agreed objectives.",
      actionUrl:"/mentorship",actionRequired:true,priority:"normal",
-     dedupeKey:"mentorship-session-reminder:"+session.id+":"+kind+":"+participantId,
+     dedupeKey:"mentorship-session-reminder:"+session.id+":"+new Date(session.scheduled_start_at).toISOString()+":"+kind+":"+participantId,
      category:"mentorship"
     });
     if(notification)enqueued++;

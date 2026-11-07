@@ -1,1 +1,20 @@
-.loader,.loaderCompact,.markOnly{display:flex;min-height:52vh;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:var(--text);text-align:center}.loaderCompact{min-height:150px;gap:12px}.markOnly{min-height:0;min-width:0;gap:0}.mark{position:relative;display:grid;width:88px;height:88px;place-items:center;border-radius:24px;background:#071927;color:#97C024;box-shadow:0 14px 36px rgba(7,25,39,.18)}.loaderCompact .mark{width:64px;height:64px;border-radius:19px}.markOnly .mark{width:30px;height:30px;border-radius:10px;box-shadow:none}.letter{font-family:Inter,system-ui,sans-serif;font-size:52px;font-weight:900;line-height:1;letter-spacing:-.12em;transform:translateX(-3px);color:#97C024}.loaderCompact .letter{font-size:39px}.markOnly .letter{font-size:21px}.orbit{position:absolute;inset:0;width:100%;height:100%;overflow:visible;animation:mpa-orbit-spin 1.35s linear infinite}.orbit circle{fill:none;stroke:#D9ED39;stroke-width:4;stroke-linecap:round;stroke-dasharray:174 65;transform-origin:44px 44px}.markOnly .orbit circle{stroke-width:5}.label{font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--muted)}@keyframes mpa-orbit-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.orbit{animation:none}.orbit circle{stroke-dasharray:205 34}}
+.loader,.loaderCompact,.markOnly{display:flex;min-height:52vh;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--text);text-align:center}
+.loaderCompact{min-height:150px;gap:12px}
+.markOnly{min-height:0;min-width:0;gap:0}
+.mark{--orbit-x:54px;--orbit-y:14px;--dot-size:8px;position:relative;display:block;width:124px;height:124px;flex:0 0 auto}
+.loaderCompact .mark{--orbit-x:35px;--orbit-y:9px;--dot-size:6px;width:82px;height:82px}
+.markOnly .mark{--orbit-x:12px;--orbit-y:3px;--dot-size:3px;width:30px;height:30px}
+.logo{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain}
+.logoDark{display:none}
+:global(.dark) .logoLight{display:none}
+:global(.dark) .logoDark{display:block}
+.orbit{position:absolute;inset:0;pointer-events:none}
+.dot{position:absolute;left:50%;top:50%;width:var(--dot-size);height:var(--dot-size);border-radius:50%;transform:translate(-50%,-50%);will-change:transform}
+.dotNavy{background:#0A3258;box-shadow:0 0 0 2px rgba(10,50,88,.10);animation:mpa-orbit-one 2.4s linear infinite}
+.dotBlue{background:#1B4D80;box-shadow:0 0 0 2px rgba(27,77,128,.10);animation:mpa-orbit-two 2.4s linear infinite}
+.dotLime{background:#97C024;box-shadow:0 0 0 2px rgba(151,192,36,.12);animation:mpa-orbit-three 2.4s linear infinite}
+.label{font-size:13px;font-weight:650;letter-spacing:.01em;color:var(--muted)}
+@keyframes mpa-orbit-one{0%{transform:translate(-50%,-50%) translate(calc(var(--orbit-x)*-1),0)}25%{transform:translate(-50%,-50%) translate(0,calc(var(--orbit-y)*-1))}50%{transform:translate(-50%,-50%) translate(var(--orbit-x),0)}75%{transform:translate(-50%,-50%) translate(0,var(--orbit-y))}100%{transform:translate(-50%,-50%) translate(calc(var(--orbit-x)*-1),0)}}
+@keyframes mpa-orbit-two{0%{transform:translate(-50%,-50%) translate(var(--orbit-x),0)}25%{transform:translate(-50%,-50%) translate(0,var(--orbit-y))}50%{transform:translate(-50%,-50%) translate(calc(var(--orbit-x)*-1),0)}75%{transform:translate(-50%,-50%) translate(0,calc(var(--orbit-y)*-1))}100%{transform:translate(-50%,-50%) translate(var(--orbit-x),0)}}
+@keyframes mpa-orbit-three{0%{transform:translate(-50%,-50%) translate(0,calc(var(--orbit-y)*-1))}25%{transform:translate(-50%,-50%) translate(calc(var(--orbit-x)*-1),0)}50%{transform:translate(-50%,-50%) translate(0,var(--orbit-y))}75%{transform:translate(-50%,-50%) translate(var(--orbit-x),0)}100%{transform:translate(-50%,-50%) translate(0,calc(var(--orbit-y)*-1))}}
+@media(prefers-reduced-motion:reduce){.dot{animation:none}.dotNavy{transform:translate(-50%,-50%) translate(calc(var(--orbit-x)*-1),0)}.dotBlue{transform:translate(-50%,-50%) translate(0,calc(var(--orbit-y)*-1))}.dotLime{transform:translate(-50%,-50%) translate(var(--orbit-x),0)}}

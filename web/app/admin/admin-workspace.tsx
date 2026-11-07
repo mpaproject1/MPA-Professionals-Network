@@ -11,6 +11,13 @@ import styles from "./admin-workspace.module.css";
 type Destination = { href: string; label: string; description: string; icon: typeof Activity; exact?: boolean };
 const destinations: Destination[] = [
   { href: "/admin", label: "Overview", description: "Review and administration", icon: Activity, exact: true },
+  { href: "/admin/membership-center", label: "Membership Center", description: "Applications, paid-member register, renewals and analytics", icon: ShieldCheck },
+  { href: "/admin/jobs/review", label: "Vacancy review", description: "Review submitted vacancies and publication approvals", icon: ClipboardList },
+  { href: "/admin/mentorship-interest", label: "Mentorship interest", description: "Review mentor interest and propose matches", icon: Users },
+  { href: "/admin/mentorship-reports", label: "Mentorship reports", description: "Confidential participant reports and outcomes", icon: ClipboardCheck },
+  { href: "/admin/service-mentorship-cases", label: "Service and mentorship cases", description: "Audited participant case records", icon: Users },
+  { href: "/admin/public-media-stories", label: "Public story moderation", description: "Consent and publication review", icon: ShieldCheck },
+  { href: "/admin/community-campaigns", label: "Community campaigns", description: "Message approvals, schedules and delivery", icon: Mail },
   { href: "/admin/finance", label: "Finance payments", description: "Verify membership payments and record authorized reversals", icon: CreditCard },
   { href: "/admin/accounts", label: "Account and Team", description: "Account catalogue, roles and access actions", icon: Users },
   { href: "/admin/account-governance", label: "Account governance", description: "Account references, membership history and authorized organization relationships", icon: ShieldCheck },
@@ -49,7 +56,10 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const hydrateToken = useUiStore((state) => state.hydrateToken);
   const [roles, setRoles] = useState<string[] | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
-  const [reportIds, setReportIds] = useState<string[]>([]);\n  const [collapsed, setCollapsed] = useState(false);\n  const [expandedGroups, setExpandedGroups] = useState<string[]>(["People","Finance","Opportunities","Community Impact"]);\n  useEffect(() => { try { setCollapsed(window.localStorage.getItem("mpa-admin-sidebar-collapsed") === "true"); const saved=window.localStorage.getItem("mpa-admin-sidebar-groups"); if(saved) setExpandedGroups(JSON.parse(saved) as string[]); } catch { /* keep defaults */ } }, []);
+  const [reportIds, setReportIds] = useState<string[]>([]);
+  const [collapsed, setCollapsed] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(["People","Finance","Opportunities","Community Impact"]);
+  useEffect(() => { try { setCollapsed(window.localStorage.getItem("mpa-admin-sidebar-collapsed") === "true"); const saved=window.localStorage.getItem("mpa-admin-sidebar-groups"); if(saved) setExpandedGroups(JSON.parse(saved) as string[]); } catch { /* keep defaults */ } }, []);
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
   useEffect(() => {
@@ -78,7 +88,10 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     if (exact) return exact;
     return [...destinations].sort((a, b) => b.href.length - a.href.length).find((item) => pathname.startsWith(`${item.href}/`));
   }, [pathname]);
-  const grouped=useMemo(()=>groupOrder.map(group=>({group,items:navDestinations.filter(item=>groupFor(item.href)===group)})).filter(entry=>entry.items.length),[navDestinations]);\n  const roleSummary = roles === null ? "Resolving account access…" : roles.length ? roles.map((role) => role.replaceAll("_", " ")).join(" · ") : "No administrator role confirmed";\n  const toggleCollapsed=()=>setCollapsed(value=>{const next=!value;try{window.localStorage.setItem("mpa-admin-sidebar-collapsed",String(next));}catch{}return next;});\n  const toggleGroup=(group:string)=>setExpandedGroups(value=>{const next=value.includes(group)?value.filter(item=>item!==group):[...value,group];try{window.localStorage.setItem("mpa-admin-sidebar-groups",JSON.stringify(next));}catch{}return next;});
+  const grouped=useMemo(()=>groupOrder.map(group=>({group,items:navDestinations.filter(item=>groupFor(item.href)===group)})).filter(entry=>entry.items.length),[navDestinations]);
+  const roleSummary = roles === null ? "Resolving account access…" : roles.length ? roles.map((role) => role.replaceAll("_", " ")).join(" · ") : "No administrator role confirmed";
+  const toggleCollapsed=()=>setCollapsed(value=>{const next=!value;try{window.localStorage.setItem("mpa-admin-sidebar-collapsed",String(next));}catch{}return next;});
+  const toggleGroup=(group:string)=>setExpandedGroups(value=>{const next=value.includes(group)?value.filter(item=>item!==group):[...value,group];try{window.localStorage.setItem("mpa-admin-sidebar-groups",JSON.stringify(next));}catch{}return next;});
   const navDestinations = useMemo(() => {
     const platformAdmin = Boolean(roles?.some((role) => ["system_admin", "admin", "platform_admin"].includes(role)));
     const membershipReviewer = Boolean(roles?.some((role) => ["reviewer", "membership_reviewer"].includes(role)) || permissions.includes("membership.review"));
@@ -91,7 +104,10 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
     return destinations.filter((item) => {
       if (item.href === "/admin/test-lab") return roles?.includes("system_admin") === true;
       if (["/admin/accounts", "/admin/account-governance", "/admin/experience", "/admin/members", "/admin/members/catalog", "/admin/membership-card", "/admin/reference-portfolio"].includes(item.href)) return false;
-      if (item.href === "/admin/membership") return membershipReviewer;
+      if (item.href === "/admin/membership" || item.href === "/admin/membership-center") return membershipReviewer || permissions.some((permission) => ["membership.review","membership.activate","members.view","members.manage"].includes(permission));
+      if (item.href === "/admin/jobs/review") return roles?.some((role) => ["reviewer","system_admin"].includes(role)) === true || permissions.includes("jobs.review");
+      if (["/admin/mentorship-interest","/admin/mentorship-reports","/admin/service-mentorship-cases","/admin/public-media-stories"].includes(item.href)) return roles?.some((role) => ["system_admin","supporting_staff"].includes(role)) === true;
+      if (item.href === "/admin/community-campaigns") return platformAdmin;
       if (item.href === "/admin/finance") return financeAccess;
       if (item.href === "/admin/membership/payment-methods") return financeConfig;
       if (item.href === "/admin/reports") return reportIds.length > 0;

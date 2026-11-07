@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
-const [migration,service,requests,server,ui,landing,listingAdmin,businessAdmin,adminNav,compatibility] = await Promise.all([
+const [migration,service,requests,server,ui,landing,listingAdmin,businessAdmin,adminNav,compatibility,preapprovalMigration] = await Promise.all([
   read("../../db/migrations/20261103130000_network_plus_phase1_needs_offers.sql"),
   read("../../src/network-plus/business-discovery.js"),
   read("../../src/network-plus/request-collaboration.js"),
@@ -14,6 +14,7 @@ const [migration,service,requests,server,ui,landing,listingAdmin,businessAdmin,a
   read("../../web/app/admin/network-plus/businesses/page.tsx"),
   read("../../web/app/admin/admin-workspace.tsx"),
   read("../../scripts/check-new-migration-compatibility.js"),
+  read("../../db/migrations/20261107090000_network_plus_preapproval_opportunity_references.sql"),
 ]);
 
 test("Phase 1 extends the canonical listing model and adds governed taxonomy, not a duplicate listing entity",()=>{
@@ -129,4 +130,26 @@ test("independent business and listing moderation queues reuse the existing revi
 
 test("Phase 1 migration participates in disposable migration compatibility validation",()=>{
   assert.match(compatibility,/20261103130000_network_plus_phase1_needs_offers\.sql/);
+});
+
+test("offers can enter listing moderation before business approval without becoming publicly visible",()=>{
+  const submit=service.slice(service.indexOf("export async function submitProfessionalServiceListing"),service.indexOf("export async function moderateProfessionalServiceListing"));
+  const moderate=service.slice(service.indexOf("export async function moderateProfessionalServiceListing"),service.indexOf("export async function listBusinesses"));
+  assert.doesNotMatch(submit,/assertBusinessPublishable/);
+  assert.match(submit,/BUSINESS_NOT_PUBLISHABLE/);
+  assert.match(moderate,/approved_pending_business/);
+  assert.match(moderate,/assertBusinessPublishable/);
+  assert.match(service,/service_listing_published_after_business_approval/);
+  assert.match(preapprovalMigration,/approved_pending_business/);
+  assert.match(preapprovalMigration,/public_reference/);
+  assert.match(compatibility,/20261107090000_network_plus_preapproval_opportunity_references\.sql/);
+});
+
+test("opportunity owners see durable readable references and a visual business approval journey",()=>{
+  assert.match(service,/newOpportunityReference/);
+  assert.match(service,/public_reference/);
+  assert.match(ui,/Opportunity reference:/);
+  assert.match(ui,/businessJourney/);
+  assert.match(ui,/Next step:/);
+  assert.ok(!ui.includes("Listing ID {draftId}"));
 });

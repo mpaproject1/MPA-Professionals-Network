@@ -1,6 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { loadConfig } from "../platform/config.js";
 import { getPool, withTransaction } from "../platform/db.js";
+import { legacyMembershipFeeSettledSql, membershipIsCurrentlyActiveSql } from "./eligibility.js";
 
 const fail=(status,message,code)=>Object.assign(new Error(message),{statusCode:status,code});
 const coalesceLegacySource=source=>source??"";
@@ -41,7 +42,7 @@ function membershipDateString(value) {
 export function getMembershipCardStatus(row, now=new Date()) {
   if(["revoked","cancelled","merged"].includes(row.status)) return "revoked";
   if(row.status==="suspended") return "suspended";
-  if(coalesceLegacySource(row.source)==="legacy_import" && !row.legacy_payment_verified) return "payment_verification_required";
+  if(coalesceLegacySource(row.source)==="legacy_import" && row.legacy_fee_settled!==true) return "payment_verification_required";
   const today=addisAbabaCivilDate(now);
   const startDate=membershipDateString(row.start_date);
   const endDate=membershipDateString(row.end_date);
@@ -69,7 +70,7 @@ async function settings(db=getPool()){
 }
 export async function getMyMembershipCard(userId){
   const db=getPool();
-  const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=m.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)) legacy_payment_verified,
+  const r=await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
       p.name membership_type,coalesce((a.fee_snapshot->>'renewalRequired')::boolean,p.renewal_required) renewal_required,
       coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m
@@ -78,7 +79,7 @@ export async function getMyMembershipCard(userId){
     join app_user u on u.id=m.user_id
     left join person on person.user_id=u.id
     where m.user_id=$1 and m.status<>'pending'
-    order by (m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and (coalesce(m.source,'')<>'legacy_import' or exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=m.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)))) desc,m.start_date desc nulls last,m.created_at desc
+    order by (m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")}) desc,m.start_date desc nulls last,m.created_at desc
     limit 1`,[userId]);
   const row=r.rows[0];
   if(!row) throw fail(404,"No membership record is available for this account. Complete membership approval and activation first.","MEMBERSHIP_NOT_FOUND");
@@ -102,13 +103,13 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
   if(!number||number.length>100||/\p{Cc}/u.test(number)) throw fail(400,"Enter the canonical MPA membership ID.","INVALID_MEMBERSHIP_NUMBER");
   if(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(number)||/^MPA-(MEM|APP|REF)-/i.test(number)) throw fail(400,"This is an internal account, payment or application reference, not a membership number. Use the human-readable MPA membership ID shown in the member workspace.","WRONG_MEMBERSHIP_IDENTIFIER");
   const db=getPool();
-  const row=(await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,
-      exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=m.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)) legacy_payment_verified,
+  const row=(await db.query(`select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
+      ${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
       p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m join membership_product p on p.id=m.membership_product_id
     join app_user u on u.id=m.user_id left join person on person.user_id=u.id
     where upper(m.membership_number)=$1 and m.status<>'pending'
-    order by (m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and (coalesce(m.source,'')<>'legacy_import' or exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=m.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)))) desc,m.start_date desc nulls last,m.created_at desc limit 1`,[number])).rows[0];
+    order by (m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")}) desc,m.start_date desc nulls last,m.created_at desc limit 1`,[number])).rows[0];
   if(!row) throw fail(404,"No membership record matches that membership ID. Account IDs and application references are not accepted here.","MEMBERSHIP_NOT_FOUND");
   assertEligible(row);
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'membership.card_admin_issued','membership_record',$2,$3,'success',$4)",[actorId,row.membership_record_id,requestId,JSON.stringify({issuedCount:1})]);
@@ -116,8 +117,8 @@ export async function getMembershipCardForAdmin(membershipNumber,actorId,request
 }
 export async function listEligibleMembershipCardsForAdmin({q="",limit=50,offset=0}={}){
   const search=String(q||"").trim().slice(0,100),pageSize=Math.min(Math.max(Number(limit)||50,1),100),start=Math.max(Number(offset)||0,0),db=getPool();
-  const result=await db.query("select m.membership_number,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name,p.name membership_type,m.start_date,m.end_date from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and (coalesce(m.source,'')<>'legacy_import' or exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=m.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id))) and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name))) like lower('%'||$1||'%')) order by m.membership_number limit $2 offset $3",[search,pageSize,start]);
-  const total=Number((await db.query("select count(*)::int count from membership_record m left join person on person.user_id=m.user_id where m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and (coalesce(m.source,'')<>'legacy_import' or exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=m.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id))) and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(person.display_name,'')) like lower('%'||$1||'%'))",[search])).rows[0]?.count||0);
+  const result=await db.query("select m.membership_number,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name,p.name membership_type,m.start_date,m.end_date from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")} and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name))) like lower('%'||$1||'%')) order by m.membership_number limit $2 offset $3",[search,pageSize,start]);
+  const total=Number((await db.query("select count(*)::int count from membership_record m left join person on person.user_id=m.user_id where m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")} and ($1='' or lower(m.membership_number) like lower('%'||$1||'%') or lower(coalesce(person.display_name,'')) like lower('%'||$1||'%'))",[search])).rows[0]?.count||0);
   return {items:result.rows.map(row=>({membershipNumber:row.membership_number,memberName:row.member_name||"MPA Member",membershipType:row.membership_type,startDate:row.start_date,endDate:row.end_date})),total,limit:pageSize,offset:start,hasMore:start+result.rows.length<total};
 }
 export async function getMembershipCardsForAdmin(membershipNumbers,actorId,requestId){
@@ -125,7 +126,7 @@ export async function getMembershipCardsForAdmin(membershipNumbers,actorId,reque
   if(membershipNumbers.length>100)throw fail(413,"Select no more than 100 members per print batch.","CARD_BATCH_LIMIT");
   const numbers=[...new Set(membershipNumbers.map(value=>String(value||"").trim().toUpperCase()).filter(Boolean))];
   if(numbers.length!==membershipNumbers.length||numbers.some(value=>value.length>100||/\p{Cc}/u.test(value)||/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value)||/^MPA-(MEM|APP|REF)-/i.test(value)))throw fail(400,"Select unique canonical membership numbers, not internal account or record references.","INVALID_CARD_SELECTION");
-  const db=getPool(),rows=(await db.query("select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where upper(m.membership_number)=any($1::text[]) and m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and (coalesce(m.source,'')<>'legacy_import' or exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=m.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id))) order by m.membership_number",[numbers])).rows;
+  const db=getPool(),rows=(await db.query("select m.id membership_record_id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name from membership_record m join membership_product p on p.id=m.membership_product_id join app_user u on u.id=m.user_id left join person on person.user_id=u.id where upper(m.membership_number)=any($1::text[]) and m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")} order by m.membership_number",[numbers])).rows;
   const byNumber=new Map(rows.map(row=>[String(row.membership_number).toUpperCase(),row])),cardSettings=await settings(db);
   const cards=rows.map(row=>cardPayload(row,cardSettings)),skipped=numbers.filter(number=>!byNumber.has(number)).map(membershipNumber=>({membershipNumber,reason:"No active eligible membership was found. Check the membership ID or membership status."}));
   const batchReference=randomUUID();
@@ -148,7 +149,7 @@ export async function setMyProfilePicture(userId,fileObjectId,requestId){
       from app_user u join person p on p.user_id=u.id
       join professional_profile pr on pr.person_id=p.id
       where u.id=$1 and u.account_type='professional'
-        and exists(select 1 from membership_record m where m.user_id=u.id and m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and (coalesce(m.source,'')<>'legacy_import' or exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=m.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id))))
+        and exists(select 1 from membership_record m where m.user_id=u.id and m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")})
       for update of pr`,[userId])).rows[0];
     if(!owner) throw fail(403,"An active professional membership is required to change the profile picture.","MEMBERSHIP_REQUIRED");
     const file=(await db.query("select f.id,f.created_by,f.content_type,f.visibility from file_object f join private_upload_session s on s.file_object_id=f.id and s.status='confirmed' where f.id=$1",[fileObjectId])).rows[0];
@@ -163,7 +164,7 @@ export async function removeMyProfilePicture(userId,requestId){
   return withTransaction(async db=>{
     const r=await db.query(`update professional_profile pr set profile_picture_file_id=null,updated_at=now()
       from person p where p.id=pr.person_id and p.user_id=$1
-      and exists(select 1 from membership_record m where m.user_id=$1 and m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and (coalesce(m.source,'')<>'legacy_import' or exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=m.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id))))
+      and exists(select 1 from membership_record m where m.user_id=$1 and m.status='active' and m.start_date<=(now() at time zone 'Africa/Addis_Ababa')::date and (m.end_date is null or m.end_date>=(now() at time zone 'Africa/Addis_Ababa')::date) and ${membershipIsCurrentlyActiveSql("m")})
       returning pr.id`,[userId]);
     if(!r.rows[0]) throw fail(403,"An active professional membership is required to change the profile picture.","MEMBERSHIP_REQUIRED");
     await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'profile.picture_removed','professional_profile',$2,$3,'success','{}')",[userId,r.rows[0].id,requestId]);
@@ -220,7 +221,7 @@ export async function rotateMembershipCardVerification(recordId,actorId,requestI
 export async function verifyMembershipCard(identifier,token){
   if(typeof identifier!=="string"||!identifier.trim()||identifier.length>100||typeof token!=="string") return {valid:false,status:"invalid",message:"This membership ID could not be verified."};
   const db=getPool();
-  const row=(await db.query(`select m.id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,exists(select 1 from payment_reconciliation pr join payment_transaction pt on pt.id=pr.payment_transaction_id where pr.membership_id=m.id and pr.reconciliation_status='matched' and pt.source='legacy_import' and pt.status='succeeded' and not exists(select 1 from membership_payment_reversal rev where rev.payment_transaction_id=pt.id)) legacy_payment_verified,
+  const row=(await db.query(`select m.id,m.membership_number,m.status,m.start_date,m.end_date,m.card_token_version,m.source,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,${legacyMembershipFeeSettledSql("m")} legacy_fee_settled,
       p.name membership_type,coalesce(nullif(person.display_name,''),concat_ws(' ',person.first_name,person.middle_name,person.last_name)) member_name
     from membership_record m join membership_product p on p.id=m.membership_product_id
     join person on person.user_id=m.user_id

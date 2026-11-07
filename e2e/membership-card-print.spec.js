@@ -132,8 +132,8 @@ test("imported membership awaiting Finance settlement is not shown as inactive o
  await page.route("**/api/v1/membership/card",route=>route.fulfill({status:409,contentType:"application/json",body:JSON.stringify({error:{code:"MEMBERSHIP_NOT_ELIGIBLE",message:"This membership is payment_verification_required and cannot be used to issue a card."}})}));
  await page.goto("/membership");
  await expect(page.getByRole("heading",{name:"Your imported membership needs Finance verification"})).toBeVisible();
- await expect(page.getByText("Finance verification required",{exact:true})).toBeVisible();
- await expect(page.getByText(/Do not submit a duplicate membership application/)).toBeVisible();
+ await expect(page.getByText("Finance verification required",{exact:true}).first()).toBeVisible();
+ await expect(page.getByText(/Do not submit a duplicate membership application/).first()).toBeVisible();
  await expect(page.getByRole("link",{name:"Explore membership plans"})).toHaveCount(0);
  await expect(page.getByRole("heading",{name:"Available membership plans"})).toHaveCount(0);
 });

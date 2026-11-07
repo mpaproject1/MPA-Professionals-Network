@@ -49,9 +49,9 @@ test.describe("MPA application workspace UX", () => {
     await expect(page.getByRole("heading", { name: /Welcome back, Test Member/ })).toBeVisible();
     // The welcome heading renders before the account-backed workspace data. Wait for
     // the progress section as the explicit signal that the workspace has hydrated.
-    await expect(page.locator("#progress-title")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Membership progress", exact: true })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Your workspace shortcuts" })).toBeVisible();
-    const refresh = page.getByRole("button", { name: "Refresh your workspace status" });
+    const refresh = page.getByRole("button", { name: "Refresh", exact: true });
     await refresh.focus();
     await expect(refresh).toBeFocused();
     await page.setViewportSize({ width: 390, height: 844 });

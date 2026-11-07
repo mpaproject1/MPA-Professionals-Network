@@ -13,7 +13,7 @@ const REGION_MAP = Object.freeze({
 });
 const ADDIS="ET14",DIRE_DAWA="ET15",CONTESTED="ET99";
 function sourceMetadata(record,sourceUrl,sourceLevel,administrativeLabel){
- return {sourceUrl,sourceDataset:"Ethiopia Administrative Divisions",sourceLicense:SOURCE_LICENSE,sourceCommit:SOURCE_COMMIT,
+ return {sourceUrl,sourceDataset:"Ethiopia Administrative Divisions",sourceRepository:"Jafermenza/ethiopia-administrative-divisions",sourceAttribution:"Open Admin Data (upstream dataset)",sourceLicense:SOURCE_LICENSE,sourceCommit:SOURCE_COMMIT,
   sourceId:String(record.id),sourceParentId:record.parent?.id||null,sourceLevel,administrativeLabel,
   localLabel:record.name?.local||record.name?.en||"",slug:record.name?.slug||"",
   coordinates:record.geo?.lat&&record.geo?.lon?{latitude:String(record.geo.lat),longitude:String(record.geo.lon),crs:"WGS84"}:null};

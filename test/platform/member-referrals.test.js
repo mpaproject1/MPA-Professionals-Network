@@ -10,6 +10,8 @@ const membership=await readFile(new URL("../../src/membership/service.js",import
 const jobs=await readFile(new URL("../../src/organization-jobs/service.js",import.meta.url),"utf8");
 const routes=await readFile(new URL("../../server.js",import.meta.url),"utf8");
 const emailVerification=await readFile(new URL("../../src/platform/email-verification.js",import.meta.url),"utf8");
+const registrationPage=await readFile(new URL("../../web/app/register/page.tsx",import.meta.url),"utf8");
+const jobsPage=await readFile(new URL("../../web/app/jobs/page.tsx",import.meta.url),"utf8");
 
 test("referral schema enforces separate types and duplicate prevention",()=>{
  assert.match(migration,/member_referral_code/);
@@ -31,6 +33,14 @@ test("membership attribution follows registration, application, review and activ
  assert.ok(membership.includes("captureMembershipRegistration"));
  assert.ok(membership.includes("membership_application_submitted"));
  assert.ok(membership.includes("recordMembershipActivated"));
+});
+test("referral URLs are captured at registration and carried through formal job applications",()=>{
+ assert.ok(registrationPage.includes('new URLSearchParams(window.location.search).get("ref")'));
+ assert.ok(registrationPage.includes("referralCode:referralCode.trim()||undefined"));
+ assert.ok(registrationPage.includes("referralStatusConsent"));
+ assert.ok(jobsPage.includes('new URLSearchParams(window.location.search).get("ref")'));
+ assert.ok(jobsPage.includes("referralCode:referralCode,referralStatusConsent"));
+ assert.ok(jobsPage.includes("I consent to the member who referred me seeing my name and limited referral progress."));
 });
 test("employment attribution attaches to formal applications and verified hiring milestones",()=>{
  assert.ok(jobs.includes("captureEmploymentApplication"));

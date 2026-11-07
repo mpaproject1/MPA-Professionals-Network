@@ -50,10 +50,11 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
   const failures:string[]=[];
   const settle=<T,>(promise:Promise<T>)=>promise.then(value=>({value,error:null as unknown}),error=>({value:null as T|null,error}));
   try{
-   const [productsResult,applicationsResult,meResult]=await Promise.all([
+   const [productsResult,applicationsResult,meResult,cardResult]=await Promise.all([
     settle(api<Product[]>("/api/v1/membership/products")),
     token?settle(api<Application[]>("/api/v1/membership/applications/me",{},token)):Promise.resolve({value:[] as Application[]|null,error:null as unknown}),
-    token?settle(api<Me>("/api/v1/me",{},token)):Promise.resolve({value:null as Me|null,error:null as unknown})
+    token?settle(api<Me>("/api/v1/me",{},token)):Promise.resolve({value:null as Me|null,error:null as unknown}),
+    token?settle(api<MembershipCardSummary>("/api/v1/membership/card",{},token)):Promise.resolve({value:null as MembershipCardSummary|null,error:null as unknown})
    ]);
    if(productsResult.error){
     setProducts([]);
@@ -80,22 +81,28 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
      }
     }
     if(meResult.error||!meResult.value){
-     setHasActiveMembership(false);setMembershipStatusUnavailable(true);setMembershipCard(null);setMembershipCardError("");
+     if(cardResult.value){
+      setHasActiveMembership(true);setMembershipStatusUnavailable(false);setMembershipCard(cardResult.value);setMembershipCardError("");
+      setAccountIdentity(current=>({...current,displayName:current.displayName||cardResult.value!.memberName}));
+     }else{
+      setHasActiveMembership(false);setMembershipStatusUnavailable(true);setMembershipCard(null);
+      setMembershipCardError(cardResult.error instanceof ApiError?cardResult.error.message:"Your membership card could not be confirmed.");
+     }
      failures.push(meResult.error instanceof ApiError?meResult.error.message:"Your account membership status could not be loaded.");
     }else{
      const me=meResult.value;
      setRoles(Array.isArray(me.roles)?me.roles:[]);
      setPermissions(Array.isArray(me.permissions)?me.permissions:[]);
-     setHasActiveMembership(Boolean(me.has_active_membership));
+     const cardConfirmsActive=Boolean(cardResult.value);
+     const confirmedActiveMembership=Boolean(me.has_active_membership)||cardConfirmsActive;
+     setHasActiveMembership(confirmedActiveMembership);
      setMembershipStatusUnavailable(false);
      setAccountIdentity({email:String(me.email||""),phone:String(me.phone||""),displayName:String(me.display_name||[me.first_name,me.middle_name,me.last_name].filter(Boolean).join(" ")),headline:String(me.headline||"")});
      setProfessionalDetails(current=>({...current,fullName:current.fullName||String(me.display_name||[me.first_name,me.middle_name,me.last_name].filter(Boolean).join(" ")),sector:current.sector||""}));
-     let card:MembershipCardSummary|null=null;
-     if(me.has_active_membership){
-      try{card=await api<MembershipCardSummary>("/api/v1/membership/card",{},token);setMembershipCardError("");}
-      catch(cardLoadError){setMembershipCardError(cardLoadError instanceof ApiError?cardLoadError.message:"Your membership is active, but the membership ID could not be loaded. Retry or contact membership support.");}
-     }else setMembershipCardError("");
-     setMembershipCard(card);
+     if(confirmedActiveMembership){
+      if(cardResult.value){setMembershipCard(cardResult.value);setMembershipCardError("");}
+      else{setMembershipCard(null);setMembershipCardError(cardResult.error instanceof ApiError?cardResult.error.message:"Your membership is active, but the membership ID could not be loaded. Retry or contact membership support.");}
+     }else{setMembershipCard(null);setMembershipCardError("");}
      if(adminWorkspace&&((me.roles||[]).some(role=>["reviewer","membership_reviewer","system_admin"].includes(role))||(me.permissions||[]).some(permission=>["membership.review","members.view"].includes(permission)))){
       try{const review=await api<Application[]>("/api/v1/review/membership/applications",{},token);setReviewApplications(Array.isArray(review)?review:[]);}
       catch(reviewError){setReviewApplications([]);failures.push(reviewError instanceof ApiError?reviewError.message:"Membership review applications could not be loaded.");}

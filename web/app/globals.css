@@ -1742,3 +1742,76 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 @media(max-width:620px){.member-command{padding:14px 12px 92px!important}.member-hero{grid-template-columns:minmax(0,1fr) 110px;gap:10px;padding:16px}.member-profile-ring{width:80px;height:80px}.member-hero h2{font-size:22px}.member-hero-action .btn{font-size:9px;padding:8px 5px}.member-category-nav{top:60px;margin-left:-2px;margin-right:-2px}.member-category-nav button{padding:8px 10px;font-size:9px}.member-overview-bottom{grid-template-columns:1fr}.member-journey-track{gap:3px}.member-journey-track small{font-size:7px}.member-help-footer{align-items:flex-start;flex-direction:column}.impact-mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:390px){.member-hero{grid-template-columns:1fr}.member-hero-action{grid-template-columns:80px 1fr;justify-items:stretch}.member-hero-action .btn{align-self:center}.member-topline{align-items:flex-start;flex-direction:column}.member-journey-detail-grid,.member-destination-grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.member-command *,.member-command *:before,.member-command *:after,.impact-mini *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+
+/* Mobile dock: keep all six signed-in destinations visible and anchor More above it. */
+@media (max-width: 900px) {
+  .app-shell,
+  .shell-main,
+  .member-command,
+  .member-hero,
+  .member-section-panel {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .member-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .member-metric-grid,
+  .member-overview-bottom,
+  .member-journey-detail-grid,
+  .member-destination-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-nav {
+    display: grid !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    grid-auto-flow: column;
+    gap: 2px;
+    overflow: visible !important;
+    min-width: 0;
+    padding-left: max(5px, env(safe-area-inset-left));
+    padding-right: max(5px, env(safe-area-inset-right));
+  }
+
+  .mobile-nav > a,
+  .mobile-nav > button {
+    display: grid !important;
+    min-width: 0 !important;
+    width: 100%;
+    flex: none !important;
+    justify-items: center;
+    align-content: center;
+    gap: 3px;
+    padding-inline: 1px;
+    white-space: nowrap;
+  }
+
+  .mobile-more-panel {
+    position: fixed !important;
+    right: max(10px, env(safe-area-inset-right)) !important;
+    bottom: calc(70px + env(safe-area-inset-bottom)) !important;
+    z-index: 85 !important;
+    max-height: calc(100dvh - 100px);
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .member-topline,
+  .member-section-heading,
+  .member-inline-heading {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+  .member-metric-grid,
+  .member-overview-bottom,
+  .member-journey-detail-grid,
+  .member-destination-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

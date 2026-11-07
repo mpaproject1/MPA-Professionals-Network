@@ -4,7 +4,7 @@
  * A user's organization workspace and personal professional identity are
  * separate capabilities. Organization membership must be checked against the
  * requested organization; it must never be inferred from a platform role.
- * Membership is current only when status and inclusive UTC date bounds agree.
+ * Membership is current only when status, Addis Ababa inclusive date bounds and\n * any required historical fee settlement all agree.
  */
 export const PROFESSIONAL_IDENTITY_ROLES = Object.freeze(["member", "professional"]);
 export const ORGANIZATION_RESOURCE_ROLES = Object.freeze(["owner", "administrator", "recruiter", "project_manager"]);
@@ -41,7 +41,7 @@ export async function assertProfessionalIdentity(db, userId) {
 
 export async function hasCurrentActiveMembership(db, userId) {
   const result = await db.query(
-    "select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date) limit 1",
+    `select 1 from membership_record mr where mr.user_id=$1 and ${membershipIsCurrentlyActiveSql("mr")} limit 1`,
     [userId],
   );
   return result.rowCount > 0;

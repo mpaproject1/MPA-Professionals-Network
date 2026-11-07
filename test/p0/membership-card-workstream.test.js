@@ -3,7 +3,7 @@ import {readFile} from "node:fs/promises";
 import test from "node:test";
 
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [service,server,bulkPage,bulkCss,singlePage,verifyPage,membershipService,membershipWorkspace]=await Promise.all([
+const [service,server,bulkPage,bulkCss,singlePage,verifyPage,membershipService,membershipWorkspace,eligibility]=await Promise.all([
   read("../../src/membership/card.js"),
   read("../../server.js"),
   read("../../web/app/admin/membership-cards/page.tsx"),
@@ -11,7 +11,8 @@ const [service,server,bulkPage,bulkCss,singlePage,verifyPage,membershipService,m
   read("../../web/app/membership/card/page.tsx"),
   read("../../web/app/membership/verify/page.tsx"),
   read("../../src/membership/service.js"),
-  read("../../web/app/membership/workspace.tsx")
+  read("../../web/app/membership/workspace.tsx"),
+  read("../../src/membership/eligibility.js")
 ]);
 
 test("single card issuance requires an active eligible membership record, not an account role",()=>{
@@ -78,17 +79,22 @@ test("QR verification accepts canonical membership number and preserves existing
 
 test("member active flag and every card issuance path share the Addis-date legacy settlement safeguard",()=>{
   assert.match(membershipService,/has_active_membership/);
-  assert.match(membershipService,/coalesce\(mr\.source,''\)<>'legacy_import'/);
-  assert.match(membershipService,/payment_reconciliation/);
+  assert.match(membershipService,/membershipIsCurrentlyActiveSql\("mr"\)/);
+  assert.match(membershipService,/from "\.\/eligibility\.js"/);
   assert.match(membershipService,/Africa\/Addis_Ababa/);
   assert.match(service,/function addisAbabaCivilDate/);
   assert.match(service,/timeZone:"Africa\/Addis_Ababa"/);
-  assert.match(service,/legacy_payment_verified/);
+  assert.match(service,/legacy_fee_settled/);
+  assert.match(eligibility,/membership_fee_obligation_balance/);
+  assert.match(eligibility,/balance\.outstanding_balance=0/);
+  assert.match(eligibility,/balance\.outstanding_balance>0/);
+  assert.match(eligibility,/membershipIsCurrentlyActiveSql/);
   const adminLookup=service.slice(service.indexOf("export async function getMembershipCardForAdmin"),service.indexOf("export async function listEligibleMembershipCardsForAdmin"));
   assert.match(adminLookup,/m\.source/);
-  assert.match(adminLookup,/legacy_payment_verified/);
+  assert.match(adminLookup,/legacy_fee_settled/);
+  assert.match(adminLookup,/legacyMembershipFeeSettledSql/);
   assert.match(adminLookup,/assertEligible\(row\)/);
-  assert.match(service,/coalesce\(m\.source,''\)<>'legacy_import'/);
+  assert.match(service,/membershipIsCurrentlyActiveSql\("m"\)/);
 });
 
 test("member membership workspace leads with live status, surfaces card errors and labels activated applications",()=>{
@@ -115,6 +121,8 @@ test("membership products and authenticated member data load independently",()=>
   assert.match(load,/Promise\.all\(\[/);
   assert.match(load,/settle\(api<Product\[]>\("\/api\/v1\/membership\/products"\)\)/);
   assert.match(load,/settle\(api<Me>\("\/api\/v1\/me"/);
+  assert.match(load,/settle\(api<MembershipCardSummary>\("\/api\/v1\/membership\/card"/);
+  assert.match(load,/const confirmedActiveMembership=Boolean\(me\.has_active_membership\)\|\|cardConfirmsActive/);
   assert.match(load,/membershipCardError/);
   assert.match(load,/failures\.push/);
 });

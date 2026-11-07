@@ -118,3 +118,11 @@ test("membership products and authenticated member data load independently",()=>
   assert.match(load,/membershipCardError/);
   assert.match(load,/failures\.push/);
 });
+
+
+test("membership API failures are shown as unknown status, never as an inactive decision",()=>{
+  assert.match(membershipWorkspace,/membershipStatusUnavailable/);
+  assert.match(membershipWorkspace,/Status unavailable/);
+  assert.match(membershipWorkspace,/We could not confirm your current membership status/);
+  assert.match(membershipWorkspace,/!membershipStatusUnavailable&&!hasActiveMembership/);
+});

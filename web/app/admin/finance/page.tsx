@@ -329,7 +329,7 @@ export default function FinanceWorkspacePage() {
 
   return <div className="grid" style={{ gap: 16 }}>
     <AdminPageHeader eyebrow="MPA · Finance operations" title="Membership payment queue" description="Verify eligible payments, review payment exceptions and record authorized reversals. This workspace does not approve or activate membership applications." actions={<><button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={busy !== ""}>{busy === "load" ? "Refreshing…" : "Refresh queue"}</button></>} />
-    <div className="row" style={{gap:8,flexWrap:"wrap"}}><a className="btn btn-primary" href="/admin/finance/receipts">Record manual payment & issue QR vouchers</a><a className="btn btn-ghost" href="/admin/reports?report=manual-finance-receipts">Manual finance receipts report</a></div>
+    <div className="row" style={{gap:8,flexWrap:"wrap"}}><a className="btn btn-ghost" href="/admin/reports?report=manual-finance-receipts">Manual finance receipts report</a></div>
     {error && <p className="form-error" role="alert">{error}</p>}
     {notice && <p className="form-success" role="status" aria-live="polite">{notice}</p>}
     <Card>
@@ -365,6 +365,7 @@ export default function FinanceWorkspacePage() {
       onVerifyReceipt={(id,decision,note)=>void decideManualReceipt(id,decision,note)}
       onReverseReceipt={(id,reason)=>void reverseManualReceipt(id,reason)}
       onIssueVoucher={(id,manual)=>void issueFinanceVoucher(id,manual)}
+      onRefresh={()=>void load()}
     />
     <Card><p className="muted">Payment verification, reversal and reconciliation remain audited financial actions. A successful payment does not by itself approve or activate a membership application.</p></Card>
     {evidencePreview && <div role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeEvidencePreview(); }} style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(2,8,23,.82)", display: "grid", placeItems: "center", padding: 16 }}>

@@ -673,3 +673,22 @@
   .folder { transition: none; }
   .folder:hover { transform: none; }
 }
+
+
+/* Guided onboarding and status tracking refinements */
+.gateIntro { max-width: 70ch; }
+.statusCard > p { line-height: 1.55; }
+.verificationTimeline { gap: .5rem; }
+.secondaryStatuses { display: grid; gap: .6rem; }
+.folderShelf .folder:focus-visible,
+.folderActions a:focus-visible,
+.workflowTypeSelector button:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+}
+@media (max-width: 520px) {
+  .workspace, .gate { padding: .85rem; border-radius: .95rem; }
+  .statusTop { flex-wrap: wrap; }
+  .statusPill { white-space: normal; }
+  .folderShelf .folder { min-height: 66px; }
+}

@@ -78,6 +78,11 @@ type OrgForm = {
   phone: string;
   addressText: string;
 };
+function missingEvidenceFor(organization: Organization) {
+  if (Array.isArray(organization.missing_evidence)) return organization.missing_evidence;
+  const uploaded = new Set((organization.verification_evidence || []).map((item) => item.evidenceType));
+  return (organization.required_evidence || []).filter((item) => !uploaded.has(item));
+}
 const blank: OrgForm = {
   legalName: "",
   displayName: "",
@@ -687,10 +692,10 @@ export default function Organizations() {
                   <div className="org-step-panel">
                     <span className="eyebrow">Step 4 of 4 · Review</span><h3 className="h2">Review before submitting</h3>
                     <p className="muted">Check the evidence checklist and application reference. MPA reviewers make the independent verification decision; submission does not guarantee approval.</p>
-                    {organizations.filter((org) => org.verification_status !== "verified").map((org) => <div className="org-review-summary" key={org.id}><strong>{org.display_name || org.legal_name}</strong><span>Reference: {org.tracking_reference || "Pending"}</span><span>Required evidence: {(org.required_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "Not specified by the service"}</span><span>Still needed: {(org.missing_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "No outstanding items reported"}</span></div>)}
+                    {organizations.filter((org) => org.verification_status !== "verified").map((org) => <div className="org-review-summary" key={org.id}><strong>{org.display_name || org.legal_name}</strong><span>Reference: {org.tracking_reference || "Pending"}</span><span>Required evidence: {(org.required_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "Not specified by the service"}</span><span>Still needed: {missingEvidenceFor(org).map((item) => item.replaceAll("_", " ")).join(", ") || "No outstanding items reported"}</span></div>)}
                     <div className="form-error" role="note"><b>Decision boundary:</b> MPA verification is separate from representative email verification. Do not submit while required evidence is outstanding. The server remains authoritative for the final submission decision.</div>
                     <div className="org-step-actions"><button className="btn btn-ghost" type="button" onClick={() => document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Review documents</button>
-                    {organizations.filter((org) => org.verification_status !== "verified" && ["owner", "administrator"].includes(org.role_code || "") && !["submitted", "in_review", "pending"].includes(org.verification_case_status || "")).map((org) => <button className="btn btn-primary" type="button" key={org.id} disabled={(org.missing_evidence || []).length > 0} onClick={() => void submitVerification(org)}>Submit {org.display_name || "organization"} for MPA review</button>)}</div>
+                    {organizations.filter((org) => org.verification_status !== "verified" && ["owner", "administrator"].includes(org.role_code || "") && !["submitted", "in_review", "pending"].includes(org.verification_case_status || "")).map((org) => <button className="btn btn-primary" type="button" key={org.id} disabled={missingEvidenceFor(org).length > 0} onClick={() => void submitVerification(org)}>Submit {org.display_name || "organization"} for MPA review</button>)}</div>
                   </div>
                 )}
               </div>

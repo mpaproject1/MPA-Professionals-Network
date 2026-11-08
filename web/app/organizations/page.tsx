@@ -663,7 +663,7 @@ export default function Organizations() {
                   ))}
                 </ol>
                 {registrationStep === 1 ? (
-                  <form className="form-stack org-step-panel" onSubmit={(event) => { event.preventDefault(); setRegistrationStep(2); }}>
+                  <form className="form-stack org-step-panel" aria-live="polite" onSubmit={(event) => { event.preventDefault(); setRegistrationStep(2); }}>
                     <span className="eyebrow">Step 1 of 4 · Identity</span>
                     <h3 className="h2">Tell us about your organization</h3>
                     <p className="muted">Use the legal identity shown on your institution's registration documents. Your display name is how members will recognize you.</p>
@@ -691,7 +691,7 @@ export default function Organizations() {
                     <div className="org-step-actions"><button className="btn btn-ghost" type="button" onClick={() => setRegistrationStep(1)} disabled={submitting}>Back</button><button className="btn btn-primary" type="submit" disabled={submitting || !form.email.trim()}>{submitting ? "Creating registration…" : "Save and continue"}</button></div>
                   </form>
                 ) : registrationStep === 3 ? (
-                  <div className="org-step-panel">
+                  <div className="org-step-panel" aria-live="polite">
                     <span className="eyebrow">Step 3 of 4 · Documents</span>
                     <h3 className="h2">Add the evidence needed for verification</h3>
                     <p className="muted">Select your organization in the private evidence section. Upload the requested documents there; files are privately attached and checksum-verified. Uploading evidence does not itself verify the organization.</p>

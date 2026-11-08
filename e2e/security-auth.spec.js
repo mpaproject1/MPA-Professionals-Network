@@ -81,16 +81,18 @@ test("administrator passkey enrollment, authentication, revocation and recovery 
  await addAuthenticator();
  try{
   await page.goto("/login");
-  await page.getByLabel("Email").fill(admin.email);
+  await expect(page.locator(".auth-login-card")).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Welcome back"})).toBeVisible();
+  await page.getByLabel("Email or username").fill(admin.email);
   await page.getByLabel("Password").fill("Security-e2e-password-12345");
-  await page.getByRole("button",{name:/Login with password/}).click();
+  await page.getByRole("button",{name:/Sign in/}).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/admin/security");
   await page.getByRole("button",{name:"Add passkey"}).click();
   await expect(page.getByRole("heading",{name:"Save your recovery codes now"})).toBeVisible({timeout:15000});
   await page.goto("/login");
-  await page.getByLabel("Email").fill(admin.email);
-  await page.getByRole("button",{name:"Sign in with administrator passkey"}).click();
+  await page.getByLabel("Email or username").fill(admin.email);
+  await page.getByRole("button",{name:"Passkey"}).click();
   await expect(page).toHaveURL(/\/dashboard$/,{timeout:15000});
   expect(assertionPayload).toBeTruthy();
   const replayApi=await playwrightRequest.newContext({baseURL:API_BASE});
@@ -123,17 +125,17 @@ test("administrator passkey enrollment, authentication, revocation and recovery 
    expect(bypass.status()).toBe(401);
   }finally{await api.dispose();}
   await page.goto("/login");
-  await page.getByLabel("Email").fill(admin.email);
-  await page.getByRole("button",{name:"Use a passkey recovery code"}).click();
+  await page.getByLabel("Email or username").fill(admin.email);
+  await page.getByRole("button",{name:"Recovery code"}).click();
   await page.getByLabel("One-time recovery code").fill(uiRecoveryCode);
-  await page.getByRole("button",{name:"Recover passkey access"}).click();
+  await page.getByRole("button",{name:"Recover access"}).click();
   await expect(page).toHaveURL(/\/admin\/security\?recovery=1$/,{timeout:15000});
   await removeAuthenticator();
   await addAuthenticator();
   await page.getByRole("button",{name:"Register replacement passkey"}).click();
   await expect(page.getByRole("heading",{name:"Save your recovery codes now"})).toBeVisible({timeout:15000});
   await page.goto("/login");
-  await page.getByLabel("Email").fill(admin.email);
+  await page.getByLabel("Email or username").fill(admin.email);
   await page.getByRole("button",{name:"Sign in with administrator passkey"}).click();
   await expect(page).toHaveURL(/\/dashboard$/,{timeout:15000});
   const replay=await apiRecoveryReplay(admin.email,recoveryCode);

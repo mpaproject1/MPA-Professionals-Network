@@ -1,5 +1,5 @@
 "use client";
-import {ArrowRight,ClipboardCheck,Clock3,Compass,FilePlus2,Filter,HeartHandshake,MapPin,Search,ShieldCheck,Users,X} from "lucide-react";
+import {ArrowRight,Briefcase,ClipboardCheck,Clock3,Compass,FilePlus2,Filter,HeartHandshake,MapPin,Search,ShieldCheck,Users,X} from "lucide-react";
 import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
 import {SupportAction} from "../../components/support-action";
@@ -60,6 +60,12 @@ export default function ServeCommunityPage(){
         <span className="sc-folder-tab"/>
         <span className="sc-folder-icon"><ClipboardCheck size={28}/></span>
         <span className="sc-folder-copy"><strong>Record community impact</strong><small>Submit an initiative, contribution or impact claim</small></span>
+        <span className="sc-folder-open"><ArrowRight size={18}/></span>
+      </Link>
+      <Link href="/services" className="sc-folder sc-folder--services">
+        <span className="sc-folder-tab"/>
+        <span className="sc-folder-icon"><Briefcase size={28}/></span>
+        <span className="sc-folder-copy"><strong>Professional services</strong><small>Find expertise, offer a service and manage engagements</small></span>
         <span className="sc-folder-open"><ArrowRight size={18}/></span>
       </Link>
     </div>

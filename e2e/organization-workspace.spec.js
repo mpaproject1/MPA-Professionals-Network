@@ -97,7 +97,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await dismissPrivacyChoices(page);
     await expect(page.getByRole("heading", { name: "Tell us about your organization" })).toBeVisible();
     await expect(page.getByLabel("Legal name")).toHaveValue("Example Ethiopian Association");
-    await expect(page.getByRole("list", { name: "Organization onboarding" }).getByRole("listitem")).toHaveCount(4);
+    await expect(page.getByRole("list", { name: "Organization onboarding" }).getByRole("listitem")).toHaveCount(5);
     await page.getByRole("button", { name: /Continue/ }).click();
     await expect(page.getByRole("heading", { name: "Add an official institutional contact" })).toBeVisible();
     await expect(page.getByLabel("Institutional email")).toBeVisible();
@@ -180,7 +180,9 @@ test.describe("MPA organization app entry and navigation", () => {
     await dismissPrivacyChoices(page);
     await expect(page.getByText("Changes requested").first()).toBeVisible();
     await expect(page.getByText(/Please attach the current trade license/).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "Continue verification" })).toHaveAttribute("href", "/organizations#org-evidence");
+    await expect(page.getByRole("button", { name: "Complete trust checklist" })).toBeVisible();
+    await page.getByRole("button", { name: "Complete trust checklist" }).click();
+    await expect(page.locator("#org-evidence")).toBeInViewport();
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
   });
 
@@ -250,7 +252,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(discoverPanel.getByRole("link", { name: /Network-Plus/ })).toHaveAttribute("href", "/network-plus");
     await expect(discoverPanel.getByRole("link", { name: /Organization directory/ })).toHaveAttribute("href", "/organizations/directory");
     await expect(discoverPanel.getByRole("link", { name: /Serve-Community requests/ })).toHaveAttribute("href", "/service-demand");
-    await expect(discoverPanel.getByRole("link", { name: /Mentorship network/ })).toHaveAttribute("href", "/mentorship");
+    await expect(discoverPanel.getByRole("link", { name: /Mentorship network/ })).toHaveAttribute("href", "/mentorship?organizationId=org-e2e-1");
     await tabs.getByRole("tab", { name: /^Organization/ }).click();
     await expect(page.getByRole("heading", { name: "Organization details and verification" })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });

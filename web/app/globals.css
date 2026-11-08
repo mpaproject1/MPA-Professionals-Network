@@ -64,7 +64,7 @@ button:disabled,[role=button][aria-disabled=true]{cursor:not-allowed!important;o
 button:disabled svg{animation:none!important}
 button:not(:disabled),a.btn{transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease}
 button:not(:disabled):active,a.btn:active{transform:translateY(1px)}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:0.01ms!important}.operation-status__icon--moving svg{animation:none;opacity:.8}button:not(:disabled),a.btn{transition:none}button:not(:disabled):active,a.btn:active{transform:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0s!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:0s!important}.operation-status__icon--moving svg{animation:none;opacity:.8}button:not(:disabled),a.btn{transition:none}button:not(:disabled):active,a.btn:active{transform:none}}
 
 /* Page-level UX refinements: responsive marketplace hierarchy, readable filters and compact membership steps. */
 .marketplace-pathway{min-height:260px;border-radius:18px;transition:transform .18s ease,border-color .18s ease}
@@ -1793,9 +1793,10 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
   }
 
   .mobile-more-panel {
-    position: fixed !important;
+    position: absolute !important;
     right: max(10px, env(safe-area-inset-right)) !important;
-    bottom: calc(70px + env(safe-area-inset-bottom)) !important;
+    bottom: calc(100% + 8px) !important;
+    top: auto !important;
     z-index: 85 !important;
     max-height: calc(100dvh - 100px);
     overflow-y: auto;

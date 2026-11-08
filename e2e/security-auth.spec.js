@@ -136,7 +136,7 @@ test("administrator passkey enrollment, authentication, revocation and recovery 
   await expect(page.getByRole("heading",{name:"Save your recovery codes now"})).toBeVisible({timeout:15000});
   await page.goto("/login");
   await page.getByLabel("Email or username").fill(admin.email);
-  await page.getByRole("button",{name:"Sign in with administrator passkey"}).click();
+  await page.getByRole("button",{name:"Passkey"}).click();
   await expect(page).toHaveURL(/\/dashboard$/,{timeout:15000});
   const replay=await apiRecoveryReplay(admin.email,recoveryCode);
   expect(replay).toBe(false);

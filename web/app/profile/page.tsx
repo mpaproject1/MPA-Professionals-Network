@@ -16,8 +16,8 @@ import {
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
 import { FormFeedback } from "../../components/form-feedback";
-import { MemberResidenceEditor } from "../../components/member-residence-editor";
 import { MemberReferralWorkspace } from "../../components/member-referral-workspace";
+import { MemberResidenceEditor } from "../../components/member-residence-editor";
 import { OperationStatus } from "../../components/operation-status";
 import { SupportAction } from "../../components/support-action";
 import { Badge, Card } from "../../components/ui";

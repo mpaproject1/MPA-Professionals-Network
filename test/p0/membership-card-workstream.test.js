@@ -66,9 +66,12 @@ test("bulk print previews count, provides actionable skipped states and prints o
   assert.match(bulkPage,/skipped/);
   assert.match(bulkPage,/window\.print\(\)/);
   assert.match(bulkCss,/@page\{size:A4 portrait;margin:0\}/);
-  assert.match(bulkCss,/break-after:page/);
-  assert.match(bulkCss,/width:210mm;height:297mm/);
-  assert.match(bulkCss,/width:85\.6mm;height:53\.98mm/);
+  // Each printable wrapper occupies one A4 sheet minus the print engine's
+  // rounding tolerance; the following wrapper, not the current one, starts
+  // the next sheet so the final card cannot create a trailing blank page.
+  assert.match(bulkCss,/\.printPage\{[^}]*width:210mm;[^}]*height:296mm;[^}]*break-after:auto;[^}]*page-break-after:auto;/);
+  assert.match(bulkCss,/\.printPage\+\.printPage\{break-before:page;page-break-before:always\}/);
+  assert.match(bulkCss,/\.card\{width:85\.6mm;height:53\.98mm;/);
 });
 
 test("QR verification accepts canonical membership number and preserves existing record-based QR links",()=>{

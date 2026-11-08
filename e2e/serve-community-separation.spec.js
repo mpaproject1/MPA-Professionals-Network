@@ -44,12 +44,15 @@ test.describe("Serve-Community approved initiative journey",()=>{
   await expect(page.getByRole("heading",{name:"Create an initiative draft"})).toBeVisible();
   await page.getByRole("button",{name:"Reject optional"}).click();
   await page.getByLabel("Initiative title").fill("New community initiative proposal");
-  await page.getByRole("button",{name:"Continue"}).click();
+  await page.getByRole("dialog",{name:"Create an initiative draft"}).getByRole("button",{name:"Continue"}).click();
   await page.getByLabel("Short summary").fill("A community programme with practical learning and volunteer support.");
   await page.getByLabel("Full description").fill("This programme will coordinate local volunteers to provide practical learning support for young people and community organisations.");
   await page.getByRole("button",{name:"Continue"}).click();
   await page.getByRole("button",{name:"Continue"}).click();
-  await page.getByRole("button",{name:"Create private draft"}).click();
+  const proposalDialog=page.getByRole("dialog",{name:"Create an initiative draft"});
+  await expect(proposalDialog.getByRole("button",{name:"Create private draft"})).toBeVisible();
+  await expect(proposalDialog.getByRole("button",{name:"Create private draft"})).toBeEnabled();
+  await proposalDialog.getByRole("button",{name:"Create private draft"}).click();
   await expect(page.locator(".sc-owner-card").getByRole("heading",{name:"New community initiative proposal"})).toBeVisible();
   await expect(page.locator(".sc-owner-card").getByText("Draft in progress",{exact:true})).toBeVisible();
   await expect.poll(()=>ownerReads).toBeGreaterThan(1);

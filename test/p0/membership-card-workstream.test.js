@@ -140,7 +140,7 @@ test("membership products and authenticated member data load independently",()=>
   assert.match(load,/settle\(api<Me>\("\/api\/v1\/me"/);
   assert.match(load,/settle\(api<MembershipCardSummary>\("\/api\/v1\/membership\/card"/);
   assert.match(load,/const confirmedActiveMembership=Boolean\(me\.has_active_membership\)\|\|cardConfirmsActive/);
-  assert.match(load,/membershipCardError/);
+  assert.match(load,/setMembershipCardError/);
   assert.match(load,/failures\.push/);
 });
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseXlsxRows } from "../src/platform/xlsx.js";
+
 const file=resolve(process.argv[2]||"artifacts/member-geography-reference.xlsx");
 const required=["unit_code","label","unit_level","parent_code","country_iso3","country_m49","source_name","source_version","active","metadata"];
 const workbook=parseXlsxRows(await readFile(file));for(const c of required)assert.ok(workbook.headers.includes(c),"Missing required geography workbook column: "+c);

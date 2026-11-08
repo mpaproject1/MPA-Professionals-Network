@@ -235,7 +235,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await page.getByRole("button", { name: "Public inquiries" }).click();
     await expect(page.getByRole("link", { name: /Open review/ })).toHaveAttribute("href", "/organizations#org-inquiries");
     await expect(page.getByRole("heading", { name: "Public job inquiries" })).toBeVisible();
-    await tabs.getByRole("tab", { name: /Publishing/ }).click();
+    await tabs.getByRole("tab", { name: /Opportunities/ }).click();
     await expect(page.getByRole("heading", { name: "Public job inquiries" })).toHaveCount(0);
     await tabs.getByRole("tab", { name: /^Organization/ }).click();
     await expect(page.getByRole("heading", { name: "Organization details and verification" })).toBeVisible();
@@ -276,8 +276,8 @@ test.describe("MPA organization app entry and navigation", () => {
     await dismissPrivacyChoices(page);
     const tabs = page.getByRole("tablist", { name: "Organization workspace folders" });
     await expect(tabs.getByRole("tab")).toHaveCount(2);
-    await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
-    await expect(tabs.getByRole("tab", { name: /Reviewing/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /Opportunities/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /Applications/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /^Organization\b/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /Discover/ })).toBeVisible();
   });
@@ -286,8 +286,8 @@ test.describe("MPA organization app entry and navigation", () => {
     await mockOrganizationApi(page, [organization({ role_code: "recruiter" })]);
     await page.goto("/organizations");
     await dismissPrivacyChoices(page);
-    await expect(page.getByRole("tab", { name: /Publishing/ })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /Reviewing/ })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /Opportunities/ })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /Applications/ })).toBeVisible();
     await expect(page.getByRole("tab", { name: /^Organization\b/ })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Job" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Professional service" })).toBeVisible();
@@ -299,10 +299,10 @@ test.describe("MPA organization app entry and navigation", () => {
     await page.goto("/organizations");
     await dismissPrivacyChoices(page);
     const tabs = page.getByRole("tablist", { name: "Organization workspace folders" });
-    await expect(tabs.getByRole("tab")).toHaveCount(3);
+    await expect(tabs.getByRole("tab")).toHaveCount(2);
     await expect(tabs.getByRole("tab", { name: /Impact/ })).toBeVisible();
-    await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
-    await expect(tabs.getByRole("tab", { name: /Reviewing/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /Opportunities/ })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: /Applications/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /^Organization\b/ })).toHaveCount(0);
   });
 

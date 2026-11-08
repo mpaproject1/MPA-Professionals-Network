@@ -4,8 +4,8 @@ import test from "node:test";
 import { buildEthiopiaAdministrativeRows } from "../../scripts/lib/ethiopia-geography-reference.js";
 import {
   applyMemberGeographyImport,
-  getMemberGeographySummary,
   exportPublishedMemberGeography,
+  getMemberGeographySummary,
   getMyResidence,
   listMemberGeography,
   memberGeographyImportTemplate,

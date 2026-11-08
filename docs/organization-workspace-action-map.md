@@ -29,7 +29,7 @@ Draft recovery is tied to the signed-in account email, expires after 24 hours, a
 | Applications | `/recruitment#candidate-pipeline`, `/organizations#org-inquiries` | Candidate review and public inquiry decisions remain distinct |
 | Discover | `/network`, `/network-plus`, `/organizations/directory`, `/service-demand`, `/mentorship` | Existing access checks in each destination remain authoritative |
 | Impact | `/organizations/reports` | Existing role and endpoint authorization remain authoritative |
-| Organization | `/organizations/team`, `/organizations#org-registration`, `/organizations#org-evidence` | Owner/administrator-only folder and evidence controls; the current registration UI does not expose an edit-existing-legal-profile API |
+| Organization | `/organizations/team`, `/organizations#org-registration`, `/organizations#org-evidence` | Owner/administrator-only folder and evidence controls; the current organization page does not expose an edit-existing-profile action |
 
 The Overview dashboard is the landing view; its five role-filtered workspace destinations are Opportunities, Applications, Discover, Impact and Organization. The former Connections actions are preserved within Discover. The organization selector passes the selected organization context to supported destinations using the existing `organizationId` query parameter.
 

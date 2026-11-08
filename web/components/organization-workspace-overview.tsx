@@ -409,7 +409,7 @@ export function OrganizationWorkspaceOverview({
                 </ol>
                 <p>{status.detail}</p>
                 {organization.verification_decision_reason ? <p className={styles.reviewNote}><strong>Reviewer feedback:</strong> {organization.verification_decision_reason}</p> : null}
-                {(organization.missing_evidence || []).length > 0 && status.tone !== "pending" ? <p className={styles.reviewNote}><strong>Outstanding:</strong> {(organization.missing_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ")}</p> : null}
+                {((organization.missing_evidence || []).length > 0 || (organization.required_evidence || []).length > 0) && status.tone !== "pending" ? <p className={styles.reviewNote}><strong>Outstanding:</strong> {(organization.missing_evidence || (organization.required_evidence || []).filter((item) => !(organization.verification_evidence || []).some((evidence) => evidence.evidenceType === item))).map((item) => item.replaceAll("_", " ")).join(", ") || "No outstanding items reported"}</p> : null}
                 {VERIFICATION_MANAGER_ROLES.includes(organization.role_code || "") && status.tone !== "pending" && status.tone !== "verified" ? <Link className="btn btn-primary" href="/organizations#org-evidence">{status.tone === "attention" && organization.verification_case_status === "correction_required" ? "Update requested evidence" : organization.verification_case_status === "rejected" ? "Review decision and evidence" : "Complete verification checklist"}</Link> : null}
               </article>
             );

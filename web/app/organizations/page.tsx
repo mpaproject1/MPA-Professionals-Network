@@ -651,7 +651,8 @@ export default function Organizations() {
                     { step: 1, label: "Identity" },
                     { step: 2, label: "Contact" },
                     { step: 3, label: "Documents" },
-                    { step: 4, label: "Review" },\n                    { step: 5, label: "Track" },
+                    { step: 4, label: "Review" },
+                    { step: 5, label: "Track" },
                   ].map((item) => (
                     <li key={item.step} className={registrationStep === item.step ? "is-current" : registrationStep > item.step ? "is-complete" : ""}>
                       <button type="button" onClick={() => {

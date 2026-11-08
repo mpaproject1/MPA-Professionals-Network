@@ -211,14 +211,14 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(tabs.getByRole("tab")).toHaveCount(2);
     await expect(tabs.getByRole("tab", { name: /Opportunities/ })).toHaveCount(0);
     await organizationSwitcher.selectOption("org-e2e-1");
-    await expect(tabs.getByRole("tab")).toHaveCount(6);
-    await tabs.getByRole("tab", { name: "Publishing" }).click();
+    await expect(tabs.getByRole("tab")).toHaveCount(5);
+    await tabs.getByRole("tab", { name: "Opportunities" }).click();
     await page.getByRole("button", { name: "Professional service" }).click();
     await expect(page.getByRole("link", { name: /Continue/ })).toHaveAttribute("href", "/services?organizationId=org-e2e-1");
     await page.getByRole("button", { name: "Mentorship" }).click();
     await expect(page.getByRole("link", { name: /Continue/ })).toHaveAttribute("href", "/mentorship?organizationId=org-e2e-1");
     await page.getByRole("button", { name: "Job" }).click();
-    const publishing = tabs.getByRole("tab", { name: /Publishing/ });
+    const publishing = tabs.getByRole("tab", { name: /Opportunities/ });
     const reviewing = tabs.getByRole("tab", { name: /Applications/ });
     await publishing.focus();
     await expect(publishing).toBeFocused();
@@ -231,14 +231,14 @@ test.describe("MPA organization app entry and navigation", () => {
     await reports.press("Enter");
     await expect(reports).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tabpanel").getByRole("link", { name: /Impact and outcomes/ })).toHaveAttribute("href", "/organizations/reports?organizationId=org-e2e-1");
-    await tabs.getByRole("tab", { name: /Reviewing/ }).click();
+    await tabs.getByRole("tab", { name: /Applications/ }).click();
     await page.getByRole("button", { name: "Public inquiries" }).click();
     await expect(page.getByRole("link", { name: /Open review/ })).toHaveAttribute("href", "/organizations#org-inquiries");
     await expect(page.getByRole("heading", { name: "Public job inquiries" })).toBeVisible();
     await tabs.getByRole("tab", { name: /Publishing/ }).click();
     await expect(page.getByRole("heading", { name: "Public job inquiries" })).toHaveCount(0);
     await tabs.getByRole("tab", { name: /^Organization/ }).click();
-    await expect(page.getByRole("heading", { name: "Organization registration" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Organization details and verification" })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
@@ -270,19 +270,19 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByText("Active pipeline", { exact: true })).toHaveCount(0);
   });
 
-  test("read-only organization members do not see publishing, reviewing or team-administration folders", async ({ page }) => {
+  test("read-only organization members do not see opportunity, application or team-administration workspaces", async ({ page }) => {
     await mockOrganizationApi(page, [organization({ role_code: "read_only" })]);
     await page.goto("/organizations");
     await dismissPrivacyChoices(page);
     const tabs = page.getByRole("tablist", { name: "Organization workspace folders" });
-    await expect(tabs.getByRole("tab")).toHaveCount(3);
+    await expect(tabs.getByRole("tab")).toHaveCount(2);
     await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /Reviewing/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /^Organization\b/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /Discover/ })).toBeVisible();
   });
 
-  test("recruiter role sees recruitment publishing and reviewing but not mentorship or team administration", async ({ page }) => {
+  test("recruiter role sees permitted opportunities and application workspaces but not mentorship offers or team administration", async ({ page }) => {
     await mockOrganizationApi(page, [organization({ role_code: "recruiter" })]);
     await page.goto("/organizations");
     await dismissPrivacyChoices(page);
@@ -300,7 +300,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await dismissPrivacyChoices(page);
     const tabs = page.getByRole("tablist", { name: "Organization workspace folders" });
     await expect(tabs.getByRole("tab")).toHaveCount(3);
-    await expect(tabs.getByRole("tab", { name: /Reports/ })).toBeVisible();
+    await expect(tabs.getByRole("tab", { name: /Impact/ })).toBeVisible();
     await expect(tabs.getByRole("tab", { name: /Publishing/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /Reviewing/ })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: /^Organization\b/ })).toHaveCount(0);

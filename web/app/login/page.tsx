@@ -78,5 +78,35 @@ export default function Login(){
    catch(err){setError(err instanceof Error?err.message:"Could not request a verification link.");}
    finally{setBusy(false);}
  }
- return <div className="auth-page"><Card><div className="eyebrow">Welcome back</div><h1 className="h1">Login to your MPA workspace</h1><p className="muted">Continue applications, membership, opportunities and partner work from where you stopped.</p><form onSubmit={recoveryMode?recover:submit} className="form-stack" aria-busy={busy||passkeyBusy}><fieldset disabled={busy||passkeyBusy} style={{border:0,padding:0,margin:0,minWidth:0,display:"grid",gap:12}}><label>Email or username<input required type="text" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" placeholder="you@example.org or your username"/></label>{!recoveryMode&&<><label>Password<input required type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password"/></label>{error&&<div className="form-error" role="alert">{error}</div>}<button type="submit" className="btn btn-primary" disabled={busy}>{busy?"Signing in securely…":"Login with password"} <LogIn size={16}/></button><button type="button" className="btn btn-ghost" onClick={()=>void signInWithPasskey()} disabled={passkeyBusy||busy||!email.trim()}><Fingerprint size={16}/>{passkeyBusy?"Waiting for device verification…":"Sign in with administrator passkey"}</button><button type="button" className="btn btn-ghost" onClick={()=>void resendVerification()} disabled={busy||!email.includes("@")}>Resend email verification link</button><button type="button" className="btn btn-ghost" onClick={()=>{setRecoveryMode(true);setError("");}}>Use a passkey recovery code</button></>}{recoveryMode&&<><label>One-time recovery code<input required value={recoveryCode} onChange={e=>setRecoveryCode(e.target.value)} autoComplete="one-time-code" spellCheck={false}/></label>{error&&<div className="form-error" role="alert">{error}</div>}<p className="muted">Recovery codes create a restricted session only for registering a replacement administrator passkey. They do not grant normal administrator access by themselves.</p><button type="submit" className="btn btn-primary" disabled={busy}>{busy?"Checking recovery code…":"Recover passkey access"} <KeyRound size={16}/></button><button type="button" className="btn btn-ghost" onClick={()=>{setRecoveryMode(false);setError("");}}>Back to login</button></>}</fieldset></form><section className="auth-register-cta" aria-labelledby="register-prompt-title"><div className="auth-register-cta__copy"><span className="auth-register-cta__eyebrow">New to MPA?</span><h2 id="register-prompt-title">Don’t have an account yet?</h2><p>Create your account to get started with the Muslim Professionals Association network.</p></div><Link className="auth-register-button" href="/register"><UserRoundPlus size={19} aria-hidden="true"/> Apply / Create an account <ArrowRight size={18} aria-hidden="true"/></Link></section><div className="footer-note"><ShieldCheck size={15}/> Administrator passkeys require device verification and are checked by the server.</div><div className="auth-links"><a href="/track">Track an existing application</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/cookies">Cookies</a></div></Card><div className="auth-note"><ShieldCheck size={20} color="var(--primary)"/><span><b>Amanah · Trust</b><br/>Your private evidence is not exposed through public profile views.</span></div></div>;
+ return <main className="auth-page auth-login-page">
+  <section className="auth-login-card" aria-labelledby="login-title">
+   <div className="auth-login-glow" aria-hidden="true"/>
+   <div className="auth-login-brand"><span className="auth-login-mark"><ShieldCheck size={17}/></span><span>MPA <i>·</i> PROFESSIONALS NETWORK</span><span className="auth-login-secure"><span/> SECURE ACCESS</span></div>
+   <div className="auth-login-heading"><div className="eyebrow">MEMBER ACCESS</div><h1 id="login-title">{recoveryMode?"Recover access":"Welcome back"}</h1><p>{recoveryMode?"Verify your recovery code to register a replacement administrator passkey.":"Sign in to continue to your MPA workspace."}</p></div>
+   <form onSubmit={recoveryMode?recover:submit} className="form-stack auth-login-form" aria-busy={busy||passkeyBusy}>
+    <fieldset disabled={busy||passkeyBusy} style={{border:0,padding:0,margin:0,minWidth:0,display:"grid",gap:11}}>
+     <label>Email or username<input required type="text" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" placeholder="you@example.org or username"/></label>
+     {!recoveryMode&&<>
+      <label>Password<input required type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" placeholder="Enter your password"/></label>
+      {error&&<div className="form-error" role="alert">{error}</div>}
+      <button type="submit" className="btn btn-primary auth-login-submit" disabled={busy}>{busy?"Signing in…":"Sign in"} <LogIn size={16}/></button>
+      <div className="auth-login-tools">
+       <button type="button" className="btn btn-ghost" onClick={()=>void signInWithPasskey()} disabled={passkeyBusy||busy||!email.trim()}><Fingerprint size={15}/>{passkeyBusy?"Verifying…":"Passkey"}</button>
+       <button type="button" className="btn btn-ghost" onClick={()=>void resendVerification()} disabled={busy||!email.includes("@")}>Resend verification</button>
+       <button type="button" className="btn btn-ghost" onClick={()=>{setRecoveryMode(true);setError("");}}>Recovery code</button>
+      </div>
+     </>}
+     {recoveryMode&&<>
+      <label>One-time recovery code<input required value={recoveryCode} onChange={e=>setRecoveryCode(e.target.value)} autoComplete="one-time-code" spellCheck={false}/></label>
+      {error&&<div className="form-error" role="alert">{error}</div>}
+      <button type="submit" className="btn btn-primary auth-login-submit" disabled={busy}>{busy?"Checking code…":"Recover access"} <KeyRound size={16}/></button>
+      <button type="button" className="btn btn-ghost" onClick={()=>{setRecoveryMode(false);setError("");}}>Back to sign in</button>
+     </>}
+    </fieldset>
+   </form>
+   {!recoveryMode&&<div className="auth-login-register"><span>New to MPA?</span><Link href="/register">Create an account <ArrowRight size={15}/></Link></div>}
+   <div className="auth-login-foot"><ShieldCheck size={14}/><span>Protected sign-in · Your private evidence stays private.</span></div>
+   <div className="auth-links"><a href="/track">Track application</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
+  </section>
+ </main>;
 }

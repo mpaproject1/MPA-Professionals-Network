@@ -115,7 +115,7 @@ test("membership workspace still loads the canonical ID and plan when the separa
  await page.route("**/api/v1/me",route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({error:{code:"TEMPORARY_FAILURE",message:"Account summary temporarily unavailable."}})}));
  await page.route("**/api/v1/membership/card",route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:card})}));
  await page.goto("/membership");
- await expect(page.getByText("Your membership is active")).toBeVisible();
+ await expect(page.getByRole("heading",{name:"Your membership is active",exact:true})).toBeVisible();
  await expect(page.getByText("MPA-2026-99AA11BB")).toBeVisible();
  await expect(page.getByText("Lifetime",{exact:true})).toBeVisible();
  await expect(page.getByRole("link",{name:/View \/ download membership ID/i})).toBeVisible();

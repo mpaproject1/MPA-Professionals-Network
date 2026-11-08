@@ -1,7 +1,7 @@
 "use client";
-import {ArrowRight, ArrowUpRight, BriefcaseBusiness, Building2, CheckCircle2, ClipboardCopy, ClipboardList, Clock3, FileCheck2, LayoutDashboard, LogOut, RefreshCw, ShieldCheck, UserRound, UsersRound, WalletCards} from "lucide-react";
+import {ArrowRight, ArrowUpRight, BriefcaseBusiness, Building2, CheckCircle2, ClipboardCopy, ClipboardList, Clock3, FileCheck2, LayoutDashboard, LogOut, ShieldCheck, UserRound, UsersRound, WalletCards} from "lucide-react";
 import {useRouter} from "next/navigation";
-import {useEffect, useId, useState} from "react";
+import {useCallback, useEffect, useId, useState} from "react";
 import {OperationStatus} from "../../components/operation-status";
 import {Badge} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
@@ -46,7 +46,7 @@ export default function Dashboard(){
 
   async function copyReference(value:string){const ref=String(value||"").trim();if(!ref){setCopyNotice("A display reference has not been assigned yet.");return;}try{await navigator.clipboard.writeText(ref);setCopyNotice("Reference copied to clipboard.");}catch{setCopyNotice("Clipboard access is unavailable. Select the reference and copy it manually.");}}
 
-  async function load(){
+  const load=useCallback(async function load(){
     if(!token)return;
     setLoading(true);setError("");
     try{
@@ -160,9 +160,9 @@ export default function Dashboard(){
       }
 
       setData({profile,tracking,outcomes,organizations,reviewQueues,memberClarity,errors});
-    }catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"We could not load your dashboard. Please retry.");}
+    }catch(e){setError(e instanceof ApiError?e.message:e instanceof Error?e.message:"We could not load your dashboard. Please sign in again or contact support.");}
     finally{setLoading(false);}
-  }
+  },[token]);
 
   useEffect(()=>{if(hydrated&&token)void load();else if(hydrated)setData(null);},[token, hydrated, load]);
 
@@ -245,8 +245,8 @@ export default function Dashboard(){
       <div className={styles.roleRow}>{roleNames.length?roleNames.map(role=><Badge key={role} tone="slate">{role}</Badge>):<Badge tone="slate">Account user</Badge>}{data?.organizations.length?<Badge tone="slate">{data.organizations.length} organization {data.organizations.length===1?"scope":"scopes"}</Badge>:null}<Badge>{profile?.status||"Loading account"}</Badge></div>
     </header>
 
-    {error&&<div className="form-error" role="alert">{error} <button className="btn btn-ghost" type="button" onClick={()=>void load()} disabled={loading}>Retry</button></div>}
-    {data?.errors.length? <div className={styles.partial} aria-live="polite" aria-atomic="true"><span>Some dashboard sections could not be refreshed: {data.errors.join(", ")}.</span><button className="btn btn-ghost" type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/> Retry</button></div>:null}
+    {error&&<div className="form-error" role="alert">{error}</div>}
+    {data?.errors.length? <div className={styles.partial} aria-live="polite" aria-atomic="true"><span>Some dashboard sections could not be loaded: {data.errors.join(", ")}. Open the relevant workspace for details.</span></div>:null}
 
     <section className={styles.metrics} aria-label="Workspace overview">
       <div><span>Applications</span><strong>{data?.tracking?.summary?.total??"—"}</strong><small>{data?.tracking?.summary?.active??0} in progress</small></div>
@@ -264,7 +264,7 @@ export default function Dashboard(){
     <div className={styles.columns}>
       <div className={styles.primaryColumn}>
         <section className={styles.section}>
-          <div className={styles.sectionHeading}><div><div className={styles.kicker}>Priorities</div><h2>Needs your attention</h2></div><button className="btn btn-ghost" type="button" onClick={()=>void load()} disabled={loading} aria-busy={loading} aria-label={loading?"Checking your priorities":"Check latest priorities"}><RefreshCw size={15}/>{loading?"Checking priorities…":"Check latest priorities"}</button></div>
+          <div className={styles.sectionHeading}><div><div className={styles.kicker}>Priorities</div><h2>Needs your attention</h2></div></div>
           {loading&&!data?<OperationStatus state="loading" title="Loading your dashboard" detail="We’re gathering your applications, assigned reviews and organization access. No records are being changed." />:null}
           {attentionItems.length>0&&<div className={styles.rows}>{attentionItems.slice(0,5).map(item=><a className={styles.activity} href={trackingHref(item.type)} key={item.type+item.id}><span className={styles.activityIcon}><Clock3 size={17}/></span><span className={styles.activityBody}><b>{item.title}</b><small>{item.nextAction}</small></span><Badge tone="gold">{item.statusLabel||humanStatus(item.status)}</Badge><ArrowUpRight size={16}/></a>)}</div>}
           {reviewCount>0&&<div className={styles.rows} aria-label="Unified review queue">{visibleAssignedItems.map(item=><div className={styles.activity} key={item.queueLabel+item.id}><span className={styles.activityIcon}><ShieldCheck size={17}/></span><span className={styles.activityBody}><b>{item.title}</b><small>{item.queueLabel} · {item.reason}</small><small><b>Next action:</b> {item.action}</small><small><b>History:</b> {item.history}</small><small><b>Deadline:</b> {item.deadline?new Date(item.deadline).toLocaleString():"No deadline recorded"}{item.updatedAt?` · Last updated ${new Date(item.updatedAt).toLocaleDateString()}`:""}</small></span><span className={styles.activityBody}><Badge tone={item.priority==="Urgent"?"gold":item.priority==="High"?"gold":"slate"}>{item.priority} priority</Badge><Badge tone="slate">{item.status.replaceAll("_"," ")}</Badge><a className={styles.secondaryLink} href={item.href}>Open authorized workspace <ArrowUpRight size={14}/></a></span></div>)}</div>}
@@ -287,7 +287,7 @@ export default function Dashboard(){
           </div>
           {data?.memberClarity?.applications.some(a=>a.status==="correction_required")&&<div className={styles.partial} aria-live="polite" aria-atomic="true"><b>Next action:</b> open Membership, read the requested correction, attach any missing evidence and submit your response.</div>}
           {data?.memberClarity?.cases.some(row=>row.status==="consent_pending")&&<div className={styles.partial} aria-live="polite" aria-atomic="true"><b>Next action:</b> open Verification and give consent for the case you want reviewed.</div>}
-          <p className={styles.muted}>The information above is based on records returned for your account. If a section failed to load, use its link and retry; a missing result is not proof that a claim or payment was rejected.</p>
+          <p className={styles.muted}>The information above is based on records returned for your account. If a section is unavailable, open its workspace for the latest available details. A missing result is not proof that a claim or payment was rejected.</p>
         </section>}
         <section className={styles.section}>
           <div className={styles.sectionHeading}><div><div className={styles.kicker}>Your activity</div><h2>Recent applications</h2></div><a className="btn btn-ghost" href="/track">View all <ArrowRight size={15}/></a></div>{copyNotice&&<p className={styles.muted} role="status" aria-live="polite">{copyNotice}</p>}

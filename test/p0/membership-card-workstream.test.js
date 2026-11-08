@@ -152,5 +152,5 @@ test("membership API failures are shown as unknown status, never as an inactive 
   assert.match(membershipWorkspace,/Do not submit a duplicate membership application/);
   assert.match(membershipWorkspace,/Status unavailable/);
   assert.match(membershipWorkspace,/We could not confirm your current membership status/);
-  assert.match(membershipWorkspace,/!\s*membershipStatusUnavailable\s*&&\s*!\s*hasActiveMembership/);
+  assert.match(membershipWorkspace,/!membershipStatusUnavailable\s*&&\s*!membershipPaymentVerificationRequired/);
 });

@@ -637,7 +637,7 @@ export default function Organizations() {
             </div>
             <div className="org-journey-intro">
               <span className="eyebrow">Guided organization setup</span>
-              <p>Complete your organization's identity, representative contact and private evidence. MPA verification is a separate review decision.</p>
+              <p>Complete your organization's identity, institutional contact and private evidence. MPA verification is a separate review decision.</p>{organizations.length > 0 && organizations.every((org) => org.verification_status === "verified") ? <p className="muted">Existing verified legal details are read-only in this workspace; an edit-existing-profile action is not currently exposed here.</p> : null}
             </div>
             <button className="btn btn-primary" type="button" onClick={() => { const opening = !showForm; setShowForm(opening); setError(""); setNotice(""); if (opening && organizations.some((org) => org.verification_status !== "verified")) { const target = organizations.find((org) => org.verification_status !== "verified")!; setRegistrationStep(missingEvidenceFor(target).length ? 3 : 4); setEvidenceOrg(target.id); } else if (opening && organizations.length && organizations.every((org) => org.verification_status === "verified")) { setForm(blank); setOrganizationTypeChoice(""); setRegistrationStep(1); setRegistrationCreated(false); } }}>
               {showForm ? "Close guided setup" : organizations.some((org) => org.verification_status !== "verified") ? "Continue organization setup" : organizations.length ? "Register another organization" : "Start organization registration"}

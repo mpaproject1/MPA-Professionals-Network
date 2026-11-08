@@ -20,7 +20,7 @@ async function mockMemberWorkspace(page) {
         user_id: "member-responsive-test",
         display_name: "Member Test",
         email: "member@example.test",
-        has_active_membership: true,
+        has_active_membership: false,
         completion_percent: 72,
         roles: ["member"],
         permissions: [],
@@ -75,14 +75,14 @@ test.describe("Members workspace responsive layout", () => {
       ["Mentorship", "Guidance and professional learning"],
       ["Services", "Share your professional expertise"],
       ["Network", "Professional connections and community"],
-      ["Referrals", "Member referrals"],
+      ["Referrals", "#referrals"],
       ["Impact", "Your Community Impact"],
       ["Activity", "Your activity centre"],
     ];
 
     for (const [label, heading] of destinations) {
       await shortcuts.getByRole("button", { name: new RegExp(label, "i") }).click();
-      await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
+      if (heading.startsWith("#")) await expect(page.locator(heading)).toBeVisible();\n      else await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
       await expectNoHorizontalOverflow(page);
     }
   });

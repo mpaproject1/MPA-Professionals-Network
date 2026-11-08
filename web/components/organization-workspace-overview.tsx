@@ -500,6 +500,9 @@ export function OrganizationWorkspaceOverview({
                 ))}
               </div>
             )}
+            {activeFolder.key === "reports" ? (
+              <p className={styles.activityEmpty}>Organization-scoped volunteer drives and skill dispatch are not implemented as a verified workflow yet. Use the available professional service and mentorship workflows instead.</p>
+            ) : null}
           </section>
         </>
       )}

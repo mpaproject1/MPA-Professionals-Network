@@ -77,7 +77,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
     await page.getByRole("button", { name: "Register your organization" }).click();
     await expect(page.getByRole("heading", { name: "Tell us about your organization" })).toBeVisible();
-    await expect(page.getByRole("list", { name: "Organization onboarding" }).getByRole("listitem")).toHaveCount(4);
+    await expect(page.getByRole("list", { name: "Organization onboarding" }).getByRole("listitem")).toHaveCount(5);
   });
 
   test("guided registration advances one step at a time and saves a signed-in account draft", async ({ page }) => {
@@ -151,6 +151,9 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByText("Under review").first()).toBeVisible();
     await expect(page.getByText(/awaiting an authorized MPA review/)).toBeVisible();
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Continue organization setup" }).click();
+    await expect(page.getByRole("heading", { name: "Track your MPA verification" })).toBeVisible();
+    await expect(page.getByText(/awaiting review/i).first()).toBeVisible();
   });
 
   test("case actively in review remains locked against resubmission", async ({ page }) => {

@@ -7,7 +7,7 @@
  .controls,.previewHeader,.skipped,.printNote{display:none!important}
  .previewSection{display:block!important;position:static!important;width:210mm!important;height:auto!important;margin:0!important;padding:0!important}
  .printStack{display:block!important;width:210mm!important;margin:0!important;padding:0!important}
- .printPage{width:210mm;height:297mm;min-height:297mm;box-sizing:border-box;padding:0;margin:0;border:0;border-radius:0;background:#fff;display:grid;place-items:center;break-after:page;page-break-after:always;break-inside:avoid}
- .printPage:last-child{break-after:auto;page-break-after:auto}
+ .printPage{width:210mm;height:296mm;min-height:296mm;max-height:296mm;box-sizing:border-box;padding:0;margin:0;border:0;border-radius:0;background:#fff;display:grid;place-items:center;break-after:auto;page-break-after:auto;break-inside:avoid;page-break-inside:avoid}
+ .printPage+.printPage{break-before:page;page-break-before:always}
  .card{box-shadow:none;border-radius:0;print-color-adjust:exact;-webkit-print-color-adjust:exact}
 }

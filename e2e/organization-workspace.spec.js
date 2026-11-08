@@ -237,6 +237,13 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("heading", { name: "Public job inquiries" })).toBeVisible();
     await tabs.getByRole("tab", { name: /Opportunities/ }).click();
     await expect(page.getByRole("heading", { name: "Public job inquiries" })).toHaveCount(0);
+    await tabs.getByRole("tab", { name: /Discover/ }).click();
+    const discoverPanel = page.getByRole("tabpanel");
+    await expect(discoverPanel.getByRole("link", { name: /Professional network/ })).toHaveAttribute("href", "/network");
+    await expect(discoverPanel.getByRole("link", { name: /Network-Plus/ })).toHaveAttribute("href", "/network-plus");
+    await expect(discoverPanel.getByRole("link", { name: /Organization directory/ })).toHaveAttribute("href", "/organizations/directory");
+    await expect(discoverPanel.getByRole("link", { name: /Serve-Community requests/ })).toHaveAttribute("href", "/service-demand");
+    await expect(discoverPanel.getByRole("link", { name: /Mentorship network/ })).toHaveAttribute("href", "/mentorship");
     await tabs.getByRole("tab", { name: /^Organization/ }).click();
     await expect(page.getByRole("heading", { name: "Organization details and verification" })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });

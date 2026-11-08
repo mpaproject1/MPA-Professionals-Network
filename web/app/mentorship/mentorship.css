@@ -27,3 +27,7 @@
  .mpa-mentorship-page{padding-bottom:calc(124px + env(safe-area-inset-bottom))}
 }
 @media(prefers-reduced-motion:reduce){.mpa-mentorship-page .mentorship-commandbar__nav button,.mpa-mentorship-page .mentorship-mobile-nav button{transition:none}}
+
+/* Preserve each panel's original layout mode when it becomes active. */
+.mpa-mentorship-page .grid[data-workspace-panel]{display:grid!important}
+.mpa-mentorship-page .row[data-workspace-panel]{display:flex!important}

@@ -13,7 +13,7 @@ async function mockMemberWorkspace(page) {
   });
 
   await page.route("**/api/v1/**", async route => {
-    const path = new URL(route.request().url()).pathname.replace(/\\/+$/, "");
+    const path = new URL(route.request().url()).pathname.replace(/\/+$/, "");
     let data = [];
     if (path === "/api/v1/me") {
       data = {
@@ -82,7 +82,11 @@ test.describe("Members workspace responsive layout", () => {
 
     for (const [label, heading] of destinations) {
       await shortcuts.getByRole("button", { name: new RegExp(label, "i") }).click();
-      if (heading.startsWith("#")) await expect(page.locator(heading)).toBeVisible();\n      else await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
+      if (heading.startsWith("#")) {
+        await expect(page.locator(heading)).toBeVisible();
+      } else {
+        await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
+      }
       await expectNoHorizontalOverflow(page);
     }
   });

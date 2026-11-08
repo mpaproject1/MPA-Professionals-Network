@@ -25,7 +25,7 @@ type Organization = {
   tracking_reference?: string;
   verification_submitted_at?: string | null;
   verification_decision_reason?: string | null;
-  missing_evidence?: string[];
+  missing_evidence?: string[];\n  required_evidence?: string[];\n  verification_evidence?: { evidenceType: string }[];
 };
 
 type OrganizationOutcomes = {

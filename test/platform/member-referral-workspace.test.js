@@ -30,7 +30,10 @@ test("referral activity separates membership and employment milestones", () => {
     assert.ok(component.includes(status), "missing employment milestone " + status);
   }
   assert.match(component, /item\.referral_type === "employment"/);
-  assert.match(component, /item\.referral_type === "membership"/);
+  assert.match(component, /const registrations = countFor\("membership"\)/);
+  assert.match(component, /const activeMembers = countFor\("membership", \["membership_activated"\]\)/);
+  assert.match(component, /const verifiedEmployment = countFor\("employment", \["employment_verified"\]\)/);
+  assert.match(component, /item\.referral_type === "employment" \? "Employment referral" : "Membership referral"/);
 });
 
 test("member-visible referral identities remain consent-gated by the existing service", () => {

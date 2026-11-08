@@ -84,7 +84,8 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
     if(meResult.error||!meResult.value){
      if(cardResult.value){
       setHasActiveMembership(true);setMembershipStatusUnavailable(false);setMembershipPaymentVerificationRequired(false);setMembershipCard(cardResult.value);setMembershipCardError("");
-      setAccountIdentity(current=>({...current,displayName:current.displayName||cardResult.value!.memberName}));
+      const cardMemberName=cardResult.value?.memberName;
+      if(cardMemberName)setAccountIdentity(current=>({...current,displayName:current.displayName||cardMemberName}));
      }else{
       setHasActiveMembership(false);setMembershipStatusUnavailable(true);setMembershipPaymentVerificationRequired(false);setMembershipCard(null);
       setMembershipCardError(cardResult.error instanceof ApiError?cardResult.error.message:"Your membership card could not be confirmed.");

@@ -387,9 +387,11 @@ test("organization workspace uses state-aware onboarding and exposes only suppor
     source("../../server.js"),
     source("../../src/platform/stakeholder-outcomes.js"),
   ]);
-  assert.ok(page.includes("Step 1 — Entity profile"));
-  assert.ok(page.includes("Step 2 — Institutional contact"));
-  assert.ok(page.includes("Step 3 — Upload evidence for Tabayyun review"));
+  assert.ok(page.includes("Step 1 of 5 · Identity"));
+  assert.ok(page.includes("Step 2 of 5 · Institutional contact"));
+  assert.ok(page.includes("Step 3 of 5 · Documents"));
+  assert.ok(page.includes("Step 4 of 5 · Review"));
+  assert.ok(page.includes("Step 5 of 5 · Tracking"));
   assert.ok(page.includes("setEvidenceOrg(created.id)"), "new registrations must carry their own organization into the evidence step");
   assert.ok(page.includes("verification_status === \"verified\""), "publishing links must depend on returned verification state");
   assert.ok(overview.includes("/recruitment"));

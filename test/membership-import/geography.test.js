@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
+import { buildEthiopiaAdministrativeRows } from "../../scripts/lib/ethiopia-geography-reference.js";
 import {
   applyMemberGeographyImport,
   getMemberGeographySummary,
@@ -15,7 +16,6 @@ import {
 import * as membership from "../../src/membership/service.js";
 import { getPool } from "../../src/platform/db.js";
 import { createXlsx, parseXlsxRows } from "../../src/platform/xlsx.js";
-import { buildEthiopiaAdministrativeRows } from "../../scripts/lib/ethiopia-geography-reference.js";
 
 const admin={sub:"system-admin",roles:["system_admin"],permissions:[]};
 const member={sub:"member-user",roles:["member"],permissions:[]};

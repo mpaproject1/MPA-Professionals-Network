@@ -542,6 +542,15 @@ export default function Organizations() {
   }
   async function submitVerification(org: Organization) {
     if (!token) return;
+    const caseState = org.verification_case_status || org.verification_status || "draft";
+    if (["submitted", "in_review", "pending", "verified"].includes(caseState) || org.verification_status === "pending" || org.verification_status === "verified") {
+      setNotice("This organization is already awaiting or has completed an MPA decision. No duplicate submission was made.");
+      return;
+    }
+    if (missingEvidenceFor(org).length > 0) {
+      setError("Complete the required private evidence checklist before submitting for verification.");
+      return;
+    }
     setError("");
     setNotice("");
     try {
@@ -630,7 +639,7 @@ export default function Organizations() {
               <span className="eyebrow">Guided organization setup</span>
               <p>Complete your organization's identity, representative contact and private evidence. MPA verification is a separate review decision.</p>
             </div>
-            <button className="btn btn-primary" type="button" onClick={() => { const opening = !showForm; setShowForm(opening); setError(""); setNotice(""); if (opening && organizations.length) { setRegistrationStep(3); setEvidenceOrg(organizations.find((org) => org.verification_status !== "verified")?.id || ""); } }}>
+            <button className="btn btn-primary" type="button" onClick={() => { const opening = !showForm; setShowForm(opening); setError(""); setNotice(""); if (opening && organizations.some((org) => org.verification_status !== "verified")) { setRegistrationStep(3); setEvidenceOrg(organizations.find((org) => org.verification_status !== "verified")?.id || ""); } else if (opening && organizations.length && organizations.every((org) => org.verification_status === "verified")) { setForm(blank); setOrganizationTypeChoice(""); setRegistrationStep(1); setRegistrationCreated(false); } }}>
               {showForm ? "Close guided setup" : organizations.length ? "Continue organization setup" : "Start organization registration"}
             </button>
             {showForm && (

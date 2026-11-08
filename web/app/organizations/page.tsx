@@ -628,7 +628,7 @@ export default function Organizations() {
           <Card id="org-registration">
             <div className="row">
               <div>
-                <h2 className="h2">Organization registration</h2>
+                <h2 className="h2">{organizations.some((org) => org.verification_status === "verified") ? "Organization profile and verification" : "Register your organization"}</h2>
                 <p className="muted">
                   Legal identity, organization type and contact information.
                 </p>
@@ -647,7 +647,7 @@ export default function Organizations() {
                 <ol className="org-stepper-track">
                   {[
                     { step: 1, label: "Identity" },
-                    { step: 2, label: "Representative" },
+                    { step: 2, label: "Contact" },
                     { step: 3, label: "Documents" },
                     { step: 4, label: "Review" },
                   ].map((item) => (
@@ -681,8 +681,8 @@ export default function Organizations() {
                   </form>
                 ) : registrationStep === 2 ? (
                   <form className="form-stack org-step-panel" onSubmit={register}>
-                    <span className="eyebrow">Step 2 of 4 · Representative</span>
-                    <h3 className="h2">How can MPA contact your organization?</h3>
+                    <span className="eyebrow">Step 2 of 4 · Institutional contact</span>
+                    <h3 className="h2">Add an official institutional contact</h3>
                     <p className="muted">Provide an official institutional contact channel that you are authorized to represent. Creating a registration draft does not verify the institution or unlock publishing.</p>
                     <label>Institutional email<input type="email" required maxLength={254} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>
                     <label>Official contact phone <span className="muted">(optional)</span><input type="tel" maxLength={40} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></label>
@@ -767,7 +767,7 @@ export default function Organizations() {
                           : "Build trust by completing the required evidence checklist and submitting it for review."}
                   </p>
                   {org.verification_decision_reason&&<p aria-live="polite" aria-atomic="true"><b>Latest review note:</b> {org.verification_decision_reason}</p>}
-                  {(org.missing_evidence||[]).length>0&&org.verification_case_status!=="submitted"&&org.verification_case_status!=="in_review"&&org.verification_case_status!=="pending"&&org.verification_status!=="pending"&&<div className="form-error" aria-live="polite" aria-atomic="true"><b>Still needed:</b> {(org.missing_evidence||[]).map(item=>item.replaceAll("_"," ")).join(", ")}. Upload these documents before submitting for review.</div>}
+                  {missingEvidenceFor(org).length>0&&org.verification_case_status!=="submitted"&&org.verification_case_status!=="in_review"&&org.verification_case_status!=="pending"&&org.verification_status!=="pending"&&<div className="form-error" aria-live="polite" aria-atomic="true"><b>Still needed:</b> {missingEvidenceFor(org).map(item=>item.replaceAll("_"," ")).join(", ")}. Upload these documents before submitting for review.</div>}
                   {(org.required_evidence||[]).length>0&&<p className="muted">Required evidence: {(org.required_evidence||[]).map(item=>item.replaceAll("_"," ")).join(", ")}. Uploaded evidence: {(org.verification_evidence||[]).map(item=>item.evidenceType.replaceAll("_"," ")).filter((item,index,all)=>all.indexOf(item)===index).join(", ")||"none recorded"}.</p>}
                   <div className="row" style={{flexWrap:"wrap",gap:8}}>
                     {org.verification_status==="verified" ? <>

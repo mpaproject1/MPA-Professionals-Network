@@ -298,7 +298,7 @@ export default function Mentorship(){
      <button className="btn btn-primary" type="submit" disabled={loading}>{loading?"Finding mentor profiles…":"Search mentors"}</button>
      <button className="btn btn-ghost" type="button" onClick={()=>{setQuery("");setTopic("");void load("","",0)}}>Clear</button>
    </form></Card>
-   <div style={{marginTop:14}}><button className="btn btn-ghost" type="button" disabled={submitting||submissionUncertain} onClick={()=>{setSelected(null);setShowRequestForm(true);setCreated(null);setNotice("");setError("");}}>Submit an open mentorship request <span aria-hidden="true">→</span></button><p className="muted">Share your goals even when you have not selected a mentor. Your request and status are recorded in your account; a match requires an eligible mentor’s acceptance and your approval.</p></div>
+   <div data-workspace-panel="discover" style={{marginTop:14}}><button className="btn btn-ghost" type="button" disabled={submitting||submissionUncertain} onClick={()=>{setSelected(null);setShowRequestForm(true);setCreated(null);setNotice("");setError("");}}>Submit an open mentorship request <span aria-hidden="true">→</span></button><p className="muted">Share your goals even when you have not selected a mentor. Your request and status are recorded in your account; a match requires an eligible mentor’s acceptance and your approval.</p></div>
    {error&&<FormFeedback kind="error" message={error} onRetry={()=>{if(submissionUncertain){void submit();return;}void load();void loadMyRequests();void loadOrganizationOffers();}} retryLabel={submissionUncertain?"Check submission again":"Reload workspace"} busy={submitting} nextAction={submissionUncertain?"We could not confirm whether the request was received. Your entries are locked so you can safely retry the same submission.":"Reload mentor profiles, requests and organization offers before assuming the information is current."} membershipReturnTo="/mentorship"/>}
    {notice&&<FormFeedback kind="success" message={notice} actionHref={!token?"/login?next=/mentorship":undefined} actionLabel={!token?"Sign in":undefined}/>}
    {portalMode==="mentee"&&created&&<Card><Badge tone="green">Request recorded</Badge><h2 className="h2" style={{marginTop:10}}>Your request is in the system</h2><p className="muted">Request reference: {created.id}</p><p className="muted">Status: {humanStatus(created.status)}. The platform does not create a mentorship until the matching and acceptance steps are completed.</p><p className="muted">{created.nextAction||"Review your request status and wait for an eligible mentor proposal."}</p><a className="btn btn-ghost" href="#mentorship-requests">Track request and matching</a><button className="btn btn-ghost" type="button" onClick={()=>setCreated(null)}>Dismiss</button></Card>}
@@ -374,7 +374,7 @@ export default function Mentorship(){
      </div>}
    </Card>}
    <div className="footer-note">The matching score is not invented in this interface. Human governance and explicit acceptance remain authoritative.</div>
-   <nav className="mentorship-mobile-nav" aria-label="Mobile mentorship destinations">
+   {token&&myWorkspaceLoaded&&!myWorkspaceLoadFailed&&<nav className="mentorship-mobile-nav" aria-label="Mobile mentorship destinations">
      <button type="button" onClick={()=>openWorkspace("overview")} aria-current={activeWorkspace==="overview"?"page":undefined}> <LayoutDashboard size={18}/><span>Overview</span></button>
      <button type="button" onClick={()=>openWorkspace("people")} aria-current={activeWorkspace==="people"?"page":undefined}><Users size={18}/><span>People</span></button>
      <button type="button" onClick={()=>openWorkspace("sessions")} aria-current={activeWorkspace==="sessions"?"page":undefined}><CalendarDays size={18}/><span>Sessions</span></button>
@@ -382,6 +382,6 @@ export default function Mentorship(){
      <button type="button" onClick={()=>openWorkspace("discover")} aria-current={activeWorkspace==="discover"?"page":undefined}><Compass size={18}/><span>Discover</span></button>
      <button type="button" onClick={()=>openWorkspace("practice")} aria-current={activeWorkspace==="practice"?"page":undefined}><HeartHandshake size={18}/><span>Practice</span></button>
      <button type="button" onClick={()=>openWorkspace("organizations")} aria-current={activeWorkspace==="organizations"?"page":undefined}><Building2 size={18}/><span>Programs</span></button>
-   </nav>
+   </nav>}
  </div>;
 }

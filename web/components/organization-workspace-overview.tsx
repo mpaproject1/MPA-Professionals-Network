@@ -6,6 +6,7 @@ import {
   Building2,
   ClipboardCheck,
   Compass,
+  Handshake,
   Network,
   UsersRound,
 } from "lucide-react";

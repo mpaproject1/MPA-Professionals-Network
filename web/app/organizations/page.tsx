@@ -624,11 +624,11 @@ export default function Organizations() {
       ) : (
         <>
           
-          {((organizations.length === 0 && organizationLookupReady && organizationAccess.length === 0) || (organizations.some((org) => org.verification_status === "verified") && activeOrganizationFolder === "organization")) && (
+          {((organizations.length === 0 && organizationLookupReady && organizationAccess.length === 0) || organizations.some((org) => org.verification_status !== "verified" && ["owner", "administrator"].includes(org.role_code || "")) || (organizations.some((org) => org.verification_status === "verified") && activeOrganizationFolder === "organization")) && (
           <Card id="org-registration">
             <div className="row">
               <div>
-                <h2 className="h2">{organizations.some((org) => org.verification_status === "verified") ? "Organization profile and verification" : "Register your organization"}</h2>
+                <h2 className="h2">{organizations.length === 0 ? "Register your organization" : organizations.every((org) => org.verification_status === "verified") ? "Organization profile and verification" : "Complete organization verification"}</h2>
                 <p className="muted">
                   Legal identity, organization type and contact information.
                 </p>
@@ -639,8 +639,8 @@ export default function Organizations() {
               <span className="eyebrow">Guided organization setup</span>
               <p>Complete your organization's identity, representative contact and private evidence. MPA verification is a separate review decision.</p>
             </div>
-            <button className="btn btn-primary" type="button" onClick={() => { const opening = !showForm; setShowForm(opening); setError(""); setNotice(""); if (opening && organizations.some((org) => org.verification_status !== "verified")) { setRegistrationStep(3); setEvidenceOrg(organizations.find((org) => org.verification_status !== "verified")?.id || ""); } else if (opening && organizations.length && organizations.every((org) => org.verification_status === "verified")) { setForm(blank); setOrganizationTypeChoice(""); setRegistrationStep(1); setRegistrationCreated(false); } }}>
-              {showForm ? "Close guided setup" : organizations.length ? "Continue organization setup" : "Start organization registration"}
+            <button className="btn btn-primary" type="button" onClick={() => { const opening = !showForm; setShowForm(opening); setError(""); setNotice(""); if (opening && organizations.some((org) => org.verification_status !== "verified")) { const target = organizations.find((org) => org.verification_status !== "verified")!; setRegistrationStep(missingEvidenceFor(target).length ? 3 : 4); setEvidenceOrg(target.id); } else if (opening && organizations.length && organizations.every((org) => org.verification_status === "verified")) { setForm(blank); setOrganizationTypeChoice(""); setRegistrationStep(1); setRegistrationCreated(false); } }}>
+              {showForm ? "Close guided setup" : organizations.some((org) => org.verification_status !== "verified") ? "Continue organization setup" : organizations.length ? "Register another organization" : "Start organization registration"}
             </button>
             {showForm && (
               <div className="org-stepper">
@@ -701,7 +701,7 @@ export default function Organizations() {
                   <div className="org-step-panel" aria-live="polite">
                     <span className="eyebrow">Step 4 of 4 · Review</span><h3 className="h2">Review before submitting</h3>
                     <p className="muted">Check the evidence checklist and application reference. MPA reviewers make the independent verification decision; submission does not guarantee approval.</p>
-                    {organizations.filter((org) => org.verification_status !== "verified").map((org) => <div className="org-review-summary" key={org.id}><strong>{org.display_name || org.legal_name}</strong><span>Reference: {org.tracking_reference || "Pending"}</span><span>Required evidence: {(org.required_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "Not specified by the service"}</span><span>Still needed: {missingEvidenceFor(org).map((item) => item.replaceAll("_", " ")).join(", ") || "No outstanding items reported"}</span></div>)}
+                    {organizations.filter((org) => org.verification_status !== "verified").map((org) => <div className="org-review-summary" key={org.id}><strong>{org.display_name || org.legal_name}</strong><span>Reference: {org.tracking_reference || "Pending"}</span><span>Required evidence: {(org.required_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "Not specified by the service"}</span><span>Still needed: {missingEvidenceFor(org).map((item) => item.replaceAll("_", " ")).join(", ") || "No outstanding items reported"}</span>{org.verification_decision_reason ? <span>MPA feedback: {org.verification_decision_reason}</span> : null}</div>)}
                     <div className="form-error" role="note"><b>Decision boundary:</b> MPA verification is separate from representative email verification. Do not submit while required evidence is outstanding. The server remains authoritative for the final submission decision.</div>
                     <div className="org-step-actions"><button className="btn btn-ghost" type="button" onClick={() => document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Review documents</button>
                     {organizations.filter((org) => org.verification_status !== "verified" && ["owner", "administrator"].includes(org.role_code || "") && org.verification_status !== "pending" && !["submitted", "in_review", "pending"].includes(org.verification_case_status || "")).map((org) => <button className="btn btn-primary" type="button" key={org.id} disabled={missingEvidenceFor(org).length > 0} onClick={() => void submitVerification(org)}>Submit {org.display_name || "organization"} for MPA review</button>)}</div>

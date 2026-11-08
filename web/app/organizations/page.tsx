@@ -585,9 +585,9 @@ export default function Organizations() {
     <div className="grid mpa-experience mpa-organizations">
       <div>
         <div className="eyebrow">MPA Organization</div>
-        <h1 className="h1">Unified organization workspace</h1>
+        <h1 className="h1">Organizations</h1>
         <p className="muted">
-          Your organization at a glance. Here is what needs attention next.
+          Register and verify an organization, or manage the opportunities and relationships your organization is authorized to access.
         </p>
       </div>
 

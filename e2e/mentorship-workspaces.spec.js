@@ -2,6 +2,12 @@ import { expect, test } from "@playwright/test";
 
 test.use({ serviceWorkers: "block" });
 
+async function dismissPrivacyChoices(page) {
+  const rejectOptional = page.getByRole("button", { name: "Reject optional" });
+  await rejectOptional.waitFor({ state: "visible", timeout: 2000 }).catch(() => {});
+  if (await rejectOptional.isVisible().catch(() => false)) await rejectOptional.click();
+}
+
 async function mockMentorshipAccount(page) {
   await page.addInitScript(() => {
     window.sessionStorage.setItem("mpa-session-token", "e2e-mentorship-session");
@@ -57,6 +63,7 @@ test.describe("Mentorship Studio workspace navigation", () => {
     await mockMentorshipAccount(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/mentorship");
+    await dismissPrivacyChoices(page);
     const navigation = page.getByRole("navigation", { name: "Mentorship destinations" });
     await expect(navigation).toBeVisible();
 
@@ -108,6 +115,7 @@ test.describe("Mentorship Studio workspace navigation", () => {
     await mockMentorshipAccount(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/mentorship?view=organizations");
+    await dismissPrivacyChoices(page);
     await expect(page.locator(".mpa-mentorship-page")).toHaveAttribute("data-active-workspace", "organizations");
     const mobile = page.getByRole("navigation", { name: "Mobile mentorship destinations" });
     await expect(mobile).toBeVisible();

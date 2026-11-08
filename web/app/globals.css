@@ -1343,7 +1343,7 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 .sc-workspace-status{display:flex;align-items:center;gap:8px;flex:none;padding:9px 12px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--muted);font-size:11px;font-weight:650}
 .sc-workspace-status-dot{width:7px;height:7px;border-radius:50%;background:#80a92b;box-shadow:0 0 0 4px rgba(128,169,43,.13)}
 .sc-workspace-status-separator{width:1px;height:13px;background:var(--border)}
-.sc-folder-desk{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;margin:28px 4px 8px;padding:19px 14px 12px;border:1px solid color-mix(in srgb,var(--border) 75%,transparent);border-radius:18px;background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 76%,var(--primary) 7%),var(--surface));perspective:1100px}
+.sc-folder-desk{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:17px;margin:28px 4px 8px;padding:19px 14px 12px;border:1px solid color-mix(in srgb,var(--border) 75%,transparent);border-radius:18px;background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 76%,var(--primary) 7%),var(--surface));perspective:1100px}
 .sc-folder-desk:before{position:absolute;inset:auto 7% 4px;height:14px;border-radius:50%;background:rgba(12,34,53,.09);filter:blur(12px);content:"";pointer-events:none}
 .sc-folder{--folder-accent:#4678a6;--folder-soft:#e8f0f8;position:relative;isolation:isolate;display:flex;min-height:174px;flex-direction:column;align-items:flex-start;gap:11px;padding:26px 20px 17px;border:1px solid color-mix(in srgb,var(--folder-accent) 28%,var(--border));border-radius:14px 16px 16px 16px;background:linear-gradient(155deg,color-mix(in srgb,var(--folder-soft) 80%,var(--surface)),var(--surface) 68%);box-shadow:0 9px 0 color-mix(in srgb,var(--folder-accent) 20%,transparent),0 17px 25px rgba(9,32,54,.10),inset 0 1px rgba(255,255,255,.7);color:var(--text);text-decoration:none;transform:translateY(0) rotateX(0) rotateY(0);transform-origin:50% 90%;transition:transform .24s cubic-bezier(.2,.8,.2,1),box-shadow .24s,border-color .24s;will-change:transform}
 .sc-folder:before{position:absolute;z-index:-1;top:0;left:0;width:38%;height:17px;border:1px solid color-mix(in srgb,var(--folder-accent) 26%,var(--border));border-bottom:0;border-radius:9px 9px 0 0;background:color-mix(in srgb,var(--folder-soft) 90%,var(--surface));content:"";transform:translateY(-14px) skewX(-18deg);transform-origin:left bottom}
@@ -1353,6 +1353,7 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 .sc-folder--explore{--folder-accent:#2d79a8;--folder-soft:#e1f0f7}
 .sc-folder--propose{--folder-accent:#829c24;--folder-soft:#eff3d9}
 .sc-folder--record{--folder-accent:#a56b35;--folder-soft:#f6eadc}
+.sc-folder--services{--folder-accent:#526a9a;--folder-soft:#e9edf7}
 .sc-folder-icon{display:grid;width:48px;height:48px;place-items:center;border:1px solid color-mix(in srgb,var(--folder-accent) 25%,transparent);border-radius:13px;background:color-mix(in srgb,var(--folder-soft) 75%,var(--surface));color:var(--folder-accent);box-shadow:0 5px 12px color-mix(in srgb,var(--folder-accent) 13%,transparent)}
 .sc-folder-copy{display:grid;gap:4px}
 .sc-folder-copy strong{color:var(--text);font-size:16px;font-weight:760;letter-spacing:-.02em}

@@ -152,6 +152,9 @@ test("PostgreSQL geography workbook preview, apply, publish, member selectors an
   assert.equal(regionalResidence.admin_level_2_code,"ET-ZONE-"+suffix);
   assert.equal(regionalResidence.admin_level_3_code,"ET-WOREDA-"+suffix);
   assert.equal(regionalResidence.geography_version_id,applied.versionId);
+  const summary=await getMemberGeographySummary(identity);
+  assert.equal(summary.publishedVersion.id,applied.versionId,"aggregation must use the exact published geography version used by profile selectors");
+  assert.ok(summary.ethiopiaLevel1.some(row=>row.unit_code==="ET-REG-"+suffix&&Number(row.member_count)>=1));
   await saveMyResidence(userId,{residenceType:"ethiopia",countryCode:"ETH",adminLevel1Code:"ET-CITY-"+suffix,adminLevel2Code:"ET-SUBCITY-"+suffix,adminLevel3Code:"ET-CITY-WOREDA-"+suffix,localityNote:"Chartered city Woreda integration fixture"},randomUUID());
   const residence=await getMyResidence(userId);
   assert.equal(residence.admin_level_1_code,"ET-CITY-"+suffix);
@@ -160,9 +163,6 @@ test("PostgreSQL geography workbook preview, apply, publish, member selectors an
   assert.equal(residence.geography_version_id,applied.versionId);
   const residenceAudit=await db.query("select 1 from audit_log where actor_user_id=$1 and action='member.residence_updated' and resource_id=$1::uuid::text",[userId]);
   assert.equal(residenceAudit.rowCount,2,"regional and chartered-city residence changes must persist audit events");
-  const summary=await getMemberGeographySummary(identity);
-  assert.equal(summary.publishedVersion.id,applied.versionId,"aggregation must use the exact published geography version used by profile selectors");
-  assert.ok(summary.ethiopiaLevel1.some(row=>row.unit_code==="ET-REG-"+suffix&&Number(row.member_count)>=1));
  }finally{
   await db.query("delete from member_residence where user_id=$1",[userId]);
   for(const batchId of batchIds)await db.query("delete from membership_geography_import_batch where id=$1",[batchId]);

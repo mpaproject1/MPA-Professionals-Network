@@ -13,6 +13,7 @@ import { membershipEndDate } from "../platform/membership-duration.js";
 import { createInAppNotification } from "../platform/notifications.js";
 import { consumeHumanChallenge } from "../platform/security-controls.js";
 import { nextTrackingReference } from "../platform/tracking-reference.js";
+import { legacyMembershipPaymentVerificationRequiredSql, membershipIsCurrentlyActiveSql } from "./eligibility.js";
 import { hashPassword, normalizeEmail, validatePersonInput, verifyPassword } from "./identity.js";
 import { assertMembershipPaymentMethodAvailable, buildMembershipPaymentMethodSnapshot, buildPaymentMethodAuditMetadata, normalizeMembershipPaymentMethodInput } from "./payment-method-policy.js";
 import { applicationStatusAfterPaymentVerification, applicationStatusAfterReview, canSubmitMembershipPayment, missingRequiredMembershipEvidence, requiresMembershipPaymentEvidence } from "./payment-policy.js";

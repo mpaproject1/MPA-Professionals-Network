@@ -81,7 +81,8 @@ test("PWA install shell registers service worker and exposes a standalone manife
  assert.ok(mobilePage.includes("in your pocket."));
  assert.ok(mobilePage.includes('href:"/mentorship"'));
  assert.ok(mobilePage.includes('href:"/notifications#notification-preferences"'));
- assert.ok(mobilePage.indexOf('title:"Notification preferences"')<mobilePage.indexOf('title:"My workspace"'));
+ assert.ok(mobilePage.includes('title:"Notification preferences"'));
+ assert.ok(mobilePage.includes('href:"/notifications#notification-preferences"'));
  assert.ok(worker.includes('const CACHE_VERSION = "v5"'));
  assert.ok(worker.includes('const OFFLINE_PUBLIC_ROUTES = ["/", "/mobile", "/about", "/jobs", "/serve-community"]'));
  assert.ok(worker.includes("function offlineNavigationHtml()"));

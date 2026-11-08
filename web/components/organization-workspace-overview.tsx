@@ -6,7 +6,6 @@ import {
   Building2,
   ClipboardCheck,
   Compass,
-  Handshake,
   Network,
   UsersRound,
 } from "lucide-react";
@@ -80,8 +79,8 @@ const reviewingOptions = [
 const folders: Folder[] = [
   {
     key: "publishing",
-    title: "Publishing",
-    description: "Create and manage professional opportunities.",
+    title: "Opportunities",
+    description: "Publish jobs, professional services and mentorship offers.",
     icon: BriefcaseBusiness,
     tone: "publishing",
     allowedRoles: ["owner", "administrator", "recruiter", "project_manager"],
@@ -93,8 +92,8 @@ const folders: Folder[] = [
   },
   {
     key: "reviewing",
-    title: "Reviewing",
-    description: "Work through applications and incoming requests.",
+    title: "Applications",
+    description: "Review candidate pipelines and public inquiries.",
     icon: ClipboardCheck,
     tone: "reviewing",
     allowedRoles: ["owner", "administrator", "recruiter"],
@@ -105,20 +104,22 @@ const folders: Folder[] = [
   },
   {
     key: "exploring",
-    title: "Exploring",
-    description: "Find professionals, organizations and collaborators.",
+    title: "Discover",
+    description: "Find professionals, organizations, mentors and ways to contribute.",
     icon: Compass,
     tone: "exploring",
     links: [
       { label: "Professional network", href: "/network" },
       { label: "Network-Plus", href: "/network-plus" },
       { label: "Organization directory", href: "/organizations/directory" },
+      { label: "Serve-Community requests", href: "/service-demand" },
+      { label: "Mentorship network", href: "/mentorship" },
     ],
   },
   {
     key: "reports",
-    title: "Reports",
-    description: "Understand authorized activity and recorded outcomes.",
+    title: "Impact",
+    description: "Understand authorized activity, recruitment and recorded outcomes.",
     icon: BarChart3,
     tone: "reports",
     links: [
@@ -138,18 +139,7 @@ const folders: Folder[] = [
       { label: "Verification evidence", href: "/organizations#org-evidence" },
     ],
   },
-  {
-    key: "connections",
-    title: "Connections",
-    description: "Build relationships and take part in community work. Organization-scoped volunteer drives and skill dispatch are not implemented as a verified workflow yet.",
-    icon: Handshake,
-    tone: "connections",
-    links: [
-      { label: "Serve-Community requests", href: "/service-demand" },
-      { label: "Mentorship network", href: "/mentorship" },
-      { label: "Professional connections", href: "/network" },
-    ],
-  },
+
 ];
 
 function statusFor(organization: Organization) {

@@ -667,7 +667,7 @@ export default function Organizations() {
                 </ol>
                 {registrationStep === 1 ? (
                   <form className="form-stack org-step-panel" aria-live="polite" onSubmit={(event) => { event.preventDefault(); setRegistrationStep(2); }}>
-                    <span className="eyebrow">Step 1 of 4 · Identity</span>
+                    <span className="eyebrow">Step 1 of 5 · Identity</span>
                     <h3 className="h2">Tell us about your organization</h3>
                     <p className="muted">Use the legal identity shown on your institution's registration documents. Your display name is how members will recognize you.</p>
                     <label>Legal name<input required maxLength={200} value={form.legalName} onChange={e => setForm({ ...form, legalName: e.target.value })} /></label>
@@ -684,7 +684,7 @@ export default function Organizations() {
                   </form>
                 ) : registrationStep === 2 ? (
                   <form className="form-stack org-step-panel" aria-live="polite" onSubmit={register}>
-                    <span className="eyebrow">Step 2 of 4 · Institutional contact</span>
+                    <span className="eyebrow">Step 2 of 5 · Institutional contact</span>
                     <h3 className="h2">Add an official institutional contact</h3>
                     <p className="muted">Provide an official institutional contact channel that you are authorized to represent. Creating a registration draft does not verify the institution or unlock publishing.</p>
                     <label>Institutional email<input type="email" required maxLength={254} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>
@@ -695,7 +695,7 @@ export default function Organizations() {
                   </form>
                 ) : registrationStep === 3 ? (
                   <div className="org-step-panel" aria-live="polite">
-                    <span className="eyebrow">Step 3 of 4 · Documents</span>
+                    <span className="eyebrow">Step 3 of 5 · Documents</span>
                     <h3 className="h2">Add the evidence needed for verification</h3>
                     <p className="muted">Select your organization in the private evidence section. Upload the requested documents there; files are privately attached and checksum-verified. Uploading evidence does not itself verify the organization.</p>
                     <div className="org-step-actions"><span className="muted">Your organization draft is saved. Continue to the private evidence checklist below.</span><button className="btn btn-primary" type="button" onClick={() => { setEvidenceOrg(organizations.find((org) => org.verification_status !== "verified")?.id || organizations[0]?.id || ""); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Open document checklist <span aria-hidden="true">→</span></button></div>

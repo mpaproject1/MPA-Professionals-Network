@@ -1,5 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
+
 import { getMembershipCardStatus } from "../src/membership/card.js";
 
 const now = new Date("2026-11-07T09:00:00.000Z");

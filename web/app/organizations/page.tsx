@@ -103,7 +103,7 @@ export default function Organizations() {
   const [form, setForm] = useState<OrgForm>(blank);
   const [organizationTypeChoice,setOrganizationTypeChoice]=useState("");
   const [showForm, setShowForm] = useState(false);
-  const [registrationStep, setRegistrationStep] = useState<1 | 2 | 3>(1);
+  const [registrationStep, setRegistrationStep] = useState<1 | 2 | 3 | 4>(1);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -425,8 +425,9 @@ export default function Organizations() {
       );
       setEvidenceFile(null);
       setEvidenceNote("");
+      setRegistrationStep(4);
       setNotice(
-        "Private evidence uploaded, checksum-verified and attached to the selected organization. Submit the verification case when its required evidence is complete.",
+        "Private evidence uploaded, checksum-verified and attached to the selected organization. Review the checklist before submitting for MPA verification.",
       );
       await load();
     } catch (e) {
@@ -596,92 +597,81 @@ export default function Organizations() {
               </div>
               <Building2 color="var(--primary)" />
             </div>
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={() => {
-                setShowForm((v) => !v);
-                setError("");
-                setNotice("");
-              }}
-            >
-              {showForm
-                ? "Close registration form"
-                : "Register an organization"}
+            <div className="org-journey-intro">
+              <span className="eyebrow">Guided organization setup</span>
+              <p>Complete your organization's identity, representative contact and private evidence. MPA verification is a separate review decision.</p>
+            </div>
+            <button className="btn btn-primary" type="button" onClick={() => { setShowForm((v) => !v); setError(""); setNotice(""); }}>
+              {showForm ? "Close guided setup" : organizations.length ? "Continue organization setup" : "Start organization registration"}
             </button>
-            {showForm && (registrationStep < 3 ? (
-                <form
-                  className="form-stack"
-                  onSubmit={register}
-                  style={{ marginTop: 18 }}
-                >
-                  <div className="row" aria-label="Organization registration steps" style={{ flexWrap: "wrap", gap: 8 }}>
-                    {[
-                      { step: 1, label: "Entity profile" },
-                      { step: 2, label: "Institutional contact" },
-                      { step: 3, label: "Evidence & review" },
-                    ].map(item => (
-                      <span key={item.step} className="badge" aria-current={registrationStep === item.step ? "step" : undefined}>
-                        {item.step}. {item.label}{registrationStep > item.step ? " · Complete" : ""}
-                      </span>
-                    ))}
+            {showForm && (
+              <div className="org-stepper" aria-label="Organization onboarding">
+                <ol className="org-stepper-track">
+                  {[
+                    { step: 1, label: "Identity" },
+                    { step: 2, label: "Representative" },
+                    { step: 3, label: "Documents" },
+                    { step: 4, label: "Review" },
+                  ].map((item) => (
+                    <li key={item.step} className={registrationStep === item.step ? "is-current" : registrationStep > item.step ? "is-complete" : ""}>
+                      <button type="button" onClick={() => {
+                        if (item.step < registrationStep && item.step <= 2) setRegistrationStep(item.step as 1 | 2);
+                        if (item.step === 3 && registrationStep >= 3) { setRegistrationStep(3); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+                        if (item.step === 4 && registrationStep === 4) setRegistrationStep(4);
+                      }} aria-current={registrationStep === item.step ? "step" : undefined} disabled={item.step > registrationStep}>
+                        <span className="org-step-number">{registrationStep > item.step ? "✓" : item.step}</span><span>{item.label}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+                {registrationStep === 1 ? (
+                  <form className="form-stack org-step-panel" onSubmit={(event) => { event.preventDefault(); setRegistrationStep(2); }}>
+                    <span className="eyebrow">Step 1 of 4 · Identity</span>
+                    <h3 className="h2">Tell us about your organization</h3>
+                    <p className="muted">Use the legal identity shown on your institution's registration documents. Your display name is how members will recognize you.</p>
+                    <label>Legal name<input required maxLength={200} value={form.legalName} onChange={e => setForm({ ...form, legalName: e.target.value })} /></label>
+                    <label>Display name<input required maxLength={160} value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} /></label>
+                    <label>Organization type
+                      <select required value={organizationTypeChoice} onChange={e => { setOrganizationTypeChoice(e.target.value); setForm(current => ({ ...current, organizationType: e.target.value === "other" ? "" : e.target.value })); }}>
+                        <option value="">Choose organization type</option><option value="company">Company / business</option><option value="nonprofit">Nonprofit / NGO</option><option value="professional_association">Professional association</option><option value="government">Government / public institution</option><option value="educational_institution">Educational institution</option><option value="cooperative">Cooperative</option><option value="other">Other</option>
+                      </select>
+                    </label>
+                    {organizationTypeChoice === "other" && <label>Describe organization type<input required maxLength={120} value={form.organizationType} onChange={e => setForm(current => ({ ...current, organizationType: e.target.value }))} /></label>}
+                    <label>About the organization <span className="muted">(optional)</span><textarea rows={3} maxLength={2000} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
+                    <label>Official website <span className="muted">(optional)</span><input type="url" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} placeholder="https://" /></label>
+                    <div className="org-step-actions"><span className="muted">Only the current step is shown.</span><button className="btn btn-primary" type="submit" disabled={!form.legalName.trim() || !form.displayName.trim() || !organizationTypeChoice || (organizationTypeChoice === "other" && !form.organizationType.trim())}>Continue <span aria-hidden="true">→</span></button></div>
+                  </form>
+                ) : registrationStep === 2 ? (
+                  <form className="form-stack org-step-panel" onSubmit={register}>
+                    <span className="eyebrow">Step 2 of 4 · Representative</span>
+                    <h3 className="h2">How can MPA contact your organization?</h3>
+                    <p className="muted">Provide an official institutional contact channel that you are authorized to represent. Creating a registration draft does not verify the institution or unlock publishing.</p>
+                    <label>Institutional email<input type="email" required maxLength={254} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>
+                    <label>Official contact phone <span className="muted">(optional)</span><input type="tel" maxLength={40} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></label>
+                    <label>Institution address <span className="muted">(optional)</span><input maxLength={300} value={form.addressText} onChange={e => setForm({ ...form, addressText: e.target.value })} /></label>
+                    <div className="form-error" role="note"><b>Data boundary:</b> The current registration API does not persist a structured TIN, representative name/position, or verification-fee payment/receipt. Do not treat these as collected or paid. Only submit information and evidence supported by the current service.</div>
+                    <div className="org-step-actions"><button className="btn btn-ghost" type="button" onClick={() => setRegistrationStep(1)} disabled={submitting}>Back</button><button className="btn btn-primary" type="submit" disabled={submitting || !form.email.trim()}>{submitting ? "Creating registration…" : "Save and continue"}</button></div>
+                  </form>
+                ) : registrationStep === 3 ? (
+                  <div className="org-step-panel">
+                    <span className="eyebrow">Step 3 of 4 · Documents</span>
+                    <h3 className="h2">Add the evidence needed for verification</h3>
+                    <p className="muted">Select your organization in the private evidence section. Upload the requested documents there; files are privately attached and checksum-verified. Uploading evidence does not itself verify the organization.</p>
+                    <div className="org-step-actions"><button className="btn btn-ghost" type="button" onClick={() => setRegistrationStep(2)}>Back</button><button className="btn btn-primary" type="button" onClick={() => { setEvidenceOrg(organizations.find((org) => org.verification_status !== "verified")?.id || organizations[0]?.id || ""); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Open document checklist <span aria-hidden="true">→</span></button></div>
                   </div>
-                  {registrationStep === 1 ? (
-                    <>
-                      <h3 className="h2">Step 1 — Entity profile</h3>
-                      <label>Legal name<input required maxLength={200} value={form.legalName} onChange={e => setForm({ ...form, legalName: e.target.value })} /></label>
-                      <label>Display name<input required maxLength={160} value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} /></label>
-                      <label>Institution type
-                        <select required value={organizationTypeChoice} onChange={e => { setOrganizationTypeChoice(e.target.value); setForm(current => ({ ...current, organizationType: e.target.value === "other" ? "" : e.target.value })); }}>
-                          <option value="">Choose institution type</option>
-                          <option value="company">Company / business</option>
-                          <option value="nonprofit">Nonprofit / NGO</option>
-                          <option value="professional_association">Professional association</option>
-                          <option value="government">Government / public institution</option>
-                          <option value="educational_institution">Educational institution</option>
-                          <option value="cooperative">Cooperative</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </label>
-                      {organizationTypeChoice === "other" && <label>Describe institution type<input required maxLength={120} value={form.organizationType} onChange={e => setForm(current => ({ ...current, organizationType: e.target.value }))} /></label>}
-                      <label>Institution description<textarea rows={3} maxLength={2000} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
-                      <label>Official website<input type="url" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} placeholder="https://" /></label>
-                      <div className="row" style={{ justifyContent: "flex-end" }}>
-                        <button className="btn btn-primary" type="button" onClick={() => setRegistrationStep(2)} disabled={!form.legalName.trim() || !form.displayName.trim() || !organizationTypeChoice || (organizationTypeChoice === "other" && !form.organizationType.trim())}>Continue to contact details</button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <h3 className="h2">Step 2 — Institutional contact</h3>
-                      <p className="muted">Use an official institutional contact channel that you are authorized to represent. Registration creates a draft; it does not verify the institution or unlock publishing.</p>
-                      <label>Institutional email<input type="email" required maxLength={254} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>
-                      <label>Official contact phone<input type="tel" maxLength={40} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></label>
-                      <label>Institution address<input maxLength={300} value={form.addressText} onChange={e => setForm({ ...form, addressText: e.target.value })} /></label>
-                      <div className="form-error" role="note">
-                        <b>Evidence and data boundary:</b> the current registration API does not persist a structured TIN, representative name/position, or verification-fee payment/receipt. Do not treat those items as collected or paid. Use the private evidence workflow below for documents the server explicitly supports; fee collection is not enabled by this page.
-                      </div>
-                      <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
-                        <button className="btn btn-ghost" type="button" onClick={() => setRegistrationStep(1)} disabled={submitting}>Back to entity profile</button>
-                        <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? "Creating draft…" : "Create registration draft"}</button>
-                      </div>
-                    </>
-                  )}
-                </form>
-              ) : (
-                <div className="form-stack" style={{ marginTop: 18 }}>
-                  <div className="row" aria-label="Organization registration steps" style={{ flexWrap: "wrap", gap: 8 }}>
-                    <span className="badge">1. Entity profile · Complete</span>
-                    <span className="badge">2. Institutional contact · Complete</span>
-                    <span className="badge" aria-current="step">3. Evidence & review · Current step</span>
+                ) : (
+                  <div className="org-step-panel">
+                    <span className="eyebrow">Step 4 of 4 · Review</span><h3 className="h2">Review before submitting</h3>
+                    <p className="muted">Check the evidence checklist and application reference. MPA reviewers make the independent verification decision; submission does not guarantee approval.</p>
+                    {organizations.filter((org) => org.verification_status !== "verified").map((org) => <div className="org-review-summary" key={org.id}><strong>{org.display_name || org.legal_name}</strong><span>Reference: {org.tracking_reference || "Pending"}</span><span>Required evidence: {(org.required_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "Not specified by the service"}</span><span>Still needed: {(org.missing_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "No outstanding items reported"}</span></div>)}
+                    <div className="form-error" role="note"><b>Decision boundary:</b> MPA verification is separate from representative email verification. Do not submit while required evidence is outstanding. The server remains authoritative for the final submission decision.</div>
+                    <div className="org-step-actions"><button className="btn btn-ghost" type="button" onClick={() => { setRegistrationStep(3); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Back to documents</button>
+                    {organizations.filter((org) => org.verification_status !== "verified" && ["owner", "administrator"].includes(org.role_code || "") && !["submitted", "in_review", "pending"].includes(org.verification_case_status || "")).map((org) => <button className="btn btn-primary" type="button" key={org.id} disabled={(org.missing_evidence || []).length > 0} onClick={() => void submitVerification(org)}>Submit {org.display_name || "organization"} for MPA review</button>)}</div>
                   </div>
-                  <h3 className="h2">Step 3 — Upload evidence for Tabayyun review</h3>
-                  <p className="muted">Your draft exists, but the institution is not verified. Upload the required private evidence for this organization, then submit the verification case. Reviewers must make an independent decision.</p>
-                  <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
-                    <button className="btn btn-primary" type="button" onClick={() => document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Continue to private evidence upload</button>
-                    <button className="btn btn-ghost" type="button" onClick={() => { setRegistrationStep(1); setForm(blank); setOrganizationTypeChoice(""); setShowForm(false); }}>Close wizard</button>
-                  </div>
-                </div>
-              ))}
+                )}
+              </div>
+            )}
+
           </Card>
           )}
 

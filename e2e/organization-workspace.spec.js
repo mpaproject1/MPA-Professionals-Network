@@ -158,7 +158,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await dismissPrivacyChoices(page);
     await expect(page.getByText("Under review").first()).toBeVisible();
     await expect(page.getByText(/awaiting an authorized MPA review/)).toBeVisible();
-    await expect(page.getByRole("link", { name: "Continue verification" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Update requested evidence" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Submit for verification" })).toBeDisabled();
   });
 

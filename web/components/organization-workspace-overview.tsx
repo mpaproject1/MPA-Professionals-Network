@@ -135,7 +135,7 @@ const folders: Folder[] = [
     allowedRoles: ["owner", "administrator"],
     links: [
       { label: "Team and permissions", href: "/organizations/team" },
-      { label: "Organization profile", href: "/organizations#org-registration" },
+      { label: "Organization details & verification", href: "/organizations#org-registration" },
       { label: "Verification evidence", href: "/organizations#org-evidence" },
     ],
   },

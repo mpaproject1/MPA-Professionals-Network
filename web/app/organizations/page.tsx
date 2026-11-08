@@ -101,6 +101,8 @@ export default function Organizations() {
   >({});
   const [reviewingOrg, setReviewingOrg] = useState("");
   const [form, setForm] = useState<OrgForm>(blank);
+  const [accountEmail, setAccountEmail] = useState("");
+  const [registrationCreated, setRegistrationCreated] = useState(false);
   const [organizationTypeChoice,setOrganizationTypeChoice]=useState("");
   const [showForm, setShowForm] = useState(false);
   const [registrationStep, setRegistrationStep] = useState<1 | 2 | 3 | 4>(1);
@@ -217,6 +219,7 @@ export default function Organizations() {
         const me = await api<{ email?: string; user?: { email?: string } }>("/api/v1/me", {}, token);
         if (cancelled) return;
         const accountEmail = String(me.email || me.user?.email || "").trim().toLowerCase();
+        setAccountEmail(accountEmail);
         const raw = localStorage.getItem("mpa.organization-registration-draft");
         if (!raw) return;
         const draft = JSON.parse(raw);
@@ -230,6 +233,7 @@ export default function Organizations() {
         }
         setForm({ ...blank, legalName: String(draft.legalName || ""), displayName: String(draft.displayName || ""), organizationType: String(draft.organizationType || ""), description: String(draft.description || ""), website: String(draft.website || ""), email: String(draft.email || ""), phone: String(draft.phone || ""), addressText: String(draft.addressText || "") });
         setOrganizationTypeChoice(String(draft.organizationType || ""));
+        setRegistrationStep([1, 2, 3, 4].includes(Number(draft.registrationStep)) ? Number(draft.registrationStep) as 1 | 2 | 3 | 4 : 1);
         setShowForm(true);
       } catch {
         // Keep the draft, but do not prefill it until the signed-in account is confirmed.
@@ -238,6 +242,25 @@ export default function Organizations() {
     void restoreDraft();
     return () => { cancelled = true; };
   }, [token]);
+
+  useEffect(() => {
+    if (!accountEmail || registrationCreated) return;
+    const hasDraftContent = Object.values(form).some((value) => String(value).trim().length > 0) || Boolean(organizationTypeChoice);
+    if (!hasDraftContent) return;
+    const savedAt = Date.now();
+    try {
+      localStorage.setItem("mpa.organization-registration-draft", JSON.stringify({
+        ...form,
+        organizationType: organizationTypeChoice === "other" ? form.organizationType : organizationTypeChoice,
+        representativeEmail: accountEmail,
+        registrationStep,
+        savedAt,
+        expiresAt: savedAt + 24 * 60 * 60 * 1000,
+      }));
+    } catch {
+      // Draft persistence is best-effort; the current form remains usable.
+    }
+  }, [accountEmail, form, organizationTypeChoice, registrationStep, registrationCreated]);
 
   async function register(e: FormEvent) {
     e.preventDefault();
@@ -271,6 +294,7 @@ export default function Organizations() {
         ...current.filter((x) => x.id !== created.id),
       ]);
       localStorage.removeItem("mpa.organization-registration-draft");
+      setRegistrationCreated(true);
       setRegistrationStep(3);
       setEvidenceOrg(created.id);
       setShowForm(true);
@@ -601,7 +625,7 @@ export default function Organizations() {
               <span className="eyebrow">Guided organization setup</span>
               <p>Complete your organization's identity, representative contact and private evidence. MPA verification is a separate review decision.</p>
             </div>
-            <button className="btn btn-primary" type="button" onClick={() => { setShowForm((v) => !v); setError(""); setNotice(""); }}>
+            <button className="btn btn-primary" type="button" onClick={() => { const opening = !showForm; setShowForm(opening); setError(""); setNotice(""); if (opening && organizations.length) { setRegistrationStep(3); setEvidenceOrg(organizations.find((org) => org.verification_status !== "verified")?.id || ""); } }}>
               {showForm ? "Close guided setup" : organizations.length ? "Continue organization setup" : "Start organization registration"}
             </button>
             {showForm && (
@@ -618,7 +642,7 @@ export default function Organizations() {
                         if (item.step < registrationStep && item.step <= 2) setRegistrationStep(item.step as 1 | 2);
                         if (item.step === 3 && registrationStep >= 3) { setRegistrationStep(3); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
                         if (item.step === 4 && registrationStep === 4) setRegistrationStep(4);
-                      }} aria-current={registrationStep === item.step ? "step" : undefined} disabled={item.step > registrationStep}>
+                      }} aria-current={registrationStep === item.step ? "step" : undefined} disabled={item.step > registrationStep || (registrationStep >= 3 && item.step < 3)}>
                         <span className="org-step-number">{registrationStep > item.step ? "✓" : item.step}</span><span>{item.label}</span>
                       </button>
                     </li>
@@ -657,7 +681,7 @@ export default function Organizations() {
                     <span className="eyebrow">Step 3 of 4 · Documents</span>
                     <h3 className="h2">Add the evidence needed for verification</h3>
                     <p className="muted">Select your organization in the private evidence section. Upload the requested documents there; files are privately attached and checksum-verified. Uploading evidence does not itself verify the organization.</p>
-                    <div className="org-step-actions"><button className="btn btn-ghost" type="button" onClick={() => setRegistrationStep(2)}>Back</button><button className="btn btn-primary" type="button" onClick={() => { setEvidenceOrg(organizations.find((org) => org.verification_status !== "verified")?.id || organizations[0]?.id || ""); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Open document checklist <span aria-hidden="true">→</span></button></div>
+                    <div className="org-step-actions"><span className="muted">Your organization draft is saved. Continue to the private evidence checklist below.</span><button className="btn btn-primary" type="button" onClick={() => { setEvidenceOrg(organizations.find((org) => org.verification_status !== "verified")?.id || organizations[0]?.id || ""); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Open document checklist <span aria-hidden="true">→</span></button></div>
                   </div>
                 ) : (
                   <div className="org-step-panel">
@@ -665,7 +689,7 @@ export default function Organizations() {
                     <p className="muted">Check the evidence checklist and application reference. MPA reviewers make the independent verification decision; submission does not guarantee approval.</p>
                     {organizations.filter((org) => org.verification_status !== "verified").map((org) => <div className="org-review-summary" key={org.id}><strong>{org.display_name || org.legal_name}</strong><span>Reference: {org.tracking_reference || "Pending"}</span><span>Required evidence: {(org.required_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "Not specified by the service"}</span><span>Still needed: {(org.missing_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "No outstanding items reported"}</span></div>)}
                     <div className="form-error" role="note"><b>Decision boundary:</b> MPA verification is separate from representative email verification. Do not submit while required evidence is outstanding. The server remains authoritative for the final submission decision.</div>
-                    <div className="org-step-actions"><button className="btn btn-ghost" type="button" onClick={() => { setRegistrationStep(3); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Back to documents</button>
+                    <div className="org-step-actions"><button className="btn btn-ghost" type="button" onClick={() => document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Review documents</button>
                     {organizations.filter((org) => org.verification_status !== "verified" && ["owner", "administrator"].includes(org.role_code || "") && !["submitted", "in_review", "pending"].includes(org.verification_case_status || "")).map((org) => <button className="btn btn-primary" type="button" key={org.id} disabled={(org.missing_evidence || []).length > 0} onClick={() => void submitVerification(org)}>Submit {org.display_name || "organization"} for MPA review</button>)}</div>
                   </div>
                 )}

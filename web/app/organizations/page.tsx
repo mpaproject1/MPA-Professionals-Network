@@ -643,8 +643,8 @@ export default function Organizations() {
               {showForm ? "Close guided setup" : organizations.length ? "Continue organization setup" : "Start organization registration"}
             </button>
             {showForm && (
-              <div className="org-stepper" aria-label="Organization onboarding">
-                <ol className="org-stepper-track">
+              <div className="org-stepper">
+                <ol className="org-stepper-track" aria-label="Organization onboarding">
                   {[
                     { step: 1, label: "Identity" },
                     { step: 2, label: "Contact" },
@@ -680,7 +680,7 @@ export default function Organizations() {
                     <div className="org-step-actions"><span className="muted">Only the current step is shown.</span><button className="btn btn-primary" type="submit" disabled={!form.legalName.trim() || !form.displayName.trim() || !organizationTypeChoice || (organizationTypeChoice === "other" && !form.organizationType.trim())}>Continue <span aria-hidden="true">→</span></button></div>
                   </form>
                 ) : registrationStep === 2 ? (
-                  <form className="form-stack org-step-panel" onSubmit={register}>
+                  <form className="form-stack org-step-panel" aria-live="polite" onSubmit={register}>
                     <span className="eyebrow">Step 2 of 4 · Institutional contact</span>
                     <h3 className="h2">Add an official institutional contact</h3>
                     <p className="muted">Provide an official institutional contact channel that you are authorized to represent. Creating a registration draft does not verify the institution or unlock publishing.</p>
@@ -698,7 +698,7 @@ export default function Organizations() {
                     <div className="org-step-actions"><span className="muted">Your organization draft is saved. Continue to the private evidence checklist below.</span><button className="btn btn-primary" type="button" onClick={() => { setEvidenceOrg(organizations.find((org) => org.verification_status !== "verified")?.id || organizations[0]?.id || ""); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Open document checklist <span aria-hidden="true">→</span></button></div>
                   </div>
                 ) : (
-                  <div className="org-step-panel">
+                  <div className="org-step-panel" aria-live="polite">
                     <span className="eyebrow">Step 4 of 4 · Review</span><h3 className="h2">Review before submitting</h3>
                     <p className="muted">Check the evidence checklist and application reference. MPA reviewers make the independent verification decision; submission does not guarantee approval.</p>
                     {organizations.filter((org) => org.verification_status !== "verified").map((org) => <div className="org-review-summary" key={org.id}><strong>{org.display_name || org.legal_name}</strong><span>Reference: {org.tracking_reference || "Pending"}</span><span>Required evidence: {(org.required_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "Not specified by the service"}</span><span>Still needed: {missingEvidenceFor(org).map((item) => item.replaceAll("_", " ")).join(", ") || "No outstanding items reported"}</span></div>)}

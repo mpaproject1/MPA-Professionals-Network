@@ -628,7 +628,7 @@ export default function Organizations() {
           <Card id="org-registration">
             <div className="row">
               <div>
-                <h2 className="h2">{organizations.length === 0 ? "Register your organization" : organizations.every((org) => org.verification_status === "verified") ? "Organization profile and verification" : "Complete organization verification"}</h2>
+                <h2 className="h2">{organizations.length === 0 ? "Register your organization" : organizations.every((org) => org.verification_status === "verified") ? "Organization details and verification" : "Complete organization verification"}</h2>
                 <p className="muted">
                   Legal identity, organization type and contact information.
                 </p>

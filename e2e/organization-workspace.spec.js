@@ -76,7 +76,8 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("button", { name: "Register your organization" })).toBeVisible();
     await expect(page.getByRole("tablist", { name: "Organization workspace folders" })).toHaveCount(0);
     await page.getByRole("button", { name: "Register your organization" }).click();
-    await expect(page.getByRole("heading", { name: "Step 1 — Entity profile" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tell us about your organization" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Organization onboarding" }).getByRole("listitem")).toHaveCount(4);
   });
 
   test("inactive organization membership is not mistaken for an unregistered account", async ({ page }) => {

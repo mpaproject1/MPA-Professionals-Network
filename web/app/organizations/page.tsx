@@ -677,7 +677,7 @@ export default function Organizations() {
                     {organizationTypeChoice === "other" && <label>Describe organization type<input required maxLength={120} value={form.organizationType} onChange={e => setForm(current => ({ ...current, organizationType: e.target.value }))} /></label>}
                     <label>About the organization <span className="muted">(optional)</span><textarea rows={3} maxLength={2000} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
                     <label>Official website <span className="muted">(optional)</span><input type="url" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} placeholder="https://" /></label>
-                    <div className="org-step-actions"><span className="muted">Only the current step is shown.</span><button className="btn btn-primary" type="submit" disabled={!form.legalName.trim() || !form.displayName.trim() || !organizationTypeChoice || (organizationTypeChoice === "other" && !form.organizationType.trim())}>Continue <span aria-hidden="true">→</span></button></div>
+                    <div className="org-step-actions"><span className="muted">Your entries are saved in this browser for up to 24 hours and restored only for this signed-in account.</span><button className="btn btn-primary" type="submit" disabled={!form.legalName.trim() || !form.displayName.trim() || !organizationTypeChoice || (organizationTypeChoice === "other" && !form.organizationType.trim())}>Continue <span aria-hidden="true">→</span></button></div>
                   </form>
                 ) : registrationStep === 2 ? (
                   <form className="form-stack org-step-panel" aria-live="polite" onSubmit={register}>

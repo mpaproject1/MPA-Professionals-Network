@@ -93,6 +93,9 @@ test.describe("Mentorship Studio workspace navigation", () => {
       if (view === "discover") await expect(page.getByLabel("Search expertise")).toBeVisible();
       if (view === "practice") await expect(page.locator("#offer-mentorship")).toBeVisible();
       if (view === "organizations") await expect(page.getByText("Mentorship offered by verified organizations")).toBeVisible();
+      if (view !== "discover") await expect(page.locator("#mentor-discovery")).toBeHidden();
+      if (view !== "people") await expect(page.locator("#mentorship-requests")).toBeHidden();
+      if (!["people", "sessions", "learning"].includes(view)) await expect(page.locator("#active-mentorships")).toBeHidden();
       const visiblePanels = await page.locator(".mpa-mentorship-page [data-workspace-panel]:visible").count();
       expect(visiblePanels).toBeGreaterThan(0);
     }

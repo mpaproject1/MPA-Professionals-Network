@@ -312,7 +312,8 @@ test("Serve-Community routes discovery into existing private workflows with comp
   assert.match(marketplace, /api\/v1\/serve-community\/initiatives/);
   assert.match(marketplace, /api\/v1\/public\/serve-community\/completed-projects/);
   assert.match(marketplace, /href="\/network-plus"/);
-  assert.doesNotMatch(marketplace, /href="\/(?:services|service-demand|mentorship)"/);
+  assert.match(marketplace, /href="\/services"/, "professional services belongs in the Serve-Community destination panel");
+  assert.doesNotMatch(marketplace, /href="\/(?:service-demand|mentorship)"/, "private demand and mentorship management remain in their dedicated workspaces");
   assert.match(services, /api\/v1\/services/);
   assert.match(demand, /api\/v1\/marketplace-demand/);
   assert.match(shell, /\["\/serve-community","Serve-Community",Search\]/);

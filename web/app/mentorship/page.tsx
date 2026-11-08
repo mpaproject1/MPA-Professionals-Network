@@ -23,7 +23,6 @@ import { MentorshipSessionRecord } from "../../components/mentorship-session-rec
 type MentorshipWorkspace="overview"|"people"|"sessions"|"learning"|"discover"|"practice"|"organizations";
 const MENTORSHIP_WORKSPACES:MentorshipWorkspace[]=["overview","people","sessions","learning","discover","practice","organizations"];
 function isMentorshipWorkspace(value:string|null):value is MentorshipWorkspace{return !!value&&MENTORSHIP_WORKSPACES.includes(value as MentorshipWorkspace);}
-function getInitialMentorshipWorkspace():MentorshipWorkspace{if(typeof window==="undefined")return "overview";const requested=new URLSearchParams(window.location.search).get("view");return isMentorshipWorkspace(requested)?requested:"overview";}
 function portalModeForWorkspace(view:MentorshipWorkspace):"choose"|"mentee"|"mentor"|"organization"{if(view==="practice")return "mentor";if(view==="organizations")return "organization";if(view==="overview")return "choose";return "mentee";}
 type Mentor={id:string;user_id:string;display_name:string;approved_banner_url?:string|null;approved_banner_alt?:string|null;video_url?:string|null;headline?:string;bio?:string;expertise?:string[]|string;languages?:string[]|string;mentoring_modes?:string[]|string;max_active_mentees?:number;circle_enabled?:boolean;circle_name?:string|null;circle_joined_count?:number;circle_joined_by_me?:boolean;active_mentee_count?:number;availability?:{day_of_week:number;start_time:string;end_time:string;timezone:string}[]|string};
 type OrganizationOffer={id:string;organization_id:string;organization_name:string;title:string;description:string;expertise?:string[]|string;languages?:string[]|string;delivery_mode:string;visibility:string;status:string;moderation_status:string;moderation_note?:string|null};
@@ -70,7 +69,7 @@ export default function Mentorship(){
  const claimAction=(key:string)=>{if(inFlightActions.current.has(key))return false;inFlightActions.current.add(key);return true;};
  const releaseAction=(key:string)=>{inFlightActions.current.delete(key);};
  const openWorkspace=(view:MentorshipWorkspace)=>{setActiveWorkspace(view);setPortalMode(portalModeForWorkspace(view));if(typeof window!=="undefined"){const url=new URL(window.location.href);url.searchParams.set("view",view);window.history.pushState({mentorshipView:view},"",url.pathname+url.search+url.hash);}};
- useEffect(()=>{const syncWorkspace=()=>{const requested=new URLSearchParams(window.location.search).get("view");const view=isMentorshipWorkspace(requested)?requested:"overview";setActiveWorkspace(view);setPortalMode(portalModeForWorkspace(view));};window.addEventListener("popstate",syncWorkspace);return()=>window.removeEventListener("popstate",syncWorkspace);},[]);
+ useEffect(()=>{const syncWorkspace=()=>{const requested=new URLSearchParams(window.location.search).get("view");const view=isMentorshipWorkspace(requested)?requested:"overview";setActiveWorkspace(view);setPortalMode(portalModeForWorkspace(view));};syncWorkspace();window.addEventListener("popstate",syncWorkspace);return()=>window.removeEventListener("popstate",syncWorkspace);},[]);
 
  const [mentors,setMentors]=useState<Mentor[]>([]);
   const [discoveryPage,setDiscoveryPage]=useState(0);const [mentorsHasMore,setMentorsHasMore]=useState(false);const discoveryPageSize=20;
@@ -125,8 +124,8 @@ export default function Mentorship(){
  const [notice,setNotice]=useState("");
  const [selected,setSelected]=useState<Mentor|null>(null);
  const [showRequestForm,setShowRequestForm]=useState(false);
- const [activeWorkspace,setActiveWorkspace]=useState<MentorshipWorkspace>(getInitialMentorshipWorkspace);
- const [portalMode,setPortalMode]=useState<"choose"|"mentee"|"mentor"|"organization">(()=>portalModeForWorkspace(getInitialMentorshipWorkspace()));
+ const [activeWorkspace,setActiveWorkspace]=useState<MentorshipWorkspace>("overview");
+ const [portalMode,setPortalMode]=useState<"choose"|"mentee"|"mentor"|"organization">("choose");
 
  const [requestStep,setRequestStep]=useState<"OBJECTIVES"|"CONSENT">("OBJECTIVES");
  const [selectedSector,setSelectedSector]=useState("Executive leadership & policy");

@@ -110,7 +110,7 @@ export default function Organizations() {
   const [registrationCreated, setRegistrationCreated] = useState(false);
   const [organizationTypeChoice,setOrganizationTypeChoice]=useState("");
   const [showForm, setShowForm] = useState(false);
-  const [registrationStep, setRegistrationStep] = useState<1 | 2 | 3 | 4>(1);
+  const [registrationStep, setRegistrationStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -238,7 +238,7 @@ export default function Organizations() {
         }
         setForm({ ...blank, legalName: String(draft.legalName || ""), displayName: String(draft.displayName || ""), organizationType: String(draft.organizationType || ""), description: String(draft.description || ""), website: String(draft.website || ""), email: String(draft.email || ""), phone: String(draft.phone || ""), addressText: String(draft.addressText || "") });
         setOrganizationTypeChoice(String(draft.organizationType || ""));
-        setRegistrationStep([1, 2, 3, 4].includes(Number(draft.registrationStep)) ? Number(draft.registrationStep) as 1 | 2 | 3 | 4 : 1);
+        setRegistrationStep([1, 2, 3, 4, 5].includes(Number(draft.registrationStep)) ? Number(draft.registrationStep) as 1 | 2 | 3 | 4 | 5 : 1);
         setShowForm(true);
       } catch {
         // Keep the draft, but do not prefill it until the signed-in account is confirmed.
@@ -566,8 +566,10 @@ export default function Organizations() {
           item.id === org.id ? { ...item, ...result } : item,
         ),
       );
+      setRegistrationStep(5);
+      setShowForm(true);
       setNotice(
-        "Verification submission was accepted by the server. Check the displayed status for the next step.",
+        "Verification submission was accepted by the server. Track the review status and any MPA feedback below.",
       );
       await load();
     } catch (e) {
@@ -639,7 +641,7 @@ export default function Organizations() {
               <span className="eyebrow">Guided organization setup</span>
               <p>Complete your organization's identity, institutional contact and private evidence. MPA verification is a separate review decision.</p>{organizations.length > 0 && organizations.every((org) => org.verification_status === "verified") ? <p className="muted">Existing verified legal details are read-only in this workspace; an edit-existing-profile action is not currently exposed here.</p> : null}
             </div>
-            <button className="btn btn-primary" type="button" onClick={() => { const opening = !showForm; setShowForm(opening); setError(""); setNotice(""); if (opening && organizations.some((org) => org.verification_status !== "verified")) { const target = organizations.find((org) => org.verification_status !== "verified")!; setRegistrationStep(missingEvidenceFor(target).length ? 3 : 4); setEvidenceOrg(target.id); } else if (opening && organizations.length && organizations.every((org) => org.verification_status === "verified")) { setForm(blank); setOrganizationTypeChoice(""); setRegistrationStep(1); setRegistrationCreated(false); } }}>
+            <button className="btn btn-primary" type="button" onClick={() => { const opening = !showForm; setShowForm(opening); setError(""); setNotice(""); if (opening && organizations.some((org) => org.verification_status !== "verified")) { const target = organizations.find((org) => org.verification_status !== "verified")!; const awaitingReview = target.verification_status === "pending" || ["submitted", "in_review", "pending"].includes(target.verification_case_status || ""); setRegistrationStep(awaitingReview ? 5 : missingEvidenceFor(target).length ? 3 : 4); setEvidenceOrg(target.id); } else if (opening && organizations.length && organizations.every((org) => org.verification_status === "verified")) { setForm(blank); setOrganizationTypeChoice(""); setRegistrationStep(1); setRegistrationCreated(false); } }}>
               {showForm ? "Close guided setup" : organizations.some((org) => org.verification_status !== "verified") ? "Continue organization setup" : organizations.length ? "Register another organization" : "Start organization registration"}
             </button>
             {showForm && (
@@ -649,13 +651,13 @@ export default function Organizations() {
                     { step: 1, label: "Identity" },
                     { step: 2, label: "Contact" },
                     { step: 3, label: "Documents" },
-                    { step: 4, label: "Review" },
+                    { step: 4, label: "Review" },\n                    { step: 5, label: "Track" },
                   ].map((item) => (
                     <li key={item.step} className={registrationStep === item.step ? "is-current" : registrationStep > item.step ? "is-complete" : ""}>
                       <button type="button" onClick={() => {
                         if (item.step < registrationStep && item.step <= 2) setRegistrationStep(item.step as 1 | 2);
                         if (item.step === 3 && registrationStep >= 3) { setRegistrationStep(3); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
-                        if (item.step === 4 && registrationStep === 4) setRegistrationStep(4);
+                        if (item.step === 4 && registrationStep === 5) setRegistrationStep(4);
                       }} aria-current={registrationStep === item.step ? "step" : undefined} disabled={item.step > registrationStep || (registrationStep >= 3 && item.step < 3)}>
                         <span className="org-step-number">{registrationStep > item.step ? "✓" : item.step}</span><span>{item.label}</span>
                       </button>
@@ -697,14 +699,22 @@ export default function Organizations() {
                     <p className="muted">Select your organization in the private evidence section. Upload the requested documents there; files are privately attached and checksum-verified. Uploading evidence does not itself verify the organization.</p>
                     <div className="org-step-actions"><span className="muted">Your organization draft is saved. Continue to the private evidence checklist below.</span><button className="btn btn-primary" type="button" onClick={() => { setEvidenceOrg(organizations.find((org) => org.verification_status !== "verified")?.id || organizations[0]?.id || ""); document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Open document checklist <span aria-hidden="true">→</span></button></div>
                   </div>
-                ) : (
+                ) : registrationStep === 4 ? (
                   <div className="org-step-panel" aria-live="polite">
-                    <span className="eyebrow">Step 4 of 4 · Review</span><h3 className="h2">Review before submitting</h3>
+                    <span className="eyebrow">Step 4 of 5 · Review</span><h3 className="h2">Review before submitting</h3>
                     <p className="muted">Check the evidence checklist and application reference. MPA reviewers make the independent verification decision; submission does not guarantee approval.</p>
                     {organizations.filter((org) => org.verification_status !== "verified").map((org) => <div className="org-review-summary" key={org.id}><strong>{org.display_name || org.legal_name}</strong><span>Reference: {org.tracking_reference || "Pending"}</span><span>Required evidence: {(org.required_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ") || "Not specified by the service"}</span><span>Still needed: {missingEvidenceFor(org).map((item) => item.replaceAll("_", " ")).join(", ") || "No outstanding items reported"}</span>{org.verification_decision_reason ? <span>MPA feedback: {org.verification_decision_reason}</span> : null}</div>)}
                     <div className="form-error" role="note"><b>Decision boundary:</b> MPA verification is separate from representative email verification. Do not submit while required evidence is outstanding. The server remains authoritative for the final submission decision.</div>
                     <div className="org-step-actions"><button className="btn btn-ghost" type="button" onClick={() => document.getElementById("org-evidence")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Review documents</button>
                     {organizations.filter((org) => org.verification_status !== "verified" && ["owner", "administrator"].includes(org.role_code || "") && org.verification_status !== "pending" && !["submitted", "in_review", "pending"].includes(org.verification_case_status || "")).map((org) => <button className="btn btn-primary" type="button" key={org.id} disabled={missingEvidenceFor(org).length > 0} onClick={() => void submitVerification(org)}>Submit {org.display_name || "organization"} for MPA review</button>)}</div>
+                  </div>
+                ) : (
+                  <div className="org-step-panel" aria-live="polite">
+                    <span className="eyebrow">Step 5 of 5 · Tracking</span>
+                    <h3 className="h2">Track your MPA verification</h3>
+                    <p className="muted">Your submission is recorded separately from representative email verification. While it is awaiting review, no resubmission is needed. Any decision or correction request will appear here.</p>
+                    {organizations.filter((org) => org.verification_status !== "verified").map((org) => <div className="org-review-summary" key={org.id}><strong>{org.display_name || org.legal_name}</strong><span>Application reference: {org.tracking_reference || "Pending"}</span><span>Current status: {(org.verification_case_status || org.verification_status || "draft").replaceAll("_", " ")}</span><span>Submitted: {org.verification_submitted_at ? new Date(org.verification_submitted_at).toLocaleString() : "Not yet recorded"}</span>{org.verification_decision_reason ? <span>MPA feedback: {org.verification_decision_reason}</span> : null}</div>)}
+                    <div className="org-step-actions"><span className="muted">Check again for a decision or requested corrections.</span><button className="btn btn-primary" type="button" onClick={() => void load()} disabled={loading}>{loading ? "Refreshing…" : "Refresh application status"}</button></div>
                   </div>
                 )}
               </div>

@@ -254,7 +254,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(discoverPanel.getByRole("link", { name: /Serve-Community requests/ })).toHaveAttribute("href", "/service-demand");
     await expect(discoverPanel.getByRole("link", { name: /Mentorship network/ })).toHaveAttribute("href", "/mentorship?organizationId=org-e2e-1");
     await tabs.getByRole("tab", { name: /^Organization/ }).click();
-    await expect(page.getByRole("heading", { name: "Organization details and verification" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Organization", exact: true })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });

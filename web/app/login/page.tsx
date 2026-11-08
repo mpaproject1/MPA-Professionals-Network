@@ -1,10 +1,9 @@
 "use client";
-import {ArrowRight,Fingerprint,KeyRound,LogIn,ShieldCheck,UserRoundPlus} from "lucide-react";
+import {ArrowRight,Fingerprint,KeyRound,LogIn,ShieldCheck} from "lucide-react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {type FormEvent,useState} from "react";
 import {EmailVerificationGate} from "../../components/email-verification-gate";
-import {Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
 

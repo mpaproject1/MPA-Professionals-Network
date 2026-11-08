@@ -35,7 +35,7 @@ async function mockOrganizationApi(page, organizations, organizationAccess = org
     let data = {};
     if (path === "/api/v1/organizations") data = organizations;
     else if (path === "/api/v1/me/organization-access") data = organizationAccess;
-    else if (path === "/api/v1/me") data = { user_id: "e2e-org-user", roles: ["member"] };
+    else if (path === "/api/v1/me") data = { user_id: "e2e-org-user", email: "org-owner@example.org", roles: ["member"] };
     else if (path === "/api/v1/opportunity-inquiries") data = [];
     else if (/^\/api\/v1\/organizations\/[^/]+\/jobs$/.test(path)) data = [];
     else if (/^\/api\/v1\/organizations\/[^/]+\/users$/.test(path)) data = [];
@@ -78,6 +78,27 @@ test.describe("MPA organization app entry and navigation", () => {
     await page.getByRole("button", { name: "Register your organization" }).click();
     await expect(page.getByRole("heading", { name: "Tell us about your organization" })).toBeVisible();
     await expect(page.getByRole("list", { name: "Organization onboarding" }).getByRole("listitem")).toHaveCount(4);
+  });
+
+  test("guided registration advances one step at a time and saves a signed-in account draft", async ({ page }) => {
+    await mockOrganizationApi(page, []);
+    await page.goto("/organizations");
+    await dismissPrivacyChoices(page);
+    await page.getByRole("button", { name: "Register your organization" }).click();
+    await expect(page.getByRole("heading", { name: "Tell us about your organization" })).toBeVisible();
+    await page.getByLabel("Legal name").fill("Example Ethiopian Association");
+    await page.getByLabel("Display name").fill("Example Association");
+    await page.getByLabel("Organization type").selectOption("professional_association");
+    await expect.poll(() => page.evaluate(() => {
+      const raw = window.localStorage.getItem("mpa.organization-registration-draft");
+      return raw ? JSON.parse(raw).legalName : "";
+    })).toBe("Example Ethiopian Association");
+    await expect(page.getByRole("list", { name: "Organization onboarding" }).getByRole("listitem")).toHaveCount(4);
+    await page.getByRole("button", { name: /Continue/ }).click();
+    await expect(page.getByRole("heading", { name: "How can MPA contact your organization?" })).toBeVisible();
+    await expect(page.getByLabel("Institutional email")).toBeVisible();
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page.getByRole("heading", { name: "Tell us about your organization" })).toBeVisible();
   });
 
   test("inactive organization membership is not mistaken for an unregistered account", async ({ page }) => {

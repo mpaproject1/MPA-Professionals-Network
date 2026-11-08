@@ -61,7 +61,7 @@ test.describe("Serve-Community approved initiative journey",()=>{
   await page.reload();
   await expect(page.getByRole("heading",{name:"Community initiatives"})).toBeVisible();
   await expect(page.locator(".sc-owner-card").getByRole("heading",{name:"New community initiative proposal"})).toBeVisible();
-  await expect(page.locator(".sc-owner-card").getByText("draft",{exact:true})).toBeVisible();
+  await expect(page.locator(".sc-owner-card").getByText("Draft in progress",{exact:true})).toBeVisible();
 
   await page.getByRole("button",{name:"Submit for review"}).click();
   await expect.poll(()=>submissionRequest!==null).toBe(true);

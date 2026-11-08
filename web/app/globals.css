@@ -2214,7 +2214,7 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
 .mpa-organizations .org-journey-intro { max-width: 68ch; margin: .5rem 0 1rem; }
 .mpa-organizations .org-journey-intro p { color: var(--muted); line-height: 1.55; margin: .35rem 0 0; }
 .mpa-organizations .org-stepper { display: grid; gap: 1.25rem; margin-top: 1.25rem; }
-.mpa-organizations .org-stepper-track { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .5rem; list-style: none; padding: 0; margin: 0; }
+.mpa-organizations .org-stepper-track { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: .5rem; list-style: none; padding: 0; margin: 0; }
 .mpa-organizations .org-stepper-track li { min-width: 0; position: relative; }
 .mpa-organizations .org-stepper-track li::before { content: ""; position: absolute; top: 16px; left: 50%; right: -50%; height: 2px; background: var(--border); z-index: 0; }
 .mpa-organizations .org-stepper-track li:last-child::before { display: none; }

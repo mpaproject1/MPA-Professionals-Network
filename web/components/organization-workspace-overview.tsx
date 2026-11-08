@@ -168,7 +168,7 @@ function statusFor(organization: Organization) {
       : { label: "Owner action needed", detail: "MPA has requested changes. Only the organization owner or an administrator can update verification evidence and resubmit.", tone: "attention" };
   }
   if (state === "rejected") {
-    return { label: "Not approved", detail: "The application was not approved. Review the recorded decision before taking another step.", tone: "attention" };
+    return { label: "Not approved", detail: "MPA did not approve this application. Read the recorded reason and check whether updated evidence or a new submission is permitted before proceeding.", tone: "attention" };
   }
   return canManageVerification
     ? { label: "Setup in progress", detail: "Complete the required evidence checklist and submit the organization for review.", tone: "draft" }
@@ -339,7 +339,7 @@ export function OrganizationWorkspaceOverview({
         <div>
           <span className={styles.eyebrow}>MPA · Organization app</span>
           <h2 id="organization-overview-title">{hasVerifiedOrganization ? "Your organization at a glance" : "Your organization application"}</h2>
-          <p>{hasVerifiedOrganization ? "Choose a folder to continue with the work your organization is authorized to do." : "Your registration and verification status are shown below. Operational folders unlock after approval."}</p>
+          <p>{hasVerifiedOrganization ? "Your organization is verified. Choose a workspace for the work your assigned role allows." : "Follow the next required step below. Publishing and operational tools stay locked until MPA verification is approved."}</p>
         </div>
         <div className={styles.dashboardActions}>
           <label className={styles.organizationSwitcher}>
@@ -410,7 +410,7 @@ export function OrganizationWorkspaceOverview({
                 <p>{status.detail}</p>
                 {organization.verification_decision_reason ? <p className={styles.reviewNote}><strong>Reviewer feedback:</strong> {organization.verification_decision_reason}</p> : null}
                 {(organization.missing_evidence || []).length > 0 && status.tone !== "pending" ? <p className={styles.reviewNote}><strong>Outstanding:</strong> {(organization.missing_evidence || []).map((item) => item.replaceAll("_", " ")).join(", ")}</p> : null}
-                {VERIFICATION_MANAGER_ROLES.includes(organization.role_code || "") && status.tone !== "pending" && status.tone !== "verified" ? <Link className="btn btn-primary" href="/organizations#org-evidence">Continue verification</Link> : null}
+                {VERIFICATION_MANAGER_ROLES.includes(organization.role_code || "") && status.tone !== "pending" && status.tone !== "verified" ? <Link className="btn btn-primary" href="/organizations#org-evidence">{status.tone === "attention" && organization.verification_case_status === "correction_required" ? "Update requested evidence" : organization.verification_case_status === "rejected" ? "Review decision and evidence" : "Complete verification checklist"}</Link> : null}
               </article>
             );
           })}

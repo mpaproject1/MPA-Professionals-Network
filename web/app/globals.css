@@ -1815,3 +1815,396 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+
+/* Members workspace — responsive layout refinements.
+   Preserve the existing desktop composition; reflow controls and content on touch screens. */
+@media (max-width: 900px) {
+  .member-command {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100% !important;
+    min-width: 0;
+  }
+
+  .member-topline,
+  .member-section-heading,
+  .member-inline-heading,
+  .member-help-footer {
+    min-width: 0;
+  }
+
+  .member-hero {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  .member-hero > div:first-child,
+  .member-hero-action {
+    min-width: 0;
+  }
+
+  .member-hero-action {
+    grid-template-columns: 76px minmax(0, 1fr);
+    align-items: center;
+    justify-items: start;
+    column-gap: 14px;
+  }
+
+  .member-profile-ring {
+    width: 72px;
+    height: 72px;
+    grid-row: span 2;
+  }
+
+  .member-hero-action .btn {
+    width: auto;
+    max-width: 100%;
+    justify-self: stretch;
+  }
+
+  .member-hero-action > small {
+    max-width: none;
+    text-align: left;
+  }
+
+  .member-category-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    overflow: visible;
+    min-width: 0;
+    padding: 7px;
+  }
+
+  .member-category-nav button {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    min-height: 52px;
+    gap: 4px;
+    padding: 7px 3px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .member-category-nav button svg {
+    width: 17px;
+    height: 17px;
+    flex: none;
+  }
+
+  .member-section-panel,
+  .member-section-panel > *,
+  .member-section-heading > div {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .member-section-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .member-section-heading > div:first-child {
+    flex: 1 1 220px;
+  }
+
+  .member-section-heading > a,
+  .member-section-heading > div:last-child {
+    max-width: 100%;
+  }
+
+  .member-journey-track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .member-journey-track > div {
+    grid-template-columns: 25px minmax(0, 1fr);
+    align-items: center;
+    justify-items: start;
+    gap: 7px;
+    text-align: left;
+  }
+
+  .member-journey-track small {
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .member-journey-track > div > span {
+    width: 24px;
+    height: 24px;
+  }
+
+  .member-command .member-journey-detail-grid,
+  .member-command .member-destination-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .member-command .member-overview-bottom {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .member-help-footer {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .member-help-footer > div:last-child {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 620px) {
+  .member-command {
+    padding: 14px 12px calc(100px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .member-topline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin-bottom: 13px;
+  }
+
+  .member-topline > div:first-child {
+    min-width: 0;
+  }
+
+  .member-welcome {
+    overflow-wrap: anywhere;
+    font-size: clamp(25px, 7vw, 32px);
+    line-height: 1.08;
+  }
+
+  .member-topline > div:first-child > p {
+    max-width: 48ch;
+    line-height: 1.5;
+  }
+
+  .member-top-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .member-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .member-hero h2 {
+    font-size: clamp(21px, 6vw, 27px);
+    overflow-wrap: anywhere;
+  }
+
+  .member-hero p {
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .member-hero-tags {
+    gap: 6px;
+  }
+
+  .member-hero-action {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 4px 12px;
+    width: 100%;
+  }
+
+  .member-profile-ring {
+    width: 62px;
+    height: 62px;
+  }
+
+  .member-profile-ring strong {
+    font-size: 18px;
+  }
+
+  .member-hero-action .btn {
+    min-height: 40px;
+    justify-content: center;
+    font-size: 11px;
+  }
+
+  .member-hero-action > small {
+    font-size: 9px;
+    line-height: 1.35;
+  }
+
+  .member-category-nav {
+    top: calc(56px + env(safe-area-inset-top));
+    margin: 0 0 12px;
+    border-radius: 13px;
+  }
+
+  .member-category-nav button {
+    min-height: 48px;
+    font-size: 10px;
+  }
+
+  .member-category-nav button svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .member-section-heading {
+    gap: 9px;
+    margin-bottom: 11px;
+  }
+
+  .member-section-heading h2 {
+    font-size: 20px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .member-section-heading p {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .member-inline-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .member-command .member-metric-grid,
+  .member-command .member-overview-bottom,
+  .member-command .member-journey-detail-grid,
+  .member-command .member-destination-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .member-command .member-metric-grid > .card,
+  .member-command .member-journey-detail-grid > .card {
+    min-width: 0;
+    padding: 11px;
+  }
+
+  .member-metric-grid .metric {
+    font-size: clamp(20px, 6vw, 25px);
+  }
+
+  .member-journey-detail-grid h3,
+  .member-destination-card strong {
+    overflow-wrap: anywhere;
+  }
+
+  .member-destination-card {
+    min-width: 0;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .member-destination-card > svg {
+    width: 19px;
+    height: 19px;
+    flex: none;
+  }
+
+  .member-destination-card p {
+    overflow-wrap: anywhere;
+  }
+
+  .member-overview-journey {
+    padding: 12px;
+  }
+
+  .member-journey-track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px 7px;
+  }
+
+  .member-help-footer {
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .member-help-footer > div:last-child {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .member-help-footer .btn {
+    justify-content: center;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .member-command :is(input, select, textarea, button, a) {
+    max-width: 100%;
+  }
+
+  .member-command :is(input, select, textarea) {
+    min-width: 0;
+  }
+
+  .member-command table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 380px) {
+  .member-command {
+    padding-inline: 9px !important;
+  }
+
+  .member-top-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .member-category-nav {
+    gap: 3px;
+    padding: 5px;
+  }
+
+  .member-category-nav button {
+    min-height: 46px;
+    padding-inline: 1px;
+    font-size: 9px;
+  }
+
+  .member-command .member-metric-grid,
+  .member-command .member-overview-bottom,
+  .member-command .member-journey-detail-grid,
+  .member-command .member-destination-grid {
+    gap: 7px;
+  }
+
+  .member-command .member-metric-grid > .card,
+  .member-command .member-journey-detail-grid > .card {
+    padding: 9px;
+  }
+
+  .member-hero-action {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .member-profile-ring {
+    width: 54px;
+    height: 54px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .member-command .member-section-panel {
+    animation: none !important;
+  }
+}

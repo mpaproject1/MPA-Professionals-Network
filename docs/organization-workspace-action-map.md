@@ -10,7 +10,7 @@ This document maps the existing `/organizations` page actions to the reconstruct
 |---|---|---|---|
 | Start registration | `/organizations#org-registration` | `POST /api/v1/organizations` after identity and representative steps | Signed-in account; creates the organization record/draft only |
 | Identity | Step 1 in the onboarding stepper | Local form state; submitted with the registration request | Legal name, display name and organization type required |
-| Representative contact | Step 2 in the onboarding stepper | Existing registration request fields: email, phone, address | Institutional email required; no unsupported representative identity or fee fields are fabricated |
+| Institutional contact | Step 2 in the onboarding stepper | Existing registration request fields: email, phone, address | Institutional email required; no unsupported representative identity or fee fields are fabricated |
 | Save and continue | Step 3 · Documents | Existing create-registration operation | A draft is not a verified organization |
 | Upload private evidence | `/organizations#org-evidence` | `POST /api/v1/files/uploads`, authorized `PUT`, `POST /api/v1/files/uploads/:id/confirm`, then `POST /api/v1/organizations/:id/verification-evidence` | Owner/administrator only; PDF, PNG, JPEG or text; 10 MiB maximum; upload authorization and server checks remain in force |
 | Review checklist | Step 4 · Review | Existing organization response: `required_evidence`, `missing_evidence`, `tracking_reference` | Submission remains disabled in the UI when the service reports missing required evidence; server remains final authority |
@@ -27,7 +27,7 @@ Draft recovery is tied to the signed-in account email, expires after 24 hours, a
 | Overview | `/organizations`; organization outcomes endpoint `GET /api/v1/organizations/:id/outcomes` | Outcome data is displayed only when returned by the authorized API; no placeholder totals |
 | Opportunities | `/recruitment`, `/services`, `/mentorship` | Folder and action visibility follows the existing organization role allowlists |
 | Applications | `/recruitment#candidate-pipeline`, `/organizations#org-inquiries` | Candidate review and public inquiry decisions remain distinct |
-| Discover | `/network`, `/network-plus`, `/organizations/directory` | Existing access checks in each destination remain authoritative |
+| Discover | `/network`, `/network-plus`, `/organizations/directory`, `/service-demand`, `/mentorship` | Existing access checks in each destination remain authoritative |
 | Impact | `/organizations/reports` | Existing role and endpoint authorization remain authoritative |
 | Organization | `/organizations/team`, `/organizations#org-registration`, `/organizations#org-evidence` | Owner/administrator-only folder and evidence controls; the current registration UI does not expose an edit-existing-legal-profile API |
 | Connections | `/service-demand`, `/mentorship`, `/network` | Only existing workflows are linked; organization-scoped volunteer drives/skill dispatch are not represented as implemented |

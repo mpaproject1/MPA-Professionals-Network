@@ -95,7 +95,7 @@ test.describe("MPA organization app entry and navigation", () => {
     })).toBe("Example Ethiopian Association");
     await expect(page.getByRole("list", { name: "Organization onboarding" }).getByRole("listitem")).toHaveCount(4);
     await page.getByRole("button", { name: /Continue/ }).click();
-    await expect(page.getByRole("heading", { name: "How can MPA contact your organization?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Add an official institutional contact" })).toBeVisible();
     await expect(page.getByLabel("Institutional email")).toBeVisible();
     await page.getByRole("button", { name: "Back" }).click();
     await expect(page.getByRole("heading", { name: "Tell us about your organization" })).toBeVisible();

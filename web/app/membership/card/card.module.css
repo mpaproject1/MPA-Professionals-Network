@@ -17,6 +17,8 @@
 
 .shell{gap:26px;padding:clamp(20px,3vw,34px) 22px 56px}.toolbar{gap:20px}.toolbar h1{font-weight:600;line-height:1.2}.eyebrow{font-weight:600;letter-spacing:.1em}.actions{gap:10px}.primary,.secondary{min-height:44px;padding:11px 16px;border-radius:10px;font-weight:600}.primary{background:var(--brand-lemon);color:var(--brand-navy-deep)}.secondary{background:var(--surface);border-color:var(--border-strong)}.preview{background:var(--surface-muted);border:0;border-radius:18px;box-shadow:none;padding:clamp(16px,3vw,34px)}
 
+/* Reassert the physical page box after all component presentation rules. */
+@page{size:85.6mm 53.98mm!important;margin:0!important}
 /* Isolated one-card print surface. The page box itself is the physical ID-card size. */
 @media print{
  :global(html):has(.shell),:global(body):has(.shell){width:85.6mm!important;height:auto!important;min-width:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important}

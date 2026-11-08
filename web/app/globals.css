@@ -2208,3 +2208,40 @@ main.shell-main :is(th, legend, summary) { font-weight: 600; }
     animation: none !important;
   }
 }
+
+
+/* Organization onboarding stepper */
+.mpa-organizations .org-journey-intro { max-width: 68ch; margin: .5rem 0 1rem; }
+.mpa-organizations .org-journey-intro p { color: var(--muted); line-height: 1.55; margin: .35rem 0 0; }
+.mpa-organizations .org-stepper { display: grid; gap: 1.25rem; margin-top: 1.25rem; }
+.mpa-organizations .org-stepper-track { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .5rem; list-style: none; padding: 0; margin: 0; }
+.mpa-organizations .org-stepper-track li { min-width: 0; position: relative; }
+.mpa-organizations .org-stepper-track li::before { content: ""; position: absolute; top: 16px; left: 50%; right: -50%; height: 2px; background: var(--border); z-index: 0; }
+.mpa-organizations .org-stepper-track li:last-child::before { display: none; }
+.mpa-organizations .org-stepper-track button { position: relative; z-index: 1; display: flex; align-items: center; gap: .45rem; width: 100%; padding: .25rem; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: .76rem; font-weight: 700; text-align: left; }
+.mpa-organizations .org-step-number { display: inline-grid; place-items: center; flex: 0 0 2rem; width: 2rem; height: 2rem; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--text); font-size: .78rem; }
+.mpa-organizations .org-stepper-track .is-current button { color: var(--text); }
+.mpa-organizations .org-stepper-track .is-current .org-step-number,
+.mpa-organizations .org-stepper-track .is-complete .org-step-number { background: #0A3258; border-color: #0A3258; color: #fff; }
+.mpa-organizations .org-stepper-track .is-complete::before { background: #97C024; }
+.mpa-organizations .org-stepper-track button:disabled { cursor: not-allowed; opacity: .58; }
+.mpa-organizations .org-stepper-track button:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; border-radius: .5rem; }
+.mpa-organizations .org-step-panel { border: 1px solid var(--border); border-radius: 1rem; background: var(--bg); padding: clamp(.9rem,2vw,1.35rem); }
+.mpa-organizations .org-step-panel > h3 { margin: .15rem 0; }
+.mpa-organizations .org-step-panel > p { max-width: 68ch; line-height: 1.55; }
+.mpa-organizations .org-step-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; margin-top: .5rem; }
+.mpa-organizations .org-review-summary { display: grid; gap: .3rem; border: 1px solid var(--border); border-radius: .75rem; padding: .85rem; background: var(--surface); }
+.mpa-organizations .org-review-summary span { color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
+.mpa-organizations :is(input,select,textarea) { max-width: 100%; }
+@media (max-width: 620px) {
+  .mpa-organizations .org-stepper-track { gap: .2rem; }
+  .mpa-organizations .org-stepper-track button { flex-direction: column; justify-content: center; gap: .25rem; text-align: center; font-size: .66rem; }
+  .mpa-organizations .org-step-number { width: 1.8rem; height: 1.8rem; flex-basis: 1.8rem; }
+  .mpa-organizations .org-stepper-track li::before { top: 14px; }
+  .mpa-organizations .org-step-panel { padding: .8rem; }
+  .mpa-organizations .org-step-actions { align-items: stretch; }
+  .mpa-organizations .org-step-actions .btn { justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mpa-organizations .org-stepper-track * { scroll-behavior: auto !important; transition: none !important; }
+}

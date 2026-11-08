@@ -15,7 +15,7 @@ This document maps the existing `/organizations` page actions to the reconstruct
 | Upload private evidence | `/organizations#org-evidence` | `POST /api/v1/files/uploads`, authorized `PUT`, `POST /api/v1/files/uploads/:id/confirm`, then `POST /api/v1/organizations/:id/verification-evidence` | Owner/administrator only; PDF, PNG, JPEG or text; 10 MiB maximum; upload authorization and server checks remain in force |
 | Review checklist | Step 4 · Review | Existing organization response: `required_evidence`, `missing_evidence`, `tracking_reference` | Submission remains disabled in the UI when the service reports missing required evidence; server remains final authority |
 | Submit for verification | Step 4 · Review | `POST /api/v1/organizations/:id/submit-verification` | Owner/administrator; no resubmission while submitted/in review/pending; approval is not promised |
-| Track status | `/organizations#your-organizations` and status summary | `GET /api/v1/organizations`, `GET /api/v1/me/organization-access` | Shows reference, status, submission time, reviewer feedback, missing evidence and next action |
+| Track status | Step 5 · Tracking and `/organizations#your-organizations` | `GET /api/v1/organizations`, `GET /api/v1/me/organization-access` | Shows reference, status, submission time, reviewer feedback, missing evidence and next action; pending cases are not offered another submission |
 | Retry access lookup | Access-check gate | Re-runs organization and access lookups | No registration/workspace actions are exposed until both lookups succeed |
 
 Draft recovery is tied to the signed-in account email, expires after 24 hours, and is best-effort browser storage. It does not replace server persistence or store uploaded documents.

@@ -166,20 +166,12 @@ export default function Jobs(){
          .then((result) => setEligibilityByJob((current) => ({ ...current, [job.id]: result })))
          .catch((e) => setEligibilityByJob((current) => ({
            ...current,
-           [job.id]: { error: e instanceof ApiError ? e.message : "Eligibility could not be checked. Retry to refresh." },
+           [job.id]: { error: e instanceof ApiError ? e.message : "Eligibility could not be confirmed. Do not treat this opportunity as eligible until the server returns a valid result." },
          })))
          .finally(() => setEligibilityLoading((current) => ({ ...current, [job.id]: false }))),
      );
    }
    await Promise.all(tasks);
- }
- async function retryEligibility(job:Job){
-   if(!token)return;
-   setEligibilityLoading(current=>({...current,[job.id]:true}));
-   setEligibilityByJob(current=>{const next={...current};delete next[job.id];return next;});
-   try{const result=await api<Eligibility>(`/api/v1/jobs/${encodeURIComponent(job.id)}/eligibility`,{},token);setEligibilityByJob(current=>({...current,[job.id]:result}));}
-   catch(e){setEligibilityByJob(current=>({...current,[job.id]:{error:e instanceof ApiError?e.message:"Eligibility could not be checked. Retry to refresh."}}));}
-   finally{setEligibilityLoading(current=>({...current,[job.id]:false}));}
  }
 
  return <div className="mpa-jobs-page">

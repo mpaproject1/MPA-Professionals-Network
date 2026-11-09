@@ -67,7 +67,7 @@ export default function Jobs(){
      const items=Array.isArray(payload)?payload:payload?.items;
      const valid=Array.isArray(items)?items.filter(j=>j&&typeof j.id==="string"&&typeof j.title==="string"):[];
      setJobs(valid);setHasMore(Array.isArray(payload)?valid.length===pageSize:Boolean(payload.hasMore));setPage(pageIndex);
-     if(!Array.isArray(items))setError("The service returned an unexpected jobs response. Please refresh and try again.");
+     if(!Array.isArray(items))setError("The jobs service returned an incomplete response. Published opportunities are unavailable until a complete response is received.");
    }catch(e){
      setJobs([]);
      setError(e instanceof ApiError?e.message:"We couldn't load opportunities right now.");
@@ -85,7 +85,7 @@ export default function Jobs(){
      setDraftIds(Object.fromEntries(drafts.map(row=>[row.job_id,row.id])));
      setCoverLetters(Object.fromEntries(drafts.map(row=>[row.job_id,row.cover_letter||""])));
      setScreeningAnswersByJob(Object.fromEntries(drafts.map(row=>[row.job_id,Object.fromEntries((row.screening_answers||[]).map(answer=>[answer.questionId,answer.answer]))])));
-   }).catch(e=>{if(active)setError(e instanceof ApiError?e.message:"Saved application drafts could not be restored. Retry loading your applications before submitting.")});
+   }).catch(e=>{if(active)setError(e instanceof ApiError?e.message:"Saved application drafts could not be restored. Confirm the current application state in tracking before submitting another application.")});
    return ()=>{active=false};
  },[token]);
 

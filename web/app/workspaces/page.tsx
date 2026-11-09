@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
 import { Card } from "../../components/ui";
 import { api } from "../../lib/api";
-import { getAccountContext } from "../../lib/account-context";
+import { getAccountContext, getOrganizationDirectory } from "../../lib/account-context";
 import { useUiStore } from "../../lib/store";
 
 type Identity = { user_id: string; roles?: string[]; permissions?: string[] };
@@ -48,7 +48,7 @@ export default function RoleWorkspacesPage() {
   if (!token) { setIdentity(null); setOrganizations([]); setJobAssignments([]); return; }
   setLoading(true); setError("");
   try {
-   const [me, orgs, jobs] = await Promise.all([getAccountContext<Identity>(token),api<Organization[]>("/api/v1/organizations",{},token),api<JobAssignment[]>("/api/v1/me/job-assignments",{},token)]);
+   const [me, orgs, jobs] = await Promise.all([getAccountContext<Identity>(token),getOrganizationDirectory<Organization[]>(token),api<JobAssignment[]>("/api/v1/me/job-assignments",{},token)]);
    setIdentity(me); setOrganizations(Array.isArray(orgs) ? orgs.filter(org => !["inactive","revoked"].includes(String(org.status))) : []); setJobAssignments(Array.isArray(jobs) ? jobs : []);
   } catch (cause) { setIdentity(null); setOrganizations([]); setJobAssignments([]); setError(cause instanceof Error ? cause.message : "Role and organization access could not be loaded."); }
   finally { setLoading(false); }

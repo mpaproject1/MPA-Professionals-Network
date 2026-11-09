@@ -3,8 +3,8 @@ import {Bell, Bookmark, BriefcaseBusiness, Building2, CheckCircle2, GraduationCa
 import Link from "next/link";
 import {usePathname, useRouter} from "next/navigation";
 import {useEffect, useId, useRef, useState} from "react";
-import {api} from "../lib/api";
 import {clearAccountContext,getAccountContext,getOrganizationDirectory} from "../lib/account-context";
+import {api} from "../lib/api";
 import {hasProfessionalIdentity} from "../lib/identity-capabilities";
 import {useUiStore} from "../lib/store";
 import {GuideLauncher} from "./guide";

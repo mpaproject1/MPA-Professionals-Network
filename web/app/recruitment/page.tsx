@@ -8,8 +8,8 @@ import {TagInput} from "../../components/tag-input";
 import {Badge, Card} from "../../components/ui";
 import {getOrganizationDirectory} from "../../lib/account-context";
 import {humanStatus} from "../../lib/status-labels";
-import {useUiStore} from "../../lib/store";
 import {ApiError, api} from "../../lib/api";
+import {useUiStore} from "../../lib/store";
 
 type Organization={id:string;legal_name:string;display_name:string;verification_status?:string;role_code?:string};
 type Job={id:string;title:string;description?:string;status:string;posting_scope?:string;application_deadline?:string;organization_id:string};

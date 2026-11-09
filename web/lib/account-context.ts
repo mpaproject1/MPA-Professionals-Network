@@ -38,3 +38,22 @@ export function clearAccountContext(token?: string): void {
     accountRequest = null;
   }
 }
+
+let reportsToken = "";
+let reportCatalogueRequest: Promise<Array<{ id?: unknown }>> | null = null;
+
+/** Shares the stable report catalogue between the admin shell and admin home. */
+export function getAdminReportCatalogue<T = Array<{ id?: unknown }>>(token: string): Promise<T> {
+  if (!token) return Promise.reject(new Error("An authenticated session is required."));
+  if (reportsToken !== token) {
+    reportsToken = token;
+    reportCatalogueRequest = null;
+  }
+  if (!reportCatalogueRequest) {
+    reportCatalogueRequest = api<Array<{ id?: unknown }>>("/api/v1/admin/reports", {}, token).catch((error) => {
+      if (reportsToken === token) reportCatalogueRequest = null;
+      throw error;
+    });
+  }
+  return reportCatalogueRequest as Promise<T>;
+}

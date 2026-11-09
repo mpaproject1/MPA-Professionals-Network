@@ -99,7 +99,7 @@ export default function Track() {
       await api("/api/v1/job-interviews/" + encodeURIComponent(interviewId) + "/response", { method: "POST", body: JSON.stringify({ status }) }, token);
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Your interview response could not be confirmed. Refresh the timeline before retrying.");
+      setError(cause instanceof Error ? cause.message : "Your interview response could not be confirmed. Check the recorded interview status before submitting another response.");
     } finally { setInterviewAction(""); }
   }
   async function proposeInterviewChange(interviewId: string) {
@@ -134,7 +134,7 @@ export default function Track() {
       await api("/api/v1/job-applications/" + encodeURIComponent(applicationId) + "/respond", { method: "POST", body: JSON.stringify({ status }) }, token);
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Your application response could not be confirmed. Refresh the timeline before retrying.");
+      setError(cause instanceof Error ? cause.message : "Your application response could not be confirmed. Check the recorded application status before submitting another response.");
     } finally { setApplicationAction(""); }
   }
 
@@ -155,7 +155,7 @@ export default function Track() {
         token,
       );
       if (!page || !Array.isArray(page.items) || !page.summary) {
-        throw new Error("The tracking service returned an unexpected response. Please retry.");
+        throw new Error("The tracking service returned an incomplete response. Current progress is unavailable until a complete response is received.");
       }
       const next = append && dataRef.current
         ? { ...page, items: [...dataRef.current.items, ...page.items] }

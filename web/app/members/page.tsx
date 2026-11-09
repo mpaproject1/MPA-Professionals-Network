@@ -10,6 +10,7 @@ import {SupportAction} from "../../components/support-action";
 import {Badge, Card} from "../../components/ui";
 import {VolunteerPledgePanel} from "../../components/volunteer-pledge-panel";
 import {ApiError, api} from "../../lib/api";
+import {getAccountContext} from "../../lib/account-context";
 import {useUiStore} from "../../lib/store";
 
 type Me = {
@@ -120,7 +121,7 @@ export default function MembersWorkspacePage() {
     setLoading(true);
     setError("");
     const results = await Promise.allSettled([
-      api<Me>("/api/v1/me", {}, token),
+      getAccountContext<Me>(token),
       api<Tracking>("/api/v1/me/progress?limit=5", {}, token),
       api<Application[]>("/api/v1/membership/applications/me", {}, token),
       api<MembershipHistory>("/api/v1/membership/history", {}, token),

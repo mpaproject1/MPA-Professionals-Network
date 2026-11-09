@@ -9,6 +9,7 @@ import { OperationStatus } from "../../components/operation-status";
 import { ServiceImpactReportPanel } from "../../components/service-impact-report-panel";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
+import {getAccountContext} from "../../lib/account-context";
 import { humanStatus } from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 import {useSavedDiscoveryItems} from "../../lib/use-saved-discovery-items";
@@ -81,7 +82,7 @@ export default function Services(){
  const loadRequests=useCallback(async()=>{
    if(!token){setRequests([]);setDeliveries({});setDeliveryErrors({});setRequestUpdates({});setRequestUpdateErrors({});return;}
    try{
-    const [result,me]=await Promise.all([api<ServiceRequest[]>("/api/v1/me/service-requests",{},token),api<{user_id:string}>("/api/v1/me",{},token)]);
+    const [result,me]=await Promise.all([api<ServiceRequest[]>("/api/v1/me/service-requests",{},token),getAccountContext<{user_id:string}>(token)]);
     const rows=Array.isArray(result)?result:[];setRequests(rows);setCurrentUserId(me.user_id);
     const loaded=await Promise.all(rows.map(async r=>{try{return {id:r.id,rows:await api<ServiceDelivery[]>(`/api/v1/service-requests/${encodeURIComponent(r.id)}/deliveries`,{},token),error:""};}catch(e){return {id:r.id,rows:[] as ServiceDelivery[],error:e instanceof ApiError?e.message:"Delivery history could not be loaded."};}}));
     setDeliveries(Object.fromEntries(loaded.map(x=>[x.id,x.rows] as const)));setDeliveryErrors(Object.fromEntries(loaded.filter(x=>x.error).map(x=>[x.id,x.error] as const)));

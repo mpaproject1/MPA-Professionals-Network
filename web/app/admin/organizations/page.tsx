@@ -1,7 +1,7 @@
 "use client";
 
 import { Building2, ChevronDown, Search, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FormFeedback } from "../../../components/form-feedback";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
@@ -46,6 +46,7 @@ export default function AdminOrganizationsPage() {
  const [newMemberRole, setNewMemberRole] = useState<Record<string,string>>({});
  const [newMemberReason, setNewMemberReason] = useState<Record<string,string>>({});
  const [membershipBusy, setMembershipBusy] = useState("");
+ const expandedRef = useRef(expanded); expandedRef.current = expanded;
 
  const load = useCallback(async () => {
   if (!token) return;
@@ -54,11 +55,11 @@ export default function AdminOrganizationsPage() {
    const params = new URLSearchParams({ q, status, limit: "25", offset: String(page * 25) });
    const data = await api<Result>(`/api/v1/admin/organizations?${params.toString()}`, {}, token);
    setResult(data);
-   if (expanded && !data.items.some(item => item.id === expanded)) setExpanded(null);
+   if (expandedRef.current && !data.items.some(item => item.id === expandedRef.current)) setExpanded(null);
   } catch (e) {
    setError(e instanceof ApiError || e instanceof Error ? e.message : "Organization catalogue could not be loaded.");
   } finally { setBusy(false); }
- }, [token, q, status, page, expanded]);
+ }, [token, q, status, page]);
 
  useEffect(() => { hydrateToken(); }, [hydrateToken]);
  useEffect(() => { if (hydrated && token) void load(); }, [hydrated, token, load]);

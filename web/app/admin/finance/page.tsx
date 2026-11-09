@@ -6,6 +6,7 @@ import { type FinanceManualReceipt, FinanceOperationsRegister } from "../../../c
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
+import { getAccountContext } from "../../../lib/account-context";
 import { useUiStore } from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";
 
@@ -114,7 +115,7 @@ export default function FinanceWorkspacePage() {
     setError("");
     setBusy("load");
     try {
-      const me = await api<Me>("/api/v1/me", {}, token);
+      const me = await getAccountContext<Me>(token);
       const roles = Array.isArray(me.roles) ? me.roles : [];
       const permissions = Array.isArray(me.permissions) ? me.permissions : [];
       const financeRole = roles.includes("finance_officer");

@@ -294,6 +294,7 @@ export default function Organizations() {
         },
         token,
       );
+      invalidateOrganizationDirectory(token);
       setOrganizations((current) => [
         created,
         ...current.filter((x) => x.id !== created.id),

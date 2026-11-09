@@ -2,7 +2,6 @@
 import {
   Building2,
   FileCheck2,
-  RefreshCw,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
@@ -140,7 +139,7 @@ export default function Organizations() {
     const results = await Promise.allSettled([
       api<Organization[]>("/api/v1/organizations", {}, token),
       api<Inquiry[]>("/api/v1/opportunity-inquiries?type=job", {}, token),
-      api<{ roles?: string[] }>("/api/v1/me", {}, token),
+      api<{ roles?: string[]; email?: string; user?: { email?: string } }>("/api/v1/me", {}, token),
       api<OrganizationAccess[]>("/api/v1/me/organization-access", {}, token),
     ]);
     const organizationResult = results[0];
@@ -187,6 +186,10 @@ export default function Organizations() {
       if (message) setError((current) => current || message);
     }
     const meResult = results[2];
+    const loadedAccountEmail = meResult.status === "fulfilled"
+      ? String(meResult.value.email || meResult.value.user?.email || "").trim().toLowerCase()
+      : "";
+    setAccountEmail(loadedAccountEmail);
     if (
       meResult.status === "fulfilled" &&
       (meResult.value.roles || []).some((role) =>
@@ -217,14 +220,10 @@ export default function Organizations() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("register") === "1") setShowForm(true);
-    if (!token) return;
+    if (!token || !accountEmail) return;
     let cancelled = false;
     async function restoreDraft() {
       try {
-        const me = await api<{ email?: string; user?: { email?: string } }>("/api/v1/me", {}, token);
-        if (cancelled) return;
-        const accountEmail = String(me.email || me.user?.email || "").trim().toLowerCase();
-        setAccountEmail(accountEmail);
         const raw = localStorage.getItem("mpa.organization-registration-draft");
         if (!raw) return;
         const draft = JSON.parse(raw);
@@ -246,7 +245,7 @@ export default function Organizations() {
     }
     void restoreDraft();
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, accountEmail]);
 
   useEffect(() => {
     if (!accountEmail || registrationCreated) return;
@@ -599,7 +598,6 @@ export default function Organizations() {
             onActiveFolderChange={setActiveOrganizationFolder}
             authenticated={Boolean(token)}
             organizationLookupReady={organizationLookupReady}
-            onRetry={() => void load()}
             onRegister={() => {
               if (!token) {
                 window.location.assign("/login?next=/organizations");
@@ -715,7 +713,7 @@ export default function Organizations() {
                     <h3 className="h2">Track your MPA verification</h3>
                     <p className="muted">Your submission is recorded separately from representative email verification. While it is awaiting review, no resubmission is needed. Any decision or correction request will appear here.</p>
                     {organizations.filter((org) => org.verification_status !== "verified").map((org) => <div className="org-review-summary" key={org.id}><strong>{org.display_name || org.legal_name}</strong><span>Application reference: {org.tracking_reference || "Pending"}</span><span>Current status: {(org.verification_case_status || org.verification_status || "draft").replaceAll("_", " ")}</span><span>Submitted: {org.verification_submitted_at ? new Date(org.verification_submitted_at).toLocaleString() : "Not yet recorded"}</span>{org.verification_decision_reason ? <span>MPA feedback: {org.verification_decision_reason}</span> : null}</div>)}
-                    <div className="org-step-actions"><span className="muted">Check again for a decision or requested corrections.</span><button className="btn btn-primary" type="button" onClick={() => void load()} disabled={loading}>{loading ? "Refreshing…" : "Refresh application status"}</button></div>
+                    <div className="org-step-actions"><span className="muted">Your latest recorded application status and MPA feedback are shown above.</span></div>
                   </div>
                 )}
               </div>
@@ -734,15 +732,6 @@ export default function Organizations() {
                   are shown.
                 </p>
               </div>
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => void load()}
-                disabled={loading}
-              >
-                <RefreshCw size={16} />
-                {loading ? "Checking organizations…" : "Check latest organizations"}
-              </button>
             </div>
             {loading && <OperationStatus state="loading" title="Checking your organizations" detail="We’re retrieving organizations linked to your signed-in account. This does not change your organization records." /> }
             {!loading && organizations.length === 0 && (
@@ -1138,7 +1127,7 @@ export default function Organizations() {
           )}
         </>
       )}
-      {error && <FormFeedback kind="error" message={error} onRetry={()=>void load()} retryLabel="Reload workspace" />}
+      {error && <FormFeedback kind="error" message={error} />}
       {notice && <FormFeedback kind="success" message={notice} />}
       <Card>
         <div className="row">

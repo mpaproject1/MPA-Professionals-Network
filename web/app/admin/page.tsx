@@ -1,5 +1,5 @@
 "use client";
-import { ClipboardList, RefreshCw, ShieldCheck, UserCog } from "lucide-react";
+import { ClipboardList, ShieldCheck, UserCog } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
@@ -217,14 +217,13 @@ export default function AdminPage() {
                 return <a className={styles.moduleCard} href={operationalQueueLinks[queue] || "/admin/reports"} key={queue}><span className={styles.moduleIcon}><ClipboardList size={20} aria-hidden="true"/></span><span className={styles.moduleCopy}><small>{unreviewed ? "Needs review" : "Queue snapshot"}</small><strong>{queue}</strong><span>{requests} requests in the report; {unreviewed} unreviewed. Counts are grouped by stored status.</span></span><span className={styles.moduleArrow} aria-hidden="true">↗</span></a>;
               })}
             </div>
-          </> : <Card><p className="muted">No queue report snapshot has been loaded yet.</p><button type="button" className="btn btn-ghost" onClick={() => void loadOperationalQueues()}>Load queue counts</button></Card>}
+          </> : <Card><p className="muted">Authoritative queue counts are unavailable because no valid report snapshot has been confirmed. No zero or partial count is being substituted.</p></Card>}
         </section>
       )}
       {error && (
         <div className="field-banner" role="alert">
           <ShieldCheck size={18} />
           <span>{error}</span>
-          <button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={loading}>{loading ? "Checking…" : "Retry overview"}</button>
         </div>
       )}
       {sectionErrors.length > 0 && (

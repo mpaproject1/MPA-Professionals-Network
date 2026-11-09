@@ -127,7 +127,7 @@ export default function Jobs(){
        await api("/api/v1/job-applications/"+encodeURIComponent(draftId),{method:"PATCH",body:JSON.stringify({coverLetter:coverLetters[job.id]||"",answers:answersFor(job.id),referralCode:referralCode,referralStatusConsent})},token);
      }
      setNotice("Your application draft is saved to your account. You can return to it before submitting.");
-   }catch(e){setError(e instanceof ApiError?e.message:"We couldn't save this draft. Your text is still on this page; retry before leaving.");}
+   }catch(e){setError(e instanceof ApiError?e.message:"We couldn't confirm the saved draft. Keep this page open and confirm the draft in application tracking before leaving.");}
    finally{setApplyingIds(current=>({...current,[job.id]:false}));}
  }
 

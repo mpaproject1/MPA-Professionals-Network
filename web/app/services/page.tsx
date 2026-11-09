@@ -9,7 +9,7 @@ import { OperationStatus } from "../../components/operation-status";
 import { ServiceImpactReportPanel } from "../../components/service-impact-report-panel";
 import {Badge, Card} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
-import {getAccountContext} from "../../lib/account-context";
+import {getAccountContext,getOrganizationDirectory} from "../../lib/account-context";
 import { humanStatus } from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 import {useSavedDiscoveryItems} from "../../lib/use-saved-discovery-items";
@@ -76,7 +76,7 @@ export default function Services(){
  },[token]);
  const loadProviderWorkspace=useCallback(async()=>{
    if(!token){setMyListings([]);setOrganizations([]);return;}
-   try{const [listings,orgs]=await Promise.all([api<ProviderListing[]>("/api/v1/me/service-listings",{},token),api<Org[]>("/api/v1/organizations",{},token)]);setMyListings(Array.isArray(listings)?listings:[]);const organizationRows=Array.isArray(orgs)?orgs:[];setOrganizations(organizationRows);const requestedOrganizationId=typeof window!=="undefined"?new URLSearchParams(window.location.search).get("organizationId")||"":"";setProviderForm(current=>({...current,organizationId:current.organizationId&&organizationRows.some(org=>org.id===current.organizationId)?current.organizationId:requestedOrganizationId&&organizationRows.some(org=>org.id===requestedOrganizationId)?requestedOrganizationId:current.organizationId}));}
+   try{const [listings,orgs]=await Promise.all([api<ProviderListing[]>("/api/v1/me/service-listings",{},token),getOrganizationDirectory<Org[]>(token)]);setMyListings(Array.isArray(listings)?listings:[]);const organizationRows=Array.isArray(orgs)?orgs:[];setOrganizations(organizationRows);const requestedOrganizationId=typeof window!=="undefined"?new URLSearchParams(window.location.search).get("organizationId")||"":"";setProviderForm(current=>({...current,organizationId:current.organizationId&&organizationRows.some(org=>org.id===current.organizationId)?current.organizationId:requestedOrganizationId&&organizationRows.some(org=>org.id===requestedOrganizationId)?requestedOrganizationId:current.organizationId}));}
    catch(e){setError(e instanceof ApiError?e.message:"Your provider workspace could not be loaded.");}
  },[token]);
  const loadRequests=useCallback(async()=>{

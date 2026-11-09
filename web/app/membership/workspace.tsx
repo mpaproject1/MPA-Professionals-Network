@@ -1,9 +1,10 @@
 "use client";
-import {ArrowRight,CheckCircle2,ClipboardCheck,RefreshCw,ShieldCheck,X} from "lucide-react";
+import {ArrowRight,CheckCircle2,ClipboardCheck,ShieldCheck,X} from "lucide-react";
 import {type FormEvent,useCallback,useEffect,useRef,useState} from "react";
 import {FormFeedback} from "../../components/form-feedback";
 import { OperationStatus } from "../../components/operation-status";
 import {Badge, Card} from "../../components/ui";
+import {getAccountContext} from "../../lib/account-context";
 import {ApiError, api} from "../../lib/api";
 import { uploadPrivateFile } from "../../lib/private-upload";
 import {useUiStore} from "../../lib/store";
@@ -22,6 +23,7 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
  const token=useUiStore(s=>s.token),hydrated=useUiStore(s=>s.hydrated);
  const [products,setProducts]=useState<Product[]>([]),[applications,setApplications]=useState<Application[]>([]),[reviewApplications,setReviewApplications]=useState<Application[]>([]),[roles,setRoles]=useState<string[]>([]),[permissions,setPermissions]=useState<string[]>([]);
  const [productCode,setProductCode]=useState(""),[applicationType,setApplicationType]=useState("new");
+ const productCodeRef=useRef(productCode); productCodeRef.current=productCode;
  const [correction,setCorrection]=useState<Record<string,string>>({});
 
  const [attachmentFiles,setAttachmentFiles]=useState<Record<string,File|null>>({});
@@ -54,19 +56,19 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
    const [productsResult,applicationsResult,meResult,cardResult]=await Promise.all([
     settle(api<Product[]>("/api/v1/membership/products")),
     token?settle(api<Application[]>("/api/v1/membership/applications/me",{},token)):Promise.resolve({value:[] as Application[]|null,error:null as unknown}),
-    token?settle(api<Me>("/api/v1/me",{},token)):Promise.resolve({value:null as Me|null,error:null as unknown}),
+    token?settle(getAccountContext<Me>(token)):Promise.resolve({value:null as Me|null,error:null as unknown}),
     token?settle(api<MembershipCardSummary>("/api/v1/membership/card",{},token)):Promise.resolve({value:null as MembershipCardSummary|null,error:null as unknown})
    ]);
    if(productsResult.error){
     setProducts([]);
-    failures.push(productsResult.error instanceof ApiError?productsResult.error.message:"Membership plans and products could not be loaded. Retry without losing your account status.");
+    failures.push(productsResult.error instanceof ApiError?productsResult.error.message:"Membership plans and products are unavailable. No plan is shown as available until a complete response is received.");
    }else if(Array.isArray(productsResult.value)){
     const productRows=productsResult.value;
     setProducts(productRows);
-    if(!productCode&&productRows.length)setProductCode(productRows[0].product_code);
+    if(!productCodeRef.current&&productRows.length){productCodeRef.current=productRows[0].product_code;setProductCode(productRows[0].product_code);}
    }else{
     setProducts([]);
-    failures.push("The membership service returned an unexpected product response. Refresh and try again.");
+    failures.push("The membership service returned an incomplete product response. Available plans cannot be confirmed.");
    }
    if(!token){
     setApplications([]);setReviewApplications([]);setRoles([]);setPermissions([]);setHasActiveMembership(false);setMembershipStatusUnavailable(false);setMembershipPaymentVerificationRequired(false);setMembershipCard(null);setMembershipCardError("");setRenewalMode(false);
@@ -104,7 +106,7 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
      setProfessionalDetails(current=>({...current,fullName:current.fullName||String(me.display_name||[me.first_name,me.middle_name,me.last_name].filter(Boolean).join(" ")),sector:current.sector||""}));
      if(confirmedActiveMembership){
       if(cardResult.value){setMembershipCard(cardResult.value);setMembershipCardError("");}
-      else{setMembershipCard(null);setMembershipCardError(cardResult.error instanceof ApiError?cardResult.error.message:"Your membership is active, but the membership ID could not be loaded. Retry or contact membership support.");}
+      else{setMembershipCard(null);setMembershipCardError(cardResult.error instanceof ApiError?cardResult.error.message:"Your membership is active, but the membership ID could not be confirmed. Contact membership support before relying on the ID status.");}
      }else{setMembershipCard(null);setMembershipCardError(me.membership_payment_verification_required?(cardResult.error instanceof ApiError?cardResult.error.message:"Finance must confirm full historical fee settlement before a membership ID can be issued."):"");}
      if(adminWorkspace&&((me.roles||[]).some(role=>["reviewer","membership_reviewer","system_admin"].includes(role))||(me.permissions||[]).some(permission=>["membership.review","members.view"].includes(permission)))){
       try{const review=await api<Application[]>("/api/v1/review/membership/applications",{},token);setReviewApplications(Array.isArray(review)?review:[]);}
@@ -112,14 +114,14 @@ export default function MembershipWorkspace({adminWorkspace=false}:{adminWorkspa
      }else setReviewApplications([]);
      if(adminWorkspace&&((me.roles||[]).some(role=>["system_admin","reviewer"].includes(role))||(me.permissions||[]).some(permission=>["members.view","members.manage"].includes(permission)))){
       try{const plans=await api<AdminPlan[]>("/api/v1/admin/membership/products",{},token);setAdminPlans(Array.isArray(plans)?plans:[]);setAdminPlansError("");}
-      catch(adminError){setAdminPlans([]);setAdminPlansError(adminError instanceof ApiError?adminError.message:"Membership plans could not be loaded. Retry before assuming no plans are available.");}
+      catch(adminError){setAdminPlans([]);setAdminPlansError(adminError instanceof ApiError?adminError.message:"Membership plans could not be confirmed. No plan is presented as available until an authorized response is received.");}
      }else{setAdminPlans([]);setAdminPlansError("");}
     }
    }
    if(failures.length)setError(failures.join(" "));
   }catch(error){setError(error instanceof ApiError?error.message:"We couldn't load membership information.");}
   finally{setLoading(false);}
- },[token,productCode,adminWorkspace]);
+ },[token,adminWorkspace]);
  useEffect(()=>{if(hydrated)void load();},[hydrated,load]);
  useEffect(()=>{if(!hydrated||!token||!accountIdentity.email)return;setApplicationDraftRestoredFor("");setDraftPersistenceAvailable(false);try{const saved=JSON.parse(sessionStorage.getItem("mpa-membership-application-draft")||"null");if(saved&&saved.email===accountIdentity.email){setProductCode(typeof saved.productCode==="string"?saved.productCode:"");setApplicationType(saved.applicationType==="renewal"?"renewal":"new");setProfessionalDetails({fullName:String(saved.professionalDetails?.fullName||""),sector:String(saved.professionalDetails?.sector||""),linkedinOrCvUrl:String(saved.professionalDetails?.linkedinOrCvUrl||""),institutionalAffiliation:String(saved.professionalDetails?.institutionalAffiliation||"")});setEligibilityConfirmed(saved.eligibilityConfirmed===true);setApplicationStep([1,2,3,4].includes(saved.applicationStep)?saved.applicationStep:1);setApplicationModalOpen(saved.applicationModalOpen===true&&saved.applicationStep!==4);}else{setProfessionalDetails({fullName:"",sector:"",linkedinOrCvUrl:"",institutionalAffiliation:""});setEligibilityConfirmed(false);setApplicationStep(1);setApplicationModalOpen(false);setApplicationType("new");}}catch{setApplicationStep(1);setApplicationModalOpen(false);}setApplicationDraftRestoredFor(accountIdentity.email);},[hydrated,token,accountIdentity.email]);
  useEffect(()=>{if(!accountIdentity.email||applicationDraftRestoredFor!==accountIdentity.email)return;try{const key="mpa-membership-application-draft";if(applicationStep===4){sessionStorage.removeItem(key);return;}if(!applicationModalOpen&&applicationStep===1)return;sessionStorage.setItem(key,JSON.stringify({email:accountIdentity.email,productCode,applicationType,professionalDetails,eligibilityConfirmed,applicationStep,applicationModalOpen}));setDraftPersistenceAvailable(true);}catch{setDraftPersistenceAvailable(false);}},[accountIdentity.email,applicationDraftRestoredFor,productCode,applicationType,professionalDetails,eligibilityConfirmed,applicationStep,applicationModalOpen]);

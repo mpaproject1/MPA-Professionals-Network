@@ -112,7 +112,7 @@ export default function MembershipAdminWorkspace() {
     if (!token) return;
     setLoading(true);
     try {
-      const me = await api<Me>("/api/v1/me", {}, token);
+      const me = await getAccountContext<Me>(token);
       const roles = Array.isArray(me.roles) ? me.roles : [];
       const permissions = Array.isArray(me.permissions) ? me.permissions : [];
       const managePlans = roles.includes("system_admin") || permissions.includes("members.manage");

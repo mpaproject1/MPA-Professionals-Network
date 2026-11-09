@@ -235,7 +235,7 @@ export default function Profile() {
       setError(
         e instanceof ApiError
           ? e.message
-          : "We couldn't load your account profile. Please try again.",
+          : "Your account profile could not be loaded. Profile actions remain unavailable until a complete response is received.",
       );
     } finally {
       setLoading(false);
@@ -458,7 +458,7 @@ export default function Profile() {
       setSavingPreferences(false);
     }
   }
-  useEffect(()=>{let active=true;if(!token){setMembershipApplications([]);setMembershipReferencesError("");return;}void api<ProfileMembershipApplication[]>("/api/v1/membership/applications/me",{},token).then(rows=>{if(active){setMembershipApplications(Array.isArray(rows)?rows:[]);setMembershipReferencesError("");}}).catch(()=>{if(active)setMembershipReferencesError("Membership references could not be loaded. Refresh or open Membership to retry; no internal record IDs are displayed.");});return()=>{active=false;}},[token]);
+  useEffect(()=>{let active=true;if(!token){setMembershipApplications([]);setMembershipReferencesError("");return;}void api<ProfileMembershipApplication[]>("/api/v1/membership/applications/me",{},token).then(rows=>{if(active){setMembershipApplications(Array.isArray(rows)?rows:[]);setMembershipReferencesError("");}}).catch(()=>{if(active)setMembershipReferencesError("Membership references could not be loaded. Open Membership to review the authoritative status; no internal record IDs are displayed.");});return()=>{active=false;}},[token]);
   async function copyDisplayReference(value:string){const ref=String(value||"").trim();if(!ref){setCopyNotice("A display reference has not been assigned yet.");return;}try{await navigator.clipboard.writeText(ref);setCopyNotice("Reference copied to clipboard.");}catch{setCopyNotice("Clipboard access is unavailable. Select the displayed reference and copy it manually.");}}
   const update = (key: keyof typeof blank, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));

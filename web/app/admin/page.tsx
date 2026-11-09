@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
+import { getAccountContext } from "../../lib/account-context";
 import { useUiStore } from "../../lib/store";
 import styles from "./admin-overview.module.css";
 import { AdminPageHeader } from "./admin-page-header";
@@ -68,7 +69,7 @@ export default function AdminPage() {
     };
     const tasks: Promise<void>[] = [];
     try {
-      const me = await api<any>("/api/v1/me", {}, token);
+      const me = await getAccountContext<any>(token);
       const currentRoles = Array.isArray(me?.roles) ? me.roles.map((role: any) => typeof role === "string" ? role : role?.role_code).filter(Boolean) : [];
       setRoles(currentRoles);
       const currentPermissions = Array.isArray(me?.permissions) ? me.permissions.map((permission: any) => typeof permission === "string" ? permission : permission?.permission_code).filter((permission: unknown): permission is string => typeof permission === "string") : [];

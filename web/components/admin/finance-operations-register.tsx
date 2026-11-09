@@ -4,7 +4,7 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "re
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
 import { FinanceMembershipObligations } from "../finance-membership-obligations";
-import { Badge, Card } from "../ui";
+import { Badge, Card, OperationStatus } from "../ui";
 
 export type FinancePaymentRow = {
   payment_id: string; payment_status: string; amount: string | number; currency: string;
@@ -24,7 +24,7 @@ export type FinanceManualReceipt = {
 };
 type Tab = "register" | "queue" | "reconciliation" | "refunds" | "outstanding";
 type Props = {
-  payments: FinancePaymentRow[]; receipts: FinanceManualReceipt[]; historicalPanel?: ReactNode;
+  payments: FinancePaymentRow[]; receipts: FinanceManualReceipt[]; receiptsError?: string; historicalPanel?: ReactNode;
   canVerify: boolean; canReverse: boolean; canIssueVoucher: boolean; busy: string;
   onPreview: (fileId: string, fileName: string) => void;
   onVerifyPayment: (id: string, decision: "approved" | "needs_correction" | "rejected", note: string) => void;
@@ -39,7 +39,7 @@ const label = (value?: string | null) => (value || "—").replaceAll("_"," ");
 const statusTone = (status: string): "green" | "gold" | "slate" => ["succeeded","verified"].includes(status) ? "green" : ["pending","recorded"].includes(status) ? "gold" : "slate";
 const date = (value?: string | null) => value ? new Date(value).toLocaleDateString() : "—";
 
-export function FinanceOperationsRegister({payments,receipts,historicalPanel,canVerify,canReverse,canIssueVoucher,busy,onPreview,onVerifyPayment,onReversePayment,onVerifyReceipt,onReverseReceipt,onIssueVoucher,onRefresh}:Props) {
+export function FinanceOperationsRegister({payments,receipts,receiptsError,historicalPanel,canVerify,canReverse,canIssueVoucher,busy,onPreview,onVerifyPayment,onReversePayment,onVerifyReceipt,onReverseReceipt,onIssueVoucher,onRefresh}:Props) {
   const [tab,setTab]=useState<Tab>("register");
   const [status,setStatus]=useState("all");
   const [account,setAccount]=useState("all");
@@ -145,6 +145,7 @@ export function FinanceOperationsRegister({payments,receipts,historicalPanel,can
 
 
   return <div className="grid" style={{gap:12}}>
+    {receiptsError ? <OperationStatus state="error" title="Manual receipt records unavailable" detail={`The register below includes only confirmed membership payment records. Combined totals are incomplete. ${receiptsError}`} /> : null}
     <Card>
       <div className="row" style={{justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         <div><div className="eyebrow">FINANCE OPERATIONS</div><h2 className="h2" style={{marginBottom:2}}>Financial position</h2><p className="muted">Live records · totals are record counts, not cross-currency sums</p></div>

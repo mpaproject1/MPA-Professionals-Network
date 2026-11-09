@@ -1,12 +1,13 @@
 "use client";
 
-import { Activity, ArrowDownToLine, ArrowRight, BarChart3, CalendarDays, CreditCard, Download, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowRight, BarChart3, CalendarDays, CreditCard, Download, ShieldCheck, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MemberGeographySummary } from "../../../components/member-geography-summary";
 import { MembershipFeeBalanceSummary } from "../../../components/membership-fee-balance-summary";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
+import { getAccountContext } from "../../../lib/account-context";
 import { useUiStore } from "../../../lib/store";
 import { AdminPageHeader } from "../admin-page-header";
 import styles from "./membership-center.module.css";
@@ -137,7 +138,7 @@ export default function MembershipCenterPage() {
     setBusy(true);
     setError("");
     try {
-      const me = await api<Me>("/api/v1/me", {}, token);
+      const me = await getAccountContext<Me>(token);
       const currentRoles = Array.isArray(me.roles) ? me.roles : [];
       const currentPermissions = Array.isArray(me.permissions) ? me.permissions : [];
       const allowed = currentRoles.some(role => ["system_admin", "admin", "reviewer", "membership_reviewer"].includes(role)) ||
@@ -288,11 +289,11 @@ export default function MembershipCenterPage() {
   ] as [string, string, boolean][];
 
   return <div className={styles.page}>
-    <AdminPageHeader eyebrow="MPA · Membership management" title="Membership Center" description="One place to review applications, understand the paid membership base and monitor renewal risk." actions={<button className="btn btn-ghost" type="button" onClick={() => void load(filters)} disabled={busy}><RefreshCw size={16}/>{busy ? "Refreshing…" : "Refresh data"}</button>} />
+    <AdminPageHeader eyebrow="MPA · Membership management" title="Membership Center" description="One place to review applications, understand the paid membership base and monitor renewal risk." />
     <nav className={styles.nav} aria-label="Membership management sections">
       {nav.map(([label, href, active]) => <a key={label} href={href} aria-current={active ? "page" : undefined} className={active ? styles.navActive : ""}>{label}</a>)}
     </nav>
-    {error && <Card><OperationStatus state="error" title="Membership data could not be fully verified" detail={error} action={<button className="btn btn-ghost" type="button" onClick={() => void load(filters)}>Retry</button>} /></Card>}
+    {error && <Card><OperationStatus state="error" title="Membership data could not be fully verified" detail={error} /></Card>}
     <section className={styles.filterPanel} aria-label="Membership report filters">
       <div className={styles.filterTitle}><div><strong>Reporting period</strong><span>The date range filters application cohorts and queue-ageing reports using Addis Ababa civil dates. Current member stock is a snapshot; renewal is a rolling 90-day expiry view. Cohort conversion counts only cohorts mature enough for each 30/90-day observation window.</span></div><Badge tone="slate">Calendar reporting filters</Badge></div>
       <div className={styles.filters}>

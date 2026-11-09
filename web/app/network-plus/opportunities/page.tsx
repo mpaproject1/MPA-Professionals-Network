@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NetworkPlusAccessGuard } from "../../../components/network-plus-access-guard";
 import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
+import { getOrganizationDirectory } from "../../../lib/account-context";
 
 type Taxon={code:string;parent_code:string|null;label:string;description:string;listing_kinds:string[];field_schema:{code:string;label:string;type:string;options?:string[];required?:boolean}[]};
 type Business={id:string;display_name:string;business_kind:string;description?:string;website?:string|null;location_label?:string|null;verification_status:string;moderation_status:string;publication_status:string};
@@ -56,7 +57,7 @@ export default function NetworkPlusOpportunitiesPage(){
    const [tax,biz,org,my,geo]=await Promise.all([
     api<Taxon[]>("/api/v1/network-plus/listing-taxonomy",{},token),
     api<Business[]>("/api/v1/network-plus/my/businesses",{},token),
-    api<Organization[]>("/api/v1/organizations",{},token),
+    getOrganizationDirectory<Organization[]>(token),
     api<Listing[]>("/api/v1/network-plus/my/listings",{},token),
     api<GeoReference>("/api/v1/network-plus/geography-reference",{},token)
    ]);

@@ -21,7 +21,7 @@ import { MemberResidenceEditor } from "../../components/member-residence-editor"
 import { OperationStatus } from "../../components/operation-status";
 import { SupportAction } from "../../components/support-action";
 import { Badge, Card } from "../../components/ui";
-import { getAccountContext } from "../../lib/account-context";
+import { getAccountContext, invalidateAccountContext } from "../../lib/account-context";
 import { ApiError, api } from "../../lib/api";
 import { hasProfessionalIdentity } from "../../lib/identity-capabilities";
 import { useUiStore } from "../../lib/store";
@@ -285,6 +285,7 @@ export default function Profile() {
       const stored = await api<{id:string}>(`/api/v1/files/uploads/${encodeURIComponent(upload.uploadId)}/confirm`, { method: "POST", body: "{}" }, token);
       await api("/api/v1/me/profile-picture", { method: "PATCH", body: JSON.stringify({ fileObjectId: stored.id }) }, token);
       setProfile(current => current ? { ...current, profile_picture_file_id: stored.id } : current);
+      invalidateAccountContext(token);
       setNotice("Profile picture updated. You can now print your membership card.");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : (e instanceof Error ? e.message : "We couldn't update your profile picture."));
@@ -296,6 +297,7 @@ export default function Profile() {
     try {
       await api("/api/v1/me/profile-picture", { method: "DELETE" }, token);
       setProfile(current => current ? { ...current, profile_picture_file_id: null } : current);
+      invalidateAccountContext(token);
       setNotice("Profile picture removed. Your membership card will use its photo placeholder.");
     } catch (e) { setError(e instanceof ApiError ? e.message : "We couldn't remove your profile picture."); }
     finally { setUploadingPicture(false); }
@@ -327,6 +329,7 @@ export default function Profile() {
         token,
       );
       setProfile(updated);
+      invalidateAccountContext(token);
       setForm({
         firstName: updated.first_name || "",
         middleName: updated.middle_name || "",

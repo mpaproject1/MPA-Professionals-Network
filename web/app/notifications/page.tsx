@@ -4,8 +4,8 @@ import Link from "next/link";
 import {useCallback, useEffect, useState} from "react";
 import {OperationStatus} from "../../components/operation-status";
 import {PushNotificationSettings} from "../../components/push-notification-settings";
-import {ApiError, api} from "../../lib/api";
 import {getAccountContext} from "../../lib/account-context";
+import {ApiError, api} from "../../lib/api";
 import {useUiStore} from "../../lib/store";
 
 type Category="all"|"membership"|"verification"|"opportunities"|"recruitment"|"organizations"|"mentorship"|"services"|"events_learning"|"community_impact"|"community_campaign"|"network_plus"|"security"|"system";

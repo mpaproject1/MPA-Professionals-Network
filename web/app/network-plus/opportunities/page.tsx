@@ -52,7 +52,7 @@ export default function NetworkPlusOpportunitiesPage(){
  const payload=useMemo(()=>({listingKind,categoryCode:categoryCode||null,subcategoryCode:subcategoryCode||null,title,summary,description,structuredAttributes:attributes,wizardStep:step,audience,deliveryMode,locationLabel,capacity,pricingModel,priceAmount,currency:["fixed","hourly","unit","range","subscription"].includes(pricingModel)?currency:null,pricingDetails,geographyVersionId:geography.version?.id||null,geographyUnitIds,remoteAvailable,serviceRadiusKm,availabilityStatus,leadTimeDays,activeWorkLimit,timezone,nextAvailableAt,targetAudience,secondaryTags}),[listingKind,categoryCode,subcategoryCode,title,summary,description,attributes,step,audience,deliveryMode,locationLabel,capacity,pricingModel,priceAmount,currency,pricingDetails,geography.version?.id,geographyUnitIds,remoteAvailable,serviceRadiusKm,availabilityStatus,leadTimeDays,activeWorkLimit,timezone,nextAvailableAt,targetAudience,secondaryTags]);
 
  const load=useCallback(async()=>{
-  if(!token){setLoading(false);return;}setLoading(true);setError("");
+  if(!token){setTaxonomy([]);setBusinesses([]);setOrganizations([]);setMine([]);setGeography({version:null,countries:[],regions:[],federalCities:[],children:[]});setBusinessId("");businessIdRef.current="";setLoading(false);return;}setLoading(true);setError("");
   try{
    const [tax,biz,org,my,geo]=await Promise.all([
     api<Taxon[]>("/api/v1/network-plus/listing-taxonomy",{},token),
@@ -63,7 +63,7 @@ export default function NetworkPlusOpportunitiesPage(){
    ]);
    setTaxonomy(tax||[]);setBusinesses(biz||[]);setOrganizations(org||[]);setMine(my||[]);setGeography(geo||{version:null,countries:[],regions:[],federalCities:[],children:[]});
    if(!businessIdRef.current&&biz?.length)setBusinessId(biz[0].id);
-  }catch(e){setError(e instanceof ApiError?e.message:"Network-Plus directory could not be loaded.");}
+  }catch(e){setTaxonomy([]);setBusinesses([]);setOrganizations([]);setMine([]);setGeography({version:null,countries:[],regions:[],federalCities:[],children:[]});setBusinessId("");businessIdRef.current="";setError(e instanceof ApiError?e.message:"Network-Plus directory could not be loaded.");}
   finally{setLoading(false);}
  },[token]);
  useEffect(()=>{void load();},[load]);

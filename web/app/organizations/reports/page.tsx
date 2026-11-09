@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Printer, RefreshCw } from "lucide-react";
+import { FileText, Printer } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { FormFeedback } from "../../../components/form-feedback";
 import { OperationStatus } from "../../../components/operation-status";
@@ -143,7 +143,7 @@ export default function OrganizationReportsPage() {
         <button className="btn btn-primary" type="button" onClick={() => { setNotice("Use your browser's print dialog and choose Save as PDF to export this currently loaded report."); window.print(); }} disabled={!outcomes || loadingOutcomes}><Printer size={16} aria-hidden="true" /> Print / Save as PDF</button>
       </div>
     </div>
-    {error && <FormFeedback kind="error" message={error} onRetry={() => { if (!organizationId) void loadOrganizations(); else void loadOutcomes(); }} retryLabel="Retry loading report" />}
+    {error && <FormFeedback kind="error" message={error} />}
     {notice && <FormFeedback kind="success" message={notice} />}
     <Card>
       <div className="row" style={{ alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
@@ -153,13 +153,13 @@ export default function OrganizationReportsPage() {
             {organizations.map(org => <option key={org.id} value={org.id}>{org.display_name} — {org.legal_name}</option>)}
           </select>
         </label>
-        <button type="button" className="btn btn-ghost" onClick={() => void loadOrganizations()} disabled={loadingOrganizations || loadingOutcomes}><RefreshCw size={16} aria-hidden="true" /> Refresh organizations</button>
+        
       </div>
       {selected && <p className="muted" style={{ marginTop: 10 }}>{selected.legal_name} · Workspace role: {selected.role_code || "organization member"} · Verification: {selected.verification_status || "unverified"}</p>}
       {loadingOrganizations && <OperationStatus state="loading" title="Loading your organizations" detail="The server is resolving organizations linked to your authenticated account." />}
       {!loadingOrganizations && organizations.length === 0 && !error && <p className="muted">No organization is linked to this account. Register an organization before requesting its report.</p>}
       {loadingOutcomes && <OperationStatus state="loading" title="Loading verified outcome data" detail="Recruitment and requisition records are being fetched for the selected organization. No totals are displayed until the response is complete." />}
-      {!loadingOutcomes && !outcomes && !error && organizationId && <p className="muted">No report data has been confirmed yet. Refresh to retry.</p>}
+      {!loadingOutcomes && !outcomes && !error && organizationId && <p className="muted">No report data has been confirmed yet. The report remains unavailable until a complete response is received.</p>}
     </Card>
     {outcomes && selected && <>
       <div className="grid grid-2" style={{ gap: 12 }}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, History, Plus, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, History, Plus, ShieldCheck, X } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";

@@ -4,7 +4,8 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "re
 import { api } from "../../lib/api";
 import { useUiStore } from "../../lib/store";
 import { FinanceMembershipObligations } from "../finance-membership-obligations";
-import { Badge, Card, OperationStatus } from "../ui";
+import { Badge, Card } from "../ui";
+import { OperationStatus } from "../operation-status";
 
 export type FinancePaymentRow = {
   payment_id: string; payment_status: string; amount: string | number; currency: string;

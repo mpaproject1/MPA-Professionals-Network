@@ -5,6 +5,7 @@ import {useCallback, useEffect, useId, useState} from "react";
 import {OperationStatus} from "../../components/operation-status";
 import {Badge} from "../../components/ui";
 import {ApiError, api} from "../../lib/api";
+import {getAccountContext} from "../../lib/account-context";
 import {humanStatus} from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 import styles from "./dashboard.module.css";
@@ -50,7 +51,7 @@ export default function Dashboard(){
     if(!token)return;
     setLoading(true);setError("");
     try{
-      const profile=await api<Profile>("/api/v1/me",{},token);
+      const profile=await getAccountContext<Profile>(token);
       const roles=profile.roles||[];
       const core=await Promise.allSettled([
         api<Tracking>("/api/v1/me/application-tracking?limit=5",{},token),

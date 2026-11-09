@@ -5,6 +5,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
+import { getAccountContext } from "../../../lib/account-context";
 import { useUiStore } from "../../../lib/store";
 
 type Plan = {
@@ -300,7 +301,7 @@ export default function MembershipAdminWorkspace() {
   return <div className="grid" style={{ gap: 16 }}>
     <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" }}>
       <div><div className="eyebrow">MPA · Operations workspace</div><h1 className="h1">Membership management</h1><p className="muted">One task at a time. Plan configuration and application decisions are separated into focused workspaces.</p></div>
-      <button type="button" className="btn btn-ghost" disabled={loading} onClick={() => void refresh()}><RefreshCw size={15} /> {loading ? "Refreshing…" : "Refresh data"}</button>
+      
     </div>
 
     <div role="tablist" aria-label="Membership administration sections" className="row" style={{ gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
@@ -314,7 +315,7 @@ export default function MembershipAdminWorkspace() {
           <div><h2 className="h2">Membership plan catalogue</h2><p className="muted">Published terms are versioned. Existing applications keep the plan snapshot they accepted.</p></div>
           <button type="button" className="btn btn-primary" onClick={startCreate}><Plus size={16} /> Add membership plan</button>
         </div>
-        {planError && <div className="form-error" role="alert">{planError} <button type="button" className="btn btn-ghost" onClick={() => void loadPlans()}>Retry</button></div>}
+        {planError && <div className="form-error" role="alert">{planError} </div>}
         {loading && !plans.length ? <OperationStatus state="loading" title="Loading membership plans" detail="Retrieving the current plan catalogue and fee versions." /> :
           !plans.length && !planError ? <div className="muted">No plans are configured yet. Add the first plan to make it available for new applications.</div> :
           <div className="grid" style={{ gap: 8, marginTop: 12 }}>
@@ -337,9 +338,9 @@ export default function MembershipAdminWorkspace() {
       <Card>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
           <div><h2 className="h2">Membership review queue</h2><p className="muted">Find an application, inspect its evidence and history, then take only the action your role permits.</p></div>
-          <button type="button" className="btn btn-ghost" disabled={loading} onClick={() => void loadQueue()}><RefreshCw size={15} /> Refresh queue</button>
+          
         </div>
-        {queueError && <div className="form-error" role="alert">{queueError} <button type="button" className="btn btn-ghost" onClick={() => void loadQueue()}>Retry</button></div>}
+        {queueError && <div className="form-error" role="alert">{queueError} </div>}
         <div className="grid grid-3" style={{ gap: 8, margin: "12px 0" }}>
           <div className="membership-progress"><small className="muted">Total applications</small><div className="h2">{applications.length}</div></div>
           <div className="membership-progress"><small className="muted">Awaiting decision</small><div className="h2">{applications.filter(item => ["submitted", "in_review"].includes(item.status)).length}</div></div>

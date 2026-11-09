@@ -1,6 +1,6 @@
 "use client";
 
-import {ArrowRight, ClipboardCopy, RefreshCw, ShieldCheck} from "lucide-react";
+import {ArrowRight, ClipboardCopy, ShieldCheck} from "lucide-react";
 import Link from "next/link";
 import {useCallback, useEffect, useRef, useState} from "react";
 import {EmptyState} from "../../components/empty-state";
@@ -230,7 +230,7 @@ export default function Track() {
           <div className="eyebrow">Application tracking</div>
           <h1 className="h1">Know where your application stands.</h1>
           <p className="muted">Sign in to see all your applications, service requests, verification, mentorship, networking, community participation and responses in one place. We show current status and the next useful action without exposing reviewer-only notes.</p>
-          {error && <FormFeedback kind="error" message={error} onRetry={() => window.location.reload()} retryLabel="Try private link again" />}
+          {error && <FormFeedback kind="error" message={error} />}
           <div className="landing-actions">
             <Link className="btn btn-primary" href="/login?next=/track">Sign in to track</Link>
             <Link className="btn btn-ghost" href="/register">Create account</Link>
@@ -248,13 +248,11 @@ export default function Track() {
           <h1 className="h1">Progress you can see</h1>
           <p className="muted">See the latest status, last update and next step for your own applications.</p>
         </div>
-        <button type="button" className="btn btn-ghost" onClick={() => void load()} disabled={loading}>
-          <RefreshCw size={16} /> {loading ? "Checking status…" : "Check latest status"}
-        </button>
+
       </header>
 
-      {error && <FormFeedback kind="error" message={error} onRetry={() => void load()} retryLabel="Check status again" />}
-      {loading && data && <OperationStatus state="loading" title="Checking for the latest updates" detail="We’re retrieving your current application statuses and next steps. You can keep this page open; actions that depend on this refresh are temporarily paused." />}
+      {error && <FormFeedback kind="error" message={error} />}
+      
 
       <div className="grid grid-3">
         {([
@@ -270,7 +268,7 @@ export default function Track() {
       </div>
 
       <nav className="row" aria-label="Progress filters" style={{ gap: 8, flexWrap: "wrap" }}>{([["all","All"],["attention","Needs my attention"],["waiting","Waiting for response"],["progress","In progress"],["history","History"]] as const).map(([value,label])=><button key={value} type="button" className={progressView===value?"btn btn-primary":"btn btn-ghost"} aria-pressed={progressView===value} onClick={()=>setProgressView(value)}>{label}</button>)}</nav>
-      {data?.errors?.length ? <div className="case-row" role="status"><b>Some progress sections are temporarily unavailable.</b><p className="muted">{data.errors.map(e=>e.category).filter((v,i,a)=>a.indexOf(v)===i).join(", ")} could not be loaded. Other records remain visible; refresh to retry.</p></div> : null}
+      {data?.errors?.length ? <div className="case-row" role="status"><b>Some progress sections are temporarily unavailable.</b><p className="muted">{data.errors.map(e=>e.category).filter((v,i,a)=>a.indexOf(v)===i).join(", ")} could not be loaded. Other records remain visible; unavailable sections are not treated as empty or complete.</p></div> : null}
       <label className="row" style={{gap:8,flexWrap:"wrap"}}>Category <select aria-label="Filter progress by category" value={progressCategory} onChange={event=>setProgressCategory(event.target.value)}><option value="all">All categories</option><option value="membership">Membership</option><option value="jobs">Jobs</option><option value="organizations">Organizations</option><option value="services">Services</option><option value="mentorship">Mentorship</option><option value="verification">Verification</option><option value="record_claims">Record claims</option><option value="networking">Networking</option><option value="collaboration">Collaboration</option><option value="initiatives">Initiatives</option><option value="referrals">Referrals</option><option value="recognition">Recognition</option></select></label>
       <section className="grid" aria-label="Member progress" style={{ gap: 12 }}>
         {loading && !data && <Card><OperationStatus state="loading" title="Loading your application progress" detail="We’re gathering your membership, organization and job application updates. Your saved applications are not being changed." /></Card>}
@@ -299,7 +297,7 @@ export default function Track() {
                 <div><b>{item.statusLabel || humanStatus(item.status)}</b><p className="muted">Started {dateLabel(item.submittedAt || item.createdAt)}</p></div>
               </div>
               {item.history?.length ? <details className="case-row"><summary>View recorded history ({item.history.length})</summary><ol className="grid" style={{gap:8,marginTop:10}}>{item.history.map((event,index)=><li key={index}><b>{humanStatus(event.status)}</b><p className="muted">{dateLabel(event.at,true)}</p></li>)}</ol></details> : null}
-              {item.type === "job" && progressErrors[item.id] && <FormFeedback kind="error" message={progressErrors[item.id]} onRetry={() => void load()} retryLabel="Refresh job progress" />}
+              {item.type === "job" && progressErrors[item.id] && <FormFeedback kind="error" message={progressErrors[item.id]} />}
               {item.type === "job" && jobProgress[item.id] && <section className="grid" aria-label="Job application details" style={{ gap: 10, marginTop: 12 }}>
                 <div className="case-row"><b>Recruitment history</b>{jobProgress[item.id].events.length ? jobProgress[item.id].events.map((event, index) => <div className="tracker-line" key={index}><span className="timeline-dot" /><div><b>{humanStatus(event.to_status)}</b><p className="muted">{dateLabel(event.created_at, true)}</p></div></div>) : <p className="muted">No additional stage events have been recorded yet.</p>}</div>
                 {jobProgress[item.id].interviews.length > 0 && <div className="case-row"><b>Interview schedule</b>{jobProgress[item.id].interviews.map((interview) => {

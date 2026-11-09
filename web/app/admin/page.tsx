@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { OperationStatus } from "../../components/operation-status";
 import { Badge, Card } from "../../components/ui";
 import { api } from "../../lib/api";
-import { getAccountContext } from "../../lib/account-context";
+import { getAccountContext, getAdminReportCatalogue } from "../../lib/account-context";
 import { useUiStore } from "../../lib/store";
 import styles from "./admin-overview.module.css";
 import { AdminPageHeader } from "./admin-page-header";
@@ -102,7 +102,7 @@ export default function AdminPage() {
     setOperationalQueueLoading(true);
     setOperationalQueueError("");
     try {
-      const catalogue = await api<{ id: string }[]>("/api/v1/admin/reports", {}, token);
+      const catalogue = await getAdminReportCatalogue<Array<{ id: string }>>(token);
       if (!Array.isArray(catalogue) || !catalogue.some((report) => report.id === "support-demand-response")) {
         throw new Error("Your account cannot access the authoritative Support Desk queue report.");
       }

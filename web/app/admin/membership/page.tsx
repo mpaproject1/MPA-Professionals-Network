@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { OperationStatus } from "../../../components/operation-status";
 import { Card } from "../../../components/ui";
 import { api } from "../../../lib/api";
+import { getAccountContext } from "../../../lib/account-context";
 import { useUiStore } from "../../../lib/store";
 import MembershipAdminWorkspace from "./admin-workspace";
 
@@ -27,7 +28,7 @@ export default function MembershipAdministrationPage() {
       return () => { cancelled = true; };
     }
     setAccess("loading");
-    api<MembershipAccess>("/api/v1/me", {}, token)
+    getAccountContext<MembershipAccess>(token)
       .then(me => {
         if (cancelled) return;
         const roles = Array.isArray(me.roles) ? me.roles : [];

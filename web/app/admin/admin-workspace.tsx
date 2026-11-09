@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
+import { getAccountContext, getAdminReportCatalogue } from "../../lib/account-context";
 import { useUiStore } from "../../lib/store";
 import styles from "./admin-workspace.module.css";
 
@@ -65,7 +66,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     if (!hydrated || !token) { setRoles(null); return () => { cancelled = true; }; }
-    api<{ roles?: unknown; permissions?: unknown }>("/api/v1/me", {}, token)
+    getAccountContext<{ roles?: unknown; permissions?: unknown }>(token)
       .then((me) => {
         if (cancelled) return;
         setRoles(Array.isArray(me.roles) ? me.roles.map((role) => typeof role === "string" ? role : role && typeof role === "object" && "role_code" in role && typeof role.role_code === "string" ? role.role_code : "").filter(Boolean) : []);
@@ -77,7 +78,7 @@ export function AdminWorkspace({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     if (!hydrated || !token) { setReportIds([]); return () => { cancelled = true; }; }
-    api<{ id?: unknown }[]>("/api/v1/admin/reports", {}, token)
+    getAdminReportCatalogue<Array<{ id?: unknown }>>(token)
       .then((reports) => { if (!cancelled) setReportIds(Array.isArray(reports) ? reports.map((report) => typeof report?.id === "string" ? report.id : "").filter(Boolean) : []); })
       .catch(() => { if (!cancelled) setReportIds([]); });
     return () => { cancelled = true; };

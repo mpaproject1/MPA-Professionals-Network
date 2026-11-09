@@ -176,7 +176,6 @@ export function OrganizationWorkspaceOverview({
   onActiveFolderChange,
   authenticated,
   organizationLookupReady,
-  onRetry,
   onRegister,
 }: {
   organizations: Organization[];
@@ -186,7 +185,6 @@ export function OrganizationWorkspaceOverview({
   onActiveFolderChange: (key: string) => void;
   authenticated: boolean;
   organizationLookupReady: boolean;
-  onRetry: () => void;
   onRegister: () => void;
 }) {
   const verified = organizations.filter((item) => item.verification_status === "verified");
@@ -272,7 +270,6 @@ export function OrganizationWorkspaceOverview({
           <h2 id="organization-access-check-title">Confirming your organization access</h2>
           <p>We need to confirm both your active organization assignments and any previous organization relationships before showing registration or workspace actions.</p>
         </div>
-        <button className="btn btn-ghost" type="button" onClick={onRetry}>Retry access check</button>
       </section>
     );
   }
@@ -284,7 +281,7 @@ export function OrganizationWorkspaceOverview({
         <div className={styles.gateIntro}>
           <span className={styles.eyebrow}>MPA organization access</span>
           <h2 id="organization-access-restricted-title">{hasActiveRelationship ? "Your organization access needs attention" : "Organization access is not active"}</h2>
-          <p>{hasActiveRelationship ? "An active organization relationship was found, but the organization workspace details could not be loaded. Refresh before attempting another action." : "Your account has a previous organization relationship, but it is suspended or removed. This is not treated as an unregistered account, and a new registration is not offered."}</p>
+          <p>{hasActiveRelationship ? "An active organization relationship was found, but the organization workspace details could not be loaded. Workspace actions remain unavailable until access can be confirmed." : "Your account has a previous organization relationship, but it is suspended or removed. This is not treated as an unregistered account, and a new registration is not offered."}</p>
         </div>
         <div className={styles.statusList}>
           {organizationAccess.map((item) => (
@@ -297,7 +294,6 @@ export function OrganizationWorkspaceOverview({
             </article>
           ))}
         </div>
-        <button className="btn btn-ghost" type="button" onClick={onRetry}>Refresh organization access</button>
       </section>
     );
   }

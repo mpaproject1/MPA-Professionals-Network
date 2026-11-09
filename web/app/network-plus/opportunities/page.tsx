@@ -3,9 +3,9 @@ import { CalendarDays, Heart, MessageCircle, Quote } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NetworkPlusAccessGuard } from "../../../components/network-plus-access-guard";
-import { ApiError, api } from "../../../lib/api";
-import { useUiStore } from "../../../lib/store";
 import { getOrganizationDirectory } from "../../../lib/account-context";
+import { useUiStore } from "../../../lib/store";
+import { ApiError, api } from "../../../lib/api";
 
 type Taxon={code:string;parent_code:string|null;label:string;description:string;listing_kinds:string[];field_schema:{code:string;label:string;type:string;options?:string[];required?:boolean}[]};
 type Business={id:string;display_name:string;business_kind:string;description?:string;website?:string|null;location_label?:string|null;verification_status:string;moderation_status:string;publication_status:string};

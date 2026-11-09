@@ -4,8 +4,8 @@ import { Check, ChevronLeft, ChevronRight, Download, Eye, FileText, History, Plu
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
-import { ApiError, api } from "../../../lib/api";
 import { getAccountContext } from "../../../lib/account-context";
+import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 
 type Plan = {

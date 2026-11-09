@@ -6,6 +6,7 @@ import { FormFeedback } from "../../../components/form-feedback";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
 import { ApiError, api } from "../../../lib/api";
+import { getOrganizationDirectory } from "../../../lib/account-context";
 import { useUiStore } from "../../../lib/store";
 
 type Organization = {
@@ -67,7 +68,7 @@ export default function OrganizationReportsPage() {
     setLoadingOrganizations(true);
     setError("");
     try {
-      const rows = await api<Organization[]>("/api/v1/organizations", {}, token);
+      const rows = await getOrganizationDirectory<Organization[]>(token);
       const list = Array.isArray(rows) ? rows : [];
       setOrganizations(list);
       const requestedId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("organizationId") || "" : "";

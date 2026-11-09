@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ChevronDown, RefreshCw, Search, Users } from "lucide-react";
+import { Building2, ChevronDown, Search, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { FormFeedback } from "../../../components/form-feedback";
 import { OperationStatus } from "../../../components/operation-status";
@@ -68,7 +68,7 @@ export default function AdminOrganizationsPage() {
   if(typeof window!=="undefined"&&!window.confirm("Confirm changing "+account.email+"'s membership in "+(org.display_name||org.legal_name)+"? This change will be audited."))return;
   setMembershipBusy(key);setError("");setNotice("");
   try{await api("/api/v1/admin/organizations/"+encodeURIComponent(org.id)+"/members/"+encodeURIComponent(account.userId),{method:"PATCH",body:JSON.stringify({roleCode:draft.roleCode,status:draft.status,reason:draft.reason})},token);setNotice("Organization membership updated and audit reason recorded.");setMemberEdits(current=>({...current,[key]:{...draft,reason:""}}));await load();}
-  catch(cause){setError(cause instanceof ApiError?cause.message:"Organization membership change was not confirmed. Refresh the organization before retrying.");}
+  catch(cause){setError(cause instanceof ApiError?cause.message:"Organization membership change was not confirmed. Verify the current membership state before making another change.");}
   finally{setMembershipBusy("");}
  }
  async function addOrganizationMember(org:Organization){
@@ -77,7 +77,7 @@ export default function AdminOrganizationsPage() {
   if(typeof window!=="undefined"&&!window.confirm("Confirm granting "+email+" the "+roleCode.replaceAll("_"," ")+" role in "+(org.display_name||org.legal_name)+"? This change will be audited."))return;
   setMembershipBusy("add:"+org.id);setError("");setNotice("");
   try{await api("/api/v1/admin/organizations/"+encodeURIComponent(org.id)+"/members",{method:"POST",body:JSON.stringify({email,roleCode,reason})},token);setNotice("Organization membership granted and audit reason recorded.");setNewMemberEmail(current=>({...current,[org.id]:""}));setNewMemberReason(current=>({...current,[org.id]:""}));await load();}
-  catch(cause){setError(cause instanceof ApiError?cause.message:"Organization membership was not confirmed. Refresh before retrying.");}
+  catch(cause){setError(cause instanceof ApiError?cause.message:"Organization membership was not confirmed. Verify the current membership state before making another change.");}
   finally{setMembershipBusy("");}
  }
 
@@ -87,7 +87,7 @@ export default function AdminOrganizationsPage() {
 
  return <div className="grid" style={{ gap: 18, minWidth: 0 }}>
   <AdminPageHeader eyebrow="Administration · Organization governance" title="Organizations & accounts" description="Search the organization register, inspect verification state and review each organization's account relationships separately. This catalogue is read-only; verification decisions and account changes remain in their existing audited workflows." actions={<><a className="btn btn-ghost" href="/admin">Admin overview</a><a className="btn btn-ghost" href="/organizations">Organization review workspace</a></>} />
-  {error && <FormFeedback kind="error" message={error} onRetry={() => void load()} retryLabel="Retry loading" />}
+  {error && <FormFeedback kind="error" message={error} />}
   {notice && <FormFeedback kind="success" message={notice} />}
   <section className={styles.stats} aria-label="Organization register summary">
    <Card><span className={styles.statLabel}>Matching organizations</span><strong>{result?.total ?? "—"}</strong><small>Current search and status filter</small></Card>
@@ -104,7 +104,7 @@ export default function AdminOrganizationsPage() {
       {statuses.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
      </select>
     </label>
-    <button className="btn btn-ghost" type="button" onClick={() => void load()} disabled={busy}><RefreshCw size={16} aria-hidden="true"/>{busy ? "Refreshing…" : "Refresh"}</button>
+    
    </div>
    <div className={styles.listHeading}><div><h2 className="h2">Organization register</h2><p className="muted">Open a row to inspect associated accounts. Organization membership roles are not platform administrator roles.</p></div><span className={styles.count}>{result?.total ?? 0} records</span></div>
    {busy && !result ? <OperationStatus state="loading" title="Loading organization records" detail="Organization and account data are being fetched from the authorized admin endpoint." /> : !result?.items.length ? <div className={styles.empty}><Building2 size={26}/><strong>No organizations found</strong><span>Try another search term or clear the verification filter.</span></div> : <div className={styles.orgList}>

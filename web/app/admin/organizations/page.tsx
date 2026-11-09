@@ -109,7 +109,7 @@ export default function AdminOrganizationsPage() {
     
    </div>
    <div className={styles.listHeading}><div><h2 className="h2">Organization register</h2><p className="muted">Open a row to inspect associated accounts. Organization membership roles are not platform administrator roles.</p></div><span className={styles.count}>{result ? `${result.total} records` : error ? "Count unavailable" : "Loading…"}</span></div>
-   {busy && !result ? <OperationStatus state="loading" title="Loading organization records" detail="Organization and account data are being fetched from the authorized admin endpoint." /> : error && !result ? <OperationStatus state="error" title="Organization register unavailable" detail={error} /> : result && !result.items.length ? <div className={styles.empty}><Building2 size={26}/><strong>No organizations found</strong><span>Try another search term or clear the verification filter.</span></div> : <div className={styles.orgList}>
+   {busy && !result ? <OperationStatus state="loading" title="Loading organization records" detail="Organization and account data are being fetched from the authorized admin endpoint." /> : error && !result ? <OperationStatus state="error" title="Organization register unavailable" detail={error} /> : result && !result.items.length ? <div className={styles.empty}><Building2 size={26}/><strong>No organizations found</strong><span>Try another search term or clear the verification filter.</span></div> : result ? <div className={styles.orgList}>
     {result.items.map(org => <article className={styles.org} key={org.id}>
      <div className={styles.orgMain}>
       <div className={styles.orgIcon}><Building2 size={20} aria-hidden="true"/></div>

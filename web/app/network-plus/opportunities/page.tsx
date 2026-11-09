@@ -39,6 +39,8 @@ export default function NetworkPlusOpportunitiesPage(){
  const [editingBusinessId,setEditingBusinessId]=useState(""),[editBusinessName,setEditBusinessName]=useState(""),[editBusinessDescription,setEditBusinessDescription]=useState(""),[editBusinessWebsite,setEditBusinessWebsite]=useState(""),[editBusinessLocation,setEditBusinessLocation]=useState("");
  const [saving,setSaving]=useState(false),[loading,setLoading]=useState(true),[saveState,setSaveState]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const saveQueue=useRef<Promise<void>>(Promise.resolve());
+ const businessIdRef=useRef(businessId);
+ businessIdRef.current=businessId;
 
  const categories=useMemo(()=>taxonomy.filter(t=>!t.parent_code&&t.listing_kinds.includes(listingKind)),[taxonomy,listingKind]);
  const subcategories=useMemo(()=>taxonomy.filter(t=>t.parent_code===categoryCode&&t.listing_kinds.includes(listingKind)),[taxonomy,categoryCode,listingKind]);
@@ -59,10 +61,10 @@ export default function NetworkPlusOpportunitiesPage(){
     api<GeoReference>("/api/v1/network-plus/geography-reference",{},token)
    ]);
    setTaxonomy(tax||[]);setBusinesses(biz||[]);setOrganizations(org||[]);setMine(my||[]);setGeography(geo||{version:null,countries:[],regions:[],federalCities:[],children:[]});
-   if(!businessId&&biz?.length)setBusinessId(biz[0].id);
+   if(!businessIdRef.current&&biz?.length)setBusinessId(biz[0].id);
   }catch(e){setError(e instanceof ApiError?e.message:"Network-Plus directory could not be loaded.");}
   finally{setLoading(false);}
- },[token,businessId]);
+ },[token]);
  useEffect(()=>{void load();},[load]);
  const searchDirectory=useCallback(async()=>{
   if(!token)return;

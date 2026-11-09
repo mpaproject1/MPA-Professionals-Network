@@ -114,6 +114,7 @@ export default function FinanceWorkspacePage() {
   const load = useCallback(async () => {
     if (!token) return;
     setError("");
+    setManualReceiptsError("");
     setBusy("load");
     try {
       const me = await getAccountContext<Me>(token);

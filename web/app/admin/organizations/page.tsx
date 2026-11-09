@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FormFeedback } from "../../../components/form-feedback";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
-import { invalidateOrganizationDirectory } from "../../../lib/account-context";
+import { invalidateAccountContext, invalidateOrganizationDirectory } from "../../../lib/account-context";
 import { useUiStore } from "../../../lib/store";
 import { ApiError, api } from "../../../lib/api";
 import { AdminPageHeader } from "../admin-page-header";
@@ -69,7 +69,7 @@ export default function AdminOrganizationsPage() {
   if(draft.reason.trim().length<8){setError("Provide an audit reason of at least 8 characters before changing organization access.");return;}
   if(typeof window!=="undefined"&&!window.confirm("Confirm changing "+account.email+"'s membership in "+(org.display_name||org.legal_name)+"? This change will be audited."))return;
   setMembershipBusy(key);setError("");setNotice("");
-  try{await api("/api/v1/admin/organizations/"+encodeURIComponent(org.id)+"/members/"+encodeURIComponent(account.userId),{method:"PATCH",body:JSON.stringify({roleCode:draft.roleCode,status:draft.status,reason:draft.reason})},token);setNotice("Organization membership updated and audit reason recorded.");invalidateOrganizationDirectory(token);setMemberEdits(current=>({...current,[key]:{...draft,reason:""}}));await load();}
+  try{await api("/api/v1/admin/organizations/"+encodeURIComponent(org.id)+"/members/"+encodeURIComponent(account.userId),{method:"PATCH",body:JSON.stringify({roleCode:draft.roleCode,status:draft.status,reason:draft.reason})},token);setNotice("Organization membership updated and audit reason recorded.");invalidateOrganizationDirectory(token);invalidateAccountContext(token);setMemberEdits(current=>({...current,[key]:{...draft,reason:""}}));await load();}
   catch(cause){setError(cause instanceof ApiError?cause.message:"Organization membership change was not confirmed. Verify the current membership state before making another change.");}
   finally{setMembershipBusy("");}
  }
@@ -78,7 +78,7 @@ export default function AdminOrganizationsPage() {
   if(!email||reason.length<8){setError("Enter the account email and an audit reason of at least 8 characters.");return;}
   if(typeof window!=="undefined"&&!window.confirm("Confirm granting "+email+" the "+roleCode.replaceAll("_"," ")+" role in "+(org.display_name||org.legal_name)+"? This change will be audited."))return;
   setMembershipBusy("add:"+org.id);setError("");setNotice("");
-  try{await api("/api/v1/admin/organizations/"+encodeURIComponent(org.id)+"/members",{method:"POST",body:JSON.stringify({email,roleCode,reason})},token);setNotice("Organization membership granted and audit reason recorded.");invalidateOrganizationDirectory(token);setNewMemberEmail(current=>({...current,[org.id]:""}));setNewMemberReason(current=>({...current,[org.id]:""}));await load();}
+  try{await api("/api/v1/admin/organizations/"+encodeURIComponent(org.id)+"/members",{method:"POST",body:JSON.stringify({email,roleCode,reason})},token);setNotice("Organization membership granted and audit reason recorded.");invalidateOrganizationDirectory(token);invalidateAccountContext(token);setNewMemberEmail(current=>({...current,[org.id]:""}));setNewMemberReason(current=>({...current,[org.id]:""}));await load();}
   catch(cause){setError(cause instanceof ApiError?cause.message:"Organization membership was not confirmed. Verify the current membership state before making another change.");}
   finally{setMembershipBusy("");}
  }

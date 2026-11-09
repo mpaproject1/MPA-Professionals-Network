@@ -5,8 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { FormFeedback } from "../../../components/form-feedback";
 import { OperationStatus } from "../../../components/operation-status";
 import { Badge, Card } from "../../../components/ui";
-import { ApiError, api } from "../../../lib/api";
 import { getOrganizationDirectory } from "../../../lib/account-context";
+import { ApiError, api } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 
 type Organization = {

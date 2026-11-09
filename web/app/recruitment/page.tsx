@@ -7,8 +7,8 @@ import {OperationStatus} from "../../components/operation-status";
 import {TagInput} from "../../components/tag-input";
 import {Badge, Card} from "../../components/ui";
 import {getOrganizationDirectory} from "../../lib/account-context";
-import {humanStatus} from "../../lib/status-labels";
 import {ApiError, api} from "../../lib/api";
+import {humanStatus} from "../../lib/status-labels";
 import {useUiStore} from "../../lib/store";
 
 type Organization={id:string;legal_name:string;display_name:string;verification_status?:string;role_code?:string};

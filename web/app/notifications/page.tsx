@@ -1,7 +1,7 @@
 "use client";
 import {AlertTriangle, Archive, ArrowRight, Bell, CheckCheck, Clock3, ExternalLink, Inbox, RefreshCw, Settings2} from "lucide-react";
 import Link from "next/link";
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {OperationStatus} from "../../components/operation-status";
 import {PushNotificationSettings} from "../../components/push-notification-settings";
 import {getAccountContext} from "../../lib/account-context";

@@ -306,7 +306,7 @@ export default function MembershipAdminWorkspace() {
 
     <div role="tablist" aria-label="Membership administration sections" className="row" style={{ gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
       {canManagePlans && <button id="membership-plans-tab" type="button" role="tab" aria-controls="membership-plans-panel" aria-selected={tab === "plans"} tabIndex={tab === "plans" ? 0 : -1} className={"btn " + (tab === "plans" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("plans")}>1. Membership plans <span className="muted">({plans.length})</span></button>}
-      {canViewQueue && <button id="membership-review-tab" type="button" role="tab" aria-controls="membership-review-panel" aria-selected={tab === "queue"} tabIndex={tab === "queue" ? 0 : -1} className={"btn " + (tab === "queue" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("queue")}>2. Review queue <span className="muted">({applications.length})</span></button>}
+      {canViewQueue && <button id="membership-review-tab" type="button" role="tab" aria-controls="membership-review-panel" aria-selected={tab === "queue"} tabIndex={tab === "queue" ? 0 : -1} className={"btn " + (tab === "queue" ? "btn-primary" : "btn-ghost")} onClick={() => setTab("queue")}>2. Review queue <span className="muted">({queueError ? "Unavailable" : applications.length})</span></button>}
     </div>
 
     {canManagePlans && tab === "plans" && <section id="membership-plans-panel" role="tabpanel" aria-labelledby="membership-plans-tab" className="grid" style={{ gap: 14 }}>
@@ -340,19 +340,18 @@ export default function MembershipAdminWorkspace() {
           <div><h2 className="h2">Membership review queue</h2><p className="muted">Find an application, inspect its evidence and history, then take only the action your role permits.</p></div>
           
         </div>
-        {queueError && <div className="form-error" role="alert">{queueError} </div>}
-        <div className="grid grid-3" style={{ gap: 8, margin: "12px 0" }}>
+        {queueError ? <OperationStatus state="error" title="Membership review queue unavailable" detail={queueError} /> : <div className="grid grid-3" style={{ gap: 8, margin: "12px 0" }}>
           <div className="membership-progress"><small className="muted">Total applications</small><div className="h2">{applications.length}</div></div>
           <div className="membership-progress"><small className="muted">Awaiting decision</small><div className="h2">{applications.filter(item => ["submitted", "in_review"].includes(item.status)).length}</div></div>
           <div className="membership-progress"><small className="muted">Payment verified / activation</small><div className="h2">{applications.filter(item => item.status === "paid").length}</div></div>
-        </div>
+        </div>}
         <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "end" }}>
           <label style={{ flex: "2 1 260px" }}>Search applications<input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Reference, applicant, email, plan or payment ref…" /></label>
           <label style={{ flex: "1 1 150px" }}>Status<select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">All statuses</option>{statusOptions.map(status => <option key={status} value={status}>{readable(status)}</option>)}</select></label>
           <label style={{ flex: "1 1 150px" }}>Application type<select value={typeFilter} onChange={event => setTypeFilter(event.target.value)}><option value="all">All types</option><option value="new">New membership</option><option value="renewal">Renewal</option></select></label>
           <button type="button" className="btn btn-ghost" onClick={() => { setQuery(""); setStatusFilter("all"); setTypeFilter("all"); }}>Clear filters</button>
         </div>
-        {loading && !applications.length ? <OperationStatus state="loading" title="Loading review queue" detail="Retrieving applications and their current server-side states." /> :
+        {queueError ? null : loading && !applications.length ? <OperationStatus state="loading" title="Loading review queue" detail="Retrieving applications and their current server-side states." /> :
           <div style={{ overflowX: "auto", marginTop: 12 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
               <thead><tr>{["Application / applicant", "Plan terms", "Payment", "Status", "Submitted", "Actions"].map(label => <th key={label} scope="col" style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}>{label}</th>)}</tr></thead>

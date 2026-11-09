@@ -1,6 +1,6 @@
 "use client";
 import {ChartNoAxesCombined, FileSpreadsheet, FileText, RefreshCw, ShieldCheck} from "lucide-react";
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {FormFeedback} from "../../../components/form-feedback";
 import {OperationStatus} from "../../../components/operation-status";
 import {Badge, Card} from "../../../components/ui";
@@ -19,8 +19,9 @@ export default function AdminReportsPage(){
  const [catalogue,setCatalogue]=useState<Report[]>([]),[savedViews,setSavedViews]=useState<SavedView[]>([]),[viewName,setViewName]=useState(""),[selectedView,setSelectedView]=useState(""),[selected,setSelected]=useState("membership-status"),[result,setResult]=useState<Result|null>(null),[from,setFrom]=useState(""),[to,setTo]=useState(""),[status,setStatus]=useState(""),[q,setQ]=useState(""),[groupBy,setGroupBy]=useState("default"),[viewBusy,setViewBusy]=useState(false),[reportBusy,setReportBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[retryAction,setRetryAction]=useState<"run"|"csv"|"pdf"|"xlsx"|null>(null),[activeReportAction,setActiveReportAction]=useState<"run"|"csv"|"pdf"|"xlsx"|null>(null);
  const [selectedCategory,setSelectedCategory]=useState("all");
  const [reportSearch,setReportSearch]=useState("");
+ const selectedRef=useRef(selected); selectedRef.current=selected;
  useEffect(()=>{hydrateToken();},[hydrateToken]);
- const load=useCallback(async()=>{if(!token)return;setError("");try{const [rows,views]=await Promise.all([getAdminReportCatalogue<Report[]>(token),api<SavedView[]>("/api/v1/me/report-saved-views",{},token)]);setCatalogue(rows);setSavedViews(Array.isArray(views)?views:[]);const requested=new URLSearchParams(window.location.search).get("report");const requestedReport=rows.find(report=>report.id===requested);if(requestedReport){setSelected(requestedReport.id);setSelectedCategory(requestedReport.category);}else if(!rows.some(r=>r.id===selected)&&rows[0])setSelected(rows[0].id);}catch(e){setError(e instanceof ApiError?e.message:"The report catalogue could not be loaded.");}},[token,selected]);
+ const load=useCallback(async()=>{if(!token)return;setError("");try{const [rows,views]=await Promise.all([getAdminReportCatalogue<Report[]>(token),api<SavedView[]>("/api/v1/me/report-saved-views",{},token)]);setCatalogue(rows);setSavedViews(Array.isArray(views)?views:[]);const requested=new URLSearchParams(window.location.search).get("report");const requestedReport=rows.find(report=>report.id===requested);if(requestedReport){setSelected(requestedReport.id);setSelectedCategory(requestedReport.category);}else if(!rows.some(r=>r.id===selectedRef.current)&&rows[0])setSelected(rows[0].id);}catch(e){setError(e instanceof ApiError?e.message:"The report catalogue could not be loaded.");}},[token]);
  useEffect(()=>{if(hydrated&&token)void load();},[hydrated,token,load]);
  const categories=Array.from(new Set(catalogue.map(report=>report.category).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
  const visibleReports=catalogue.filter(report=>(selectedCategory==="all"||report.category===selectedCategory)&&(!reportSearch.trim()||`${report.title} ${report.description} ${report.category} ${report.scope}`.toLowerCase().includes(reportSearch.trim().toLowerCase())));

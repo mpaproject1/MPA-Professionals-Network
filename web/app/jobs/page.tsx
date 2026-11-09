@@ -211,7 +211,7 @@ export default function Jobs(){
        </form>
      </Card>
      <div id={`${jobsId}-cards`} className="grid">
-       {error&&<div className="form-error" role="alert">{error}<button className="btn btn-ghost" onClick={()=>void loadJobs(filters,page)} type="button" disabled={loading} style={{marginLeft:8}}>{loading?"Checking opportunities…":"Retry loading opportunities"}</button></div>}
+       {error&&<div className="form-error" role="alert">{error}</div>}
        {notice&&<p className="muted" aria-live="polite" aria-atomic="true">{notice}{(notice.includes("application tracking")||notice.includes("Check application tracking"))&&token?<a className="btn btn-ghost" href="/track" style={{marginLeft:8}}>Open application tracking</a>:null}{!token&&<a href="/login?next=/jobs"> Sign in</a>}</p>}
        {loading&&<Card><OperationStatus state="loading" title="Loading current opportunities" detail="We’re retrieving published jobs that match your search and account access. Your saved drafts and applications are not being changed." /></Card>}
        {!loading&&!error&&jobs.length===0&&<Card><h2 className="h2">No roles match these filters yet</h2><p className="muted">Broaden your search or register your job interest to help the team understand what roles you are looking for. You can also review saved opportunities while new listings are published.</p><div className="row" style={{gap:8,flexWrap:"wrap"}}><button type="button" className="btn btn-ghost" onClick={()=>{setFilters(initialFilters);void loadJobs(initialFilters)}}>Clear filters</button><a className="btn btn-primary" href="/jobs/interest">Register job interest <span aria-hidden="true">→</span></a><a className="btn btn-ghost" href="/saved">View saved items</a></div></Card>}

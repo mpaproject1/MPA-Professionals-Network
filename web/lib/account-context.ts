@@ -57,3 +57,27 @@ export function getAdminReportCatalogue<T = Array<{ id?: unknown }>>(token: stri
   }
   return reportCatalogueRequest as Promise<T>;
 }
+
+let organizationsToken = "";
+let organizationDirectoryRequest: Promise<unknown[]> | null = null;
+
+/** Shares the signed-in user organization directory between the shell and workspaces. */
+export function getOrganizationDirectory<T = unknown[]>(token: string, refresh = false): Promise<T> {
+  if (!token) return Promise.reject(new Error("An authenticated session is required."));
+  if (organizationsToken !== token) {
+    organizationsToken = token;
+    organizationDirectoryRequest = null;
+  }
+  if (refresh) organizationDirectoryRequest = null;
+  if (!organizationDirectoryRequest) {
+    organizationDirectoryRequest = api<unknown[]>("/api/v1/organizations", {}, token).catch((error) => {
+      if (organizationsToken === token) organizationDirectoryRequest = null;
+      throw error;
+    });
+  }
+  return organizationDirectoryRequest as Promise<T>;
+}
+
+export function invalidateOrganizationDirectory(token?: string): void {
+  if (!token || token === organizationsToken) organizationDirectoryRequest = null;
+}

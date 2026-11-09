@@ -79,5 +79,8 @@ export function getOrganizationDirectory<T = unknown[]>(token: string, refresh =
 }
 
 export function invalidateOrganizationDirectory(token?: string): void {
-  if (!token || token === organizationsToken) organizationDirectoryRequest = null;
+  if (!token || token === organizationsToken) {
+    organizationDirectoryRequest = null;
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("mpa:organization-directory-invalidated"));
+  }
 }

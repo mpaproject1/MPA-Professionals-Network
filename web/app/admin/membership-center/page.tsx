@@ -333,13 +333,13 @@ export default function MembershipCenterPage() {
     <section className={styles.chartGrid} aria-label="Membership analysis charts">
       <Card><BarList title="Applications by month" rows={monthlyApplications?.rows || []} labelKey="Month" valueKey="Applications" empty={monthlyApplications ? "No applications matched this period." : "Monthly trend report unavailable."}/>
       {canViewReviewerPerformance && <BarList title="Review decisions by staff" rows={reviewerRows} labelKey="Reviewer" valueKey="Decisions" empty={reviewerPerformance ? "No review decisions were recorded in this period." : "Reviewer performance report unavailable."}/>}
-      <BarList title="Application pipeline" rows={statusChart} labelKey="Status" valueKey="Applications" empty={applications ? "No applications matched this period." : "Application report unavailable; retry after checking access."}/>
+      <BarList title="Application pipeline" rows={statusChart} labelKey="Status" valueKey="Applications" empty={applications ? "No applications matched this period." : "Application report unavailable until a complete, authorized report response is received."}/>
       <BarList title="Open application queue ageing" rows={applicationAging?.rows || []} labelKey="Age band" valueKey="Applications" empty={applicationAging ? "No open applications are waiting." : "Application ageing report unavailable."}/>
       <BarList title="Renewal and expiry pipeline" rows={renewalPipeline?.rows || []} labelKey="Renewal window" valueKey="Members" empty={renewalPipeline ? "No verified-paid memberships are due in the next 90 days." : "Renewal pipeline unavailable."}/></Card>
       <Card><CohortConversionList rows={cohortApplications?.rows || []} days={30}/></Card>
       <Card><CohortConversionList rows={cohortApplications?.rows || []} days={90}/></Card>
       <Card><BarList title="Month-end active membership stock" rows={monthEndStock?.rows || []} labelKey="Month" valueKey="Active members" empty={monthEndStock ? "No month-end snapshot is available in this period yet." : "Month-end stock report unavailable."}/></Card>
-      <Card><BarList title="Current membership by plan" rows={planChart} labelKey="Product" valueKey="Members" empty={membership ? "No membership records were returned." : "Membership report unavailable; retry after checking access."}/></Card>
+      <Card><BarList title="Current membership by plan" rows={planChart} labelKey="Product" valueKey="Members" empty={membership ? "No membership records were returned." : "Membership report unavailable until a complete, authorized report response is received."}/></Card>
       <Card><BarList title="Applications by membership plan" rows={applicationPlanChart} labelKey="Product" valueKey="Applications" empty="No applications matched this period."/></Card>
       <Card>
         <div className={styles.chartHeading}><h3>Membership health</h3><span>Current stock</span></div>

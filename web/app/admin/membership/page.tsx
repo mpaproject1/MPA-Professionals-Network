@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { OperationStatus } from "../../../components/operation-status";
 import { Card } from "../../../components/ui";
 import { getAccountContext } from "../../../lib/account-context";
+import { ApiError } from "../../../lib/api";
 import { useUiStore } from "../../../lib/store";
 import MembershipAdminWorkspace from "./admin-workspace";
 
 type MembershipAccess = { roles?: string[]; permissions?: string[] };
-type AccessState = "loading" | "allowed" | "denied" | "signin";
+type AccessState = "loading" | "allowed" | "denied" | "signin" | "unavailable";
 
 export default function MembershipAdministrationPage() {
   const token = useUiStore(state => state.token);
@@ -38,7 +39,7 @@ export default function MembershipAdministrationPage() {
           permissions.some(permission => ["membership.review", "members.view", "members.manage"].includes(permission));
         setAccess(allowed ? "allowed" : "denied");
       })
-      .catch(() => { if (!cancelled) setAccess("denied"); });
+      .catch(cause => { if (!cancelled) setAccess(cause instanceof ApiError && cause.status === 401 ? "signin" : cause instanceof ApiError && cause.status === 403 ? "denied" : "unavailable"); });
     return () => { cancelled = true; };
   }, [hydrated, token]);
 
@@ -51,5 +52,6 @@ export default function MembershipAdministrationPage() {
   if (access === "denied") {
     return <Card><h1 className="h1">You do not have access to this workspace</h1><p className="muted">Membership application review and activation are available only to authorized membership administrators. Plan administration is separately permissioned. Finance authority remains separate and does not grant access to applicant records.</p><a className="btn btn-ghost" href="/admin/finance">Open Finance workspace</a></Card>;
   }
+  if (access === "unavailable") return <Card><OperationStatus state="error" title="Membership access could not be confirmed" detail="The account permission check failed. No membership review data is displayed until the server confirms your access." /></Card>;
   return <><MembershipAdminWorkspace />{canManageFinanceConfig && <a className="btn btn-ghost" href="/admin/membership/payment-methods">Manage finance payment methods</a>}</>;
 }

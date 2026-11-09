@@ -284,7 +284,7 @@ export default function Profile() {
       if (!bytes.ok) throw new Error("The image upload could not be completed.");
       const stored = await api<{id:string}>(`/api/v1/files/uploads/${encodeURIComponent(upload.uploadId)}/confirm`, { method: "POST", body: "{}" }, token);
       await api("/api/v1/me/profile-picture", { method: "PATCH", body: JSON.stringify({ fileObjectId: stored.id }) }, token);
-      await load();
+      setProfile(current => current ? { ...current, profile_picture_file_id: stored.id } : current);
       setNotice("Profile picture updated. You can now print your membership card.");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : (e instanceof Error ? e.message : "We couldn't update your profile picture."));
@@ -295,7 +295,8 @@ export default function Profile() {
     setUploadingPicture(true); setError(""); setNotice("");
     try {
       await api("/api/v1/me/profile-picture", { method: "DELETE" }, token);
-      await load(); setNotice("Profile picture removed. Your membership card will use its photo placeholder.");
+      setProfile(current => current ? { ...current, profile_picture_file_id: null } : current);
+      setNotice("Profile picture removed. Your membership card will use its photo placeholder.");
     } catch (e) { setError(e instanceof ApiError ? e.message : "We couldn't remove your profile picture."); }
     finally { setUploadingPicture(false); }
   }

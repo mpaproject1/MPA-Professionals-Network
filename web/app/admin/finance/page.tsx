@@ -93,9 +93,10 @@ export default function FinanceWorkspacePage() {
   const token = useUiStore(state => state.token);
   const hydrated = useUiStore(state => state.hydrated);
   const hydrateToken = useUiStore(state => state.hydrateToken);
-  const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "signin">("loading");
+  const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "signin" | "unavailable">("loading");
   const [rows, setRows] = useState<Payment[]>([]);
   const [manualReceipts, setManualReceipts] = useState<FinanceManualReceipt[]>([]);
+  const [manualReceiptsError, setManualReceiptsError] = useState("");
   const [legacyPayments, setLegacyPayments] = useState<LegacyMembershipPayment[]>([]);
   const [legacyDrafts, setLegacyDrafts] = useState<Record<string, LegacyPaymentDraft>>({});
   const [legacyQueueError, setLegacyQueueError] = useState("");
@@ -125,6 +126,7 @@ export default function FinanceWorkspacePage() {
         setAccess("denied");
         setRows([]);
         setManualReceipts([]);
+        setManualReceiptsError("");
         setLegacyPayments([]);
         setSummaryRows([]);
         setSummaryError("");
@@ -144,8 +146,9 @@ export default function FinanceWorkspacePage() {
           allReceipts.push(...(Array.isArray(next.items) ? next.items : []));
         }
         setManualReceipts(allReceipts);
-      } catch {
+      } catch (receiptCause) {
         setManualReceipts([]);
+        setManualReceiptsError(receiptCause instanceof ApiError ? receiptCause.message : "Manual receipt records could not be confirmed.");
       }
       setLegacyQueueError("");
       try {
@@ -172,7 +175,8 @@ export default function FinanceWorkspacePage() {
       setSummaryRows([]);
       setSummaryError("");
       setSummaryGeneratedAt("");
-      setAccess("denied");
+      const status = cause instanceof ApiError ? cause.status : 0;
+      setAccess(status === 401 ? "signin" : status === 403 ? "denied" : "unavailable");
       setError(cause instanceof ApiError ? cause.message : "The finance payment queue could not be loaded.");
     } finally {
       setBusy("");
@@ -296,7 +300,7 @@ export default function FinanceWorkspacePage() {
     <Card id="historical-member-payment-verification">
       <div className="row" style={{justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
         <div><h2 className="h2">Historical member payment verification</h2><p className="muted">Record the original fee due separately from each actual installment. Partial receipts reduce the outstanding balance but do not unlock the account invitation until the fee is fully settled by verified cash or an approved non-cash disposition.</p></div>
-        <Badge tone={legacyPayments.length ? "gold" : "slate"}>{legacyPayments.length} awaiting Finance</Badge>
+        <Badge tone={legacyPayments.length ? "gold" : "slate"}>{legacyQueueError ? "Unavailable" : `${legacyPayments.length} awaiting Finance`}</Badge>
       </div>
       {legacyQueueError ? <OperationStatus state="error" title="Historical payment queue unavailable" detail={legacyQueueError} /> : legacyPayments.length === 0 ? <OperationStatus state="info" title="No imported membership payments awaiting verification" detail="No unverified legacy membership records were returned from the authoritative source." /> : <div className="grid" style={{gap:12}}>
         {legacyPayments.map(item => {
@@ -327,6 +331,7 @@ export default function FinanceWorkspacePage() {
   if (!hydrated || access === "loading") return <Card><OperationStatus state="loading" title="Checking finance permissions" detail="Verifying the current account before retrieving payment records." /></Card>;
   if (access === "signin") return <Card><h1 className="h1">Sign in required</h1><p className="muted">Finance payment records are available only to authorized finance staff and administrators.</p><a className="btn btn-primary" href="/login?next=/admin/finance">Sign in</a></Card>;
   if (access === "denied") return <Card><OperationStatus state="error" title="Finance workspace access denied" detail={error || "Your account does not have finance payment queue access. Membership-review permissions do not grant finance access."} /><a className="btn btn-ghost" href="/dashboard">Return to your dashboard</a></Card>;
+  if (access === "unavailable") return <Card><OperationStatus state="error" title="Finance data unavailable" detail={error || "Finance access and records could not be confirmed. No empty or zero queue is being presented."} /></Card>;
 
   return <div className="grid" style={{ gap: 16 }}>
     <AdminPageHeader eyebrow="MPA · Finance operations" title="Membership payment queue" description="Verify eligible payments, review payment exceptions and record authorized reversals. This workspace does not approve or activate membership applications." />
@@ -355,6 +360,7 @@ export default function FinanceWorkspacePage() {
     <FinanceOperationsRegister
       payments={rows}
       receipts={manualReceipts}
+      receiptsError={manualReceiptsError}
       historicalPanel={historicalVerificationPanel}
       canVerify={canVerify}
       canReverse={canReverse}

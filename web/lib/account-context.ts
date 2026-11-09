@@ -36,6 +36,10 @@ export function clearAccountContext(token?: string): void {
   if (!token || token === activeToken) {
     activeToken = "";
     accountRequest = null;
+    reportsToken = "";
+    reportCatalogueRequest = null;
+    organizationsToken = "";
+    organizationDirectoryRequest = null;
   }
 }
 

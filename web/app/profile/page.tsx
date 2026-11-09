@@ -22,6 +22,7 @@ import { OperationStatus } from "../../components/operation-status";
 import { SupportAction } from "../../components/support-action";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
+import { getAccountContext } from "../../lib/account-context";
 import { hasProfessionalIdentity } from "../../lib/identity-capabilities";
 import { useUiStore } from "../../lib/store";
 import GuidedProfessionalProfile from "./guided-professional-profile";
@@ -169,7 +170,7 @@ export default function Profile() {
     setError("");
     setNotice("");
     try {
-      const me = await api<Profile>("/api/v1/me", {}, token);
+      const me = await getAccountContext<Profile>(token);
       const roles = Array.isArray(me.roles) ? me.roles : [];
       if (!hasProfessionalIdentity(roles)) {
         setProfile(me);

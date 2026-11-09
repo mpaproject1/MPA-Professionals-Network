@@ -11,6 +11,7 @@ import { OperationStatus } from "../../components/operation-status";
 import { OrganizationWorkspaceOverview } from "../../components/organization-workspace-overview";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
+import { getAccountContext } from "../../lib/account-context";
 import { useUiStore } from "../../lib/store";
 
 type Inquiry = {
@@ -139,7 +140,7 @@ export default function Organizations() {
     const results = await Promise.allSettled([
       api<Organization[]>("/api/v1/organizations", {}, token),
       api<Inquiry[]>("/api/v1/opportunity-inquiries?type=job", {}, token),
-      api<{ roles?: string[]; email?: string; user?: { email?: string } }>("/api/v1/me", {}, token),
+      getAccountContext<{ roles?: string[]; email?: string; user?: { email?: string } }>(token),
       api<OrganizationAccess[]>("/api/v1/me/organization-access", {}, token),
     ]);
     const organizationResult = results[0];

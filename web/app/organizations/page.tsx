@@ -11,7 +11,7 @@ import { OperationStatus } from "../../components/operation-status";
 import { OrganizationWorkspaceOverview } from "../../components/organization-workspace-overview";
 import { Badge, Card } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
-import { getAccountContext } from "../../lib/account-context";
+import { getAccountContext, getOrganizationDirectory, invalidateOrganizationDirectory } from "../../lib/account-context";
 import { useUiStore } from "../../lib/store";
 
 type Inquiry = {
@@ -138,7 +138,7 @@ export default function Organizations() {
     setOrganizationLookupReady(false);
     setError("");
     const results = await Promise.allSettled([
-      api<Organization[]>("/api/v1/organizations", {}, token),
+      getOrganizationDirectory<Organization[]>(token),
       api<Inquiry[]>("/api/v1/opportunity-inquiries?type=job", {}, token),
       getAccountContext<{ roles?: string[]; email?: string; user?: { email?: string } }>(token),
       api<OrganizationAccess[]>("/api/v1/me/organization-access", {}, token),

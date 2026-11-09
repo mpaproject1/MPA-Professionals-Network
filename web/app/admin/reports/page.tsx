@@ -5,6 +5,7 @@ import {FormFeedback} from "../../../components/form-feedback";
 import {OperationStatus} from "../../../components/operation-status";
 import {Badge, Card} from "../../../components/ui";
 import {ApiError, api} from "../../../lib/api";
+import {getAdminReportCatalogue} from "../../../lib/account-context";
 import {useUiStore} from "../../../lib/store";
 import {AdminPageHeader} from "../admin-page-header";
 import styles from "./reports.module.css";
@@ -19,7 +20,7 @@ export default function AdminReportsPage(){
  const [selectedCategory,setSelectedCategory]=useState("all");
  const [reportSearch,setReportSearch]=useState("");
  useEffect(()=>{hydrateToken();},[hydrateToken]);
- const load=useCallback(async()=>{if(!token)return;setError("");try{const [rows,views]=await Promise.all([api<Report[]>("/api/v1/admin/reports",{},token),api<SavedView[]>("/api/v1/me/report-saved-views",{},token)]);setCatalogue(rows);setSavedViews(Array.isArray(views)?views:[]);const requested=new URLSearchParams(window.location.search).get("report");const requestedReport=rows.find(report=>report.id===requested);if(requestedReport){setSelected(requestedReport.id);setSelectedCategory(requestedReport.category);}else if(!rows.some(r=>r.id===selected)&&rows[0])setSelected(rows[0].id);}catch(e){setError(e instanceof ApiError?e.message:"The report catalogue could not be loaded.");}},[token,selected]);
+ const load=useCallback(async()=>{if(!token)return;setError("");try{const [rows,views]=await Promise.all([getAdminReportCatalogue<Report[]>(token),api<SavedView[]>("/api/v1/me/report-saved-views",{},token)]);setCatalogue(rows);setSavedViews(Array.isArray(views)?views:[]);const requested=new URLSearchParams(window.location.search).get("report");const requestedReport=rows.find(report=>report.id===requested);if(requestedReport){setSelected(requestedReport.id);setSelectedCategory(requestedReport.category);}else if(!rows.some(r=>r.id===selected)&&rows[0])setSelected(rows[0].id);}catch(e){setError(e instanceof ApiError?e.message:"The report catalogue could not be loaded.");}},[token,selected]);
  useEffect(()=>{if(hydrated&&token)void load();},[hydrated,token,load]);
  const categories=Array.from(new Set(catalogue.map(report=>report.category).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
  const visibleReports=catalogue.filter(report=>(selectedCategory==="all"||report.category===selectedCategory)&&(!reportSearch.trim()||`${report.title} ${report.description} ${report.category} ${report.scope}`.toLowerCase().includes(reportSearch.trim().toLowerCase())));

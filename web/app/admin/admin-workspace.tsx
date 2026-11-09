@@ -4,7 +4,6 @@ import { Activity, BookOpenCheck, BriefcaseBusiness, Building2, ChevronDown, Che
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../../lib/api";
 import { getAccountContext, getAdminReportCatalogue } from "../../lib/account-context";
 import { useUiStore } from "../../lib/store";
 import styles from "./admin-workspace.module.css";

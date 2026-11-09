@@ -32,6 +32,10 @@ export function getAccountContext<T = AccountContext>(token: string): Promise<T>
   return accountRequest as Promise<T>;
 }
 
+export function invalidateAccountContext(token?: string): void {
+  if (!token || token === activeToken) accountRequest = null;
+}
+
 export function clearAccountContext(token?: string): void {
   if (!token || token === activeToken) {
     activeToken = "";

@@ -48,9 +48,9 @@
 @media print{
  :global(html):has(.shell),:global(body):has(.shell){page:membership-id!important;width:85.6mm!important;height:auto!important;min-width:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
  :global(html):has(.a4),:global(body):has(.a4){page:membership-a4!important;width:210mm!important;height:auto!important;min-width:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
- :global(.app-shell){display:block!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;overflow:visible!important}
- :global(.app-shell > :not(.shell-main)){display:none!important}
- :global(.shell-main){display:block!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;overflow:visible!important}
+ :global(.app-shell):has(.shell){display:block!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;overflow:visible!important}
+ :global(.app-shell):has(.shell) > :global(:not(.shell-main)){display:none!important}
+ :global(.app-shell):has(.shell) > :global(.shell-main){display:block!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;overflow:visible!important}
  .shell{page:membership-id!important}
  .a4{page:membership-a4!important}
 }

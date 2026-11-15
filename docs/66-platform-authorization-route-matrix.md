@@ -2,7 +2,7 @@
 
 **Repository:** `mpaproject1/MPA-Professionals-Network`  
 **Branch:** `feat/workstream-3-progress-members-workspace`  
-**Source:** `server.js` at blob `7cef3c29efbd6c74d324c934879b1541954f036a` (Phase 2 authorization policy centralization)  
+**Source:** `server.js` at blob `5e263792d4a7a6d93c592f84226ae57d36ce7c7d` (Phase 4 action-specific card-print route gates)  
 **Inventory generated:** 2026-11-15  
 **Coverage:** 643 API route branches found by static inspection of `server.js` (all methods and dispatch predicates). This includes public, authenticated, privileged, and token/webhook routes. It does not claim that a route's service-level policy has been proven unless an explicit route helper is shown.
 
@@ -255,15 +255,15 @@ The Phase 1 implementation hardens the shared authentication helper and the expl
 | 407 | GET | `p startsWith "api/v1/admin/reference-portfolio/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `referencePortfolio.exportReferenceCsv` |
 | 408 | GET | `p startsWith "api/v1/admin/reference-portfolio/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `referencePortfolio.exportReferenceJson` |
 | 409 | GET | `p startsWith "api/v1/admin/reference-portfolio/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `referencePortfolio.exportReferenceXlsx` |
-| 410 | GET | `p === "api/v1/admin/directory-export/fields"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `—` |
-| 411 | POST | `p === "api/v1/admin/directory-export/preview"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `directoryExports.previewDirectoryExport` |
-| 412 | POST | `p === "api/v1/admin/directory-export"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `directoryExports.exportDirectory` |
+| 410 | GET | `p === "api/v1/admin/directory-export/fields"` | auth(req); `directoryExports.listDirectoryExportFields` enforces `members.export` or `accounts.export`, plus separate contact-export fields | `directoryExports.listDirectoryExportFields` |
+| 411 | POST | `p === "api/v1/admin/directory-export/preview"` | auth(req); service requires dedicated `members.export` or `accounts.export`; sensitive contacts require a separate capability | `directoryExports.previewDirectoryExport` |
+| 412 | POST | `p === "api/v1/admin/directory-export"` | auth(req); service requires dedicated export capability; field allowlist, contact-export gate, row cap, snapshot check and export audit remain | `directoryExports.exportDirectory` |
 | 413 | GET | `p === "api/v1/admin/members/import-template"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `—` |
 | 414 | GET | `p === "api/v1/admin/members/import-template.xlsx"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `—` |
 | 415 | POST | `p === "api/v1/admin/members/import/preview"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `membershipAdminBulk.previewMemberImport` |
 | 416 | POST | `p startsWith "api/v1/admin/members/import/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `membershipAdminBulk.applyMemberImport` |
 | 417 | GET | `p === "api/v1/admin/members/catalog"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `membershipAdminBulk.listMemberCatalog` |
-| 418 | GET | `p === "api/v1/admin/members/export"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `directoryExports.exportDirectory` |
+| 418 | GET | `p === "api/v1/admin/members/export"` | auth(req); service requires `members.export`; contact fields additionally require `members.export.contacts` | `directoryExports.exportDirectory` |
 | 419 | GET | `p === "api/v1/me/report-saved-views"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `reports.listSavedViews` |
 | 420 | POST | `p === "api/v1/me/report-saved-views"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `reports.saveSavedView` |
 | 421 | DELETE | `p startsWith "api/v1/me/report-saved-views/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `reports.deleteSavedView` |
@@ -545,8 +545,8 @@ The Phase 1 implementation hardens the shared authentication helper and the expl
 | 803 | GET | `p === "api/v1/membership/card"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `membershipCard.getMyMembershipCard` |
 | 804 | GET | `p === "api/v1/admin/membership-card"` | anyRoleOrPermission(identity,["system_admin","reviewer"],["members.view","members.manage"]) | `membershipCard.getMembershipCardForAdmin` |
 | 805 | GET | `p === "api/v1/admin/membership-cards/eligible"` | anyRoleOrPermission(identity,["system_admin","reviewer"],["members.view","members.manage"]) | `membershipCard.listEligibleMembershipCardsForAdmin` |
-| 806 | POST | `p === "api/v1/admin/membership-cards/batch"` | anyRoleOrPermission(identity,["system_admin","reviewer"],["members.view","members.manage"]) | `membershipCard.getMembershipCardsForAdmin` |
-| 807 | POST | `p === "api/v1/admin/membership-cards/print"` | anyRoleOrPermission(identity,["system_admin","reviewer"],["members.view","members.manage"]) | `membershipCard.recordMembershipCardsPrintRequest` |
+| 806 | POST | `p === "api/v1/admin/membership-cards/batch"` | anyRoleOrPermission(identity,["system_admin"],["membership.cards.print"]) | `membershipCard.getMembershipCardsForAdmin` |
+| 807 | POST | `p === "api/v1/admin/membership-cards/print"` | anyRoleOrPermission(identity,["system_admin"],["membership.cards.print"]) | `membershipCard.recordMembershipCardsPrintRequest` |
 | 808 | PATCH | `p === "api/v1/me/profile-picture"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `membershipCard.setMyProfilePicture` |
 | 809 | DELETE | `p === "api/v1/me/profile-picture"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `membershipCard.removeMyProfilePicture` |
 | 810 | GET | `p === "api/v1/admin/audit-log"` | anyRoleOrPermission(identity,["system_admin"],["audit.view"]) | `adminAudit.listAdminAuditEvents` |
@@ -591,11 +591,11 @@ The Phase 1 implementation hardens the shared authentication helper and the expl
 | 866 | POST | `dynamic parts predicate (see server.js line)` | assertPaymentReversalAccess(identity) | `membership.reverseMembershipPayment` |
 | 870 | GET | `p === "api/v1/finance/payer-search"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `financeReceipts.searchFinancePayers` |
 | 871 | GET | `p === "api/v1/finance/organization-search"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `financeReceipts.searchFinanceOrganizations` |
-| 872 | GET | `p === "api/v1/finance/receipts"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `financeReceipts.listManualFinancePayments` |
-| 873 | POST | `p === "api/v1/finance/receipts"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `financeReceipts.recordManualFinancePayment` |
-| 874 | POST | `p startsWith "api/v1/finance/receipts/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `financeReceipts.decideManualFinancePayment` |
-| 875 | POST | `p startsWith "api/v1/finance/receipts/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `financeReceipts.reverseManualFinancePayment` |
-| 876 | POST | `p startsWith "api/v1/finance/receipts/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `financeReceipts.issueFinancePaymentVoucher` |
+| 872 | GET | `p === "api/v1/finance/receipts"` | auth(req); service requires `finance.view` or finance-officer bundle | `financeReceipts.listManualFinancePayments` |
+| 873 | POST | `p === "api/v1/finance/receipts"` | auth(req); service requires `finance.payment.record`; legacy `finance.manage` only remains for this record action | `financeReceipts.recordManualFinancePayment` |
+| 874 | POST | `p startsWith "api/v1/finance/receipts/" + path-segment constraints` | auth(req); service requires `finance.payment.verify` | `financeReceipts.decideManualFinancePayment` |
+| 875 | POST | `p startsWith "api/v1/finance/receipts/" + path-segment constraints` | auth(req); service requires `finance.payment.reverse` | `financeReceipts.reverseManualFinancePayment` |
+| 876 | POST | `p startsWith "api/v1/finance/receipts/" + path-segment constraints` | auth(req); service requires `finance.voucher.issue` | `financeReceipts.issueFinancePaymentVoucher` |
 | 877 | POST | `p startsWith "api/v1/finance/membership/payments/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `financeReceipts.issueVerifiedMembershipPaymentVoucher` |
 | 878 | GET | `p === "api/v1/finance/membership/fee-obligations/export.xlsx"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `membershipFeeObligations.exportFeeObligations` |
 | 879 | GET | `p === "api/v1/finance/membership/fee-obligations"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `membershipFeeObligations.listFeeObligations` |
@@ -720,3 +720,15 @@ For each row, inspect the named service function and its downstream repository/q
 8. action-specific permission checks for writes, exports, bulk actions and decisions.
 
 Until that trace is completed, rows marked auth-only or no-helper remain **Unreconciled** at the effective-policy layer. The static dispatch matrix must not be read as approval to broaden access.
+
+
+## Phase 4 action-specific gate updates (2026-11-15)
+
+This route matrix now reflects the Phase 4 source-level changes:
+
+- Member/account directory export metadata and execution are service-gated by dedicated export capabilities; contact fields require a separate sensitive-export capability.
+- Membership-card batch generation and print-request POST routes require `membership.cards.print` or the `system_admin` role. Member-view and generic member-management permissions do not satisfy those POST gates. GET card/eligibility routes remain read-only.
+- Finance receipt list, record, verify, reverse and voucher-issue operations are documented with their distinct service-level capabilities. The legacy `finance.manage` compatibility grant is limited to manual payment recording.
+- Private-file resource/relationship checks remain service-level and are not replaced by route-level global capabilities.
+
+The matrix remains a static dispatch inventory. It does not assert that all 643 route families have completed Phase 4 action and sensitive-data validation, and no runtime tests were run for this update.

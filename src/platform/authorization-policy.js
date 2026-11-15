@@ -324,10 +324,11 @@ export function isPrivilegedRole(roleCode) {
 }
 
 export function hasRole(identity, roleCode) {
+  // A permission is a capability, not proof that the user holds the role.
+  // Never infer a privileged role from one of its bundled permissions:
+  // doing so lets a single finance capability impersonate finance_officer.
   const roles = Array.isArray(identity?.roles) ? identity.roles : [];
-  if (roles.includes(roleCode)) return true;
-  const permissions = Array.isArray(identity?.permissions) ? identity.permissions : [];
-  return (ROLE_PERMISSION_BUNDLES[roleCode] || []).some((permission) => permissions.includes(permission));
+  return roles.includes(roleCode);
 }
 
 export function hasAnyRoleOrPermission(identity, allowedRoles = [], allowedPermissions = []) {

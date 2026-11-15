@@ -710,15 +710,15 @@ The route matrix at `docs/66-platform-authorization-route-matrix.md` contains 64
 | API route branches inventoried | 642 | Verified source inventory |
 | Branches with local `auth(req)` | 275 | Authentication visible; service authorization still must be traced |
 | Branches using optional identity | 8 | Public/optional identity; service visibility rules must be traced |
-| Branches using `identity.*` without local auth or local identity declaration | 319 | **Defect candidate**; route code may throw `ReferenceError` |
+| Branches flagged by the original branch-local identity scan | 319 | **Reclassified in Phase 0:** all inherit the dispatcher-wide authenticated principal established at `server.js:463`; zero confirmed missing-principal defects in this candidate set |
 
-A `const identity` declared inside one `if` block is not visible in a sibling `if` block. The route branches flagged in the matrix must be corrected by establishing a request-scoped authenticated principal before protected routes or by locally authenticating in each branch. Public endpoints must not rely on a missing principal. Do not globally authenticate all routes in a way that breaks public access; use explicit route metadata or a safe route wrapper.
+Phase 0 inspected the enclosing dispatcher scope rather than treating every route branch as an isolated block. `server.js:463` unconditionally executes `const identity=await auth(req);` inside the request handler's enclosing `try` block. The 319 candidates occur after that statement and before the matching dispatcher `catch`, so they inherit the same authenticated `identity` binding. The former branch-local heuristic therefore produced false positives: **319/319 are dispatcher-authenticated; zero are confirmed missing-principal defects.** Public, optional-viewer and signed webhook routes are dispatched before this authentication boundary. Do not add redundant `auth(req)` calls or move the boundary without a separate route-contract review. This is a source-level lexical validation; request-level smoke tests were not run in this documentation update.
 
 ### 12.10 Prioritized defects and correction files
 
 | Priority | Finding | Evidence | Correction files | Regression required |
 |---|---|---|---|---|
-| P0 | Missing local `identity` binding in many route branches | `server.js` static route scan; see every flagged row in docs/66 | `server.js`; request-level API tests | Unauthenticated request returns 401; authenticated request succeeds only with correct scope; no ReferenceError/500 |
+| P0 | Original branch-local identity scan over-reported missing principals | `server.js:463` establishes the shared principal in the enclosing dispatcher `try`; all 319 candidates are after this binding | `docs/65` and `docs/66` classification records; representative request-level tests remain follow-up | No missing-principal defect confirmed by lexical inspection; runtime 401/valid-session smoke tests still required before release |
 | P1 | UI role assignability is not enforced by mutation API | `user-admin.js:listRoles()` applies `NON_PLATFORM_ROLES`; `updateUser()` only checks role existence/privilege | `src/platform/user-admin.js`; user-admin tests | Direct PATCH cannot grant organization/job/profile roles globally; unknown/unclassified role fails closed |
 | P1 | Unclassified role rows default to platform-assignable | `listRoles()` uses `!nonPlatform` default | `src/platform/user-admin.js` | New unclassified role hidden and mutation rejected until explicit policy classification |
 | P1 | `appeal_reviewer` mapping differs between auth helpers | `src/platform/auth.js:7` versus `server.js` ROLE_PERMISSION | `src/platform/auth.js`, `server.js`, shared policy tests | Same role has one narrow capability across all route helpers; no general verification access |
@@ -758,11 +758,11 @@ This is the recommended canonical authority model, not a claim that all rows are
 
 **Verified:** 161 migration files inventoried; role seed locations and major role namespaces identified; base and additive permission seeds extracted; admin UI and mutation paths compared; shared role helpers compared; route dispatch inventory generated; concrete source-level mismatches recorded.
 
-**Defect:** The source contains role assignment policy mismatches, divergent helper mappings, a too-broad membership review queue gate, membership-card read/write gate overlap, route permission strings missing from the permission catalogue, and route branches that reference `identity` without a local authentication binding.
+**Defect:** The source contains role assignment policy mismatches, divergent helper mappings, a too-broad membership review queue gate, membership-card read/write gate overlap, route permission strings missing from the permission catalogue, and route branches that were initially flagged for lacking a branch-local identity binding; Phase 0 confirmed that all 319 inherit the dispatcher-wide binding at `server.js:463`, so this is not a confirmed missing-principal defect.
 
 **Unreconciled:** Runtime role aliases, generic reviewer usage, global scoped-role seeds, service-level policy for every route, and complete project/job/personal-data ownership checks.
 
-**Not verified:** Live production role assignments, direct permission assignments, applied migration ledger, runtime behavior of the flagged route branches, and production cross-tenant isolation.
+**Not verified:** Live production role assignments, direct permission assignments, applied migration ledger, request-level runtime smoke tests for representative routes, and production cross-tenant isolation.
 
 Accordingly, this addendum substantially expands the source inventory and supplies the dispatch-level route matrix, but it does **not** mark the entire effective authorization audit complete. The remaining service-level scope trace and read-only production reconciliation are explicitly open; no production changes or permission broadening are authorized by this document.
 
@@ -789,7 +789,7 @@ Accordingly, this addendum substantially expands the source inventory and suppli
 
 | Phase | Priority | Objective | Main audit findings addressed | Primary correction files / areas | Exit gate |
 |---|---|---|---|---|---|
-| **0 — Evidence validation and route triage** | **P0 / first** | Validate the 642-branch dispatch inventory and classify every identity-without-local-binding row as authenticated, public, token/webhook, helper-wrapped, or genuine missing-principal defect. Confirm route reachability and actual thrown errors before modifying shared request context. | 319 static identity-binding candidates; 642 route branches; effective route policy not yet fully proven. | `server.js`; route matrix `docs/66-platform-authorization-route-matrix.md`; route registration/dispatch tests; request identity helpers. | Every candidate row has a disposition and evidence; representative unauthenticated/authenticated requests prove expected 401/403/success; no route returns ReferenceError/500 because of missing principal; public and webhook routes remain public only where explicitly intended. |
+| **0 — Evidence validation and route triage** | **P0 / first** | Validate the 642-branch dispatch inventory and classify all 319 original identity-binding candidates against the enclosing lexical scope and authentication boundary. | 319 original candidates; shared dispatcher principal at `server.js:463`; no confirmed missing-principal defect in this set. | `server.js`; route matrix `docs/66-platform-authorization-route-matrix.md`; request identity helper. | All 319 candidates have a source-backed disposition; public/optional/webhook routes remain before the authentication boundary; docs/65 and docs/66 corrected. Runtime smoke tests are recorded as a separate follow-up gate because they were not executed in this documentation-only phase. |
 | **1 — Request principal and endpoint authentication integrity** | **P0 / immediate after triage** | Establish one reliable request principal contract for protected routes, with explicit public/optional exceptions. Fix only confirmed missing bindings and missing authentication gates; never globally require login on public routes. | Confirmed subset of §12.9; route branches with inconsistent authentication; unstable error behavior. | `server.js`; authentication middleware/helper; route tests and test fixtures. | Every protected route rejects unauthenticated calls with 401; authenticated calls receive a principal from the current session; no sibling-block variable leakage; public routes and signed callbacks still work; tests assert no ReferenceError/500. |
 | **2 — Canonical role catalogue and fail-closed role assignment** | **P1 / next** | Define a machine-readable, reviewed classification for every platform role code: domain, canonical/legacy state, assignability, assigning authority, privilege tier, scope model and replacement path. Enforce it in both role listing and mutation. | UI/backend assignability mismatch; unknown roles default assignable; global organization/job/mentor role overlap; `platform_admin`, `super_admin`, `membership_reviewer` and generic `reviewer` aliases. | `src/platform/user-admin.js`; shared role policy module; `web/app/admin/accounts/page.tsx`; `web/app/admin/users-table.tsx`; user-admin tests. | Every role returned by API has an explicit classification; unknown/unclassified codes are not assignable; mutation rejects non-platform/scoped roles even when called directly; only approved actors can assign privileged roles; UI and API agree; existing self-change, last-system-admin, audit-reason and session-revocation protections still pass. |
 | **3 — Single role-to-capability policy and permission catalogue reconciliation** | **P1** | Establish one authoritative role-to-capability registry and reconcile every route/helper permission string against `app_permission`. Remove divergent fallback maps and make action permissions explicit. | `appeal_reviewer` mismatch; `ethics_reviewer` over-broad fallback; missing `audit.view`, `jobs.review`, support-inquiry and knowledge permissions; mixed OR semantics; generic `members.view` queue access. | `src/platform/auth.js`; `server.js`; `src/platform/workspace-authorization.js`; permission migrations; shared policy tests. | Every permission literal used in a gate is either present in the catalogue with documented meaning or removed; each role has one effective capability mapping; ethics and appeal permissions are narrow; general directory read cannot grant review-queue access; direct-grant API rejects unknown and system-only permissions; all gate semantics are tested. |
@@ -800,16 +800,15 @@ Accordingly, this addendum substantially expands the source inventory and suppli
 
 ### 13.3 Detailed sequencing decisions
 
-#### Phase 0 — validate before fixing the 319 static candidates
+#### Phase 0 — source-level classification of the 319 candidates (completed 2026-11-15)
 
-The route matrix currently labels a branch as a candidate when it references `identity` without a local declaration or an `auth(req)` call in that dispatch block. That heuristic can over-count routes where identity is supplied by a wrapper, closure, token-specific verification or another explicit mechanism. It can also identify real block-scope defects. Therefore:
+The original scan was branch-local. It did not account for the unconditional dispatcher-level statement `const identity=await auth(req);` at `server.js:463`. That statement is inside the request handler's enclosing `try` scope and precedes all 319 candidate branches. Therefore all 319 have an authenticated principal in scope. The previous 296 `DEFECT CANDIDATE` matrix labels were false positives for missing-principal defects; 23 additional candidates had explicit route helper gates but were counted by the same branch-local scan.
 
-- Do not apply a blanket replacement or move a single `identity` variable across the entire dispatcher.
-- For every flagged row in docs/66, record the principal source and the route's public/authenticated contract.
-- Exercise each distinct route family with missing, invalid, expired and valid credentials.
-- Check logs for `ReferenceError`, `TypeError`, 401, 403 and unintended 500 outcomes.
-- Update the matrix with a disposition: `confirmed defect`, `authenticated by wrapper`, `public by design`, `token/webhook verified`, or `not yet verified`.
-- Only confirmed defects move into Phase 1 fixes.
+- **Disposition:** 319/319 inherit the dispatcher principal; 0 confirmed missing-principal defects; 0 public/token/webhook exceptions among these candidates.
+- **Public-route boundary:** the public, optional-viewer and signed callback routes are dispatched before line 463. Preserve this ordering.
+- **No code correction is justified by this finding.** Do not add duplicate local `auth(req)` calls or move the shared authentication boundary based only on the former heuristic.
+- **Remaining runtime evidence:** representative no-token, invalid-token, expired-session and valid-session requests have not been executed in this documentation-only update. Record those results before treating endpoint authentication behavior as runtime-tested.
+- **Still separate:** every route must be assessed for its action capability and service-level tenant/resource/relationship checks; dispatcher authentication does not prove those controls.
 
 #### Phase 2 — catalogue contract
 
@@ -881,7 +880,7 @@ All phases are **Planned** at the time this section is added. Change a phase to 
 
 | Phase | Status | Completion evidence required |
 |---|---|---|
-| 0 — Evidence validation and route triage | Planned | Disposition for all 319 candidates; request-level evidence; updated docs/66 |
+| 0 — Evidence validation and route triage | Complete — source classification | 319/319 classified as inheriting `server.js:463` dispatcher authentication; 0 confirmed missing-principal defects; docs/65 and docs/66 updated. Request-level smoke tests were not run and remain a runtime validation gate. |
 | 1 — Request principal and endpoint authentication integrity | Planned | Fix commit; route integration tests; public/webhook regression |
 | 2 — Canonical role catalogue and fail-closed role assignment | Planned | Policy registry; API/UI parity tests; unknown-role negative tests |
 | 3 — Single role-to-capability policy and permission catalogue | Planned | Mapping parity report; catalogue completeness test; helper/route regression |

@@ -765,3 +765,129 @@ This is the recommended canonical authority model, not a claim that all rows are
 **Not verified:** Live production role assignments, direct permission assignments, applied migration ledger, runtime behavior of the flagged route branches, and production cross-tenant isolation.
 
 Accordingly, this addendum substantially expands the source inventory and supplies the dispatch-level route matrix, but it does **not** mark the entire effective authorization audit complete. The remaining service-level scope trace and read-only production reconciliation are explicitly open; no production changes or permission broadening are authorized by this document.
+
+
+---
+
+## 13. Phase-by-phase implementation priority and release gates
+
+**Purpose:** Convert the findings in this audit into an ordered, evidence-led implementation programme. This is the implementation order for the MPA authorization baseline. It is intentionally sequenced to prevent a broad role refactor from hiding route failures, weakening existing separation-of-duties rules, or migrating legacy assignments before their real usage is known.
+
+**Status at this document revision:** This section is a prioritized implementation plan. It does not claim that any phase below has been implemented or passed unless its status is explicitly changed with commit and test evidence.
+
+### 13.1 Priority principles
+
+1. **Do not broaden access to make an error disappear.** A 403, 401, 404, or failed workspace load must be fixed at the correct principal, capability, relationship, or scope boundary.
+2. **Prove the route finding before mass edits.** The static `identity` scan is a high-priority signal, not proof that every flagged route is reachable or broken. Reproduce representative branches and classify all flagged rows before changing shared request handling.
+3. **Preserve existing separation of duties.** Finance verification/reversal, membership review/activation, verification, ethics and appeals remain distinct actions.
+4. **Fail closed for unknown authority.** An unclassified role, permission or context must not silently become a platform role or capability.
+5. **Scope is mandatory.** A role or permission answers what action may be attempted; the service must still prove which organization, job, project, case, business, member or file the actor may access.
+6. **Reconcile data before retiring codes.** Do not drop aliases, roles, or grants until read-only inventory of deployed role rows, user assignments, direct grants and migration state has been reviewed.
+7. **Keep the change set reviewable.** Each phase has a narrow objective, explicit regression tests and a release gate. Do not combine a schema migration, broad authorization rewrite and UI redesign in one release.
+
+### 13.2 Ordered implementation phases
+
+| Phase | Priority | Objective | Main audit findings addressed | Primary correction files / areas | Exit gate |
+|---|---|---|---|---|---|
+| **0 — Evidence validation and route triage** | **P0 / first** | Validate the 642-branch dispatch inventory and classify every identity-without-local-binding row as authenticated, public, token/webhook, helper-wrapped, or genuine missing-principal defect. Confirm route reachability and actual thrown errors before modifying shared request context. | 319 static identity-binding candidates; 642 route branches; effective route policy not yet fully proven. | `server.js`; route matrix `docs/66-platform-authorization-route-matrix.md`; route registration/dispatch tests; request identity helpers. | Every candidate row has a disposition and evidence; representative unauthenticated/authenticated requests prove expected 401/403/success; no route returns ReferenceError/500 because of missing principal; public and webhook routes remain public only where explicitly intended. |
+| **1 — Request principal and endpoint authentication integrity** | **P0 / immediate after triage** | Establish one reliable request principal contract for protected routes, with explicit public/optional exceptions. Fix only confirmed missing bindings and missing authentication gates; never globally require login on public routes. | Confirmed subset of §12.9; route branches with inconsistent authentication; unstable error behavior. | `server.js`; authentication middleware/helper; route tests and test fixtures. | Every protected route rejects unauthenticated calls with 401; authenticated calls receive a principal from the current session; no sibling-block variable leakage; public routes and signed callbacks still work; tests assert no ReferenceError/500. |
+| **2 — Canonical role catalogue and fail-closed role assignment** | **P1 / next** | Define a machine-readable, reviewed classification for every platform role code: domain, canonical/legacy state, assignability, assigning authority, privilege tier, scope model and replacement path. Enforce it in both role listing and mutation. | UI/backend assignability mismatch; unknown roles default assignable; global organization/job/mentor role overlap; `platform_admin`, `super_admin`, `membership_reviewer` and generic `reviewer` aliases. | `src/platform/user-admin.js`; shared role policy module; `web/app/admin/accounts/page.tsx`; `web/app/admin/users-table.tsx`; user-admin tests. | Every role returned by API has an explicit classification; unknown/unclassified codes are not assignable; mutation rejects non-platform/scoped roles even when called directly; only approved actors can assign privileged roles; UI and API agree; existing self-change, last-system-admin, audit-reason and session-revocation protections still pass. |
+| **3 — Single role-to-capability policy and permission catalogue reconciliation** | **P1** | Establish one authoritative role-to-capability registry and reconcile every route/helper permission string against `app_permission`. Remove divergent fallback maps and make action permissions explicit. | `appeal_reviewer` mismatch; `ethics_reviewer` over-broad fallback; missing `audit.view`, `jobs.review`, support-inquiry and knowledge permissions; mixed OR semantics; generic `members.view` queue access. | `src/platform/auth.js`; `server.js`; `src/platform/workspace-authorization.js`; permission migrations; shared policy tests. | Every permission literal used in a gate is either present in the catalogue with documented meaning or removed; each role has one effective capability mapping; ethics and appeal permissions are narrow; general directory read cannot grant review-queue access; direct-grant API rejects unknown and system-only permissions; all gate semantics are tested. |
+| **4 — Action-specific write, export and sensitive-data gates** | **P1** | Separate read from mutation, bulk, print, export, approve, reverse and private-data actions. Add narrowly named capabilities where required and keep workflow decisions independent. | Membership-card batch/print accepts read permission; finance queue/action conflation risk; generic reviewer access; private-file purpose requirements. | `server.js`; `src/platform/workspace-authorization.js`; membership-card service; finance services; `src/platform/private-file-storage.js`; migrations and tests. | Read-only permissions cannot invoke write/batch/print/export/decision endpoints; payment verification and reversal remain separate; membership review and activation remain separate; private file access checks actor, purpose, relationship and resource; every sensitive action emits required audit evidence. |
+| **5 — Tenant and resource-scope enforcement** | **P1 / security-critical** | Trace each route into service/repository code and enforce exact resource relationship checks. Treat selected context as a selector, never as an authority grant. | Organization, job, project, application, business, request, case, personal/member and file scope gaps in §12.8; direct grants are global at schema level. | `src/platform/identity-policy.js`; `src/platform/workspace-authorization.js`; organization/job/project services; Network-Plus services; mentorship and verification services; community-impact services; private-file storage; API tests. | For each route, matrix records principal, action, resource, tenant/resource scope, relationship/assignment, state/consent and expected status. Cross-organization and cross-resource access is denied; user can access own personal records only; candidate sees own application; reviewer sees only assigned case; support grant is resource-specific, read-only and expires; context switching does not union permissions. |
+| **6 — Legacy, duplicate and unknown role/grant data reconciliation** | **P2 / only after source policy is stable** | Produce a read-only production inventory of role rows, user-role assignments, direct grants, unknown codes, duplicates, migration ledger and inactive users. Approve a mapping for every live legacy assignment before any data migration. | Unseeded runtime aliases; globally seeded organization/job roles; `membership_reviewer` seed gap; unknown production role/permission rows not verified. | Read-only inventory SQL/runbook; migration scripts; role catalogue; audit logging; admin reconciliation report. | Every deployed code is classified; every assigned legacy role has an approved replacement or explicit retirement; duplicate grants are deduplicated safely; no user loses required access silently; migration is reversible or has a tested recovery plan; migration ledger is confirmed. This phase requires explicit deployment/database authorization. |
+| **7 — End-to-end regression, observability and controlled rollout** | **P1 / release gate** | Validate the whole policy across UI, API, services, database scope and lifecycle events. Roll out in a controlled environment before production. | All previous phases; session revocation, role changes, context changes, expired organization membership, reviewer reassignment and permission revocation. | Authorization test suites; Playwright/API integration tests; audit logs; monitoring/alerting; release checklist. | Positive and negative tests cover every protected route family and all scopes; no access broadening; no redirect/retry loops; 401/403/404 behavior is stable; role/grant revocation takes effect promptly; existing tests and full build pass; staged rollout and rollback plan approved. |
+
+### 13.3 Detailed sequencing decisions
+
+#### Phase 0 — validate before fixing the 319 static candidates
+
+The route matrix currently labels a branch as a candidate when it references `identity` without a local declaration or an `auth(req)` call in that dispatch block. That heuristic can over-count routes where identity is supplied by a wrapper, closure, token-specific verification or another explicit mechanism. It can also identify real block-scope defects. Therefore:
+
+- Do not apply a blanket replacement or move a single `identity` variable across the entire dispatcher.
+- For every flagged row in docs/66, record the principal source and the route's public/authenticated contract.
+- Exercise each distinct route family with missing, invalid, expired and valid credentials.
+- Check logs for `ReferenceError`, `TypeError`, 401, 403 and unintended 500 outcomes.
+- Update the matrix with a disposition: `confirmed defect`, `authenticated by wrapper`, `public by design`, `token/webhook verified`, or `not yet verified`.
+- Only confirmed defects move into Phase 1 fixes.
+
+#### Phase 2 — catalogue contract
+
+Each platform role must have these explicit fields in the canonical policy registry (or equivalent typed structure):
+
+| Field | Required meaning |
+|---|---|
+| `code` | Stable unique role code |
+| `domain` | `platform`, `organization`, `job`, `project`, `case`, `business`, `mentorship`, or identity/context domain |
+| `status` | `canonical`, `legacy`, `deprecated`, or `blocked` |
+| `assignable` | Explicit boolean; absence means false |
+| `assignableBy` | Exact authority required to assign |
+| `privilegeTier` | Defined tier; no implicit escalation |
+| `scopeType` | `platform`, `organization`, `job`, `project`, `case`, `business`, `request`, or `self` |
+| `capabilities` | Explicit action capabilities; no implicit broad permission inheritance |
+| `replacementCode` | Required for deprecated/legacy roles |
+| `migrationPlan` | Required before retiring an assigned role |
+
+Organization/job/project/team assignments remain in their scoped tables. They must not be made assignable through the global platform role mutation API.
+
+#### Phase 3 — permission catalogue contract
+
+Build a mechanical parity test that extracts or enumerates all permission literals used by:
+- role fallback helpers;
+- `anyRoleOrPermission` and related route gates;
+- `assertAccess` and workspace authorization helpers;
+- service-level `hasPermission` checks;
+- frontend capability checks where they correspond to backend capabilities.
+
+For each code, document description, read/write/action class, system-only status, assignability, and whether it is valid as a global direct grant. Scoped capabilities must not be represented as global direct grants unless a service enforces the exact resource relationship independently.
+
+#### Phase 5 — scope verification order
+
+Perform service-level tracing in this order, because each domain contains sensitive or multi-tenant data:
+
+1. Organization membership and organization administration.
+2. Job and application ownership, recruiter/team assignment, candidate self-access and attachments.
+3. Project and initiative ownership, contributor assignment, approval and second-review boundaries.
+4. Membership, verification, ethics and appeals case assignment and conflict-of-interest checks.
+5. Network-Plus business ownership/delegation and private request participant consent/support grants.
+6. Professional profile and mentorship relationship/session/submission scope.
+7. Personal data, private files, exports and audit records.
+
+Do not declare a domain complete until every route in its family has a route-to-service-to-query trace and negative cross-scope tests.
+
+### 13.4 Cross-phase non-regression requirements
+
+The following controls are mandatory in every phase and must not be weakened to make tests pass:
+
+- Finance officer cannot review or activate membership.
+- Membership reviewer cannot verify or reverse payments.
+- Payment verification and payment reversal remain distinct capabilities.
+- Direct `membership.review` does not imply `membership.activate`.
+- `finance.view` remains read-only.
+- `finance.manage` legacy behavior must not silently expand beyond its currently tested payment-only meaning.
+- `system_admin` role alone does not bypass payment separation-of-duties controls.
+- No actor can change their own privileged roles or direct permissions.
+- Last `system_admin` protection remains.
+- Privileged assignment restrictions, audit reasons, audit events and session revocation remain.
+- Organization roles never confer platform authority or access to another organization.
+- Professional profile/account type never confers organization authority or membership entitlement by itself.
+- Membership expiry removes member-only benefits, not unrelated personal or professional identity.
+- Revoked/expired organization membership, job assignment, case assignment or support grant stops authorizing subsequent requests.
+- Context switching replaces effective context; it never unions authority from multiple contexts.
+
+### 13.5 Phase status tracker
+
+All phases are **Planned** at the time this section is added. Change a phase to **In progress**, **Blocked**, or **Complete** only with a dated evidence note, commit reference and test results.
+
+| Phase | Status | Completion evidence required |
+|---|---|---|
+| 0 — Evidence validation and route triage | Planned | Disposition for all 319 candidates; request-level evidence; updated docs/66 |
+| 1 — Request principal and endpoint authentication integrity | Planned | Fix commit; route integration tests; public/webhook regression |
+| 2 — Canonical role catalogue and fail-closed role assignment | Planned | Policy registry; API/UI parity tests; unknown-role negative tests |
+| 3 — Single role-to-capability policy and permission catalogue | Planned | Mapping parity report; catalogue completeness test; helper/route regression |
+| 4 — Action-specific write/export/sensitive-data gates | Planned | Read-vs-write tests; finance/membership separation tests; private-file tests |
+| 5 — Tenant and resource-scope enforcement | Planned | Complete route-to-service-to-query matrix; cross-tenant/resource negative tests |
+| 6 — Legacy and production grant reconciliation | Planned | Read-only production inventory; approved mapping; migration/rollback evidence |
+| 7 — End-to-end regression and controlled rollout | Planned | Full test/build report; staged validation; approved rollback and rollout evidence |
+
+**Completion rule:** The authorization baseline is not complete when the documentation or role list is complete. It is complete only when every protected endpoint has a verified principal, action capability and resource-scope policy; every assignable role and direct grant is classified; live legacy assignments have been reconciled; and the full positive/negative regression suite passes without weakening existing controls.

@@ -363,7 +363,9 @@ export async function listJobsForReview(reviewerId){
  return (await db.query(`select j.id,j.organization_id,j.title,j.description,j.employment_type,j.work_mode,j.location_label,j.posting_scope,j.visibility,j.application_deadline,j.created_at,j.review_status,j.review_submitted_at,o.display_name organization_name,o.verification_status
   from job j join organization o on o.id=j.organization_id
   where j.status='pending_review' and j.review_status='pending'
-  order by j.review_submitted_at nulls last,j.created_at`)).rows;
+    and j.created_by is distinct from $1 and j.updated_by is distinct from $1
+    and not exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id=$1 and om.status='active')
+  order by j.review_submitted_at nulls last,j.created_at`,[reviewerId])).rows;
 }
 export async function publishJob(jobId,userId,requestId){
  return withTransaction(async db=>{
@@ -387,6 +389,8 @@ export async function reviewJob(jobId,reviewerId,input,requestId){
   await assertJobReviewer(db,reviewerId);
   const j=(await db.query("select j.*,o.verification_status,o.public_visible from job j join organization o on o.id=j.organization_id where j.id=$1 for update of j",[jobId])).rows[0];
   if(!j)throw error(404,"Vacancy not found.","NOT_FOUND");
+  const reviewerConflict=j.created_by===reviewerId||j.updated_by===reviewerId||(await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active' limit 1",[j.organization_id,reviewerId])).rows[0];
+  if(reviewerConflict)throw error(403,"A reviewer cannot decide a vacancy they created, submitted, or are affiliated with.","REVIEWER_CONFLICT");
   if(j.status!=="pending_review"||j.review_status!=="pending")throw error(409,"This vacancy is not awaiting MPA review.","INVALID_STATE");
   const decision=String(input.decision||"");
   if(!["approved","rejected","correction_required"].includes(decision))throw error(400,"Choose approve, reject or return for correction.","VALIDATION_ERROR");

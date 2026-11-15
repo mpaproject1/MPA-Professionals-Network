@@ -230,8 +230,8 @@ export async function listMyBusinesses(userId) {
             where bo.business_id=b.id and bo.owner_type='organization' and bo.owner_role='primary_owner' and bo.status='active'
               and om.user_id=$1 and om.status='active' and om.role_code='project_manager')
         or (not exists(select 1 from network_plus_business_ownership bo where bo.business_id=b.id and bo.owner_type='organization' and bo.owner_role='primary_owner' and bo.status='active')
-          and exists(select 1 from membership_record mr where mr.user_id=$1 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))))
-    order by created_at desc`,[userId,ORG_OWNER_ROLES])).rows;
+          and $3::boolean and exists(select 1 from membership_record mr where mr.user_id=$1 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))))
+    order by created_at desc`,[userId,ORG_OWNER_ROLES,memberActive])).rows;
 }
 export async function updateBusiness(businessId,userId,input,requestId) {
   const entries=Object.entries(input||{}).filter(([key])=>MODIFIABLE.has(key));

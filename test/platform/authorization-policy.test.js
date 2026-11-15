@@ -213,3 +213,50 @@ test("Phase 4 route and service source keep card printing, exports and membershi
   assert.doesNotMatch(financeFileGate, /system_admin|admin|finance\.manage/);
   assert.match(privateFiles, /purpose:f\.purpose/);
 });
+
+
+test("Phase 5 resource scope is bound to the current tenant, assignment, participant and consent relationship", () => {
+  const identityPolicy = readFileSync(new URL("../../src/platform/identity-policy.js", import.meta.url), "utf8");
+  assert.match(identityPolicy, /om\.organization_id=\$1 and om\.user_id=\$2 and om\.status='active'/);
+
+  const jobs = readFileSync(new URL("../../src/organization-jobs/service.js", import.meta.url), "utf8");
+  assert.match(jobs, /membershipIsCurrentlyActiveSql\("m"\)/);
+  assert.match(jobs, /j\.created_by is distinct from \$1 and j\.updated_by is distinct from \$1/);
+  assert.match(jobs, /not exists\(select 1 from organization_membership om where om\.organization_id=j\.organization_id and om\.user_id=\$1 and om\.status='active'\)/);
+  assert.match(jobs, /reviewerConflict=j\.created_by===reviewerId\|\|j\.updated_by===reviewerId/);
+
+  const verification = readFileSync(new URL("../../src/verification/service.js", import.meta.url), "utf8");
+  const assignedGate = verification.match(/async function assertAssignedReviewer[\s\S]*?export function allowedTransition/)?.[0] || "";
+  assert.match(assignedGate, /row\.assigned_reviewer_id!==actorId/);
+  assert.doesNotMatch(assignedGate, /system_admin|verification\.manage|can_manage/);
+  const caseRead = verification.slice(verification.indexOf("export async function getCase"), verification.indexOf("export async function listCases"));
+  assert.ok(caseRead.indexOf("row.assigned_reviewer_id!==viewerId") < caseRead.indexOf("const [claims,evidence"));
+  assert.match(verification, /vc\.assigned_reviewer_id=\$N/);
+
+  const privateFiles = readFileSync(new URL("../../src/platform/private-file-storage.js", import.meta.url), "utf8");
+  assert.match(privateFiles, /vc\.assigned_reviewer_id=\$2 limit 1/);
+  assert.match(privateFiles, /c\.submitted_by is distinct from \$2 and o\.created_by is distinct from \$2/);
+  assert.doesNotMatch(privateFiles, /vc\.assigned_reviewer_id=\$2 or \$3=true/);
+  assert.match(privateFiles, /membershipIsCurrentlyActiveSql\("mr"\)/);
+
+  const business = readFileSync(new URL("../../src/network-plus/business-discovery.js", import.meta.url), "utf8");
+  assert.match(business, /hasCurrentActiveMembership\(db,userId\)/);
+  const requests = readFileSync(new URL("../../src/network-plus/request-collaboration.js", import.meta.url), "utf8");
+  assert.match(requests, /hasCurrentActiveMembership\(db,userId\)/);
+  assert.match(requests, /expires_at>now\(\)/);
+  assert.match(requests, /support_case_reference=\$3/);
+
+  const mentorship = readFileSync(new URL("../../src/services-mentorship/service.js", import.meta.url), "utf8");
+  assert.match(mentorship, /membershipIsCurrentlyActiveSql\("m"\)/);
+  assert.match(mentorship, /mentor_user_id!==userId&&.*mentee_user_id!==userId|mentor_user_id!==userId/);
+
+  const ethics = readFileSync(new URL("../../src/ethics/service.js", import.meta.url), "utf8");
+  const ethicsAssignment = ethics.match(/async function assertAssigned[\s\S]*?function text/)?.[0] || "";
+  assert.match(ethicsAssignment, /assignment\.rowCount===0/);
+  assert.doesNotMatch(ethicsAssignment, /system_admin/);
+  assert.match(ethics, /c\.assigned_reviewer_id=\$1 or exists\(select 1 from ethics_case_panel_member/);
+
+  const initiatives = readFileSync(new URL("../../src/platform/serve-community-initiatives.js", import.meta.url), "utf8");
+  assert.match(initiatives, /i\.created_by is distinct from \$4 and i\.submitted_by is distinct from \$4/);
+  assert.match(initiatives, /om\.organization_id=i\.owner_organization_id and om\.user_id=\$4/);
+});

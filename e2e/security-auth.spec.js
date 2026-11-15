@@ -164,6 +164,8 @@ test("public optional-viewer routes accept anonymous visitors but reject invalid
   expect(malformedSupportBot.status()).toBe(401,"public support remains anonymous without a token but must not silently downgrade an invalid supplied bearer token");
 
   const expiredActor=await createActor("member");
+  const validSession=await api.get("/api/v1/jobs",{headers:{authorization:"Bearer "+expiredActor.token}});
+  expect(validSession.status()).toBe(200,"a valid current session may personalize public job discovery");
   await getPool().query("update auth_session set expires_at=now()-interval '1 second' where user_id=$1 and revoked_at is null",[expiredActor.userId]);
   const expired=await api.get("/api/v1/jobs",{headers:{authorization:`Bearer ${expiredActor.token}`}});
   expect(expired.status()).toBe(401);

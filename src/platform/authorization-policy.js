@@ -210,7 +210,7 @@ export const PERMISSION_CATALOG = Object.freeze(Object.fromEntries(
       sensitive: metadata[2],
       systemOnly: metadata[3],
       source: seeded ? "migration-seeded" : legacy ? "legacy-runtime" : "unclassified",
-      assignable: seeded !== undefined && !metadata[3],
+      assignable: !metadata[3],
     })];
   }),
 ));
@@ -262,7 +262,7 @@ export function hasAnyRoleOrPermission(identity, allowedRoles = [], allowedPermi
 }
 
 export function effectiveCapabilities(identity) {
-  const capabilities = new Set(Array.isArray(identity?.permissions) ? identity.permissions : []);
+  const capabilities = new Set((Array.isArray(identity?.permissions) ? identity.permissions : []).filter(isKnownPermission));
   for (const roleCode of Array.isArray(identity?.roles) ? identity.roles : []) {
     for (const permission of ROLE_PERMISSION_BUNDLES[roleCode] || []) capabilities.add(permission);
   }

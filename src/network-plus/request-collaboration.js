@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { withTransaction } from "../platform/db.js";
-import { policyError } from "../platform/identity-policy.js";
+import { hasCurrentActiveMembership, policyError } from "../platform/identity-policy.js";
 import { resolveNetworkPlusAccess } from "../platform/network-plus-access.js";
 import { createInAppNotification } from "../platform/notifications.js";
 
@@ -74,7 +74,8 @@ async function audit(db,requestId,actor,event,from,to,requestIdHeader,metadata={
   await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'network_plus_request',$3,$4,'success',$5)",[actor,event,requestId,requestIdHeader||null,metadata]);
 }
 async function hasBusinessAuthority(db,businessId,userId,capability) {
-  const owner=(await db.query("select 1 from network_plus_business_ownership bo join network_plus_business b on b.id=bo.business_id where bo.business_id=$1 and bo.status='active' and bo.consent_status='accepted' and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published' and ((bo.owner_type='member' and bo.owner_user_id=$2 and exists(select 1 from membership_record mr where mr.user_id=$2 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))) or (bo.owner_type='organization' and exists(select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=bo.owner_organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true)))",[businessId,userId])).rowCount>0;
+  const owner=(await db.query("select bo.owner_type from network_plus_business_ownership bo join network_plus_business b on b.id=bo.business_id where bo.business_id=$1 and bo.status='active' and bo.consent_status='accepted' and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published' and ((bo.owner_type='member' and bo.owner_user_id=$2 and exists(select 1 from membership_record mr where mr.user_id=$2 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))) or (bo.owner_type='organization' and exists(select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=bo.owner_organization_id and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true)))",[businessId,userId])).rows[0];
+  if(owner?.owner_type==="member"&&!(await hasCurrentActiveMembership(db,userId)))return false;
   if(owner)return true;
   return (await db.query("select 1 from network_plus_business_access a join network_plus_business b on b.id=a.business_id where a.business_id=$1 and a.user_id=$2 and a.capability_code=$3 and a.revoked_at is null and (a.expires_at is null or a.expires_at>now()) and b.verification_status='verified' and b.moderation_status='approved' and b.publication_status='published'",[businessId,userId,capability])).rowCount>0;
 }

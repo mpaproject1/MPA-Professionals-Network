@@ -255,9 +255,9 @@ The Phase 1 implementation hardens the shared authentication helper and the expl
 | 407 | GET | `p startsWith "api/v1/admin/reference-portfolio/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `referencePortfolio.exportReferenceCsv` |
 | 408 | GET | `p startsWith "api/v1/admin/reference-portfolio/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `referencePortfolio.exportReferenceJson` |
 | 409 | GET | `p startsWith "api/v1/admin/reference-portfolio/" + path-segment constraints` | auth(req); no explicit route helper — service must enforce capability and resource scope | `referencePortfolio.exportReferenceXlsx` |
-| 410 | GET | `p === "api/v1/admin/directory-export/fields"` | auth(req); `directoryExports.listDirectoryExportFields` enforces `members.export` or `accounts.export`, plus separate contact-export fields | `directoryExports.listDirectoryExportFields` |
-| 411 | POST | `p === "api/v1/admin/directory-export/preview"` | auth(req); service requires dedicated `members.export` or `accounts.export`; sensitive contacts require a separate capability | `directoryExports.previewDirectoryExport` |
-| 412 | POST | `p === "api/v1/admin/directory-export"` | auth(req); service requires dedicated export capability; field allowlist, contact-export gate, row cap, snapshot check and export audit remain | `directoryExports.exportDirectory` |
+| 410 | GET | `p === "api/v1/admin/directory-export/fields"` | auth(req); `directoryExports.listDirectoryExportFields` enforces `members.export` or `accounts.export`, plus separate contact-export and organization-relationship export capabilities | `directoryExports.listDirectoryExportFields` |
+| 411 | POST | `p === "api/v1/admin/directory-export/preview"` | auth(req); service requires dedicated `members.export` or `accounts.export`; sensitive contacts and organization relationship fields require separate capabilities | `directoryExports.previewDirectoryExport` |
+| 412 | POST | `p === "api/v1/admin/directory-export"` | auth(req); service requires dedicated export capability; field allowlist, contact-export and organization-relationship gates, row cap, snapshot check and export audit remain | `directoryExports.exportDirectory` |
 | 413 | GET | `p === "api/v1/admin/members/import-template"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `—` |
 | 414 | GET | `p === "api/v1/admin/members/import-template.xlsx"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `—` |
 | 415 | POST | `p === "api/v1/admin/members/import/preview"` | auth(req); no explicit route helper — service must enforce capability and resource scope | `membershipAdminBulk.previewMemberImport` |
@@ -732,3 +732,6 @@ This route matrix now reflects the Phase 4 source-level changes:
 - Private-file resource/relationship checks remain service-level and are not replaced by route-level global capabilities.
 
 The matrix remains a static dispatch inventory. It does not assert that all 643 route families have completed Phase 4 action and sensitive-data validation, and no runtime tests were run for this update.
+
+
+Phase 4 also adds `accounts.export.organizations` as a separate sensitive-export capability for the account export's organization-relationship field. It is not implied by the generic account export or ordinary platform-admin UI visibility.

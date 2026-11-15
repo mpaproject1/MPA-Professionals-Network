@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getPool, withTransaction } from "./db.js";
+import { hasAnyRoleOrPermission } from "./authorization-policy.js";
 
 const fail=(status,message,code)=>Object.assign(new Error(message),{statusCode:status,code});
 const hash=value=>createHash("sha256").update(value).digest("hex");
@@ -9,9 +10,10 @@ const allowedMethods=new Set(["bank_transfer","cash","mobile_money","cheque","ca
 const currencyPattern=/^[A-Z]{3}$/;
 
 function assertFinance(identity, permission="finance.payment.record"){
-  const roles=identity?.roles||[],permissions=identity?.permissions||[];
-  if(roles.some(r=>["finance_officer","system_admin","admin"].includes(r))||permissions.includes("finance.manage")||permissions.includes(permission))return;
-  throw fail(403,"You do not have permission to manage finance receipts.","FORBIDDEN");
+  const legacyRecordGrant = permission === "finance.payment.record"
+    && hasAnyRoleOrPermission(identity, [], ["finance.manage"]);
+  if (hasAnyRoleOrPermission(identity, ["finance_officer"], [permission]) || legacyRecordGrant) return;
+  throw fail(403,"This finance action requires its dedicated finance capability.","FORBIDDEN");
 }
 function safeReceipt(row){
   return {id:row.id,receiptNumber:row.receipt_number,payerType:row.payer_type,payerName:row.payer_name,payerEmail:row.payer_email,

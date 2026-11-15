@@ -56,11 +56,14 @@ test("card output contains approved minimal fields and no internal UUID or priva
   assert.match(payload,/memberName:row\.member_name/);
   assert.match(payload,/membershipType:row\.membership_type/);
   assert.doesNotMatch(payload,/membershipRecordId|profilePictureFileId|account_reference|email|phone|payment|recovery/i);
-  assert.doesNotMatch(singlePage,/membershipRecordId|profilePictureFileId|productCode/);\n  assert.match(singleCss,/page:membership-id/);
-  assert.match(singleCss,/@page membership-id\{size:85\.6mm 53\.98mm;margin:0\}/);
-  assert.match(singleCss,/:global\(html\):has\(\.shell\).*page:membership-id/s);
-  assert.match(singleCss,/:global\(\.app-shell > :not\(\.shell-main\)\)/);
+  assert.doesNotMatch(singlePage,/membershipRecordId|profilePictureFileId|productCode/);
 });
+
+test("single member ID print uses the exact physical page and excludes shared portal chrome",()=>{
+  assert.match(singleCss,/page:membership-id/);
+  assert.match(singleCss,/@page membership-id\\{size:85\\.6mm 53\\.98mm;margin:0\\}/);
+  assert.match(singleCss,/:global\\(html\\):has\\(\\.shell\\).*page:membership-id/s);
+  assert.match(singleCss,/:global\\(\\.app-shell > :not\\(\\.shell-main\\)\\)/);;
 
 test("bulk print previews count, provides actionable skipped states and prints one card per A4 page",()=>{
   assert.match(bulkPage,/selected\.length/);

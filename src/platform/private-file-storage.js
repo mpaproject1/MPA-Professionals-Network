@@ -141,7 +141,7 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
     }
   }
     if(!allowed){
-      const canReadFinanceEvidence=permissions.some(permission=>["finance.view","finance.payment.record","finance.payment.verify","finance.payment.reverse","finance.voucher.issue"].includes(permission));
+      const canReadFinanceEvidence=roles.includes("finance_officer")||permissions.some(permission=>["finance.view","finance.payment.record","finance.payment.verify","finance.payment.reverse","finance.voucher.issue"].includes(permission));
       if(canReadFinanceEvidence){
         const financeEvidence=await db.query(`select 1 from finance_payment_record where evidence_file_id=$1
           union all select 1 from membership_fee_balance_disposition where details->>'evidenceFileId'=$1::text

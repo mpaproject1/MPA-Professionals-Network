@@ -1,3 +1,4 @@
+import { hasAnyRoleOrPermission } from "../platform/authorization-policy.js";
 import { getPool, withTransaction } from "../platform/db.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
 import { assertOrganizationCapability } from "../platform/identity-policy.js";
@@ -697,9 +698,7 @@ export async function listOrganizationUsers(orgId,actorUserId){
 }
 
 function assertOrganizationAdminMutation(identity){
- const roles=Array.isArray(identity?.roles)?identity.roles:[];
- const permissions=Array.isArray(identity?.permissions)?identity.permissions:[];
- if(!roles.some(role=>["system_admin","admin"].includes(role))&&!permissions.includes("organizations.manage"))throw error(403,"Organization membership administration requires explicit platform organization-management authority.","FORBIDDEN");
+ if(!hasAnyRoleOrPermission(identity,["system_admin","admin"],["organizations.manage"]))throw error(403,"Organization membership administration requires explicit platform organization-management authority.","FORBIDDEN");
  if(!identity?.sub)throw error(403,"A signed-in administrator is required.","FORBIDDEN");
 }
 const ADMIN_ORG_ROLES=["administrator","recruiter","project_manager","event_manager","finance","read_only"];

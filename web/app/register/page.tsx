@@ -31,6 +31,12 @@ function parseOrganizationDraft(raw:string|null):OrganizationDraft|null{
 }
 const DRAFT_FIELDS: (keyof OrganizationDraftForm)[]=["email","firstName","middleName","lastName","orgLegalName","orgDisplayName","orgType","orgDescription","orgWebsite","orgEmail","orgPhone","orgAddress"];
 function draftHasContent(form:OrganizationDraftForm){return DRAFT_FIELDS.some(key=>String(form[key]||"").trim().length>0);}
+async function registrationRequest<T>(path:string,init:RequestInit):Promise<T>{
+ const controller=new AbortController();
+ const timeout=window.setTimeout(()=>controller.abort(),30000);
+ try{return await api<T>(path,{...init,signal:controller.signal});}
+ finally{window.clearTimeout(timeout);}
+}
 
 
 export default function Register(){
@@ -157,13 +163,13 @@ export default function Register(){
    const currentChallenge=challenge;
    if(challengeRequired&&!currentChallenge)throw new Error("Load a new human check before registering.");
    const proof=challengeRequired
-    ? await api<{token:string}>("/api/v1/auth/human-challenge/verify",{method:"POST",body:JSON.stringify({id:currentChallenge!.id,answer:challengeAnswer})})
+    ? await registrationRequest<{token:string}>("/api/v1/auth/human-challenge/verify",{method:"POST",body:JSON.stringify({id:currentChallenge!.id,answer:challengeAnswer})})
     : {token:""};
    const organizationDraftSaved=kind!=="organization"||writeOrganizationDraft();
    setDraftWarning(kind==="organization"&&!organizationDraftSaved);
    const representativeName=[form.firstName,form.middleName,form.lastName].map(x=>x.trim()).filter(Boolean).join(" ");
    const payload={accountType:kind==="organization"?"organization":"professional",email:form.email.trim(),password:form.password,referralCode:referralCode.trim()||undefined,referralStatusConsent,passwordConfirmation:form.passwordConfirm,humanCheckToken:proof.token,firstName:form.firstName.trim(),middleName:form.middleName.trim(),lastName:form.lastName.trim(),displayName:kind==="organization"?representativeName:form.displayName.trim(),phone:kind==="professional"?form.phone.trim():form.orgPhone.trim(),nationality:form.nationality};
-   const r=await api<any>("/api/v1/auth/register",{method:"POST",body:JSON.stringify(payload)});
+   const r=await registrationRequest<any>("/api/v1/auth/register",{method:"POST",body:JSON.stringify(payload)});
    if(r.verificationRequired){
     setVerificationMessage((r.verificationSent?"Your representative account was created. Verify the representative's email before signing in; check your inbox and spam folder.":"Your account was created, but email delivery was not confirmed. Use the resend option on the login page, or use the development link if one is provided.")+(kind==="organization"&&!organizationDraftSaved?" Browser storage was unavailable, so the organization details could not be saved for later. After verifying and signing in, re-enter them in the organization workspace.":""));
     setVerificationUrl(String(r.developmentVerificationUrl||""));

@@ -50,7 +50,7 @@ export const ROLE_PERMISSION_BUNDLES = Object.freeze({
   system_admin: Object.freeze(["users.manage", "members.export", "members.export.contacts", "accounts.export", "accounts.export.contacts", "membership.cards.print"]),
   reviewer: Object.freeze(["membership.review", "membership.activate", "members.view"]),
   membership_reviewer: Object.freeze(["membership.review", "membership.activate", "members.view"]),
-  finance_officer: Object.freeze(["finance.view", "finance.manage", "finance.payment.verify", "finance.payment.reverse"]),
+  finance_officer: Object.freeze(["finance.view", "finance.manage", "finance.payment.record", "finance.payment.verify", "finance.payment.reverse", "finance.voucher.issue"]),
   verification_reviewer: Object.freeze(["verification.manage"]),
   appeal_reviewer: Object.freeze(["verification.appeal.review"]),
   supporting_staff: Object.freeze(["reviews.view"]),
@@ -125,6 +125,8 @@ export const PERMISSIONS = Object.freeze({
   MEMBERSHIP_ACTIVATE: "membership.activate",
   FINANCE_VIEW: "finance.view",
   FINANCE_MANAGE: "finance.manage",
+  FINANCE_PAYMENT_RECORD: "finance.payment.record",
+  FINANCE_VOUCHER_ISSUE: "finance.voucher.issue",
   FINANCE_PAYMENT_VERIFY: "finance.payment.verify",
   FINANCE_PAYMENT_REVERSE: "finance.payment.reverse",
   ORGANIZATIONS_VIEW: "organizations.view",
@@ -216,7 +218,7 @@ const PERMISSION_DETAILS = {
   "membership.review": { description: "Review submitted membership applications; does not grant payment verification or activation.", actionClass: "review", globalDirectGrant: true },
   "membership.activate": { description: "Activate approved membership after independent payment and approval requirements are satisfied.", actionClass: "write", globalDirectGrant: true },
   "finance.view": { description: "View payment queues and restricted finance reports without mutation authority.", actionClass: "read", globalDirectGrant: true },
-  "finance.manage": { description: "Perform legacy payment-management actions only; does not grant membership decisions.", actionClass: "write", globalDirectGrant: true },
+  "finance.manage": { description: "Legacy finance management compatibility; does not replace action-specific verification or reversal permissions.", actionClass: "write", globalDirectGrant: true },\n  "finance.payment.record": { description: "Record manual finance payments with ownership checks and audit evidence.", actionClass: "write", globalDirectGrant: true },\n  "finance.voucher.issue": { description: "Issue or reissue payment vouchers only for verified, non-reversed payments.", actionClass: "write", globalDirectGrant: true },
   "finance.payment.verify": { description: "Verify payment evidence and transaction status.", actionClass: "write", globalDirectGrant: true },
   "finance.payment.reverse": { description: "Reverse eligible payments with reason and audit evidence.", actionClass: "write", globalDirectGrant: true },
   "organizations.view": { description: "View organization workspace data only where organization membership permits.", actionClass: "read", globalDirectGrant: true },
@@ -251,7 +253,7 @@ const PERMISSION_DETAILS = {
   "support.inquiries.manage": { description: "Manage support inquiries subject to assignment and contact-consent controls.", actionClass: "write", globalDirectGrant: true },
 };
 
-const LEGACY_PERMISSION_METADATA = {
+const LEGACY_PERMISSION_METADATA = {\n  "finance.payment.record": ["Finance", "Record manual finance payments", true, false],\n  "finance.voucher.issue": ["Finance", "Issue payment vouchers after verification", true, false],
   "jobs.review": ["Recruitment", "Review vacancies", true, false],
   "reports.sensitive": ["Reports", "View sensitive reports", true, false],
   "support.manage": ["Support", "Manage support desk", true, false],

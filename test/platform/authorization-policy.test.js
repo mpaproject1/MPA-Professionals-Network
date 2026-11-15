@@ -131,3 +131,17 @@ test("database-backed service permission checks reference only canonical permiss
   assert.ok(referenced.size > 0, "service-level permission SQL inventory must not be empty");
   for (const code of referenced) assert.equal(isKnownPermission(code), true, code);
 });
+
+test("every registered permission documents action class and global grant boundary", () => {
+  for (const permission of Object.values(PERMISSION_CATALOG)) {
+    assert.ok(permission.description && permission.description.length >= 10, permission.code);
+    assert.ok(["read", "write", "review", "review_write", "sensitive_read", "sensitive_write", "privileged_write"].includes(permission.actionClass), permission.code);
+    assert.equal(typeof permission.globalDirectGrant, "boolean", permission.code);
+    assert.equal(permission.assignable, permission.globalDirectGrant && !permission.systemOnly, permission.code);
+  }
+  assert.equal(PERMISSION_CATALOG["jobs.manage"].globalDirectGrant, false);
+  assert.equal(PERMISSION_CATALOG["applications.manage"].globalDirectGrant, false);
+  assert.equal(PERMISSION_CATALOG["files.view_private"].globalDirectGrant, false);
+  assert.equal(PERMISSION_CATALOG["finance.view"].actionClass, "read");
+  assert.equal(PERMISSION_CATALOG["permissions.manage"].systemOnly, true);
+});

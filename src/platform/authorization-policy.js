@@ -100,6 +100,150 @@ export function roleMetadata(roleCode) {
   };
 }
 
+/**
+ * Canonical direct-permission catalogue.
+ *
+ * Codes seeded by migrations 024, 20261030190000 and 20261030210000 are
+ * registered here. Additional codes observed in existing service SQL are
+ * retained as legacy/runtime entries until their historical seed source and
+ * live database presence are reconciled. Resource/tenant scope is never
+ * implied by possession of a capability.
+ */
+export const PERMISSIONS = Object.freeze({
+  DASHBOARD_VIEW: "dashboard.view",
+  MEMBERS_VIEW: "members.view",
+  MEMBERS_MANAGE: "members.manage",
+  MEMBERSHIP_REVIEW: "membership.review",
+  MEMBERSHIP_ACTIVATE: "membership.activate",
+  FINANCE_VIEW: "finance.view",
+  FINANCE_MANAGE: "finance.manage",
+  FINANCE_PAYMENT_VERIFY: "finance.payment.verify",
+  FINANCE_PAYMENT_REVERSE: "finance.payment.reverse",
+  ORGANIZATIONS_VIEW: "organizations.view",
+  ORGANIZATIONS_MANAGE: "organizations.manage",
+  ORGANIZATIONS_REVIEW: "organizations.review",
+  JOBS_VIEW: "jobs.view",
+  JOBS_MANAGE: "jobs.manage",
+  JOBS_REVIEW: "jobs.review",
+  APPLICATIONS_VIEW: "applications.view",
+  APPLICATIONS_MANAGE: "applications.manage",
+  SERVICES_VIEW: "services.view",
+  SERVICES_MANAGE: "services.manage",
+  MENTORSHIP_VIEW: "mentorship.view",
+  MENTORSHIP_MANAGE: "mentorship.manage",
+  VERIFICATION_VIEW: "verification.view",
+  VERIFICATION_MANAGE: "verification.manage",
+  VERIFICATION_APPEAL_REVIEW: "verification.appeal.review",
+  REVIEWS_VIEW: "reviews.view",
+  REPORTS_VIEW: "reports.view",
+  REPORTS_SENSITIVE: "reports.sensitive",
+  USERS_VIEW: "users.view",
+  USERS_MANAGE: "users.manage",
+  PERMISSIONS_MANAGE: "permissions.manage",
+  SETTINGS_MANAGE: "settings.manage",
+  FILES_VIEW_PRIVATE: "files.view_private",
+  NOTIFICATIONS_MANAGE: "notifications.manage",
+  ETHICS_CASE_INTAKE: "ethics.case.intake",
+  ETHICS_CASE_REVIEW: "ethics.case.review",
+  ETHICS_CASE_ASSIGN: "ethics.case.assign",
+  SUPPORT_MANAGE: "support.manage",
+  SUPPORT_QUEUE_MANAGE: "support.queue.manage",
+  SUPPORT_INQUIRIES_MANAGE: "support.inquiries.manage",
+});
+
+const SEEDED_PERMISSION_METADATA = {
+  "dashboard.view": ["Dashboard", "View dashboard", false, false],
+  "members.view": ["Membership", "View members", false, false],
+  "members.manage": ["Membership", "Manage members", true, false],
+  "membership.review": ["Membership", "Review membership applications", true, false],
+  "membership.activate": ["Membership", "Activate approved memberships", true, false],
+  "finance.view": ["Finance", "View finance", true, false],
+  "finance.manage": ["Finance", "Manage finance", true, false],
+  "finance.payment.verify": ["Finance", "Verify membership payments", true, false],
+  "finance.payment.reverse": ["Finance", "Reverse membership payments", true, false],
+  "organizations.view": ["Organizations", "View organizations", false, false],
+  "organizations.manage": ["Organizations", "Manage organizations", true, false],
+  "organizations.review": ["Organizations", "Review organization verification", true, false],
+  "jobs.view": ["Recruitment", "View jobs and pipeline", true, false],
+  "jobs.manage": ["Recruitment", "Manage jobs", true, false],
+  "applications.view": ["Applications", "View applications", true, false],
+  "applications.manage": ["Applications", "Manage applications", true, false],
+  "services.view": ["Services", "View services", false, false],
+  "services.manage": ["Services", "Manage services", true, false],
+  "mentorship.view": ["Mentorship", "View mentorship", false, false],
+  "mentorship.manage": ["Mentorship", "Manage mentorship", true, false],
+  "verification.view": ["Verification", "View verification", true, false],
+  "verification.manage": ["Verification", "Manage verification", true, false],
+  "reviews.view": ["Review queues", "View review queues", true, false],
+  "reports.view": ["Reports", "View reports", true, false],
+  "users.view": ["User administration", "View users", true, false],
+  "users.manage": ["User administration", "Manage users", true, false],
+  "permissions.manage": ["User administration", "Manage user permissions", true, true],
+  "settings.manage": ["Platform settings", "Manage settings", true, true],
+  "files.view_private": ["Private files", "View private files", true, false],
+  "notifications.manage": ["Notifications", "Manage notifications", false, false],
+  "finance.payment.verify": ["Finance", "Verify membership payments", true, false],
+  "finance.payment.reverse": ["Finance", "Reverse membership payments", true, false],
+  "verification.appeal.review": ["Verification", "Review independent verification appeals", true, false],
+  "ethics.case.intake": ["Ethics", "Submit a confidential ethics concern", true, false],
+  "ethics.case.review": ["Ethics", "Review assigned ethics cases", true, false],
+  "ethics.case.assign": ["Ethics", "Assign ethics reviewers", true, true],
+};
+
+const LEGACY_PERMISSION_METADATA = {
+  "jobs.review": ["Recruitment", "Review vacancies", true, false],
+  "reports.sensitive": ["Reports", "View sensitive reports", true, false],
+  "support.manage": ["Support", "Manage support desk", true, false],
+  "support.queue.manage": ["Support", "Manage support queues", true, false],
+  "support.inquiries.manage": ["Support", "Manage support inquiries", true, false],
+};
+
+export const PERMISSION_CATALOG = Object.freeze(Object.fromEntries(
+  Object.entries(PERMISSIONS).map(([, code]) => {
+    const seeded = SEEDED_PERMISSION_METADATA[code];
+    const legacy = LEGACY_PERMISSION_METADATA[code];
+    const metadata = seeded || legacy || ["Unclassified", code, true, false];
+    return [code, Object.freeze({
+      code,
+      area: metadata[0],
+      label: metadata[1],
+      sensitive: metadata[2],
+      systemOnly: metadata[3],
+      source: seeded ? "migration-seeded" : legacy ? "legacy-runtime" : "unclassified",
+      assignable: seeded !== undefined && !metadata[3],
+    })];
+  }),
+));
+
+export function permissionMetadata(permissionCode) {
+  return PERMISSION_CATALOG[permissionCode] || Object.freeze({
+    code: permissionCode,
+    area: "Unknown",
+    label: "Unclassified permission",
+    sensitive: true,
+    systemOnly: true,
+    source: "unknown",
+    assignable: false,
+  });
+}
+
+export function isKnownPermission(permissionCode) {
+  return Object.prototype.hasOwnProperty.call(PERMISSION_CATALOG, permissionCode);
+}
+
+export function assertKnownPermissionCodes(permissionCodes) {
+  const unknown = [...new Set((Array.isArray(permissionCodes) ? permissionCodes : [])
+    .filter((code) => !isKnownPermission(code)))];
+  if (unknown.length) {
+    throw Object.assign(new Error("One or more permission codes are not in the authorization catalogue."), {
+      statusCode: 400,
+      code: "UNKNOWN_PERMISSION",
+      details: { unknown },
+    });
+  }
+  return true;
+}
+
 export function isPrivilegedRole(roleCode) {
   return roleMetadata(roleCode).privileged;
 }

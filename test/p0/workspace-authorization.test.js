@@ -49,10 +49,10 @@ test("direct permissions grant only their named membership or finance capability
   assert.throws(() => assertMembershipReviewAccess(paymentOnly), forbidden);
 });
 
-test("legacy finance.manage remains payment-only and never grants membership decisions", () => {
+test("legacy finance.manage does not replace action-specific payment permissions", () => {
   const legacyFinance = { sub: "legacy-finance", roles: [], permissions: ["finance.manage"] };
-  assert.equal(assertPaymentVerificationAccess(legacyFinance), legacyFinance);
-  assert.equal(assertPaymentReversalAccess(legacyFinance), legacyFinance);
+  assert.throws(() => assertPaymentVerificationAccess(legacyFinance), forbidden);
+  assert.throws(() => assertPaymentReversalAccess(legacyFinance), forbidden);
   assert.throws(() => assertMembershipReviewAccess(legacyFinance), forbidden);
   assert.throws(() => assertMembershipActivationAccess(legacyFinance), forbidden);
 });

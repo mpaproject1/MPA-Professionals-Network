@@ -1,3 +1,4 @@
+import { hasAnyRoleOrPermission } from "../platform/authorization-policy.js";
 const ALLOWED_TYPES = new Set(["chapa", "telebirr", "bank_transfer", "cash", "manual"]);
 function bad(message) { throw Object.assign(new Error(message), { statusCode: 400, code: "VALIDATION_ERROR" }); }
 function clean(value, max = 120) {
@@ -6,10 +7,7 @@ function clean(value, max = 120) {
   return valueText || null;
 }
 export function canManageMembershipPaymentMethods(identity = {}) {
-  const roles = Array.isArray(identity.roles) ? identity.roles : [];
-  const permissions = Array.isArray(identity.permissions) ? identity.permissions : [];
-  return roles.includes("system_admin") || roles.includes("finance_officer") ||
-    permissions.includes("finance.manage");
+  return hasAnyRoleOrPermission(identity, ["system_admin", "finance_officer"], ["finance.manage"]);
 }
 export function assertMembershipPaymentMethodAdmin(identity = {}) {
   if (!canManageMembershipPaymentMethods(identity)) {

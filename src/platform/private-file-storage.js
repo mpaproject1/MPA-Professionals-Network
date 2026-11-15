@@ -115,7 +115,7 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
   }
   if(!allowed){
     const ethicsRole=roles.some(role=>["ethics_reviewer","system_admin"].includes(role))||permissions.includes("ethics.case.review");
-    const ethicsEvidence=await db.query("select 1 from ethics_case_evidence e join ethics_case c on c.id=e.case_id where e.file_object_id=$1 and not exists(select 1 from ethics_case_conflict x where x.case_id=c.id and x.reviewer_id=$2 and x.resolution='recused') and (c.reporter_user_id=$2 or c.subject_user_id=$2 or $3::boolean or ($4::boolean and (c.assigned_reviewer_id=$2 or exists(select 1 from ethics_case_panel_member pm where pm.case_id=c.id and pm.reviewer_id=$2 and pm.active=true)))) limit 1",[fileId,userId,roles.includes("system_admin"),ethicsRole]);
+    const ethicsEvidence=await db.query("select 1 from ethics_case_evidence e join ethics_case c on c.id=e.case_id where e.file_object_id=$1 and not exists(select 1 from ethics_case_conflict x where x.case_id=c.id and x.reviewer_id=$2 and x.resolution='recused') and (c.reporter_user_id=$2 or c.subject_user_id=$2 or ($3::boolean and (c.assigned_reviewer_id=$2 or exists(select 1 from ethics_case_panel_member pm where pm.case_id=c.id and pm.reviewer_id=$2 and pm.active=true)))) limit 1",[fileId,userId,ethicsRole]);
     allowed=ethicsEvidence.rowCount>0;
   }
   if(!allowed){
@@ -136,7 +136,7 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
     if(!allowed&&canReviewMembership){
       const membershipEvidence=await db.query("select 1 from membership_application_attachment aa join membership_application a on a.id=aa.application_id where aa.file_object_id=$1 and a.user_id=$2 limit 1",[fileId,f.created_by]);
       const canReadMemberProfilePictures=roles.some(role=>["reviewer","membership_reviewer","system_admin"].includes(role))||permissions.some(permission=>["membership.review","members.manage"].includes(permission));
-      const membershipCardPhoto=canReadMemberProfilePictures?await db.query("select 1 from professional_profile pp join person p on p.id=pp.person_id where pp.profile_picture_file_id=$1 limit 1",[fileId]):{rowCount:0};
+      const membershipCardPhoto=canReadMemberProfilePictures?await db.query("select 1 from professional_profile pp join person p on p.id=pp.person_id where pp.profile_picture_file_id=$1 and exists(select 1 from membership_record mr where mr.user_id=p.user_id and ${membershipIsCurrentlyActiveSql("mr")}) limit 1",[fileId]):{rowCount:0};
       allowed=membershipEvidence.rowCount>0||membershipCardPhoto.rowCount>0;
     }
   }

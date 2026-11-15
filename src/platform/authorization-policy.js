@@ -47,6 +47,7 @@ const ROLE_DEFINITIONS = {
  * ethics_reviewer receives no general verification-management alias.
  */
 export const ROLE_PERMISSION_BUNDLES = Object.freeze({
+  system_admin: Object.freeze(["users.manage"]),
   verification_reviewer: Object.freeze(["verification.manage"]),
   appeal_reviewer: Object.freeze(["verification.appeal.review"]),
   supporting_staff: Object.freeze(["reviews.view"]),

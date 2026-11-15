@@ -303,9 +303,9 @@ export function hasRole(identity, roleCode) {
 }
 
 export function hasAnyRoleOrPermission(identity, allowedRoles = [], allowedPermissions = []) {
-  const permissions = Array.isArray(identity?.permissions) ? identity.permissions : [];
+  const capabilities = effectiveCapabilities(identity);
   return allowedRoles.some((roleCode) => hasRole(identity, roleCode))
-    || permissions.some((permission) => isKnownPermission(permission) && allowedPermissions.includes(permission));
+    || allowedPermissions.some((permission) => capabilities.includes(permission));
 }
 
 export function effectiveCapabilities(identity) {

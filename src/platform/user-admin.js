@@ -126,6 +126,9 @@ export async function updateUser(actor,userId,input,requestId){
   for(const requested of requestedRoles){
    const rr=(await tx.query("select id from app_role where role_code=$1",[requested])).rows[0];
    if(!rr)throw err(400,"Unknown role.","INVALID_ROLE");
+   const policy=roleMetadata(requested);
+   if(!policy.active||!policy.assignable)
+    throw err(403,policy.assignmentNote||"This role is not assignable through platform account administration.","ROLE_SCOPE_MISMATCH");
    if(isPrivilegedRole(requested)&&!actorRoles.includes(SYSTEM_ROLE))
     throw err(403,"Only a system administrator may grant or remove privileged roles.","PRIVILEGED_ROLE_CHANGE");
   }

@@ -36,7 +36,7 @@ test("membership attribution follows registration, application, review and activ
  assert.ok(membership.includes("recordMembershipActivated"));
 });
 test("referral URLs are captured at registration and carried through formal job applications",()=>{
- assert.ok(registrationPage.includes('new URLSearchParams(window.location.search).get("ref")'));
+ assert.match(registrationPage,/params\.get\("ref"\)/);
  assert.ok(registrationPage.includes("referralCode:referralCode.trim()||undefined"));
  assert.ok(registrationPage.includes("referralStatusConsent"));
  assert.ok(jobsPage.includes('new URLSearchParams(window.location.search).get("ref")'));

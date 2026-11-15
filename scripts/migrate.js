@@ -61,3 +61,8 @@ for(const migration of migrations){
   const record=`insert into ${ledger}(filename,checksum) values (${quote(filename)},${quote(checksum)})`;
   execute(`${sql}\n\n${record};`);
 }
+
+// Install and publish the reviewed member-geography baseline on first bootstrap.
+// The installer is idempotent and defers safely until the initial system-admin
+// account exists; rerunning migrations after admin provisioning completes it.
+execFileSync(process.execPath,["scripts/bootstrap-member-geography.js"],{stdio:"inherit",timeout:240000});

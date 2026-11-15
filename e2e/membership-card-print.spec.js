@@ -103,6 +103,7 @@ test("single member membership ID PDF is one exact-size card with no portal chro
   expect(extracted).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
   // The dedicated A4 mode must keep the ID at physical card dimensions and
   // place the complete card on exactly one A4 sheet.
+  await page.emulateMedia({media:"screen"});
   await page.goto("/membership/card?paper=a4");
   await expect(page.getByRole("heading",{name:"Membership ID"})).toBeVisible();
   await page.emulateMedia({media:"print"});

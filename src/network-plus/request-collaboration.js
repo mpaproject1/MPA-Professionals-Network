@@ -146,7 +146,7 @@ export async function createNetworkPlusRequest(userId,input,requestIdHeader,idem
       const reps=(await db.query("select user_id from organization_membership where organization_id=$1 and status='active' and role_code in ('owner','administrator')",[org.id])).rows;
       if(!reps.length)fail(409,"Recipient organization has no active authorized representative.","RECIPIENT_UNAVAILABLE");
     } else if(input.businessId) {
-      const activeOwner=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[recipientUserId])).rowCount>0;
+      const activeOwner=await hasCurrentActiveMembership(db,recipientUserId);
       if(!activeOwner)fail(409,"The business owner must retain active membership to receive requests.","RECIPIENT_UNAVAILABLE");
     } else {
       const eligible=(await db.query("select 1 from app_user u join membership_record m on m.user_id=u.id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date) join verification_visibility vv on vv.user_id=u.id and vv.directory_visible=true join person p on p.user_id=u.id join professional_profile pp on pp.person_id=p.id and pp.directory_visibility in ('members','public') where u.id=$1 and exists(select 1 from verification_claim vc join verification_case c on c.id=vc.case_id where c.subject_user_id=u.id and vc.status='verified' and lower(vc.claim_code_snapshot)=any($2::text[]))",[recipientUserId,["professional_certification","education","employment","experience","service_capability"]])).rowCount>0;
@@ -191,7 +191,7 @@ async function transitionRequest(requestId,userId,to,input,requestIdHeader,idemp
         const capability=to==="accepted"?"business.accept_terms":"business.respond_requests";
         if(!await hasBusinessAuthority(db,row.business_id,userId,capability))fail(403,"The current business owner or required delegated capability is needed for this decision.","RECIPIENT_AUTHORITY_REQUIRED");
       } else if(row.recipient_user_id) {
-        const active=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[userId])).rowCount>0;
+        const active=await hasCurrentActiveMembership(db,userId);
         if(userId!==row.recipient_user_id||!active)fail(403,"Only the intended active member recipient may decide this request.","RECIPIENT_AUTHORITY_REQUIRED");
       } else if(row.recipient_organization_id) {
         const active=(await db.query("select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true",[row.recipient_organization_id,userId])).rowCount>0;
@@ -429,7 +429,7 @@ async function hasCurrentRecipientAuthority(db,request,userId,capability="busine
     return (await db.query("select 1 from organization_membership om join organization o on o.id=om.organization_id where om.organization_id=$1 and om.user_id=$2 and om.status='active' and om.role_code in ('owner','administrator') and o.verification_status='verified' and o.network_plus_visible=true",[request.recipient_organization_id,userId])).rowCount>0;
   }
   if(request.recipient_user_id===userId){
-    return (await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[userId])).rowCount>0;
+    return hasCurrentActiveMembership(db,userId);
   }
   return false;
 }

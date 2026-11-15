@@ -120,7 +120,7 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
   if(!allowed){
     const canReviewVetting=roles.some(role=>["verification_reviewer","appeal_reviewer","system_admin"].includes(role))||permissions.includes("verification.manage");
     const canReviewOrganization=roles.some(role=>["reviewer","system_admin"].includes(role))||permissions.includes("organizations.review");
-    const canReviewMembership=roles.some(role=>["reviewer","finance_officer","system_admin"].includes(role))||permissions.some(permission=>["finance.view","finance.manage","members.view","members.manage"].includes(permission));
+    const canReviewMembership=roles.some(role=>["reviewer","membership_reviewer","system_admin"].includes(role))||permissions.some(permission=>["membership.review","members.manage"].includes(permission));
     if(canReviewOrganization){
       const organizationEvidence=await db.query("select 1 from organization_verification_evidence where file_object_id=$1 limit 1",[fileId]);
       allowed=organizationEvidence.rowCount>0;
@@ -135,7 +135,7 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
     }
     if(!allowed&&canReviewMembership){
       const membershipEvidence=await db.query("select 1 from membership_application_attachment aa join membership_application a on a.id=aa.application_id where aa.file_object_id=$1 and a.user_id=$2 limit 1",[fileId,f.created_by]);
-      const canReadMemberProfilePictures=roles.some(role=>["reviewer","system_admin"].includes(role))||permissions.some(permission=>["members.view","members.manage"].includes(permission));
+      const canReadMemberProfilePictures=roles.some(role=>["reviewer","membership_reviewer","system_admin"].includes(role))||permissions.some(permission=>["membership.review","members.manage"].includes(permission));
       const membershipCardPhoto=canReadMemberProfilePictures?await db.query("select 1 from professional_profile pp join person p on p.id=pp.person_id where pp.profile_picture_file_id=$1 limit 1",[fileId]):{rowCount:0};
       allowed=membershipEvidence.rowCount>0||membershipCardPhoto.rowCount>0;
     }
@@ -177,6 +177,6 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
   if(!allowed) throw fail(403,"You do not have permission to read this private file.","FORBIDDEN");
   const {readFile}=await import("node:fs/promises");
   let bytes; try{bytes=await readFile(filePath(f.object_key));}catch{throw fail(404,"Private file content is unavailable.","PRIVATE_FILE_MISSING");}
-  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'file.private_read','file_object',$2,$3,'success',$4)",[userId,fileId,requestId,JSON.stringify({contentType:f.content_type,byteSize:Number(f.byte_size)})]);
+  await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'file.private_read','file_object',$2,$3,'success',$4)",[userId,fileId,requestId,JSON.stringify({contentType:f.content_type,byteSize:Number(f.byte_size),purpose:f.purpose})]);
   return {file:f,bytes};
 }

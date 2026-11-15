@@ -13,8 +13,9 @@ const VERSION_LABEL="bootstrap-ethiopia-"+SOURCE_COMMIT.slice(0,12);
 
 async function main(){
  const db=getPool();
- const published=(await db.query("select v.id,v.version_label,count(u.id)::int row_count from membership_geography_version v left join membership_geography_unit u on u.version_id=v.id where v.status='published' group by v.id order by v.published_at desc limit 1")).rows[0];
- if(published?.row_count>0){process.stdout.write("Member geography already published: "+published.version_label+" ("+published.row_count+" rows).\n");return;}
+ const published=(await db.query("select v.id,v.version_label,count(u.id)::int row_count,count(*) filter(where u.unit_level='country')::int country_count,count(*) filter(where u.unit_level='region')::int region_count,count(*) filter(where u.unit_level='federal_city')::int federal_city_count,count(*) filter(where u.unit_level='zone')::int zone_count,count(*) filter(where u.unit_level='sub_city')::int sub_city_count,count(*) filter(where u.unit_level='woreda')::int woreda_count from membership_geography_version v left join membership_geography_unit u on u.version_id=v.id where v.status='published' group by v.id order by v.published_at desc limit 1")).rows[0];
+ const baselineComplete=published&&published.country_count>=200&&published.region_count===12&&published.federal_city_count===2&&published.zone_count===101&&published.sub_city_count===13&&published.woreda_count===1119;
+ if(baselineComplete){process.stdout.write("Member geography baseline already published: "+published.version_label+" ("+published.row_count+" rows).\\n");return;}
  const admin=(await db.query("select u.id from app_user u join app_user_role ur on ur.user_id=u.id join app_role r on r.id=ur.role_id where r.role_code='system_admin' and u.status='active' order by u.created_at limit 1")).rows[0];
  if(!admin){process.stdout.write("Member geography bootstrap deferred: create the initial active system administrator, then run npm run migrate again.\n");return;}
  const identity={sub:admin.id,roles:["system_admin"],permissions:["members.geography.manage"]};

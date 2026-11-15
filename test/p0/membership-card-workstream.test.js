@@ -64,7 +64,7 @@ test("single member ID print uses the exact physical page and excludes shared po
   assert.match(singleCss,/@page membership-id\{size:85\.6mm 53\.98mm;margin:0\}/);
   assert.match(singleCss,/:global\(html\):has\(\.shell\).*page:membership-id/s);
   assert.match(singleCss,/:global\(html\):has\(\.a4\).*page:membership-a4/s);
-  assert.match(singleCss,/:global\(\.app-shell > :not\(\.shell-main\)\)/);
+  assert.match(singleCss,/:global\(\.app-shell\):has\(\.shell\) > :global\(:not\(\.shell-main\)\)/);
 });
 
 test("bulk print previews count, provides actionable skipped states and prints one card per A4 page",()=>{
@@ -83,7 +83,7 @@ test("bulk print previews count, provides actionable skipped states and prints o
   assert.match(bulkCss,/\.card\{width:85\.6mm;height:53\.98mm;/);
   assert.match(bulkCss,/@page membership-bulk-a4\{size:210mm 297mm;margin:0\}/);
   assert.match(bulkCss,/:global\(html\):has\(\.printPage\).*page:membership-bulk-a4/s);
-  assert.match(bulkCss,/:global\(\.app-shell > :not\(\.shell-main\)\)/);
+  assert.match(bulkCss,/:global\(\.app-shell\):has\(\.printPage\) > :global\(:not\(\.shell-main\)\)/);
 });
 
 test("QR verification accepts canonical membership number and preserves existing record-based QR links",()=>{

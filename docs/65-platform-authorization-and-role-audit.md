@@ -498,3 +498,270 @@ Do not automatically bounce a user between `/members`, `/profile`, `/organizatio
 6. **Regression:** run a full route × method × context × scope matrix, including deep links, cross-organization IDs, expired membership, revoked assignments, multi-context users, and browser back/old-tab behavior.
 
 **Architecture status:** This account-boundary requirement is approved as a foundational design requirement. The current code contains partial foundations, but the audit does not claim that all listed behaviors are implemented. Implementation must be a separate, test-led change set with no broadening of access as a workaround.
+
+
+---
+
+## 12. Expanded repository inventory — branch snapshot 2026-11-15
+
+**Scope and evidence discipline**
+
+This addendum is based on the complete Git tree returned for `feat/workstream-3-progress-members-workspace` (789 tracked blobs; 161 files under `db/migrations/`) and targeted source inspection. It distinguishes source-level facts from live database state. No production database, deployed server, or live `app_user_role` / `app_user_permission` assignments were queried. Therefore, seeded role codes are verified in migration source, while actual production assignment counts and migration execution state are **Not verified**.
+
+Status labels used below:
+
+- **Verified** — directly supported by checked-in source or an existing test.
+- **Defect** — a demonstrated inconsistency in source policy or enforcement.
+- **Unreconciled** — referenced or defined but not fully reconciled with all other namespaces, migration history, or effective service behavior.
+- **Not verified** — requires runtime, deployed environment, or production database evidence.
+
+The complete dispatch-level route matrix is in [docs/66-platform-authorization-route-matrix.md](./66-platform-authorization-route-matrix.md). It contains 642 route branches from `server.js`, with HTTP method, route predicate, visible dispatch gate, handler and source line.
+
+### 12.1 Migration role-code inventory
+
+**Verified seeded into `app_role` by migrations inspected:**
+
+| Role code | Seed source | Domain / interpretation | Proposed classification |
+|---|---|---|---|
+| `system_admin` | `002_platform_foundation.sql` | Highest platform security/governance authority | Canonical platform |
+| `reviewer` | `002_platform_foundation.sql` | Generic review role; reused across workflows | Legacy / too broad; replace with workflow-specific role or capability |
+| `finance_officer` | `002_platform_foundation.sql` | Finance operations | Canonical platform specialist |
+| `member` | `002_platform_foundation.sql` | Person/member identity marker; not proof of current membership entitlement | Canonical identity marker only |
+| `supporting_staff` | `006_vetting_and_trust_framework.sql` | Staff-assisted support within scope | Canonical platform support specialist, but scope must be explicit |
+| `verification_reviewer` | `006_vetting_and_trust_framework.sql` | Verification case review | Canonical workflow specialist; assignment required |
+| `ethics_reviewer` | `006_vetting_and_trust_framework.sql` | Ethics case review | Canonical workflow specialist; assignment and conflict checks required |
+| `appeal_reviewer` | `006_vetting_and_trust_framework.sql` | Independent verification appeals | Canonical workflow specialist; must not be original decision-maker |
+| `admin` | `017_production_security_and_sessions.sql` | Platform operational administrator | Canonical platform operational role; must remain distinct from system security authority |
+| `organization_admin` | `017_production_security_and_sessions.sql` | Organization administrator label, but seeded globally | Legacy/misplaced global role; organization authority belongs in `organization_membership` |
+| `recruiter` | `017_production_security_and_sessions.sql` | Recruiting role, but seeded globally | Legacy/misplaced; organization/job scoped |
+| `project_manager` | `017_production_security_and_sessions.sql` | Project/organization operations, but seeded globally | Legacy/misplaced; project/org scoped |
+| `read_only` | `017_production_security_and_sessions.sql` | Read-only organizational visibility, but seeded globally | Legacy/misplaced; organization scoped |
+| `mentor` | `017_production_security_and_sessions.sql` | Approved mentor label, but seeded globally | Legacy/misplaced; derive from verified professional profile and mentorship relationship |
+| `organization_representative` | `20261015180000_account_type.sql` | Organization-representative account classification | Context/account type, not platform authority |
+| `business_verification_reviewer` | `20261031110000_network_plus_business_discovery.sql` | Business verification | Canonical platform specialist; case assignment and submitter-conflict checks required |
+| `business_moderator` | `20261031110000_network_plus_business_discovery.sql` | Network-Plus business/service moderation | Canonical platform specialist; creator/self-review conflict checks required |
+| `network_plus_support` | `20261031120000_network_plus_request_collaboration.sql` | Read-only support for a specific support case | Canonical specialist marker only; explicit `network_plus_request_support_grant` and expiry remain mandatory |
+| `serve_community_reviewer` | `20261031130000_serve_community_initiatives.sql` | Serve-Community initiative and legacy classification review | Canonical platform specialist; independent review required |
+
+No later migration in the 161-file migration directory was found to add another `app_role` seed. The 161 migration filenames were scanned for role/permission definitions and references; role seeds are concentrated in the files above.
+
+### 12.2 Other role namespaces — keep separate from platform roles
+
+| Namespace | Codes found in schema/source | Scope | Rule |
+|---|---|---|---|
+| Organization membership (`009_phase3_organizations_jobs.sql`) | `owner`, `administrator`, `recruiter`, `project_manager`, `event_manager`, `finance`, `read_only` | One `organization_id` and active `organization_membership` row | Never copy these into global `app_user_role`; evaluate requested organization on every call |
+| Job team (`013_comprehensive_job_portal.sql`) | `hiring_manager`, `recruiter`, `interviewer`, `approver`, `observer` | One `job_id` + user + active team membership | No cross-job or global authority |
+| Job application participant | `candidate`, `interviewer`, `observer` | One application/job workflow | Not platform roles; enforce applicant/assigned-team relationship |
+| Account type | `professional`, `organization_representative` | Account/person classification | Not an authorization grant; use capabilities and scoped relationships |
+| Network-Plus business ownership/access | `primary_owner`, `co_owner`; capabilities `business.manage_listing`, `business.respond_requests`, `business.accept_terms` | One business ID | Business owner and delegated access are separate from platform roles and organization membership |
+| Network-Plus request participants | `requester`, `recipient_representative`, `additional_participant` | One request ID and consent state | Private request access requires participant relationship/consent or an explicit time-bounded support grant |
+| Community Impact contributor taxonomy | `lead`, `co_lead`, `contributor`, `mentor`, `reviewer_organizer`, `partner_organization`, `other` | Contribution classification | Descriptive contribution roles, not login roles |
+
+### 12.3 Runtime role references not reconciled to migration seeds
+
+| Code | Evidence | Classification | Required treatment |
+|---|---|---|---|
+| `super_admin` | `src/platform/user-admin.js` privileged-role set; legacy docs | Unreconciled / legacy alias | Determine whether any DB assignments exist; map or retire via audited migration |
+| `platform_admin` | `src/platform/user-admin.js`, `server.js`, admin UI | Unreconciled / conflicting alias | Decide whether it aliases `admin`; remove competing admin checks after migration |
+| `membership_reviewer` | `src/platform/user-admin.js`, `workspace-authorization.js`, tests | Unreconciled | Tests and gates expect it, but no seed was found in the migration inventory |
+| `professional` | `identity-policy.js`, `web/lib/identity-capabilities.ts`, account_type default | Context/capability, not a verified app_role seed | Replace global-role test with account-type/professional-profile capability check |
+| `organization_owner` | Demo guide metadata in `014_demo_cases_and_ui_guides.sql` | Documentation/demo-only | Canonical organization role is `owner` in `organization_membership` |
+| `field_worker`, `inspector`, `executive`, `organization_lead` | Demo guide metadata | Documentation/demo-only | Do not seed or grant without a defined scoped resource model |
+
+**Verified:** The migration seeds do not include `super_admin`, `platform_admin`, or `membership_reviewer`; runtime code nevertheless treats them as privileged or valid authorization labels.  
+**Not verified:** Whether any of these codes exist in the deployed `app_role` table or have assigned users.
+
+### 12.4 Admin-assignable role path — UI versus backend
+
+**UI path**
+
+- `web/app/admin/accounts/page.tsx` derives its display gate from token roles `system_admin`, `admin`, or `platform_admin`.
+- `web/app/admin/users-table.tsx` displays only API roles where `assignable=true`; privileged roles are additionally restricted to a current `system_admin`.
+- `src/platform/user-admin.js:listRoles()` loads every row from `app_role`. It sets `assignable=false` only for codes in `NON_PLATFORM_ROLES`; otherwise it defaults to assignable unless the role is privileged and actor is not `system_admin`.
+
+**Backend mutation path**
+
+- `src/platform/user-admin.js:updateUser()` checks the requested role exists in `app_role`, protects privileged roles, protects privileged targets, blocks self-role changes, requires an audit reason, preserves last-`system_admin` protection, revokes sessions and records the change.
+- It does **not** apply `NON_PLATFORM_ROLES` or the `assignable` result from `listRoles()`.
+
+<badge color="danger">Defect — UI/backend policy mismatch</badge>
+
+A role hidden as non-assignable in the UI can still be submitted directly to the mutation endpoint if it exists in `app_role`. The backend does not enforce the UI classification. This applies to `organization_admin`, `recruiter`, `project_manager`, `read_only`, and `mentor`. Additionally, unclassified future role rows default to platform-assignable in `listRoles()`. The correction belongs in `src/platform/user-admin.js`, with negative API tests; UI filtering alone is insufficient.
+
+The UI's `platform_admin` display gate also differs from the backend's `admin()` rule, which accepts `system_admin`, `admin`, or the required direct permission. A `platform_admin` role alone is not enough unless it also carries that permission. This is a second UI/backend access mismatch.
+
+### 12.5 Direct permission catalogue and assignment rules
+
+**Base catalogue in `024_per_user_permission_matrix.sql` (26 codes):**
+
+`dashboard.view`, `members.view`, `members.manage`, `finance.view`, `finance.manage`, `organizations.view`, `organizations.manage`, `organizations.review`, `jobs.view`, `jobs.manage`, `applications.view`, `applications.manage`, `services.view`, `services.manage`, `mentorship.view`, `mentorship.manage`, `verification.view`, `verification.manage`, `reviews.view`, `reports.view`, `users.view`, `users.manage`, `permissions.manage`, `settings.manage`, `files.view_private`, `notifications.manage`.
+
+**Additional migration-seeded capabilities:**
+
+| Migration | Added permission codes |
+|---|---|
+| `20261014170000_p2_reporting_and_member_import.sql` | `reports.sensitive`, `members.import` |
+| `20261030190000_membership_finance_permission_separation.sql` | `membership.review`, `membership.activate`, `finance.payment.verify`, `finance.payment.reverse` (also updates `finance.view`) |
+| `20261030200000_general_finance_receipts_and_vouchers.sql` | `finance.payment.record`, `finance.voucher.issue` |
+| `20261030210000_phase3_ethics_volunteer_role_scopes.sql` | `verification.appeal.review`, `ethics.case.intake`, `ethics.case.review`, `ethics.case.assign` |
+| `20261031110000_network_plus_business_discovery.sql` | `business.verify`, `business.moderate` |
+| `20261031130000_serve_community_initiatives.sql` | `serve_community.initiatives.moderate`, `serve_community.legacy.classify` |
+| `20261031140000_serve_community_offline_completed_projects.sql` | `serve_community.projects.manage`, `serve_community.projects.approve` |
+| `20261031150000_community_impact_detection.sql` | `community_impact.detection.manage` |
+| `20261031170000_community_impact_retention_policy.sql` | `community_impact.retention.manage`, `community_impact.retention.approve` |
+| `20261031180000_community_impact_manual_claims.sql` | `community_impact.claim.review`, `community_impact.claim.assign`, `community_impact.claim.appeal_review` |
+| `20261101090000_community_impact_governance_completion.sql` | `community_impact.identity.review`, `community_impact.offline_attribution.review`, `community_impact.detection_policy.manage`, `community_impact.detection_policy.approve`, `community_impact.claim.assess`, `community_impact.claim.second_review`, `community_impact.retention.evaluate` |
+| `20261101110000_community_impact_unified_score.sql` | `community_impact.score.policy.manage`, `community_impact.score.policy.approve`, `community_impact.score.recalculate`, `community_impact.score.reverse`, `community_impact.score.view_all` |
+| `20261101240000_community_impact_recognition_and_engagement.sql` | `community_impact.recognition.manage`, `community_impact.recognition.review`, `community_impact.recognition.view_all` |
+| `20261102150000_membership_geography_and_fee_obligations.sql` | `members.geography.manage`, `finance.payment.adjust`, `finance.payment.import` (also updates `finance.payment.record`) |
+
+The migration-defined catalogue is not equivalent to the complete set of permission strings used by route gates.
+
+<badge color="danger">Defect — route permissions missing from catalogue</badge>
+
+The following route-gate permission codes were found in `server.js` / `workspace-authorization.js` but were not found in the migration-seeded `app_permission` catalogue scanned:
+
+- `audit.view`
+- `jobs.review`
+- `support.inquiries.manage`
+- `support.inquiries.view`
+- `support.knowledge.manage`
+
+A direct grant for a code absent from `app_permission` is rejected by `updateUserPermissions()` as `INVALID_PERMISSION`. Unless these are granted through a role-only path, the direct-permission alternatives are not assignable through the current catalogue. Add or remove these codes intentionally and test each gate; do not assume a string literal is a provisioned permission.
+
+**Verified direct-grant rules in `src/platform/user-admin.js:updateUserPermissions()`:**
+
+1. Only a current `system_admin` can list or mutate the direct permission catalogue.
+2. The actor cannot change their own direct permissions.
+3. An audit reason is mandatory.
+4. Input must be an array, deduplicated, with a maximum of 100 codes.
+5. Every code must exist in `app_permission`; unknown codes are rejected.
+6. Any `system_only=true` permission is rejected for direct assignment.
+7. An `ethics_reviewer` cannot receive `verification.manage` or `verification.appeal.review`.
+8. Existing direct grants are replaced as a set; new grants record `assigned_by`.
+9. All target sessions are revoked and an audit event is written.
+
+**Schema limitation:** `app_user_permission` stores user, permission code, assigner and timestamp, but no context, tenant/resource ID, scope, expiry, or grant purpose. Direct grants are therefore global user capabilities at schema level. Service-level scope checks must remain mandatory; scoped delegations should use dedicated assignment tables, not global direct grants.
+
+### 12.6 Role-to-permission mapping comparison
+
+There is no canonical role-permission relation table or single role-policy registry in the inspected source. The following helper mappings are different:
+
+| Role | `src/platform/auth.js` | `server.js` | Status |
+|---|---|---|---|
+| `verification_reviewer` | `verification.manage` | `verification.manage` | Consistent fallback |
+| `ethics_reviewer` | `verification.manage` | No mapping | Conflicting/overbroad; ethics must not inherit general verification |
+| `appeal_reviewer` | `verification.manage` | `verification.appeal.review` | **Defect:** same role has different effective fallback |
+| `organization_admin` | `organizations.manage` | No mapping | Legacy global alias; organization membership must be authoritative |
+| `recruiter` | `jobs.manage` | No mapping | Legacy global alias; job/organization assignment must be authoritative |
+| `project_manager` | `jobs.manage` | No mapping | Legacy global alias; project/job assignment must be authoritative |
+| `mentor` | `mentorship.manage` | No mapping | Legacy global alias; verified professional/mentor relationship must be authoritative |
+| `supporting_staff` | `reviews.view` | `reviews.view` | Consistent fallback, but scope still required |
+| `admin` | `users.manage` | `users.manage` | Consistent fallback |
+| `platform_admin` | No mapping | `users.manage` | Conflicting alias |
+| `system_admin` | Explicit role checks | Explicit role checks | Role authority, not a direct permission alias |
+
+`requireRole()` and server `anyRole()` treat a role as satisfied either by that role code or by the helper's mapped direct permission. This is not a full role bundle; most route access is a mixture of explicit roles, direct permission arrays and service-specific checks.
+
+**Defect:** `appeal_reviewer` must map only to `verification.appeal.review` in every shared helper. `ethics_reviewer` must not map to `verification.manage`. The canonical correction should consolidate the mappings and make each sensitive reviewer permission require case assignment and conflict checks.
+
+### 12.7 Verified route-level policy helpers and access matrix
+
+The checked-in route matrix is the exhaustive dispatch-level inventory. The following shared helper policies are explicitly verified:
+
+| Helper | Role alternatives | Direct permission alternatives | Effective caution |
+|---|---|---|---|
+| `assertMembershipReviewAccess` | `reviewer`, `membership_reviewer`, `system_admin` | `membership.review` | Role/permission OR; `membership_reviewer` has no migration seed |
+| `assertMembershipActivationAccess` | Same | `membership.activate` | Activation remains separate from finance verification |
+| `assertMembershipReviewQueueAccess` | Same | `membership.review`, **`members.view`** | **Defect:** generic directory read grants queue access |
+| `assertFinancePaymentQueueAccess` | `finance_officer`, `system_admin` | `finance.view`, `finance.payment.verify`, `finance.payment.reverse`, `finance.manage` | Queue read and action capabilities are conflated; action routes must still check exact action |
+| `assertPaymentVerificationAccess` | `finance_officer` | `finance.payment.verify`, `finance.manage` | Dedicated verification |
+| `assertPaymentReversalAccess` | `finance_officer` | `finance.payment.reverse`, `finance.manage` | Dedicated reversal |
+
+The finance/membership separation tests in `test/p0/workspace-authorization.test.js` verify that finance officers cannot review/activate membership, membership reviewers cannot verify/reverse payments, and direct permissions are action-specific. Preserve those tests.
+
+Additional route gates use OR semantics:
+- `anyRoleOrPermission` accepts any one listed role **or** any one listed direct permission.
+- Some membership-card GET and POST operations accept `members.view` or `members.manage`; the POST batch and print routes therefore accept a read permission for a stateful/export/print action. This is a **Defect** requiring a card-specific print/batch capability.
+- `server.js` has several role aliases that do not match `auth.js`; see §12.6.
+
+### 12.8 Organization, project, job and personal-data scope baseline
+
+| Resource/context | Source evidence | Verified boundary | Remaining gap |
+|---|---|---|---|
+| Organization membership | `009_phase3_organizations_jobs.sql`; `src/platform/identity-policy.js:70-77` | Active membership is queried by exact organization ID + user ID; allowed role list is organization-scoped | Inspect every organization service handler and verify every read/export/write path passes the exact requested organization ID |
+| Professional identity | `src/platform/identity-policy.js:12-62`; `web/lib/identity-capabilities.ts` | Professional identity and current active membership are separate checks | The helper still tests `professional` as a role although migration models `account_type='professional'`; reconcile the source of truth |
+| Job team | `013_comprehensive_job_portal.sql` | `job_team_member` has job ID, user ID, scoped role code and active state | Full service-by-service enforcement trace is not complete |
+| Job application | `013_comprehensive_job_portal.sql`; `src/organization-jobs/service.js` | Candidate/interviewer/observer roles are workflow-specific | Verify candidate ownership, employer organization, assigned team, attachments and offer actions for each endpoint |
+| Network-Plus business | `20261031110000_network_plus_business_discovery.sql` | Business ownership and access are stored by business ID; capability codes are separate from organization roles | Verify all list/update/evidence/moderation routes enforce business ownership/delegation and reviewer conflicts |
+| Network-Plus request | `20261031120000_network_plus_request_collaboration.sql` | Request participant consent and time-bounded support grants exist | Verify every private request and workspace route checks participant consent or active support grant |
+| Community Impact | `20261031180000_community_impact_manual_claims.sql` and later governance migrations | Claim assignments, reviewer decisions and conflict declarations are modelled | Verify each queue/decision endpoint enforces assigned reviewer and second-review independence |
+| Private files | `src/platform/private-file-storage.js`; `files.view_private` | Dedicated private-file policy and purpose-aware access functions exist | Trace all file reads through `readAuthorizedPrivateFile`; ensure no route returns raw storage paths or bypasses purpose scope |
+| Personal/member records | `/api/v1/me/*` handlers and domain services | Several service methods receive the authenticated user ID | The route inventory identifies many handlers referencing `identity` without a local authentication binding; fix and test before considering self-scope effective |
+
+**Not verified:** No live cross-tenant API test or production data inspection was performed in this audit update. Existing scope tests provide evidence for selected cases only; they do not prove every route.
+
+### 12.9 Route dispatch inventory findings
+
+The route matrix at `docs/66-platform-authorization-route-matrix.md` contains 642 API branches. Static inspection of `server.js` found:
+
+| Static observation | Count | Status |
+|---|---:|---|
+| API route branches inventoried | 642 | Verified source inventory |
+| Branches with local `auth(req)` | 275 | Authentication visible; service authorization still must be traced |
+| Branches using optional identity | 8 | Public/optional identity; service visibility rules must be traced |
+| Branches using `identity.*` without local auth or local identity declaration | 319 | **Defect candidate**; route code may throw `ReferenceError` |
+
+A `const identity` declared inside one `if` block is not visible in a sibling `if` block. The route branches flagged in the matrix must be corrected by establishing a request-scoped authenticated principal before protected routes or by locally authenticating in each branch. Public endpoints must not rely on a missing principal. Do not globally authenticate all routes in a way that breaks public access; use explicit route metadata or a safe route wrapper.
+
+### 12.10 Prioritized defects and correction files
+
+| Priority | Finding | Evidence | Correction files | Regression required |
+|---|---|---|---|---|
+| P0 | Missing local `identity` binding in many route branches | `server.js` static route scan; see every flagged row in docs/66 | `server.js`; request-level API tests | Unauthenticated request returns 401; authenticated request succeeds only with correct scope; no ReferenceError/500 |
+| P1 | UI role assignability is not enforced by mutation API | `user-admin.js:listRoles()` applies `NON_PLATFORM_ROLES`; `updateUser()` only checks role existence/privilege | `src/platform/user-admin.js`; user-admin tests | Direct PATCH cannot grant organization/job/profile roles globally; unknown/unclassified role fails closed |
+| P1 | Unclassified role rows default to platform-assignable | `listRoles()` uses `!nonPlatform` default | `src/platform/user-admin.js` | New unclassified role hidden and mutation rejected until explicit policy classification |
+| P1 | `appeal_reviewer` mapping differs between auth helpers | `src/platform/auth.js:7` versus `server.js` ROLE_PERMISSION | `src/platform/auth.js`, `server.js`, shared policy tests | Same role has one narrow capability across all route helpers; no general verification access |
+| P1 | `ethics_reviewer` inherits `verification.manage` through auth helper | `src/platform/auth.js:7`; ethics permission separation exists in migration 302100 | `src/platform/auth.js`; role policy tests | Ethics reviewer cannot access general verification or appeals |
+| P1 | Membership queue accepts `members.view` | `workspace-authorization.js:18-20` | `src/platform/workspace-authorization.js`; tests | Directory viewer denied review queue; dedicated queue capability/role succeeds |
+| P1 | Membership card batch/print POST routes accept read permission | `server.js` membership-card batch/print gates | `server.js`, membership-card service/tests, permission migration | `members.view` denied; explicit card batch/print capability required and audited |
+| P1 | Route permission codes absent from catalogue | `server.js` uses `audit.view`, `jobs.review`, `support.inquiries.manage`, `support.inquiries.view`, `support.knowledge.manage`; no corresponding migration seeds found | Permission migrations; route/helper code; permission catalogue tests | Every route permission resolves to exactly one catalogue code or is removed; direct grant API validates |
+| P1 | UI recognizes `platform_admin` but backend admin helper does not consistently | `web/app/admin/accounts/page.tsx` vs `user-admin.js:8,103-105` | `web/app/admin/accounts/page.tsx`, `src/platform/user-admin.js` | Admin list/catalog access is consistent; no UI-only authority |
+| P2 | Global direct grants lack scope, expiry and purpose | `024_per_user_permission_matrix.sql` schema | Permission schema/service and scoped delegation tables | Direct grants cannot bypass tenant/resource checks; expiry/revocation tested |
+| P2 | Global `organization_admin`, `recruiter`, `project_manager`, `read_only`, `mentor` role seeds overlap with scoped roles | `017_production_security_and_sessions.sql`; `identity-policy.js` | Migration plan; user-admin; organization/job/mentorship services | No platform role leakage; old assignments reconciled before removal |
+| P2 | `professional` is tested as role while migration uses account_type | `identity-policy.js:12,22-32`; `20261015180000_account_type.sql` | `identity-policy.js`, `web/lib/identity-capabilities.ts`, account-context API | Account type/profile capability governs professional workspace, not unseeded role |
+| P2 | Generic `reviewer` remains overloaded | `002_platform_foundation.sql`; membership/job routes and tests | `server.js`, shared policy, reviewer assignment services | Explicit workflow role/capability required for each queue |
+| P2 | Live role/permission assignments and migration execution state unknown | No production DB query in this audit | Read-only production inventory script/runbook; reconciliation report | Counts, unknown assignments, and migration ledger verified before any data migration |
+
+### 12.11 Canonical role and context matrix — proposed target
+
+This is the recommended canonical authority model, not a claim that all rows are implemented today.
+
+| Canonical actor/context | Authority source | Permitted scope | Must not imply |
+|---|---|---|---|
+| Platform system administrator | `system_admin` | Platform security, user governance, system-only actions; audited | Organization ownership; unrestricted access to private records without purpose |
+| Platform operational administrator | `admin` + explicit capability | Platform operational modules only | System bootstrap/security authority unless separately granted |
+| Finance officer | `finance_officer` + action-specific finance capabilities | Finance queues and payment records | Membership review/activation; organization finance unless a separate org relationship exists |
+| Membership reviewer | Dedicated membership reviewer assignment/capability; retire generic aliases | Assigned membership queue and review action | Payment verification/reversal or self-approval |
+| Verification reviewer | `verification_reviewer` + assigned case | Assigned verification cases/evidence | Appeals, ethics, other cases, or global private-file access |
+| Appeal reviewer | `appeal_reviewer` + independent appeal assignment | Assigned appeal only | Original case decision or general verification authority |
+| Ethics reviewer | `ethics_reviewer` + assigned ethics case/panel | Assigned ethics case only | Verification authority; subject/conflicted case |
+| Business verifier/moderator | Specialist platform role + assigned business/listing case | Assigned Network-Plus review object | Business ownership or access to unrelated organizations |
+| Serve-Community reviewer | `serve_community_reviewer` + review assignment/capability | Assigned initiative/classification | General membership/finance administration |
+| Network-Plus support | `network_plus_support` + active case support grant | Read-only specified request until grant expiry | Global private request access or mutation rights |
+| Member/personal context | Authenticated person + member record/entitlement where required | Own membership and member-only services | Platform or organization administration |
+| Professional context | Account type/profile verification and own professional profile | Own profile and explicitly shared professional data | Employer organization access or active membership entitlement |
+| Organization context | Active `organization_membership` for selected organization ID + role | That organization only | Another organization or platform authority |
+| Job/project context | Active team/project assignment tied to resource ID | Assigned job/project | Global recruiter/project manager role |
+
+### 12.12 Audit completion boundary
+
+**Verified:** 161 migration files inventoried; role seed locations and major role namespaces identified; base and additive permission seeds extracted; admin UI and mutation paths compared; shared role helpers compared; route dispatch inventory generated; concrete source-level mismatches recorded.
+
+**Defect:** The source contains role assignment policy mismatches, divergent helper mappings, a too-broad membership review queue gate, membership-card read/write gate overlap, route permission strings missing from the permission catalogue, and route branches that reference `identity` without a local authentication binding.
+
+**Unreconciled:** Runtime role aliases, generic reviewer usage, global scoped-role seeds, service-level policy for every route, and complete project/job/personal-data ownership checks.
+
+**Not verified:** Live production role assignments, direct permission assignments, applied migration ledger, runtime behavior of the flagged route branches, and production cross-tenant isolation.
+
+Accordingly, this addendum substantially expands the source inventory and supplies the dispatch-level route matrix, but it does **not** mark the entire effective authorization audit complete. The remaining service-level scope trace and read-only production reconciliation are explicitly open; no production changes or permission broadening are authorized by this document.

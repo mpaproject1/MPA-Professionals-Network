@@ -47,7 +47,7 @@ const ROLE_DEFINITIONS = {
  * ethics_reviewer receives no general verification-management alias.
  */
 export const ROLE_PERMISSION_BUNDLES = Object.freeze({
-  system_admin: Object.freeze(["users.manage", "members.export", "members.export.contacts", "accounts.export", "accounts.export.contacts", "membership.cards.print"]),
+  system_admin: Object.freeze(["users.manage", "members.export", "members.export.contacts", "accounts.export", "accounts.export.contacts", "accounts.export.organizations", "membership.cards.print"]),
   reviewer: Object.freeze(["membership.review", "membership.activate", "members.view"]),
   membership_reviewer: Object.freeze(["membership.review", "membership.activate", "members.view"]),
   finance_officer: Object.freeze(["finance.view", "finance.manage", "finance.payment.record", "finance.payment.verify", "finance.payment.reverse", "finance.voucher.issue"]),
@@ -120,6 +120,7 @@ export const PERMISSIONS = Object.freeze({
   MEMBERS_EXPORT_CONTACTS: "members.export.contacts",
   ACCOUNTS_EXPORT: "accounts.export",
   ACCOUNTS_EXPORT_CONTACTS: "accounts.export.contacts",
+  ACCOUNTS_EXPORT_ORGANIZATIONS: "accounts.export.organizations",
   MEMBERSHIP_CARDS_PRINT: "membership.cards.print",
   MEMBERSHIP_REVIEW: "membership.review",
   MEMBERSHIP_ACTIVATE: "membership.activate",
@@ -203,6 +204,7 @@ const POLICY_PERMISSION_METADATA = {
   "members.export.contacts": ["Membership", "Export member contact details", true, false],
   "accounts.export": ["User administration", "Export account directory", true, false],
   "accounts.export.contacts": ["User administration", "Export account contact details", true, false],
+  "accounts.export.organizations": ["User administration", "Export organization relationships", true, false],
   "membership.cards.print": ["Membership", "Generate and print membership cards", true, true],
 };
 
@@ -214,6 +216,7 @@ const PERMISSION_DETAILS = {
   "members.export.contacts": { description: "Export member email and phone fields for an approved administrative purpose.", actionClass: "sensitive_export", globalDirectGrant: true },
   "accounts.export": { description: "Export approved platform account-directory fields to a controlled file.", actionClass: "export", globalDirectGrant: true },
   "accounts.export.contacts": { description: "Export account email and phone fields for an approved administrative purpose.", actionClass: "sensitive_export", globalDirectGrant: true },
+  "accounts.export.organizations": { description: "Export organization relationship names for approved platform governance purposes.", actionClass: "sensitive_export", globalDirectGrant: true },
   "membership.cards.print": { description: "Generate and print membership cards after eligibility checks.", actionClass: "sensitive_write", globalDirectGrant: true },
   "membership.review": { description: "Review submitted membership applications; does not grant payment verification or activation.", actionClass: "review", globalDirectGrant: true },
   "membership.activate": { description: "Activate approved membership after independent payment and approval requirements are satisfied.", actionClass: "write", globalDirectGrant: true },

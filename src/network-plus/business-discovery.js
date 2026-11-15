@@ -109,8 +109,8 @@ async function assertBusinessOwner(db,businessId,userId,capability="business.man
           select 1 from organization_membership om where om.organization_id=bo.owner_organization_id
             and om.user_id=$2 and om.status='active' and om.role_code=any($3::text[])
         ))) limit 1`,[businessId,userId,ORG_OWNER_ROLES])).rows[0];
-  if(owned)return {business,owner:owned};
-  const delegated=(await db.query(`select 1 from network_plus_business_access
+  if(owned){if(owned.owner_type==="member"&&!(await hasCurrentActiveMembership(db,userId)))fail(403,"A current active membership is required to manage a member-owned business.","MEMBERSHIP_REQUIRED");return {business,owner:owned};}
+  let delegated=(await db.query(`select 1 from network_plus_business_access
     where business_id=$1 and user_id=$2 and capability_code=$3 and revoked_at is null
       and (expires_at is null or expires_at>now())
       and (
@@ -120,6 +120,7 @@ async function assertBusinessOwner(db,businessId,userId,capability="business.man
         or (not exists(select 1 from network_plus_business_ownership bo where bo.business_id=$1 and bo.owner_type='organization' and bo.owner_role='primary_owner' and bo.status='active')
           and exists(select 1 from membership_record mr where mr.user_id=$2 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date)))
       ) limit 1`,[businessId,userId,capability])).rowCount>0;
+  if(delegated&&!(await db.query("select 1 from network_plus_business_ownership bo where bo.business_id=$1 and bo.owner_type='organization' and bo.owner_role='primary_owner' and bo.status='active'",[businessId])).rowCount&&!await hasCurrentActiveMembership(db,userId))delegated=false;
   if(!delegated)fail(403,"An active owner or explicit business-scoped assignment is required.","BUSINESS_FORBIDDEN");
   return {business,owner:null};
 }
@@ -211,12 +212,12 @@ export async function createBusiness(userId,input,requestId,idempotencyKey) {
   });
 }
 export async function listMyBusinesses(userId) {
-  const db=getPool();await assertEntry(db,userId);
+  const db=getPool();await assertEntry(db,userId);const memberActive=await hasCurrentActiveMembership(db,userId);
   return (await db.query(`select distinct b.id,b.business_kind,b.display_name,b.trading_name,b.description,b.website,b.location_label,
     b.verification_status,b.moderation_status,b.publication_status,b.created_at,b.updated_at
     from network_plus_business b join network_plus_business_ownership bo on bo.business_id=b.id
     where bo.status='active' and bo.consent_status='accepted'
-      and ((bo.owner_type='member' and bo.owner_user_id=$1
+      and ((bo.owner_type='member' and $3::boolean and bo.owner_user_id=$1
             and exists(select 1 from membership_record mr where mr.user_id=$1 and mr.status='active' and mr.start_date<=current_date and (mr.end_date is null or mr.end_date>=current_date))
             and exists(select 1 from app_user_role ur join app_role ar on ar.id=ur.role_id where ur.user_id=$1 and ar.role_code=any(array['member','professional']::text[])))
         or (bo.owner_type='organization' and exists(select 1 from organization_membership om where om.organization_id=bo.owner_organization_id and om.user_id=$1 and om.status='active' and om.role_code=any($2::text[]))))

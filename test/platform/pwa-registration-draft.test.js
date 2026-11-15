@@ -28,7 +28,7 @@ test("draft persistence retries explicitly and surfaces cross-tab conflicts with
 
 test("account creation is never queued or auto-replayed as offline synchronization", async () => {
   const source = await readFile(registrationUrl, "utf8");
-  const draftWriter = source.match(/function writeOrganizationDraft\([\s\S]*?\n \}\n\n function applyOrganizationDraft/);
+  const draftWriter = source.match(/const writeOrganizationDraft=useCallback\([\s\S]*?\n \},\[form,organizationDraftForm\]\);/);
   assert.ok(draftWriter, "draft persistence function should be separable from submission");
   assert.doesNotMatch(draftWriter[0], /api<|fetch\(|navigator\.serviceWorker|Background Sync/i);
   assert.match(source, /if\(challengeRequired&&!currentChallenge\)throw new Error\("Load a new human check before registering\."\)/);

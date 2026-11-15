@@ -165,7 +165,7 @@ test("Phase 4 action capabilities keep exports and membership-card printing sepa
   assert.equal(hasAnyRoleOrPermission({ roles: ["membership_reviewer"], permissions: [] }, [], ["membership.cards.print"]), false);
   assert.equal(hasAnyRoleOrPermission({ roles: ["finance_officer"], permissions: [] }, [], ["members.export"]), false);
   const root = { roles: ["system_admin"], permissions: [] };
-  for (const code of ["members.export", "members.export.contacts", "accounts.export", "accounts.export.contacts", "membership.cards.print"]) {
+  for (const code of ["members.export", "members.export.contacts", "accounts.export", "accounts.export.contacts", "accounts.export.organizations", "membership.cards.print"]) {
     assert.equal(hasAnyRoleOrPermission(root, [], [code]), true, code);
   }
 });

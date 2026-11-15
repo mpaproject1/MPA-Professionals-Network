@@ -232,7 +232,7 @@ export const ELIGIBILITY_RULES=[
 ];
 
 async function profileContext(db,userId){
- const r=(await db.query("select u.id user_id,pp.years_experience,pp.availability_status,pp.location_label,pp.id profile_id,m.status membership_status from app_user u join person p on p.user_id=u.id left join professional_profile pp on pp.person_id=p.id left join membership_record m on m.user_id=u.id and ${membershipIsCurrentlyActiveSql("m")} where u.id=$1",[userId])).rows[0];
+ const r=(await db.query(`select u.id user_id,pp.years_experience,pp.availability_status,pp.location_label,pp.id profile_id,m.status membership_status from app_user u join person p on p.user_id=u.id left join professional_profile pp on pp.person_id=p.id left join membership_record m on m.user_id=u.id and ${membershipIsCurrentlyActiveSql("m")} where u.id=$1`,[userId])).rows[0];
  if(!r) throw error(404,"Applicant account not found.","NOT_FOUND");
  return r;
 }
@@ -420,10 +420,10 @@ export async function changeJobStatus(jobId,userId,status,requestId){
 async function jobScopeAllowed(db,job,viewerId){
  if(job.posting_scope==="public") return true;
  if(!viewerId) return false;
- if(job.posting_scope==="mpa_members") return Boolean((await db.query("select 1 from membership_record m where m.user_id=$1 and ${membershipIsCurrentlyActiveSql("m")} limit 1",[viewerId])).rows[0]);
+ if(job.posting_scope==="mpa_members") return Boolean((await db.query(`select 1 from membership_record m where m.user_id=$1 and ${membershipIsCurrentlyActiveSql("m")} limit 1`,[viewerId])).rows[0]);
  if(job.posting_scope==="organization_internal") return Boolean((await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[job.organization_id,viewerId])).rows[0]);
  if(job.posting_scope==="partner_network"){
-   return Boolean((await db.query("select 1 from membership_record where user_id=$1 and status='active' limit 1",[viewerId])).rows[0]);
+   return Boolean((await db.query(`select 1 from membership_record m where m.user_id=$1 and ${membershipIsCurrentlyActiveSql("m")} limit 1`,[viewerId])).rows[0]);
  }
  return false;
 }

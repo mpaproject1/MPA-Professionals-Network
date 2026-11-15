@@ -189,7 +189,7 @@ test("private verification files require case assignment or independent appeal a
   const verification = read("src/verification/service.js");
   assert.match(files, /vc\.assigned_reviewer_id=\$2 limit 1/);
   assert.match(files, /a\.status in \('submitted','under_review'\) and vc\.subject_user_id<>\$2 and d\.decided_by<>\$2/);
-  const vettingStart = files.indexOf("const canReviewVetting=");
+  const vettingStart = files.indexOf("if(!allowed&&canReviewVetting){");
   const vettingEnd = files.indexOf("if(!allowed&&canReviewMembership)", vettingStart);
   const vettingAccess = files.slice(vettingStart, vettingEnd);
   assert.ok(vettingStart >= 0 && vettingEnd > vettingStart, "verification evidence access block must remain identifiable");

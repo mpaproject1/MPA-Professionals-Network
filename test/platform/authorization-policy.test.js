@@ -11,7 +11,7 @@ import {
   hasAnyRoleOrPermission,
   roleMetadata,
 } from "../../src/platform/authorization-policy.js";
-import { assertMembershipReviewQueueAccess, assertPaymentReversalAccess, assertPaymentVerificationAccess } from "../../src/platform/workspace-authorization.js";
+import { assertFinancePaymentQueueAccess, assertMembershipReviewQueueAccess, assertPaymentReversalAccess, assertPaymentVerificationAccess } from "../../src/platform/workspace-authorization.js";
 
 test("all authorization entry points use the same appeal-reviewer capability", () => {
   const identity = { roles: ["appeal_reviewer"], permissions: [] };
@@ -171,6 +171,9 @@ test("Phase 4 action capabilities keep exports and membership-card printing sepa
 });
 
 test("Phase 4 review queues and finance decisions reject read or generic management permissions", () => {
+  assert.throws(() => assertFinancePaymentQueueAccess({ roles: ["system_admin"], permissions: [] }), { statusCode: 403 });
+  assert.throws(() => assertFinancePaymentQueueAccess({ roles: [], permissions: ["finance.manage"] }), { statusCode: 403 });
+  assert.doesNotThrow(() => assertFinancePaymentQueueAccess({ roles: ["finance_officer"], permissions: [] }));
   assert.throws(() => assertMembershipReviewQueueAccess({ roles: [], permissions: ["members.view"] }), { statusCode: 403 });
   assert.doesNotThrow(() => assertMembershipReviewQueueAccess({ roles: ["membership_reviewer"], permissions: [] }));
   assert.throws(() => assertPaymentVerificationAccess({ roles: [], permissions: ["finance.manage"] }), { statusCode: 403 });

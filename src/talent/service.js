@@ -175,7 +175,7 @@ export async function createTalentInquiry(requesterId,input,requestId,idempotenc
    if(existing.request_fingerprint!==fingerprint)throw error(409,"This submission key was already used for different information. Start a new inquiry before changing the form.","IDEMPOTENCY_KEY_CONFLICT");
    return {...existing,idempotent:true,replayed:true,nextAction:existing.status==="requested"?"Your inquiry is awaiting a response. Check your inquiries for updates.":"Review the recorded inquiry status; do not submit the same request again."};
   }
-  const member=(await db.query("select 1 from membership_record where user_id=$1 and status='active' and start_date<=current_date and (end_date is null or end_date>=current_date)",[requesterId])).rows[0];
+  const member=await hasCurrentActiveMembership(db,requesterId);
   if(!member)throw error(403,"An active membership is required to contact a professional.","MEMBERSHIP_REQUIRED");
   const target=(await db.query(`
     select u.id

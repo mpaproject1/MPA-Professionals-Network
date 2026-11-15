@@ -48,6 +48,9 @@ const ROLE_DEFINITIONS = {
  */
 export const ROLE_PERMISSION_BUNDLES = Object.freeze({
   system_admin: Object.freeze(["users.manage"]),
+  reviewer: Object.freeze(["membership.review", "membership.activate", "members.view"]),
+  membership_reviewer: Object.freeze(["membership.review", "membership.activate", "members.view"]),
+  finance_officer: Object.freeze(["finance.view", "finance.manage", "finance.payment.verify", "finance.payment.reverse"]),
   verification_reviewer: Object.freeze(["verification.manage"]),
   appeal_reviewer: Object.freeze(["verification.appeal.review"]),
   supporting_staff: Object.freeze(["reviews.view"]),
@@ -182,8 +185,6 @@ const SEEDED_PERMISSION_METADATA = {
   "settings.manage": ["Platform settings", "Manage settings", true, true],
   "files.view_private": ["Private files", "View private files", true, false],
   "notifications.manage": ["Notifications", "Manage notifications", false, false],
-  "finance.payment.verify": ["Finance", "Verify membership payments", true, false],
-  "finance.payment.reverse": ["Finance", "Reverse membership payments", true, false],
   "verification.appeal.review": ["Verification", "Review independent verification appeals", true, false],
   "ethics.case.intake": ["Ethics", "Submit a confidential ethics concern", true, false],
   "ethics.case.review": ["Ethics", "Review assigned ethics cases", true, false],

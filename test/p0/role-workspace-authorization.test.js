@@ -31,9 +31,9 @@ test("verification case reads fail closed when no viewer identity is supplied", 
   assert.match(service, /if\(existing\.rows\[0\]\) return getCase\(existing\.rows\[0\]\.id,actorId\)/);
 });
 
-test("reviewer case details enforce assignment unless the viewer has elevated authority", () => {
+test("reviewer case details enforce assignment or independent appeal authority without manager bypass", () => {
   const service = read("src/verification/service.js");
-  assert.match(service, /Only the assigned reviewer, an independent appeal reviewer, or an explicitly authorized verification manager may view this case/);
+  assert.match(service, /Only the assigned reviewer or an independent appeal reviewer may view this case/);
   assert.match(service, /row\.assigned_reviewer_id!==viewerId/);
 });
 
@@ -59,9 +59,11 @@ test("verification claim, evidence, and claim-status writes enforce assignment a
   const server = read("server.js");
   assert.equal((server.match(/verification\.getCase\(parts\[4\],identity\.sub\)/g) || []).length, 3, "case detail, claim, and evidence routes must pass the authenticated viewer");
 });
-test("verification manager permission is honored by service-level assigned-reviewer checks", () => {
+test("verification manager grants do not bypass case assignment for review actions", () => {
   const service = read("src/verification/service.js");
-  assert.match(service, /r\.role_code='system_admin'\) or exists\(select 1 from app_user_permission up where up\.user_id=\$1 and up\.permission_code='verification\.manage'/);
+  const assignedGate = service.match(/async function assertAssignedReviewer[\s\S]*?export function allowedTransition/)?.[0] || "";
+  assert.match(assignedGate, /row\.assigned_reviewer_id!==actorId/);
+  assert.doesNotMatch(assignedGate, /system_admin|verification\.manage|can_manage/);
 });
 
 test("support inquiry lists and actions are scoped to unassigned or self-assigned work unless explicitly authorized for all", () => {
@@ -182,12 +184,12 @@ test("support escalation, priority and waiting states are persisted and routed",
 });
 
 
-test("private verification files require case assignment, manager authority, or independent appeal access", () => {
+test("private verification files require case assignment or independent appeal access", () => {
   const files = read("src/platform/private-file-storage.js");
   const verification = read("src/verification/service.js");
-  assert.match(files, /vc\.assigned_reviewer_id=\$2 or \$3=true/);
+  assert.match(files, /vc\.assigned_reviewer_id=\$2 limit 1/);
   assert.match(files, /a\.status in \('submitted','under_review'\) and vc\.subject_user_id<>\$2 and d\.decided_by<>\$2/);
-  assert.doesNotMatch(files, /or \$5=true/);
+  assert.doesNotMatch(files, /canManageVerification|verification\.manage|system_admin|or \$3=true/);
   assert.match(verification, /independentAppealReviewer/);
   assert.match(verification, /pendingIndependentAppeal/);
 });

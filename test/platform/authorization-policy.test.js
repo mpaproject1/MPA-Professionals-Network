@@ -198,6 +198,7 @@ test("Phase 4 route and service source keep card printing, exports and membershi
   const financeReceipts = readFileSync(new URL("../../src/platform/finance-receipts.js", import.meta.url), "utf8");
   assert.equal(PERMISSION_CATALOG["finance.payment.record"].source, "legacy-runtime");
   assert.equal(PERMISSION_CATALOG["finance.voucher.issue"].source, "legacy-runtime");
+  assert.equal(PERMISSION_CATALOG["membership.cards.print"].assignable, true);
   assert.match(financeReceipts, /permission === "finance\.payment\.record"[\s\S]*finance\.manage/);
   assert.match(financeReceipts, /hasAnyRoleOrPermission\(identity, \["finance_officer"\], \[permission\]\)/);
   assert.doesNotMatch(financeReceipts.match(/function assertFinance[\s\S]*?function safeReceipt/)?.[0] || "", /system_admin|\["finance_officer","system_admin","admin"\]/);

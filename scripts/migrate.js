@@ -65,4 +65,10 @@ for(const migration of migrations){
 // Install and publish the reviewed member-geography baseline on first bootstrap.
 // The installer is idempotent and defers safely until the initial system-admin
 // account exists; rerunning migrations after admin provisioning completes it.
-execFileSync(process.execPath,["scripts/bootstrap-member-geography.js"],{stdio:"inherit",timeout:240000});
+try {
+  execFileSync(process.execPath,["scripts/bootstrap-member-geography.js"],{stdio:"inherit",timeout:240000});
+} catch (error) {
+  // Keep schema migration success independent from a temporary upstream source outage.
+  // The idempotent bootstrap can be retried with npm run geography:bootstrap.
+  console.error("Member geography bootstrap did not complete. Retry with npm run geography:bootstrap.",error.message);
+}

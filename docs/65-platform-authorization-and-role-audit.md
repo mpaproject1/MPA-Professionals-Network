@@ -771,7 +771,7 @@ Accordingly, this addendum substantially expands the source inventory and suppli
 
 **Purpose:** Convert the findings in this audit into an ordered, evidence-led implementation programme. This is the implementation order for the MPA authorization baseline. It is intentionally sequenced to prevent a broad role refactor from hiding route failures, weakening existing separation-of-duties rules, or migrating legacy assignments before their real usage is known.
 
-**Status at this document revision:** Phases 0 and 1 have dated evidence notes below. Phase 0 is complete at source-classification level. Phase 1 implementation is updated but its runtime test/CI exit gate remains pending. Later phases remain planned unless explicitly updated with commit and test evidence.
+**Status at this document revision (2026-11-15):** Phase 0 is complete at source-classification level. Phases 1–5 have source implementation evidence with their stated runtime/coverage boundaries. Phase 6 now has a committed read-only reconciliation runbook and SQL inventory procedure; the production-data inventory, code-by-code classification and approval gate remain pending. Phase 7 remains the end-to-end release gate.
 
 ### 13.1 Priority principles
 
@@ -974,3 +974,20 @@ Status is tracked individually below. Do not mark a phase **Complete** without a
 **Known source/schema boundary — not marked complete:** the current schema does not provide an explicit assigned-reviewer relationship for every organization verification, job moderation, membership application and verification-appeal queue. Those queues retain their existing authorized reviewer-pool model with creator/submitter/owner conflict exclusions where implemented. The current membership private-file evidence path and appeal evidence path likewise do not have a complete case-assignment join. These are not silently represented as assigned-case controls. A dedicated assignment model and migration would be needed to make those queues strictly assignment-only. Network-Plus business moderation and some Serve-Community review queues also retain reviewer-pool access with independent owner/delegate conflict checks. Full route-to-query inventory for every route in §12.8, project/initiative second-review controls, and context-switch request-level tests remain open.
 
 **Validation boundary:** no tests, backend suite, build, Playwright or CI workflow was executed. No database query, migration, role/grant change or deployment was performed. Phase 5 is **implemented at source level for existing relationship and assignment models; complete runtime and assignment-schema exit gates remain pending**.
+
+
+### 13.10 Phase 6 source-level preparation evidence (2026-11-15)
+
+**Implementation scope:** added `docs/67-platform-authorization-data-reconciliation-runbook.md` on `feat/workstream-3-progress-members-workspace`.
+
+1. Defined a strictly read-only procedure for capturing the deployed `app_role`, `app_user_role`, `app_permission` and `app_user_permission` inventories, including role assignment counts, active/non-active account counts, direct grants, duplicate links, orphan references, unknown permission rows and system-only direct grants.
+2. Added schema/constraint discovery queries so operators confirm the actual deployed table definitions before using the inventory queries. Migration-ledger discovery is deliberately schema-driven; the runbook does not assume an unverified ledger table name or infer applied migrations from repository filenames.
+3. Defined a code-level reconciliation worksheet covering migration provenance, canonical/legacy/policy-defined/unknown status, authority domain, scope, assignment counts, disposition, replacement mapping, impact, reviewer and approval reference.
+4. Documented safeguards for unknown roles and permissions, organization/resource-scoped roles, inactive-user assignments, duplicate links, separation of duties and rollback planning. The runbook explicitly prohibits role/grant changes, session revocation, migration and deployment during this read-only phase.
+5. Added an explicit approval gate requiring a complete inventory, an approved mapping for every assigned legacy code, a scope/separation-of-duties impact review, staging rehearsal, rollback plan and independent platform/security approval before any later data mutation.
+
+**Source commit:** read-only Phase 6 inventory and reconciliation runbook `46aa1f9b8ea7f68ebb56937816e811939bbd2c0b`.
+
+**Validation and data boundary:** the runbook is a source/documentation artifact. It has not been executed against staging or production. No live `app_role`, `app_user_role`, `app_permission`, `app_user_permission` or migration-ledger data was queried. No database writes, migration, role/grant changes, session revocation, deployment, backend test, frontend build, Playwright run or CI workflow was performed. Therefore Phase 6 is **source-level read-only inventory tooling prepared — operational inventory, complete code classification and approval pending**. It is not marked complete against the plan's production-data exit gate.
+
+**Next required action:** an authorized operator must run the read-only procedure using a SELECT-only database account, capture restricted inventory outputs, classify every deployed code and obtain the required approvals. Only then may a separate, explicitly authorized migration plan be considered.

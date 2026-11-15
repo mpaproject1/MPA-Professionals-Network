@@ -42,3 +42,15 @@
  .a4 .preview{display:grid!important;place-items:center!important;width:210mm!important;height:297mm!important;min-width:210mm!important;min-height:297mm!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;overflow:hidden!important;background:#fff!important}
  .a4 .card{width:85.6mm!important;height:53.98mm!important;min-width:85.6mm!important;min-height:53.98mm!important;margin:0!important;border-radius:3mm!important;box-shadow:none!important;page-break-before:avoid!important;page-break-after:avoid!important;break-before:avoid!important;break-after:avoid!important;break-inside:avoid!important;print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
 }
+
+/* Apply the selected page type to the document and remove the shared portal
+   shell from print flow. Visibility alone hides chrome but still reserves space. */
+@media print{
+ :global(html):has(.shell),:global(body):has(.shell){page:membership-id!important;width:85.6mm!important;height:53.98mm!important;min-width:85.6mm!important;min-height:53.98mm!important;margin:0!important;padding:0!important;overflow:hidden!important}
+ :global(html):has(.a4),:global(body):has(.a4){page:membership-a4!important;width:210mm!important;height:297mm!important;min-width:210mm!important;min-height:297mm!important;margin:0!important;padding:0!important;overflow:hidden!important}
+ :global(.app-shell){display:block!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;overflow:visible!important}
+ :global(.app-shell)>:not(.shell-main){display:none!important}
+ :global(.shell-main){display:block!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;overflow:visible!important}
+ .shell{page:membership-id!important}
+ .a4{page:membership-a4!important}
+}

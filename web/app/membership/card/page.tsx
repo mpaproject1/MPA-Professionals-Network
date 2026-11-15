@@ -18,8 +18,9 @@ function dateLabel(value:string|null){ if(!value) return "No expiry"; const date
 export default function MembershipCardPage(){
   const token=useUiStore(s=>s.token),hydrateToken=useUiStore(s=>s.hydrateToken);
   const [membershipNumber,setMembershipNumber]=useState("");
+  const [a4Paper,setA4Paper]=useState(false);
   const [queryReady,setQueryReady]=useState(false);
-  useEffect(()=>{setMembershipNumber(new URLSearchParams(window.location.search).get("membershipNumber")||"");setQueryReady(true);},[]);
+  useEffect(()=>{const params=new URLSearchParams(window.location.search);setMembershipNumber(params.get("membershipNumber")||"");setA4Paper(params.get("paper")==="a4");setQueryReady(true);},[]);
   const [origin,setOrigin]=useState("");
   useEffect(()=>{hydrateToken();},[hydrateToken]);
   useEffect(()=>{setOrigin(window.location.origin);},[]);
@@ -41,8 +42,9 @@ export default function MembershipCardPage(){
   const s=card.settings;
   const verifyUrl=origin+card.verificationPath;
   const cardStyle={background:`linear-gradient(125deg,${s.background_start},${s.background_end})`,color:s.text_color,"--card-accent":s.accent_color} as CSSProperties;
-  return <main className={styles.shell}>
-    <div className={styles.toolbar}><div><p className={styles.eyebrow}>OFFICIAL MEMBER CREDENTIAL</p><h1>Membership ID</h1><p>Exact-size membership ID · 85.6 × 53.98 mm · Download PDF or print</p></div><div className={styles.actions}><a href="/profile" className={styles.secondary}>Profile & photo</a><button type="button" onClick={()=>window.print()} className={styles.primary}>Download PDF / Print ID</button></div></div>
+  const printHref=(a4:boolean)=>"/membership/card"+(membershipNumber?"?membershipNumber="+encodeURIComponent(membershipNumber)+"&paper="+(a4?"a4":"id"):"?paper="+(a4?"a4":"id"));
+  return <main className={a4Paper?`${styles.shell} ${styles.a4}`:styles.shell}>
+    <div className={styles.toolbar}><div><p className={styles.eyebrow}>OFFICIAL MEMBER CREDENTIAL</p><h1>Membership ID</h1><p>{a4Paper?"A4 sheet · one complete, full-size ID card":"Exact-size membership ID · 85.6 × 53.98 mm"}</p></div><div className={styles.actions}><a href="/profile" className={styles.secondary}>Profile & photo</a><a href={printHref(!a4Paper)} className={styles.secondary}>{a4Paper?"Use exact-size card":"Print on A4"}</a><button type="button" onClick={()=>window.print()} className={styles.primary}>Download PDF / Print ID</button></div></div>
     <section className={styles.preview} aria-label="Membership ID card preview">
       <article className={`${styles.card} ${s.background_style==="midnight"?styles.midnight:""} ${s.background_style==="gradient"?styles.gradient:""}`} style={cardStyle}>
         <div className={styles.orbOne}/><div className={styles.orbTwo}/><div className={styles.lines}/>

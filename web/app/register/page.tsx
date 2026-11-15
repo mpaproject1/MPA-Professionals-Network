@@ -83,28 +83,28 @@ export default function Register(){
  useEffect(()=>{void loadChallenge();},[loadChallenge]);
  useEffect(()=>{const code=new URLSearchParams(window.location.search).get("ref");if(code)setReferralCode(code.trim().toUpperCase());},[]);
 
- function organizationDraftForm(source:RegistrationForm=form):OrganizationDraftForm{
-  return {email:source.email.trim().toLowerCase(),firstName:source.firstName.trim(),middleName:source.middleName.trim(),lastName:source.lastName.trim(),orgLegalName:source.orgLegalName.trim(),orgDisplayName:source.orgDisplayName.trim(),orgType:source.orgType.trim(),orgDescription:source.orgDescription.trim(),orgWebsite:source.orgWebsite.trim(),orgEmail:source.orgEmail.trim(),orgPhone:source.orgPhone.trim(),orgAddress:source.orgAddress.trim()};
- }
+ const organizationDraftForm=useCallback((source:RegistrationForm=form):OrganizationDraftForm=>({email:source.email.trim().toLowerCase(),firstName:source.firstName.trim(),middleName:source.middleName.trim(),lastName:source.lastName.trim(),orgLegalName:source.orgLegalName.trim(),orgDisplayName:source.orgDisplayName.trim(),orgType:source.orgType.trim(),orgDescription:source.orgDescription.trim(),orgWebsite:source.orgWebsite.trim(),orgEmail:source.orgEmail.trim(),orgPhone:source.orgPhone.trim(),orgAddress:source.orgAddress.trim()}),[form]);
 
- function writeOrganizationDraft(source:RegistrationForm=form):boolean{
-  const now=Date.now();const draft:OrganizationDraft={version:2,form:organizationDraftForm(source),savedAt:now,expiresAt:now+DRAFT_TTL_MS};
+ const writeOrganizationDraft=useCallback((source:RegistrationForm=form):boolean=>{
+  const now=Date.now();const normalized=organizationDraftForm(source);const draft:OrganizationDraft={version:2,form:normalized,savedAt:now,expiresAt:now+DRAFT_TTL_MS};
   if(!draftHasContent(draft.form)){setDraftStatus("Enter organization details to save a draft.");return false;}
   try{
-   localStorage.setItem(ORGANIZATION_DRAFT_KEY,JSON.stringify(draft));
+   // Keep the versioned nested form and publish the canonical flat wizard fields
+   // in the same record so both registration stages consume one compatible contract.
+   localStorage.setItem(ORGANIZATION_DRAFT_KEY,JSON.stringify({...draft,representativeEmail:normalized.email,legalName:normalized.orgLegalName,displayName:normalized.orgDisplayName,organizationType:normalized.orgType,description:normalized.orgDescription,website:normalized.orgWebsite,email:normalized.orgEmail,phone:normalized.orgPhone,addressText:normalized.orgAddress,registrationStep:1}));
    setDraftSavedAt(now);setDraftStorageError("");setDraftStatus("Draft saved on this device. It will expire after 24 hours of inactivity.");
    return true;
   }catch{
    setDraftStorageError("This browser could not save the draft. Check available device storage and retry. Nothing has been submitted.");
    setDraftStatus("");return false;
   }
- }
+ },[form,organizationDraftForm]);
 
- function applyOrganizationDraft(draft:OrganizationDraft){
+ const applyOrganizationDraft=useCallback((draft:OrganizationDraft)=>{
   setForm(current=>({...current,...draft.form,password:"",passwordConfirm:""}));
   setKind("organization");setDraftSavedAt(draft.savedAt);setDraftConflict(null);setDraftStorageError("");setDraftPaused(false);
   setDraftStatus("Saved organization details restored. Review them before submitting; passwords and human-check answers were not restored.");
- }
+ },[]);
 
  useEffect(()=>{
   try{
@@ -119,11 +119,11 @@ export default function Register(){
 
  useEffect(()=>{
   if(!draftHydrated||kind!=="organization"||draftConflict||draftPaused)return;
-  const snapshot=organizationDraftForm();
+  const snapshot=organizationDraftForm(form);
   if(!draftHasContent(snapshot))return;
-  const timer=window.setTimeout(()=>{writeOrganizationDraft();},500);
+  const timer=window.setTimeout(()=>{writeOrganizationDraft(form);},500);
   return()=>window.clearTimeout(timer);
- },[kind, draftHydrated, draftConflict, draftPaused, organizationDraftForm, writeOrganizationDraft]);
+ },[kind,draftHydrated,draftConflict,draftPaused,form,organizationDraftForm,writeOrganizationDraft]);
 
  useEffect(()=>{
   function onStorage(event:StorageEvent){

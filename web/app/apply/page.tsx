@@ -61,16 +61,9 @@ export default function Apply() {
             ". You can now track its progress.",
         );
       } else {
-        const r = await api<any>(
-          "/api/v1/organizations",
-          { method: "POST", body: JSON.stringify(org) },
-          token,
-        );
-        setMessage(
-          "Organization registered as " +
-            r.display_name +
-            ". Complete verification from the organization workspace, then track progress.",
-        );
+        // Organization creation is owned exclusively by the canonical multi-step
+        // /organizations wizard; never submit a second, reduced application here.
+        window.location.assign("/organizations?register=1");
       }
     } catch (err) {
       setError(
@@ -100,7 +93,7 @@ export default function Apply() {
           </button>
           <button type="button"
             className={kind === "organization" ? "choice active" : "choice"}
-            onClick={() => setKind("organization")}
+            onClick={() => { window.location.assign("/organizations?register=1"); }}
           >
             <Building2 />
             <b>Register an organization</b>

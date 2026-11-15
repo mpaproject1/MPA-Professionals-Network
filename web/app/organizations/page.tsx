@@ -254,9 +254,25 @@ export default function Organizations() {
     if (!hasDraftContent) return;
     const savedAt = Date.now();
     try {
+      const organizationType = organizationTypeChoice === "other" ? form.organizationType : organizationTypeChoice;
+      // Version 2 is the shared hand-off contract used by /register and this wizard.
+      // Flat aliases keep drafts created by earlier releases readable during migration.
       localStorage.setItem("mpa.organization-registration-draft", JSON.stringify({
+        version: 2,
+        form: {
+          email: accountEmail,
+          firstName: "", middleName: "", lastName: "",
+          orgLegalName: form.legalName,
+          orgDisplayName: form.displayName,
+          orgType: organizationType,
+          orgDescription: form.description,
+          orgWebsite: form.website,
+          orgEmail: form.email,
+          orgPhone: form.phone,
+          orgAddress: form.addressText,
+        },
         ...form,
-        organizationType: organizationTypeChoice === "other" ? form.organizationType : organizationTypeChoice,
+        organizationType,
         representativeEmail: accountEmail,
         registrationStep,
         savedAt,

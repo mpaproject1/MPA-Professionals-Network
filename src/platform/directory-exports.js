@@ -1,8 +1,7 @@
 import { getPool } from "./db.js";
 import { makeXlsx } from "./reports.js";
+import { hasAnyRoleOrPermission } from "./authorization-policy.js";
 
-const MEMBER_ROLES = ["system_admin", "admin", "membership_reviewer"];
-const ACCOUNT_ROLES = ["system_admin", "admin", "platform_admin"];
 const MAX_ROWS = 20000;
 const PAGE_SIZE = 500;
 
@@ -14,18 +13,18 @@ function fail(status, message, code = "DIRECTORY_EXPORT_ERROR") {
 }
 function roles(identity) { return Array.isArray(identity?.roles) ? identity.roles : []; }
 function permissions(identity) { return Array.isArray(identity?.permissions) ? identity.permissions : []; }
-function isPlatformAdmin(identity) { return roles(identity).some(role => ACCOUNT_ROLES.includes(role)); }
+function isPlatformAdmin(identity) { return roles(identity).some(role => ["system_admin", "admin", "platform_admin"].includes(role)); }
 function canViewOrganizations(identity) { return isPlatformAdmin(identity) || permissions(identity).includes("organizations.manage"); }
 function authorize(identity, kind) {
   if (kind === "members") {
-    if (!roles(identity).some(role => [...MEMBER_ROLES, "finance_officer"].includes(role)) && !permissions(identity).some(permission => ["members.view", "members.export", "members.import"].includes(permission))) {
-      throw fail(403, "Member directory export requires the same authorized membership-administration access as the member catalogue.", "FORBIDDEN");
+    if (!hasAnyRoleOrPermission(identity, [], ["members.export"])) {
+      throw fail(403, "Member directory export requires the dedicated member-export capability.", "FORBIDDEN");
     }
     return;
   }
   if (kind === "accounts") {
-    if (!roles(identity).some(role => ACCOUNT_ROLES.includes(role)) && !permissions(identity).includes("users.view")) {
-      throw fail(403, "Account directory export requires authorized account-directory access.", "FORBIDDEN");
+    if (!hasAnyRoleOrPermission(identity, [], ["accounts.export"])) {
+      throw fail(403, "Account directory export requires the dedicated account-export capability.", "FORBIDDEN");
     }
     return;
   }
@@ -72,7 +71,7 @@ const PRESETS = [
 
 function allowedFields(identity, kind) {
   authorize(identity, kind);
-  const canSeeSensitive = isPlatformAdmin(identity) || (kind === "members" && roles(identity).some(role => MEMBER_ROLES.includes(role))) || permissions(identity).some(code => ["users.view", "members.export"].includes(code));
+  const canSeeSensitive = hasAnyRoleOrPermission(identity, [], [kind === "members" ? "members.export.contacts" : "accounts.export.contacts"]);
   return DEFINITIONS[kind].filter(field => (!field.sensitive || canSeeSensitive) && (!field.organization || canViewOrganizations(identity)));
 }
 export function listDirectoryExportFields(identity, kind) {

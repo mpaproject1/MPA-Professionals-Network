@@ -36,7 +36,7 @@ These are syntactic counts from the checked-in source, not runtime success/failu
 | Confirmed missing-principal defects in this candidate set | 0 | No candidate branch is outside the lexical scope of the line-463 binding |
 | Public/token/webhook exceptions within this candidate set | 0 | Public, optional-viewer and signed callback routes are dispatched before the unconditional authentication boundary; the 319 candidates occur after it |
 
-**Classification rule:** the dispatcher-wide binding is the principal source for all 319 candidates. The matrix's former 296 explicit `DEFECT CANDIDATE` labels are corrected below; the remaining 23 candidates were represented by rows whose route-level gate already showed an `identity`-based helper. Both groups inherit the same dispatcher binding.
+**Classification rule:** the dispatcher-wide binding is the principal source for all 319 candidates. The matrix's former 296 explicit `DEFECT CANDIDATE` labels are corrected below; the remaining 23 candidates were represented by rows whose route-level gate already showed an `identity`-based helper or whose handler spans multiple source lines. Both groups inherit the same dispatcher binding. For every matrix row with a `server.js` source line at or after 464, the gate column shows the route-specific action check (if any); authentication is inherited from line 463 unless a route explicitly documents a different public/optional contract before that boundary.
 
 **Evidence boundary:** this is a source/lexical-scope conclusion based on the checked-in `server.js` at blob `ed753d7ba3415afd59aa85f402ac615b78c237d4`. It is not a claim that every route's action authorization, tenant/resource check, or service policy is correct. No application was started and no request-level test or CI run was performed for this documentation-only update. Those runtime checks remain explicit follow-up validation, not grounds for adding duplicate authentication calls.
 
@@ -539,7 +539,7 @@ These are syntactic counts from the checked-in source, not runtime success/failu
 | 803 | PATCH | `p === "api/v1/admin/membership-card-settings"` | anyRoleOrPermission(identity,["system_admin"],["members.manage"]) | `membershipCard.updateMembershipCardSettings` |
 | 804 | POST | `dynamic parts predicate (see server.js line)` | anyRoleOrPermission(identity,["system_admin"],["members.manage"]) | `membershipCard.rotateMembershipCardVerification` |
 | 805 | GET | `p === "api/v1/me"` | Inherited dispatcher authentication at server.js:463; route action/scope policy remains separate | `membership.getMe` |
-| 806 | PATCH | `p === "api/v1/me/account"` | No auth helper in dispatch branch; public/token/webhook or service-level proof must be verified | `accountSecurity.updateOwnCredentials` |
+| 806 | PATCH | `p === "api/v1/me/account"` | Inherited dispatcher authentication at server.js:463; self-account action policy remains separate | `accountSecurity.updateOwnCredentials` |
 | 807 | PATCH | `p === "api/v1/me/profile"` | Inherited dispatcher authentication at server.js:463; route action/scope policy remains separate | `membership.updateProfile` |
 | 808 | GET | `p === "api/v1/membership/history"` | Inherited dispatcher authentication at server.js:463; route action/scope policy remains separate | `membership.history` |
 | 809 | GET | `p === "api/v1/membership/applications/me"` | Inherited dispatcher authentication at server.js:463; route action/scope policy remains separate | `membership.listMyApplications` |

@@ -160,6 +160,8 @@ test("public optional-viewer routes accept anonymous visitors but reject invalid
   const malformed=await api.get("/api/v1/jobs",{headers:{authorization:"Bearer malformed.token.value"}});
   expect(malformed.status()).toBe(401);
   expect((await malformed.json()).error?.code).toBe("UNAUTHENTICATED");
+  const malformedSupportBot=await api.post("/api/v1/public/support-bot/message",{headers:{authorization:"Bearer malformed.token.value"},data:{visitorKey:"security-auth-invalid-token",pagePath:"/login",message:"Help"}});
+  expect(malformedSupportBot.status()).toBe(401,"public support remains anonymous without a token but must not silently downgrade an invalid supplied bearer token");
 
   const expiredActor=await createActor("member");
   await getPool().query("update auth_session set expires_at=now()-interval '1 second' where user_id=$1 and revoked_at is null",[expiredActor.userId]);

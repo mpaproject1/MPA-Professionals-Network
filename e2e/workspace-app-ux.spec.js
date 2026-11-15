@@ -52,9 +52,11 @@ test.describe("MPA application workspace UX", () => {
     await expect(page.getByRole("heading", { name: "Membership progress", exact: true })).toBeVisible();
     await expect(page.locator("#progress-title")).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Your workspace shortcuts" })).toBeVisible();
-    const refresh = page.getByRole("button", { name: "Refresh", exact: true });
-    await refresh.focus();
-    await expect(refresh).toBeFocused();
+    // Workspace refresh controls were intentionally removed to prevent
+    // redundant reload actions. Verify keyboard access on the real shortcut nav.
+    const overviewShortcut = page.getByRole("button", { name: "Overview", exact: true });
+    await overviewShortcut.focus();
+    await expect(overviewShortcut).toBeFocused();
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByRole("heading", { name: /Welcome back, Test Member/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

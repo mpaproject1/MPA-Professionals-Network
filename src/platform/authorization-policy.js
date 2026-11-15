@@ -218,7 +218,9 @@ const PERMISSION_DETAILS = {
   "membership.review": { description: "Review submitted membership applications; does not grant payment verification or activation.", actionClass: "review", globalDirectGrant: true },
   "membership.activate": { description: "Activate approved membership after independent payment and approval requirements are satisfied.", actionClass: "write", globalDirectGrant: true },
   "finance.view": { description: "View payment queues and restricted finance reports without mutation authority.", actionClass: "read", globalDirectGrant: true },
-  "finance.manage": { description: "Legacy finance management compatibility; does not replace action-specific verification or reversal permissions.", actionClass: "write", globalDirectGrant: true },\n  "finance.payment.record": { description: "Record manual finance payments with ownership checks and audit evidence.", actionClass: "write", globalDirectGrant: true },\n  "finance.voucher.issue": { description: "Issue or reissue payment vouchers only for verified, non-reversed payments.", actionClass: "write", globalDirectGrant: true },
+  "finance.manage": { description: "Legacy finance management compatibility; does not replace action-specific verification or reversal permissions.", actionClass: "write", globalDirectGrant: true },
+  "finance.payment.record": { description: "Record manual finance payments with ownership checks and audit evidence.", actionClass: "write", globalDirectGrant: true },
+  "finance.voucher.issue": { description: "Issue or reissue payment vouchers only for verified, non-reversed payments.", actionClass: "write", globalDirectGrant: true },
   "finance.payment.verify": { description: "Verify payment evidence and transaction status.", actionClass: "write", globalDirectGrant: true },
   "finance.payment.reverse": { description: "Reverse eligible payments with reason and audit evidence.", actionClass: "write", globalDirectGrant: true },
   "organizations.view": { description: "View organization workspace data only where organization membership permits.", actionClass: "read", globalDirectGrant: true },
@@ -253,7 +255,9 @@ const PERMISSION_DETAILS = {
   "support.inquiries.manage": { description: "Manage support inquiries subject to assignment and contact-consent controls.", actionClass: "write", globalDirectGrant: true },
 };
 
-const LEGACY_PERMISSION_METADATA = {\n  "finance.payment.record": ["Finance", "Record manual finance payments", true, false],\n  "finance.voucher.issue": ["Finance", "Issue payment vouchers after verification", true, false],
+const LEGACY_PERMISSION_METADATA = {
+  "finance.payment.record": ["Finance", "Record manual finance payments", true, false],
+  "finance.voucher.issue": ["Finance", "Issue payment vouchers after verification", true, false],
   "jobs.review": ["Recruitment", "Review vacancies", true, false],
   "reports.sensitive": ["Reports", "View sensitive reports", true, false],
   "support.manage": ["Support", "Manage support desk", true, false],

@@ -16,6 +16,7 @@ import * as accountSecurity from "./src/platform/account-security.js";
 import * as adminAudit from "./src/platform/admin-audit.js";
 import * as applicationTracking from "./src/platform/application-tracking.js";
 import {requireRole, verifyToken, withCurrentRoles} from "./src/platform/auth.js";
+import {effectiveCapabilities, hasAnyRoleOrPermission} from "./src/platform/authorization-policy.js";
 import * as communityCampaigns from "./src/platform/community-campaigns.js";
 import * as communityImpactClaims from "./src/platform/community-impact-claims.js";
 import * as communityImpactDetection from "./src/platform/community-impact-detection.js";
@@ -137,17 +138,12 @@ async function optionalIdentity(req){
   if(!req.headers.authorization?.startsWith("Bearer ")) return null;
   return auth(req);
 }
-const ROLE_PERMISSION={verification_reviewer:"verification.manage",appeal_reviewer:"verification.appeal.review",supporting_staff:"reviews.view",platform_admin:"users.manage",admin:"users.manage"};
 function anyRole(identity,allowed){
-  const roles=Array.isArray(identity.roles)?identity.roles:[];
-  const permissions=Array.isArray(identity.permissions)?identity.permissions:[];
-  if(!allowed.some(role=>roles.includes(role)||(ROLE_PERMISSION[role]&&permissions.includes(ROLE_PERMISSION[role])))) throw Object.assign(new Error("Forbidden."),{statusCode:403,code:"FORBIDDEN"});
+  if(!hasAnyRoleOrPermission(identity,allowed,[])) throw Object.assign(new Error("Forbidden."),{statusCode:403,code:"FORBIDDEN"});
   return identity;
 }
 function anyRoleOrPermission(identity,allowed,permissionCodes=[]){
-  const roles=Array.isArray(identity.roles)?identity.roles:[];
-  const permissions=Array.isArray(identity.permissions)?identity.permissions:[];
-  if(!allowed.some(role=>roles.includes(role)||(ROLE_PERMISSION[role]&&permissions.includes(ROLE_PERMISSION[role])))&&!permissions.some(permission=>permissionCodes.includes(permission))) throw Object.assign(new Error("Forbidden."),{statusCode:403,code:"FORBIDDEN"});
+  if(!hasAnyRoleOrPermission(identity,allowed,permissionCodes)) throw Object.assign(new Error("Forbidden."),{statusCode:403,code:"FORBIDDEN"});
   return identity;
 }
 function ok(res,data,requestId,status=200){ return json(res,status,{data},requestId); }
@@ -815,6 +811,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/admin/membership-card-settings") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin","admin","platform_admin"],["members.manage"]); return ok(res,await membershipCard.getMembershipCardSettings(),requestId); }
     if(req.method==="PATCH" && p==="api/v1/admin/membership-card-settings") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin"],["members.manage"]); return ok(res,await membershipCard.updateMembershipCardSettings(identity.sub,await body(req),requestId),requestId); }
     if(req.method==="POST" && parts.length===6 && parts[0]==="api" && parts[1]==="v1" && parts[2]==="admin" && parts[3]==="membership-records" && parts[5]==="rotate-verification") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin"],["members.manage"]); return ok(res,await membershipCard.rotateMembershipCardVerification(parts[4],identity.sub,requestId),requestId); }
+    if(req.method==="GET" && p==="api/v1/me/capabilities") return ok(res,{roles:Array.isArray(identity.roles)?identity.roles:[],permissions:Array.isArray(identity.permissions)?identity.permissions:[],capabilities:effectiveCapabilities(identity)},requestId);
     if(req.method==="GET" && p==="api/v1/me") return ok(res,{...(await membership.getMe(identity.sub)),permissions:identity.permissions||[],credential_setup_required:identity.credential_setup_required===true},requestId);
     if(req.method==="PATCH" && p==="api/v1/me/account") return ok(res,await accountSecurity.updateOwnCredentials(identity,await body(req),requestId),requestId);
     if(req.method==="PATCH" && p==="api/v1/me/profile") return ok(res,await membership.updateProfile(identity.sub,await body(req),requestId),requestId);

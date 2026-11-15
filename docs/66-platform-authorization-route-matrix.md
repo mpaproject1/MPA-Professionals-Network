@@ -735,3 +735,23 @@ The matrix remains a static dispatch inventory. It does not assert that all 643 
 
 
 Phase 4 also adds `accounts.export.organizations` as a separate sensitive-export capability for the account export's organization-relationship field. It is not implied by the generic account export or ordinary platform-admin UI visibility.
+
+
+## Phase 5 tenant and resource-scope evidence (2026-11-15)
+
+| Resource family | Required relationship at service/query level | Source implementation evidence | Remaining boundary |
+|---|---|---|---|
+| Organization workspace | Active membership in the exact organization; role must match action | `assertOrganizationCapability`; organization job/initiative queries bind organization ID and membership | Cross-organization runtime negative tests remain pending |
+| Organization verification review | Independent reviewer; exclude creator, submitter and current organization members | `listOrganizationVerificationQueue` and `reviewOrganization` conflict checks in `src/organization-jobs/service.js` | No dedicated assigned-reviewer field for organization cases |
+| Jobs and candidate applications | Job's organization or active job-team assignment; candidate's own application for personal operations | `src/organization-jobs/service.js`; `src/platform/private-file-storage.js` | Job moderation has no case assignment table; reviewer pool remains with conflict exclusion |
+| Community initiatives | Owner user or exact organization owner/administrator; participant owns own participation; explicit contact consent | `src/platform/serve-community-initiatives.js` | Reviewer pool remains; queue excludes owner/submitter conflicts |
+| Verification | Subject's own case or exact assigned reviewer; independent appeal path remains separate | `src/verification/service.js`; `src/platform/private-file-storage.js` | Appeal reviewer assignment is not represented consistently in current schema |
+| Ethics | Assigned lead reviewer or active panel member; no reporter/respondent or unrecused conflict | `src/ethics/service.js`; private evidence checks | System admin assignment does not bypass review assignment |
+| Network-Plus business | Accepted active ownership or capability-specific unexpired delegated grant; organization ownership bound to exact org | `src/network-plus/business-discovery.js`; `src/platform/private-file-storage.js` | Business moderation reviewer-pool remains, with owner/delegate conflict checks |
+| Network-Plus requests | Accepted non-revoked participant or request-specific support grant with case reference and expiry | `src/network-plus/request-collaboration.js` | Support grants are intentionally scoped read access; no general support workspace bypass |
+| Mentorship | Mentor/mentee participant on the exact relationship/session; current membership for discovery | `src/services-mentorship/service.js`; `src/services-mentorship/operations.js` | Runtime cross-participant tests pending |
+| Talent directory and inquiries | Current membership, directory visibility and own requester/recipient relationship | `src/talent/service.js` | Runtime privacy and membership-expiry tests pending |
+
+The current-membership predicate is used for member-only job visibility, Network-Plus member-owned business actions, mentorship discovery, talent discovery/inquiries and eligible private-file access. It is not equivalent to a raw `membership_record.status='active'` check; it includes the shared current-period and fee-settlement policy.
+
+**Assignment-model limitation:** membership application review, organization verification review, job moderation and verification appeals do not all have dedicated assignment relationships in the current schema. The source changes do not claim these reviewer-pool queues are assignment-only. A future schema-backed assignment change is required before that stronger boundary can be asserted.

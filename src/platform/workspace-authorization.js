@@ -22,10 +22,12 @@ export function assertMembershipReviewQueueAccess(identity) {
 export function assertFinancePaymentQueueAccess(identity) {
   // System administrators may inspect the queue, but their platform role alone
   // never authorizes a payment decision. A verifier also needs queue visibility.
+  // Queue visibility is a finance-domain capability. Platform administration
+  // and the legacy generic finance.manage grant do not confer finance access.
   return assertAccess(
     identity,
-    ["finance_officer", "system_admin"],
-    ["finance.view", "finance.payment.verify", "finance.manage"],
+    ["finance_officer"],
+    ["finance.view", "finance.payment.verify"],
     "Finance payment queue permission required.",
   );
 }

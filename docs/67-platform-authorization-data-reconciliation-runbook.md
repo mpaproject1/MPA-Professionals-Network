@@ -6,6 +6,8 @@
 
 ## 1. Preconditions and evidence capture
 
+The executable read-only query set is also checked in at `scripts/authorization/phase-6-read-only-inventory.sql`. Review the schema-discovery output before running any later section; the script assumes the authorization tables use the documented `app_*` names in the current schema.
+
 1. Confirm the target database, environment, PostgreSQL version, UTC timestamp, operator, branch and current application commit.
 2. Use a database principal with SELECT access only. Confirm the session is read-only:
    ```sql

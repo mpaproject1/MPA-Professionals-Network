@@ -1,7 +1,7 @@
+import { hasAnyRoleOrPermission } from "./authorization-policy.js";
+
 function assertAccess(identity, allowedRoles, allowedPermissions, message) {
-  const roles = Array.isArray(identity?.roles) ? identity.roles : [];
-  const permissions = Array.isArray(identity?.permissions) ? identity.permissions : [];
-  if (allowedRoles.some(role => roles.includes(role)) || allowedPermissions.some(permission => permissions.includes(permission))) return identity;
+  if (hasAnyRoleOrPermission(identity, allowedRoles, allowedPermissions)) return identity;
   throw Object.assign(new Error(message || "Forbidden."), { statusCode: 403, code: "FORBIDDEN" });
 }
 

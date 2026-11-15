@@ -181,8 +181,10 @@ test("Phase 4 review queues and finance decisions reject read or generic managem
 
 test("Phase 4 route and service source keep card printing, exports and membership evidence behind action gates", () => {
   const server = readFileSync(new URL("../../server.js", import.meta.url), "utf8");
-  const batchRoute = server.match(/if\(req\.method==="POST" && p==="api\/v1\/admin\/membership-cards\/batch"\)([^\n]+)/)?.[1] || "";
-  const printRoute = server.match(/if\(req\.method==="POST" && p==="api\/v1\/admin\/membership-cards\/print"\)([^\n]+)/)?.[1] || "";
+  const batchRoute = server.match(/if\(req\.method==="POST" && p==="api\/v1\/admin\/membership-cards\/batch"\)([^
+]+)/)?.[1] || "";
+  const printRoute = server.match(/if\(req\.method==="POST" && p==="api\/v1\/admin\/membership-cards\/print"\)([^
+]+)/)?.[1] || "";
   assert.match(batchRoute, /membership\.cards\.print/);
   assert.match(printRoute, /membership\.cards\.print/);
   assert.doesNotMatch(batchRoute, /members\.view/);
@@ -193,9 +195,11 @@ test("Phase 4 route and service source keep card printing, exports and membershi
   assert.match(directory, /members\.export\.contacts/);
   assert.match(directory, /accounts\.export\.contacts/);
   const financeReceipts = readFileSync(new URL("../../src/platform/finance-receipts.js", import.meta.url), "utf8");
-  assert.equal(PERMISSION_CATALOG["finance.payment.record"].source, "legacy-runtime");\n  assert.equal(PERMISSION_CATALOG["finance.voucher.issue"].source, "legacy-runtime");\n  assert.match(financeReceipts, /permission === "finance\.payment\.record"[\s\S]*finance\.manage/);
+  assert.equal(PERMISSION_CATALOG["finance.payment.record"].source, "legacy-runtime");
+  assert.equal(PERMISSION_CATALOG["finance.voucher.issue"].source, "legacy-runtime");
+  assert.match(financeReceipts, /permission === "finance\.payment\.record"[\s\S]*finance\.manage/);
   assert.match(financeReceipts, /hasAnyRoleOrPermission\(identity, \["finance_officer"\], \[permission\]\)/);
-  assert.doesNotMatch(financeReceipts.match(/function assertFinance[\\s\\S]*?function safeReceipt/)?.[0] || "", /system_admin|\["finance_officer","system_admin","admin"\]/);
+  assert.doesNotMatch(financeReceipts.match(/function assertFinance[\s\S]*?function safeReceipt/)?.[0] || "", /system_admin|\["finance_officer","system_admin","admin"\]/);
   const privateFiles = readFileSync(new URL("../../src/platform/private-file-storage.js", import.meta.url), "utf8");
   const membershipGate = privateFiles.match(/const canReviewMembership=([^;]+);/)?.[1] || "";
   assert.doesNotMatch(membershipGate, /finance_officer|finance\.view|finance\.manage/);

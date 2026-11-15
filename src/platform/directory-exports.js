@@ -1,6 +1,6 @@
+import { hasAnyRoleOrPermission } from "./authorization-policy.js";
 import { getPool } from "./db.js";
 import { makeXlsx } from "./reports.js";
-import { hasAnyRoleOrPermission } from "./authorization-policy.js";
 
 const MAX_ROWS = 20000;
 const PAGE_SIZE = 500;

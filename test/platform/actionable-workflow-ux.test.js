@@ -27,7 +27,7 @@ test("admin overview, support and security loaders stay stable and distinguish u
   assert.ok(admin.includes("}, [hydrated, token, load]);"));
   assert.ok(accounts.includes("usersLoadFailed={loadFailed}"), "account loading failures must be explicit and retryable");
   assert.ok(admin.includes('sectionErrors.includes("opportunity inquiries") ? "Unavailable"'));
-  assert.ok(admin.includes('onClick={() => void load()} disabled={loading}'));
+  assert.doesNotMatch(admin, /onClick=\{\(\)\s*=>\s*void load\(\)\}/, "the overview must not add a disruptive manual reload control");
   assert.ok(admin.includes('role="alert"'));
   assert.ok(support.includes("const refresh=useCallback(async()=>"));
   assert.ok(support.includes("},[token,status,inquiryPage,inquirySearch]);"), "support loader must refresh for page and search changes without an unstable callback");
@@ -120,7 +120,8 @@ test("operation feedback explains loading, respects reduced motion, and locks pe
   assert.match(component, /title: string/);
   assert.match(styles, /prefers-reduced-motion:reduce/);
   assert.match(styles, /button:disabled/);
-  assert.match(tracker, /Checking for the latest updates/);
+  assert.match(tracker, /Loading your application progress/);
+  assert.doesNotMatch(tracker, /Checking for the latest updates/);
   assert.match(tracker, /Loading your application progress/);
   assert.match(feedback, /disabled=\{busy\}/);
 });
@@ -193,7 +194,8 @@ test("shared loading states and report controls explain pending work without blo
     source("../../web/app/globals.css"),
   ]);
   assert.match(dashboard, /title="Loading your dashboard"/);
-  assert.match(organizations, /Check latest organizations/);
+  assert.doesNotMatch(organizations, /Check latest organizations/);
+  assert.match(organizations, /getOrganizationDirectory/);
   assert.match(admin, /Preparing the administrator workspace/);
   assert.match(reports, /setViewBusy/);
   assert.match(reports, /setReportBusy/);

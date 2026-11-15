@@ -1,5 +1,5 @@
-import { hasCapability } from "./authorization-policy.js";
 import { deflateRawSync } from "node:zlib";
+import { hasCapability } from "./authorization-policy.js";
 import { getPool, withTransaction } from "./db.js";
 import { displayReference } from "./display-reference.js";
 

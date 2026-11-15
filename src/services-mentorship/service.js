@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
+import { membershipIsCurrentlyActiveSql } from "../membership/eligibility.js";
 import { getPool, withTransaction } from "../platform/db.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
 import { assertCurrentActiveMembership, assertOrganizationCapability, assertProfessionalIdentity, hasCurrentActiveMembership, hasProfessionalIdentity } from "../platform/identity-policy.js";
 import { createInAppNotification } from "../platform/notifications.js";
-import { membershipIsCurrentlyActiveSql } from "../membership/eligibility.js";
 
 function hashValue(value){return createHash("sha256").update(value).digest("hex");}
 function hashPayload(value){return hashValue(JSON.stringify(value));}

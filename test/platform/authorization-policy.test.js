@@ -1,14 +1,14 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import test from "node:test";
 import { requireRole } from "../../src/platform/auth.js";
 import {
   assertKnownPermissionCodes,
   canAssignRole,
   effectiveCapabilities,
+  hasAnyRoleOrPermission,
   isKnownPermission,
   PERMISSION_CATALOG,
-  hasAnyRoleOrPermission,
   roleMetadata,
 } from "../../src/platform/authorization-policy.js";
 import { assertFinancePaymentQueueAccess, assertMembershipReviewQueueAccess, assertPaymentReversalAccess, assertPaymentVerificationAccess } from "../../src/platform/workspace-authorization.js";
@@ -49,7 +49,17 @@ test("effective capabilities combine current role bundles and direct grants with
     permissions: ["members.view", "custom.read"],
   };
   const capabilities = effectiveCapabilities(identity);
-  assert.deepEqual(capabilities, ["members.view", "users.manage", "verification.appeal.review"]);
+  assert.deepEqual(capabilities, [
+    "accounts.export",
+    "accounts.export.contacts",
+    "accounts.export.organizations",
+    "members.export",
+    "members.export.contacts",
+    "members.view",
+    "membership.cards.print",
+    "users.manage",
+    "verification.appeal.review",
+  ]);
   assert.equal(hasAnyRoleOrPermission(identity, ["organization_admin"], []), true);
   assert.equal(capabilities.includes("organizations.manage"), false);
   assert.equal(capabilities.includes("custom.read"), false, "unclassified direct grants must not become effective capabilities");

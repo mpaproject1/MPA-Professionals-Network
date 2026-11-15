@@ -20,13 +20,32 @@ export function assertMembershipReviewQueueAccess(identity) {
 }
 
 export function assertFinancePaymentQueueAccess(identity) {
-  return assertAccess(identity, ["finance_officer"], ["finance.view"], "Finance payment queue permission required.");
+  // System administrators may inspect the queue, but their platform role alone
+  // never authorizes a payment decision. A verifier also needs queue visibility.
+  return assertAccess(
+    identity,
+    ["finance_officer", "system_admin"],
+    ["finance.view", "finance.payment.verify", "finance.manage"],
+    "Finance payment queue permission required.",
+  );
 }
 
 export function assertPaymentVerificationAccess(identity) {
-  return assertAccess(identity, ["finance_officer"], ["finance.payment.verify"], "Finance payment verification permission required.");
+  // finance.manage is retained as a legacy payment-only grant.
+  return assertAccess(
+    identity,
+    ["finance_officer"],
+    ["finance.payment.verify", "finance.manage"],
+    "Finance payment verification permission required.",
+  );
 }
 
 export function assertPaymentReversalAccess(identity) {
-  return assertAccess(identity, ["finance_officer"], ["finance.payment.reverse"], "Finance payment reversal permission required.");
+  // finance.manage is retained as a legacy payment-only grant.
+  return assertAccess(
+    identity,
+    ["finance_officer"],
+    ["finance.payment.reverse", "finance.manage"],
+    "Finance payment reversal permission required.",
+  );
 }

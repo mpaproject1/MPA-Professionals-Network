@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
+import { membershipIsCurrentlyActiveSql } from "../membership/eligibility.js";
 import { getPool, withTransaction } from "../platform/db.js";
 import { assertProfessionalProfileCapability, hasCurrentActiveMembership } from "../platform/identity-policy.js";
-import { membershipIsCurrentlyActiveSql } from "../membership/eligibility.js";
 
 function hashValue(value){return createHash("sha256").update(value).digest("hex");}
 function hashPayload(value){return hashValue(JSON.stringify(value));}

@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { getPool, withTransaction } from "./db.js";
 import { hasAnyRoleOrPermission } from "./authorization-policy.js";
+import { getPool, withTransaction } from "./db.js";
 
 const fail=(status,message,code)=>Object.assign(new Error(message),{statusCode:status,code});
 const hash=value=>createHash("sha256").update(value).digest("hex");

@@ -1,4 +1,5 @@
 import { hasAnyRoleOrPermission } from "../platform/authorization-policy.js";
+
 const ALLOWED_TYPES = new Set(["chapa", "telebirr", "bank_transfer", "cash", "manual"]);
 function bad(message) { throw Object.assign(new Error(message), { statusCode: 400, code: "VALIDATION_ERROR" }); }
 function clean(value, max = 120) {

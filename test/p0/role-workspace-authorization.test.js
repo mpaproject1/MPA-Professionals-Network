@@ -370,12 +370,12 @@ test("admin navigation resolves current server roles and separates finance from 
   const workspace = read("web/app/admin/admin-workspace.tsx");
   const overview = read("web/app/admin/page.tsx");
   const membershipPage = read("web/app/admin/membership/page.tsx");
-  assert.ok(workspace.includes('api<{ roles?: unknown; permissions?: unknown }>("/api/v1/me"'));
+  assert.ok(workspace.includes("getAccountContext"));
   assert.ok(workspace.includes("const financeOfficer = Boolean"));
   assert.ok(workspace.includes('item.href === "/admin/membership") return membershipReviewer'));
   assert.ok(workspace.includes('item.href === "/admin/reports") return reportIds.length > 0'));
-  assert.ok(workspace.includes('"/api/v1/admin/reports"'));
-  assert.ok(overview.includes('const me = await api<any>("/api/v1/me"'));
+  assert.ok(workspace.includes("getAdminReportCatalogue"));
+  assert.ok(overview.includes("const me = await getAccountContext<any>(token)"));
   assert.ok(!overview.includes("token.split"));
   assert.ok(workspace.includes('item.href === "/admin/membership/payment-methods") return financeConfig'));
   assert.ok(!membershipPage.includes('"system_admin", "reviewer", "finance_officer"'));
@@ -409,7 +409,7 @@ test("finance payment workspace uses a privacy-minimized queue and separate fina
 test("payment-method configuration is not granted by generic membership management", () => {
   const policy = read("src/membership/payment-method-policy.js");
   const methodsPage = read("web/app/admin/membership/payment-methods/page.tsx");
-  assert.ok(policy.includes('permissions.includes("finance.manage")'));
+  assert.ok(policy.includes('hasAnyRoleOrPermission(identity, ["system_admin", "finance_officer"], ["finance.manage"])'));
   assert.ok(!policy.includes("members.manage"));
   assert.ok(!methodsPage.includes('"members.manage"'));
 });
@@ -432,7 +432,7 @@ test("finance reporting is separate from membership and payment mutation authori
   for (const id of ["approved-payments", "failed-reversed-payments", "membership-collections", "outstanding-membership-payments", "finance-summary"]) {
     assert.ok(reports.includes('id:"' + id + '"'));
   }
-  assert.ok(reports.includes('permissions.includes("finance.view")'));
+  assert.ok(reports.includes('hasCapability(identity,"finance.view")'));
   assert.ok(finance.includes("/api/v1/admin/reports/finance-summary/run"));
   assert.ok(finance.includes('href="/admin/reports?report=approved-payments"'));
   assert.ok(reportUi.includes('new URLSearchParams(window.location.search).get("report")'));

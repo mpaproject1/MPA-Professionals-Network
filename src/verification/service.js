@@ -25,7 +25,8 @@ async function assertAssignedReviewer(db,caseId,actorId){
  const row=(await db.query("select subject_user_id,assigned_reviewer_id from verification_case where id=$1",[caseId])).rows[0];
  if(!row) throw error(404,"Verification case not found.","NOT_FOUND");
  if(row.subject_user_id===actorId) throw error(403,"The subject cannot review their own case.","CONFLICT_OF_INTEREST");
- if(row.assigned_reviewer_id!==actorId) throw error(403,"Only the reviewer assigned to this verification case may perform this review action.","FORBIDDEN");
+ const manager=(await db.query("select exists(select 1 from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1 and r.role_code='system_admin') or exists(select 1 from app_user_permission up where up.user_id=$1 and up.permission_code='verification.manage') as allowed",[actorId])).rows[0]?.allowed===true;
+ if(row.assigned_reviewer_id!==actorId&&!manager) throw error(403,"Only the assigned reviewer or an explicitly authorized verification manager may perform this review action.","FORBIDDEN");
  return row;
 }
 export function allowedTransition(from,to){ return Boolean(TRANSITIONS[from]?.includes(to)); }

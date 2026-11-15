@@ -1,8 +1,8 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { getPool, withTransaction } from "./db.js";
 import { membershipIsCurrentlyActiveSql } from "../membership/eligibility.js";
+import { getPool, withTransaction } from "./db.js";
 
 export const MAX_PRIVATE_UPLOAD_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["application/pdf","image/jpeg","image/png","text/plain"]);
@@ -119,7 +119,8 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
     allowed=ethicsEvidence.rowCount>0;
   }
   if(!allowed){
-    const canReviewVetting=roles.some(role=>["verification_reviewer","appeal_reviewer","system_admin"].includes(role))||permissions.includes("verification.manage");
+    const canManageVerification=roles.includes("system_admin")||permissions.includes("verification.manage");
+    const canReviewVetting=roles.some(role=>["verification_reviewer","appeal_reviewer"].includes(role))||canManageVerification;
     const canReviewOrganization=roles.some(role=>["reviewer","system_admin"].includes(role))||permissions.includes("organizations.review");
     const canReviewMembership=roles.some(role=>["reviewer","membership_reviewer","system_admin"].includes(role))||permissions.some(permission=>["membership.review","members.manage"].includes(permission));
     if(canReviewOrganization){
@@ -127,8 +128,8 @@ export async function readAuthorizedPrivateFile(userId,fileId,roles=[],requestId
       allowed=organizationEvidence.rowCount>0;
     }
     if(!allowed&&canReviewVetting){
-      const assignedCaseEvidence=await db.query("select 1 from verification_evidence e join verification_case vc on vc.id=e.case_id where e.file_object_id=$1 and vc.assigned_reviewer_id=$2 limit 1",[fileId,userId]);
-      const assignedPortfolioEvidence=await db.query("select 1 from professional_portfolio_item pi join professional_profile pp on pp.id=pi.profile_id join person p on p.id=pp.person_id join verification_case vc on vc.subject_user_id=p.user_id join verification_evidence ve on ve.file_object_id=pi.evidence_file_id and ve.case_id=vc.id where pi.evidence_file_id=$1 and vc.assigned_reviewer_id=$2 limit 1",[fileId,userId]);
+      const assignedCaseEvidence=await db.query("select 1 from verification_evidence e join verification_case vc on vc.id=e.case_id where e.file_object_id=$1 and vc.subject_user_id<>$2 and (vc.assigned_reviewer_id=$2 or $3=true) limit 1",[fileId,userId,canManageVerification]);
+      const assignedPortfolioEvidence=await db.query("select 1 from professional_portfolio_item pi join professional_profile pp on pp.id=pi.profile_id join person p on p.id=pp.person_id join verification_case vc on vc.subject_user_id=p.user_id join verification_evidence ve on ve.file_object_id=pi.evidence_file_id and ve.case_id=vc.id where pi.evidence_file_id=$1 and vc.subject_user_id<>$2 and (vc.assigned_reviewer_id=$2 or $3=true) limit 1",[fileId,userId,canManageVerification]);
       const appealEvidence=roles.includes("appeal_reviewer")?await db.query("select 1 from verification_evidence e join verification_case vc on vc.id=e.case_id join verification_appeal a on a.case_id=vc.id join verification_decision d on d.id=a.decision_id where e.file_object_id=$1 and a.status in ('submitted','under_review') and vc.subject_user_id<>$2 and d.decided_by<>$2 limit 1",[fileId,userId]):{rowCount:0};
       const appealPortfolioEvidence=roles.includes("appeal_reviewer")?await db.query("select 1 from professional_portfolio_item pi join professional_profile pp on pp.id=pi.profile_id join person p on p.id=pp.person_id join verification_case vc on vc.subject_user_id=p.user_id join verification_evidence ve on ve.file_object_id=pi.evidence_file_id and ve.case_id=vc.id join verification_appeal a on a.case_id=vc.id join verification_decision d on d.id=a.decision_id where pi.evidence_file_id=$1 and a.status in ('submitted','under_review') and vc.subject_user_id<>$2 and d.decided_by<>$2 limit 1",[fileId,userId]):{rowCount:0};
       allowed=assignedCaseEvidence.rowCount>0||assignedPortfolioEvidence.rowCount>0||appealEvidence.rowCount>0||appealPortfolioEvidence.rowCount>0;

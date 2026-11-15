@@ -11,8 +11,8 @@ test("role workspace navigation is available from the authenticated application 
 
 test("workspace entry reads current server identity and organization relationships", () => {
   const page = read("../../web/app/workspaces/page.tsx");
-  assert.ok(page.includes('api<Identity>("/api/v1/me"'));
-  assert.ok(page.includes('api<Organization[]>("/api/v1/organizations"'));
+  assert.ok(page.includes("getAccountContext<Identity>(token)"));
+  assert.ok(page.includes("getOrganizationDirectory"));
   assert.ok(!page.includes("task.orgScope"));
   assert.ok(!page.includes("task.scopeRoles"));
   assert.ok(page.includes("organization_representative"));
@@ -25,9 +25,10 @@ test("workspace entry reads current server identity and organization relationshi
 
 test("privileged platform role grants remain system-administrator-only", () => {
   const admin = read("../../src/platform/user-admin.js");
-  assert.ok(admin.includes("const PRIVILEGED_ROLES=new Set"));
+  const policy = read("../../src/platform/authorization-policy.js");
+  assert.ok(policy.includes("const PRIVILEGED_ROLE_CODES = new Set(["));
   for (const role of ["system_admin", "platform_admin", "membership_reviewer", "reviewer", "verification_reviewer", "ethics_reviewer", "appeal_reviewer", "finance_officer"]) {
-    assert.ok(admin.includes(JSON.stringify(role)), "missing privileged role: " + role);
+    assert.ok(policy.includes(JSON.stringify(role)), "missing privileged role: " + role);
   }
   assert.ok(admin.includes("Only a system administrator may modify a privileged account"));
 });

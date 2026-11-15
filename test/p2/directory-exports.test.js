@@ -7,22 +7,21 @@ import { exportDirectory, listDirectoryExportFields, previewDirectoryExport } fr
 
 const admin = { sub: "directory-export-admin", roles: ["system_admin"], permissions: [] };
 const memberAdmin = { sub: "directory-export-member-admin", roles: ["membership_reviewer"], permissions: [] };
+const memberExporter = { sub: "directory-export-member-exporter", roles: ["membership_reviewer"], permissions: ["members.export", "members.export.contacts"] };
 const support = { sub: "directory-export-support", roles: ["supporting_staff"], permissions: [] };
 const finance = { sub: "directory-export-finance", roles: ["finance_officer"], permissions: [] };
 const memberView = { sub: "directory-export-member-view", roles: [], permissions: ["members.view"] };
 
 test("directory export field catalogues preserve role boundaries and never offer unapproved profile fields", () => {
-  const memberFields = listDirectoryExportFields(memberAdmin, "members").fields.map(field => field.key);
+  const memberFields = listDirectoryExportFields(memberExporter, "members").fields.map(field => field.key);
+  assert.throws(() => listDirectoryExportFields(memberAdmin, "members"), error => error.statusCode === 403);
   assert.ok(memberFields.includes("membership_number"));
   assert.ok(memberFields.includes("email"));
   assert.equal(memberFields.includes("gender"), false);
   assert.equal(memberFields.includes("private_evidence"), false);
   assert.throws(() => listDirectoryExportFields(support, "members"), error => error.statusCode === 403);
-  const financeMemberFields = listDirectoryExportFields(finance, "members").fields.map(field => field.key);
-  assert.ok(financeMemberFields.includes("membership_number"));
-  assert.equal(financeMemberFields.includes("email"), false);
-  assert.equal(financeMemberFields.includes("phone"), false);
-  assert.ok(listDirectoryExportFields(memberView, "members").fields.some(field => field.key === "membership_number"));
+  assert.throws(() => listDirectoryExportFields(finance, "members"), error => error.statusCode === 403);
+  assert.throws(() => listDirectoryExportFields(memberView, "members"), error => error.statusCode === 403);
   assert.throws(() => listDirectoryExportFields(support, "accounts"), error => error.statusCode === 403);
   const accountFields = listDirectoryExportFields(admin, "accounts").fields.map(field => field.key);
   assert.ok(accountFields.includes("account_reference"));
@@ -96,12 +95,12 @@ test("account export applies member/non-member row scope and safely preserves Un
   const pendingMembership = await previewDirectoryExport(identity, "accounts", { fields: ["account_reference"], membershipStatus: "pending", q: fixture.email });
   assert.equal(activeMembership.expectedRows, 1, "membership status filter must use current membership state");
   assert.equal(pendingMembership.expectedRows, 0, "membership status filter must exclude accounts outside the requested state");
-  const memberCsv = await exportDirectory({ sub: fixture.id, roles: ["membership_reviewer"], permissions: [] }, "members", { fields: ["membership_number", "full_name"], q: "000012340056", format: "csv" }, "directory-export-leading-zero-test");
+  const memberCsv = await exportDirectory({ sub: fixture.id, roles: ["membership_reviewer"], permissions: ["members.export"] }, "members", { fields: ["membership_number", "full_name"], q: "000012340056", format: "csv" }, "directory-export-leading-zero-test");
   assert.ok(memberCsv.buffer.toString("utf8").includes("000012340056"), "leading zeros in membership numbers must be preserved");
   assert.equal(memberCsv.rowCount, 1);
 
   await db.query("insert into membership_record(user_id,membership_product_id,membership_number,status,start_date,source) select $1,$2,'BULK-'||lpad(n::text,8,'0'),'cancelled',current_date,'admin' from generate_series(1,505) n", [fixture.id, product.id]);
-  const paged = await exportDirectory({ sub: fixture.id, roles: ["membership_reviewer"], permissions: [] }, "members", { fields: ["membership_number"], q: fixture.email, format: "csv" }, "directory-export-paged-test");
+  const paged = await exportDirectory({ sub: fixture.id, roles: ["membership_reviewer"], permissions: ["members.export"] }, "members", { fields: ["membership_number"], q: fixture.email, format: "csv" }, "directory-export-paged-test");
   assert.equal(paged.rowCount, 506, "exports must fetch all rows across the 500-row database page boundary");
   assert.ok(paged.buffer.toString("utf8").includes("BULK-00000505"), "rows after the first page must be included");
   assert.ok((await db.query("select id from app_user where id=$1", [fixture.id])).rowCount === 1);

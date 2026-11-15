@@ -1,6 +1,6 @@
+import { membershipIsCurrentlyActiveSql } from "../membership/eligibility.js";
 import { hasAnyRoleOrPermission } from "../platform/authorization-policy.js";
 import { getPool, withTransaction } from "../platform/db.js";
-import { membershipIsCurrentlyActiveSql } from "../membership/eligibility.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
 import { assertOrganizationCapability } from "../platform/identity-policy.js";
 import * as memberReferrals from "../platform/member-referrals.js";

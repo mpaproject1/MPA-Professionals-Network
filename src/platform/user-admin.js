@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
 import {hashPassword} from "../membership/identity.js";
+import {assertKnownPermissionCodes, canAssignRole, hasAnyRoleOrPermission, isKnownPermission, isPrivilegedRole, permissionMetadata, roleMetadata} from "./authorization-policy.js";
 import {getPool,withTransaction} from "./db.js";
 import {createInAppNotification} from "./notifications.js";
-import {assertKnownPermissionCodes, canAssignRole, hasAnyRoleOrPermission, isKnownPermission, isPrivilegedRole, permissionMetadata, roleMetadata} from "./authorization-policy.js";
 
 function err(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e}
 async function allowed(db,userId){const r=await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId]);return r.rows.map(x=>x.role_code)}

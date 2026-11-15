@@ -14,7 +14,7 @@ const [migration,alignmentMigration,phase2Migration,phase3Migration,contractMigr
  read("../../web/app/network-plus/requests/page.tsx"),
  read("../../e2e/network-plus-requests.spec.js"),
  read("../../scripts/check-new-migration-compatibility.js"),
- read("../../src/platform/user-admin.js"),
+ read("../../src/platform/authorization-policy.js"),
  read("../../web/app/network-plus/opportunities/page.tsx"),
  read("../../src/platform/notifications.js"),
  read("../../web/app/notifications/page.tsx")
@@ -183,7 +183,7 @@ test("migration compatibility and support-role governance include Increment 6",(
  assert.match(compatibility,/network_plus_request_support_grant/);
  assert.match(compatibility,/trg_network_plus_request_event_immutable/);
  assert.match(userAdmin,/network_plus_support/);
- assert.match(userAdmin,/PRIVILEGED_ROLES/);
+ assert.match(userAdmin,/PRIVILEGED_ROLE_CODES/);
 });
 
 test("Phase 2 recipient clarification and question answers revalidate current recipient authority",()=>{

@@ -6,7 +6,7 @@ const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("members workspace is a server-state-driven progress journey, not a card catalogue", async () => {
   const page = await read("../../web/app/members/page.tsx");
-  assert.match(page, /api<Me>\("\/api\/v1\/me"/);
+  assert.match(page, /getAccountContext<Me>\(token\)/);
   assert.match(page, /api<Application\[]>\("\/api\/v1\/membership\/applications\/me"/);
   assert.match(page, /api<MembershipHistory>\("\/api\/v1\/membership\/history"/);
   assert.match(page, /api<Tracking>\("\/api\/v1\/me\/progress\?limit=5/);
@@ -36,7 +36,7 @@ test("members workspace preserves honest unavailable states and only exposes cur
   assert.match(page, /Confirm your membership status/);
   assert.match(page, /Recent activity could not be loaded/);
   assert.match(page, /Recent notifications could not be loaded/);
-  assert.match(page, /api<Me>\("\/api\/v1\/me"/);
+  assert.match(page, /getAccountContext<Me>\(token\)/);
   assert.match(page, /api<Inbox>\("\/api\/v1\/notifications\?limit=5"/);
   assert.match(page, /role="alert"/);
   assert.match(page, /aria-label="Your workspace shortcuts"/);

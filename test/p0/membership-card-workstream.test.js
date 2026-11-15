@@ -140,7 +140,7 @@ test("membership products and authenticated member data load independently",()=>
   const load=membershipWorkspace.slice(start,end);
   assert.match(load,/Promise\.all\(\[/);
   assert.match(load,/settle\(api<Product\[]>\("\/api\/v1\/membership\/products"\)\)/);
-  assert.match(load,/settle\(api<Me>\("\/api\/v1\/me"/);
+  assert.match(load,/settle\(getAccountContext<Me>\(token\)/);
   assert.match(load,/settle\(api<MembershipCardSummary>\("\/api\/v1\/membership\/card"/);
   assert.match(load,/const confirmedActiveMembership=Boolean\(me\.has_active_membership\)\|\|cardConfirmsActive/);
   assert.match(load,/setMembershipCardError/);
@@ -154,6 +154,6 @@ test("membership API failures are shown as unknown status, never as an inactive 
   assert.match(membershipWorkspace,/Finance must confirm full historical fee settlement/);
   assert.match(membershipWorkspace,/Do not submit a duplicate membership application/);
   assert.match(membershipWorkspace,/Status unavailable/);
-  assert.match(membershipWorkspace,/We could not confirm your current membership status/);
+  assert.match(membershipWorkspace,/Membership status and ID could not be confirmed/);
   assert.match(membershipWorkspace,/!membershipStatusUnavailable\s*&&\s*!membershipPaymentVerificationRequired/);
 });

@@ -115,7 +115,7 @@ test("single member membership ID PDF is one exact-size card with no portal chro
    "p=r.pages[0] if r.pages else None",
    "print('A4='+str(bool(p and abs(float(p.mediabox.width)-595.28)<1 and abs(float(p.mediabox.height)-841.89)<1)))",
    "print('TEXT='+chr(10).join((p.extract_text() or '') for p in r.pages))"
-  ].join("\\n"),a4Path],{encoding:"utf8"});
+  ].join("\n"),a4Path],{encoding:"utf8"});
   expect(a4Extracted).toContain("PAGES=1");
   expect(a4Extracted).toContain("A4=True");
   expect(a4Extracted).toContain("Amina Yusuf");

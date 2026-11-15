@@ -2,19 +2,12 @@ import crypto from "node:crypto";
 import {hashPassword} from "../membership/identity.js";
 import {getPool,withTransaction} from "./db.js";
 import {createInAppNotification} from "./notifications.js";
+import {canAssignRole, hasAnyRoleOrPermission, isPrivilegedRole, roleMetadata} from "./authorization-policy.js";
 
 function err(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e}
 async function allowed(db,userId){const r=await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId]);return r.rows.map(x=>x.role_code)}
-function admin(roles,permissions=[],requiredPermission="users.manage"){if(!roles.some(x=>["system_admin","admin"].includes(x))&&!permissions.includes(requiredPermission))throw err(403,"Administrator role or explicit user-administration permission required.","FORBIDDEN")}
+function admin(roles,permissions=[],requiredPermission="users.manage"){if(!hasAnyRoleOrPermission({roles,permissions},["system_admin","admin"],[requiredPermission]))throw err(403,"Administrator role or explicit user-administration permission required.","FORBIDDEN")}
 const SYSTEM_ROLE="system_admin";
-const PRIVILEGED_ROLES=new Set([SYSTEM_ROLE,"super_admin","admin","platform_admin","reviewer","membership_reviewer","verification_reviewer","business_verification_reviewer","business_moderator","serve_community_reviewer","network_plus_support","ethics_reviewer","appeal_reviewer","finance_officer"]);
-const NON_PLATFORM_ROLES={
- organization_admin:{scope:"organization",reason:"Use an organization membership role instead."},
- recruiter:{scope:"organization_or_job",reason:"Use organization membership or job-team scope instead."},
- project_manager:{scope:"organization_or_project",reason:"Use organization or project assignment scope instead."},
- read_only:{scope:"organization",reason:"Use an organization membership role instead."},
- mentor:{scope:"profile",reason:"Mentor eligibility is based on a verified professional profile, not a platform role."}
-};
 
 
 async function requireSystemAdmin(actor){
@@ -101,13 +94,13 @@ export async function getAccountGovernance(actor,accountReference) {
 }
 
 export async function listRoles(actor){
- const actorRoles=await allowed(getPool(),actor); admin(actorRoles);
+ const actorId=typeof actor==="string"?actor:actor?.sub;
+ const actorPermissions=Array.isArray(actor?.permissions)?actor.permissions:[];
+ const actorRoles=await allowed(getPool(),actorId);
+ admin(actorRoles,actorPermissions);
+ const actorIdentity={roles:actorRoles,permissions:actorPermissions};
  const rows=(await getPool().query("select role_code,name,description from app_role order by name,role_code")).rows;
- return rows.map(row=>{
-  const nonPlatform=NON_PLATFORM_ROLES[row.role_code];
-  const privileged=PRIVILEGED_ROLES.has(row.role_code);
-  return {...row,scope:nonPlatform?.scope||"platform",assignable:!nonPlatform&&(!privileged||actorRoles.includes(SYSTEM_ROLE)),privileged,assignmentNote:nonPlatform?.reason||null};
- });
+ return rows.map(row=>({...row,...roleMetadata(row.role_code),assignable:canAssignRole(actorIdentity,row.role_code)}));
 }
 
 export async function updateUser(actor,userId,input,requestId){
@@ -133,10 +126,10 @@ export async function updateUser(actor,userId,input,requestId){
   for(const requested of requestedRoles){
    const rr=(await tx.query("select id from app_role where role_code=$1",[requested])).rows[0];
    if(!rr)throw err(400,"Unknown role.","INVALID_ROLE");
-   if(PRIVILEGED_ROLES.has(requested)&&!actorRoles.includes(SYSTEM_ROLE))
+   if(isPrivilegedRole(requested)&&!actorRoles.includes(SYSTEM_ROLE))
     throw err(403,"Only a system administrator may grant or remove privileged roles.","PRIVILEGED_ROLE_CHANGE");
   }
-  const targetIsPrivileged=currentRoles.some(r=>PRIVILEGED_ROLES.has(r));
+  const targetIsPrivileged=currentRoles.some(r=>isPrivilegedRole(r));
   if(targetIsPrivileged&&!actorRoles.includes(SYSTEM_ROLE))
    throw err(403,"Only a system administrator may modify a privileged account.","PRIVILEGED_ACCOUNT_CHANGE");
 
@@ -177,7 +170,7 @@ export async function revokeSessions(actor,userId,requestId,reasonInput){
   const target=(await tx.query("select id from app_user where id=$1 for update",[userId])).rows[0];
   if(!target)throw err(404,"User not found.","NOT_FOUND");
   const targetRoles=await allowed(tx,userId);
-  if(targetRoles.some(r=>PRIVILEGED_ROLES.has(r))&&!actorRoles.includes(SYSTEM_ROLE))throw err(403,"Only a system administrator may revoke sessions for a privileged account.","PRIVILEGED_ACCOUNT_CHANGE");
+  if(targetRoles.some(r=>isPrivilegedRole(r))&&!actorRoles.includes(SYSTEM_ROLE))throw err(403,"Only a system administrator may revoke sessions for a privileged account.","PRIVILEGED_ACCOUNT_CHANGE");
   const r=await tx.query("update auth_session set revoked_at=now() where user_id=$1 and revoked_at is null",[userId]);
   await tx.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,'admin.sessions.revoked','app_user',$2,$3,'success',$4)",[actorId,userId,requestId,JSON.stringify({count:r.rowCount,reason})]);
   if(r.rowCount)await createInAppNotification(tx,userId,"security.sessions_revoked","security_event",userId,{category:"security",critical:true,priority:"high",message:"Your active sessions were revoked by MPA account support.",nextAction:"Sign in again if this was expected. If you did not request this, contact MPA support.",actionUrl:"/profile",actionRequired:true});
@@ -197,7 +190,7 @@ export async function issueOneTimePassword(actor,userId,requestId,reasonInput){
   if(target.status!=="active")throw err(409,"Only active accounts can receive a one-time password.","ACCOUNT_NOT_ACTIVE");
   if(!target.email_verified_at)throw err(409,"This account must verify its sign-in email before a one-time password can be issued. Use the approved recovery-link workflow if appropriate.","EMAIL_VERIFICATION_REQUIRED");
   const targetRoles=await allowed(tx,userId);
-  if(targetRoles.some(r=>PRIVILEGED_ROLES.has(r))&&!actorRoles.includes(SYSTEM_ROLE))throw err(403,"Only a system administrator may issue a one-time password for a privileged account.","PRIVILEGED_ACCOUNT_CHANGE");
+  if(targetRoles.some(r=>isPrivilegedRole(r))&&!actorRoles.includes(SYSTEM_ROLE))throw err(403,"Only a system administrator may issue a one-time password for a privileged account.","PRIVILEGED_ACCOUNT_CHANGE");
   if(target.admin_passkey_enforced_at && targetRoles.some(r=>["system_admin","admin"].includes(r)))throw err(409,"This privileged account requires passkey authentication; do not issue a password credential. Use the approved administrator passkey recovery process.","PASSKEY_REQUIRED");
   await tx.query("update app_user set password_hash=$1,credential_setup_required=true,credential_setup_expires_at=now()+interval '24 hours',credential_setup_used_at=null,updated_at=now() where id=$2",[hashPassword(oneTimePassword),userId]);
   const revoked=await tx.query("update auth_session set revoked_at=now() where user_id=$1 and revoked_at is null",[userId]);

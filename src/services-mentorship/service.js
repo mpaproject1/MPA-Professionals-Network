@@ -3,6 +3,7 @@ import { getPool, withTransaction } from "../platform/db.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
 import { assertCurrentActiveMembership, assertOrganizationCapability, assertProfessionalIdentity, hasCurrentActiveMembership, hasProfessionalIdentity } from "../platform/identity-policy.js";
 import { createInAppNotification } from "../platform/notifications.js";
+import { membershipIsCurrentlyActiveSql } from "../membership/eligibility.js";
 
 function hashValue(value){return createHash("sha256").update(value).digest("hex");}
 function hashPayload(value){return hashValue(JSON.stringify(value));}
@@ -469,8 +470,8 @@ export async function listPublicServiceAnnouncements(viewerId=null,{limit=30}={}
  where a.status='published' and s.status='published' and s.moderation_status='approved' and s.lifecycle_status='active'
    and (s.expires_at is null or s.expires_at>now())
    and (
-    (a.audience='public' and (s.visibility='public' or ($1::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$1 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date)))))
-    or (a.audience='members' and $1::uuid is not null and exists(select 1 from membership_record m where m.user_id=$1 and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)))
+    (a.audience='public' and (s.visibility='public' or ($1::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$1 and ${membershipIsCurrentlyActiveSql("vm")}))))
+    or (a.audience='members' and $1::uuid is not null and exists(select 1 from membership_record m where m.user_id=$1 and ${membershipIsCurrentlyActiveSql("m")}))
    )
  order by a.created_at desc,a.id desc limit $2`,[viewerId||null,n])).rows;
 }
@@ -1021,7 +1022,7 @@ export async function getMentorProfile(userId,viewerId=null){
  const row=(await db.query(`select mp.id,mp.user_id,p.display_name,mp.headline,mp.bio,mp.expertise,mp.languages,mp.mentoring_modes,mp.max_active_mentees,mp.approved_banner_url,mp.approved_banner_alt,mp.video_url,(select coalesce(json_agg(json_build_object('day_of_week',a.day_of_week,'start_time',a.start_time,'end_time',a.end_time,'timezone',a.timezone) order by a.day_of_week,a.start_time),'[]'::json) from mentor_availability a where a.mentor_profile_id=mp.id and a.active=true) availability
  from mentor_profile mp join app_user u on u.id=mp.user_id join person p on p.user_id=mp.user_id
  where mp.user_id=$1 and u.status='active' and mp.status='active' and mp.moderation_status='approved'
- and exists(select 1 from membership_record mm where mm.user_id=mp.user_id and mm.status='active' and mm.start_date<=current_date and (mm.end_date is null or mm.end_date>=current_date))
+ and exists(select 1 from membership_record mm where mm.user_id=mp.user_id and ${membershipIsCurrentlyActiveSql("mm")})
  and (mp.visibility='public' or (mp.visibility='members' and $2::uuid is not null and exists(select 1 from membership_record vm where vm.user_id=$2 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date))))`,[userId,viewerId||null])).rows[0];
  if(!row)throw error(404,"Mentor profile not found or not visible.","NOT_FOUND");
  return row;

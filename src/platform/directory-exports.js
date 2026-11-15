@@ -11,10 +11,7 @@ function fail(status, message, code = "DIRECTORY_EXPORT_ERROR") {
   error.code = code;
   return error;
 }
-function roles(identity) { return Array.isArray(identity?.roles) ? identity.roles : []; }
-function permissions(identity) { return Array.isArray(identity?.permissions) ? identity.permissions : []; }
-function isPlatformAdmin(identity) { return roles(identity).some(role => ["system_admin", "admin", "platform_admin"].includes(role)); }
-function canViewOrganizations(identity) { return isPlatformAdmin(identity) || permissions(identity).includes("organizations.manage"); }
+function canViewOrganizations(identity) { return hasAnyRoleOrPermission(identity, [], ["accounts.export.organizations"]); }
 function authorize(identity, kind) {
   if (kind === "members") {
     if (!hasAnyRoleOrPermission(identity, [], ["members.export"])) {

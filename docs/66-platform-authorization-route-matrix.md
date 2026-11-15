@@ -2,7 +2,7 @@
 
 **Repository:** `mpaproject1/MPA-Professionals-Network`  
 **Branch:** `feat/workstream-3-progress-members-workspace`  
-**Source:** `server.js` at blob `7cef3c29efbd6c74d324c934879b1541954f036a` (Phase 1 authentication hardening)  
+**Source:** `server.js` at blob `7cef3c29efbd6c74d324c934879b1541954f036a` (Phase 2 authorization policy centralization)  
 **Inventory generated:** 2026-11-15  
 **Coverage:** 643 API route branches found by static inspection of `server.js` (all methods and dispatch predicates). This includes public, authenticated, privileged, and token/webhook routes. It does not claim that a route's service-level policy has been proven unless an explicit route helper is shown.
 

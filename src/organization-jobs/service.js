@@ -1,5 +1,6 @@
 import { hasAnyRoleOrPermission } from "../platform/authorization-policy.js";
 import { getPool, withTransaction } from "../platform/db.js";
+import { membershipIsCurrentlyActiveSql } from "../membership/eligibility.js";
 import { queueWorkflowEmail } from "../platform/email-operations.js";
 import { assertOrganizationCapability } from "../platform/identity-policy.js";
 import * as memberReferrals from "../platform/member-referrals.js";
@@ -231,7 +232,7 @@ export const ELIGIBILITY_RULES=[
 ];
 
 async function profileContext(db,userId){
- const r=(await db.query("select u.id user_id,pp.years_experience,pp.availability_status,pp.location_label,pp.id profile_id,m.status membership_status from app_user u join person p on p.user_id=u.id left join professional_profile pp on pp.person_id=p.id left join membership_record m on m.user_id=u.id and m.status='active' where u.id=$1",[userId])).rows[0];
+ const r=(await db.query("select u.id user_id,pp.years_experience,pp.availability_status,pp.location_label,pp.id profile_id,m.status membership_status from app_user u join person p on p.user_id=u.id left join professional_profile pp on pp.person_id=p.id left join membership_record m on m.user_id=u.id and ${membershipIsCurrentlyActiveSql("m")} where u.id=$1",[userId])).rows[0];
  if(!r) throw error(404,"Applicant account not found.","NOT_FOUND");
  return r;
 }
@@ -419,7 +420,7 @@ export async function changeJobStatus(jobId,userId,status,requestId){
 async function jobScopeAllowed(db,job,viewerId){
  if(job.posting_scope==="public") return true;
  if(!viewerId) return false;
- if(job.posting_scope==="mpa_members") return Boolean((await db.query("select 1 from membership_record where user_id=$1 and status='active' limit 1",[viewerId])).rows[0]);
+ if(job.posting_scope==="mpa_members") return Boolean((await db.query("select 1 from membership_record m where m.user_id=$1 and ${membershipIsCurrentlyActiveSql("m")} limit 1",[viewerId])).rows[0]);
  if(job.posting_scope==="organization_internal") return Boolean((await db.query("select 1 from organization_membership where organization_id=$1 and user_id=$2 and status='active'",[job.organization_id,viewerId])).rows[0]);
  if(job.posting_scope==="partner_network"){
    return Boolean((await db.query("select 1 from membership_record where user_id=$1 and status='active' limit 1",[viewerId])).rows[0]);
@@ -440,7 +441,7 @@ export async function listJobs(filters={},viewerId=null){
  // Keep the existing jobScopeAllowed policy equivalent, but apply it inside SQL
  // before count/limit/offset. This avoids loading all jobs and per-row membership queries.
  args.push(viewerId||null);const viewerParam=`$${args.length}`;
- where.push(`(j.posting_scope='public' or (j.posting_scope in ('mpa_members','partner_network') and ${viewerParam}::uuid is not null and exists(select 1 from membership_record m where m.user_id=${viewerParam}::uuid and m.status='active')) or (j.posting_scope='organization_internal' and ${viewerParam}::uuid is not null and exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id=${viewerParam}::uuid and om.status='active')))`);
+ where.push(`(j.posting_scope='public' or (j.posting_scope in ('mpa_members','partner_network') and ${viewerParam}::uuid is not null and exists(select 1 from membership_record m where m.user_id=${viewerParam}::uuid and ${membershipIsCurrentlyActiveSql("m")})) or (j.posting_scope='organization_internal' and ${viewerParam}::uuid is not null and exists(select 1 from organization_membership om where om.organization_id=j.organization_id and om.user_id=${viewerParam}::uuid and om.status='active')))`);
  const predicate=where.join(" and ");
  const total=Number((await db.query(`select count(*)::int count from job j join organization o on o.id=j.organization_id where ${predicate}`,args)).rows[0]?.count||0);
  const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.min(Math.max(Number(filters.offset)||0,0),100000);

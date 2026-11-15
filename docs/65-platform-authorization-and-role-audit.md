@@ -374,3 +374,127 @@ The next implementation should be a separate, test-led change set, starting with
 ---
 
 **Audit status:** Findings recorded. Implementation and live database reconciliation remain separate approval-gated work.
+
+
+## 11. Foundational requirement — account and authority boundaries
+
+This section is a platform-wide architecture requirement. It applies to authentication, account onboarding, workspace navigation, account administration, API authorization, data ownership, and future modules. It is not a UI-only account-switching feature.
+
+### 11.1 Do not model these four concepts as interchangeable account types
+
+MPA must distinguish four authority domains:
+
+1. **Platform administration** — authority delegated by MPA to operate the association's platform. Examples include system security administration, membership review, finance operations, verification, support, and platform configuration. These are platform-scoped roles/capabilities assigned to a person. They do not make that person the owner or administrator of an organization.
+2. **Organization account** — the legal or operational organization record. The organization is an entity, not a human login. People access its workspace only through an active `organization_membership` row for that exact organization, with an allowed organization role. Organization verification status and organization membership status are separate checks.
+3. **Professional identity/workspace** — a person's professional profile and personal career/networking capabilities. It belongs to the person. It does not grant access to an employer's organization workspace, another person's private profile, or platform administration.
+4. **Member identity and membership entitlement** — the person's association identity and membership lifecycle. A login/person identity is not proof of current paid/active membership. Membership eligibility must be derived from the membership record and its current status/date/fee rules, not from a role label alone.
+
+**Critical modelling decision:** A person should normally have one authenticated human identity (`app_user`) and may have several separately authorized contexts: personal/member, professional, one or more organizations, and (only if separately appointed) platform operations. Do not create duplicate human logins merely because a person wears multiple hats. Conversely, do not merge these contexts into one broad union of roles. The active workspace/context is a navigation and policy input, never an authorization grant by itself.
+
+The existing code already points toward this separation: `identity-policy.js` distinguishes professional identity roles from organization resource roles and checks active organization membership against a requested organization ID; migration `009_phase3_organizations_jobs.sql` stores organization roles in `organization_membership`, not merely in the person's global role list. Preserve and complete this model.
+
+### 11.2 Canonical account/context matrix
+
+| Context | Identity/resource owner | Authority source | Scope | Must never imply |
+|---|---|---|---|---|
+| Platform operations | MPA platform | Explicit platform role bundle and narrowly scoped direct grants | Platform modules/actions; sensitive operations may be further assigned/case-scoped | Ownership/admin rights in any organization; access to every private user record without purpose and data policy |
+| Organization workspace | Organization entity | Active `organization_membership` for the requested organization + role + action capability | One organization ID; job/team/resource scope may narrow it further | Platform admin, another organization, personal member entitlement, or unrestricted access to all employees/applicants |
+| Professional workspace | Person | Professional profile capability/record and action permissions | Own professional identity and explicitly shared/public information | Organization administration, platform administration, active association membership |
+| Member workspace | Person | Authenticated person identity; membership record for member-only entitlements | Own membership, own applications/requests, and explicitly authorized member services | Platform administration, organization authority, another member's private data, or professional credentials not separately established |
+
+The system must additionally support public/guest access as a distinct unauthenticated policy, not as a weak member account.
+
+### 11.3 The authorization decision contract
+
+Every protected request must resolve all of the following explicitly:
+
+- **Principal:** the authenticated human `app_user` ID and active, non-revoked session.
+- **Context:** personal/member, professional, platform, or a specific organization context. Context selection cannot add permissions.
+- **Action:** the exact capability required (for example, `organizations.jobs.create`, `membership.application.review`, `finance.payment.verify`).
+- **Resource:** the target object and its owner/tenant (organization ID, job ID, application ID, case ID, member ID, file ID).
+- **Scope:** self, organization, assigned resource/case, platform queue, or another explicitly defined scope.
+- **Relationship/state:** active organization membership, current membership entitlement, ownership, reviewer assignment, participant relationship, consent, verification status, and resource lifecycle as applicable.
+- **Separation-of-duties:** no conflicting reviewer/approver/subject relationship or prohibited combination.
+- **Outcome:** allow or deny, with a stable reason code and audit event for sensitive actions.
+
+A role name alone must never authorize access to an object. A direct permission alone must never bypass tenant/resource scope, status, consent, or separation-of-duties checks.
+
+### 11.4 Required workspace entry and switching behavior
+
+1. Authenticate once as the person; keep the stable principal ID and session.
+2. Resolve the contexts the person is actually entitled to use from current database relationships and assignments.
+3. Show only those workspaces in navigation. Do not infer a context from a role label or a stale token claim.
+4. When a person chooses an organization, carry its organization ID as the requested context, then verify active membership and capability server-side on every request.
+5. Switching from Organization A to Organization B must replace the selected context, not accumulate A's and B's permissions.
+6. Returning to the personal/member workspace must drop organization context. Platform operations remains a separately authorized context and must not inherit whichever organization was last selected.
+7. A removed, suspended, expired, or revoked relationship must immediately stop authorizing requests, even if an old browser tab remains open.
+8. A deep link to an unauthorized workspace or resource must return a consistent 403/404 policy response and a clear next step; it must not redirect repeatedly between workspaces or retry the same forbidden request.
+9. The frontend may hide inaccessible navigation, but backend APIs remain authoritative. Never use UI visibility as a security boundary.
+10. Provide one canonical `/api/v1/me/contexts` (or equivalent) response for current context availability and effective capabilities. Do not duplicate context-resolution logic in each page.
+
+### 11.5 Role and relationship placement rules
+
+- Platform roles belong to platform authorization assignments, not organization membership rows.
+- Organization roles belong to `organization_membership` and must always be evaluated with the requested `organization_id`.
+- Job/project/team roles belong to the relevant resource membership/assignment relation, not the global `app_user_role` namespace.
+- Professional identity is a personal capability/profile relation. Do not treat the generic `member` role as proof of an active membership subscription.
+- Membership status and membership plan are domain records/entitlements, not administrator roles.
+- Direct per-user grants are exceptional platform or explicitly scoped delegations; they must not be a shortcut around organization/resource relationships.
+- A person can hold multiple contexts, but each permission must be evaluated only in its authority domain and target scope.
+- Organization owner is a relationship to one organization. It is not a global account superuser and should not be freely assignable or transferrable without the organization ownership-transfer workflow.
+- Organization verification is a status of the organization entity. A user who submitted or owns an organization does not thereby gain verifier authority.
+
+### 11.6 Account lifecycle and edge cases
+
+The implementation must define and test these transitions:
+
+- New person registers: a personal identity exists; professional profile and association membership entitlements are not silently assumed.
+- Person becomes a member: membership application/approval/payment lifecycle changes the membership record; it does not grant platform or organization roles.
+- Person creates a professional profile: personal professional capability is activated; no employer access is created.
+- Person creates an organization: an organization entity is created and the creator receives only the explicitly approved initial organization relationship; organization verification remains pending until approved.
+- Person joins an organization: an invitation/approval creates an active membership for that organization only.
+- Person joins multiple organizations: each membership is independent and can have a different role/status.
+- Person loses organization access: only that organization's relationship is revoked; their personal/member identity and other organization memberships remain intact.
+- Person's membership expires: member-only benefits are removed according to policy; their login, professional profile, and legitimate organization work do not disappear solely because membership expired.
+- Platform staff appointment ends: platform role/grants are revoked and sessions refreshed/revoked as required; personal and organization relationships remain unless independently changed.
+- Account suspended/disabled: global authentication is blocked according to account-security policy; this is distinct from suspending one organization membership or one professional capability.
+- A user has conflicting assignments (for example, is both subject and reviewer): explicit conflict-of-interest rules deny the prohibited action even if the role otherwise permits it.
+
+### 11.7 Stable error and navigation contract
+
+Use consistent machine-readable errors so the frontend can distinguish:
+- unauthenticated/expired session (`401`);
+- authenticated but missing action capability (`403`);
+- missing or inaccessible tenant/resource (use the platform's consistent non-disclosing `404` policy where appropriate);
+- inactive organization membership (`403` with a specific organization-membership reason);
+- missing/expired member entitlement (`403` with a membership-required reason);
+- invalid or unavailable workspace context (a stable context error, not a redirect loop).
+
+Do not automatically bounce a user between `/members`, `/profile`, `/organizations`, and `/admin` based only on a failed request. Show a single clear explanation and a route to a context the user is actually allowed to enter. Avoid automatic retry/refresh loops for authorization failures.
+
+### 11.8 Acceptance criteria before implementation is considered complete
+
+- A member with no organization membership cannot enter any organization workspace by guessing an organization ID.
+- An organization administrator in Organization A cannot read, export, update, invite users to, or administer Organization B.
+- Organization roles never grant platform-admin endpoints.
+- Platform reviewers/admins do not automatically gain organization owner/admin rights.
+- A professional profile does not grant access to employer-only recruitment or organization records.
+- Membership expiry removes member-only entitlements without deleting the person's login, professional profile, or unrelated organization access.
+- Removing one organization membership does not remove another organization's membership.
+- A person with several legitimate contexts can switch between them without logging out or merging permissions.
+- Switching context cannot retain permissions from the previous context.
+- Direct API calls, not just frontend navigation, are tested for every boundary.
+- Old tabs/sessions cannot continue using revoked role or relationship assignments.
+- No unauthorized route creates a redirect/retry loop.
+- Existing case assignment, participant, consent, finance/membership separation, and ethics conflict controls continue to pass.
+
+### 11.9 Implementation sequence for this requirement
+
+1. **Inventory:** map every workspace route, API endpoint, owning entity, context, action capability, and scope. Identify pages that currently infer account type from global roles.
+2. **Policy contract:** approve the context matrix and define canonical context/capability/error response shapes.
+3. **Backend enforcement:** centralize context resolution and authorization evaluation; preserve service-level checks and fail closed for missing context/resource ownership.
+4. **API/UI integration:** expose available contexts and capabilities from the server; make workspace navigation a reflection of that response; remove competing client-side role inference.
+5. **Lifecycle reconciliation:** migrate only after dry-run comparison of current role assignments, organization memberships, professional identity records, and membership entitlements.
+6. **Regression:** run a full route × method × context × scope matrix, including deep links, cross-organization IDs, expired membership, revoked assignments, multi-context users, and browser back/old-tab behavior.
+
+**Architecture status:** This account-boundary requirement is approved as a foundational design requirement. The current code contains partial foundations, but the audit does not claim that all listed behaviors are implemented. Implementation must be a separate, test-led change set with no broadening of access as a workaround.

@@ -153,7 +153,7 @@ test("every registered permission documents action class and global grant bounda
 
 
 test("Phase 4 action capabilities keep exports and membership-card printing separate from read access", () => {
-  for (const code of ["members.export", "members.export.contacts", "accounts.export", "accounts.export.contacts", "membership.cards.print"]) {
+  for (const code of ["members.export", "members.export.contacts", "accounts.export", "accounts.export.contacts", "accounts.export.organizations", "membership.cards.print"]) {
     assert.equal(isKnownPermission(code), true, code);
     assert.equal(PERMISSION_CATALOG[code].source, "policy-defined", code);
   }
@@ -161,6 +161,7 @@ test("Phase 4 action capabilities keep exports and membership-card printing sepa
   assert.equal(hasAnyRoleOrPermission(readOnly, [], ["members.export"]), false);
   assert.equal(hasAnyRoleOrPermission(readOnly, [], ["accounts.export"]), false);
   assert.equal(hasAnyRoleOrPermission(readOnly, [], ["membership.cards.print"]), false);
+  assert.equal(hasAnyRoleOrPermission({ roles: ["admin"], permissions: [] }, [], ["accounts.export.organizations"]), false);
   assert.equal(hasAnyRoleOrPermission({ roles: ["membership_reviewer"], permissions: [] }, [], ["membership.cards.print"]), false);
   assert.equal(hasAnyRoleOrPermission({ roles: ["finance_officer"], permissions: [] }, [], ["members.export"]), false);
   const root = { roles: ["system_admin"], permissions: [] };
@@ -193,6 +194,7 @@ test("Phase 4 route and service source keep card printing, exports and membershi
   assert.match(directory, /hasAnyRoleOrPermission\(identity, \[\], \["accounts\.export"\]\)/);
   assert.match(directory, /members\.export\.contacts/);
   assert.match(directory, /accounts\.export\.contacts/);
+  assert.match(directory, /accounts\.export\.organizations/);
   const financeReceipts = readFileSync(new URL("../../src/platform/finance-receipts.js", import.meta.url), "utf8");
   assert.equal(PERMISSION_CATALOG["finance.payment.record"].source, "legacy-runtime");
   assert.equal(PERMISSION_CATALOG["finance.voucher.issue"].source, "legacy-runtime");

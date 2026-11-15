@@ -81,7 +81,7 @@ export default function Register(){
   }
  },[]);
  useEffect(()=>{void loadChallenge();},[loadChallenge]);
- useEffect(()=>{const code=new URLSearchParams(window.location.search).get("ref");if(code)setReferralCode(code.trim().toUpperCase());},[]);
+ useEffect(()=>{const params=new URLSearchParams(window.location.search);const code=params.get("ref");if(code)setReferralCode(code.trim().toUpperCase());if(params.get("accountType")==="organization")setKind("organization");},[]);
 
  const organizationDraftForm=useCallback((source:RegistrationForm=form):OrganizationDraftForm=>({email:source.email.trim().toLowerCase(),firstName:source.firstName.trim(),middleName:source.middleName.trim(),lastName:source.lastName.trim(),orgLegalName:source.orgLegalName.trim(),orgDisplayName:source.orgDisplayName.trim(),orgType:source.orgType.trim(),orgDescription:source.orgDescription.trim(),orgWebsite:source.orgWebsite.trim(),orgEmail:source.orgEmail.trim(),orgPhone:source.orgPhone.trim(),orgAddress:source.orgAddress.trim()}),[form]);
 

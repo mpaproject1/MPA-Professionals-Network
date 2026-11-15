@@ -101,6 +101,25 @@ test("single member membership ID PDF is one exact-size card with no portal chro
   expect(extracted).not.toContain("My-Workspace");
   expect(extracted).not.toContain("@");
   expect(extracted).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
+  // The dedicated A4 mode must keep the ID at physical card dimensions and
+  // place the complete card on exactly one A4 sheet.
+  await page.goto("/membership/card?paper=a4");
+  await expect(page.getByRole("heading",{name:"Membership ID"})).toBeVisible();
+  await page.emulateMedia({media:"print"});
+  const a4Pdf=await page.pdf({format:"A4",printBackground:true,preferCSSPageSize:true});
+  const a4Path=join(directory,"membership-id-a4.pdf");
+  await writeFile(a4Path,a4Pdf);
+  const a4Extracted=execFileSync("python3",["-c",[
+   "from pypdf import PdfReader","import sys","r=PdfReader(sys.argv[1])",
+   "print('PAGES='+str(len(r.pages)))",
+   "p=r.pages[0] if r.pages else None",
+   "print('A4='+str(bool(p and abs(float(p.mediabox.width)-595.28)<1 and abs(float(p.mediabox.height)-841.89)<1)))",
+   "print('TEXT='+chr(10).join((p.extract_text() or '') for p in r.pages))"
+  ].join("\\n"),a4Path],{encoding:"utf8"});
+  expect(a4Extracted).toContain("PAGES=1");
+  expect(a4Extracted).toContain("A4=True");
+  expect(a4Extracted).toContain("Amina Yusuf");
+  expect(a4Extracted).toContain("MPA-2026-77DD88EE");
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 

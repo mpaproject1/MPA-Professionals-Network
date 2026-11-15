@@ -102,6 +102,8 @@ test("reviewer and finance role bundles preserve membership/finance separation",
   assert.ok(membership.includes("members.view"));
   assert.ok(!membership.includes("finance.payment.verify"));
   assert.ok(!membership.includes("finance.payment.reverse"));
+  assert.equal(hasAnyRoleOrPermission({ roles: ["membership_reviewer"], permissions: [] }, [], ["membership.review"]), true);
+  assert.equal(hasAnyRoleOrPermission({ roles: ["membership_reviewer"], permissions: [] }, [], ["finance.payment.verify"]), false);
 
   const finance = effectiveCapabilities({ roles: ["finance_officer"], permissions: [] });
   assert.ok(finance.includes("finance.view"));
@@ -109,6 +111,8 @@ test("reviewer and finance role bundles preserve membership/finance separation",
   assert.ok(finance.includes("finance.payment.reverse"));
   assert.ok(!finance.includes("membership.review"));
   assert.ok(!finance.includes("membership.activate"));
+  assert.equal(hasAnyRoleOrPermission({ roles: ["finance_officer"], permissions: [] }, [], ["finance.payment.verify"]), true);
+  assert.equal(hasAnyRoleOrPermission({ roles: ["finance_officer"], permissions: [] }, [], ["membership.review"]), false);
 });
 
 test("database-backed service permission checks reference only canonical permission codes", () => {

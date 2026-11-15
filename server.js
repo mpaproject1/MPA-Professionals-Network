@@ -113,7 +113,7 @@ async function auth(req){
     // Authorization must use current database roles, never stale role claims from a signed token.
     identity.roles=withCurrentRoles(identity,Array.isArray(r.rows[0].roles)?r.rows[0].roles:JSON.parse(r.rows[0].roles||"[]")).roles;
     identity.permissions=(await db.query("select permission_code from app_user_permission where user_id=$1",[identity.sub])).rows.map(row=>row.permission_code);
-    const path=new URL(req.url,"http://localhost").pathname.replace(/^\\/+/, "");
+    const path=new URL(req.url,"http://localhost").pathname.replace(/^\/+/, "");
     const passkeySetupRoute=req.method==="POST"&&["api/v1/admin/passkeys/registration/options","api/v1/admin/passkeys/registration/verify"].includes(path);
     const logoutRoute=req.method==="POST"&&path==="api/v1/auth/logout";
     const isAdministrator=identity.roles.some(role=>["system_admin","admin"].includes(role));

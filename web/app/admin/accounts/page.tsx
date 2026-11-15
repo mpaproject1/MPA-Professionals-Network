@@ -33,11 +33,27 @@ export default function AdminAccountsPage() {
   const [error, setError] = useState("");
   const [loadFailed, setLoadFailed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [effectiveAccess, setEffectiveAccess] = useState<{ roles: string[]; permissions: string[]; capabilities: string[] } | null>(null);
   const identity = token ? claimsFromToken(token) : { roles: [], userId: "" };
-  const roleKey = identity.roles.join("|");
-  const isPlatformAdmin = identity.roles.some((role) => ["system_admin", "admin", "platform_admin"].includes(role));
+  const currentRoles = effectiveAccess?.roles ?? [];
+  const roleKey = currentRoles.join("|");
+  const isPlatformAdmin = Boolean(effectiveAccess?.capabilities.includes("users.manage"));
 
   useEffect(() => { hydrateToken(); }, [hydrateToken]);
+
+  useEffect(() => {
+    if (!hydrated || !token) { setEffectiveAccess(null); return; }
+    let active = true;
+    api<{ roles: string[]; permissions: string[]; capabilities: string[] }>("/api/v1/me/capabilities", {}, token)
+      .then((result) => { if (active) setEffectiveAccess(result); })
+      .catch((cause) => {
+        if (!active) return;
+        setEffectiveAccess({ roles: [], permissions: [], capabilities: [] });
+        setLoadFailed(true);
+        setError(cause instanceof Error ? cause.message : "Current account capabilities could not be resolved.");
+      });
+    return () => { active = false; };
+  }, [hydrated, token]);
 
   const load = useCallback(async () => {
     if (!token || !isPlatformAdmin) return;
@@ -73,6 +89,7 @@ export default function AdminAccountsPage() {
 
   if (!hydrated) return <div className="grid"><Card><OperationStatus state="loading" title="Preparing account and team" detail="Restoring your session before loading account records." /></Card></div>;
   if (!token) return <div className="grid"><AdminPageHeader eyebrow="Administration · People & access" title="Account and Team" description="Manage platform accounts and access with auditable, permission-checked actions."/><Card><p className="muted">Sign in with an authorized administrator account to continue.</p><a className="btn btn-primary" href="/login?next=/admin/accounts">Sign in</a></Card></div>;
+  if (token && !effectiveAccess) return <div className="grid"><Card><OperationStatus state="loading" title="Resolving current access" detail="Checking current server-side roles and permissions before showing account controls." /></Card></div>;
   if (!isPlatformAdmin) return <div className="grid"><AdminPageHeader eyebrow="Administration · People & access" title="Account and Team" description="Manage platform accounts and access with auditable, permission-checked actions."/><Card><OperationStatus state="error" title="Platform administrator access required" detail="This route is not a grant of access. Ask an authorized administrator if you need account-management access."/><a className="btn btn-ghost" href="/admin">Return to admin overview</a></Card></div>;
 
   return <div className="grid" style={{ gap: 18, minWidth: 0 }}>
@@ -83,7 +100,7 @@ export default function AdminAccountsPage() {
       <Card><div className="row" style={{ gap: 10, alignItems: "flex-start" }}><ShieldCheck size={20}/><div><strong>Governed access</strong><p className="muted">Sensitive actions require a reason. Server authorization remains authoritative; this interface does not replace scoped organization or membership workflows.</p></div></div></Card>
     </div>
     {error && <FormFeedback kind="error" message={error}/>}
-    {loading && users.length === 0 ? <Card><OperationStatus state="loading" title="Loading account catalogue" detail="Fetching the current account page and role definitions from the administration API." /></Card> : <Card><UsersTable users={users} roleCatalog={roleCatalog} permissionCatalog={permissionCatalog} auditEvents={auditEvents} currentRoles={identity.roles} currentUserId={identity.userId} token={token} onChanged={load} onError={setError} usersLoadFailed={loadFailed}/></Card>}
+    {loading && users.length === 0 ? <Card><OperationStatus state="loading" title="Loading account catalogue" detail="Fetching the current account page and role definitions from the administration API." /></Card> : <Card><UsersTable users={users} roleCatalog={roleCatalog} permissionCatalog={permissionCatalog} auditEvents={auditEvents} currentRoles={currentRoles} currentUserId={identity.userId} token={token} onChanged={load} onError={setError} usersLoadFailed={loadFailed}/></Card>}
     <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}><span className="muted">Showing up to 200 accounts returned by the API. This screen does not imply that the result is a complete directory.</span><button className="btn btn-ghost" type="button" onClick={() => void load()} disabled={loading}>{loading ? "Refreshing…" : "Refresh accounts"}</button></div>
   </div>;
 }

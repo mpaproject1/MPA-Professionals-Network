@@ -11,6 +11,7 @@ import {
   hasAnyRoleOrPermission,
   roleMetadata,
 } from "../../src/platform/authorization-policy.js";
+import { assertMembershipReviewQueueAccess, assertPaymentReversalAccess, assertPaymentVerificationAccess } from "../../src/platform/workspace-authorization.js";
 
 test("all authorization entry points use the same appeal-reviewer capability", () => {
   const identity = { roles: ["appeal_reviewer"], permissions: [] };

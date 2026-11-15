@@ -1,10 +1,10 @@
-import {execFileSync} from "node:child_process";
-import {mkdtemp,readFile,rm} from "node:fs/promises";
-import {tmpdir} from "node:os";
-import {join} from "node:path";
-import {randomUUID} from "node:crypto";
-import {getPool,closePool} from "../src/platform/db.js";
-import {previewMemberGeographyImport,applyMemberGeographyImport,publishMemberGeographyVersion} from "../src/membership/geography.js";
+import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { applyMemberGeographyImport, previewMemberGeographyImport, publishMemberGeographyVersion } from "../src/membership/geography.js";
+import { closePool, getPool } from "../src/platform/db.js";
 
 const SOURCE_NAME="UNSD M49 + Open Admin Data Ethiopia (CC BY 4.0)";
 const SOURCE_URL="https://unstats.un.org/unsd/methodology/m49/overview/";

@@ -109,3 +109,24 @@ test("reviewer and finance role bundles preserve membership/finance separation",
   assert.ok(!finance.includes("membership.review"));
   assert.ok(!finance.includes("membership.activate"));
 });
+
+test("database-backed service permission checks reference only canonical permission codes", () => {
+  const serviceFiles = [
+    "../../src/verification/service.js",
+    "../../src/organization-jobs/service.js",
+    "../../src/platform/support-bot.js",
+    "../../src/membership/service.js",
+  ];
+  const referenced = new Set();
+  for (const file of serviceFiles) {
+    const source = readFileSync(new URL(file, import.meta.url), "utf8");
+    for (const match of source.matchAll(/permission_code\s*=\s*'([a-z][a-z0-9_.-]+)'/g)) {
+      referenced.add(match[1]);
+    }
+    for (const match of source.matchAll(/permission_code\s*=\s*any\s*\(\s*array\s*\[([^\]]+)\]/g)) {
+      for (const code of match[1].matchAll(/'([a-z][a-z0-9_.-]+)'/g)) referenced.add(code[1]);
+    }
+  }
+  assert.ok(referenced.size > 0, "service-level permission SQL inventory must not be empty");
+  for (const code of referenced) assert.equal(isKnownPermission(code), true, code);
+});

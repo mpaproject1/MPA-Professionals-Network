@@ -18,7 +18,7 @@
 @media print{
  :global(html):has(.printPage),:global(body):has(.printPage){page:membership-bulk-a4!important;width:210mm!important;height:auto!important;min-width:0!important;min-height:0!important;margin:0!important;padding:0!important;overflow:visible!important}
  :global(.app-shell){display:block!important;width:210mm!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;overflow:visible!important}
- :global(.app-shell)>:not(:global(.shell-main)){display:none!important}
+ :global(.app-shell > :not(.shell-main)){display:none!important}
  :global(.shell-main){display:block!important;width:210mm!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;overflow:visible!important}
  :global(.workspace){display:block!important;width:210mm!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;overflow:visible!important}
  :global(.sidebar),:global(.breadcrumbs){display:none!important}

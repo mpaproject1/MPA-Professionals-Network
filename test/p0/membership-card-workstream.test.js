@@ -71,7 +71,10 @@ test("bulk print previews count, provides actionable skipped states and prints o
   assert.match(bulkCss,/\.printPage\{[^}]*width:210mm;[^}]*height:297mm;[^}]*max-height:297mm;[^}]*overflow:hidden;[^}]*break-inside:avoid;[^}]*page-break-inside:avoid;[^}]*break-after:page;[^}]*page-break-after:always/);
   assert.match(bulkCss,/\.printPage:last-child\{break-after:auto;page-break-after:auto\}/);
   assert.doesNotMatch(bulkCss,/\.printPage\+\.printPage\{/);
-  assert.match(bulkCss,/\.card\{width:85\.6mm;height:53\.98mm;/);\n  assert.match(bulkCss,/@page membership-bulk-a4\\{size:210mm 297mm;margin:0\\}/);\n  assert.match(bulkCss,/:global\\(html\\):has\\(\\.printPage\\).*page:membership-bulk-a4/s);\n  assert.match(bulkCss,/:global\\(app-shell\\)>:not\\(:global\\(\\.shell-main\\)\\)/);
+  assert.match(bulkCss,/\.card\{width:85\.6mm;height:53\.98mm;/);
+  assert.match(bulkCss,/@page membership-bulk-a4\{size:210mm 297mm;margin:0\}/);
+  assert.match(bulkCss,/:global\(html\):has\(\.printPage\).*page:membership-bulk-a4/s);
+  assert.match(bulkCss,/:global\(\.app-shell\)>:not\(:global\(\.shell-main\)\)/);
 });
 
 test("QR verification accepts canonical membership number and preserves existing record-based QR links",()=>{

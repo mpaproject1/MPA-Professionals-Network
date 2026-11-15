@@ -52,6 +52,7 @@ test("effective capabilities combine current role bundles and direct grants with
   assert.equal(hasAnyRoleOrPermission(identity, ["organization_admin"], []), true);
   assert.equal(capabilities.includes("organizations.manage"), false);
   assert.equal(capabilities.includes("custom.read"), false, "unclassified direct grants must not become effective capabilities");
+  assert.equal(hasAnyRoleOrPermission({ roles: [], permissions: ["custom.read"] }, [], ["custom.read"]), false, "unclassified direct grants must not satisfy evaluator checks");
 });
 
 test("canonical permission catalogue exactly covers permission codes seeded by the authorization migrations", () => {

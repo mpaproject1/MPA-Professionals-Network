@@ -151,6 +151,30 @@ async function apiRecoveryReplay(email,code){
  finally{await api.dispose();}
 }
 
+test("public optional-viewer routes accept anonymous visitors but reject invalid, expired and revoked bearer sessions",async()=>{
+ const api=await playwrightRequest.newContext({baseURL:API_BASE});
+ try{
+  const anonymous=await api.get("/api/v1/jobs");
+  expect(anonymous.status()).toBe(200,"public job discovery remains available without a bearer token");
+
+  const malformed=await api.get("/api/v1/jobs",{headers:{authorization:"Bearer malformed.token.value"}});
+  expect(malformed.status()).toBe(401);
+  expect((await malformed.json()).error?.code).toBe("UNAUTHENTICATED");
+
+  const expiredActor=await createActor("member");
+  await getPool().query("update auth_session set expires_at=now()-interval '1 second' where user_id=$1 and revoked_at is null",[expiredActor.userId]);
+  const expired=await api.get("/api/v1/jobs",{headers:{authorization:`Bearer ${expiredActor.token}`}});
+  expect(expired.status()).toBe(401);
+  expect((await expired.json()).error?.code).toBe("UNAUTHENTICATED");
+
+  const revokedActor=await createActor("member");
+  await getPool().query("update auth_session set revoked_at=now() where user_id=$1 and revoked_at is null",[revokedActor.userId]);
+  const revoked=await api.get("/api/v1/jobs",{headers:{authorization:`Bearer ${revokedActor.token}`}});
+  expect(revoked.status()).toBe(401);
+  expect((await revoked.json()).error?.code).toBe("UNAUTHENTICATED");
+ }finally{await api.dispose();}
+});
+
 test.afterAll(async()=>{
  const db=getPool();
  for(const userId of createdUsers){await db.query("delete from audit_log where actor_user_id=$1",[userId]);await db.query("delete from app_user_role where user_id=$1",[userId]);await db.query("update app_user set status='suspended',admin_passkey_enforced_at=null where id=$1",[userId]);}

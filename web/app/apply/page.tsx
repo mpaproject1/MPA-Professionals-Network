@@ -93,7 +93,7 @@ export default function Apply() {
           </button>
           <button type="button"
             className={kind === "organization" ? "choice active" : "choice"}
-            onClick={() => { window.location.assign("/organizations?register=1"); }}
+            onClick={() => { window.location.assign(token ? "/organizations?register=1" : "/register?accountType=organization"); }}
           >
             <Building2 />
             <b>Register an organization</b>

@@ -44,21 +44,17 @@ The `auth(req)` middleware in `server.js` validates the signed token, requires a
 
 This is a positive control: the server explicitly replaces token role claims with current database roles, so stale role claims are not intended to remain authoritative. The middleware also enforces recovery-session restrictions, administrator passkey requirements, and one-time credential setup restrictions.
 
-### 3.2 Multiple authorization helper implementations
+### 3.2 Authorization helper centralization
 
-There are at least three related implementations:
+The source-level Phase 2 implementation now routes the dispatcher helpers in `server.js`, `requireRole` in `src/platform/auth.js`, and workspace gates in `src/platform/workspace-authorization.js` through `src/platform/authorization-policy.js`. Phase 3 also moved the JavaScript permission gates in report authorization, membership payment-method administration, and platform organization-membership administration to the same evaluator.
 
-- `src/platform/auth.js` exports `requireRole` and defines its own `ROLE_PERMISSION` map.
-- `server.js` defines `anyRole`, `anyRoleOrPermission`, and a second `ROLE_PERMISSION` map.
-- `src/platform/workspace-authorization.js` defines `assertAccess` and domain-specific wrappers.
+Some service-level checks intentionally remain SQL-backed. They evaluate current role assignments, direct permission rows, reviewer assignment and resource ownership in the same database query as the protected operation. Those checks are not equivalent to a global capability check and must not be replaced with a broad role/permission shortcut. Their permission-code literals are now included in the targeted source inventory regression test.
 
-All of these use variations of role OR permission semantics. A permission can therefore substitute for a role in some checks, and the exact substitution depends on which helper a route uses.
+### 3.3 Direct permissions and effective capabilities
 
-### 3.3 Direct permissions are separate from role bundles
+The database remains authoritative for which direct permission rows are assigned to an account. The source-level canonical catalogue in `src/platform/authorization-policy.js` now describes known permission codes, their area, sensitivity, system-only status, source classification and assignability. Narrow role bundles are evaluated alongside direct grants to produce effective capabilities for the authenticated account.
 
-Migration `024_per_user_permission_matrix.sql` creates `app_permission` and `app_user_permission`. It does not establish a central role-to-permission mapping table. Instead, the permission catalog is supplemented by hard-coded role aliases in application code and direct user grants in the database.
-
-This means the effective access policy is not represented in one authoritative catalogue.
+The catalogue is parity-tested against the three reviewed permission-seed migrations. Additional permission codes observed in existing service SQL but not found in those migrations are explicitly marked `legacy-runtime`; they are not represented as migration-verified. Unknown permission codes fail closed in direct-grant validation and are omitted from the effective-capabilities projection. This source catalogue does not replace the live `app_permission` table or prove production assignment inventory.
 
 ## 4. Findings
 

@@ -139,7 +139,7 @@ test("database-backed service permission checks reference only canonical permiss
 test("every registered permission documents action class and global grant boundary", () => {
   for (const permission of Object.values(PERMISSION_CATALOG)) {
     assert.ok(permission.description && permission.description.length >= 10, permission.code);
-    assert.ok(["read", "write", "review", "review_write", "sensitive_read", "sensitive_write", "privileged_write"].includes(permission.actionClass), permission.code);
+    assert.ok(["read", "write", "review", "review_write", "sensitive_read", "sensitive_write", "sensitive_export", "export", "privileged_write"].includes(permission.actionClass), permission.code);
     assert.equal(typeof permission.globalDirectGrant, "boolean", permission.code);
     assert.equal(permission.assignable, permission.globalDirectGrant && !permission.systemOnly, permission.code);
   }
@@ -148,4 +148,52 @@ test("every registered permission documents action class and global grant bounda
   assert.equal(PERMISSION_CATALOG["files.view_private"].globalDirectGrant, false);
   assert.equal(PERMISSION_CATALOG["finance.view"].actionClass, "read");
   assert.equal(PERMISSION_CATALOG["permissions.manage"].systemOnly, true);
+});
+
+
+test("Phase 4 action capabilities keep exports and membership-card printing separate from read access", () => {
+  for (const code of ["members.export", "members.export.contacts", "accounts.export", "accounts.export.contacts", "membership.cards.print"]) {
+    assert.equal(isKnownPermission(code), true, code);
+    assert.equal(PERMISSION_CATALOG[code].source, "policy-defined", code);
+  }
+  const readOnly = { roles: [], permissions: ["members.view", "users.view"] };
+  assert.equal(hasAnyRoleOrPermission(readOnly, [], ["members.export"]), false);
+  assert.equal(hasAnyRoleOrPermission(readOnly, [], ["accounts.export"]), false);
+  assert.equal(hasAnyRoleOrPermission(readOnly, [], ["membership.cards.print"]), false);
+  assert.equal(hasAnyRoleOrPermission({ roles: ["membership_reviewer"], permissions: [] }, [], ["membership.cards.print"]), false);
+  assert.equal(hasAnyRoleOrPermission({ roles: ["finance_officer"], permissions: [] }, [], ["members.export"]), false);
+  const root = { roles: ["system_admin"], permissions: [] };
+  for (const code of ["members.export", "members.export.contacts", "accounts.export", "accounts.export.contacts", "membership.cards.print"]) {
+    assert.equal(hasAnyRoleOrPermission(root, [], [code]), true, code);
+  }
+});
+
+test("Phase 4 review queues and finance decisions reject read or generic management permissions", () => {
+  assert.throws(() => assertMembershipReviewQueueAccess({ roles: [], permissions: ["members.view"] }), { statusCode: 403 });
+  assert.doesNotThrow(() => assertMembershipReviewQueueAccess({ roles: ["membership_reviewer"], permissions: [] }));
+  assert.throws(() => assertPaymentVerificationAccess({ roles: [], permissions: ["finance.manage"] }), { statusCode: 403 });
+  assert.throws(() => assertPaymentReversalAccess({ roles: [], permissions: ["finance.manage"] }), { statusCode: 403 });
+  assert.doesNotThrow(() => assertPaymentVerificationAccess({ roles: [], permissions: ["finance.payment.verify"] }));
+  assert.throws(() => assertPaymentReversalAccess({ roles: [], permissions: ["finance.payment.verify"] }), { statusCode: 403 });
+  assert.doesNotThrow(() => assertPaymentReversalAccess({ roles: [], permissions: ["finance.payment.reverse"] }));
+  assert.throws(() => assertPaymentVerificationAccess({ roles: [], permissions: ["finance.payment.reverse"] }), { statusCode: 403 });
+});
+
+test("Phase 4 route and service source keep card printing, exports and membership evidence behind action gates", () => {
+  const server = readFileSync(new URL("../../server.js", import.meta.url), "utf8");
+  const batchRoute = server.match(/if\(req\.method==="POST" && p==="api\/v1\/admin\/membership-cards\/batch"\)([^\n]+)/)?.[1] || "";
+  const printRoute = server.match(/if\(req\.method==="POST" && p==="api\/v1\/admin\/membership-cards\/print"\)([^\n]+)/)?.[1] || "";
+  assert.match(batchRoute, /membership\.cards\.print/);
+  assert.match(printRoute, /membership\.cards\.print/);
+  assert.doesNotMatch(batchRoute, /members\.view/);
+  assert.doesNotMatch(printRoute, /members\.view/);
+  const directory = readFileSync(new URL("../../src/platform/directory-exports.js", import.meta.url), "utf8");
+  assert.match(directory, /hasAnyRoleOrPermission\(identity, \[\], \["members\.export"\]\)/);
+  assert.match(directory, /hasAnyRoleOrPermission\(identity, \[\], \["accounts\.export"\]\)/);
+  assert.match(directory, /members\.export\.contacts/);
+  assert.match(directory, /accounts\.export\.contacts/);
+  const privateFiles = readFileSync(new URL("../../src/platform/private-file-storage.js", import.meta.url), "utf8");
+  const membershipGate = privateFiles.match(/const canReviewMembership=([^;]+);/)?.[1] || "";
+  assert.doesNotMatch(membershipGate, /finance_officer|finance\.view|finance\.manage/);
+  assert.match(privateFiles, /purpose:f\.purpose/);
 });

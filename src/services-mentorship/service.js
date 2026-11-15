@@ -482,8 +482,8 @@ export async function listServiceListingAnnouncements(listingId,viewerId=null){
  from service_listing_announcement a join service_listing s on s.id=a.listing_id
  where a.listing_id=$1 and (
   (a.status='published' and s.status='published' and s.lifecycle_status='active' and (s.expires_at is null or s.expires_at>now()) and (
-   (a.audience='public' and (s.visibility='public' or ($2::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$2 and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date)))))
-   or (a.audience='members' and $2::uuid is not null and exists(select 1 from membership_record m where m.user_id=$2 and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)))
+   (a.audience='public' and (s.visibility='public' or ($2::uuid is not null and s.visibility='members' and exists(select 1 from membership_record vm where vm.user_id=$2 and ${membershipIsCurrentlyActiveSql("vm")}))))
+   or (a.audience='members' and $2::uuid is not null and exists(select 1 from membership_record m where m.user_id=$2 and ${membershipIsCurrentlyActiveSql("m")}))
   ))
   or ($2::uuid is not null and (a.author_user_id=$2 or s.provider_user_id=$2 or exists(select 1 from organization_membership om where om.organization_id=s.organization_id and om.user_id=$2 and om.status='active' and om.role_code=any(array['owner','administrator','recruiter','project_manager']::text[]))))
  ) order by a.created_at desc`,[listingId,viewerId||null])).rows;
@@ -1033,7 +1033,7 @@ export async function listMentors(viewerId,filters={}){
   // The public endpoint must not disclose member-only mentor profiles. $1 is
   // always bound so the query is valid with or without optional filters.
   const args=[viewerId||null];
-  const where=["mp.status='active'","mp.moderation_status='approved'","m.status='active'","m.start_date<=current_date","(m.end_date is null or m.end_date>=current_date)","(mp.visibility='public' or (mp.visibility='members' and $1::uuid is not null and exists(select 1 from membership_record vm where vm.user_id=$1::uuid and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date))))"];
+  const where=["mp.status='active'","mp.moderation_status='approved'",membershipIsCurrentlyActiveSql("m"),"(mp.visibility='public' or (mp.visibility='members' and $1::uuid is not null and exists(select 1 from membership_record vm where vm.user_id=$1::uuid and vm.status='active' and vm.start_date<=current_date and (vm.end_date is null or vm.end_date>=current_date))))"];
   if(filters.q){ args.push(`%${String(filters.q).trim()}%`); where.push(`(mp.headline ilike $${args.length} or mp.bio ilike $${args.length})`); }
   if(filters.topic){ args.push(`%${String(filters.topic).trim().toLowerCase()}%`); where.push(`mp.expertise::text ilike $${args.length}`); }
   const limit=Math.min(Math.max(Number(filters.limit)||20,1),50),offset=Math.max(Number(filters.offset)||0,0);
@@ -1075,7 +1075,7 @@ export async function createMentorshipRequest(menteeId,input,requestId,idempoten
  });
 }
 async function mentorCandidates(db,request){
-  const mentors=(await db.query("select mp.*,p.display_name from mentor_profile mp join person p on p.user_id=mp.user_id where mp.status='active' and mp.moderation_status='approved' and mp.visibility in ('members','public') and exists (select 1 from membership_record m where m.user_id=mp.user_id and m.status='active' and m.start_date<=current_date and (m.end_date is null or m.end_date>=current_date)) and exists (select 1 from verification_claim vc join verification_case c on c.id=vc.case_id where c.subject_user_id=mp.user_id and vc.status='verified' and lower(vc.claim_code_snapshot)=any($1::text[])) and mp.user_id<>$2",[PROFESSIONAL_CLAIMS,request.mentee_user_id])).rows;
+  const mentors=(await db.query(`select mp.*,p.display_name from mentor_profile mp join person p on p.user_id=mp.user_id where mp.status='active' and mp.moderation_status='approved' and mp.visibility in ('members','public') and exists (select 1 from membership_record m where m.user_id=mp.user_id and ${membershipIsCurrentlyActiveSql("m")}) and exists (select 1 from verification_claim vc join verification_case c on c.id=vc.case_id where c.subject_user_id=mp.user_id and vc.status='verified' and lower(vc.claim_code_snapshot)=any($1::text[])) and mp.user_id<>$2`,[PROFESSIONAL_CLAIMS,request.mentee_user_id])).rows;
   const results=[];
   for(const m of mentors){
     const active=(await db.query("select count(*)::int count from mentorship where mentor_user_id=$1 and status in ('active','paused')",[m.user_id])).rows[0].count;

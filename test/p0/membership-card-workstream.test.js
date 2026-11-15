@@ -63,6 +63,7 @@ test("single member ID print uses the exact physical page and excludes shared po
   assert.match(singleCss,/page:membership-id/);
   assert.match(singleCss,/@page membership-id\{size:85\.6mm 53\.98mm;margin:0\}/);
   assert.match(singleCss,/:global\(html\):has\(\.shell\).*page:membership-id/s);
+  assert.match(singleCss,/:global\(html\):has\(\.a4\).*page:membership-a4/s);
   assert.match(singleCss,/:global\(\.app-shell > :not\(\.shell-main\)\)/);
 });
 

@@ -182,10 +182,8 @@ test("Phase 4 review queues and finance decisions reject read or generic managem
 
 test("Phase 4 route and service source keep card printing, exports and membership evidence behind action gates", () => {
   const server = readFileSync(new URL("../../server.js", import.meta.url), "utf8");
-  const batchRoute = server.match(/if\(req\.method==="POST" && p==="api\/v1\/admin\/membership-cards\/batch"\)([^
-]+)/)?.[1] || "";
-  const printRoute = server.match(/if\(req\.method==="POST" && p==="api\/v1\/admin\/membership-cards\/print"\)([^
-]+)/)?.[1] || "";
+  const batchRoute = server.match(/if\(req\.method==="POST" && p==="api\/v1\/admin\/membership-cards\/batch"\)([^\r\n]+)/)?.[1] || "";
+  const printRoute = server.match(/if\(req\.method==="POST" && p==="api\/v1\/admin\/membership-cards\/print"\)([^\r\n]+)/)?.[1] || "";
   assert.match(batchRoute, /membership\.cards\.print/);
   assert.match(printRoute, /membership\.cards\.print/);
   assert.doesNotMatch(batchRoute, /members\.view/);
@@ -204,5 +202,8 @@ test("Phase 4 route and service source keep card printing, exports and membershi
   const privateFiles = readFileSync(new URL("../../src/platform/private-file-storage.js", import.meta.url), "utf8");
   const membershipGate = privateFiles.match(/const canReviewMembership=([^;]+);/)?.[1] || "";
   assert.doesNotMatch(membershipGate, /finance_officer|finance\.view|finance\.manage/);
+  const financeFileGate = privateFiles.match(/const canReadFinanceEvidence=([^;]+);/)?.[1] || "";
+  assert.match(financeFileGate, /roles\.includes\("finance_officer"\)/);
+  assert.doesNotMatch(financeFileGate, /system_admin|admin|finance\.manage/);
   assert.match(privateFiles, /purpose:f\.purpose/);
 });

@@ -93,3 +93,19 @@ test("shared capability evaluator recognizes direct permissions but never invent
   assert.equal(effectiveCapabilities(identity).includes("organizations.manage"), true);
   assert.equal(effectiveCapabilities(identity).includes("organization:123:manage"), false);
 });
+
+test("reviewer and finance role bundles preserve membership/finance separation", () => {
+  const membership = effectiveCapabilities({ roles: ["membership_reviewer"], permissions: [] });
+  assert.ok(membership.includes("membership.review"));
+  assert.ok(membership.includes("membership.activate"));
+  assert.ok(membership.includes("members.view"));
+  assert.ok(!membership.includes("finance.payment.verify"));
+  assert.ok(!membership.includes("finance.payment.reverse"));
+
+  const finance = effectiveCapabilities({ roles: ["finance_officer"], permissions: [] });
+  assert.ok(finance.includes("finance.view"));
+  assert.ok(finance.includes("finance.payment.verify"));
+  assert.ok(finance.includes("finance.payment.reverse"));
+  assert.ok(!finance.includes("membership.review"));
+  assert.ok(!finance.includes("membership.activate"));
+});

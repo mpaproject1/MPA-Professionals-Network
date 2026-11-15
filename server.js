@@ -85,13 +85,22 @@ async function body(req,limit=1024*1024){
   try { return JSON.parse(raw); } catch { throw Object.assign(new Error("Request body must be valid JSON."),{statusCode:400,code:"INVALID_JSON"}); }
 }
 function clientIp(req){ return String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim() || null; }
+function isAuthDependencyUnavailable(error){
+  const code=String(error?.code||"");
+  return code.startsWith("08")||["53300","57P01","57P02","57P03"].includes(code)||/^(ECONN|ETIMEDOUT|EHOST|ENETUNREACH|EPIPE)/.test(code);
+}
 async function auth(req){
   if(!config.jwtSecret) throw Object.assign(new Error("Authentication secret is not configured."),{statusCode:503,code:"AUTH_NOT_CONFIGURED"});
   const header=req.headers.authorization||"";
   if(!header.startsWith("Bearer ")) throw Object.assign(new Error("Bearer authentication required."),{statusCode:401,code:"UNAUTHENTICATED"});
+  let identity;
   try {
-    const identity=verifyToken(header.slice(7),config.jwtSecret);
-    if(!identity.sid) throw Object.assign(new Error("Session-bound authentication required."),{statusCode:401});
+    identity=verifyToken(header.slice(7),config.jwtSecret);
+  } catch {
+    throw Object.assign(new Error("Invalid or expired bearer token."),{statusCode:401,code:"UNAUTHENTICATED"});
+  }
+  if(!identity.sid) throw Object.assign(new Error("Session-bound authentication required."),{statusCode:401,code:"UNAUTHENTICATED"});
+  try {
     const db=getPool();
     const r=await db.query(`select s.user_id,u.status,u.email_verified_at,s.credential_setup_required,s.auth_method,u.admin_passkey_enforced_at,
       coalesce(json_agg(distinct role.role_code) filter(where role.role_code is not null),'[]'::json) as roles
@@ -99,12 +108,12 @@ async function auth(req){
       left join app_user_role ur on ur.user_id=u.id left join app_role role on role.id=ur.role_id
       where s.id=$1 and s.revoked_at is null and s.expires_at>now()
       group by s.id,u.id,u.status,s.credential_setup_required,s.auth_method,u.admin_passkey_enforced_at`,[identity.sid]);
-    if(!r.rows[0]||r.rows[0].status!=="active"||r.rows[0].user_id!==identity.sub) throw Object.assign(new Error("Session expired or revoked."),{statusCode:401});
+    if(!r.rows[0]||r.rows[0].status!=="active"||r.rows[0].user_id!==identity.sub) throw Object.assign(new Error("Session expired or revoked."),{statusCode:401,code:"UNAUTHENTICATED"});
     if(!r.rows[0].email_verified_at) throw Object.assign(new Error("Verify your email before continuing."),{statusCode:403,code:"EMAIL_VERIFICATION_REQUIRED"});
     // Authorization must use current database roles, never stale role claims from a signed token.
     identity.roles=withCurrentRoles(identity,Array.isArray(r.rows[0].roles)?r.rows[0].roles:JSON.parse(r.rows[0].roles||"[]")).roles;
     identity.permissions=(await db.query("select permission_code from app_user_permission where user_id=$1",[identity.sub])).rows.map(row=>row.permission_code);
-    const path=new URL(req.url,"http://localhost").pathname.replace(/^\/+/, "");
+    const path=new URL(req.url,"http://localhost").pathname.replace(/^\\/+/, "");
     const passkeySetupRoute=req.method==="POST"&&["api/v1/admin/passkeys/registration/options","api/v1/admin/passkeys/registration/verify"].includes(path);
     const logoutRoute=req.method==="POST"&&path==="api/v1/auth/logout";
     const isAdministrator=identity.roles.some(role=>["system_admin","admin"].includes(role));
@@ -118,11 +127,15 @@ async function auth(req){
     }
     await db.query("update auth_session set last_seen_at=now() where id=$1",[identity.sid]);
     return identity;
-  } catch(e){ throw Object.assign(new Error(e.message),{statusCode:e.statusCode===403?403:401,code:e.statusCode===403&&e.code?e.code:"UNAUTHENTICATED"}); }
+  } catch(error) {
+    if(error.statusCode) throw error;
+    if(isAuthDependencyUnavailable(error)) throw Object.assign(new Error("Authentication service is temporarily unavailable."),{statusCode:503,code:"AUTH_SERVICE_UNAVAILABLE"});
+    throw error;
+  }
 }
-function optionalIdentity(req){
+async function optionalIdentity(req){
   if(!req.headers.authorization?.startsWith("Bearer ")) return null;
-  try { return verifyToken(req.headers.authorization.slice(7),config.jwtSecret); } catch { return null; }
+  return auth(req);
 }
 const ROLE_PERMISSION={verification_reviewer:"verification.manage",appeal_reviewer:"verification.appeal.review",supporting_staff:"reviews.view",platform_admin:"users.manage",admin:"users.manage"};
 function anyRole(identity,allowed){
@@ -214,7 +227,7 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/email/messages/") && parts[6]==="retry") { const identity=await auth(req); anyRole(identity,["system_admin"]); return ok(res,await emailOperations.retryFailedEmail(identity.sub,parts[5],requestId),requestId); }
     if(req.method==="POST" && parts.length===7 && p.startsWith("api/v1/admin/email/verification-failures/") && parts[6]==="retry") { const identity=await auth(req); anyRole(identity,["system_admin"]); return ok(res,await emailOperations.retryVerificationEmail(identity.sub,parts[5],requestId),requestId); }
     if(req.method==="PATCH" && parts.length===6 && p.startsWith("api/v1/admin/email/inbox/")) { const identity=await auth(req); anyRole(identity,["system_admin"]); return ok(res,await emailOperations.updateInbox(identity.sub,parts[5],(await body(req)).action,requestId),requestId); }
-    if(req.method==="POST" && p==="api/v1/public/opportunity-inquiries") { await enforcePersistentRateLimit(req,"public-inquiry",10,60000); publicRateLimit(req,"public-inquiry",10,60000); return ok(res,await publicOpportunity.createPublicInquiry(await body(req),requestId,optionalIdentity(req),req.headers["x-idempotency-key"]),requestId,201); }
+    if(req.method==="POST" && p==="api/v1/public/opportunity-inquiries") { await enforcePersistentRateLimit(req,"public-inquiry",10,60000); publicRateLimit(req,"public-inquiry",10,60000); return ok(res,await publicOpportunity.createPublicInquiry(await body(req),requestId,await optionalIdentity(req),req.headers["x-idempotency-key"]),requestId,201); }
     if(req.method==="GET" && p==="api/v1/public/opportunity-sharing-organizations") { await enforcePersistentRateLimit(req,"sharing-audience",10,60000); publicRateLimit(req,"sharing-audience",10,60000); const searchTerm=query(req.url).get("q")||""; return ok(res,await publicOpportunity.searchPublicSharingOrganizations(searchTerm),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/public/opportunity-inquiries/") && parts[5]==="access") { await enforcePersistentRateLimit(req,"job-seeker-access",10,60000); publicRateLimit(req,"job-seeker-access",10,60000); const b=await body(req); return ok(res,await publicOpportunity.getPublicInquiry(parts[4],b.token||""),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/public/opportunity-inquiries/") && parts[5]==="sharing-history") { await enforcePersistentRateLimit(req,"job-seeker-sharing-history",10,60000,parts[4]); const b=await body(req); return ok(res,await publicOpportunity.getSharingHistory(parts[4],b.token||""),requestId); }
@@ -222,8 +235,8 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && parts.length===6 && p.startsWith("api/v1/public/opportunity-inquiries/") && parts[5]==="details") { await enforcePersistentRateLimit(req,"public-inquiry-details",10,60000,parts[4]); const q=query(req.url); return ok(res,await publicOpportunity.getPublicInquiry(parts[4],q.get("token")||""),requestId); }
     if(req.method==="PATCH" && parts.length===6 && p.startsWith("api/v1/public/opportunity-inquiries/") && parts[5]==="details") { await enforcePersistentRateLimit(req,"public-inquiry-details-update",10,60000,parts[4]); const b=await body(req); return ok(res,await publicOpportunity.updatePublicInquiryDetails(parts[4],b.token||"",b,requestId),requestId); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/public/opportunity-inquiries/") && parts[5]==="link") { await enforcePersistentRateLimit(req,"public-inquiry-link",10,60000,parts[4]); const identity=await auth(req); const b=await body(req); return ok(res,await publicOpportunity.linkInquiryToAccount(parts[4],b.token||"",identity.sub,requestId),requestId); }
-    if(req.method==="GET" && p==="api/v1/jobs") { const q=query(req.url); const v=optionalIdentity(req); return ok(res,await organizationJobs.listJobs({visibility:q.get("visibility"),postingScope:q.get("postingScope"),q:q.get("q"),employmentType:q.get("employmentType"),workMode:q.get("workMode"),seniority:q.get("seniority"),department:q.get("department"),location:q.get("location"),industryReferenceItemId:q.get("industryReferenceItemId"),occupationReferenceItemId:q.get("occupationReferenceItemId"),limit:q.get("limit"),offset:q.get("offset")},v?.sub||null),requestId); }
-    if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/jobs/")) { const v=optionalIdentity(req); return ok(res,await organizationJobs.getJob(parts[3],v?.sub||null),requestId); }
+    if(req.method==="GET" && p==="api/v1/jobs") { const q=query(req.url); const v=await optionalIdentity(req); return ok(res,await organizationJobs.listJobs({visibility:q.get("visibility"),postingScope:q.get("postingScope"),q:q.get("q"),employmentType:q.get("employmentType"),workMode:q.get("workMode"),seniority:q.get("seniority"),department:q.get("department"),location:q.get("location"),industryReferenceItemId:q.get("industryReferenceItemId"),occupationReferenceItemId:q.get("occupationReferenceItemId"),limit:q.get("limit"),offset:q.get("offset")},v?.sub||null),requestId); }
+    if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/jobs/")) { const v=await optionalIdentity(req); return ok(res,await organizationJobs.getJob(parts[3],v?.sub||null),requestId); }
     if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/jobs/") && parts[4]==="applications") { const identity=await auth(req); return ok(res,await organizationJobs.listJobApplications(parts[3],identity.sub),requestId); }
 
     if(req.method==="GET" && parts.length===5 && parts[0]==="api" && parts[1]==="v1" && parts[2]==="public" && parts[3]==="finance-vouchers") { const q=query(req.url); return ok(res,await financeReceipts.verifyFinancePaymentVoucher(parts[4],q.get("token")||""),requestId); }
@@ -322,20 +335,20 @@ const server=http.createServer(async (req,res)=>{
     if(req.method==="GET" && p==="api/v1/admin/serve-community/legacy-classifications") { const identity=await auth(req); anyRoleOrPermission(identity,["system_admin","serve_community_reviewer"],["serve_community.legacy.classify"]); const q=query(req.url); const rows=await getPool().query("select c.id,c.service_listing_id,c.initiative_id,c.status,c.reason,c.proposed_by,c.created_at,i.title initiative_title,s.title legacy_service_title from serve_community_legacy_classification c join serve_community_initiative i on i.id=c.initiative_id join service_listing s on s.id=c.service_listing_id where c.status=any($1::text[]) order by c.created_at limit $2 offset $3",[[q.get("status")||"proposed"],Math.min(Math.max(Number(q.get("limit"))||20,1),50),Math.max(Number(q.get("offset"))||0,0)]); return ok(res,{items:rows.rows},requestId); }
     if(req.method==="PATCH" && parts.length===7 && parts[6]==="review" && p.startsWith("api/v1/admin/serve-community/legacy-classifications/")) { const identity=await auth(req); return ok(res,await serveCommunityInitiatives.reviewLegacyClassification(parts[5],identity.sub,await body(req),requestId),requestId); }
 
-    if(req.method==="GET" && p==="api/v1/service-announcements") { const q=query(req.url); const viewer=optionalIdentity(req); return ok(res,await servicesMentorship.listPublicServiceAnnouncements(viewer?.sub||null,{limit:q.get("limit")}),requestId); }
+    if(req.method==="GET" && p==="api/v1/service-announcements") { const q=query(req.url); const viewer=await optionalIdentity(req); return ok(res,await servicesMentorship.listPublicServiceAnnouncements(viewer?.sub||null,{limit:q.get("limit")}),requestId); }
     if(req.method==="GET" && p==="api/v1/services") { const q=query(req.url); const viewer=req.headers.authorization?.startsWith("Bearer ")?await auth(req):null; return ok(res,await servicesMentorship.listServices(viewer?.sub||null,{category:q.get("category"),q:q.get("q"),limit:q.get("limit"),offset:q.get("offset")}),requestId); }
 
-    if(req.method==="GET" && parts.length===5 && parts[0]==="api" && parts[1]==="v1" && parts[4]==="stories" && (parts[2]==="services"||parts[2]==="mentors")) { const viewer=optionalIdentity(req); return ok(res,await servicesMentorship.listPublicMediaStories(parts[2]==="services"?"service":"mentor",parts[3],viewer?.sub||null),requestId); }
+    if(req.method==="GET" && parts.length===5 && parts[0]==="api" && parts[1]==="v1" && parts[4]==="stories" && (parts[2]==="services"||parts[2]==="mentors")) { const viewer=await optionalIdentity(req); return ok(res,await servicesMentorship.listPublicMediaStories(parts[2]==="services"?"service":"mentor",parts[3],viewer?.sub||null),requestId); }
     if(req.method==="POST" && parts.length===5 && parts[4]==="stories" && (parts[2]==="services"||parts[2]==="mentors")) { const identity=await auth(req); return ok(res,await servicesMentorship.createPublicMediaStory(identity.sub,parts[2]==="services"?"service":"mentor",parts[3],await body(req),requestId,req.headers["x-idempotency-key"]),requestId,201); }
     if(req.method==="GET" && p==="api/v1/me/public-media-stories") { const identity=await auth(req); const q=query(req.url); return ok(res,await servicesMentorship.listMyPublicMediaStories(identity.sub,q.get("subjectType")||undefined,q.get("subjectId")||undefined),requestId); }
     if(req.method==="POST" && parts.length===5 && parts[2]==="public-media-stories" && parts[4]==="withdraw") { const identity=await auth(req); return ok(res,await servicesMentorship.withdrawPublicMediaStory(parts[3],identity.sub,requestId),requestId); }
     if(req.method==="GET" && p==="api/v1/admin/public-media-stories") { const identity=await auth(req); return ok(res,await servicesMentorship.listPublicMediaStoryReviewQueue(identity.sub,query(req.url).get("status")||"pending"),requestId); }
     if(req.method==="PATCH" && parts.length===6 && parts[2]==="admin" && parts[3]==="public-media-stories" && parts[5]==="review") { const identity=await auth(req); return ok(res,await servicesMentorship.reviewPublicMediaStory(parts[4],identity.sub,await body(req),requestId),requestId); }
 
-    if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/services/")) { const viewer=optionalIdentity(req); return ok(res,await servicesMentorship.getServiceListing(parts[3],viewer?.sub||null),requestId); }
-    if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/services/") && parts[4]==="announcements") { const viewer=optionalIdentity(req); return ok(res,await servicesMentorship.listServiceListingAnnouncements(parts[3],viewer?.sub||null),requestId); }
+    if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/services/")) { const viewer=await optionalIdentity(req); return ok(res,await servicesMentorship.getServiceListing(parts[3],viewer?.sub||null),requestId); }
+    if(req.method==="GET" && parts.length===5 && p.startsWith("api/v1/services/") && parts[4]==="announcements") { const viewer=await optionalIdentity(req); return ok(res,await servicesMentorship.listServiceListingAnnouncements(parts[3],viewer?.sub||null),requestId); }
     if(req.method==="GET" && p==="api/v1/mentors") { const q=query(req.url); const viewer=req.headers.authorization?.startsWith("Bearer ")?await auth(req):null; return ok(res,await servicesMentorship.listMentors(viewer?.sub||null,{q:q.get("q"),topic:q.get("topic"),limit:q.get("limit"),offset:q.get("offset")}),requestId); }
-    if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/mentors/")) { const viewer=optionalIdentity(req); return ok(res,await servicesMentorship.getMentorProfile(parts[3],viewer?.sub||null),requestId); }
+    if(req.method==="GET" && parts.length===4 && p.startsWith("api/v1/mentors/")) { const viewer=await optionalIdentity(req); return ok(res,await servicesMentorship.getMentorProfile(parts[3],viewer?.sub||null),requestId); }
     if(req.method==="POST" && p==="api/v1/files/uploads") { const identity=await auth(req); return ok(res,await authorizePrivateUpload(identity.sub,await body(req)),requestId,201); }
     if(req.method==="PUT" && parts.length===6 && p.startsWith("api/v1/files/uploads/") && parts[5]==="content") { const identity=await auth(req); if(!String(req.headers["content-type"]||"").startsWith("application/octet-stream")) throw Object.assign(new Error("Upload content must use application/octet-stream."),{statusCode:415,code:"UNSUPPORTED_MEDIA_TYPE"}); const result=await receivePrivateUpload(identity.sub,parts[4],String(req.headers["x-upload-token"]||""),await rawBody(req)); return ok(res,result,requestId,201); }
     if(req.method==="POST" && parts.length===6 && p.startsWith("api/v1/files/uploads/") && parts[5]==="confirm") { const identity=await auth(req); return ok(res,await confirmPrivateUpload(identity.sub,parts[4]),requestId,201); }

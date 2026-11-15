@@ -163,11 +163,6 @@ const SEEDED_PERMISSION_METADATA = {
   "dashboard.view": ["Dashboard", "View dashboard", false, false],
   "members.view": ["Membership", "View members", false, false],
   "members.manage": ["Membership", "Manage members", true, false],
-  "members.export": ["Membership", "Export member directory", true, false],
-  "members.export.contacts": ["Membership", "Export member contact details", true, false],
-  "accounts.export": ["User administration", "Export account directory", true, false],
-  "accounts.export.contacts": ["User administration", "Export account contact details", true, false],
-  "membership.cards.print": ["Membership", "Generate and print membership cards", true, true],
   "membership.review": ["Membership", "Review membership applications", true, false],
   "membership.activate": ["Membership", "Activate approved memberships", true, false],
   "finance.view": ["Finance", "View finance", true, false],
@@ -199,6 +194,14 @@ const SEEDED_PERMISSION_METADATA = {
   "ethics.case.intake": ["Ethics", "Submit a confidential ethics concern", true, false],
   "ethics.case.review": ["Ethics", "Review assigned ethics cases", true, false],
   "ethics.case.assign": ["Ethics", "Assign ethics reviewers", true, true],
+};
+
+const POLICY_PERMISSION_METADATA = {
+  "members.export": ["Membership", "Export member directory", true, false],
+  "members.export.contacts": ["Membership", "Export member contact details", true, false],
+  "accounts.export": ["User administration", "Export account directory", true, false],
+  "accounts.export.contacts": ["User administration", "Export account contact details", true, false],
+  "membership.cards.print": ["Membership", "Generate and print membership cards", true, true],
 };
 
 const PERMISSION_DETAILS = {
@@ -260,7 +263,8 @@ export const PERMISSION_CATALOG = Object.freeze(Object.fromEntries(
   Object.entries(PERMISSIONS).map(([, code]) => {
     const seeded = SEEDED_PERMISSION_METADATA[code];
     const legacy = LEGACY_PERMISSION_METADATA[code];
-    const metadata = seeded || legacy || ["Unclassified", code, true, false];
+    const policy = POLICY_PERMISSION_METADATA[code];
+    const metadata = seeded || legacy || policy || ["Unclassified", code, true, false];
     return [code, Object.freeze({
       code,
       area: metadata[0],
@@ -268,7 +272,7 @@ export const PERMISSION_CATALOG = Object.freeze(Object.fromEntries(
       sensitive: metadata[2],
       systemOnly: metadata[3],
       ...PERMISSION_DETAILS[code],
-      source: seeded ? "migration-seeded" : legacy ? "legacy-runtime" : "unclassified",
+      source: seeded ? "migration-seeded" : legacy ? "legacy-runtime" : policy ? "policy-defined" : "unclassified",
       assignable: PERMISSION_DETAILS[code]?.globalDirectGrant === true && !metadata[3],
     })];
   }),

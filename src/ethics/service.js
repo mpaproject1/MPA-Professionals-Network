@@ -15,7 +15,7 @@ async function requireSystemAdmin(db,userId){const userRoles=await roles(db,user
 async function event(db,caseId,actor,eventType,details={}){await db.query("insert into ethics_case_event(case_id,actor_user_id,event_type,details) values($1,$2,$3,$4)",[caseId,actor,eventType,JSON.stringify(details)]);await db.query("insert into audit_log(actor_user_id,action,resource_type,resource_id,request_id,outcome,metadata) values($1,$2,'ethics_case',$3,$4,'success',$5)",[actor,"ethics."+eventType,caseId,details.requestId||null,JSON.stringify(details)]);}
 async function caseForUpdate(db,caseId){const row=(await db.query("select * from ethics_case where id=$1 for update",[caseId])).rows[0];if(!row)throw fail(404,"Ethics case not found.","NOT_FOUND");return row;}
 async function assertNoConflict(db,caseId,userId){const conflict=(await db.query("select resolution from ethics_case_conflict where case_id=$1 and reviewer_id=$2",[caseId,userId])).rows[0];if(conflict?.resolution!=="cleared")throw fail(403,"You have declared a conflict or have been recused from this case.","ETHICS_CONFLICT_OF_INTEREST");}
-async function assertAssigned(db,row,userId,{panel=false}={}){await requireEthicsReviewer(db,userId);await assertNoConflict(db,row.id,userId);const assignment=panel?await db.query("select 1 from ethics_case_panel_member where case_id=$1 and reviewer_id=$2 and active=true",[row.id,userId]):{rowCount:row.assigned_reviewer_id===userId?1:0};const userRoles=await roles(db,userId);if(!userRoles.includes("system_admin")&&assignment.rowCount===0)throw fail(403,"This ethics case is not assigned to you.","ETHICS_CASE_NOT_ASSIGNED");if(row.reporter_user_id===userId||row.subject_user_id===userId)throw fail(403,"A reporter or respondent cannot review the same ethics case.","ETHICS_CONFLICT_OF_INTEREST");}
+async function assertAssigned(db,row,userId,{panel=false}={}){await requireEthicsReviewer(db,userId);await assertNoConflict(db,row.id,userId);const assignment=panel?await db.query("select 1 from ethics_case_panel_member where case_id=$1 and reviewer_id=$2 and active=true",[row.id,userId]):{rowCount:row.assigned_reviewer_id===userId?1:0};if(assignment.rowCount===0)throw fail(403,"This ethics case is not assigned to you.","ETHICS_CASE_NOT_ASSIGNED");if(row.reporter_user_id===userId||row.subject_user_id===userId)throw fail(403,"A reporter or respondent cannot review the same ethics case.","ETHICS_CONFLICT_OF_INTEREST");}
 function text(value,max){return String(value??"").trim().slice(0,max);}
 function cleanFrameworks(input){if(!Array.isArray(input))return [];const values=[...new Set(input.map(String))];if(values.length>12||values.some(value=>!FRAMEWORKS.has(value)))throw fail(400,"Select valid ethics review frameworks.","VALIDATION_ERROR");return values;}
 export async function createEthicsCase(reporterId,input={},requestId){
@@ -52,7 +52,7 @@ export async function getEthicsCase(caseId,userId){
  if(!row)throw fail(404,"Ethics case not found.","NOT_FOUND");
  const isReporter=row.reporter_user_id===userId,isSubject=row.subject_user_id===userId,reviewer=await isEthicsReviewer(db,userId)&&!isReporter&&!isSubject;
  if(!reviewer&&!isReporter&&!isSubject)throw fail(403,"You are not authorized to view this ethics case.","FORBIDDEN");
- if(reviewer){await assertNoConflict(db,caseId,userId);const userRoles=await roles(db,userId);if(!userRoles.includes("system_admin")&&row.assigned_reviewer_id!==userId&&!(await db.query("select 1 from ethics_case_panel_member where case_id=$1 and reviewer_id=$2 and active=true",[caseId,userId])).rowCount)throw fail(403,"This ethics case is not assigned to you.","ETHICS_CASE_NOT_ASSIGNED");}
+ if(reviewer){await assertNoConflict(db,caseId,userId);if(row.assigned_reviewer_id!==userId&&!(await db.query("select 1 from ethics_case_panel_member where case_id=$1 and reviewer_id=$2 and active=true",[caseId,userId])).rowCount)throw fail(403,"This ethics case is not assigned to you.","ETHICS_CASE_NOT_ASSIGNED");}
  const [reviews,events,conflicts,panel,evidence]=await Promise.all([
   reviewer?db.query("select r.*,p.display_name reviewer_name from ethics_case_review r left join person p on p.user_id=r.reviewer_id where r.case_id=$1 order by r.created_at",[caseId]):Promise.resolve({rows:[]}),
   reviewer?db.query("select e.event_type,e.details,e.created_at,p.display_name actor_name from ethics_case_event e left join person p on p.user_id=e.actor_user_id where e.case_id=$1 order by e.created_at desc limit 100",[caseId]):Promise.resolve({rows:[]}),
@@ -66,7 +66,7 @@ export async function getEthicsCase(caseId,userId){
 export async function addEthicsCaseEvidence(caseId,userId,input={},requestId){
  return withTransaction(async db=>{
   const row=await caseForUpdate(db,caseId),reviewer=await isEthicsReviewer(db,userId),party=row.reporter_user_id===userId||row.subject_user_id===userId;
-  if(reviewer){await assertNoConflict(db,row.id,userId);const userRoles=await roles(db,userId);if(!userRoles.includes("system_admin"))await assertAssigned(db,row,userId,{panel:(await db.query("select 1 from ethics_case_panel_member where case_id=$1 and reviewer_id=$2 and active=true",[caseId,userId])).rowCount>0});}
+  if(reviewer){await assertAssigned(db,row,userId,{panel:(await db.query("select 1 from ethics_case_panel_member where case_id=$1 and reviewer_id=$2 and active=true",[caseId,userId])).rowCount>0});}
   else if(!party)throw fail(403,"You are not authorized to attach evidence to this ethics case.","FORBIDDEN");
   if(["decided","referred","closed","withdrawn"].includes(row.status))throw fail(409,"Evidence cannot be added after the case is closed.","INVALID_STATE");
   if(party&&!reviewer&&!["submitted","triage","respondent_response"].includes(row.status))throw fail(409,"Evidence can be submitted only while the case is open for information.","INVALID_STATE");
@@ -133,7 +133,7 @@ export async function declareEthicsConflict(caseId,actorId,reason,requestId){
   if(why.length<8)throw fail(400,"Explain the conflict so an independent reviewer can be assigned.","VALIDATION_ERROR");
   if(row.reporter_user_id!==actorId&&row.subject_user_id!==actorId){
    const member=(await db.query("select 1 from ethics_case_panel_member where case_id=$1 and reviewer_id=$2 and active=true",[caseId,actorId])).rowCount>0;
-   if(row.assigned_reviewer_id!==actorId&&!member&&!((await roles(db,actorId)).includes("system_admin")))throw fail(403,"You are not assigned to this ethics case.","ETHICS_CASE_NOT_ASSIGNED");
+   if(row.assigned_reviewer_id!==actorId&&!member)throw fail(403,"You are not assigned to this ethics case.","ETHICS_CASE_NOT_ASSIGNED");
   }
   await db.query("insert into ethics_case_conflict(case_id,reviewer_id,reason,resolution) values($1,$2,$3,'recused') on conflict(case_id,reviewer_id) do update set reason=excluded.reason,resolution='recused',resolved_by=null",[caseId,actorId,why]);
   await db.query("update ethics_case_panel_member set active=false where case_id=$1 and reviewer_id=$2",[caseId,actorId]);

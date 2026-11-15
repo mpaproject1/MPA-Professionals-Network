@@ -31,21 +31,19 @@ export function assertFinancePaymentQueueAccess(identity) {
 }
 
 export function assertPaymentVerificationAccess(identity) {
-  // finance.manage is retained as a legacy payment-only grant.
   return assertAccess(
     identity,
     ["finance_officer"],
-    ["finance.payment.verify", "finance.manage"],
+    ["finance.payment.verify"],
     "Finance payment verification permission required.",
   );
 }
 
 export function assertPaymentReversalAccess(identity) {
-  // finance.manage is retained as a legacy payment-only grant.
   return assertAccess(
     identity,
     ["finance_officer"],
-    ["finance.payment.reverse", "finance.manage"],
+    ["finance.payment.reverse"],
     "Finance payment reversal permission required.",
   );
 }

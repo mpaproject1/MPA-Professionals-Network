@@ -66,11 +66,11 @@ test("bulk print previews count, provides actionable skipped states and prints o
   assert.match(bulkPage,/skipped/);
   assert.match(bulkPage,/window\.print\(\)/);
   assert.match(bulkCss,/@page\{size:A4 portrait;margin:0\}/);
-  // Each printable wrapper occupies one A4 sheet minus the print engine's
-  // rounding tolerance; the following wrapper, not the current one, starts
-  // the next sheet so the final card cannot create a trailing blank page.
-  assert.match(bulkCss,/\.printPage\{[^}]*width:210mm;[^}]*height:296mm;[^}]*break-after:auto;[^}]*page-break-after:auto;/);
-  assert.match(bulkCss,/\.printPage\+\.printPage\{break-before:page;page-break-before:always\}/);
+  // Every card wrapper owns one complete A4 page. A forced break follows
+  // each wrapper except the final one, preventing both split cards and blanks.
+  assert.match(bulkCss,/\.printPage\{[^}]*width:210mm;[^}]*height:297mm;[^}]*max-height:297mm;[^}]*overflow:hidden;[^}]*break-inside:avoid;[^}]*page-break-inside:avoid;[^}]*break-after:page;[^}]*page-break-after:always/);
+  assert.match(bulkCss,/\.printPage:last-child\{break-after:auto;page-break-after:auto\}/);
+  assert.doesNotMatch(bulkCss,/\.printPage\+\.printPage\{/);
   assert.match(bulkCss,/\.card\{width:85\.6mm;height:53\.98mm;/);
 });
 

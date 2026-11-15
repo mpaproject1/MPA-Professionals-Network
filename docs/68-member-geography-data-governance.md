@@ -58,13 +58,14 @@ Primary sources:
 
 ## First-time initial publication
 
-1. Run the **Member geography reference workbook** workflow on the target branch.
-2. Download the generated \`member-geography-reference\` artifact, including the XLSX workbook and manifest.
-3. In Admin → Membership Center → Member geography, upload the workbook. Use the combined UN M49 / Ethiopia source name, the generated source version and the repository URL as the primary source URL.
-4. Preview and resolve every validation error. Applying creates a draft version only.
-5. Review the source and hierarchy, enter the audit reason, and publish. Publishing switches member selectors to the new version; it does not mutate earlier versions.
+The application now installs the reviewed baseline through `scripts/bootstrap-member-geography.js` after database migrations:
 
-The repository workflow creates and validates the starter workbook. It does not connect to or silently seed a production database. Initial publication is an explicit administrator action in the target environment.
+1. `npm run migrate` applies the schema, then invokes the idempotent geography bootstrap.
+2. The bootstrap generates the workbook from the pinned UN M49 and Ethiopia source inputs, validates it through the same import service used by the administrator workflow, applies a versioned draft, and publishes it.
+3. The bootstrap uses an existing active `system_admin` account as the audited actor. If no active system administrator exists yet, it safely defers without inserting partial geography data; provision the initial system administrator and run `npm run migrate` again (or run `npm run geography:bootstrap`).
+4. The installer does not replace or mutate an existing published geography version. It skips when a published version already contains reference rows. Subsequent corrections continue through the versioned admin import/review/publish workflow.
+
+The generated workbook and manifest remain available through the separate reference-workbook workflow for audit and manual review. The production installer does not bypass row validation, source provenance checks, publication checks, or audit logging.
 
 ## Export, amend and re-import
 

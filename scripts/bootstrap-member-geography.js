@@ -25,7 +25,7 @@ async function main(){
   try{
    const workbookPath=join(directory,"member-geography-reference.xlsx");
    execFileSync(process.execPath,["scripts/generate-member-geography-reference.js",workbookPath],{stdio:"inherit",timeout:180000});
-   const manifest=JSON.parse(await readFile(workbookPath.replace(/\\.xlsx$/i,".manifest.json"),"utf8"));
+   const manifest=JSON.parse(await readFile(workbookPath.replace(/\.xlsx$/i,".manifest.json"),"utf8"));
    const workbook=await readFile(workbookPath);
    const sourceVersion=String(manifest.ethiopiaSource?.version||"pinned-ethiopia-"+SOURCE_COMMIT);
    const preview=await previewMemberGeographyImport(identity,{xlsxBase64:workbook.toString("base64"),filename:"member-geography-reference.xlsx",sourceName:SOURCE_NAME,sourceVersion,sourceUrl:SOURCE_URL},randomUUID());

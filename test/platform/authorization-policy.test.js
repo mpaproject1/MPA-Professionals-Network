@@ -193,9 +193,9 @@ test("Phase 4 route and service source keep card printing, exports and membershi
   assert.match(directory, /members\.export\.contacts/);
   assert.match(directory, /accounts\.export\.contacts/);
   const financeReceipts = readFileSync(new URL("../../src/platform/finance-receipts.js", import.meta.url), "utf8");
-  assert.match(financeReceipts, /permission === "finance\\.payment\\.record"[\\s\\S]*finance\\.manage/);
-  assert.match(financeReceipts, /hasAnyRoleOrPermission\\(identity, \\["finance_officer"\\], \\[permission\\]\\)/);
-  assert.doesNotMatch(financeReceipts.match(/function assertFinance[\\s\\S]*?function safeReceipt/)?.[0] || "", /system_admin|\\["finance_officer","system_admin","admin"\\]/);
+  assert.equal(PERMISSION_CATALOG["finance.payment.record"].source, "legacy-runtime");\n  assert.equal(PERMISSION_CATALOG["finance.voucher.issue"].source, "legacy-runtime");\n  assert.match(financeReceipts, /permission === "finance\.payment\.record"[\s\S]*finance\.manage/);
+  assert.match(financeReceipts, /hasAnyRoleOrPermission\(identity, \["finance_officer"\], \[permission\]\)/);
+  assert.doesNotMatch(financeReceipts.match(/function assertFinance[\\s\\S]*?function safeReceipt/)?.[0] || "", /system_admin|\["finance_officer","system_admin","admin"\]/);
   const privateFiles = readFileSync(new URL("../../src/platform/private-file-storage.js", import.meta.url), "utf8");
   const membershipGate = privateFiles.match(/const canReviewMembership=([^;]+);/)?.[1] || "";
   assert.doesNotMatch(membershipGate, /finance_officer|finance\.view|finance\.manage/);

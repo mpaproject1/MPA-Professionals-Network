@@ -15,6 +15,7 @@
     "test:p2": "node --test test/p2/*.test.js",
     "start": "node server.js",
     "migrate": "node scripts/migrate.js",
+    "geography:bootstrap": "node scripts/bootstrap-member-geography.js",
     "notifications:dispatch-account-recovery": "node scripts/dispatch-account-recovery.js",
     "notifications:dispatch-web-push": "node scripts/dispatch-web-push.js",
     "notifications:dispatch-community-campaigns": "node scripts/dispatch-community-campaigns.js",

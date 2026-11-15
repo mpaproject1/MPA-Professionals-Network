@@ -3,12 +3,13 @@ import {readFile} from "node:fs/promises";
 import test from "node:test";
 
 const read=path=>readFile(new URL(path,import.meta.url),"utf8");
-const [service,server,bulkPage,bulkCss,singlePage,verifyPage,membershipService,membershipWorkspace,eligibility]=await Promise.all([
+const [service,server,bulkPage,bulkCss,singlePage,singleCss,verifyPage,membershipService,membershipWorkspace,eligibility]=await Promise.all([
   read("../../src/membership/card.js"),
   read("../../server.js"),
   read("../../web/app/admin/membership-cards/page.tsx"),
   read("../../web/app/admin/membership-cards/membership-cards.module.css"),
   read("../../web/app/membership/card/page.tsx"),
+  read("../../web/app/membership/card/card.module.css"),
   read("../../web/app/membership/verify/page.tsx"),
   read("../../src/membership/service.js"),
   read("../../web/app/membership/workspace.tsx"),
@@ -55,7 +56,7 @@ test("card output contains approved minimal fields and no internal UUID or priva
   assert.match(payload,/memberName:row\.member_name/);
   assert.match(payload,/membershipType:row\.membership_type/);
   assert.doesNotMatch(payload,/membershipRecordId|profilePictureFileId|account_reference|email|phone|payment|recovery/i);
-  assert.doesNotMatch(singlePage,/membershipRecordId|profilePictureFileId|productCode/);\n  assert.match(singlePage,/page:membership-id/);
+  assert.doesNotMatch(singlePage,/membershipRecordId|profilePictureFileId|productCode/);\n  assert.match(singleCss,/page:membership-id/);\n  assert.match(singleCss,/@page membership-id\\{size:85\\.6mm 53\\.98mm;margin:0\\}/);\n  assert.match(singleCss,/:global\\(html\\):has\\(\\.shell\\).*page:membership-id/s);\n  assert.match(singleCss,/:global\\(\\.app-shell\\)>:not\\(:global\\(\\.shell-main\\)\\)/);
 });
 
 test("bulk print previews count, provides actionable skipped states and prints one card per A4 page",()=>{

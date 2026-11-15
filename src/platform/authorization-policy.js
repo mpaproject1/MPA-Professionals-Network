@@ -60,23 +60,42 @@ export function roleMetadata(roleCode) {
   if (!definition) {
     return {
       role_code: roleCode,
+      domain: "unknown",
+      status: "blocked",
       scope: "unknown",
+      scopeType: "unknown",
       active: false,
       assignable: false,
       privileged: false,
+      privilegeTier: "none",
+      capabilities: [],
       assignableBy: [],
+      replacementCode: null,
+      migrationPlan: "Review all assignments and code references before enabling this role.",
       assignmentNote: "Unclassified role. It must be reviewed before it can be assigned through platform administration.",
     };
   }
   const privileged = definition.privileged === true || PRIVILEGED_ROLE_CODES.has(roleCode);
   const assignable = definition.assignable !== false && definition.scope === "platform";
+  const domain = definition.scope === "platform" ? "platform"
+    : definition.scope === "organization" || definition.scope === "organization_or_job" ? "organization"
+    : definition.scope === "organization_or_project" ? "project"
+    : definition.scope === "profile" || definition.scope === "self" ? "identity"
+    : "resource";
   return {
     role_code: roleCode,
+    domain,
+    status: definition.status || "canonical",
     scope: definition.scope,
-    active: true,
-    assignable,
+    scopeType: definition.scope,
+    active: definition.active !== false,
+    assignable: assignable && definition.active !== false,
     privileged,
+    privilegeTier: privileged ? "privileged" : "standard",
+    capabilities: [...(ROLE_PERMISSION_BUNDLES[roleCode] || [])],
     assignableBy: assignable ? (privileged ? [SYSTEM_ADMIN_ROLE] : ["users.manage"]) : [],
+    replacementCode: definition.replacementCode || null,
+    migrationPlan: definition.migrationPlan || null,
     assignmentNote: definition.assignmentNote || null,
   };
 }

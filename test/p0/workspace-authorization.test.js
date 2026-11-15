@@ -67,7 +67,7 @@ test("finance.view grants read-only queue access without payment mutation author
 
 test("system administrator role alone cannot approve or reverse Finance payments", () => {
   const admin = { sub: "system-admin", roles: ["system_admin"], permissions: [] };
-  assert.equal(assertFinancePaymentQueueAccess(admin), admin);
+  assert.throws(() => assertFinancePaymentQueueAccess(admin), forbidden);
   assert.throws(() => assertPaymentVerificationAccess(admin), forbidden);
   assert.throws(() => assertPaymentReversalAccess(admin), forbidden);
   const delegated = { ...admin, permissions: ["finance.payment.verify"] };

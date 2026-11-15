@@ -40,7 +40,7 @@ export async function listMyEthicsCases(userId){
 }
 export async function listEthicsCases(userId,filters={}){
  const db=getPool();await requireEthicsReviewer(db,userId);const userRoles=await roles(db,userId);const isAdmin=userRoles.includes("system_admin");
- const args=[userId],where=[isAdmin?"true":"(c.assigned_reviewer_id=$1 or exists(select 1 from ethics_case_panel_member pm where pm.case_id=c.id and pm.reviewer_id=$1 and pm.active=true))"];
+ const args=[userId],where=["(c.assigned_reviewer_id=$1 or exists(select 1 from ethics_case_panel_member pm where pm.case_id=c.id and pm.reviewer_id=$1 and pm.active=true))"];
  if(filters.status){args.push(text(filters.status,30));where.push("c.status=$"+args.length);}
  if(filters.severity){args.push(text(filters.severity,20));where.push("c.severity=$"+args.length);}
  const limit=Math.min(Math.max(Number(filters.limit)||50,1),100);

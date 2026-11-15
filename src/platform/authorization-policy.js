@@ -205,7 +205,7 @@ const POLICY_PERMISSION_METADATA = {
   "accounts.export": ["User administration", "Export account directory", true, false],
   "accounts.export.contacts": ["User administration", "Export account contact details", true, false],
   "accounts.export.organizations": ["User administration", "Export organization relationships", true, false],
-  "membership.cards.print": ["Membership", "Generate and print membership cards", true, true],
+  "membership.cards.print": ["Membership", "Generate and print membership cards", true, false],
 };
 
 const PERMISSION_DETAILS = {

@@ -63,7 +63,7 @@ test("canonical permission catalogue exactly covers permission codes seeded by t
   const seeded = new Set();
   for (const migration of migrations) {
     const source = readFileSync(new URL(migration, import.meta.url), "utf8");
-    for (const match of source.matchAll(/['"]([a-z][a-z0-9_-]*(?:\\.[a-z0-9_-]+)+)['"]/g)) {
+    for (const match of source.matchAll(/['"]([a-z][a-z0-9_-]*(?:\.[a-z0-9_-]+)+)['"]/g)) {
       if (isKnownPermission(match[1])) seeded.add(match[1]);
     }
   }

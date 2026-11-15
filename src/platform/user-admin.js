@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import {hashPassword} from "../membership/identity.js";
 import {getPool,withTransaction} from "./db.js";
 import {createInAppNotification} from "./notifications.js";
-import {canAssignRole, hasAnyRoleOrPermission, isPrivilegedRole, roleMetadata} from "./authorization-policy.js";
+import {assertKnownPermissionCodes, canAssignRole, hasAnyRoleOrPermission, isPrivilegedRole, roleMetadata} from "./authorization-policy.js";
 
 function err(status,message,code="BUSINESS_RULE"){const e=new Error(message);e.statusCode=status;e.code=code;return e}
 async function allowed(db,userId){const r=await db.query("select r.role_code from app_user_role ur join app_role r on r.id=ur.role_id where ur.user_id=$1",[userId]);return r.rows.map(x=>x.role_code)}
@@ -31,6 +31,7 @@ export async function updateUserPermissions(actor,userId,input,requestId){
   if(!Array.isArray(input.permissionCodes))throw err(400,"permissionCodes must be an array.","VALIDATION_ERROR");
   const requested=[...new Set(input.permissionCodes.map(value=>String(value)))];
   if(requested.length>100)throw err(400,"Too many permissions were submitted.","VALIDATION_ERROR");
+  try { assertKnownPermissionCodes(requested); } catch (cause) { throw err(400,cause.message,"INVALID_PERMISSION"); }
   const targetRoles=await allowed(tx,userId);
   if(targetRoles.includes("ethics_reviewer")&&requested.some(code=>["verification.manage","verification.appeal.review"].includes(code)))throw err(409,"An Ethics Reviewer account cannot also receive general verification or appeal permissions. Assign separate accounts for independent review.","REVIEWER_PERMISSION_SEPARATION");
   const catalog=(await tx.query("select permission_code,system_only from app_permission where permission_code=any($1::text[])",[requested])).rows;

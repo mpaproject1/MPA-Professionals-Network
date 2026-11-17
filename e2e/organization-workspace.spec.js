@@ -242,7 +242,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(page.getByRole("tabpanel").getByRole("link", { name: /Impact and outcomes/ })).toHaveAttribute("href", "/organizations/reports?organizationId=org-e2e-1");
     await tabs.getByRole("tab", { name: /Applications/ }).click();
     await page.getByRole("button", { name: "Public inquiries" }).click();
-    await expect(page.getByRole("link", { name: /Open review/ })).toHaveAttribute("href", "/organizations#org-inquiries");
+    await expect(page.getByRole("link", { name: /Open review/ })).toHaveAttribute("href", "/organizations/workspace#org-inquiries");
     await expect(page.getByRole("heading", { name: "Public job inquiries" })).toBeVisible();
     await tabs.getByRole("tab", { name: /Opportunities/ }).click();
     await expect(page.getByRole("heading", { name: "Public job inquiries" })).toHaveCount(0);

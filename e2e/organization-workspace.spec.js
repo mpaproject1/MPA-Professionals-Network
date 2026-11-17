@@ -322,12 +322,49 @@ test.describe("MPA organization app entry and navigation", () => {
     await expect(tabs.getByRole("tab", { name: /^Organization\b/ })).toHaveCount(0);
   });
 
-  test("legacy workspace URL redirects to the canonical organization entry", async ({ page }) => {
+  test("organization workspace URL opens the operational workspace and preserves query parameters", async ({ page }) => {
     await mockOrganizationApi(page, [organization()]);
     await page.goto("/organizations/workspace?source=legacy");
     await dismissPrivacyChoices(page);
-    await expect(page).toHaveURL(/\/organizations\?source=legacy$/);
+    await expect(page).toHaveURL(/\\/organizations\\/workspace\\?source=legacy$/););
     await expect(page.getByRole("heading", { name: "Your organization at a glance" })).toBeVisible();
+  });
+
+
+  test("direct organizations entry opens the canonical workspace and permission-only reviewers see the verification queue", async ({ page }) => {
+    await mockOrganizationApi(page, [organization({
+      verification_status: "pending",
+      verification_case_status: "submitted",
+    })]);
+    await page.route("**/api/v1/me", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ data: {
+        user_id: "e2e-org-reviewer",
+        email: "org-reviewer@example.org",
+        roles: ["member"],
+        permissions: ["organizations.review"],
+      } }),
+    }));
+    await page.route("**/api/v1/review/organizations", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ data: [{
+        organization_id: "org-review-pending",
+        legal_name: "Review Queue Institution",
+        display_name: "Review Queue Institution",
+        organization_type: "nonprofit",
+        case_id: "org-review-case-1",
+        case_status: "submitted",
+        submitted_by: "another-user",
+        evidence: [],
+      }] }),
+    }));
+    await page.goto("/organizations?source=dashboard");
+    await dismissPrivacyChoices(page);
+    await expect(page).toHaveURL(/\\/organizations\\/workspace\\?source=dashboard$/);
+    await expect(page.getByRole("heading", { name: "Organization verification review queue" })).toBeVisible();
+    await expect(page.getByText("Review Queue Institution")).toBeVisible();
   });
 
   test("team and permission administration remains available as a focused destination", async ({ page }) => {

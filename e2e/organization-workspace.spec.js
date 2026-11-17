@@ -326,7 +326,7 @@ test.describe("MPA organization app entry and navigation", () => {
     await mockOrganizationApi(page, [organization()]);
     await page.goto("/organizations/workspace?source=legacy");
     await dismissPrivacyChoices(page);
-    await expect(page).toHaveURL(/\\/organizations\\/workspace\\?source=legacy$/););
+    await expect(page).toHaveURL(/\/organizations\/workspace\?source=legacy$/);
     await expect(page.getByRole("heading", { name: "Your organization at a glance" })).toBeVisible();
   });
 
@@ -362,7 +362,7 @@ test.describe("MPA organization app entry and navigation", () => {
     }));
     await page.goto("/organizations?source=dashboard");
     await dismissPrivacyChoices(page);
-    await expect(page).toHaveURL(/\\/organizations\\/workspace\\?source=dashboard$/);
+    await expect(page).toHaveURL(/\/organizations\/workspace\?source=dashboard$/);
     await expect(page.getByRole("heading", { name: "Organization verification review queue" })).toBeVisible();
     await expect(page.getByText("Review Queue Institution")).toBeVisible();
   });

@@ -74,7 +74,7 @@ const publishingOptions = [
 ];
 const reviewingOptions = [
   { key: "candidates", label: "Candidate pipeline", title: "Review job applications", detail: "Screen candidates, coordinate interviews and record recruitment decisions.", href: "/recruitment#candidate-pipeline" },
-  { key: "inquiries", label: "Public inquiries", title: "Review public job inquiries", detail: "Triage early interest before it becomes a formal eligible application.", href: "/organizations#org-inquiries" },
+  { key: "inquiries", label: "Public inquiries", title: "Review public job inquiries", detail: "Triage early interest before it becomes a formal eligible application.", href: "/organizations/workspace#org-inquiries" },
 ];
 
 const folders: Folder[] = [
@@ -100,7 +100,7 @@ const folders: Folder[] = [
     allowedRoles: ["owner", "administrator", "recruiter"],
     links: [
       { label: "Candidate pipeline", href: "/recruitment#candidate-pipeline" },
-      { label: "Public job inquiries", href: "/organizations#org-inquiries" },
+      { label: "Public job inquiries", href: "/organizations/workspace#org-inquiries" },
     ],
   },
   {
@@ -136,8 +136,8 @@ const folders: Folder[] = [
     allowedRoles: ["owner", "administrator"],
     links: [
       { label: "Team and permissions", href: "/organizations/team" },
-      { label: "Registration and verification status", href: "/organizations#org-registration" },
-      { label: "Verification evidence", href: "/organizations#org-evidence" },
+      { label: "Registration and verification status", href: "/organizations/workspace#org-registration" },
+      { label: "Verification evidence", href: "/organizations/workspace#org-evidence" },
     ],
   },
 
@@ -342,7 +342,7 @@ export function OrganizationWorkspaceOverview({
               {workspaceReady.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}
             </select>
           </label>
-          <Link className={styles.refreshLink} href="/organizations#your-organizations">View status details <span aria-hidden="true">↗</span></Link>
+          <Link className={styles.refreshLink} href="/organizations/workspace#your-organizations">View status details <span aria-hidden="true">↗</span></Link>
         </div>
       </header>
 
@@ -399,7 +399,7 @@ export function OrganizationWorkspaceOverview({
                 <p>{status.detail}</p>
                 {organization.verification_decision_reason ? <p className={styles.reviewNote}><strong>Reviewer feedback:</strong> {organization.verification_decision_reason}</p> : null}
                 {((organization.missing_evidence || []).length > 0 || (organization.required_evidence || []).length > 0) && status.tone !== "pending" ? <p className={styles.reviewNote}><strong>Outstanding:</strong> {(organization.missing_evidence || (organization.required_evidence || []).filter((item) => !(organization.verification_evidence || []).some((evidence) => evidence.evidenceType === item))).map((item) => item.replaceAll("_", " ")).join(", ") || "No outstanding items reported"}</p> : null}
-                {VERIFICATION_MANAGER_ROLES.includes(organization.role_code || "") && status.tone !== "pending" && status.tone !== "verified" ? <Link className="btn btn-primary" href="/organizations#org-evidence">{status.tone === "attention" && organization.verification_case_status === "correction_required" ? "Update requested evidence" : organization.verification_case_status === "rejected" ? "Review decision and evidence" : "Complete verification checklist"}</Link> : null}
+                {VERIFICATION_MANAGER_ROLES.includes(organization.role_code || "") && status.tone !== "pending" && status.tone !== "verified" ? <Link className="btn btn-primary" href="/organizations/workspace#org-evidence">{status.tone === "attention" && organization.verification_case_status === "correction_required" ? "Update requested evidence" : organization.verification_case_status === "rejected" ? "Review decision and evidence" : "Complete verification checklist"}</Link> : null}
               </article>
             );
           })}
